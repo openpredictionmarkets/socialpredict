@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - ENVIRONMENT=development
+    env_file:
+      - .env.dev
+    volumes:
+      - ./backend:/backend
+    command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
+    # command: /backend/supervisor.sh
+    # command: reflex -r '\.go$' -s -- sh -c 'go build -o /usr/local/bin/main && /usr/local/bin/main'
+    tty: true
+
+  #frontend:
+    # build:
+    #   context: ./frontend
+    #   dockerfile: Dockerfile
+  #  volumes:
+  #    - ./frontend:/usr/share/nginx/html
+  #  environment:
+  #    - ENVIRONMENT=development
+  #  env_file:
+  #    - .env.dev

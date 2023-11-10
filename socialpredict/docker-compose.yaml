@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+
+  backend:
+    container_name: "${BACKEND_CONTAINER_NAME}"
+    image: "${BACKEND_IMAGE_NAME}"
+    ports:
+      - "8080:8080"
+    environment:
+      - CONTAINER_NAME=${BACKEND_CONTAINER_NAME}
+      - DB_HOST=db
+      - DB_USER=user
+      - DB_PASS=password
+    depends_on:
+      - db
+
+  # frontend:
+    # build:
+    #  context: ./frontend
+    #  dockerfile: Dockerfile
+    # ports:
+    #   - "80:80"
+    # depends_on:
+    #   - backend
+
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
