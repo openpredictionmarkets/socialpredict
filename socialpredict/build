@@ -1,5 +1,0 @@
-#!/bin/bash
-
-source .env.dev
-
-docker build --progress=plain --no-cache -t "${BACKEND_IMAGE_NAME}" -f ./backend/backend.Dockerfile ./backend
