@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Remove package-lock.json
+rm -rf node_modules package-lock.json
+
+# regenerate package.json
+npm init -y
+
+# install any missing or updated dependencies without removing the entire node_modules folder
+npm install

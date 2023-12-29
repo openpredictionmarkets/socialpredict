@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Determine the script's directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Calculate the absolute path to the .env file
+ENV_PATH="$( readlink -f "${SCRIPT_DIR}/../.env.dev" )"
+
+# Source the .env file
+if [ -f "$ENV_PATH" ]; then
+    source "$ENV_PATH"
+else
+    echo "Error: .env.dev file not found."
+    exit 1
+fi
+
+docker build --progress=plain --no-cache -t "${NGINX_IMAGE_NAME}" -f nginx.Dockerfile .

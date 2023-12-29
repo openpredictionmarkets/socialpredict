@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - ENVIRONMENT=development
+    ports:
+      - "${BACKEND_HOSTPORT}:${BACKEND_PORT}"
+    env_file:
+      - .env.dev
+    volumes:
+      - ./backend:/backend
+      - ./.env.dev:/backend/.env.dev # mount this .env.dev file to keep dev env var's consistent
+    command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
+    tty: true
+
+  frontend:
+    environment:
+      - ENVIRONMENT=development
+    ports:
+      - "${REACT_HOSTPORT}:${REACT_PORT}"
+    env_file:
+      - .env.dev
+    volumes:
+      - ./frontend:/app # This line mounts your frontend directory to /app in the container
+      - /app/node_modules # This line prevents node_modules in the container from being overwritten
+    stdin_open: true
+
+  nginx:
+    environment:
+      - ENVIRONMENT=development
+      - BACKEND_PORT=${BACKEND_PORT}
+      - FRONTEND_PORT=${REACT_PORT}
+    ports:
+      - "${NGINX_HOSTPORT}:${NGINX_PORT}"
+    env_file:
+    - .env.dev
+    volumes:
+      - ./nginx:/etc/nginx/
