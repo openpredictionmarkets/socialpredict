@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+source .env.dev
+
+# Start backend and database
+docker-compose --env-file .env.dev up

@@ -1,0 +1,27 @@
+.login-success-message {
+    color: green;
+    margin-top: 10px;
+    /* other styling as needed */
+}
+
+.App table {
+    width: 100%;
+    border-collapse: collapse; /* Ensures borders are neatly adjacent */
+}
+
+.App table, .App th, .App td {
+    border: 1px solid #FDFFFF;
+}
+
+.App td {
+    padding: 8px; /* Adjust padding as needed */
+}
+
+/* Optionally, style the text color, background, etc. */
+.App table {
+    color: #FDFFFF; /* Text color */
+    background-color: #280000; /* Background color */
+    font-family: 'Futura';
+    font-size: calc(10px + 1vmin);
+
+}

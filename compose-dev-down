@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+source .env.dev
+
+# Start the database
+docker-compose --env-file .env.dev down
