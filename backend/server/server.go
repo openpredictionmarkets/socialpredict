@@ -70,6 +70,44 @@ type ProbabilityChange struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
+// AppConfig holds the application-wide configuration
+type AppConfig struct {
+	InitialMarketProbability   float64
+	InitialMarketSubsidization float64
+	CreateMarketCost           float64
+	TraderBonus                float64
+	// user stuff
+	MaximumDebtAllowed    float64
+	InitialAccountBalance float64
+	// betting stuff
+	MinimumBet    float64
+	BetFee        float64
+	SellSharesFee float64
+}
+
+var appConfig AppConfig
+
+func init() {
+	// Load configuration
+	config := setup.LoadEconomicsConfig()
+
+	// Populate the appConfig struct
+	appConfig = AppConfig{
+		// market stuff
+		InitialMarketProbability:   config.Economics.MarketCreation.InitialMarketProbability,
+		InitialMarketSubsidization: config.Economics.MarketCreation.InitialMarketSubsidization,
+		CreateMarketCost:           config.Economics.MarketCreation.CreateMarketCost,
+		TraderBonus:                config.Economics.MarketCreation.TraderBonus,
+		// user stuff
+		MaximumDebtAllowed:    config.Economics.User.MaximumDebtAllowed,
+		InitialAccountBalance: config.Economics.User.InitialAccountBalance,
+		// betting stuff
+		MinimumBet:    config.Economics.Betting.MinimumBet,
+		BetFee:        config.Economics.Betting.BetFee,
+		SellSharesFee: config.Economics.Betting.SellSharesFee,
+	}
+}
+
 func Start() {
 	// CORS handler
 	c := cors.New(cors.Options{
@@ -88,12 +126,19 @@ func Start() {
 	router.HandleFunc("/v0/markets", marketsHandler)
 	router.HandleFunc("/v0/create", createHandler)
 	router.HandleFunc("/v0/markets/{marketId}", marketDetailsHandler).Methods("GET")
+	// handle market positions, trades
+	router.HandleFunc("/v0/markets/positions/{marketId}", marketPositionsHandler).Methods("GET")
+	router.HandleFunc("/v0/markets/bets/{marketId}", marketBetsDisplayHandler).Methods("GET")
+
+	// This defines the bet method, which allows the user to place a bet in a particular direction.
 	router.HandleFunc("/v0/bet", betHandler).Methods("POST")
+
 	// handle private user stuff, get private user info, update profile
 	router.HandleFunc("/v0/user", userHandler)
 	router.HandleFunc("/v0/resolve/{marketId}", resolveMarketHandler).Methods("POST")
 
 	// router.HandleFunc("/v0/profilechange", updateUserProfile).Methods("POST")
+
 	// handle public user stuff
 	router.HandleFunc("/v0/userinfo/{username}", getPublicUserInfo).Methods("GET")
 
@@ -450,10 +495,8 @@ func betHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the user has enough balance to place the bet
 
-	// load the config constants
-	config := setup.LoadEconomicsConfig()
-	// Use the config as needed
-	maximumDebtAllowed := config.Economics.User.MaximumDebtAllowed
+	// Use the appConfig for configuration values
+	maximumDebtAllowed := appConfig.MaximumDebtAllowed
 
 	// Check if the user's balance after the bet would be lower than the allowed maximum debt
 	if user.AccountBalance-betRequest.Amount < -maximumDebtAllowed {
@@ -509,8 +552,8 @@ func calculateMarketProbabilities(market models.Market, bets []models.Bet) ([]Pr
 	var probabilityChanges []ProbabilityChange
 
 	// Initial state
-	P_initial := market.InitialProbability // Assuming this is the initial probability
-	I_initial := 10.0                      // You might want to make this a constant or part of the market struct
+	P_initial := appConfig.InitialMarketProbability
+	I_initial := appConfig.InitialMarketSubsidization
 	totalYes := 0.0
 	totalNo := 0.0
 
@@ -753,26 +796,13 @@ func resolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 
 // distributePayouts handles the logic for calculating and distributing payouts
 func distributePayouts(market *models.Market, db *gorm.DB) error {
-	// Retrieve all bets associated with the market
-	var bets []models.Bet
-	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
-		return err
-	}
-
-	// Initialize variables to calculate total amounts for each outcome
-	var totalYes, totalNo float64
-
-	// Determine the pool sizes for each outcome
-	for _, bet := range bets {
-		if bet.Outcome == "YES" {
-			totalYes += bet.Amount
-		} else if bet.Outcome == "NO" {
-			totalNo += bet.Amount
-		}
-	}
-
 	// Handle the N/A outcome by refunding all bets
 	if market.ResolutionResult == "N/A" {
+		var bets []models.Bet
+		if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
+			return err
+		}
+
 		for _, bet := range bets {
 			if err := updateUserBalance(bet.Username, bet.Amount, db, "refund"); err != nil {
 				return err
@@ -781,19 +811,53 @@ func distributePayouts(market *models.Market, db *gorm.DB) error {
 		return nil
 	}
 
+	// Calculate and distribute payouts using the CPMM model
+	return calculateCPMMPayouts(market, db)
+}
+
+// calculatePayoutForOutcome calculates the payout for a specific outcome.
+// betInput is the outcome of the bet (e.g., "YES", "NO").
+// marketResolutionInput is the outcome to calculate the payout against (e.g., market resolution).
+func calculateCPMMPayoutForOutcome(bet models.Bet, totalYes, totalNo float64, betInput, marketResolutionInput string) float64 {
+	if betInput != marketResolutionInput {
+		return 0 // No payout if the bet's outcome doesn't match the market resolution
+	}
+
+	var totalPoolForOutcome float64
+	if marketResolutionInput == "YES" {
+		totalPoolForOutcome = totalYes
+	} else {
+		totalPoolForOutcome = totalNo
+	}
+
+	totalPool := totalYes + totalNo
+	return (bet.Amount / totalPoolForOutcome) * totalPool
+}
+
+// calculateCPMMPayouts calculates and updates user balances based on the CPMM model.
+func calculateCPMMPayouts(market *models.Market, db *gorm.DB) error {
+	// Retrieve all bets associated with the market
+	var bets []models.Bet
+	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
+		return err
+	}
+
+	// Initialize variables to calculate total amounts for each outcome
+	var totalYes, totalNo float64
+	for _, bet := range bets {
+		if bet.Outcome == "YES" {
+			totalYes += bet.Amount
+		} else if bet.Outcome == "NO" {
+			totalNo += bet.Amount
+		}
+	}
+
 	// Calculate payouts based on CPMM for YES and NO outcomes
 	for _, bet := range bets {
-		if bet.Outcome == market.ResolutionResult {
-			var payout, totalPoolForOutcome float64
-			if market.ResolutionResult == "YES" {
-				totalPoolForOutcome = totalYes
-			} else {
-				totalPoolForOutcome = totalNo
-			}
+		payout := calculateCPMMPayoutForOutcome(bet, totalYes, totalNo, bet.Outcome, market.ResolutionResult)
 
-			totalPool := totalYes + totalNo
-			payout = (bet.Amount / totalPoolForOutcome) * totalPool
-
+		// Update user balance with the payout
+		if payout > 0 {
 			if err := updateUserBalance(bet.Username, payout, db, "win"); err != nil {
 				return err
 			}
@@ -801,6 +865,37 @@ func distributePayouts(market *models.Market, db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// PayoutInfo holds the calculated payout information for a user
+type PayoutInfo struct {
+	Username string
+	Payout   float64
+}
+
+// calculatePotentialPayouts calculates potential payouts for a market at a given state based upon CPMM.
+func calculatePotentialPayouts(market *models.Market, db *gorm.DB, atTime time.Time) ([]PayoutInfo, error) {
+	var bets []models.Bet
+	if err := db.Where("market_id = ? AND placed_at <= ?", market.ID, atTime).Find(&bets).Error; err != nil {
+		return nil, err
+	}
+
+	var totalYes, totalNo float64
+	for _, bet := range bets {
+		if bet.Outcome == "YES" {
+			totalYes += bet.Amount
+		} else if bet.Outcome == "NO" {
+			totalNo += bet.Amount
+		}
+	}
+
+	var payoutInfos []PayoutInfo
+	for _, bet := range bets {
+		payout := calculateCPMMPayoutForOutcome(bet, totalYes, totalNo, bet.Outcome, market.CurrentState)
+		payoutInfos = append(payoutInfos, PayoutInfo{Username: bet.Username, Payout: payout})
+	}
+
+	return payoutInfos, nil
 }
 
 // updateUserBalance updates the user's account balance for winnings or refunds
@@ -831,4 +926,168 @@ func updateUserBalance(username string, amount float64, db *gorm.DB, transaction
 	}
 
 	return nil
+}
+
+type MarketPositionResponse struct {
+	YesBetters []UserMarketPosition `json:"yesBetters"`
+	NoBetters  []UserMarketPosition `json:"noBetters"`
+}
+
+type UserMarketPosition struct {
+	Username       string    `json:"username"`
+	DisplayName    string    `json:"displayName"`
+	PersonalEmoji  string    `json:"personalEmoji"`
+	AmountInvested float64   `json:"amountInvested"`
+	Payout         float64   `json:"payout"`
+	Profit         float64   `json:"profit"`
+	ProfitPercent  float64   `json:"profitPercent"`
+	TotalShares    float64   `json:"totalShares"`
+	LastBetTime    time.Time `json:"lastBetTime"`
+}
+
+func marketPositionsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	marketId := vars["marketId"]
+
+	// Database connection
+	db := util.GetDB()
+
+	// Convert marketId to uint
+	marketIDUint, err := strconv.ParseUint(marketId, 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		return
+	}
+
+	var bets []models.Bet
+	if err := db.Where("market_id = ?", marketIDUint).Find(&bets).Error; err != nil {
+		http.Error(w, "Error fetching bets", http.StatusInternalServerError)
+		return
+	}
+
+	// Process bets to calculate positions
+	yesBetters, noBetters := processBetsForMarketPositions(bets, db)
+
+	response := MarketPositionResponse{
+		YesBetters: yesBetters,
+		NoBetters:  noBetters,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+type UserBetInfo struct {
+	TotalInvested float64
+	TotalPayout   float64
+	LastBetTime   time.Time
+	// Add other necessary fields
+}
+
+func processBetsForMarketPositions(bets []models.Bet, db *gorm.DB) ([]UserMarketPosition, []UserMarketPosition) {
+	yesBetInfo := make(map[string]UserBetInfo)
+	noBetInfo := make(map[string]UserBetInfo)
+
+	// Aggregate bet data
+	for _, bet := range bets {
+		userInfo := UserBetInfo{
+			TotalInvested: bet.Amount,
+			TotalPayout:   calculatePayout(bet), // Implement this based on your logic
+			LastBetTime:   bet.PlacedAt,
+		}
+
+		if bet.Outcome == "YES" {
+			if existing, ok := yesBetInfo[bet.Username]; ok {
+				userInfo.TotalInvested += existing.TotalInvested
+				userInfo.TotalPayout += existing.TotalPayout
+				if bet.PlacedAt.After(existing.LastBetTime) {
+					userInfo.LastBetTime = bet.PlacedAt
+				}
+			}
+			yesBetInfo[bet.Username] = userInfo
+		} else if bet.Outcome == "NO" {
+			if existing, ok := noBetInfo[bet.Username]; ok {
+				userInfo.TotalInvested += existing.TotalInvested
+				userInfo.TotalPayout += existing.TotalPayout
+				if bet.PlacedAt.After(existing.LastBetTime) {
+					userInfo.LastBetTime = bet.PlacedAt
+				}
+			}
+			noBetInfo[bet.Username] = userInfo
+		}
+	}
+
+	// Convert aggregated data into UserMarketPosition slices
+	yesBetters := make([]UserMarketPosition, 0, len(yesBetInfo))
+	for username, info := range yesBetInfo {
+		// Fetch additional user details
+		var user models.User
+		db.Where("username = ?", username).First(&user)
+		yesBetters = append(yesBetters, createUserMarketPosition(user, info))
+	}
+
+	noBetters := make([]UserMarketPosition, 0, len(noBetInfo))
+	for username, info := range noBetInfo {
+		// Fetch additional user details
+		var user models.User
+		db.Where("username = ?", username).First(&user)
+		noBetters = append(noBetters, createUserMarketPosition(user, info))
+	}
+
+	return yesBetters, noBetters
+}
+
+func marketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	marketId := vars["marketId"]
+
+	// Database connection
+	db := util.GetDB()
+
+	// Convert marketId to uint
+	marketIDUint, err := strconv.ParseUint(marketId, 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		return
+	}
+
+	var bets []models.Bet
+	if err := db.Where("market_id = ?", marketIDUint).Find(&bets).Error; err != nil {
+		http.Error(w, "Error fetching bets", http.StatusInternalServerError)
+		return
+	}
+
+	// Process bets and calculate market probability at the time of each bet
+	betsDisplayInfo := processBetsForDisplay(bets, db)
+
+	// Respond with the bets display information
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(betsDisplayInfo)
+}
+
+func processBetsForDisplay(bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
+	var betsDisplayInfo []BetDisplayInfo
+
+	for _, bet := range bets {
+		// Calculate the market probability at the time of the bet
+		probabilityAtBetTime := calculateMarketProbabilityAtTime(bet.PlacedAt, bet.MarketID, db)
+
+		betsDisplayInfo = append(betsDisplayInfo, BetDisplayInfo{
+			Username:    bet.Username,
+			Position:    bet.Outcome,
+			Amount:      bet.Amount,
+			Probability: probabilityAtBetTime,
+			PlacedAt:    bet.PlacedAt,
+		})
+	}
+
+	return betsDisplayInfo
+}
+
+type BetDisplayInfo struct {
+	Username    string    `json:"username"`
+	Position    string    `json:"position"`
+	Amount      float64   `json:"amount"`
+	Probability float64   `json:"probability"`
+	PlacedAt    time.Time `json:"placedAt"`
 }
