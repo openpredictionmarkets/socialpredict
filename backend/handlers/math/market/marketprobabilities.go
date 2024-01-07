@@ -15,6 +15,8 @@ type ProbabilityChange struct {
 type AppConfig struct {
 	InitialMarketProbability   float64
 	InitialMarketSubsidization float64
+	InitialMarketYes           float64
+	InitialMarketNo            float64
 	CreateMarketCost           float64
 	TraderBonus                float64
 	// user stuff
@@ -37,8 +39,10 @@ func init() {
 		// market stuff
 		InitialMarketProbability:   config.Economics.MarketCreation.InitialMarketProbability,
 		InitialMarketSubsidization: config.Economics.MarketCreation.InitialMarketSubsidization,
-		CreateMarketCost:           config.Economics.MarketCreation.CreateMarketCost,
-		TraderBonus:                config.Economics.MarketCreation.TraderBonus,
+		InitialMarketYes:           config.Economics.MarketCreation.InitialMarketYes,
+		InitialMarketNo:            config.Economics.MarketCreation.InitialMarketNo,
+		CreateMarketCost:           config.Economics.MarketIncentives.CreateMarketCost,
+		TraderBonus:                config.Economics.MarketIncentives.TraderBonus,
 		// user stuff
 		MaximumDebtAllowed:    config.Economics.User.MaximumDebtAllowed,
 		InitialAccountBalance: config.Economics.User.InitialAccountBalance,
@@ -50,15 +54,15 @@ func init() {
 }
 
 // Modify calculateMarketProbabilities to accept bets directly
-func CalculateMarketProbabilities(market models.Market, bets []models.Bet) ([]ProbabilityChange, error) {
+func CalculateMarketProbabilities(market models.Market, bets []models.Bet) []ProbabilityChange {
 
 	var probabilityChanges []ProbabilityChange
 
 	// Initial state
 	P_initial := appConfig.InitialMarketProbability
 	I_initial := appConfig.InitialMarketSubsidization
-	totalYes := 0.0
-	totalNo := 0.0
+	totalYes := appConfig.InitialMarketYes
+	totalNo := appConfig.InitialMarketNo
 
 	// Add initial state
 	probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: P_initial, Timestamp: market.CreatedAt})
@@ -75,5 +79,5 @@ func CalculateMarketProbabilities(market models.Market, bets []models.Bet) ([]Pr
 		probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: newProbability, Timestamp: bet.PlacedAt})
 	}
 
-	return probabilityChanges, nil
+	return probabilityChanges
 }

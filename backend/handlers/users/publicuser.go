@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -11,8 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// PublicUserResponse is a struct for user data that is safe to send to the client for Profiles
-type PublicUserResponse struct {
+// PublicUserType is a struct for user data that is safe to send to the client for Profiles
+type PublicUserType struct {
 	Username              string  `json:"username"`
 	DisplayName           string  `json:"displayname" gorm:"unique;not null"`
 	UserType              string  `json:"usertype"`
@@ -32,26 +31,25 @@ func GetPublicUserResponse(w http.ResponseWriter, r *http.Request) {
 	username := vars["username"]
 
 	db := util.GetDB()
+
+	response := GetPublicUserInfo(db, username)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// Function to get the Info From the Database
+func GetPublicUserInfo(db *gorm.DB, username string) PublicUserType {
+
 	var user models.User
+	db.Where("username = ?", username).First(&user)
 
-	// Fetch user data from the database
-	result := db.Where("Username = ?", username).First(&user)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			http.Error(w, "User not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Error fetching user data", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	// Convert to PublicUserResponse
-	response := PublicUserResponse{
+	return PublicUserType{
 		Username:              user.Username,
 		DisplayName:           user.DisplayName,
 		UserType:              user.UserType,
 		InitialAccountBalance: user.InitialAccountBalance,
-		AccountBalance:        user.AccountBalance, // Added AccountBalance
+		AccountBalance:        user.AccountBalance,
 		PersonalEmoji:         user.PersonalEmoji,
 		Description:           user.Description,
 		PersonalLink1:         user.PersonalLink1,
@@ -59,7 +57,4 @@ func GetPublicUserResponse(w http.ResponseWriter, r *http.Request) {
 		PersonalLink3:         user.PersonalLink3,
 		PersonalLink4:         user.PersonalLink4,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }

@@ -33,7 +33,7 @@ func Start() {
 	router.HandleFunc("/v0/markets/{marketId}", marketsHandlers.MarketDetailsHandler).Methods("GET")
 	// handle market positions, get trades
 	// router.HandleFunc("/v0/markets/positions/{marketId}", marketPositionsHandler).Methods("GET")
-	// router.HandleFunc("/v0/markets/bets/{marketId}", marketBetsDisplayHandler).Methods("GET")
+	router.HandleFunc("/v0/markets/bets/{marketId}", betsHandlers.MarketBetsDisplayHandler).Methods("GET")
 
 	// This defines the bet method, which allows the user to place a bet in a particular direction.
 	router.HandleFunc("/v0/bet", betsHandlers.PlaceBetHandler).Methods("POST")

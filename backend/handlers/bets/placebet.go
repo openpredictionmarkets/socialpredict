@@ -17,8 +17,6 @@ import (
 type AppConfig struct {
 	InitialMarketProbability   float64
 	InitialMarketSubsidization float64
-	CreateMarketCost           float64
-	TraderBonus                float64
 	// user stuff
 	MaximumDebtAllowed    float64
 	InitialAccountBalance float64
@@ -39,8 +37,6 @@ func init() {
 		// market stuff
 		InitialMarketProbability:   config.Economics.MarketCreation.InitialMarketProbability,
 		InitialMarketSubsidization: config.Economics.MarketCreation.InitialMarketSubsidization,
-		CreateMarketCost:           config.Economics.MarketCreation.CreateMarketCost,
-		TraderBonus:                config.Economics.MarketCreation.TraderBonus,
 		// user stuff
 		MaximumDebtAllowed:    config.Economics.User.MaximumDebtAllowed,
 		InitialAccountBalance: config.Economics.User.InitialAccountBalance,

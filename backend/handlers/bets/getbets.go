@@ -5,14 +5,14 @@ import (
 	"socialpredict/util"
 )
 
-func GetBetsForMarket(marketID uint64) ([]models.Bet, error) {
+func GetBetsForMarket(marketID uint64) []models.Bet {
 	var bets []models.Bet
 
 	// Retrieve all bets for the market
 	db := util.GetDB()
 	if err := db.Where("market_id = ?", marketID).Find(&bets).Error; err != nil {
-		return nil, err
+		return nil
 	}
 
-	return bets, nil
+	return bets
 }
