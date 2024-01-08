@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	marketMathHandlers "socialpredict/handlers/math/market"
 	"socialpredict/models"
@@ -30,6 +31,8 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
+
+	log.Println("marketIdStr: ", marketIdStr)
 
 	// Database connection
 	db := util.GetDB()

@@ -72,6 +72,56 @@ function formatDateTimeForGrid(dateTimeString) {
     return `${year}.${month}.${day} ${formattedHour}:${minute} ${amPm}`;
 };
 
+// Bottom Modal Component
+const ModalContent = ({ activeTab, changeTab, bets, toggleModal }) => {
+    return (
+
+        <div className="modal">
+            <div className="modal-tabs">
+                <button onClick={() => changeTab('Comments')}>Comments</button>
+                <button onClick={() => changeTab('Positions')}>Positions</button>
+                <button onClick={() => changeTab('Bets')}>Bets</button>
+            </div>
+            <div className="modal-content">
+                {activeTab === 'Comments' && <p>Comments Coming Soon.</p>}
+                {activeTab === 'Positions' && <p>Positions Coming Soon.</p>}
+                {activeTab === 'Bets' && (
+                    <div className="bets-display">
+                        <h3>Bets</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Outcome</th>
+                                    <th>Amount</th>
+                                    <th>Probability</th>
+                                    <th>Placed At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {bets.map(bet => (
+                                    <tr key={bet.placedAt}>
+                                        <td>
+                                            <Link to={`/user/${bet.username}`} className="nav-link">
+                                                @{bet.username}
+                                            </Link>
+                                        </td>
+                                        <td>{bet.outcome}</td>
+                                        <td>{bet.amount}</td>
+                                        <td>{bet.probability.toFixed(3)}</td>
+                                        <td>{new Date(bet.placedAt).toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
 // overall marketDetails function
 
 function MarketDetails() {
@@ -89,10 +139,40 @@ function MarketDetails() {
     const [numUsers, setNumUsers] = useState(0);
     const [totalVolume, setTotalVolume] = useState(0);
 
+    // Including Market Creator
+    const [creator, setCreator] = useState(null);
+
     // Bet logic
     const [betAmount, setBetAmount] = useState(20); // Default bet amount
     const [showBetModal, setShowBetModal] = useState(false); // State to control modal visibility
     const [selectedOutcome, setSelectedOutcome] = useState(null); // State to store selected outcome
+
+    // Bottom Modal, Including Bets, Comments and Positions
+
+    const [bets, setBets] = useState([]);
+    // handle visibility of bottom modal
+    const [isModalOpen, setIsModalOpen] = useState(true); // Default to modal open
+    const [activeTab, setActiveTab] = useState('Comments'); // Default to 'Comments'
+    // toggle modal function
+    const toggleModal = () => {
+        setIsModalOpen(!isModalOpen);
+    };
+    // change the active bottom modal tab
+    const changeTab = (tabName) => {
+        setActiveTab(tabName);
+    };
+
+    const fetchBets = useCallback(() => {
+        fetch(`http://localhost:8089/api/v0/markets/bets/${marketId}`)
+        .then(response => response.json())
+        .then(data => setBets(data))
+        .catch(error => console.error('Error fetching bets:', error));
+    }, [marketId]);
+
+
+    useEffect(() => {
+        fetchBets();
+    }, [fetchBets]);
 
     // Resolving Market Control
     const [showResolveModal, setShowResolveModal] = useState(false);
@@ -117,7 +197,7 @@ function MarketDetails() {
             body: JSON.stringify(resolutionData)
         };
 
-        fetch(`https://brierfoxforecast.ngrok.app/api/v0/resolve/${marketId}`, requestOptions)
+        fetch(`http://localhost:8089/api/v0/resolve/${marketId}`, requestOptions)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -139,12 +219,13 @@ function MarketDetails() {
 
     // get the Market Data, information from the endpoint.
     const fetchMarketData = useCallback(() => {
-        fetch(`https://brierfoxforecast.ngrok.app/api/v0/markets/${marketId}`)
+        fetch(`http://localhost:8089/api/v0/markets/${marketId}`)
             .then(response => response.json())
             .then(data => {
                 setMarket(data.market);
                 setNumUsers(data.numUsers); // Assuming `numUsers` is part of the response
                 setTotalVolume(data.totalVolume); // Assuming `totalVolume` is part of the response
+                setCreator(data.creator);
 
                 // Extract the last probability value
                 const probabilityChanges = data.probabilityChanges;
@@ -230,7 +311,7 @@ function MarketDetails() {
 
             console.log("Sending bet data:", betData);
 
-            fetch('https://brierfoxforecast.ngrok.app/api/v0/bet', {
+            fetch('http://localhost:8089/api/v0/bet', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -274,7 +355,7 @@ function MarketDetails() {
                         <td>
                         <div className="nav-link">
                             <Link to={`/user/${market.creatorUsername}`} className="nav-link">
-                            😀 @{market.creatorUsername}
+                                {creator?.personalEmoji} @{market.creatorUsername}
                             </Link>
                         </div>
                         </td>
@@ -406,8 +487,15 @@ function MarketDetails() {
                 </div>
             )}
 
+            <button onClick={toggleModal}>Toggle Activity</button>
 
-
+            {isModalOpen && (
+                <ModalContent
+                    activeTab={activeTab}
+                    changeTab={changeTab}
+                    bets={bets}
+                />
+            )}
 
         </div>
     );

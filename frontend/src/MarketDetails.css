@@ -217,3 +217,23 @@
     outline: none;
     transition: background-color 0.3s;
 }
+
+/* Bottom Modal Bottom */
+
+.modal {
+    /* Basic modal styling */
+}
+.modal-tabs button {
+    /* Styling for tab buttons */
+}
+.modal-content {
+    /* Styling for the content area of the modal */
+}
+
+/* BETs Display at Bottom */
+
+.bets-display {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
