@@ -77,7 +77,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	// Calculate probabilities using the fetched bets
 	probabilityChanges := marketMathHandlers.CalculateMarketProbabilities(market, bets)
 
-	numUsers := usersHandlers.GetMarketUsers(bets)
+	numUsers := usersHandlers.GetNumMarketUsers(bets)
 	if err != nil {
 		http.Error(w, "Error retrieving number of users.", http.StatusInternalServerError)
 		return

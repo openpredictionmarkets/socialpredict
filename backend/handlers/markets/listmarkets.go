@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"socialpredict/models"
 	"socialpredict/util"
+
+	"gorm.io/gorm"
 )
 
+// ListMarketsHandler handles the HTTP request for listing markets.
 func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method is not supported.", http.StatusNotFound)
@@ -15,28 +18,26 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := util.GetDB()
-
-	var countMarketTotal int64
-	countResult := db.Raw("SELECT COUNT(*) FROM markets;").Scan(&countMarketTotal)
-	if countResult.Error != nil {
-		// Handle error
-		log.Printf("Error executing raw SQL query: %v", countResult.Error)
-	} else {
-		log.Printf("Total number of markets: %d", countMarketTotal)
-	}
-
-	var markets []models.Market
-	result := db.Order("RANDOM()").Limit(int(countMarketTotal)).Find(&markets) // Adjust this line based on your ORM
-	if result.Error != nil {
+	markets, err := ListMarkets(db)
+	if err != nil {
 		http.Error(w, "Error fetching markets", http.StatusInternalServerError)
 		return
 	}
 
-	// Set the Content-Type header
 	w.Header().Set("Content-Type", "application/json")
-
-	// Encode the markets slice to JSON and send it as a response
 	if err := json.NewEncoder(w).Encode(markets); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// ListMarkets fetches a random list of all markets from the database.
+func ListMarkets(db *gorm.DB) ([]models.Market, error) {
+	var markets []models.Market
+	result := db.Order("RANDOM()").Limit(100).Find(&markets) // Set a reasonable limit
+	if result.Error != nil {
+		log.Printf("Error fetching markets: %v", result.Error)
+		return nil, result.Error
+	}
+
+	return markets, nil
 }
