@@ -78,16 +78,16 @@ const ModalContent = ({ activeTab, changeTab, bets, toggleModal }) => {
 
         <div className="modal">
             <div className="modal-tabs">
-                <button onClick={() => changeTab('Comments')}>Comments</button>
-                <button onClick={() => changeTab('Positions')}>Positions</button>
-                <button onClick={() => changeTab('Bets')}>Bets</button>
+                <button className="tab-button" onClick={() => changeTab('Comments')}>Comments</button>
+                <button className="tab-button" onClick={() => changeTab('Positions')}>Positions</button>
+                <button className="tab-button" onClick={() => changeTab('Bets')}>Bets</button>
             </div>
             <div className="modal-content">
                 {activeTab === 'Comments' && <p>Comments Coming Soon.</p>}
                 {activeTab === 'Positions' && <p>Positions Coming Soon.</p>}
                 {activeTab === 'Bets' && (
                     <div className="bets-display">
-                        <h3>Bets</h3>
+                        <h5></h5>
                         <table>
                             <thead>
                                 <tr>
@@ -486,8 +486,6 @@ function MarketDetails() {
                     </button>
                 </div>
             )}
-
-            <button onClick={toggleModal}>Toggle Activity</button>
 
             {isModalOpen && (
                 <ModalContent
