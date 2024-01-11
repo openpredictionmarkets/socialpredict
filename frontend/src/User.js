@@ -1,4 +1,5 @@
 // User.js
+import { API_URL } from './config';
 import React, { useState, useEffect } from 'react';
 import './User.css'; // Assuming you have a CSS file for styling
 import { Link } from 'react-router-dom';
