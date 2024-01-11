@@ -162,7 +162,7 @@ function MarketDetails() {
     };
 
     const fetchBets = useCallback(() => {
-        fetch(`http://localhost:8089/api/v0/markets/bets/${marketId}`)
+        fetch(`https://brierfoxforecast.ngrok.app/api/v0/markets/bets/${marketId}`)
         .then(response => response.json())
         .then(data => setBets(data))
         .catch(error => console.error('Error fetching bets:', error));
@@ -196,7 +196,7 @@ function MarketDetails() {
             body: JSON.stringify(resolutionData)
         };
 
-        fetch(`http://localhost:8089/api/v0/resolve/${marketId}`, requestOptions)
+        fetch(`https://brierfoxforecast.ngrok.app/api/v0/resolve/${marketId}`, requestOptions)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -218,7 +218,7 @@ function MarketDetails() {
 
     // get the Market Data, information from the endpoint.
     const fetchMarketData = useCallback(() => {
-        fetch(`http://localhost:8089/api/v0/markets/${marketId}`)
+        fetch(`https://brierfoxforecast.ngrok.app/api/v0/markets/${marketId}`)
             .then(response => response.json())
             .then(data => {
                 setMarket(data.market);
