@@ -26,14 +26,28 @@ function Markets() {
                         <tbody>
                             {marketsData.map(market => (
                                 <tr key={market.id}>
-                                    <td>⬆️⬇️</td>
+                                    <td>
+                                        <span role="img" aria-label="Market trend arrows">⬆️⬇️</span>
+                                    </td>
                                     <td>{market.initialProbability}</td>
                                     <td><Link to={`/markets/${market.id}`}>{market.questionTitle}</Link></td>
-                                    <td>📅 {new Date(market.resolutionDateTime).toLocaleDateString()}</td>
-                                    <td>😀 admin</td> {/* Placeholder for actual data */}
-                                    <td>👤 20</td>
-                                    <td>📊 1.5k</td>
-                                    <td>💬 12</td>
+                                    <td>
+                                        <span role="img" aria-label="Date">
+                                            📅 {new Date(market.resolutionDateTime).toLocaleDateString()}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span role="img" aria-label="Admin">😀 admin</span> {/* Placeholder for actual data */}
+                                    </td>
+                                    <td>
+                                        <span role="img" aria-label="Participants">👤 20</span>
+                                    </td>
+                                    <td>
+                                        <span role="img" aria-label="Market size">📊 1.5k</span>
+                                    </td>
+                                    <td>
+                                        <span role="img" aria-label="Comments">💬 12</span>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

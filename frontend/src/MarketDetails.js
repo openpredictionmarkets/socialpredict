@@ -57,7 +57,7 @@ function formatDateTimeForGrid(dateTimeString) {
 
 
     // Getting timezone
-    const timezone = /\(([^)]+)\)$/.exec(date.toString())[1];
+    // const timezone = /\(([^)]+)\)$/.exec(date.toString())[1];
 
     // Convert 24-hour time to 12-hour time and determine AM/PM
     let hour = date.getHours();
@@ -87,7 +87,6 @@ const ModalContent = ({ activeTab, changeTab, bets, toggleModal }) => {
                 {activeTab === 'Positions' && <p>Positions Coming Soon.</p>}
                 {activeTab === 'Bets' && (
                     <div className="bets-display">
-                        <h5></h5>
                         <table>
                             <thead>
                                 <tr>
@@ -353,15 +352,21 @@ function MarketDetails() {
                 <tbody>
                     <tr>
                         <td>
-                        <div className="nav-link">
-                            <Link to={`/user/${market.creatorUsername}`} className="nav-link">
-                                {creator?.personalEmoji} @{market.creatorUsername}
-                            </Link>
-                        </div>
+                            <div className="nav-link">
+                                <Link to={`/user/${market.creatorUsername}`} className="nav-link">
+                                    <span role="img" aria-label={creator?.personalEmojiLabel}>{creator?.personalEmoji}</span> @{market.creatorUsername}
+                                </Link>
+                            </div>
                         </td>
-                        <td>👤 {numUsers}</td>
-                        <td>📊 {totalVolume.toFixed(2)}</td>
-                        <td>💬 0</td>
+                        <td>
+                            <span role="img" aria-label="Number of users">👤 {numUsers}</span>
+                        </td>
+                        <td>
+                            <span role="img" aria-label="Total volume">📊 {totalVolume.toFixed(2)}</span>
+                        </td>
+                        <td>
+                            <span role="img" aria-label="Comments">💬 0</span>
+                        </td>
                         <td>
                             {market.isResolved ? (
                                 <span>
@@ -372,7 +377,7 @@ function MarketDetails() {
                                 </span>
                             ) : (
                                 <span>
-                                    Ends: 📅 {formatDateTimeForGrid(market.resolutionDateTime).toLocaleString()}
+                                    <span role="img" aria-label="Ends on date">Ends: 📅 {formatDateTimeForGrid(market.resolutionDateTime).toLocaleString()}</span>
                                 </span>
                             )}
                         </td>

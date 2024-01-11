@@ -61,21 +61,21 @@ func UpdateUserEmail(db *gorm.DB, username, newEmail string) error {
 	}
 
 	// Assume some encoding mechanism
-	encodedEmail := EncodeEmail(newEmail)
-	user.Email = encodedEmail
+	// encodedEmail := EncodeEmail(newEmail)
+	// user.Email = encodedEmail
 	return db.Save(&user).Error
 }
 
-func UpdateUserAPIKey(db *gorm.DB, username string) (string, error) {
-	var user models.User
-	result := db.Where("username = ?", username).First(&user)
-	if result.Error != nil {
-		return "", result.Error
-	}
+//func UpdateUserAPIKey(db *gorm.DB, username string) (string, error) {
+//	var user models.User
+//	result := db.Where("username = ?", username).First(&user)
+//	if result.Error != nil {
+//		return "", result.Error
+//	}
 
-	newAPIKey := GenerateRandomAPIKey()      // Implement this function
-	encodedAPIKey := EncodeAPIKey(newAPIKey) // Implement this function
-	user.ApiKey = encodedAPIKey
-	err := db.Save(&user).Error
-	return newAPIKey, err // Return the raw API key for one-time display
-}
+// newAPIKey := GenerateRandomAPIKey()      // Implement this function
+//  encodedAPIKey := EncodeAPIKey(newAPIKey) // Implement this function
+// user.ApiKey = encodedAPIKey
+// err := db.Save(&user).Error
+// return newAPIKey, err // Return the raw API key for one-time display
+//}

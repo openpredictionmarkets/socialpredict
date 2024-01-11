@@ -241,6 +241,7 @@
 
 .modal {
     /* Basic modal styling */
+    margin-top: 20px;
 }
 
 .modal-tabs {
@@ -270,6 +271,8 @@
 
 .bets-display {
     max-height: 300px;
+    margin-top: 20px;
+
     overflow-y: auto;
 }
 

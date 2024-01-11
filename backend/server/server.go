@@ -38,7 +38,7 @@ func Start() {
 	router.HandleFunc("/v0/user", usersHandlers.GetPublicUserResponse)
 
 	// handle private user stuff, display sensitive profile information to customize
-	router.HandleFunc("/v0/user/private", usersHandlers.GetPrivateUserResponse)
+	// router.HandleFunc("/v0/user/private", usersHandlers.GetPrivateUserResponse)
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketsHandlers.ResolveMarketHandler).Methods("POST")
