@@ -11,7 +11,7 @@ function About() {
 
                 <p>Have you heard of Prediction Markets?</p>
                 <ul>
-                    <li>Prediction Markets, unlike polls, incentivize accuracy. Participants take a stake in what they think is correct, promoting rigorous reseasrch and reducing bias.</li>
+                    <li>Prediction Markets, unlike polls, incentivize accuracy. Participants take a stake in what they think is correct, promoting rigorous research and reducing bias.</li>
                     <li>In contrast, social media posts and polls, using upvotes and downvotes or having users choose with no stake, are not as robust.</li>
                     <li>Of course as with anything, the knowledge of a community is tied to the ability of the participants.</li>
                     <li>Our solution is to empower individuals to run their own prediction market platforms to attempt to use the wisdom of their own crowds to out-predict one another.</li>

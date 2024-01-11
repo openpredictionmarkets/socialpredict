@@ -14,8 +14,9 @@ function Create() {
     // Get the logged-in user's ID from context or another state management solution
     // User Context
     const { username } = useContext(UserContext);
-    const isLoggedIn = username !== null;
-    const token = localStorage.getItem('token');
+
+    // User should already have been logged in to be able to access Create()
+    // const isLoggedIn = username !== null;
 
     // history for redirect after market creation
     const history = useHistory();
@@ -24,6 +25,7 @@ function Create() {
     const utcOffset = new Date().getTimezoneOffset();
 
     const handleSubmit = async (event) => {
+
         event.preventDefault();
         setError('');
 

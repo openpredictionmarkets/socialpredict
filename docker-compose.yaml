@@ -16,9 +16,6 @@ services:
     ports:
       - "${DB_PORT}:${POSTGRES_PORT}"
 
-# volumes:
-#  db-data:
-
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
     image: "${BACKEND_IMAGE_NAME}"

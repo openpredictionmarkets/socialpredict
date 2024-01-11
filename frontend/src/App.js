@@ -1,4 +1,4 @@
-import API_URL from './config';
+// import API_URL from './config';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
 import './App.css';

@@ -16,9 +16,13 @@ type EconomicConfig struct {
 		MarketCreation struct {
 			InitialMarketProbability   float64 `yaml:"initialMarketProbability"`
 			InitialMarketSubsidization float64 `yaml:"initialMarketSubsidization"`
-			CreateMarketCost           float64 `yaml:"createMarketCost"`
-			TraderBonus                float64 `yaml:"traderbonus"`
+			InitialMarketYes           float64 `yaml:"initialMarketYes"`
+			InitialMarketNo            float64 `yaml:"initialMarketNo"`
 		} `yaml:"marketcreation"`
+		MarketIncentives struct {
+			CreateMarketCost float64 `yaml:"createMarketCost"`
+			TraderBonus      float64 `yaml:"traderBonus"`
+		} `yaml:"marketincentives"`
 		User struct {
 			InitialAccountBalance float64 `yaml:"initialAccountBalance"`
 			MaximumDebtAllowed    float64 `yaml:"maximumDebtAllowed"`

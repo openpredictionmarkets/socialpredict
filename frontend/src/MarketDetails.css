@@ -118,7 +118,7 @@
     display: flex;
     bottom: 20px;
     right: 20px;
-    background-color: grey;
+    background-color: #6A6A6A;
     border-radius: 3px; /* Rounded corners */
     color: white;
     border: none;
@@ -217,3 +217,62 @@
     outline: none;
     transition: background-color 0.3s;
 }
+
+/* Bottom Modal - Comments, Positions, Bets */
+
+.toggle-button {
+    display: flex;
+    margin: 20px; /* Adjust positioning as needed */
+    background-color: #6A6A6A; /* A different shade of grey */
+    border-radius: 4px; /* Slightly more rounded corners */
+    color: white;
+    border: none;
+    outline: none;
+    padding: 12px 24px; /* Slightly larger padding */
+    transition: background-color 0.3s, transform 0.2s; /* Add transform to hover effect */
+    cursor: pointer;
+}
+
+.toggle-button:hover {
+    color: white;
+    background-color: #5D9C8B; /* A distinct hover color */
+    transform: scale(1.05); /* Slight increase in size on hover */
+}
+
+.modal {
+    /* Basic modal styling */
+    margin-top: 20px;
+}
+
+.modal-tabs {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Ensure there's no additional styling causing the buttons to stack vertically */
+}
+
+.modal-tabs .tab-button {
+    background-color: #6A6A6A; /* Similar shade of grey */
+    border-radius: 4px;
+    color: white;
+    border: none;
+    outline: none;
+    padding: 12px 24px;
+    transition: background-color 0.3s, transform 0.2s;
+    cursor: pointer;
+    margin: 0 5px; /* Spacing between buttons */
+}
+
+.modal-tabs .tab-button:hover {
+    background-color: #5D9C8B;
+    transform: scale(1.05);
+}
+/* BETs Display at Bottom */
+
+.bets-display {
+    max-height: 300px;
+    margin-top: 20px;
+
+    overflow-y: auto;
+}
+
