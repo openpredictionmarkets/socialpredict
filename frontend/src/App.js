@@ -1,4 +1,4 @@
-// import API_URL from './config';
+import { API_URL } from './config';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
 import './App.css';
@@ -34,7 +34,7 @@ function App() {
   // login function
   const handleLogin = async (username, password) => {
     try {
-      const response = await fetch('https://brierfoxforecast.ngrok.app/api/v0/login', {
+      const response = await fetch(`${API_URL}/api/v0/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +65,8 @@ function App() {
     const token = localStorage.getItem('token');
     setIsLoggedIn(!!token);
 
-    fetch('https://brierfoxforecast.ngrok.app/api/v0/home')
+    console.log(`Request URL: ${API_URL}/api/v0/home`);
+    fetch(`${API_URL}/api/v0/home`)
       .then(response => response.json())
       .then(data => {
         console.log('Data Received:', data); // Debug log

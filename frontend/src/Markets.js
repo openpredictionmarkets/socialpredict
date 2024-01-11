@@ -1,3 +1,4 @@
+import { API_URL } from './config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import './Markets.css';
@@ -7,7 +8,7 @@ function Markets() {
 
     useEffect(() => {
         // Fetch data from your API
-        fetch('https://brierfoxforecast.ngrok.app/api/v0/markets') // Adjust the URL to your API endpoint
+        fetch(`${API_URL}/api/v0/markets`) // Adjust the URL to your API endpoint
             .then(response => response.json())
             .then(data => {
                 setMarketsData(data); // Set the fetched markets data
