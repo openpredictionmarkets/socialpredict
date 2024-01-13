@@ -65,7 +65,7 @@ function Create() {
 
             console.log('marketData:', marketData);
 
-            const response = await fetch('https://brierfoxforecast.ngrok.app/api/v0/create', {
+            const response = await fetch(`${API_URL}/api/v0/create`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

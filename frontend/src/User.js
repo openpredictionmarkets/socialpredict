@@ -1,4 +1,5 @@
 // User.js
+import { API_URL } from './config';
 import React, { useState, useEffect } from 'react';
 import './User.css'; // Assuming you have a CSS file for styling
 import { Link } from 'react-router-dom';
@@ -8,7 +9,7 @@ const User = ({ match }) => {
     const username = match.params.username;
 
     useEffect(() => {
-        fetch(`https://brierfoxforecast.ngrok.app/api/v0/userinfo/${username}`)
+        fetch(`${API_URL}/api/v0/userinfo/${username}`)
             .then(response => response.json())
             .then(data => setUserData(data))
             .catch(error => console.error('Error fetching user data:', error));
