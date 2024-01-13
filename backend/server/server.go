@@ -38,14 +38,15 @@ func Start() {
 	router.HandleFunc("/v0/user", usersHandlers.GetPublicUserResponse)
 
 	// handle private user stuff, display sensitive profile information to customize
-	// router.HandleFunc("/v0/user/private", usersHandlers.GetPrivateUserResponse)
+	router.HandleFunc("/v0/user/privateprofile", usersHandlers.GetPrivateProfileUserResponse)
+	// router.HandleFunc("/v0/profilechange", updateUserProfile).Methods("POST")
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketsHandlers.ResolveMarketHandler).Methods("POST")
 	router.HandleFunc("/v0/bet", betsHandlers.PlaceBetHandler).Methods("POST")
 	router.HandleFunc("/v0/create", marketsHandlers.CreateMarketHandler)
-	// router.HandleFunc("/v0/profilechange", updateUserProfile).Methods("POST")
 
+	// handle public user stuff
 	router.HandleFunc("/v0/userinfo/{username}", usersHandlers.GetPublicUserResponse).Methods("GET")
 
 	// Apply the CORS middleware to the Gorilla Mux router
