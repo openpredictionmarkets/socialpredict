@@ -65,3 +65,38 @@
     flex-grow: 1;
     border-radius: 3px;
 }
+
+/* CELL CONTAINERS */
+
+.profile-cell-container {
+    display: flex;
+    align-items: center;
+}
+
+.profile-emoji {
+    font-size: 36px;
+    margin-right: 10px; /* Adjust spacing between emoji and button */
+}
+
+
+/* EDIT BUTTONS */
+
+.edit-button {
+    display: flex;
+    bottom: 20px;
+    right: 20px;
+    background-color: #6A6A6A;
+    border-radius: 3px; /* Rounded corners */
+    color: white;
+    border: none;
+    outline: none;
+    padding: 10px 20px;
+    transition: background-color 0.3s; /* Smooth transition for hover effect */
+    cursor: pointer;
+    margin-left: 10px; /* Add space to the left of the button */
+}
+
+.edit-button:hover {
+    color: white;
+    background-color: #DE7C5A;
+}

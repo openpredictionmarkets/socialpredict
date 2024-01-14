@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Profile.css'; // Import the CSS file
+import './ProfileEdit';
 import { API_URL } from './config';
 
 function Profile() {
@@ -53,11 +54,25 @@ function Profile() {
                     </tr>
                     <tr>
                         <td className="label">Personal Emoji:</td>
-                        <td>{userData.personalEmoji && <span style={{ fontSize: '36px' }}>{userData.personalEmoji}</span>}</td>
+                        <td>
+                            {userData.personalEmoji && (
+                                <div className="profile-cell-container">
+                                    <span className="profile-emoji">{userData.personalEmoji}</span>
+                                    <button className="edit-button">Edit</button>
+                                </div>
+                            )}
+                        </td>
                     </tr>
                     <tr>
                         <td className="label">Display Name:</td>
-                        <td>{userData.displayname}</td>
+                        <td>
+                            {userData.personalEmoji && (
+                                <div className="profile-cell-container">
+                                    <span>{userData.displayname}</span>
+                                    <button className="edit-button">Edit</button>
+                                </div>
+                            )}
+                        </td>
                     </tr>
                     <tr>
                         <td className="label">Description:</td>
@@ -88,6 +103,76 @@ function Profile() {
                     <tr>
                         <td colSpan="2" className="account-balance">
                             Account Balance: ${userData.accountBalance.toFixed(2)}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Maximum Debt Allowed:
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            <b>Balance Sheet</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Retained Earnings: $E
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Amount In Play: $X
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Amount Borrowed: $Y
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Equity = Retained Earnings + Amount In Play - Amount Borrowed
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            <b>Income Statement</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Trading Profits: ${userData.accountBalance.toFixed(2)}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Work Profits: $W
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            Total Profits: Trading Profits + $W
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            <b>Statment of Retained Earnings</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="account-balance">
+                            <b>Cash Flow Statement</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="header">
+                            <h3>Portfolio</h3>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="2" className="header">
+                            Markets Invested In (Most Recently Traded Top)...Calculated Value Based On Current Probability...Potential Top Value
                         </td>
                     </tr>
                 </tbody>
