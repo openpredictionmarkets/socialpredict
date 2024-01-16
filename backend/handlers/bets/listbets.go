@@ -79,7 +79,7 @@ func processBetsForDisplay(market models.Market, bets []models.Bet, db *gorm.DB)
 		})
 	}
 
-	// Sort betsDisplayInfo by PlacedAt in ascending order
+	// Sort betsDisplayInfo by PlacedAt in ascending order (most recent on top)
 	sort.Slice(betsDisplayInfo, func(i, j int) bool {
 		return betsDisplayInfo[i].PlacedAt.Before(betsDisplayInfo[j].PlacedAt)
 	})

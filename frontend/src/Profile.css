@@ -100,3 +100,22 @@
     color: white;
     background-color: #DE7C5A;
 }
+
+.portfolio-center-content-table {
+    text-align: left;
+    /* font-size: 0.5rem; */
+    /* margin-top: 30px; */
+}
+
+.portfolio-center-content-table a {
+    color: #00ffff;
+}
+
+.portfolio-center-content-table a:hover {
+    color: white;
+    background-color: #DE7C5A;
+}
+
+.portfolio-center-content-table a:active {
+    /* Styles for active state */
+}
