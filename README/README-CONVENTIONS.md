@@ -82,3 +82,8 @@ func GetPublicUserInfo(db *gorm.DB, username string) PublicUserType {
 	}
 
 ```
+
+### Time-Based Validations Occur on Server Side, Not Client Side
+
+* While logic could be built on the client side that governs the display of buttons, we don't validate time-based actions based upon client time.
+* Hypothetically a user could manipulate their browser time to be running in the past, so we don't rely on browsers to tell us what time it is for the purposes of rulemaking. If a user wants to fiddle with the interface and show themselves action that won't be taken, we don't care, but they can't take an action on the API.

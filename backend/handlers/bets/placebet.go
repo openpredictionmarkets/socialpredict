@@ -90,6 +90,12 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the market is closed, can't bet if closed.
+	if time.Now().After(market.ResolutionDateTime) {
+		http.Error(w, "Cannot place a bet on a closed market", http.StatusBadRequest)
+		return
+	}
+
 	// user-specific validation, sufficient balance,
 	// Fetch the user's current balance
 	if err := db.First(&user, user.ID).Error; err != nil {

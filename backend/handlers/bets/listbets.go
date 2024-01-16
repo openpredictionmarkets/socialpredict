@@ -7,6 +7,7 @@ import (
 	marketMathHandlers "socialpredict/handlers/math/market"
 	"socialpredict/models"
 	"socialpredict/util"
+	"sort"
 	"strconv"
 	"time"
 
@@ -77,6 +78,11 @@ func processBetsForDisplay(market models.Market, bets []models.Bet, db *gorm.DB)
 			PlacedAt:    bet.PlacedAt,
 		})
 	}
+
+	// Sort betsDisplayInfo by PlacedAt in ascending order (most recent on top)
+	sort.Slice(betsDisplayInfo, func(i, j int) bool {
+		return betsDisplayInfo[i].PlacedAt.Before(betsDisplayInfo[j].PlacedAt)
+	})
 
 	return betsDisplayInfo
 }

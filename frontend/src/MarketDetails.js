@@ -73,8 +73,11 @@ function formatDateTimeForGrid(dateTimeString) {
     return `${year}.${month}.${day} ${formattedHour}:${minute} ${amPm}`;
 };
 
-// Bottom Modal Component
-const ModalContent = ({ activeTab, changeTab, bets, toggleModal }) => {
+// Bottom Modal, ActivityModal Component
+const ActivityModalContent = ({ activeTab, changeTab, bets, toggleModal }) => {
+    // Check if bets is null or undefined, or if it's an empty array
+    const hasBets = bets && bets.length > 0;
+
     return (
 
         <div className="modal">
@@ -88,32 +91,36 @@ const ModalContent = ({ activeTab, changeTab, bets, toggleModal }) => {
                 {activeTab === 'Positions' && <p>Positions Coming Soon.</p>}
                 {activeTab === 'Bets' && (
                     <div className="bets-display">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Username</th>
-                                    <th>Outcome</th>
-                                    <th>Amount</th>
-                                    <th>Probability</th>
-                                    <th>Placed At</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {bets.map(bet => (
-                                    <tr key={bet.placedAt}>
-                                        <td>
-                                            <Link to={`/user/${bet.username}`} className="nav-link">
-                                                @{bet.username}
-                                            </Link>
-                                        </td>
-                                        <td>{bet.outcome}</td>
-                                        <td>{bet.amount}</td>
-                                        <td>{bet.probability.toFixed(3)}</td>
-                                        <td>{new Date(bet.placedAt).toLocaleString()}</td>
+                        {hasBets ? (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Outcome</th>
+                                        <th>Amount</th>
+                                        <th>Probability</th>
+                                        <th>Placed At</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {bets.map(bet => (
+                                        <tr key={bet.placedAt}>
+                                            <td>
+                                                <Link to={`/user/${bet.username}`} className="nav-link">
+                                                    @{bet.username}
+                                                </Link>
+                                            </td>
+                                            <td>{bet.outcome}</td>
+                                            <td>${bet.amount.toFixed(2)}</td>
+                                            <td>{bet.probability.toFixed(3)}</td>
+                                            <td>{new Date(bet.placedAt).toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <p>No bets on this market yet.</p>
+                        )}
                     </div>
                 )}
             </div>
@@ -125,6 +132,8 @@ const ModalContent = ({ activeTab, changeTab, bets, toggleModal }) => {
 // overall marketDetails function
 
 function MarketDetails() {
+
+    // error handling, if any
 
     // User Context
     const { username } = useContext(UserContext);
@@ -147,21 +156,22 @@ function MarketDetails() {
     const [showBetModal, setShowBetModal] = useState(false); // State to control modal visibility
     const [selectedOutcome, setSelectedOutcome] = useState(null); // State to store selected outcome
 
-    // Bottom Modal, Including Bets, Comments and Positions
+    // Bottom Activity Modal, Including Bets, Comments and Positions
 
     const [bets, setBets] = useState([]);
     // handle visibility of bottom modal
-    const [isModalOpen, setIsModalOpen] = useState(true); // Default to modal open
-    const [activeTab, setActiveTab] = useState('Comments'); // Default to 'Comments'
+    const [isActivityModalOpen, setIsActivityModalOpen] = useState(true); // Default to modal open
+    const [activeTab, setActiveActivityTab] = useState('Comments'); // Default to 'Comments'
     // toggle modal function
     const toggleModal = () => {
-        setIsModalOpen(!isModalOpen);
+        setIsActivityModalOpen(!isActivityModalOpen);
     };
     // change the active bottom modal tab
     const changeTab = (tabName) => {
-        setActiveTab(tabName);
+        setActiveActivityTab(tabName);
     };
 
+    // fetch the bets
     const fetchBets = useCallback(() => {
         fetch(`${API_URL}/api/v0/markets/bets/${marketId}`)
         .then(response => response.json())
@@ -169,10 +179,16 @@ function MarketDetails() {
         .catch(error => console.error('Error fetching bets:', error));
     }, [marketId]);
 
-
     useEffect(() => {
         fetchBets();
     }, [fetchBets]);
+
+    // Client-side check to see whether market is closed. This does not govern the bet data validation but just whether the buttons display.
+    const isMarketClosed = () => {
+        const resolutionDateTimeServer = new Date(market.ResolutionDateTime).getTime(); // Convert to Server timestamp
+        const nowBrowser = new Date().getTime(); // Get client (browser) time
+        return nowBrowser >= resolutionDateTimeServer;
+    };
 
     // Resolving Market Control
     const [showResolveModal, setShowResolveModal] = useState(false);
@@ -418,7 +434,7 @@ function MarketDetails() {
                 </tbody>
             </table>
 
-            {isLoggedIn && !market.isResolved && (
+            {isLoggedIn && !market.isResolved && !isMarketClosed() && (
             <div className="bet-decision-buttons">
                 <button className="bet-decision-button bet-yes-button" onClick={() => openBetModal("YES")}>YES</button>
                 <button className="bet-decision-button bet-no-button" onClick={() => openBetModal("NO")}>NO</button>
@@ -493,8 +509,8 @@ function MarketDetails() {
                 </div>
             )}
 
-            {isModalOpen && (
-                <ModalContent
+            {isActivityModalOpen && (
+                <ActivityModalContent
                     activeTab={activeTab}
                     changeTab={changeTab}
                     bets={bets}
