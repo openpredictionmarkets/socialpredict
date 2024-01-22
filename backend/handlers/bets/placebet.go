@@ -2,50 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
+	betutils "socialpredict/handlers/bets/betutils"
 	"socialpredict/middleware"
 	"socialpredict/models"
-	"socialpredict/setup"
 	"socialpredict/util"
 	"time"
-
-	"gorm.io/gorm"
 )
-
-// AppConfig holds the application-wide configuration
-type AppConfig struct {
-	InitialMarketProbability   float64
-	InitialMarketSubsidization float64
-	// user stuff
-	MaximumDebtAllowed    float64
-	InitialAccountBalance float64
-	// betting stuff
-	MinimumBet    float64
-	BetFee        float64
-	SellSharesFee float64
-}
-
-var appConfig AppConfig
-
-func init() {
-	// Load configuration
-	config := setup.LoadEconomicsConfig()
-
-	// Populate the appConfig struct
-	appConfig = AppConfig{
-		// market stuff
-		InitialMarketProbability:   config.Economics.MarketCreation.InitialMarketProbability,
-		InitialMarketSubsidization: config.Economics.MarketCreation.InitialMarketSubsidization,
-		// user stuff
-		MaximumDebtAllowed:    config.Economics.User.MaximumDebtAllowed,
-		InitialAccountBalance: config.Economics.User.InitialAccountBalance,
-		// betting stuff
-		MinimumBet:    config.Economics.Betting.MinimumBet,
-		BetFee:        config.Economics.Betting.BetFee,
-		SellSharesFee: config.Economics.Betting.SellSharesFee,
-	}
-}
 
 func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
@@ -70,31 +33,8 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate the request (check if user and market exist, if amount is positive, etc.)
-	// ...
-
-	// Fetch the market to check if it is resolved
-	var market models.Market
-	if result := db.First(&market, betRequest.MarketID); result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			http.Error(w, "Market not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "Error fetching market", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	// Check if the market is already resolved
-	if market.IsResolved {
-		http.Error(w, "Cannot place a bet on a resolved market", http.StatusBadRequest)
-		return
-	}
-
-	// Check if the market is closed, can't bet if closed.
-	if time.Now().After(market.ResolutionDateTime) {
-		http.Error(w, "Cannot place a bet on a closed market", http.StatusBadRequest)
-		return
-	}
+	// Validate the request (check if market exists, if not closed/resolved, etc.)
+	betutils.CheckMarketStatus(db, betRequest.MarketID)
 
 	// user-specific validation, sufficient balance,
 	// Fetch the user's current balance
