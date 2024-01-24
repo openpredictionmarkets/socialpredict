@@ -46,7 +46,7 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Check if the user has enough balance to place the bet
 
 	// Use the appConfig for configuration values
-	maximumDebtAllowed := appConfig.MaximumDebtAllowed
+	maximumDebtAllowed := betutils.Appconfig.MaximumDebtAllowed
 
 	// Check if the user's balance after the bet would be lower than the allowed maximum debt
 	if user.AccountBalance-betRequest.Amount < -maximumDebtAllowed {

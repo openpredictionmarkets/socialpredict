@@ -44,14 +44,14 @@ type AppConfig struct {
 	SellSharesFee float64
 }
 
-var appConfig AppConfig
+var Appconfig AppConfig
 
 func init() {
 	// Load configuration
 	config := setup.LoadEconomicsConfig()
 
 	// Populate the appConfig struct
-	appConfig = AppConfig{
+	Appconfig = AppConfig{
 		// market stuff
 		InitialMarketProbability:   config.Economics.MarketCreation.InitialMarketProbability,
 		InitialMarketSubsidization: config.Economics.MarketCreation.InitialMarketSubsidization,
