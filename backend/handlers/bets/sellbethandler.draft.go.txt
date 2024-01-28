@@ -1,4 +1,4 @@
-package handlers
+package betshandlers
 
 import (
 	"encoding/json"
@@ -39,7 +39,7 @@ func SellShareHandler(w http.ResponseWriter, r *http.Request) {
 
 	// user-specific validation, sufficient balance,
 	// Fetch the user's current balance
-	if err := db.First(&user, user.ID).Error; err != nil {
+	if err := db.First(&user, user.Username).Error; err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
@@ -47,7 +47,7 @@ func SellShareHandler(w http.ResponseWriter, r *http.Request) {
 	// we do not check whether the user has sufficient balance because this is a sale
 
 	// calculate shares owned in market
-	sharesOwned, err := marketmath.CalculateSharesOwned(db, user.ID, sellRequest.MarketID)
+	sharesOwned, err := marketmath.CalculateUserSharesOwnedOnMarket(db, user.Username, sellRequest.MarketID)
 	if err != nil {
 		// handle error
 	}

@@ -1,34 +1,19 @@
-package handlers
+package marketshandlers
 
 import (
 	"encoding/json"
 	"errors"
 	"net/http"
 	betsHandlers "socialpredict/handlers/bets"
-	marketMathHandlers "socialpredict/handlers/math/market"
+	marketmath "socialpredict/handlers/math/market"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
-	"time"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
-
-type PublicResponseMarket struct {
-	ID                      uint      `json:"id"`
-	QuestionTitle           string    `json:"questionTitle"`
-	Description             string    `json:"description"`
-	OutcomeType             string    `json:"outcomeType"`
-	ResolutionDateTime      time.Time `json:"resolutionDateTime"`
-	FinalResolutionDateTime time.Time `json:"finalResolutionDateTime"`
-	UTCOffset               int       `json:"utcOffset"`
-	IsResolved              bool      `json:"isResolved"`
-	ResolutionResult        string    `json:"resolutionResult"`
-	InitialProbability      float64   `json:"initialProbability"`
-	CreatorUsername         string    `json:"creatorUsername"`
-}
 
 func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -75,7 +60,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	bets := betsHandlers.GetBetsForMarket(marketIDUint)
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := marketMathHandlers.CalculateMarketProbabilities(market, bets)
+	probabilityChanges := marketmath.CalculateMarketProbabilities(market, bets)
 
 	numUsers := usersHandlers.GetNumMarketUsers(bets)
 	if err != nil {
@@ -84,7 +69,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Inside your handler
-	marketVolume := marketMathHandlers.GetMarketVolume(bets)
+	marketVolume := marketmath.GetMarketVolume(bets)
 	if err != nil {
 		// Handle error
 	}
@@ -95,11 +80,11 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Manually construct the response
 	response := struct {
-		Market             PublicResponseMarket                   `json:"market"`
-		Creator            usersHandlers.PublicUserType           `json:"creator"`
-		ProbabilityChanges []marketMathHandlers.ProbabilityChange `json:"probabilityChanges"`
-		NumUsers           int                                    `json:"numUsers"`
-		TotalVolume        float64                                `json:"totalVolume"`
+		Market             PublicResponseMarket           `json:"market"`
+		Creator            usersHandlers.PublicUserType   `json:"creator"`
+		ProbabilityChanges []marketmath.ProbabilityChange `json:"probabilityChanges"`
+		NumUsers           int                            `json:"numUsers"`
+		TotalVolume        float64                        `json:"totalVolume"`
 	}{
 		Market:             responseMarket,
 		Creator:            publicCreator,

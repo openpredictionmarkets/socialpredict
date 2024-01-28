@@ -1,4 +1,4 @@
-package handlers
+package betshandlers
 
 import (
 	"encoding/json"

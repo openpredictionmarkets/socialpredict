@@ -1,4 +1,4 @@
-package handlers
+package marketmath
 
 import (
 	"socialpredict/models"
