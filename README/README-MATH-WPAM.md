@@ -4,17 +4,20 @@
 
 * The Weighted Probability Adjustment Model is our base model and the math functions for this can be viewed by searching our codebase for WPAM. WPAM is designed to update the probability of an outcome based on the total amount bet on each possibility. It gives more weight to the initial settings (initial probability and investment) to stabilize the market in its early phase.
 
-WPAM Formula:
+##### WPAM Formula
 
 ```math
-P_{\text{new}} = \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{YES}}}{I_{\text{initial}} + A_{\text{YES}} + A_{\text{NO}}}
 
+P_{\text{new}} = \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{YES}}}{I_{\text{initial}} + A_{\text{YES}} + A_{\text{NO}}}
+\\
 \text{where:} \\
+\\
 P_{\text{new}} \text{ is the new probability.} \\
 P_{\text{initial}} \text{ is the initial probability, set to 0.5.} \\
 I_{\text{initial}} \text{ is the initial investment, assumed to be 10 points.} \\
 A_{\text{YES}} \text{ is the total amount bet on "YES".} \\
 A_{\text{NO}} \text{ is the total amount bet on "NO".}
+
 ```
 
 * Initial Probability as a Weighted Factor: The initial probability (P_initial) is typically set to represent a balanced or neutral starting point for the market, often 0.5 for a 50-50 chance. This value is used as a weighted factor in the numerator to establish the baseline influence on the market's direction.
