@@ -7,8 +7,13 @@
 ##### WPAM Formula
 
 ```math
+\begin{align*}
+P_{\text{new}} &= \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{YES}}}{I_{\text{initial}} + A_{\text{YES}} + A_{\text{NO}}} \\
+\end{align*}
+```
+
+```math
 \begin{flalign*}
-& P_{\text{new}} = \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{YES}}}{I_{\text{initial}} + A_{\text{YES}} + A_{\text{NO}}} & \\
 & \text{where:} & \\
 & P_{\text{new}} \text{ is the new probability.} & \\
 & P_{\text{initial}} \text{ is the initial probability, set to 0.5.} & \\
