@@ -30,19 +30,19 @@ P_{\text{new}} &= \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{
 
 1. (I_initial) of 10, (P_initial) of 0.50, (A_NO) order made in amount of 20.
 
-```
+```math
 P_{\text{new}} = \frac{0.5 \times 10}{10 + 0 + 20} = \frac{5}{30} \approx 0.167
 ```
 
 2. Same as above but (A_YES) order made in amount of 10.
 
-```
+```math
 P_{\text{new}} = \frac{0.5 \times 10 + 10}{10 + 10 + 0} = \frac{15}{20} = 0.75
 ```
 
 3. Follow up order on (2) made in (A_NO) direction.
 
-```
+```math
 P_{\text{new}} = \frac{0.5 \times 10}{10 + 0 + 20} = \frac{5}{30} \approx 0.167
 ```
 
