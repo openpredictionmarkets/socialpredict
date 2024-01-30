@@ -71,11 +71,11 @@ $ p_i $: \text{Market probability at the time of bet } i \\
 ```math
 \begin{align*}
 & S_{\text{YES}} &= S \times R \\
-\end{lalign*}
+\end{align*}
 ```
 
 ```math
 \begin{align*}
 & S_{\text{NO}} &= S \times (1 - R) \\
-\end{lalign*}
+\end{align*}
 ```
