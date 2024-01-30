@@ -168,18 +168,27 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-& \text{Step 3: Calculate Normalization Factor} & \\
+\text{Step 3: Calculate Normalization Factor} & \\
 \end{flalign*}
 ```
 
 ```math
-& \text{Normalization Factor}_{\text{YES}} = \min\left(1, \frac{S_{\text{YES}}}{\text{Total Raw Payout}_{\text{YES}}}\right) \\
-\text{Normalization Factor}_{\text{NO}} = \min\left(1, \frac{S_{\text{NO}}}{\text{Total Raw Payout}_{\text{NO}}}\right) \\
+\begin{align*}
+& \text{Normalization Factor}_{\text{YES}} = \min\left(1, \frac{S_{\text{YES}}}{\text{Total Raw Payout}_{\text{YES}}}\right) & \\
+& \text{Normalization Factor}_{\text{NO}} = \min\left(1, \frac{S_{\text{NO}}}{\text{Total Raw Payout}_{\text{NO}}}\right) & \\
+\end{align*}
 ```
 
 ```math
-\text{Step 4: Apply Normalization to Calculate Final Payouts} \\
-$ \text{Final Payout}_i = \text{Raw Payout}_i \times \text{Normalization Factor}_{\text{YES or NO}}
+\begin{flalign*}
+\text{Step 4: Apply Normalization to Calculate Final Payouts} & \\
+\end{flalign*}
+```
+
+```math
+\begin{align*}
+& \text{Final Payout}_i = \text{Raw Payout}_i \times \text{Normalization Factor}_{\text{YES or NO}} & \\
+\end{align*}
 ```
 
 ##### Step Four
