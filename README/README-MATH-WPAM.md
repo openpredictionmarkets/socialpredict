@@ -101,9 +101,11 @@ So instead, we need to come up with an operation where every user's bet will be 
 ---
 
 ```math
-\text{For each bet } i: \\
-$ d_i = |R - p_i| $ \quad  \\
-$ C_i = d_i \times b_i $ \\
+\begin{align*}
+& \text{For each bet } i: & \\
+& d_i = |R - p_i| $ \quad  & \\
+& C_i = d_i \times b_i & \\
+\end{align*}
 ```
 
 ```math
@@ -113,7 +115,7 @@ $ C_i = d_i \times b_i $ \\
 & b_i : \text{Bet amount of bet } i  & \\
 & p_i : \text{Market probability at the time of bet } i  & \\
 & d_i: \text{the Reward Factor, representing the linear deviation from the R to p_i at b_i} & \\
-& C_i: \text{he Course payout prior to normalization} &
+& C_i: \text{he Course payout prior to normalization} & \\
 \end{flalign*}
 ```
 
