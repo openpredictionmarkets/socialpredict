@@ -57,14 +57,13 @@ P_{\text{new}} = \frac{0.5 \times 10}{10 + 0 + 20} = \frac{5}{30} \approx 0.167
 
 ```math
 \begin{flalign*}
-\text{Given:} \\
-R: \text{Resolution probability (ranging from 0 to 1)} \\
-S: \text{Total share pool, sum of all bet amounts} \\
-$ b_i $: \text{Bet amount of bet } i \\
-$ p_i $: \text{Market probability at the time of bet } i \\
+& \text{Given:} & \\
+& R: \text{Resolution probability (ranging from 0 to 1)} & \\
+& S: \text{Total share pool, sum of all bet amounts} & \\
+& b_i : \text{Bet amount of bet } i  & \\
+& p_i : \text{Market probability at the time of bet } i  & \\
 \\
-\text{Total Payout Pools:} \\
-\\
+& \text{Total Payout Pools:} & \\
 \end{flalign*}
 ```
 
