@@ -142,40 +142,40 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-& \text{Step 1: Calculate Raw Payouts} & \\
+& \text{Step 1: Calculate Course Payouts} & \\
 \end{flalign*}
 ```
 
 ```math
 \begin{align*}
-& C_i = d_i \times b_i & \\
+& C_i \text{ (Course Payout) } = d_i \times b_i & \\
 & \text{where } d_i = |R - p_i| & \\
 \end{align*}
 ```
 
 ```math
 \begin{flalign*}
-& \text{Step 2: Sum Course Payouts for Each Pool} & \\
+& \text{Step 2: Sum Course Payouts, C for Each Pool} & \\
 \end{flalign*}
 ```
 
 ```math
 \begin{align*}
-& C_{\text{YES}} = \sum_{i \in \text{YES}} \text{Raw Payout}_i & \\
-& C_{\text{NO}} = \sum_{i \in \text{NO}} \text{Raw Payout}_i & \\
+& C_{\text{YES}} = \sum_{i \in \text{YES}} C_i & \\
+& C_{\text{NO}} = \sum_{i \in \text{NO}} C_i & \\
 \end{align*}
 ```
 
 ```math
 \begin{flalign*}
-& \text{Step 3: Calculate Normalization Factor} & \\
+& \text{Step 3: Calculate Normalization Factor, F for Each Pool} & \\
 \end{flalign*}
 ```
 
 ```math
 \begin{align*}
-& \text{Normalization Factor}_{\text{YES}} = \min\left(1, \frac{S_{\text{YES}}}{\text{Total Raw Payout}_{\text{YES}}}\right) & \\
-& \text{Normalization Factor}_{\text{NO}} = \min\left(1, \frac{S_{\text{NO}}}{\text{Total Raw Payout}_{\text{NO}}}\right) & \\
+& F{\text{ (Normalization Factor)}_{\text{YES}}} = \min\left(1, \frac{S_{\text{YES}}}{\text{C}_{\text{YES}}}\right) & \\
+& F{\text{ (Normalization Factor)}_{\text{NO}}} = \min\left(1, \frac{S_{\text{NO}}}{\text{C}_{\text{NO}}}\right) & \\
 \end{align*}
 ```
 
@@ -187,7 +187,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{align*}
-& \text{Final Payout}_i = \text{Raw Payout}_i \times \text{Normalization Factor}_{\text{YES or NO}} & \\
+& \text{Final Payout}_i = \text{C}_i \times \text{F}_{\text{YES or NO}} & \\
 \end{align*}
 ```
 
