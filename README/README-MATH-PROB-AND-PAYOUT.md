@@ -155,7 +155,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-\text{Step 2: Sum Course Payouts for Each Pool} & \\
+& \text{Step 2: Sum Course Payouts for Each Pool} & \\
 \end{flalign*}
 ```
 
@@ -168,7 +168,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-\text{Step 3: Calculate Normalization Factor} & \\
+& \text{Step 3: Calculate Normalization Factor} & \\
 \end{flalign*}
 ```
 
@@ -181,7 +181,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-\text{Step 4: Apply Normalization to Calculate Final Payouts} & \\
+& \text{Step 4: Apply Normalization to Calculate Final Payouts} & \\
 \end{flalign*}
 ```
 
@@ -194,8 +194,15 @@ So instead, we need to come up with an operation where every user's bet will be 
 ##### Step Four
 
 ```math
-\section{Total Payout Distribution}
-\
-\text{Sum of } $\text{Payout}_i$ \text{ for all YES bets to distribute } $S_{\text{YES}}$ \\
-\text{Sum of } $\text{Payout}_i$ \text{ for all NO bets to distribute } $S_{\text{NO}}$
+\begin{flalign*}
+& \section{Total Payout Distribution} & \\
+\end{flalign*}
+
+```
+
+```math
+\begin{flalign*}
+& \text{Sum of } $\text{Payout}_i$ \text{ for all YES bets to distribute } $S_{\text{YES}} & \\
+\text{Sum of } $\text{Payout}_i$ \text{ for all NO bets to distribute } $S_{\text{NO}} & \\
+\end{flalign*}
 ```
