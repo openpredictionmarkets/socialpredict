@@ -98,6 +98,8 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ##### DBPM Formula for Calculating Reward Factor
 
+---
+
 ```math
 \text{For each bet } i: \\
 $ d_i = |R - p_i| $ \quad  \\
@@ -115,28 +117,19 @@ $ C_i = d_i \times b_i $ \\
 \end{flalign*}
 ```
 
+---
+
 ##### Step Three
 
 
-##### Step Four
-
-
-
-
-\section{Individual Payout Calculation}
-
-
-\\
-
-\section{Scalability}
-
+```math
 \text{Step 1: Calculate Raw Payouts} \\
-$ \text{Raw Payout}_i = d_i \times b_i \\
+$ C_i = d_i \times b_i \\
 \text{where } d_i = |R - p_i| \\
 
-\text{Step 2: Sum Raw Payouts for Each Pool} \\
-$ \text{Total Raw Payout}_{\text{YES}} = \sum_{i \in \text{YES}} \text{Raw Payout}_i \\
-\text{Total Raw Payout}_{\text{NO}} = \sum_{i \in \text{NO}} \text{Raw Payout}_i \\
+\text{Step 2: Sum Course Payouts for Each Pool} \\
+$ C_{\text{YES}} = \sum_{i \in \text{YES}} \text{Raw Payout}_i \\
+C_{\text{NO}} = \sum_{i \in \text{NO}} \text{Raw Payout}_i \\
 
 \text{Step 3: Calculate Normalization Factor} \\
 $ \text{Normalization Factor}_{\text{YES}} = \min\left(1, \frac{S_{\text{YES}}}{\text{Total Raw Payout}_{\text{YES}}}\right) \\
@@ -144,10 +137,13 @@ $ \text{Normalization Factor}_{\text{YES}} = \min\left(1, \frac{S_{\text{YES}}}{
 
 \text{Step 4: Apply Normalization to Calculate Final Payouts} \\
 $ \text{Final Payout}_i = \text{Raw Payout}_i \times \text{Normalization Factor}_{\text{YES or NO}}
-\\
+```
 
+##### Step Four
+
+```math
 \section{Total Payout Distribution}
 \
 \text{Sum of } $\text{Payout}_i$ \text{ for all YES bets to distribute } $S_{\text{YES}}$ \\
 \text{Sum of } $\text{Payout}_i$ \text{ for all NO bets to distribute } $S_{\text{NO}}$
-
+```
