@@ -135,22 +135,49 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ---
 
-##### Step Three
+##### Step Three - Scaling Course Payout to Actual Amount of Capital Pool Available
+
+* The above Step Two may have introduced a problem, where calculating every individual share of every individual better may have either undershot or overshot the amount of capital available in the captial pool (e.g. the actual cash or points available that everyone has thrown into the auction).
 
 
 ```math
-\text{Step 1: Calculate Raw Payouts} \\
-$ C_i = d_i \times b_i \\
-\text{where } d_i = |R - p_i| \\
+\begin{flalign*}
+& \text{Step 1: Calculate Raw Payouts} & \\
+\end{flalign*}
+```
 
-\text{Step 2: Sum Course Payouts for Each Pool} \\
-$ C_{\text{YES}} = \sum_{i \in \text{YES}} \text{Raw Payout}_i \\
-C_{\text{NO}} = \sum_{i \in \text{NO}} \text{Raw Payout}_i \\
+```math
+\begin{align*}
+& C_i = d_i \times b_i & \\
+& \text{where } d_i = |R - p_i| & \\
+\end{align*}
+```
 
-\text{Step 3: Calculate Normalization Factor} \\
-$ \text{Normalization Factor}_{\text{YES}} = \min\left(1, \frac{S_{\text{YES}}}{\text{Total Raw Payout}_{\text{YES}}}\right) \\
+```math
+\begin{flalign*}
+\text{Step 2: Sum Course Payouts for Each Pool} & \\
+\end{flalign*}
+```
+
+```math
+\begin{align*}
+& C_{\text{YES}} = \sum_{i \in \text{YES}} \text{Raw Payout}_i & \\
+& C_{\text{NO}} = \sum_{i \in \text{NO}} \text{Raw Payout}_i & \\
+\end{align*}
+```
+
+```math
+\begin{flalign*}
+& \text{Step 3: Calculate Normalization Factor} & \\
+\end{flalign*}
+```
+
+```math
+& \text{Normalization Factor}_{\text{YES}} = \min\left(1, \frac{S_{\text{YES}}}{\text{Total Raw Payout}_{\text{YES}}}\right) \\
 \text{Normalization Factor}_{\text{NO}} = \min\left(1, \frac{S_{\text{NO}}}{\text{Total Raw Payout}_{\text{NO}}}\right) \\
+```
 
+```math
 \text{Step 4: Apply Normalization to Calculate Final Payouts} \\
 $ \text{Final Payout}_i = \text{Raw Payout}_i \times \text{Normalization Factor}_{\text{YES or NO}}
 ```
