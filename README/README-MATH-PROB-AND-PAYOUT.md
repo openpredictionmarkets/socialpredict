@@ -195,13 +195,13 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-& \section{Total Payout Distribution} & \\
+& {Total Payout Distribution, D} & \\
 \end{flalign*}
 ```
 
 ```math
 \begin{align*}
-& \text{Sum of } \text{Payout}_i \text{ for all YES bets to distribute } S_{\text{YES}} & \\
-& \text{Sum of } \text{Payout}_i \text{ for all NO bets to distribute } S_{\text{NO}} & \\
+& D = \sum_{\text{Payout}_i \text{ for all YES bets to distribute } S_{\text{YES}}} & \\
+& D = \sum_{\text{Payout}_i \text{ for all NO bets to distribute } S_{\text{NO}}} & \\
 \end{align*}
 ```
