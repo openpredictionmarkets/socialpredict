@@ -1,4 +1,14 @@
-### Weighted Probability Adjustment Model (WPAM)
+### Market Probability Adjustment and Outcome Update Mechanisms
+
+Two phases of [Double Auctions](https://en.wikipedia.org/wiki/Double_auction) occuring over time arguably exist:
+
+1. The time from the start of the auction to just before the end of the auction, where buyers and sellers are mutually determining a price at any given time during the auction.
+2. The end price of the market, which determines how all participants get paid out.
+
+To that end, we have established two mathematical frameworks which allow buying and selling of shares in a binary market to allow (1) which updates the market probability (or possibly better stated, the [normalized price, between 0 and 1](https://forum.effectivealtruism.org/posts/cJc3f4HmFqCZsgGJe/don-t-interpret-prediction-market-prices-as-probabilities)), and a fair payout mechanism which incentivizes risk taking and divergent opinions.
+
+* (1) Formula for Updating Market Probability  - Weighted Probability Adjustment Model (WPAM)
+* (2) Market Outcome Update Formulae - Divergence-Based Payout Model (DBPM)
 
 #### Formula for Updating Market Probability - Weighted Probability Adjustment Model (WPAM)
 
@@ -23,7 +33,6 @@ P_{\text{new}} &= \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{
 & A_{\text{NO}} \text{ is the total amount bet on "NO".} &
 \end{flalign*}
 ```
-
 ---
 
 * Initial Probability as a Weighted Factor: The initial probability (P_initial) is typically set to represent a balanced or neutral starting point for the market, often 0.5 for a 50-50 chance. This value is used as a weighted factor in the numerator to establish the baseline influence on the market's direction.
