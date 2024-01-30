@@ -79,13 +79,13 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{align*}
-& S_{\text{YES}} &= S \times R \\
+& S_{\text{YES}} = S \times R \\
 \end{align*}
 ```
 
 ```math
 \begin{align*}
-& S_{\text{NO}} &= S \times (1 - R) \\
+& S_{\text{NO}} = S \times (1 - R) \\
 \end{align*}
 ```
 ---
@@ -102,13 +102,12 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-& \text{For each Bet } i: & \\
+& \text{For Each Bet } i: & \\
 \end{flalign*}
 ```
 
 ```math
 \begin{align*}
-& \text{For each bet } i: & \\
 & d_i = |R - p_i| \quad  & \\
 & C_i = d_i \times b_i & \\
 \end{align*}
