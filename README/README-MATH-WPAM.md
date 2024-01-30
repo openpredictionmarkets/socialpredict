@@ -68,8 +68,8 @@ So instead, we need to come up with an operation where every user's bet will be 
 ```math
 \begin{flalign*}
 & \text{Given:} & \\
-& R: \text{Resolution probability (ranging from 0 to 1)} & \\
-& S: \text{Total share pool, sum of all bet amounts} & \\
+& R : \text{Resolution probability (ranging from 0 to 1)} & \\
+& S : \text{Total share pool, sum of all bet amounts} & \\
 & b_i : \text{Bet amount of bet } i  & \\
 & p_i : \text{Market probability at the time of bet } i  & \\
 \\
@@ -103,19 +103,19 @@ So instead, we need to come up with an operation where every user's bet will be 
 ```math
 \begin{align*}
 & \text{For each bet } i: & \\
-& d_i = |R - p_i| $ \quad  & \\
-& C_i = d_i \times b_i & \\
+& d_i &= |R - p_i| $ \quad  & \\
+& C_i &= d_i \times b_i & \\
 \end{align*}
 ```
 
 ```math
 \begin{flalign*}
 & \text{where:} & \\
-& R: \text{Resolution probability (ranging from 0 to 1)} & \\
+& R : \text{Resolution probability (ranging from 0 to 1)} & \\
 & b_i : \text{Bet amount of bet } i  & \\
 & p_i : \text{Market probability at the time of bet } i  & \\
-& d_i: \text{the Reward Factor, representing the linear deviation from the R to p_i at b_i} & \\
-& C_i: \text{he Course payout prior to normalization} & \\
+& d_i : \text{the Reward Factor, representing the linear deviation from the R to p at b} & \\
+& C_i : \text{he Course payout prior to normalization} & \\
 \end{flalign*}
 ```
 
