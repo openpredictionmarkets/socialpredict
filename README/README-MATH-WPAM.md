@@ -103,8 +103,8 @@ So instead, we need to come up with an operation where every user's bet will be 
 ```math
 \begin{align*}
 & \text{For each bet } i: & \\
-& d_i &= |R - p_i| \quad  & \\
-& C_i &= d_i \times b_i & \\
+& d_i = |R - p_i| \quad  & \\
+& C_i = d_i \times b_i & \\
 \end{align*}
 ```
 
