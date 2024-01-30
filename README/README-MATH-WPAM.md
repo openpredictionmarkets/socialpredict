@@ -4,9 +4,9 @@
 
 * The Weighted Probability Adjustment Model is our base model and the math functions for this can be viewed by searching our codebase for WPAM. WPAM is designed to update the probability of an outcome based on the total amount bet on each possibility. It gives more weight to the initial settings (initial probability and investment) to stabilize the market in its early phase.
 
-##### WPAM Formula
-
 ---
+##### WPAM Formula for Updating Market Probability
+
 
 ```math
 \begin{align*}
