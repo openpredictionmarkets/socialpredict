@@ -187,7 +187,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{align*}
-& \text{Final Payout}_i = \text{C}_i \times \text{F}_{\text{YES or NO}} & \\
+& \text{Final Payout}_i = \text{C}{\text{YES or NO}}_i \times \text{F}_{\text{YES or NO}} & \\
 \end{align*}
 ```
 
@@ -202,7 +202,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{flalign*}
-& \text{Sum of } $\text{Payout}_i$ \text{ for all YES bets to distribute } $S_{\text{YES}} & \\
-\text{Sum of } $\text{Payout}_i$ \text{ for all NO bets to distribute } $S_{\text{NO}} & \\
+& \text{Sum of } \text{Payout}_i \text{ for all YES bets to distribute } S_{\text{YES}} & \\
+\text{Sum of } \text{Payout}_i \text{ for all NO bets to distribute } S_{\text{NO}} & \\
 \end{flalign*}
 ```
