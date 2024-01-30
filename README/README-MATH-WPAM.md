@@ -7,7 +7,6 @@
 ---
 ##### WPAM Formula for Updating Market Probability
 
-
 ```math
 \begin{align*}
 P_{\text{new}} &= \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{YES}}}{I_{\text{initial}} + A_{\text{YES}} + A_{\text{NO}}} \\
@@ -55,6 +54,9 @@ P_{\text{new}} = \frac{0.5 \times 10}{10 + 0 + 20} = \frac{5}{30} \approx 0.167
 * Markets should hypothetically be able to resolve at any given probability. That being said, a complete, "YES" resolution could be defined as resolving at 1 while a complete, "NO" resolution could be defined as 0. Anything in between those numbers could be defined as R.
 * If we accept the total pool of bets into the market from the start, meaning the sum of all bet amounts as the total betting tool, then we could calculate the share of that pool, S for either the YES or NO direction.
 
+---
+##### WPAM Formula for Dividing Up Market Pool Shares
+
 ```math
 \begin{flalign*}
 & \text{Given:} & \\
@@ -78,3 +80,4 @@ P_{\text{new}} = \frac{0.5 \times 10}{10 + 0 + 20} = \frac{5}{30} \approx 0.167
 & S_{\text{NO}} &= S \times (1 - R) \\
 \end{align*}
 ```
+---
