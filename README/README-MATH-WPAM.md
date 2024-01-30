@@ -52,3 +52,21 @@ P_{\text{new}} = \frac{0.5 \times 10}{10 + 0 + 20} = \frac{5}{30} \approx 0.167
 
 #### Market Outcome Update Formulae - Weighted Probability Adjustment Model (WPAM)
 
+* Markets should hypothetically be able to resolve at any given probability. That being said, a complete, "YES" resolution could be defined as resolving at 1 while a complete, "NO" resolution could be defined as 0. Anything in between those numbers could be defined as R.
+* If we accept the total pool of bets into the market from the start, meaning the sum of all bet amounts as the total betting tool, then we could calculate the share of that pool, S for either the YES or NO direction.
+
+```math
+
+\text{Given:} \\
+R: \text{Resolution probability (ranging from 0 to 1)} \\
+S: \text{Total share pool, sum of all bet amounts} \\
+$ b_i $: \text{Bet amount of bet } i \\
+$ p_i $: \text{Market probability at the time of bet } i \\
+\\
+\text{Total Payout Pools:} \\
+\\
+$ S_{\text{YES}} = S \times R $ \\
+$ S_{\text{NO}} = S \times (1 - R) $ \\
+\\
+
+```
