@@ -201,7 +201,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{align*}
-& D = \sum_{\text{Payout}_i \text{ for all YES bets to distribute } S_{\text{YES}}} & \\
-& D = \sum_{\text{Payout}_i \text{ for all NO bets to distribute } S_{\text{NO}}} & \\
+& D_YES = \sum{\text{Payout}_i \text{ for all YES bets to distribute } S_{\text{YES}}} & \\
+& D_NO = \sum{\text{Payout}_i \text{ for all NO bets to distribute } S_{\text{NO}}} & \\
 \end{align*}
 ```
