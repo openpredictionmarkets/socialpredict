@@ -187,7 +187,7 @@ So instead, we need to come up with an operation where every user's bet will be 
 
 ```math
 \begin{align*}
-& \text{Final Payout}_i = \text{C}{\text{YES or NO}}_i \times \text{F}_{\text{YES or NO}} & \\
+& \text{Final Payout}_i = \text{C}_{\text{YES or NO}} \times \text{F}_{\text{YES or NO}} & \\
 \end{align*}
 ```
 
