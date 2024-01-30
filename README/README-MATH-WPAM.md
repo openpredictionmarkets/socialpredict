@@ -70,7 +70,7 @@ $ p_i $: \text{Market probability at the time of bet } i \\
 
 ```math
 \begin{align*}
-$ S_{\text{YES}} = S \times R $ \\
-$ S_{\text{NO}} = S \times (1 - R) $ \\
+& S_{\text{YES}} &= S \times R &
+& S_{\text{NO}} &= S \times (1 - R) &
 \end{flalign*}
 ```
