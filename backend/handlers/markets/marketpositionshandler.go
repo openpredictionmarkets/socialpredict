@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"socialpredict/handlers/math/outcomes/dbpm"
 	betshandlers "socialpredict/handlers/bets"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/models"
@@ -42,15 +43,17 @@ func MarketPositionsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get a timeline of probability changes for the market
 	// input the market the safe way
-	probabilityChanges := marketmath.CalculateMarketProbabilities(market, allBetsOnMarket)
+	allProbabilityChangesOnMarket := marketmath.CalculateMarketProbabilitiesWPAM(market, allBetsOnMarket)
 
-	// calculate number of shares that exist in the entire market, based upon cpmm
-	totalShares := marketmath.CalculateTotalShares(allBetsOnMarket, probabilityChanges)
+	// calculate number of shares that exist in the entire market, based upon dbpm
+	S_YES, S_NO := dbpm.CalculateTotalSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
 
-	// sum up the current liquidity pool in the market across all bets, e.g. total volume
-	marketVolume := marketmath.GetMarketVolume(allBetsOnMarket)
+	// calculate course payouts
+	C_YES, C_NO := CalculateCoursePayoutsDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
 
-	// for each individual better in the market, find shares owned.
+	//
+
+	// for each individual bettor in the market, find shares owned.
 	// we want shares owned to be a function of the probability bought at
 	// such that betters who bought at a probability p when they bought will get a proportionally larger
 	// payout when p was further away from the ultimate end resolution.

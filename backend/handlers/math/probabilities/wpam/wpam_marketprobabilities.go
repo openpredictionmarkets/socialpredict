@@ -1,4 +1,4 @@
-package marketmath
+package wpam
 
 import (
 	"socialpredict/models"
@@ -54,7 +54,8 @@ func init() {
 }
 
 // Modify calculateMarketProbabilities to accept bets directly
-func CalculateMarketProbabilities(market models.Market, bets []models.Bet) []ProbabilityChange {
+// See README/README-MATH-PROB-AND-PAYOUT.md#wpam-formula-for-updating-market-probability
+func CalculateMarketProbabilitiesWPAM(market models.Market, bets []models.Bet) []ProbabilityChange {
 
 	var probabilityChanges []ProbabilityChange
 

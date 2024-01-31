@@ -6,6 +6,7 @@ import (
 	"net/http"
 	betsHandlers "socialpredict/handlers/bets"
 	marketmath "socialpredict/handlers/math/market"
+	"socialpredict/handlers/math/probabilities/wpam"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -60,7 +61,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	bets := betsHandlers.GetBetsForMarket(marketIDUint)
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := marketmath.CalculateMarketProbabilities(market, bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market, bets)
 
 	numUsers := usersHandlers.GetNumMarketUsers(bets)
 	if err != nil {
@@ -80,11 +81,11 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Manually construct the response
 	response := struct {
-		Market             PublicResponseMarket           `json:"market"`
-		Creator            usersHandlers.PublicUserType   `json:"creator"`
-		ProbabilityChanges []marketmath.ProbabilityChange `json:"probabilityChanges"`
-		NumUsers           int                            `json:"numUsers"`
-		TotalVolume        float64                        `json:"totalVolume"`
+		Market             PublicResponseMarket         `json:"market"`
+		Creator            usersHandlers.PublicUserType `json:"creator"`
+		ProbabilityChanges []wpam.ProbabilityChange     `json:"probabilityChanges"`
+		NumUsers           int                          `json:"numUsers"`
+		TotalVolume        float64                      `json:"totalVolume"`
 	}{
 		Market:             responseMarket,
 		Creator:            publicCreator,

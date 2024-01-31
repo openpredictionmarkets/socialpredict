@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	marketMathHandlers "socialpredict/handlers/math/market"
+	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/util"
 	"sort"
@@ -54,7 +54,7 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 func processBetsForDisplay(market models.Market, bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := marketMathHandlers.CalculateMarketProbabilities(market, bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market, bets)
 
 	var betsDisplayInfo []BetDisplayInfo
 
