@@ -182,6 +182,17 @@ So instead, we need to come up with an operation where every user's bet will be 
 \end{align*}
 ```
 
+* The above Step 3 does the following:
+
+###### When C>S:
+
+* Use the original normalization to scale down payouts, ensuring that total payouts do not exceed S.
+
+###### When C<S:
+
+* Since scaling payouts with a very small divisor could distort the risk-reward balance that participants agreed upon by massively expanding a payout pool unintentionally, any adjustment to increase C towards S should be done with clear rules and transparency about how these adjustments are made and under what conditions. Therefore our arbitrary rule is to only allow the S/C ratio to ever have a minimum of 1, so we don't get into a scenario where a huge payout due to a small divisor is created unintentionally. Unfortunately this means that actual points can get dropped in the final payout, but this is done to prevent undeserved balooning of payouts.
+
+
 ```math
 \begin{flalign*}
 & \text{Step 4: Apply Normalization to Calculate Final Payouts} & \\

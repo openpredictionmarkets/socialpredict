@@ -16,12 +16,11 @@ import (
 
 type MarketPosition struct {
 	Username         string
-	SharesOwned      uint
-	PurchaseProb     float64
-	CalculatedPayout float64
+	NoSharesOwned	uint
+	YesSharesOwned	uint
 }
 
-func MarketPositionsHandler(w http.ResponseWriter, r *http.Request) {
+func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
 	// Convert marketId to uint
@@ -45,53 +44,23 @@ func MarketPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	// input the market the safe way
 	allProbabilityChangesOnMarket := marketmath.CalculateMarketProbabilitiesWPAM(market, allBetsOnMarket)
 
-	// calculate number of shares that exist in the entire market, based upon dbpm
+	// calculate number of shares that exist in the entire market, based upon dbpm, uints
 	S_YES, S_NO := dbpm.CalculateTotalSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
 
-	// calculate course payouts
-	C_YES, C_NO := CalculateCoursePayoutsDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
+	// calculate course payout pools, floats
+	C_YES, C_NO := dbpm.CalculateCoursePayoutsDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
 
-	//
+	// calculate scaling factor
+	F_YES, F_NO := dbpm.CalculateNormalizationFactors(S_YES, C_YES, S_NO, C_NO)
 
-	// for each individual bettor in the market, find shares owned.
-	// we want shares owned to be a function of the probability bought at
-	// such that betters who bought at a probability p when they bought will get a proportionally larger
-	// payout when p was further away from the ultimate end resolution.
-	// So for example, those who boughtat 0.1 should get a proportionally larger share than those who bet at 0.9
-	// for a market that eventually resolves YES.
-	var positions []MarketPosition
+	// calculate normalized payout pools
+	finalPayouts := dbpm.CalculateFinalPayoutsDBPM(allBetsOnMarket, F_YES, F_NO, C_YES, C_NO)
 
-	bettorShares := make(map[string]uint) // Map to hold the shares owned by each bettor
-
-	// this below way of distributing better shares does not make sense
-	// because it's basically saying shares : amount/probability, so lower probabilities automatically get more shares
-	for i, bet := range allBetsOnMarket {
-		probability := probabilityChanges[i+1].Probability // Using i+1 because the first entry is the initial condition
-		if probability > 0 {
-			shares := bet.Amount / probability
-			bettorShares[bet.Username] += uint(shares)
-		}
-	}
-
-	finalResolutionProb := marketmath.GetFinalResolutionProbability(marketIDUint)
-
-	for username, shares := range bettorShares {
-		initialProb := // Retrieve the initial probability at which the user placed the bet
-		// Calculate payout based on how far the initial probability was from the final resolution
-		// This is a simplistic formula; you might want to refine it based on your market model
-		payoutMultiplier := math.Abs(finalResolutionProb - initialProb)
-		payout := float64(shares) * payoutMultiplier
-
-		positions = append(positions, MarketPosition{
-			Username:         username,
-			SharesOwned:      shares,
-			PurchaseProb:     initialProb,
-			CalculatedPayout: payout,
-		})
-	}
+	// aggregate user payouts into list of positions including username, yes and no positions
+	marketDBPMPositions := AggregateUserPayoutsDBPM(allBetsOnMarket, finalPayouts)
 
 
 	// Respond with the bets display information
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(thingToDisplayAtEnd)
+	json.NewEncoder(w).Encode(marketDBPMPositions)
 }

@@ -81,3 +81,86 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 
 	return yesCoursePayouts, noCoursePayouts
 }
+
+func CalculateNormalizationFactorsDBPM(S_YES uint, C_YES float64, S_NO uint, C_NO float64) (float64, float64) {
+    var F_YES, F_NO float64
+
+    // Calculate normalization factor for YES
+    if C_YES > 0 {
+		// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
+        // minimum used to prevent balooning payouts edge case
+		F_YES = min(1, float64(S_YES)/C_YES)
+    } else {
+        F_YES = 1 // Default to 1 if C_YES is 0 to avoid division by zero
+    }
+
+    // Calculate normalization factor for NO
+    if C_NO > 0 {
+		// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
+		// minimum used to prevent balooning payouts edge case
+        F_NO = min(1, float64(S_NO)/C_NO)
+    } else {
+        F_NO = 1 // Default to 1 if C_NO is 0 to avoid division by zero
+    }
+
+    return F_YES, F_NO
+}
+
+// min returns the minimum of two float64 values.
+func min(a, b float64) float64 {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+// CalculateFinalPayouts calculates the final payouts for each bet, adjusted by normalization factors.
+func CalculateFinalPayoutsDBPM(bets []models.Bet, F_YES, F_NO float64, C_YES, C_NO []float64) ([]uint) {
+    finalPayouts := make([]uint, len(bets))
+
+    for i, bet := range bets {
+        var payout float64
+
+        // Check the outcome of the bet and calculate the payout accordingly
+        if bet.Outcome == "YES" {
+            payout = C_YES[i] * F_YES
+        } else if bet.Outcome == "NO" {
+            payout = C_NO[i] * F_NO
+        }
+
+        // Convert the payout to uint, rounding as necessary
+        finalPayouts[i] = uint(math.Round(payout))
+    }
+
+    return finalPayouts
+}
+
+
+// AggregateUserPayouts aggregates YES and NO payouts for each user.
+func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []uint) []models.MarketPosition {
+    userPayouts := make(map[string]*models.MarketPosition)
+
+    for i, bet := range bets {
+        payout := finalPayouts[i]
+
+        // Initialize the user's market position if it doesn't exist
+        if _, exists := userPayouts[bet.Username]; !exists {
+            userPayouts[bet.Username] = &models.MarketPosition{Username: bet.Username}
+        }
+
+        // Aggregate payouts based on the outcome
+        if bet.Outcome == "YES" {
+            userPayouts[bet.Username].YesSharesOwned += payout
+        } else if bet.Outcome == "NO" {
+            userPayouts[bet.Username].NoSharesOwned += payout
+        }
+    }
+
+    // Convert map to slice for output
+    var positions []models.MarketPosition
+    for _, pos := range userPayouts {
+        positions = append(positions, *pos)
+    }
+
+    return positions
+}

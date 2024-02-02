@@ -34,7 +34,7 @@ func Start() {
 	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")
 	// handle market positions, get trades
 	router.HandleFunc("/v0/markets/bets/{marketId}", betshandlers.MarketBetsDisplayHandler).Methods("GET")
-	router.HandleFunc("/v0/markets/positions/{marketId}", marketshandlers.MarketPositionsHandler).Methods("GET")
+	router.HandleFunc("/v0/markets/positions/{marketId}", marketshandlers.MarketDBPMPositionsHandler).Methods("GET")
 	// show comments on markets
 
 	// handle public user stuff
