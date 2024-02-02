@@ -29,7 +29,7 @@ func CalculateUserSharesOwnedOnMarket(db *gorm.DB, username string, marketID uin
 	}
 
 	// get a timeline of probability changes for the market
-	probabilityChanges := CalculateMarketProbabilitiesWPAM(market, allBetsOnMarket)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market, allBetsOnMarket)
 
 	//
 	for _, bet := range userBets {

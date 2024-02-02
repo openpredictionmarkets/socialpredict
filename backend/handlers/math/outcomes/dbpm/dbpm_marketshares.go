@@ -7,23 +7,12 @@ import (
 	"socialpredict/models"
 )
 
-// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
-func CalculateTotalSharesDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) uint {
-	var totalShares uint = 0
-
-	// Start from 1 since the first entry in probabilityChanges is just the initial condition
-	for i, bet := range bets {
-		// Since probabilityChanges has one extra entry at the beginning, use i+1
-		probability := probabilityChanges[i+1].Probability
-
-		if probability > 0 {
-			shares := bet.Amount / probability
-			totalShares += uint(shares)
-		}
-	}
-
-	return totalShares
+type MarketPosition struct {
+	Username         string
+	NoSharesOwned	uint
+	YesSharesOwned	uint
 }
+
 
 // DivideUpMarketPoolShares divides the market pool into YES and NO pools based on the resolution probability.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
@@ -137,15 +126,15 @@ func CalculateFinalPayoutsDBPM(bets []models.Bet, F_YES, F_NO float64, C_YES, C_
 
 
 // AggregateUserPayouts aggregates YES and NO payouts for each user.
-func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []uint) []models.MarketPosition {
-    userPayouts := make(map[string]*models.MarketPosition)
+func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []uint) []MarketPosition {
+    userPayouts := make(map[string]*MarketPosition)
 
     for i, bet := range bets {
         payout := finalPayouts[i]
 
         // Initialize the user's market position if it doesn't exist
         if _, exists := userPayouts[bet.Username]; !exists {
-            userPayouts[bet.Username] = &models.MarketPosition{Username: bet.Username}
+            userPayouts[bet.Username] = &MarketPosition{Username: bet.Username}
         }
 
         // Aggregate payouts based on the outcome
@@ -157,7 +146,7 @@ func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []uint) []models.M
     }
 
     // Convert map to slice for output
-    var positions []models.MarketPosition
+    var positions []MarketPosition
     for _, pos := range userPayouts {
         positions = append(positions, *pos)
     }
