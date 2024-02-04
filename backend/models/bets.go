@@ -14,7 +14,7 @@ type Bet struct {
 	User     User      `gorm:"foreignKey:Username;references:Username"`
 	MarketID uint      `json:"marketId"`
 	Market   Market    `gorm:"foreignKey:ID;references:MarketID"`
-	Amount   float64   `json:"amount"`
+	Amount   uint      `json:"amount"`
 	PlacedAt time.Time `json:"placedAt"`
 	Outcome  string    `json:"outcome,omitempty"`
 }

@@ -5,6 +5,15 @@ The following is a documentation of various coding conventions used to keep Soci
 
 ## Backend
 
+### Ab Initio
+
+* The entire program should be as stateless as possible, bets should be ideally made in one ledger and all reporting from that point on are calculated in a stateless manner.
+* User balances may be cached, though in an ideal world user balance should also be calculated ab initio, and compared to the cached amount for verification.
+
+### Points Start with Integers
+
+* All transactions must start as integer amounts rather than float amounts. There are mathematical conventions which later transparently account for drops in points throughout market mechanisms.
+
 ### Specific Data Structs for Private and Public Responses
 
 * For certain sensitive databases such as Users, there is Private information and Public information. When information from the Users table is needed to be combined with other types of tables such as Bets or Markets, we must be sure to use a function which specifically only returns public information that we explicitly allow, to prevent private information or even private fields from leaking through into API responses.
