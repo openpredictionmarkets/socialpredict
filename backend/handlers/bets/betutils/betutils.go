@@ -34,14 +34,14 @@ func CheckMarketStatus(db *gorm.DB, marketID int64) error {
 // AppConfig holds the application-wide configuration
 type AppConfig struct {
 	InitialMarketProbability   float64
-	InitialMarketSubsidization float64
+	InitialMarketSubsidization int64
 	// user stuff
-	MaximumDebtAllowed    float64
-	InitialAccountBalance float64
+	MaximumDebtAllowed    int64
+	InitialAccountBalance int64
 	// betting stuff
-	MinimumBet    float64
-	BetFee        float64
-	SellSharesFee float64
+	MinimumBet    int64
+	BetFee        int64
+	SellSharesFee int64
 }
 
 var Appconfig AppConfig

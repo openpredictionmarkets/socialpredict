@@ -11,7 +11,7 @@ func CalculatePayoutForOutcomeDBPM(bet models.Bet, totalYes, totalNo int64, betI
 		return 0 // No payout if the bet's outcome doesn't match the market resolution
 	}
 
-	var totalPoolForOutcome float64
+	var totalPoolForOutcome int64
 	if marketResolutionInput == "YES" {
 		totalPoolForOutcome = totalYes
 	} else {
