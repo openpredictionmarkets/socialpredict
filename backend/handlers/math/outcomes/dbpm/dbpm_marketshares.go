@@ -70,25 +70,30 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 	return yesCoursePayouts, noCoursePayouts
 }
 
-func CalculateNormalizationFactorsDBPM(S_YES int64, C_YES float64, S_NO int64, C_NO float64) (float64, float64) {
+func CalculateNormalizationFactorsDBPM(S_YES int64, C_YES []float64, S_NO int64, C_NO []float64) (float64, float64) {
 	var F_YES, F_NO float64
+	var C_YES_SUM, C_NO_SUM float64
+
+	// Sum up all the elements in C_YES and C_NO slices
+	for _, value := range C_YES {
+		C_YES_SUM += value
+	}
+	for _, value := range C_NO {
+		C_NO_SUM += value
+	}
 
 	// Calculate normalization factor for YES
-	if C_YES > 0 {
-		// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
-		// minimum used to prevent balooning payouts edge case
-		F_YES = min(1, float64(S_YES)/C_YES)
+	if C_YES_SUM > 0 {
+		F_YES = min(1, float64(S_YES)/C_YES_SUM)
 	} else {
-		F_YES = 1 // Default to 1 if C_YES is 0 to avoid division by zero
+		F_YES = 1 // Default to 1 if C_YES_SUM is 0 to avoid division by zero
 	}
 
 	// Calculate normalization factor for NO
-	if C_NO > 0 {
-		// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
-		// minimum used to prevent balooning payouts edge case
-		F_NO = min(1, float64(S_NO)/C_NO)
+	if C_NO_SUM > 0 {
+		F_NO = min(1, float64(S_NO)/C_NO_SUM)
 	} else {
-		F_NO = 1 // Default to 1 if C_NO is 0 to avoid division by zero
+		F_NO = 1 // Default to 1 if C_NO_SUM is 0 to avoid division by zero
 	}
 
 	return F_YES, F_NO

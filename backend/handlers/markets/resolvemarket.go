@@ -2,6 +2,7 @@ package marketshandlers
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	dbpm "socialpredict/handlers/math/outcomes/dbpm"
 	usersHandlers "socialpredict/handlers/users"
@@ -113,7 +114,7 @@ func distributePayouts(market *models.Market, db *gorm.DB) error {
 	return calculateDBPMPayouts(market, db)
 }
 
-// calculateCPMMPayouts calculates and updates user balances based on the CPMM model.
+// calculate DBPM Payouts calculates and updates user balances based on the CPMM model.
 func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
 	// Retrieve all bets associated with the market
 	var bets []models.Bet
@@ -134,11 +135,16 @@ func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
 	// Calculate payouts based on DBPM for YES and NO outcomes
 	// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
 	for _, bet := range bets {
+
+		// calculate the course, float64 based payout
 		payout := dbpm.CalculatePayoutForOutcomeDBPM(bet, totalYes, totalNo, bet.Outcome, market.ResolutionResult)
+
+		// use rounding to see how to update user balance after payout calculation
+		int_payout := int64(math.Round(payout))
 
 		// Update user balance with the payout
 		if payout > 0 {
-			if err := usersHandlers.UpdateUserBalance(bet.Username, payout, db, "win"); err != nil {
+			if err := usersHandlers.UpdateUserBalance(bet.Username, int_payout, db, "win"); err != nil {
 				return err
 			}
 		}

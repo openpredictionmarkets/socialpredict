@@ -18,7 +18,9 @@ func CalculatePayoutForOutcomeDBPM(bet models.Bet, totalYes, totalNo int64, betI
 		totalPoolForOutcome = totalNo
 	}
 
-	totalPool := totalYes + totalNo
+	// prepare calculation by converting to float64
+	totalPool := float64(totalYes) + float64(totalNo)
 
-	return (bet.Amount / totalPoolForOutcome) * totalPool
+	// convert to float64 to do course payout calculation with float64 output
+	return (float64(bet.Amount) / float64(totalPoolForOutcome)) * totalPool
 }
