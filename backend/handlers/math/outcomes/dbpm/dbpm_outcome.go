@@ -19,5 +19,6 @@ func CalculatePayoutForOutcomeDBPM(bet models.Bet, totalYes, totalNo int64, betI
 	}
 
 	totalPool := totalYes + totalNo
+
 	return (bet.Amount / totalPoolForOutcome) * totalPool
 }
