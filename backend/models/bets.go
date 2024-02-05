@@ -9,12 +9,12 @@ import (
 type Bet struct {
 	gorm.Model
 	Action   string    `json:"action"`
-	ID       uint      `json:"id" gorm:"primary_key"`
+	ID       int64     `json:"id" gorm:"primary_key"`
 	Username string    `json:"username"`
 	User     User      `gorm:"foreignKey:Username;references:Username"`
-	MarketID uint      `json:"marketId"`
+	MarketID int64     `json:"marketId"`
 	Market   Market    `gorm:"foreignKey:ID;references:MarketID"`
-	Amount   uint      `json:"amount"`
+	Amount   int64     `json:"amount"`
 	PlacedAt time.Time `json:"placedAt"`
 	Outcome  string    `json:"outcome,omitempty"`
 }

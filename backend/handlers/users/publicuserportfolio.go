@@ -15,10 +15,10 @@ import (
 )
 
 type PortfolioItem struct {
-	MarketID      uint      `json:"marketId"`
+	MarketID      int64     `json:"marketId"`
 	QuestionTitle string    `json:"questionTitle"`
-	TotalYesBets  float64   `json:"totalYesBets"`
-	TotalNoBets   float64   `json:"totalNoBets"`
+	TotalYesBets  int64     `json:"totalYesBets"`
+	TotalNoBets   int64     `json:"totalNoBets"`
 	LastBetPlaced time.Time `json:"lastBetPlaced"`
 }
 
@@ -68,7 +68,7 @@ func fetchUserBets(db *gorm.DB, username string) ([]models.Bet, error) {
 }
 
 func processUserBets(userbets []models.Bet) ([]PortfolioItem, error) {
-	marketMap := make(map[uint]PortfolioItem)
+	marketMap := make(map[int64]PortfolioItem)
 
 	// Iterate over all bets
 	for _, bet := range userbets {

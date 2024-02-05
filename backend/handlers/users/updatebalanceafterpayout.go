@@ -8,7 +8,7 @@ import (
 )
 
 // updateUserBalance updates the user's account balance for winnings or refunds
-func UpdateUserBalance(username string, amount float64, db *gorm.DB, transactionType string) error {
+func UpdateUserBalance(username string, amount int64, db *gorm.DB, transactionType string) error {
 	var user models.User
 
 	// Retrieve the user from the database using the username

@@ -3,7 +3,7 @@ package marketshandlers
 import "time"
 
 type PublicResponseMarket struct {
-	ID                      uint      `json:"id"`
+	ID                      int64     `json:"id"`
 	QuestionTitle           string    `json:"questionTitle"`
 	Description             string    `json:"description"`
 	OutcomeType             string    `json:"outcomeType"`

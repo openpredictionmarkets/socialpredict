@@ -11,7 +11,7 @@ import (
 
 // CheckMarketStatus checks if the market is resolved or closed.
 // It returns an error if the market is not suitable for placing a bet.
-func CheckMarketStatus(db *gorm.DB, marketID uint) error {
+func CheckMarketStatus(db *gorm.DB, marketID int64) error {
 	var market models.Market
 	if result := db.First(&market, marketID); result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {

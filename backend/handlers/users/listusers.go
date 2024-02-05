@@ -18,7 +18,7 @@ func GetNumMarketUsers(bets []models.Bet) int {
 }
 
 // ListUserMarkets lists all markets that a specific user is betting in, ordered by the date of the last bet.
-func ListUserMarkets(db *gorm.DB, userID uint64) ([]models.Market, error) {
+func ListUserMarkets(db *gorm.DB, userID int64) ([]models.Market, error) {
 	var markets []models.Market
 
 	// Query to find all markets where the user has bets, ordered by the date of the last bet

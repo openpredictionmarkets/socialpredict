@@ -7,8 +7,8 @@ import (
 )
 
 type PublicBet struct {
-	BetID    uint      `json:"betId"`
-	MarketID uint      `json:"marketId"`
+	BetID    int64     `json:"betId"`
+	MarketID int64     `json:"marketId"`
 	Amount   float64   `json:"amount"`
 	PlacedAt time.Time `json:"placedAt"`
 	Outcome  string    `json:"outcome,omitempty"`

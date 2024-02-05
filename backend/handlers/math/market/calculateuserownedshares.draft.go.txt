@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CalculateUserSharesOwnedOnMarket(db *gorm.DB, username string, marketID uint) (float64, error) {
+func CalculateUserSharesOwnedOnMarket(db *gorm.DB, username string, marketID int64) (float64, error) {
 	var allBetsOnMarket []models.Bet
 	var userBets []models.Bet
 	var totalShares float64
@@ -41,7 +41,7 @@ func CalculateUserSharesOwnedOnMarket(db *gorm.DB, username string, marketID uin
 	return totalShares, nil
 }
 
-func CalculateUserSharesOwnedOnMarket(userBets []models.Bet, probabilityChanges ProbabilityChange) (uint, error) {
+func CalculateUserSharesOwnedOnMarket(userBets []models.Bet, probabilityChanges ProbabilityChange) (int64, error) {
 	// ... [previous code] ...
 
 	for _, bet := range userBets {

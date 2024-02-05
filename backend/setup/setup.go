@@ -15,22 +15,22 @@ type EconomicConfig struct {
 	Economics struct {
 		MarketCreation struct {
 			InitialMarketProbability   float64 `yaml:"initialMarketProbability"`
-			InitialMarketSubsidization float64 `yaml:"initialMarketSubsidization"`
-			InitialMarketYes           float64 `yaml:"initialMarketYes"`
-			InitialMarketNo            float64 `yaml:"initialMarketNo"`
+			InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization"`
+			InitialMarketYes           int64   `yaml:"initialMarketYes"`
+			InitialMarketNo            int64   `yaml:"initialMarketNo"`
 		} `yaml:"marketcreation"`
 		MarketIncentives struct {
-			CreateMarketCost float64 `yaml:"createMarketCost"`
-			TraderBonus      float64 `yaml:"traderBonus"`
+			CreateMarketCost int64 `yaml:"createMarketCost"`
+			TraderBonus      int64 `yaml:"traderBonus"`
 		} `yaml:"marketincentives"`
 		User struct {
-			InitialAccountBalance float64 `yaml:"initialAccountBalance"`
-			MaximumDebtAllowed    float64 `yaml:"maximumDebtAllowed"`
+			InitialAccountBalance int64 `yaml:"initialAccountBalance"`
+			MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed"`
 		} `yaml:"user"`
 		Betting struct {
-			MinimumBet    float64 `yaml:"minimumBet"`
-			BetFee        float64 `yaml:"betFee"`
-			SellSharesFee float64 `yaml:"sellSharesFee"`
+			MinimumBet    int64 `yaml:"minimumBet"`
+			BetFee        int64 `yaml:"betFee"`
+			SellSharesFee int64 `yaml:"sellSharesFee"`
 		} `yaml:"betting"`
 	} `yaml:"economics"`
 }

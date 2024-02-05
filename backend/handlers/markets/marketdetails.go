@@ -85,7 +85,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		Creator            usersHandlers.PublicUserType `json:"creator"`
 		ProbabilityChanges []wpam.ProbabilityChange     `json:"probabilityChanges"`
 		NumUsers           int                          `json:"numUsers"`
-		TotalVolume        float64                      `json:"totalVolume"`
+		TotalVolume        int64                        `json:"totalVolume"`
 	}{
 		Market:             responseMarket,
 		Creator:            publicCreator,

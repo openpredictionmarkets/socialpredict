@@ -43,7 +43,7 @@ func marketPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	// Database connection
 	db := util.GetDB()
 
-	// Convert marketId to uint
+	// Convert marketId to int64
 	marketIDUint, err := strconv.ParseUint(marketId, 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"socialpredict/handlers/math/outcomes/dbpm"
 	betshandlers "socialpredict/handlers/bets"
+	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"strconv"
@@ -14,15 +14,15 @@ import (
 )
 
 type MarketPosition struct {
-	Username         string
-	NoSharesOwned	uint
-	YesSharesOwned	uint
+	Username       string
+	NoSharesOwned  int64
+	YesSharesOwned int64
 }
 
 func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
-	// Convert marketId to uint
+	// Convert marketId to int64
 	marketIDUint, err := strconv.ParseUint(marketIdStr, 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
@@ -40,7 +40,7 @@ func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	// input the market the safe way
 	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(market, allBetsOnMarket)
 
-	// calculate number of shares that exist in the entire market, based upon dbpm, uints
+	// calculate number of shares that exist in the entire market, based upon dbpm, int64s
 	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
 
 	// calculate course payout pools, floats
@@ -54,7 +54,6 @@ func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// aggregate user payouts into list of positions including username, yes and no positions
 	marketDBPMPositions := dbpm.AggregateUserPayoutsDBPM(allBetsOnMarket, finalPayouts)
-
 
 	// Respond with the bets display information
 	w.Header().Set("Content-Type", "application/json")

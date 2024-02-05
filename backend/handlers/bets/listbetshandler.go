@@ -18,7 +18,7 @@ import (
 type BetDisplayInfo struct {
 	Username    string    `json:"username"`
 	Outcome     string    `json:"outcome"`
-	Amount      float64   `json:"amount"`
+	Amount      int64     `json:"amount"`
 	Probability float64   `json:"probability"`
 	PlacedAt    time.Time `json:"placedAt"`
 }
@@ -26,7 +26,7 @@ type BetDisplayInfo struct {
 func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
-	// Convert marketId to uint
+	// Convert marketId to int64
 	marketIDUint, err := strconv.ParseUint(marketIdStr, 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)

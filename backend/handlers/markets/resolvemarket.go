@@ -122,7 +122,7 @@ func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
 	}
 
 	// Initialize variables to calculate total amounts for each outcome
-	var totalYes, totalNo float64
+	var totalYes, totalNo int64
 	for _, bet := range bets {
 		if bet.Outcome == "YES" {
 			totalYes += bet.Amount

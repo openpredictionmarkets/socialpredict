@@ -14,18 +14,18 @@ type ProbabilityChange struct {
 // AppConfig holds the application-wide configuration
 type AppConfig struct {
 	InitialMarketProbability   float64
-	InitialMarketSubsidization float64
-	InitialMarketYes           float64
-	InitialMarketNo            float64
-	CreateMarketCost           float64
-	TraderBonus                float64
+	InitialMarketSubsidization int64
+	InitialMarketYes           int64
+	InitialMarketNo            int64
+	CreateMarketCost           int64
+	TraderBonus                int64
 	// user stuff
-	MaximumDebtAllowed    float64
-	InitialAccountBalance float64
+	MaximumDebtAllowed    int64
+	InitialAccountBalance int64
 	// betting stuff
-	MinimumBet    float64
-	BetFee        float64
-	SellSharesFee float64
+	MinimumBet    int64
+	BetFee        int64
+	SellSharesFee int64
 }
 
 var appConfig AppConfig
@@ -76,7 +76,7 @@ func CalculateMarketProbabilitiesWPAM(market models.Market, bets []models.Bet) [
 			totalNo += bet.Amount
 		}
 
-		newProbability := (P_initial*I_initial + totalYes) / (I_initial + totalYes + totalNo)
+		newProbability := (P_initial*float64(I_initial) + float64(totalYes)) / (float64(I_initial) + float64(totalYes) + float64(totalNo))
 		probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: newProbability, Timestamp: bet.PlacedAt})
 	}
 
