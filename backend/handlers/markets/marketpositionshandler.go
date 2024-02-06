@@ -2,12 +2,12 @@ package marketshandlers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	betshandlers "socialpredict/handlers/bets"
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
+	"socialpredict/util"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -22,23 +22,30 @@ type MarketPosition struct {
 func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
-	// Convert marketId to int64
+	// Convert marketId to uint
 	marketIDUint, err := strconv.ParseUint(marketIdStr, 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
 
-	log.Println("marketIdStr: ", marketIdStr)
+	// open up database to utilize connection pooling
+	db := util.GetDB()
 
-	var allBetsOnMarket []models.Bet
+	// return the PublicResponse type with information about the market
+	publicResponseMarket, err := GetPublicResponseMarketByID(db, marketIdStr)
+	if err != nil {
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		return
+	}
 
 	// Fetch bets for the market
+	var allBetsOnMarket []models.Bet
 	allBetsOnMarket = betshandlers.GetBetsForMarket(marketIDUint)
 
 	// get a timeline of probability changes for the market
 	// input the market the safe way
-	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(market, allBetsOnMarket)
+	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
 
 	// calculate number of shares that exist in the entire market, based upon dbpm, int64s
 	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)

@@ -2,7 +2,7 @@ package betshandlers
 
 import (
 	"encoding/json"
-	"log"
+	"errors"
 	"net/http"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
@@ -26,14 +26,13 @@ type BetDisplayInfo struct {
 func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
-	// Convert marketId to int64
+
+	// Convert marketId to uint
 	marketIDUint, err := strconv.ParseUint(marketIdStr, 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
-
-	log.Println("marketIdStr: ", marketIdStr)
 
 	// Database connection
 	db := util.GetDB()
@@ -41,20 +40,32 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 	// Fetch bets for the market
 	bets := GetBetsForMarket(marketIDUint)
 
+	// feed in the time created
+	// note we are not using GetPublicResponseMarketByID because of circular import
 	var market models.Market
+	result := db.Where("ID = ?", marketIdStr).First(&market)
+	if result.Error != nil {
+		// Handle error, for example:
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			// Market not found
+		} else {
+			// Other error fetching market
+		}
+		return // Make sure to return or appropriately handle the error
+	}
 
 	// Process bets and calculate market probability at the time of each bet
-	betsDisplayInfo := processBetsForDisplay(market, bets, db)
+	betsDisplayInfo := processBetsForDisplay(market.CreatedAt, bets, db)
 
 	// Respond with the bets display information
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(betsDisplayInfo)
 }
 
-func processBetsForDisplay(market models.Market, bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
+func processBetsForDisplay(marketCreatedAtTime time.Time, bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market, bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, bets)
 
 	var betsDisplayInfo []BetDisplayInfo
 

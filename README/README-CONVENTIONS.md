@@ -96,3 +96,22 @@ func GetPublicUserInfo(db *gorm.DB, username string) PublicUserType {
 
 * While logic could be built on the client side that governs the display of buttons, we don't validate time-based actions based upon client time.
 * Hypothetically a user could manipulate their browser time to be running in the past, so we don't rely on browsers to tell us what time it is for the purposes of rulemaking. If a user wants to fiddle with the interface and show themselves action that won't be taken, we don't care, but they can't take an action on the API.
+
+### Definition of Handlers
+
+* From the standpoint of both golang packages and the actual function names, "handlers," means something specific, e.g. something responds to an HTTP request. Following the conventon of the Golang http/net package, it specifically means [responds to an HTTP request](https://pkg.go.dev/net/http#Handler).
+* So don't just call any old function a handler, make sure it has something to do with an http request, it is likely a hierarchically top level function that draws down from the API, e.g. it is the first function that is called when someone hits `api/v0/whatever`.
+
+#### Handler Response Types
+
+* Ideally, every handler should have its own type which pre-designates what is included in the response.
+
+### Database Connection Pooling
+
+* We should use database connection pooling, e.g. starting likely mostly from a handler, we should set up a database connection such as:
+
+```
+db := util.GetDB()
+```
+
+* Then moving down from there, we should try to pass db into subsequent functions so that each query being done is using the same connection, rather than running `db := util.GetDB()` again and again within each subsequent function.

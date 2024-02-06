@@ -55,7 +55,7 @@ func init() {
 
 // Modify calculateMarketProbabilities to accept bets directly
 // See README/README-MATH-PROB-AND-PAYOUT.md#wpam-formula-for-updating-market-probability
-func CalculateMarketProbabilitiesWPAM(market models.Market, bets []models.Bet) []ProbabilityChange {
+func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
 
 	var probabilityChanges []ProbabilityChange
 
@@ -66,7 +66,7 @@ func CalculateMarketProbabilitiesWPAM(market models.Market, bets []models.Bet) [
 	totalNo := appConfig.InitialMarketNo
 
 	// Add initial state
-	probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: P_initial, Timestamp: market.CreatedAt})
+	probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: P_initial, Timestamp: marketCreatedAtTime})
 
 	// Calculate probabilities after each bet
 	for _, bet := range bets {
