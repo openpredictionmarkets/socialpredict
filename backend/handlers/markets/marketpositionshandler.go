@@ -6,6 +6,7 @@ import (
 	betshandlers "socialpredict/handlers/bets"
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
@@ -42,22 +43,24 @@ func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	// Fetch bets for the market
 	var allBetsOnMarket []models.Bet
 	allBetsOnMarket = betshandlers.GetBetsForMarket(marketIDUint)
+	logging.LogAnyType(allBetsOnMarket, "allBetsOnMarket from marketpositionshandler")
 
 	// get a timeline of probability changes for the market
 	// input the market the safe way
 	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
+	logging.LogAnyType(allProbabilityChangesOnMarket, "allProbabilityChangesOnMarket from marketpositionshandler")
 
 	// calculate number of shares that exist in the entire market, based upon dbpm, int64s
 	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
 
 	// calculate course payout pools, floats
-	C_YES, C_NO := dbpm.CalculateCoursePayoutsDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
+	coursePayouts := dbpm.CalculateCoursePayoutsDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
 
 	// calculate scaling factor
-	F_YES, F_NO := dbpm.CalculateNormalizationFactorsDBPM(S_YES, C_YES, S_NO, C_NO)
+	F_YES, F_NO := dbpm.CalculateNormalizationFactorsDBPM(S_YES, S_NO, coursePayouts)
 
 	// calculate normalized payout pools
-	finalPayouts := dbpm.CalculateFinalPayoutsDBPM(allBetsOnMarket, F_YES, F_NO, C_YES, C_NO)
+	finalPayouts := dbpm.CalculateFinalPayoutsDBPM(allBetsOnMarket, coursePayouts, F_YES, F_NO)
 
 	// aggregate user payouts into list of positions including username, yes and no positions
 	marketDBPMPositions := dbpm.AggregateUserPayoutsDBPM(allBetsOnMarket, finalPayouts)

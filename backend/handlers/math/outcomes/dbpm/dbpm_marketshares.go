@@ -4,8 +4,15 @@ import (
 	"math"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/logging"
 	"socialpredict/models"
 )
+
+// holds
+type CourseBetPayout struct {
+	Payout  float64
+	Outcome string
+}
 
 type MarketPosition struct {
 	Username       string
@@ -22,78 +29,72 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 
 	// Get the last probability change which is the resolution probability
 	R := probabilityChanges[len(probabilityChanges)-1].Probability
+	logging.LogAnyType(R, "R")
 
 	// Get the total share pool S as a float for precision
 	S := float64(marketmath.GetMarketVolume(bets))
+	logging.LogAnyType(S, "S")
 
 	// Calculate YES and NO pools using floating-point arithmetic
 	// Note, fractional shares will be lost here
 	S_YES := math.Round(S * R)
+	logging.LogAnyType(S_YES, "S_YES")
 	S_NO := math.Round(S * (1 - R))
+	logging.LogAnyType(S_NO, "S_NO")
 
-	// Convert results to int64
-	return int64(S_YES), int64(S_NO)
+	// Convert results to int64, rounding in predictable way
+	return int64(math.Round(S_YES)), int64(math.Round(S_NO))
 }
 
 // CalculateCoursePayoutsDBPM calculates the course payout for each bet in the market,
 // separating the payouts for YES and NO outcomes.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
-func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) ([]float64, []float64) {
+func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []CourseBetPayout {
 	if len(probabilityChanges) == 0 {
-		return nil, nil
+		return nil
 	}
+
+	var coursePayouts []CourseBetPayout
 
 	// Get the last probability change which is the resolution probability
 	R := probabilityChanges[len(probabilityChanges)-1].Probability
 
-	yesCoursePayouts := make([]float64, 0)
-	noCoursePayouts := make([]float64, 0)
-
 	for i, bet := range bets {
-		// Assuming that the index of the bet corresponds to the index in probabilityChanges
-		p_i := probabilityChanges[i].Probability
-
-		// Calculate the reward factor (d_i)
-		d_i := math.Abs(R - p_i)
-
-		// Calculate the course payout (C_i) after converting bet.Amount to float64 for calculation
-		C_i := d_i * float64(bet.Amount)
-
-		// Separate YES and NO course payouts
-		if bet.Outcome == "YES" {
-			yesCoursePayouts = append(yesCoursePayouts, C_i)
-		} else if bet.Outcome == "NO" {
-			noCoursePayouts = append(noCoursePayouts, C_i)
-		}
+		// Distance to last (current) probability times bet amount
+		C_i := math.Abs(R-probabilityChanges[i].Probability) * float64(bet.Amount)
+		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: C_i, Outcome: bet.Outcome})
 	}
 
-	return yesCoursePayouts, noCoursePayouts
+	logging.LogAnyType(coursePayouts, "coursePayouts")
+
+	return coursePayouts
 }
 
-func CalculateNormalizationFactorsDBPM(S_YES int64, C_YES []float64, S_NO int64, C_NO []float64) (float64, float64) {
+func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []CourseBetPayout) (float64, float64) {
 	var F_YES, F_NO float64
 	var C_YES_SUM, C_NO_SUM float64
 
-	// Sum up all the elements in C_YES and C_NO slices
-	for _, value := range C_YES {
-		C_YES_SUM += value
-	}
-	for _, value := range C_NO {
-		C_NO_SUM += value
+	// Iterate over coursePayouts to sum payouts based on outcome
+	for _, payout := range coursePayouts {
+		if payout.Outcome == "YES" {
+			C_YES_SUM += payout.Payout
+		} else if payout.Outcome == "NO" {
+			C_NO_SUM += payout.Payout
+		}
 	}
 
 	// Calculate normalization factor for YES
 	if C_YES_SUM > 0 {
 		F_YES = min(1, float64(S_YES)/C_YES_SUM)
 	} else {
-		F_YES = 1 // Default to 1 if C_YES_SUM is 0 to avoid division by zero
+		F_YES = 1 // Avoid division by zero
 	}
 
 	// Calculate normalization factor for NO
 	if C_NO_SUM > 0 {
 		F_NO = min(1, float64(S_NO)/C_NO_SUM)
 	} else {
-		F_NO = 1 // Default to 1 if C_NO_SUM is 0 to avoid division by zero
+		F_NO = 1 // Avoid division by zero
 	}
 
 	return F_YES, F_NO
@@ -108,21 +109,18 @@ func min(a, b float64) float64 {
 }
 
 // CalculateFinalPayouts calculates the final payouts for each bet, adjusted by normalization factors.
-func CalculateFinalPayoutsDBPM(bets []models.Bet, F_YES, F_NO float64, C_YES, C_NO []float64) []int64 {
-	finalPayouts := make([]int64, len(bets))
+func CalculateFinalPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, F_YES, F_NO float64) []int64 {
+	finalPayouts := make([]int64, len(allBetsOnMarket))
 
-	for i, bet := range bets {
-		var payout float64
-
-		// Check the outcome of the bet and calculate the payout accordingly
-		if bet.Outcome == "YES" {
-			payout = C_YES[i] * F_YES
-		} else if bet.Outcome == "NO" {
-			payout = C_NO[i] * F_NO
+	for i, payout := range coursePayouts {
+		var finalPayout float64
+		if payout.Outcome == "YES" {
+			finalPayout = payout.Payout * F_YES
+		} else if payout.Outcome == "NO" {
+			finalPayout = payout.Payout * F_NO
 		}
 
-		// Convert the payout to int64, rounding as necessary
-		finalPayouts[i] = int64(math.Round(payout))
+		finalPayouts[i] = int64(math.Round(finalPayout))
 	}
 
 	return finalPayouts
