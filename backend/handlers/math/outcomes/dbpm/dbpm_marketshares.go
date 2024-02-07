@@ -8,7 +8,7 @@ import (
 	"socialpredict/models"
 )
 
-// holds
+// holds betting payout information
 type CourseBetPayout struct {
 	Payout  float64
 	Outcome string
@@ -83,26 +83,32 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 		}
 	}
 
+	logging.LogAnyType(C_YES_SUM, "C_YES_SUM")
+	logging.LogAnyType(C_NO_SUM, "C_NO_SUM")
+
 	// Calculate normalization factor for YES
 	if C_YES_SUM > 0 {
-		F_YES = min(1, float64(S_YES)/C_YES_SUM)
+		F_YES = max(1, float64(S_YES)/C_YES_SUM)
 	} else {
 		F_YES = 1 // Avoid division by zero
 	}
 
 	// Calculate normalization factor for NO
 	if C_NO_SUM > 0 {
-		F_NO = min(1, float64(S_NO)/C_NO_SUM)
+		F_NO = max(1, float64(S_NO)/C_NO_SUM)
 	} else {
 		F_NO = 1 // Avoid division by zero
 	}
+
+	logging.LogAnyType(F_YES, "F_YES")
+	logging.LogAnyType(F_NO, "F_NO")
 
 	return F_YES, F_NO
 }
 
 // min returns the minimum of two float64 values.
-func min(a, b float64) float64 {
-	if a < b {
+func max(a, b float64) float64 {
+	if a > b {
 		return a
 	}
 	return b
@@ -122,6 +128,8 @@ func CalculateFinalPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []Cou
 
 		finalPayouts[i] = int64(math.Round(finalPayout))
 	}
+
+	logging.LogAnyType(finalPayouts, "finalPayouts")
 
 	return finalPayouts
 }
