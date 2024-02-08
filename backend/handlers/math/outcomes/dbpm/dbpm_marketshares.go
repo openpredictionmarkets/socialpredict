@@ -43,7 +43,7 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	logging.LogAnyType(S_NO, "S_NO")
 
 	// Convert results to int64, rounding in predictable way
-	return int64(math.Round(S_YES)), int64(math.Round(S_NO))
+	return int64(S_YES), int64(S_NO)
 }
 
 // CalculateCoursePayoutsDBPM calculates the course payout for each bet in the market,
@@ -106,7 +106,7 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 	return F_YES, F_NO
 }
 
-// min returns the minimum of two float64 values.
+// max returns the minimum of two float64 values.
 func max(a, b float64) float64 {
 	if a > b {
 		return a
@@ -115,23 +115,54 @@ func max(a, b float64) float64 {
 }
 
 // CalculateFinalPayouts calculates the final payouts for each bet, adjusted by normalization factors.
-func CalculateFinalPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, F_YES, F_NO float64) []int64 {
-	finalPayouts := make([]int64, len(allBetsOnMarket))
+func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, F_YES, F_NO float64) []int64 {
+	scaledPayouts := make([]int64, len(allBetsOnMarket))
 
 	for i, payout := range coursePayouts {
-		var finalPayout float64
+		var scaledPayout float64
 		if payout.Outcome == "YES" {
-			finalPayout = payout.Payout * F_YES
+			scaledPayout = payout.Payout * F_YES
 		} else if payout.Outcome == "NO" {
-			finalPayout = payout.Payout * F_NO
+			scaledPayout = payout.Payout * F_NO
 		}
 
-		finalPayouts[i] = int64(math.Round(finalPayout))
+		scaledPayouts[i] = int64(math.Round(scaledPayout))
 	}
 
-	logging.LogAnyType(finalPayouts, "finalPayouts")
+	logging.LogAnyType(scaledPayouts, "scaledPayouts")
 
-	return finalPayouts
+	return scaledPayouts
+}
+
+// adjust payouts to account for case where calculated payouts > available
+func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
+	// Calculate the sum of scaledPayouts
+	var sumScaledPayouts int64
+	for _, payout := range scaledPayouts {
+		sumScaledPayouts += payout
+	}
+
+	availablePool := marketmath.GetMarketVolume(bets)
+
+	// Determine the excess amount
+	excess := sumScaledPayouts - availablePool
+
+	// Loop to deduct from newest to oldest until there's no excess
+	for excess > 0 {
+		for i := len(scaledPayouts) - 1; i >= 0; i-- {
+			if scaledPayouts[i] > 0 { // Ensure we don't deduct from a zero payout
+				scaledPayouts[i] -= 1
+				excess -= 1
+				if excess == 0 {
+					break
+				}
+			}
+		}
+	}
+
+	adjustedPayouts := scaledPayouts
+
+	return adjustedPayouts
 }
 
 // AggregateUserPayouts aggregates YES and NO payouts for each user.

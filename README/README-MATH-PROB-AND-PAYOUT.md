@@ -99,6 +99,28 @@ So instead, we need to come up with an operation where every user's bet will be 
 ```
 ---
 
+```math
+\begin{flalign*}
+& R \in \mathbb{R}, 0 < R < 1 & \\
+& S \in \mathbb{Z}^+ & \\
+\end{flalign*}
+```
+
+```math
+\begin{flalign*}
+& S_{\text{YES}} = \left\lfloor S \cdot R \right\rceil & \\
+\end{flalign*}
+```
+
+```math
+\begin{flalign*}
+& S_{\text{NO}} = \left\lfloor S \cdot (1 - R) \right\rceil & \\
+\end{flalign*}
+```
+
+
+---
+
 * It's important to note that the inputs, b_i should be integers, while the probabilities, p_i should be floats. If the p_i is not a float, then there needs to be some kind of ultimate normalized resolution, e.g. between 0 and 100 or 0 and 1000 which represents a probability level p_i or R. So given this, the above calculation will result in fractional shares of S.
 * There should ideally be a convention showing what to do with these fractional shares, optionally distribute and always favor one side, randomly favor a side, or create a residual pool which some how gets distributed to users in some manner or acts as a, "tax" on users, perhaps preventing inflation.
 

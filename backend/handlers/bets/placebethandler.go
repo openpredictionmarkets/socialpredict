@@ -43,8 +43,12 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if the user has enough balance to place the bet
+	// sell opposite shares first
+	// check users's current position on market, YES and NO
+	// for betRequest of opposite Outcome held, first sell shares held at current price
+	// Then go forward and adjust the betRequest to adjustedBetRequest and buy new shares with amount remaining
 
+	// Check if the user has enough balance to place the bet
 	// Use the appConfig for configuration values
 	maximumDebtAllowed := betutils.Appconfig.MaximumDebtAllowed
 

@@ -60,7 +60,10 @@ func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	F_YES, F_NO := dbpm.CalculateNormalizationFactorsDBPM(S_YES, S_NO, coursePayouts)
 
 	// calculate normalized payout pools
-	finalPayouts := dbpm.CalculateFinalPayoutsDBPM(allBetsOnMarket, coursePayouts, F_YES, F_NO)
+	scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(allBetsOnMarket, coursePayouts, F_YES, F_NO)
+
+	// assess fee on newest bets by --1 point at a time, looping backwards until payouts align with available betting pool
+	finalPayouts := dbpm.AdjustPayoutsFromNewest(allBetsOnMarket, scaledPayouts)
 
 	// aggregate user payouts into list of positions including username, yes and no positions
 	marketDBPMPositions := dbpm.AggregateUserPayoutsDBPM(allBetsOnMarket, finalPayouts)
