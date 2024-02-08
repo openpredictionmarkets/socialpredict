@@ -77,32 +77,8 @@ So instead, we need to come up with an operation where every user's bet will be 
 ```math
 \begin{flalign*}
 & \text{Given:} & \\
-& R : \text{Resolution probability (ranging from 0 to 1)} & \\
-& S : \text{Total share pool, sum of all bet amounts} & \\
-& b_i : \text{Bet amount of bet } i  & \\
-& p_i : \text{Market probability at the time of bet } i  & \\
-\\
-& \text{Total Payout Pools:} & \\
-\end{flalign*}
-```
-
-```math
-\begin{align*}
-& S_{\text{YES}} = S \times R \\
-\end{align*}
-```
-
-```math
-\begin{align*}
-& S_{\text{NO}} = S \times (1 - R) \\
-\end{align*}
-```
----
-
-```math
-\begin{flalign*}
-& R \in \mathbb{R}, 0 < R < 1 & \\
-& S \in \mathbb{Z}^+ & \\
+& R \in \mathbb{R}, 0 < R < 1 : \text{Resolution probability (ranging from 0 to 1)} & \\
+& S \in \mathbb{Z}^+ : \text{Total share pool, sum of all bet amounts} & \\
 \end{flalign*}
 ```
 
