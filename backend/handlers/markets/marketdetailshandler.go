@@ -3,9 +3,9 @@ package marketshandlers
 import (
 	"encoding/json"
 	"net/http"
-	betshandlers "socialpredict/handlers/bets"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/handlers/tradingdata"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/util"
 	"strconv"
@@ -26,18 +26,20 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketId := vars["marketId"]
 
-	// Parsing a String to an Unsigned Integer, base10, 32bits
-	marketIDUint, err := strconv.ParseUint(marketId, 10, 32)
+	// Parsing a String to an Unsigned Integer, base10, 64bits
+	marketIDUint64, err := strconv.ParseUint(marketId, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
 
+	marketIDUint := uint(marketIDUint64)
+
 	// open up database to utilize connection pooling
 	db := util.GetDB()
 
 	// Fetch all bets for the market
-	bets := betshandlers.GetBetsForMarket(marketIDUint)
+	bets := tradingdata.GetBetsForMarket(db, marketIDUint)
 
 	// return the PublicResponse type with information about the market
 	publicResponseMarket, err := GetPublicResponseMarketByID(db, marketId)

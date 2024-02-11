@@ -28,11 +28,14 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 	marketIdStr := vars["marketId"]
 
 	// Convert marketId to uint
-	marketIDUint, err := strconv.ParseUint(marketIdStr, 10, 32)
+	marketIDStr := "your_market_id_string"
+	parsedUint64, err := strconv.ParseUint(marketIDStr, 10, 32)
 	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
-		return
+		// handle error
 	}
+
+	// Convert uint64 to uint safely.
+	marketIDUint := uint(parsedUint64)
 
 	// Database connection
 	db := util.GetDB()

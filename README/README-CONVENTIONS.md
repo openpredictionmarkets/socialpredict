@@ -2,6 +2,11 @@
 
 The following is a documentation of various coding conventions used to keep SocialPredict clean, maintainable and secure.
 
+## Seperation of Concerns
+
+* The application is separated into a backend and a frontend so that people who specialize in different areas can easily contribute seperately.
+* The backend is written in Golang to do the processing of data, transactions, hold models and so fourth. We use Golang because it is a highly performant language with a wide adoption rate. [In some scenarios, with the proper optimizations, Golang in terms of raw processing power can beat equivalent Rust code](https://www.reddit.com/r/golang/comments/16q78g2/re_golang_code_3x_faster_than_rust_equivalent/). (Though factoring in I/O this might not be the case).
+* The frontend is built with ReactJS, similarly because as a platform it has a high adoption rate.
 
 ## Backend
 

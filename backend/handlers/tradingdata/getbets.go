@@ -1,9 +1,10 @@
-package betshandlers
+package tradingdata
 
 import (
 	"socialpredict/models"
-	"socialpredict/util"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type PublicBet struct {
@@ -14,11 +15,10 @@ type PublicBet struct {
 	Outcome  string    `json:"outcome,omitempty"`
 }
 
-func GetBetsForMarket(marketID uint) []models.Bet {
+func GetBetsForMarket(db *gorm.DB, marketID uint) []models.Bet {
 	var bets []models.Bet
 
 	// Retrieve all bets for the market
-	db := util.GetDB()
 	if err := db.Where("market_id = ?", marketID).Find(&bets).Error; err != nil {
 		return nil
 	}

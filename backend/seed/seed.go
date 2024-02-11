@@ -164,7 +164,7 @@ func SeedBets(db *gorm.DB) {
 
 	// User IDs and Market IDs (assuming they exist in your database)
 	userNames := []string{"user1", "user2"} // User1 and User2
-	marketIDs := []int64{1, 2}              // Market1 and Market2
+	marketIDs := []uint{1, 2}               // Market1 and Market2
 	outcomes := []string{"YES", "NO"}
 
 	// Initialize betTime with the initial time

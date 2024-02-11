@@ -83,17 +83,24 @@ So instead, we need to come up with an operation where every user's bet will be 
 ```
 
 ```math
-\begin{flalign*}
+\begin{align*}
 & S_{\text{YES}} = \left\lfloor S \cdot R \right\rceil & \\
-\end{flalign*}
+\end{align*}
+```
+
+```math
+\begin{align*}
+& S_{\text{NO}} = \left\lfloor S \cdot (1 - R) \right\rceil & \\
+\end{align*}
 ```
 
 ```math
 \begin{flalign*}
-& S_{\text{NO}} = \left\lfloor S \cdot (1 - R) \right\rceil & \\
+& \text{Note that the end result pools S' are produced using Banker's Rounding.} & \\
 \end{flalign*}
 ```
 
+* [Banker's Rounding, Wikipedia](https://en.wikipedia.org/wiki/Rounding#Rounding_half_to_even)
 
 ---
 
