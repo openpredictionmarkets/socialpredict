@@ -7,8 +7,7 @@ import (
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
 	marketshandlers "socialpredict/handlers/markets"
-	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/handlers/tradingdata"
+	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -58,34 +57,33 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	marketIDStr := strconv.FormatUint(uint64(betRequest.MarketID), 10)
 	quantityOppositeShares, oppositeDirection, err := marketshandlers.CheckOppositeSharesOwned(db, marketIDStr, user.Username, betRequest.Outcome)
 
+	logging.LogAnyType(quantityOppositeShares, "quantityOppositeShares")
+	logging.LogAnyType(oppositeDirection, "oppositeDirection")
+
 	var betRequestRemain int64
-	var totalPoolSaleQuanitity int64
+	var totalPoolSaleQuanitity int64 = 0
 
+	// if we have opposite shares, sell those first to pool, deduct fees, update user balance
 	if quantityOppositeShares > 0 {
-		// get the market information so we can extract the created at time to calculate price
-		publicResponseMarket, err := marketshandlers.GetPublicResponseMarketByID(db, marketIDStr)
-		if err != nil {
-			http.Error(w, "Can't retrieve market", http.StatusBadRequest)
-			return
-		}
 
-		// extract all bets on market to calculate current price
-		allBetsOnMarket := tradingdata.GetBetsForMarket(db, betRequest.MarketID)
-		allProbabilitiesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
-		currentProbability := allProbabilitiesOnMarket[len(allProbabilitiesOnMarket)-1].Probability
-
-		// Now, proceed to sell shares to the liquidity pool
-		totalPoolSaleQuanitity, fee, err := SellSharesToPool(db, user.Username, quantityOppositeShares, oppositeDirection, currentProbability)
+		// Now, proceed to sell shares to the liquidity pool, assess fee to user balance, but not add to trade
+		totalPoolSaleQuantity, fee, err := SellSharesToPool(db, betRequest, quantityOppositeShares, oppositeDirection)
 		if err != nil {
 			// Handle error: Could not sell shares to the pool
 			http.Error(w, "Failed to sell shares to the liquidity pool: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// Adjust the total amount bet on the market after selling the shares, and fees
-		betRequestRemain = betRequest.Amount - fee - totalPoolSaleQuanitity
+		logging.LogAnyType(totalPoolSaleQuanitity, "totalPoolSaleQuanitity")
+		logging.LogAnyType(fee, "fee")
+
+		// Adjust the total amount bet on the market after selling the shares.
+		// Fee is deducted from balance, not a part of the trade on the market.
+		betRequestRemain = betRequest.Amount - totalPoolSaleQuantity
+		logging.LogAnyType(betRequestRemain, "betRequestRemain")
 	} else {
 		betRequestRemain = betRequest.Amount
+		logging.LogAnyType(betRequestRemain, "betRequestRemain")
 	}
 
 	// Check if the user has enough balance to place the bet
@@ -99,8 +97,10 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logging.LogAnyType(user.AccountBalance, "user.AccountBalance before")
 	// Deduct the bet and switching sides fee amount from the user's balance
 	user.AccountBalance -= betRequestRemain
+	logging.LogAnyType(user.AccountBalance, "user.AccountBalance after")
 
 	// Update the user's balance in the database
 	if err := db.Save(&user).Error; err != nil {
@@ -117,7 +117,9 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		Outcome:  betRequest.Outcome,
 	}
 
-	// Save the Bet to the database
+	logging.LogAnyType(bet, "bet")
+
+	// Save the Bet to the database, if transaction was greater than 0.
 	result := db.Create(&bet)
 	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
@@ -127,7 +129,9 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Record the transaction for histocial data and for updating probability
 	// Do this at the end, so that the pool bet further penalizes in the case that the person is switching sides
 	// pool is buying the shares which were just sold
-	if quantityOppositeShares > 0 {
+	if quantityOppositeShares > 0 && totalPoolSaleQuanitity > 0 {
+		logging.LogAnyType(quantityOppositeShares, "quantityOppositeShares in RecordPool if statement")
+		logging.LogAnyType(totalPoolSaleQuanitity, "totalPoolSaleQuanitity in RecordPool if statement")
 		RecordPoolTransaction(db, betRequest.MarketID, betRequest.Outcome, totalPoolSaleQuanitity)
 	}
 
@@ -136,47 +140,35 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(bet)
 }
 
-func SellSharesToPool(db *gorm.DB, username string, quantity int64, direction string, currentProbability float64) (int64, int64, error) {
-	var pricePerShare float64
-	if direction == "YES" {
-		pricePerShare = currentProbability
-	} else if direction == "NO" {
-		pricePerShare = 1 - currentProbability
-	}
+func SellSharesToPool(db *gorm.DB, betRequest models.Bet, quantityOppositeSharesHeld int64, direction string) (int64, int64, error) {
 
-	// Calculate the total sale value before fees
-	totalSaleValueBeforeFees := float64(quantity) * pricePerShare
+	// totalSaleValueBeforeFees has already been calculated by marketshandlers.CheckOppositeSharesOwned
+	differenceInRequestedAndHeld := int64(math.Abs(float64(betRequest.Amount - quantityOppositeSharesHeld)))
 
 	var feePercent float64 = 0.05
 
 	// Calculate the fee as 5% of the sale value
-	fee := int64(math.Round(totalSaleValueBeforeFees * feePercent))
+	fee := int64(math.Round(float64(differenceInRequestedAndHeld) * feePercent))
 
 	// Ensure the fee is at least 1 point if 5% doesn't round up to 1
 	if fee < 1 {
 		fee = 1
 	}
 
-	// Adjust the total sale value after fees
-	totalSaleValueAfterFees := totalSaleValueBeforeFees - float64(fee)
-
-	// Round and convert to int64 for updating balance
-	totalPoolSaleValue := int64(math.Round(totalSaleValueAfterFees))
-
 	// Fetch the user from the database
 	var user models.User
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		return totalPoolSaleValue, fee, err // User not found or other database error
+	if err := db.Where("username = ?", betRequest.Username).First(&user).Error; err != nil {
+		return differenceInRequestedAndHeld, fee, err // User not found or other database error
 	}
 
-	// Update user's balance by adding the sale value, after fees
-	user.AccountBalance += totalPoolSaleValue
+	// Update user's balance by adding the sale value, minus the fee
+	user.AccountBalance += differenceInRequestedAndHeld - fee
 	if err := db.Save(&user).Error; err != nil {
-		return totalPoolSaleValue, fee, err // Error updating user balance
+		return differenceInRequestedAndHeld, fee, err // Error updating user balance
 	}
 
 	// Return the totalSaleValue for further processing
-	return totalPoolSaleValue, fee, nil
+	return differenceInRequestedAndHeld, fee, nil
 }
 
 // RecordPoolTransaction records a transaction made by the liquidity pool (admin) to the database.

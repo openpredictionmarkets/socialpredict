@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
+	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/util"
 	"sort"
@@ -29,8 +30,7 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 	marketIdStr := vars["marketId"]
 
 	// Convert marketId to uint
-	marketIDStr := "your_market_id_string"
-	parsedUint64, err := strconv.ParseUint(marketIDStr, 10, 32)
+	parsedUint64, err := strconv.ParseUint(marketIdStr, 10, 32)
 	if err != nil {
 		// handle error
 	}
@@ -43,6 +43,8 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch bets for the market
 	bets := tradingdata.GetBetsForMarket(db, marketIDUint)
+
+	logging.LogAnyType(bets, "bets")
 
 	// feed in the time created
 	// note we are not using GetPublicResponseMarketByID because of circular import

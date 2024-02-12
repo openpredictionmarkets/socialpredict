@@ -1,6 +1,7 @@
 package tradingdata
 
 import (
+	"socialpredict/logging"
 	"socialpredict/models"
 	"time"
 
@@ -8,9 +9,10 @@ import (
 )
 
 type PublicBet struct {
-	BetID    int64     `json:"betId"`
-	MarketID int64     `json:"marketId"`
-	Amount   float64   `json:"amount"`
+	ID       uint      `json:"betId"`
+	Username string    `json:"username"`
+	MarketID uint      `json:"marketId"`
+	Amount   int64     `json:"amount"`
 	PlacedAt time.Time `json:"placedAt"`
 	Outcome  string    `json:"outcome,omitempty"`
 }
@@ -22,6 +24,8 @@ func GetBetsForMarket(db *gorm.DB, marketID uint) []models.Bet {
 	if err := db.Where("market_id = ?", marketID).Find(&bets).Error; err != nil {
 		return nil
 	}
+
+	logging.LogAnyType(bets, "bets")
 
 	return bets
 }
