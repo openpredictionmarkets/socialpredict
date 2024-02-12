@@ -8,6 +8,7 @@ import (
 	betutils "socialpredict/handlers/bets/betutils"
 	marketshandlers "socialpredict/handlers/markets"
 	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/handlers/tradingdata"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -55,26 +56,37 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Then go forward and adjust the betRequest to adjustedBetRequest and buy new shares with amount remaining
 	// check users's current position on market, YES and NO
 	marketIDStr := strconv.FormatUint(uint64(betRequest.MarketID), 10)
-	quantity, oppositeDirection, err := marketshandlers.CheckOppositeSharesOwned(db, marketIDStr, user.Username, betRequest.Outcome)
+	quantityOppositeShares, oppositeDirection, err := marketshandlers.CheckOppositeSharesOwned(db, marketIDStr, user.Username, betRequest.Outcome)
 
-	// get the market information so we can extract the created at time to calculate price
-	publicResponseMarket, err := marketshandlers.GetPublicResponseMarketByID(db, marketIDStr)
+	var betRequestRemain int64
+	var totalPoolSaleQuanitity int64
 
-	// extract all bets on market to calculate current price
-	allBetsOnMarket := GetBetsForMarket(betRequest.MarketID)
-	allProbabilitiesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
-	currentProbability := allProbabilitiesOnMarket[len(allProbabilitiesOnMarket)-1].Probability
+	if quantityOppositeShares > 0 {
+		// get the market information so we can extract the created at time to calculate price
+		publicResponseMarket, err := marketshandlers.GetPublicResponseMarketByID(db, marketIDStr)
+		if err != nil {
+			http.Error(w, "Can't retrieve market", http.StatusBadRequest)
+			return
+		}
 
-	// Now, proceed to sell shares to the liquidity pool
-	totalPoolSaleQuanitity, fee, err := SellSharesToPool(db, user.Username, quantity, oppositeDirection, currentProbability)
-	if err != nil {
-		// Handle error: Could not sell shares to the pool
-		http.Error(w, "Failed to sell shares to the liquidity pool: "+err.Error(), http.StatusInternalServerError)
-		return
+		// extract all bets on market to calculate current price
+		allBetsOnMarket := tradingdata.GetBetsForMarket(db, betRequest.MarketID)
+		allProbabilitiesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
+		currentProbability := allProbabilitiesOnMarket[len(allProbabilitiesOnMarket)-1].Probability
+
+		// Now, proceed to sell shares to the liquidity pool
+		totalPoolSaleQuanitity, fee, err := SellSharesToPool(db, user.Username, quantityOppositeShares, oppositeDirection, currentProbability)
+		if err != nil {
+			// Handle error: Could not sell shares to the pool
+			http.Error(w, "Failed to sell shares to the liquidity pool: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Adjust the total amount bet on the market after selling the shares, and fees
+		betRequestRemain = betRequest.Amount - fee - totalPoolSaleQuanitity
+	} else {
+		betRequestRemain = betRequest.Amount
 	}
-
-	// Adjust the total amount bet on the market after selling the shares, and fees
-	betRequestRemain := betRequest.Amount - fee - totalPoolSaleQuanitity
 
 	// Check if the user has enough balance to place the bet
 	// Use the appConfig for configuration values
@@ -114,7 +126,10 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Record the transaction for histocial data and for updating probability
 	// Do this at the end, so that the pool bet further penalizes in the case that the person is switching sides
-	RecordPoolTransaction(db, betRequest.MarketID, oppositeDirection, totalPoolSaleQuanitity)
+	// pool is buying the shares which were just sold
+	if quantityOppositeShares > 0 {
+		RecordPoolTransaction(db, betRequest.MarketID, betRequest.Outcome, totalPoolSaleQuanitity)
+	}
 
 	// Return a success response
 	w.WriteHeader(http.StatusCreated)
