@@ -88,14 +88,14 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 
 	// Calculate normalization factor for YES
 	if C_YES_SUM > 0 {
-		F_YES = max(1, float64(S_YES)/C_YES_SUM)
+		F_YES = float64(S_YES) / C_YES_SUM
 	} else {
 		F_YES = 1 // Avoid division by zero
 	}
 
 	// Calculate normalization factor for NO
 	if C_NO_SUM > 0 {
-		F_NO = max(1, float64(S_NO)/C_NO_SUM)
+		F_NO = float64(S_NO) / C_NO_SUM
 	} else {
 		F_NO = 1 // Avoid division by zero
 	}
@@ -160,9 +160,7 @@ func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
 		}
 	}
 
-	adjustedPayouts := scaledPayouts
-
-	return adjustedPayouts
+	return scaledPayouts
 }
 
 // AggregateUserPayouts aggregates YES and NO payouts for each user.
@@ -188,6 +186,13 @@ func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []int64) []MarketP
 	// Convert map to slice for output
 	var positions []MarketPosition
 	for _, pos := range userPayouts {
+		// Check and adjust negative shares to 0
+		if pos.YesSharesOwned < 0 {
+			pos.YesSharesOwned = 0
+		}
+		if pos.NoSharesOwned < 0 {
+			pos.NoSharesOwned = 0
+		}
 		positions = append(positions, *pos)
 	}
 

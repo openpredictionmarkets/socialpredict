@@ -1,7 +1,6 @@
 package tradingdata
 
 import (
-	"socialpredict/logging"
 	"socialpredict/models"
 	"time"
 
@@ -24,8 +23,6 @@ func GetBetsForMarket(db *gorm.DB, marketID uint) []models.Bet {
 	if err := db.Where("market_id = ?", marketID).Find(&bets).Error; err != nil {
 		return nil
 	}
-
-	logging.LogAnyType(bets, "bets")
 
 	return bets
 }

@@ -7,7 +7,6 @@ import (
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
-	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
@@ -67,11 +66,9 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	// Fetch bets for the market
 	var allBetsOnMarket []models.Bet
 	allBetsOnMarket = tradingdata.GetBetsForMarket(db, marketIDUint)
-	logging.LogAnyType(allBetsOnMarket, "allBetsOnMarket from marketpositionshandler")
 
 	// Get a timeline of probability changes for the market
 	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
-	logging.LogAnyType(allProbabilityChangesOnMarket, "allProbabilityChangesOnMarket")
 
 	// Calculate the distribution of YES and NO shares based on DBPM
 	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
