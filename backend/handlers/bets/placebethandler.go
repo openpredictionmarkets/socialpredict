@@ -89,6 +89,7 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		logging.LogAnyType(betRequestRemain, "betRequestRemain")
 	}
 
+	// if buySignal {} could be used to stop transaction from happening if
 	// Check if the user has enough balance to place the bet
 	// Use the appConfig for configuration values
 	maximumDebtAllowed := betutils.Appconfig.MaximumDebtAllowed
@@ -144,10 +145,13 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		// here there is no disincentive to switch sides at all by the liquidity pool, the AMM does nothing and just assumes people can exit whenever.
 		logging.LogAnyType(betRequestRemain, "betRequestRemain in RecordPool if statement")
 
-		if betRequest.Amount < quantityOppositeShares {
-			RecordPoolTransaction(db, betRequest.MarketID, oppositeDirection, betRequest.Amount)
-		} else {
-			RecordPoolTransaction(db, betRequest.MarketID, oppositeDirection, quantityOppositeShares)
+		// if there is anything left over
+		if betRequestRemain > quantityOppositeShares {
+			// create a matching transaction for what was sold to the pool already
+			RecordPoolTransaction(db, betRequest.MarketID, oppositeDirection, totalPoolSaleQuantity)
+
+		} else { // if there is nothing left over, do the same
+			RecordPoolTransaction(db, betRequest.MarketID, oppositeDirection, totalPoolSaleQuantity)
 		}
 	}
 
@@ -176,6 +180,7 @@ func SellSharesToPool(db *gorm.DB, betRequest models.Bet, quantityOppositeShares
 		return differenceInRequestedAndHeld, fee, false, err // User not found or other database error
 	}
 
+	// get the difference in what user is trying to buy and what is currently held
 	differenceInRequestedAndHeld = int64(math.Abs(float64(betRequest.Amount - quantityOppositeSharesHeld)))
 	fee = int64(math.Round(float64(differenceInRequestedAndHeld) * feePercent))
 	// Ensure the fee is at least 1 point if 5% doesn't round up to 1
@@ -190,7 +195,10 @@ func SellSharesToPool(db *gorm.DB, betRequest models.Bet, quantityOppositeShares
 		// 2. Add transaction, quantity of quantityOppositeSharesHeld to bets as a sale (negative).
 		// 3. Passing sale amount to differenceInRequestedAndHeld
 		// 4. Passing boolean signal that we should continue forward with buying differenceInRequestedAndHeld
+		logging.LogAnyType(user.AccountBalance, "user.AccountBalance in case where betRequest.Amount > quantityOppositeSharesHeld in SellSharesToPool")
+		logging.LogAnyType(quantityOppositeSharesHeld, "adding quantityOppositeSharesHeld - fee")
 		user.AccountBalance += quantityOppositeSharesHeld - fee
+		logging.LogAnyType(user.AccountBalance, "user.AccountBalance after case where betRequest.Amount > quantityOppositeSharesHeld in SellSharesToPool")
 		if err := db.Save(&user).Error; err != nil {
 			return differenceInRequestedAndHeld, fee, false, err // Error updating user balance
 		}
@@ -214,6 +222,7 @@ func SellSharesToPool(db *gorm.DB, betRequest models.Bet, quantityOppositeShares
 		}
 
 		// return differenceInRequestedAndHeld to be able to buy
+		// since we didn't finish the transaction, there is still more betRequest.Amount, continue transaction
 		return differenceInRequestedAndHeld, fee, true, nil
 
 	} else {
@@ -222,7 +231,10 @@ func SellSharesToPool(db *gorm.DB, betRequest models.Bet, quantityOppositeShares
 		// 1. Updating the user account balance, minus fee.
 		// 2. Passing sale amount to differenceInRequestedAndHeld
 		// 3. Passing boolean signal that we should NOT continue forward with buying differenceInRequestedAndHeld
+		logging.LogAnyType(user.AccountBalance, "user.AccountBalance in case where betRequest.Amount =< quantityOppositeSharesHeld in SellSharesToPool")
+		logging.LogAnyType(betRequest.Amount, "adding betRequest.Amount - fee")
 		user.AccountBalance += betRequest.Amount - fee
+		logging.LogAnyType(user.AccountBalance, "user.AccountBalance after case where betRequest.Amount < quantityOppositeSharesHeld in SellSharesToPool")
 		if err := db.Save(&user).Error; err != nil {
 			return differenceInRequestedAndHeld, fee, false, err // Error updating user balance
 		}
@@ -245,6 +257,7 @@ func SellSharesToPool(db *gorm.DB, betRequest models.Bet, quantityOppositeShares
 			return differenceInRequestedAndHeld, fee, false, err // Error updating user balance
 		}
 
+		// since we used up the betRequest.Amount, don't continue with the transaction
 		return differenceInRequestedAndHeld, fee, false, nil
 	}
 
