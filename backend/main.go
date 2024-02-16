@@ -30,9 +30,9 @@ func main() {
 	migration.MigrateDB(db)
 
 	// Seed the admin user
-	//seed.SeedUsers(db)
-	//seed.SeedMarket(db)
-	//seed.SeedBets(db)
+	// seed.SeedUsers(db)
+	// seed.SeedMarket(db)
+	// seed.SeedBets(db)
 
 	server.Start()
 }
