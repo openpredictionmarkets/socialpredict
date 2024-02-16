@@ -12,7 +12,6 @@
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^5.3.0",
-    "react-scripts": "^3.0.1",
     "recharts": "^2.10.3",
     "web-vitals": "^2.1.4"
   },
@@ -20,7 +19,9 @@
     "node": "16.0.0"
   },
   "scripts": {
-    "start": "react-scripts start"
+    "start": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
   },
   "eslintConfig": {
     "extends": [
@@ -42,8 +43,11 @@
   },
   "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
   "main": "index.js",
-  "devDependencies": {},
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.1.3"
+  }
 }
