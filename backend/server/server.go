@@ -16,7 +16,7 @@ import (
 func Start() {
 	// CORS handler
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:3000", "https://brierfoxforecast.ngrok.app", "http://localhost:8089"},
+		AllowedOrigins: []string{"http://localhost:5173", "https://brierfoxforecast.ngrok.app", "http://localhost:8089"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"Content-Type", "Authorization"},
 	})
