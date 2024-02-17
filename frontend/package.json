@@ -16,10 +16,10 @@
     "web-vitals": "^2.1.4"
   },
   "engines": {
-    "node": "16.0.0"
+    "node": "21.0.0"
   },
   "scripts": {
-    "start": "vite",
+    "start": "vite --host",
     "build": "vite build",
     "serve": "vite preview"
   },

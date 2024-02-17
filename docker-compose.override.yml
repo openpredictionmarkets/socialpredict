@@ -1,6 +1,11 @@
 version: '3.8'
 
 services:
+
+  db:
+    networks:
+      - custom_network
+
   backend:
     environment:
       - ENVIRONMENT=development
@@ -13,6 +18,8 @@ services:
       - ./.env.dev:/backend/.env.dev # mount this .env.dev file to keep dev env var's consistent
     command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
     tty: true
+    networks:
+      - custom_network
 
   frontend:
     environment:
@@ -25,6 +32,9 @@ services:
       - ./frontend:/app # This line mounts your frontend directory to /app in the container
       - /app/node_modules # This line prevents node_modules in the container from being overwritten
     stdin_open: true
+    networks:
+      custom_network:
+        ipv4_address: 172.29.0.10  # Static IP for frontend
 
   nginx:
     environment:
@@ -37,3 +47,12 @@ services:
     - .env.dev
     volumes:
       - ./nginx:/etc/nginx/
+    networks:
+      - custom_network
+
+networks:
+  custom_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "172.29.0.0/16"
