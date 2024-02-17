@@ -5,5 +5,24 @@ set -a
 
 source .env.dev
 
-# Start backend and database
-docker-compose --env-file .env.dev up
+# Function to check if a command exists
+command_exists() {
+    type "$1" &> /dev/null
+}
+
+# Function to run Docker Compose using either docker-compose or docker compose
+run_docker_compose() {
+    if command_exists docker-compose; then
+    echo "Using docker-compose..."
+    docker-compose --env-file .env.dev up
+    elif command_exists docker && docker compose version &> /dev/null; then
+    echo "Using docker compose..."
+    docker compose --env-file .env.dev up
+    else
+    echo "Error: Docker Compose is not installed."
+    exit 1
+    fi
+}
+
+# Start backend and database using the appropriate Docker Compose command
+run_docker_compose

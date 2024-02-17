@@ -2,8 +2,26 @@
 
 set -e
 set -a
-
 source .env.dev
 
-# Start the database
-docker-compose --env-file .env.dev down
+# Function to check if a command exists
+command_exists() {
+    type "$1" &> /dev/null
+}
+
+# Function to run Docker Compose down using either docker-compose or docker compose
+run_docker_compose_down() {
+    if command_exists docker-compose; then
+    echo "Using docker-compose to shut down services..."
+    docker-compose --env-file .env.dev down
+    elif command_exists docker && docker compose version &> /dev/null; then
+    echo "Using docker compose to shut down services..."
+    docker compose --env-file .env.dev down
+    else
+    echo "Error: Docker Compose is not installed."
+    exit 1
+    fi
+}
+
+# Shut down services using the appropriate Docker Compose command
+run_docker_compose_down
