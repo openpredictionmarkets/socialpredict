@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM node:20.0.0
+FROM node:21.0.0
 
-RUN echo "hi"
+RUN echo "No op change"
 
 WORKDIR /app
 COPY package.json package-lock.json ./
