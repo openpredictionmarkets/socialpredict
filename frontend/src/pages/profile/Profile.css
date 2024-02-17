@@ -1,0 +1,121 @@
+/* Profile.css */
+.profile {
+    margin: 10px;
+    padding: 10px;
+    border: 1px solid white;
+    border-radius: 8px;
+}
+
+.profile table {
+    width: 100%;
+}
+
+.profile td {
+    text-align: left; /* Aligns text to the left */
+    vertical-align: top; /* Aligns content to the top of the cell */
+    padding: 8px; /* Adds some padding for better readability */
+}
+
+.profile .header {
+    text-align: center; /* Centers the header text, if desired */
+}
+
+.profile .label {
+    font-weight: bold; /* Makes the label text bold */
+}
+
+.profile .emoji {
+    width: 50px;
+    vertical-align: top;
+}
+
+.profile .display-name {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.profile .description, .profile .account-balance {
+    padding: 10px 10px;
+}
+
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    font-size: calc(10px + 1vmin);
+    padding: 5px 10px;
+    border-radius: 3px;
+}
+
+.nav-link-callout {
+    color: #0066cc;
+    color: black;
+    background-color: #00ffff;
+    display: flex; /* Grow to fill the available space */
+    align-items: stretch;
+    flex-grow: 1;
+    border-radius: 3px;
+}
+
+.nav-link:hover {
+    color: white;
+    background-color: #DE7C5A;
+    display: flex; /* Grow to fill the available space */
+    align-items: stretch;
+    flex-grow: 1;
+    border-radius: 3px;
+}
+
+/* CELL CONTAINERS */
+
+.profile-cell-container {
+    display: flex;
+    align-items: center;
+}
+
+.profile-emoji {
+    font-size: 36px;
+    margin-right: 10px; /* Adjust spacing between emoji and button */
+}
+
+
+/* EDIT BUTTONS */
+
+.edit-button {
+    display: flex;
+    bottom: 20px;
+    right: 20px;
+    background-color: #6A6A6A;
+    border-radius: 3px; /* Rounded corners */
+    color: white;
+    border: none;
+    outline: none;
+    padding: 10px 20px;
+    transition: background-color 0.3s; /* Smooth transition for hover effect */
+    cursor: pointer;
+    margin-left: 10px; /* Add space to the left of the button */
+}
+
+.edit-button:hover {
+    color: white;
+    background-color: #DE7C5A;
+}
+
+.portfolio-center-content-table {
+    text-align: left;
+    /* font-size: 0.5rem; */
+    /* margin-top: 30px; */
+}
+
+.portfolio-center-content-table a {
+    color: #00ffff;
+}
+
+.portfolio-center-content-table a:hover {
+    color: white;
+    background-color: #DE7C5A;
+}
+
+.portfolio-center-content-table a:active {
+    /* Styles for active state */
+}
