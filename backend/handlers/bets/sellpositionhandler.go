@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
-	dbpm "socialpredict/handlers/math/outcomes/dbpm"
+	marketshandlers "socialpredict/handlers/markets"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -36,18 +36,8 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 	betutils.CheckMarketStatus(db, redeemRequest.MarketID)
 
 	// Calculate the net aggregate positions for the user
-	allPositions := dbpm.GetMarketPositionsByUser(db, user.Username) // Assuming this function exists and retrieves all market positions for a user
-	netPositions := dbpm.NetAggregateMarketPositions(allPositions)
 
-	// Find the user's net position for the requested market
-	var userNetPosition *models.MarketPosition
-	for _, pos := range netPositions {
-		if pos.MarketID == redeemRequest.MarketID && pos.Username == user.Username {
-			userNetPosition = &pos
-			break
-		}
-	}
-
+	userNetPosition, err := marketshandlers.CalculateMarketPositionForUser_WPAM_DBPM(db, redeemRequest.MarketID, user.Username)
 	if userNetPosition == nil {
 		http.Error(w, "No position found for the given market", http.StatusBadRequest)
 		return
