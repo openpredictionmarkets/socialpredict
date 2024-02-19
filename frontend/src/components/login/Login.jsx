@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useHistory } from 'react-router-dom';
 import './Login.css';
-import UserContext from './UserContext';
+import UserContext from '../../helpers/UserContext';
 
 function Login({ onLogin }) {
   const history = useHistory();
@@ -29,23 +29,31 @@ function Login({ onLogin }) {
     }
   };
 
-
   return (
-    <form onSubmit={handleSubmit} className="login-form">
+    <form onSubmit={handleSubmit} className='login-form'>
       <div>
         <label>
           Username:
-          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input
+            type='text'
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
         </label>
       </div>
       <div>
         <label>
           Password:
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input
+            type='password'
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
         </label>
       </div>
-      {error && <div className="error-message">{error}</div>} {/* Display error message */}
-      <button type="submit">Login</button>
+      {error && <div className='error-message'>{error}</div>}{' '}
+      {/* Display error message */}
+      <button type='submit'>Login</button>
     </form>
   );
 }
