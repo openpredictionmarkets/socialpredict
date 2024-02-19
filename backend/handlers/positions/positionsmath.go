@@ -1,17 +1,14 @@
-package marketshandlers
+package positions
 
 import (
-	"encoding/json"
-	"net/http"
 	"socialpredict/errors"
+	"socialpredict/handlers/marketpublicresponse"
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
-	"socialpredict/util"
 	"strconv"
 
-	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
@@ -28,23 +25,6 @@ type UserMarketPosition struct {
 	YesSharesOwned int64
 }
 
-func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	marketIdStr := vars["marketId"]
-
-	// open up database to utilize connection pooling
-	db := util.GetDB()
-
-	marketDBPMPositions, err := CalculateMarketPositions_WPAM_DBPM(db, marketIdStr)
-	if errors.HandleHTTPError(w, err, http.StatusBadRequest, "Invalid request or data processing error.") {
-		return // Stop execution if there was an error.
-	}
-
-	// Respond with the bets display information
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(marketDBPMPositions)
-}
-
 // FetchMarketPositions fetches and summarizes positions for a given market.
 // It returns a slice of MarketPosition as defined in the dbpm package.
 func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm.MarketPosition, error) {
@@ -58,7 +38,7 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	marketIDUint := uint(marketIDUint64)
 
 	// Assuming a function to fetch the market creation time
-	publicResponseMarket, err := GetPublicResponseMarketByID(db, marketIdStr)
+	publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketIdStr)
 	if errors.ErrorLogger(err, "Can't convert marketIdStr to publicResponseMarket.") {
 		return nil, err
 	}
