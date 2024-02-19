@@ -3,6 +3,7 @@ package marketshandlers
 import (
 	"encoding/json"
 	"net/http"
+	"socialpredict/handlers/marketpublicresponse"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
@@ -15,11 +16,11 @@ import (
 
 // MarketDetailResponse defines the structure for the market detail response
 type MarketDetailHandlerResponse struct {
-	Market             PublicResponseMarket         `json:"market"`
-	Creator            usersHandlers.PublicUserType `json:"creator"`
-	ProbabilityChanges []wpam.ProbabilityChange     `json:"probabilityChanges"`
-	NumUsers           int                          `json:"numUsers"`
-	TotalVolume        int64                        `json:"totalVolume"`
+	Market             marketpublicresponse.PublicResponseMarket `json:"market"`
+	Creator            usersHandlers.PublicUserType              `json:"creator"`
+	ProbabilityChanges []wpam.ProbabilityChange                  `json:"probabilityChanges"`
+	NumUsers           int                                       `json:"numUsers"`
+	TotalVolume        int64                                     `json:"totalVolume"`
 }
 
 func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +43,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	bets := tradingdata.GetBetsForMarket(db, marketIDUint)
 
 	// return the PublicResponse type with information about the market
-	publicResponseMarket, err := GetPublicResponseMarketByID(db, marketId)
+	publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketId)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return

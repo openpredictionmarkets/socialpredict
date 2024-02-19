@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
-	dbpm "socialpredict/handlers/math/outcomes/dbpm"
+	"socialpredict/handlers/positions"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
+	"strconv"
 	"time"
 )
 
@@ -32,23 +33,16 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// get the marketID in string format
+	marketIDStr := strconv.FormatUint(uint64(redeemRequest.MarketID), 10)
+
 	// Validate the request similar to PlaceBetHandler
 	betutils.CheckMarketStatus(db, redeemRequest.MarketID)
 
 	// Calculate the net aggregate positions for the user
-	allPositions := dbpm.GetMarketPositionsByUser(db, user.Username) // Assuming this function exists and retrieves all market positions for a user
-	netPositions := dbpm.NetAggregateMarketPositions(allPositions)
 
-	// Find the user's net position for the requested market
-	var userNetPosition *models.MarketPosition
-	for _, pos := range netPositions {
-		if pos.MarketID == redeemRequest.MarketID && pos.Username == user.Username {
-			userNetPosition = &pos
-			break
-		}
-	}
-
-	if userNetPosition == nil {
+	userNetPosition, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(db, marketIDStr, user.Username)
+	if userNetPosition.NoSharesOwned == 0 && userNetPosition.YesSharesOwned == 0 {
 		http.Error(w, "No position found for the given market", http.StatusBadRequest)
 		return
 	}
@@ -61,17 +55,22 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Proceed with redemption logic
-	// Here, you would typically update the user's balance and record the transaction
-	// as a negative bet or a separate redemption record, depending on your data model.
-
 	// For simplicity, we're just creating a negative bet to represent the sale
-	// Note: Ensure your system correctly handles negative bets in all relevant calculations
 	redeemRequest.Amount = -redeemRequest.Amount // Negate the amount to indicate sale
 	redeemRequest.PlacedAt = time.Now()          // Set the current time as the redemption time
 
 	result := db.Create(&redeemRequest)
 	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Deduct the bet and switching sides fee amount from the user's balance
+	user.AccountBalance -= redeemRequest.Amount
+
+	// Update the user's balance in the database
+	if err := db.Save(&user).Error; err != nil {
+		http.Error(w, "Error updating user balance: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

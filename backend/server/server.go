@@ -6,6 +6,7 @@ import (
 	"socialpredict/handlers"
 	betshandlers "socialpredict/handlers/bets"
 	marketshandlers "socialpredict/handlers/markets"
+	"socialpredict/handlers/positions"
 	usershandlers "socialpredict/handlers/users"
 	"socialpredict/middleware"
 
@@ -34,7 +35,7 @@ func Start() {
 	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")
 	// handle market positions, get trades
 	router.HandleFunc("/v0/markets/bets/{marketId}", betshandlers.MarketBetsDisplayHandler).Methods("GET")
-	router.HandleFunc("/v0/markets/positions/{marketId}", marketshandlers.MarketDBPMPositionsHandler).Methods("GET")
+	router.HandleFunc("/v0/markets/positions/{marketId}", positions.MarketDBPMPositionsHandler).Methods("GET")
 	// show comments on markets
 
 	// handle public user stuff
@@ -49,7 +50,8 @@ func Start() {
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
 	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler).Methods("POST")
-	// router.HandleFunc("/v0/sell", betsHandlers.SellShareHandler).Methods("POST")
+	router.HandleFunc("/v0/userposition", usershandlers.UserMarketPositionHandler)
+	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler).Methods("POST")
 	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler)
 
 	// Apply the CORS middleware to the Gorilla Mux router
