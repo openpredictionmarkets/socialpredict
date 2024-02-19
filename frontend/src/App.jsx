@@ -24,7 +24,7 @@ import Footer from './components/footer/Footer';
 function App() {
   // state variables
   const [backendData, setBackendData] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState(null);
 
   // remove token if logged out
