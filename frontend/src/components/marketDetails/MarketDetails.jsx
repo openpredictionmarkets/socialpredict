@@ -291,42 +291,6 @@ function MarketDetails() {
     return <div>Loading...</div>;
   }
 
-  // Selling positions stuff
-  const fetchUserPosition = useCallback(() => {
-    if (!isLoggedIn) return; // Only fetch if the user is logged in
-
-    // Retrieve the JWT token from localStorage
-    const token = localStorage.getItem('token');
-    if (!token) {
-      alert('Authentication token not found. Please log in again.');
-      return;
-    }
-
-    const requestOptionsPosition = {
-      method: 'GET', // Changed to GET if that's what your backend expects
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    };
-
-    fetch(`${API_URL}/api/v0/userposition/${marketId}`, requestOptionsPosition) // Assuming your endpoint expects the marketId as a path variable, not a query parameter
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        return response.json();
-      })
-      .then(data => {
-        setUserPosition(data); // Assuming the API returns the position directly
-      })
-      .catch(error => console.error('Error fetching user position:', error));
-  }, [isLoggedIn, marketId, token]);
-
-  useEffect(() => {
-    fetchUserPosition();
-  }, [fetchUserPosition]);
-
 
   // Betting Stuff, open the modal, handle the amount entered in the box, submit bet
 
