@@ -166,7 +166,7 @@ function MarketDetails() {
   const [selectedOutcome, setSelectedOutcome] = useState(null); // State to store selected outcome
 
   // Bottom Activity Modal, Including Bets, Comments and Positions
-
+  const [userPosition, setUserPosition] = useState([]);
   const [bets, setBets] = useState([]);
   // handle visibility of bottom modal
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(true); // Default to modal open
@@ -215,7 +215,7 @@ function MarketDetails() {
       // Removed marketId from here, as it's now part of the URL
     };
 
-    const requestOptions = {
+    const requestOptionsResolve = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -224,7 +224,7 @@ function MarketDetails() {
       body: JSON.stringify(resolutionData),
     };
 
-    fetch(`${API_URL}/api/v0/resolve/${marketId}`, requestOptions)
+    fetch(`${API_URL}/api/v0/resolve/${marketId}`, requestOptionsResolve)
       .then((response) => {
         if (!response.ok) {
           throw new Error('Network response was not ok');
@@ -290,6 +290,7 @@ function MarketDetails() {
   if (!market) {
     return <div>Loading...</div>;
   }
+
 
   // Betting Stuff, open the modal, handle the amount entered in the box, submit bet
 
