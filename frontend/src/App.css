@@ -16,7 +16,6 @@
 }
 
 .App-header {
-  background-color: #280000;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -56,7 +55,7 @@
 
 .Center-content-table a:hover {
   color: white;
-  background-color: #DE7C5A;
+  background-color: #de7c5a;
 }
 
 .Center-content-table a:active {
