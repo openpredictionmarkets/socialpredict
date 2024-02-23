@@ -17,7 +17,7 @@ import Notifications from './components/notifications/Notifications';
 import Create from './pages/create/Create';
 import About from './pages/about/About';
 import { UserProvider } from './helpers/UserContext';
-import MarketDetails from './components/marketDetails/MarketDetails';
+import MarketDetails from './pages/marketDetails/MarketDetails';
 import User from './pages/user/User';
 import Footer from './components/footer/Footer';
 
