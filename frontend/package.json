@@ -6,6 +6,7 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "black-dashboard-react": "github:creativetimofficial/black-dashboard-react#1.2.2",
     "bootstrap": "4.6.2",
     "chart.js": "^4.4.0",
     "classnames": "2.3.1",
