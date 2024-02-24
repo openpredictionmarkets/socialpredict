@@ -20,6 +20,7 @@ import { UserProvider } from './helpers/UserContext';
 import MarketDetails from './pages/marketDetails/MarketDetails';
 import User from './pages/user/User';
 import Footer from './components/footer/Footer';
+import '../index.css';
 
 function App() {
   // state variables
