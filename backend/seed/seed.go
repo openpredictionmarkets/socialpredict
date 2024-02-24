@@ -174,7 +174,7 @@ func SeedBets(db *gorm.DB) {
 		for _, marketID := range marketIDs {
 			for _, outcome := range outcomes {
 				// Set the amount based on the outcome
-				var amount float64
+				var amount int64
 				if outcome == "YES" {
 					amount = 20
 				} else {

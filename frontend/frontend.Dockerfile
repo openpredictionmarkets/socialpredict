@@ -1,10 +1,12 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM node:16.0.0
+FROM node:21.0.0
+
+RUN echo "No op change"
 
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
 COPY . .
 
-EXPOSE 3000
-CMD ["npm", "start"]
+EXPOSE 5173
+CMD ["npm", "run", "start"]

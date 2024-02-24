@@ -1,4 +1,4 @@
-package handlers
+package usershandlers
 
 import (
 	"encoding/json"
@@ -17,8 +17,8 @@ import (
 type PortfolioItem struct {
 	MarketID      uint      `json:"marketId"`
 	QuestionTitle string    `json:"questionTitle"`
-	TotalYesBets  float64   `json:"totalYesBets"`
-	TotalNoBets   float64   `json:"totalNoBets"`
+	TotalYesBets  int64     `json:"totalYesBets"`
+	TotalNoBets   int64     `json:"totalNoBets"`
 	LastBetPlaced time.Time `json:"lastBetPlaced"`
 }
 

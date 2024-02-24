@@ -1,9 +1,10 @@
-package handlers
+package marketshandlers
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
-	cpmmMathHanders "socialpredict/handlers/math/cpmm"
+	dbpm "socialpredict/handlers/math/outcomes/dbpm"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/middleware"
 	"socialpredict/models"
@@ -110,11 +111,11 @@ func distributePayouts(market *models.Market, db *gorm.DB) error {
 	}
 
 	// Calculate and distribute payouts using the CPMM model
-	return calculateCPMMPayouts(market, db)
+	return calculateDBPMPayouts(market, db)
 }
 
-// calculateCPMMPayouts calculates and updates user balances based on the CPMM model.
-func calculateCPMMPayouts(market *models.Market, db *gorm.DB) error {
+// calculate DBPM Payouts calculates and updates user balances based on the CPMM model.
+func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
 	// Retrieve all bets associated with the market
 	var bets []models.Bet
 	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
@@ -122,7 +123,7 @@ func calculateCPMMPayouts(market *models.Market, db *gorm.DB) error {
 	}
 
 	// Initialize variables to calculate total amounts for each outcome
-	var totalYes, totalNo float64
+	var totalYes, totalNo int64
 	for _, bet := range bets {
 		if bet.Outcome == "YES" {
 			totalYes += bet.Amount
@@ -131,13 +132,19 @@ func calculateCPMMPayouts(market *models.Market, db *gorm.DB) error {
 		}
 	}
 
-	// Calculate payouts based on CPMM for YES and NO outcomes
+	// Calculate payouts based on DBPM for YES and NO outcomes
+	// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
 	for _, bet := range bets {
-		payout := cpmmMathHanders.CalculateCPMMPayoutForOutcome(bet, totalYes, totalNo, bet.Outcome, market.ResolutionResult)
+
+		// calculate the course, float64 based payout
+		payout := dbpm.CalculatePayoutForOutcomeDBPM(bet, totalYes, totalNo, bet.Outcome, market.ResolutionResult)
+
+		// use rounding to see how to update user balance after payout calculation
+		int_payout := int64(math.Round(payout))
 
 		// Update user balance with the payout
 		if payout > 0 {
-			if err := usersHandlers.UpdateUserBalance(bet.Username, payout, db, "win"); err != nil {
+			if err := usersHandlers.UpdateUserBalance(bet.Username, int_payout, db, "win"); err != nil {
 				return err
 			}
 		}

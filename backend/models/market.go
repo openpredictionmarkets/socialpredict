@@ -8,7 +8,7 @@ import (
 
 type Market struct {
 	gorm.Model
-	ID                      uint      `json:"id" gorm:"primary_key"`
+	ID                      int64     `json:"id" gorm:"primary_key"`
 	QuestionTitle           string    `json:"questionTitle" gorm:"not null"`
 	Description             string    `json:"description" gorm:"not null"`
 	OutcomeType             string    `json:"outcomeType" gorm:"not null"`
