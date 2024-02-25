@@ -44,30 +44,50 @@ function NavbarLoggedOut() {
 
   return (
     <nav
-      className={`flex items-center justify-end md:justify-between w-full ${bgColor} fixed top-0 z-50 text-xl transition-transform duration-150 ease-in-out h-10`}
+      className={`flex items-center justify-center md:justify-between w-full ${bgColor} fixed top-0 z-50 text-xl transition-transform duration-150 ease-in-out h-10`}
       ref={menuRef}
     >
-      <button onClick={toggleMenu} className='px-4 z-199 md:hidden'>
-        <svg
-          className='w-6 h-6'
-          fill='none'
-          stroke='currentColor'
-          viewBox='0 0 24 24'
-          xmlns='http://www.w3.org/2000/svg'
-        >
-          <path
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            strokeWidth='2'
-            d='M4 6h16M4 12h16m-7 6h7'
-          ></path>
-        </svg>
+      <button
+        onClick={toggleMenu}
+        className='absolute z-50 px-4 mt-3 mb-2 md:hidden right-5'
+      >
+        {isMenuOpen ? (
+          <svg
+            className='w-6 h-6'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+            xmlns='http://www.w3.org/2000/svg'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth='2'
+              d='M6 18L18 6M6 6l12 12'
+            />
+          </svg>
+        ) : (
+          <svg
+            className='w-6 h-6'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+            xmlns='http://www.w3.org/2000/svg'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth='2'
+              d='M4 6h16M4 12h16m-7 6h7'
+            />
+          </svg>
+        )}
       </button>
 
       <div
-        className={`absolute w-full top-full ${bgColor} md:relative md:top-auto md:flex ${
+        className={`absolute w-[90%] mt-2 rounded-md p-[1.4rem] top-0 bg-[#1f2251] md:relative md:top-auto md:flex ${
           isMenuOpen ? 'flex' : 'hidden'
-        } flex-col md:flex-row transition-transform duration-150 ease-in-out`}
+        } flex-col z-10 md:flex-row transition-transform duration-150 ease-in-out`}
       >
         <Navlink
           to='/markets'
