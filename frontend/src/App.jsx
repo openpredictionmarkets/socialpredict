@@ -20,6 +20,7 @@ import { UserProvider } from './helpers/UserContext';
 import MarketDetails from './pages/marketDetails/MarketDetails';
 import User from './pages/user/User';
 import Footer from './components/footer/Footer';
+import Style from './pages/style/Style';
 import '../index.css';
 
 function App() {
@@ -134,6 +135,9 @@ function App() {
                 <About />
               </Route>
               {/* Define other routes as needed */}
+              <Route path="/style">
+                <Style />
+              </Route>
             </Switch>
           </header>
           <Footer />
