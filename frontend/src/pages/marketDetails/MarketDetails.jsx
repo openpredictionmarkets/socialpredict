@@ -466,8 +466,21 @@ function MarketDetails() {
       {isLoggedIn && !market.isResolved && !isMarketClosed() && (
         <div className='bet-decision-buttons'>
           <button
-            className='bet-decision-button bet-yes-button'
-            onClick={() => openBetModal('YES')}
+            className={`px-4 py-2 text-white border border-transparent rounded focus:outline-none focus:ring-2 focus:ring-offset-2 ${selectedResolution === 'YES' ? 'bg-green-400 hover:bg-green-300 focus:ring-green-300' : 'bg-green-500 hover:bg-green-400 focus:ring-green-400'}`}
+            style={{
+              boxShadow: '0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08)',
+              backgroundColor: selectedResolution === 'YES' ? '#00cca4' : '#00f2c3',
+              borderColor: selectedResolution === 'YES' ? '#00bf9a' : '#00f2c3'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = selectedResolution === 'YES' ? '#00bf9a' : '#00cca4';
+              e.target.style.borderColor = selectedResolution === 'YES' ? '#00b290' : '#00bf9a';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = selectedResolution === 'YES' ? '#00cca4' : '#00f2c3';
+              e.target.style.borderColor = selectedResolution === 'YES' ? '#00bf9a' : '#00f2c3';
+            }}
+            onClick={() => setSelectedResolution('YES')}
           >
             YES
           </button>
@@ -515,9 +528,20 @@ function MarketDetails() {
         <div className='resolve-modal'>
           <div className='resolve-container'>
             <button
-              className={`resolve-decision-button ${
-                selectedResolution === 'YES' ? 'yes-selected' : ''
-              }`}
+              className={`px-4 py-2 text-white border border-transparent rounded focus:outline-none focus:ring-2 focus:ring-offset-2 ${selectedResolution === 'YES' ? 'bg-green-400 hover:bg-green-300 focus:ring-green-300' : 'bg-green-500 hover:bg-green-400 focus:ring-green-400'}`}
+              style={{
+                boxShadow: '0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08)',
+                backgroundColor: selectedResolution === 'YES' ? '#00cca4' : '#00f2c3',
+                borderColor: selectedResolution === 'YES' ? '#00bf9a' : '#00f2c3'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = selectedResolution === 'YES' ? '#00bf9a' : '#00cca4';
+                e.target.style.borderColor = selectedResolution === 'YES' ? '#00b290' : '#00bf9a';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = selectedResolution === 'YES' ? '#00cca4' : '#00f2c3';
+                e.target.style.borderColor = selectedResolution === 'YES' ? '#00bf9a' : '#00f2c3';
+              }}
               onClick={() => setSelectedResolution('YES')}
             >
               YES
