@@ -11,7 +11,7 @@ const Colors = {
         borderDefault: "#fd5d93",
         borderHover: "#ec250d",
     },
-    neutral: {
+    neutra_btn: {
         default: "#344675",
         hover: "#ba54f5",
         active: "#263148",
