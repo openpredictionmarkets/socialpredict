@@ -1,20 +1,63 @@
 import React, { useState } from 'react';
-import YesButton from '../../components/buttons/Buttons'; // Adjust the import path as necessary
+import {BetYesButton, BetNoButton} from '../../components/buttons/Buttons'; // Adjust the import path as necessary
 
 const Style = () => {
     const [isSelected, setIsSelected] = useState(false);
 
     return (
-    <div className="p-5">
-        {/* Buttons Can Go Here */}
-        <h2 className="text-2xl font-bold mb-4">Buttons</h2>
-        <div className="flex flex-wrap items-center gap-4">
-        <YesButton
-            isSelected={isSelected}
-            onClick={() => setIsSelected(!isSelected)}
-        />
-        </div>
+    <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+        <tr>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Component
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Description
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Import
+            </th>
+        </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+        <tr>
+            <td className="px-6 py-4 whitespace-nowrap">
+            <div className="flex flex-wrap items-center gap-4">
+                <BetYesButton
+                isSelected={isSelected}
+                onClick={() => setIsSelected(!isSelected)}
+                />
+            </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            Bet YES Button
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
+            <code>{`import BetYesButton from '../../components/buttons/Buttons';`}</code>
+            </td>
+        </tr>
+        <tr>
+            <td className="px-6 py-4 whitespace-nowrap">
+            <div className="flex flex-wrap items-center gap-4">
+                <BetNoButton
+                isSelected={isSelected}
+                onClick={() => setIsSelected(!isSelected)}
+                />
+            </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            Bet NO Button
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
+            <code>{`import BetNoButton from '../../components/buttons/Buttons';`}</code>
+            </td>
+        </tr>
+        {/* Additional rows for other components */}
+        </tbody>
+    </table>
     </div>
+
     );
 };
 
