@@ -14,16 +14,16 @@ const BetYesButton = ({ isSelected }) => (
     className={`${buttonBaseStyle} ${isSelected ? yesButtonStyle : yesButtonHoverStyle}`}
     style={{
         boxShadow: boxShadowStyle,
-        backgroundColor: isSelected ? Colors.green.hover : Colors.green.default,
-        borderColor: isSelected ? Colors.green.default : Colors.green.hover
+        backgroundColor: isSelected ? Colors.green_btn.hover : Colors.green_btn.default,
+        borderColor: isSelected ? Colors.green_btn.default : Colors.green_btn.hover
     }}
     onMouseEnter={(e) => {
-        e.target.style.backgroundColor = isSelected ? Colors.green.borderHover : Colors.green.borderDefault;
-        e.target.style.borderColor = isSelected ? Colors.green.borderHover  : Colors.green.borderDefault;
+        e.target.style.backgroundColor = isSelected ? Colors.green_btn.borderHover : Colors.green_btn.borderDefault;
+        e.target.style.borderColor = isSelected ? Colors.green_btn.borderHover  : Colors.green_btn.borderDefault;
     }}
     onMouseLeave={(e) => {
-        e.target.style.backgroundColor = isSelected ? Colors.green.default : Colors.green.hover;
-        e.target.style.borderColor = isSelected ? Colors.green.default : Colors.green.hover;
+        e.target.style.backgroundColor = isSelected ? Colors.green_btn.default : Colors.green_btn.hover;
+        e.target.style.borderColor = isSelected ? Colors.green_btn.default : Colors.green_btn.hover;
     }}
 >
     YES
