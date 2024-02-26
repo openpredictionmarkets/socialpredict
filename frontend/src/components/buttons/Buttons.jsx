@@ -1,30 +1,19 @@
 import React, { useState } from 'react';
 import Colors from '../../config/Colors';
 
-const buttonBaseStyle = `w-full px-4 py-2 text-white border border-transparent rounded focus:outline-none focus:ring-2 focus:ring-offset-2`;
-const yesButtonStyle = `bg-green-500 hover:bg-green-400 focus:ring-green-400`;
+const buttonBaseStyle = "w-full px-4 py-2 text-white border border-transparent rounded focus:outline-none focus:ring-2 focus:ring-offset-2";
+// Updated to use Tailwind's custom colors
+const yesButtonStyle = "bg-green-btn hover:bg-green-btn-hover focus:ring-green-btn-border-hover";
+const yesButtonHoverStyle = "bg-green-btn-hover hover:bg-green-btn focus:ring-green-btn-border-default";
+const boxShadowStyle = "shadow-xl"; // Example of using Tailwind's box shadow utility instead of inline style
+
 const noButtonStyle = `bg-red-500 hover:bg-red-400 focus:ring-red-400`;
-const yesButtonHoverStyle = `bg-green-600 hover:bg-green-500 focus:ring-green-500`;
 const noButtonHoverStyle = `bg-red-600 hover:bg-red-500 focus:ring-red-500`;
-const boxShadowStyle = '0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08)';
 
 
 const BetYesButton = ({ isSelected }) => (
 <button
     className={`${buttonBaseStyle} ${isSelected ? yesButtonStyle : yesButtonHoverStyle}`}
-    style={{
-        boxShadow: boxShadowStyle,
-        backgroundColor: isSelected ? Colors.green_btn.hover : Colors.green_btn.default,
-        borderColor: isSelected ? Colors.green_btn.default : Colors.green_btn.hover
-    }}
-    onMouseEnter={(e) => {
-        e.target.style.backgroundColor = isSelected ? Colors.green_btn.borderHover : Colors.green_btn.borderDefault;
-        e.target.style.borderColor = isSelected ? Colors.green_btn.borderHover  : Colors.green_btn.borderDefault;
-    }}
-    onMouseLeave={(e) => {
-        e.target.style.backgroundColor = isSelected ? Colors.green_btn.default : Colors.green_btn.hover;
-        e.target.style.borderColor = isSelected ? Colors.green_btn.default : Colors.green_btn.hover;
-    }}
 >
     YES
 </button>
