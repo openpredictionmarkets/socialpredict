@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {BetYesButton, BetNoButton} from '../../components/buttons/Buttons'; // Adjust the import path as necessary
+import {BetYesButton, BetNoButton, ResolveButton} from '../../components/buttons/Buttons'; // Adjust the import path as necessary
 
 const Style = () => {
     const [isSelected, setIsSelected] = useState(false);
@@ -53,7 +53,22 @@ const Style = () => {
             <code>{`import BetNoButton from '../../components/buttons/Buttons';`}</code>
             </td>
         </tr>
-        {/* Additional rows for other components */}
+        <tr>
+            <td className="px-6 py-4 whitespace-nowrap">
+            <div className="flex flex-wrap items-center gap-4">
+                <ResolveButton
+                isSelected={isSelected}
+                onClick={() => setIsSelected(!isSelected)}
+                />
+            </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            Bet YES Button
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
+            <code>{`import BetYesButton from '../../components/buttons/Buttons';`}</code>
+            </td>
+        </tr>
         </tbody>
     </table>
     </div>
