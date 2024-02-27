@@ -63,10 +63,10 @@ const Style = () => {
             </div>
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-            Bet YES Button
+            Neutral Button
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
-            <code>{`import BetYesButton from '../../components/buttons/Buttons';`}</code>
+            <code>{`import NeutralButton from '../../components/buttons/Buttons';`}</code>
             </td>
         </tr>
         </tbody>

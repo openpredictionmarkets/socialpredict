@@ -17,8 +17,8 @@ export default {
           'border-hover': '#ec250d',
         },
         'neutral-btn': {
-          DEFAULT: '#344675',
-          hover: '#ba54f5',
+          DEFAULT: '#ba54f5',
+          hover: '#344675',
           active: '#263148',
         },
       },
