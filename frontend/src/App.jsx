@@ -84,7 +84,7 @@ function App() {
   return (
     <UserProvider value={{ username, setUsername, isLoggedIn }}>
       <Router>
-        <div className='App bg-primary-background'>
+        <div className='App bg-primary-background sm:pl-64'>
           <header className='App-header'>
             {isLoggedIn && <Navbar onLogout={handleLogout} />}{' '}
             {/* Render Navbar if Logged In */}

@@ -9,8 +9,8 @@ const Sidebar = ({ isLoggedIn, onLogout }) => {
 };
 
 return (
-    <aside className="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full sm:translate-x-0" aria-label="Sidebar">
-        <div className="h-full px-3 py-4 overflow-y-auto bg-custom-gray-light dark:bg-custom-gray-dark">
+    <aside className="fixed top-0 left-0 z-sidebar w-sidebar h-screen transition-transform -translate-x-full sm:translate-x-0" aria-label="Sidebar">
+    <div className="h-full px-3 py-4 overflow-y-auto bg-custom-gray-light dark:bg-custom-gray-dark">
         <ul className="space-y-2 font-medium">
             {isLoggedIn ? (
             // Logged In Navbar Items

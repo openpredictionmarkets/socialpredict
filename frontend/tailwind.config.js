@@ -5,10 +5,7 @@ export default {
     extend: {
       colors: {
         'primary-background': {
-          DEFAULT: '#00bf9a',
-        },
-        'background-color': {
-          DEFAULT: '#00bf9a',
+          DEFAULT: '#0e121d',
         },
         'custom-gray-light': {
           DEFAULT: '#708090',
@@ -33,6 +30,12 @@ export default {
           hover: '#344675',
           active: '#263148',
         },
+      },
+      spacing: {
+        'sidebar': '16rem', // more rem means sidebar thicker
+      },
+      zIndex: {
+        'sidebar': 40, // higher number means more on top
       },
     },
   },
