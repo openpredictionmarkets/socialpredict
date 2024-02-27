@@ -6,7 +6,7 @@ import {
   Switch,
   Redirect,
 } from 'react-router-dom';
-import './App.css';
+// import './App.css';
 import Login from './components/login/Login';
 import Navbar from './components/navbar/Navbar';
 import NavbarLoggedOut from './components/navbar/NavbarLoggedOut';
@@ -84,7 +84,7 @@ function App() {
   return (
     <UserProvider value={{ username, setUsername, isLoggedIn }}>
       <Router>
-        <div className='App'>
+        <div className='App bg-primary-background'>
           <header className='App-header'>
             {isLoggedIn && <Navbar onLogout={handleLogout} />}{' '}
             {/* Render Navbar if Logged In */}

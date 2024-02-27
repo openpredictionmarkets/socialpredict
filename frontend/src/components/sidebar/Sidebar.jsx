@@ -1,0 +1,63 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+
+const Sidebar = ({ isLoggedIn, onLogout }) => {
+    const handleLogoutClick = () => {
+    if (onLogout) {
+      onLogout(); // Call the onLogout function
+    }
+};
+
+return (
+    <aside className="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full sm:translate-x-0" aria-label="Sidebar">
+        <div className="h-full px-3 py-4 overflow-y-auto bg-custom-gray-light dark:bg-custom-gray-dark">
+        <ul className="space-y-2 font-medium">
+            {isLoggedIn ? (
+            // Logged In Navbar Items
+            <>
+            <li>
+                <Link to="/profile" className="sidebar-link">Profile</Link>
+            </li>
+            <li>
+                <Link to="/markets" className="sidebar-link">Markets</Link>
+            </li>
+            <li>
+                <Link to="/polls" className="sidebar-link">Polls</Link>
+            </li>
+            <li>
+                <Link to="/notifications" className="sidebar-link">Notifications</Link>
+            </li>
+            <li>
+                <Link to="/create" className="sidebar-link">Create</Link>
+            </li>
+            <li>
+                <Link to="/about" className="sidebar-link">About</Link>
+            </li>
+            <li>
+                <Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link>
+            </li>
+            </>
+            ) : (
+            // Logged Out Navbar Items
+            <>
+            <li>
+                <Link to="/login" className="sidebar-link">Login</Link>
+            </li>
+            <li>
+                <Link to="/markets" className="sidebar-link">Markets</Link>
+            </li>
+            <li>
+                <Link to="/polls" className="sidebar-link">Polls</Link>
+            </li>
+            <li>
+                <Link to="/about" className="sidebar-link">About</Link>
+            </li>
+            </>
+        )}
+        </ul>
+    </div>
+    </aside>
+);
+};
+
+export default Sidebar;

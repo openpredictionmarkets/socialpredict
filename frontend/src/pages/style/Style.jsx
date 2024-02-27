@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {BetYesButton, BetNoButton, ResolveButton} from '../../components/buttons/Buttons'; // Adjust the import path as necessary
+import Sidebar from '../../components/sidebar/Sidebar';
 
 const Style = () => {
     const [isSelected, setIsSelected] = useState(false);
@@ -21,6 +22,21 @@ const Style = () => {
         </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
+        <tr>
+            <td className="px-6 py-4 whitespace-nowrap">
+                {/* This div might be used to contain a static image or a mock-up if you're not embedding the actual Sidebar */}
+                <div className="flex items-center">
+                    {/* If you decide to include the actual Sidebar component, ensure it's visually and functionally compatible within this constrained space */}
+                    <Sidebar />
+                </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                Sidebar
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
+                <code>{`import Sidebar from '../../components/sidebar/Sidebar';`}</code>
+            </td>
+        </tr>
         <tr>
             <td className="px-6 py-4 whitespace-nowrap">
             <div className="flex flex-wrap items-center gap-4">

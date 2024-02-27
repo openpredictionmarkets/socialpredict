@@ -4,8 +4,20 @@ export default {
   theme: {
     extend: {
       colors: {
+        'primary-background': {
+          DEFAULT: '#00bf9a',
+        },
+        'background-color': {
+          DEFAULT: '#00bf9a',
+        },
+        'custom-gray-light': {
+          DEFAULT: '#708090',
+        },
+        'custom-gray-dark': {
+          DEFAULT: '#303030',
+        },
         'green-btn': {
-          DEFAULT: '#00bf9a', // Use DEFAULT for the base color
+          DEFAULT: '#00bf9a',
           hover: '#00cca4',
           'border-default': '#00f2c3',
           'border-hover': '#00cca4',
