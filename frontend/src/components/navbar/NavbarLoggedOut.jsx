@@ -85,7 +85,7 @@ function NavbarLoggedOut() {
       </button>
 
       <div
-        className={`absolute w-[90%] mt-2 rounded-md p-[1.4rem] top-0 bg-[#1f2251] md:relative md:top-auto md:flex ${
+        className={`absolute w-[90%] md:w-full mt-2 rounded-md p-[1.4rem] top-0 bg-[#1f2251] md:relative md:top-auto md:flex ${
           isMenuOpen ? 'flex' : 'hidden'
         } flex-col z-10 md:flex-row transition-transform duration-150 ease-in-out`}
       >

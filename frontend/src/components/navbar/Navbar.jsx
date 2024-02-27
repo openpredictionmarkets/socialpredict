@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useHistory } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useHistory } from 'react-router-dom';
+import Navlink from './Navlink';
 
 function Navbar({ onLogout }) {
   const [bgColor, setBgColor] = useState('bg-transparent');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef();
   const history = useHistory();
 
   useEffect(() => {
@@ -16,8 +19,17 @@ function Navbar({ onLogout }) {
 
     window.addEventListener('scroll', changeNavbarColor);
 
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
     return () => {
       window.removeEventListener('scroll', changeNavbarColor);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
@@ -26,34 +38,76 @@ function Navbar({ onLogout }) {
       onLogout();
     }
     history.push('/markets');
+    setIsMenuOpen(false); // Ensure the menu is closed on logout
   };
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
+
+  const linkStyle =
+    'transition-colors px-2 rounded-lg duration-150 ease-in-out hover:text-gray-200';
 
   return (
     <div
-      className={`flex items-center w-full h-10 ${bgColor} fixed top-0 z-50 text-xl transition-colors duration-300 ease-in-out px-4`}
+      className={`flex items-center justify-between w-full ${bgColor} fixed top-0 z-50 text-xl transition-colors duration-300 ease-in-out px-4`}
+      ref={menuRef}
     >
-      {/* Left Section */}
-      <div className='flex flex-grow items-center justify-start gap-8'>
-        <Link to='/profile'>Profile</Link>
-        <Link to='/markets'>Markets</Link>
-        <Link to='/polls'>Polls</Link>{' '}
-        {/* Moved Polls to the left as requested */}
+      <button onClick={toggleMenu} className='z-50 px-4 md:hidden'></button>
+
+      <div className='flex items-center justify-start flex-grow gap-8'>
+        <Navlink
+          to='/profile'
+          className={linkStyle}
+          text='Profile'
+          onClick={closeMenu}
+        />
+        <Navlink
+          to='/markets'
+          className={linkStyle}
+          text='Markets'
+          onClick={closeMenu}
+        />
+        <Navlink
+          to='/polls'
+          className={linkStyle}
+          text='Polls'
+          onClick={closeMenu}
+        />
       </div>
 
-      {/* Center Section - Ensure Create is centered by flex-grow on both sides */}
       <div className='flex justify-center flex-grow-0'>
-        <Link to='/create' className='text-center'>
-          Create
-        </Link>
+        <Navlink
+          to='/create'
+          className={linkStyle}
+          text='Create'
+          onClick={closeMenu}
+        />
       </div>
 
-      {/* Right Section */}
-      <div className='flex flex-grow items-center justify-end gap-8'>
-        <Link to='/notifications'>Notifications</Link>
-        <Link to='/about'>About</Link>
-        <Link to='/' onClick={handleLogoutClick}>
-          Logout
-        </Link>
+      <div className='flex items-center justify-end flex-grow gap-8'>
+        <Navlink
+          to='/notifications'
+          className={linkStyle}
+          text='Notifications'
+          onClick={closeMenu}
+        />
+        <Navlink
+          to='/about'
+          className={linkStyle}
+          text='About'
+          onClick={closeMenu}
+        />
+        <Navlink
+          to='/'
+          className={linkStyle}
+          text='Logout'
+          onClick={handleLogoutClick}
+        />
       </div>
     </div>
   );
