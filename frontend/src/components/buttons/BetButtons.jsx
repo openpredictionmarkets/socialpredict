@@ -25,12 +25,5 @@ const BetNoButton = ({ isSelected }) => (
 </button>
 );
 
-const ResolveButton = ({ isSelected }) => (
-<button
-    className={`${buttonBaseStyle} ${isSelected ? neutralButtonStyle : neutralButtonHoverStyle}`}
->
-    RESOLVE
-</button>
-);
 
-export { BetYesButton, BetNoButton, ResolveButton };
+export { BetYesButton, BetNoButton };

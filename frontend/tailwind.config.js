@@ -20,8 +20,8 @@ export default {
           'border-hover': '#00cca4',
         },
         'red-btn': {
-          DEFAULT: '#fd5d93',
-          hover: '#ec250d',
+          DEFAULT: '#ec250d', // #dc3545
+          hover: '#fd5d93', // #ff69b4
           'border-default': '#fd5d93',
           'border-hover': '#ec250d',
         },
@@ -30,9 +30,18 @@ export default {
           hover: '#344675',
           active: '#263148',
         },
+        'primary-pink': {
+          DEFAULT: '#ff69b4',
+        },
+        'info-blue': {
+          DEFAULT: '#17a2b8',
+        },
+        'warning-orange': {
+          DEFAULT: '#ffc107',
+        },
       },
       spacing: {
-        'sidebar': '16rem', // more rem means sidebar thicker
+        'sidebar': '8rem', // more rem means sidebar thicker
       },
       zIndex: {
         'sidebar': 40, // higher number means more on top

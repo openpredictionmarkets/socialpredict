@@ -12,8 +12,8 @@ import Navbar from './components/navbar/Navbar';
 import NavbarLoggedOut from './components/navbar/NavbarLoggedOut';
 import Profile from './pages/profile/Profile';
 import Markets from './pages/markets/Markets';
-import Polls from './components/polls/Polls';
-import Notifications from './components/notifications/Notifications';
+import Polls from './pages/polls/Polls';
+import Notifications from './pages/notifications/Notifications';
 import Create from './pages/create/Create';
 import About from './pages/about/About';
 import { UserProvider } from './helpers/UserContext';
@@ -84,7 +84,7 @@ function App() {
   return (
     <UserProvider value={{ username, setUsername, isLoggedIn }}>
       <Router>
-        <div className='App bg-primary-background sm:pl-64'>
+      <div className='App bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar h-screen'>
           <header className='App-header'>
             {isLoggedIn && <Navbar onLogout={handleLogout} />}{' '}
             {/* Render Navbar if Logged In */}
