@@ -63,9 +63,6 @@ function formatDateTimeForGrid(dateTimeString) {
   const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-based
   const day = date.getDate().toString().padStart(2, '0');
 
-  // Getting timezone
-  // const timezone = /\(([^)]+)\)$/.exec(date.toString())[1];
-
   // Convert 24-hour time to 12-hour time and determine AM/PM
   let hour = date.getHours();
   const amPm = hour >= 12 ? 'PM' : 'AM';

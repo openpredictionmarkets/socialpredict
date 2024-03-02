@@ -7,6 +7,8 @@ import Header from '../../components/header/Header';
 import {RegularInput, SuccessInput, ErrorInput, PersonInput, LockInput} from '../../components/inputs/InputBar';
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
 import LoginModalButton from '../../components/modals/LoginModalClick';
+import MarketsTable from '../../components/tables/MarketTables';
+// import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
 
 const Style = () => {
     const [isSelected, setIsSelected] = useState(false);
@@ -246,8 +248,9 @@ const Style = () => {
         </tr>
         </tbody>
     </table>
-    </div>
+    <MarketsTable ></MarketsTable>
 
+    </div>
     );
 };
 

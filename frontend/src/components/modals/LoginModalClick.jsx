@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import LoginModal from './LoginModal';
 
+
 const LoginModalButton = () => {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
@@ -11,7 +12,7 @@ const handleOpenModal = () => {
 return (
     <div>
     <button onClick={handleOpenModal}>Login</button>
-    {isLoginModalOpen && <LoginModal onClose={() => setIsLoginModalOpen(false)} />}
+    {isLoginModalOpen && <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />}
     </div>
 );
 };

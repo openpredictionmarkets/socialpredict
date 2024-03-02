@@ -56,7 +56,7 @@ const LockInput = () => {
     <div className="flex items-center border-2 border-blue-500 bg-transparent rounded-md">
         <span className="h-5 w-5 text-blue-500 ml-2">🔒</span>
         <input
-        type="text"
+        type="password"
         placeholder="Password"
         className="flex-1 px-4 py-2 rounded-md text-white bg-transparent focus:outline-none"
         />
