@@ -1,7 +1,5 @@
 import React from 'react';
-// import { CheckIcon, XIcon, UserIcon } from '@heroicons/react/solid';
 
-// Regular Input
 const RegularInput = () => {
 return (
     <input

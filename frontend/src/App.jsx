@@ -23,9 +23,9 @@ import Footer from './components/footer/Footer';
 import Style from './pages/style/Style';
 import '../index.css';
 
+
 function App() {
   // state variables
-  const [backendData, setBackendData] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState(null);
 
@@ -75,8 +75,7 @@ function App() {
     fetch(`${API_URL}/api/v0/home`)
       .then((response) => response.json())
       .then((data) => {
-        console.log('Data Received:', data); // Debug log
-        setBackendData(data.message);
+        console.log('Data Received:', data);
       })
       .catch((error) => console.error('Error fetching data:', error));
   }, []);
@@ -89,10 +88,6 @@ function App() {
             {isLoggedIn && <Navbar onLogout={handleLogout} />}{' '}
             {/* Render Navbar if Logged In */}
             {!isLoggedIn && <NavbarLoggedOut />} {/* Render if Logged Out */}
-            <p>
-              Social Predict:{' '}
-              {backendData !== null ? backendData : 'Loading...'}
-            </p>
             {/* Define Our Router */}
             <Switch>
               <Route exact path='/'>

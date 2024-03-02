@@ -5,12 +5,15 @@ import SiteButton from '../../components/buttons/SiteButtons';
 import Sidebar from '../../components/sidebar/Sidebar';
 import Header from '../../components/header/Header';
 import {RegularInput, SuccessInput, ErrorInput, PersonInput, LockInput} from '../../components/inputs/InputBar';
+import RegularInputBox from '../../components/inputs/InputBox';
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
 import LoginModalButton from '../../components/modals/LoginModalClick';
 import MarketsTable from '../../components/tables/MarketTables';
-// import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
+import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
+
 
 const Style = () => {
+
     const [isSelected, setIsSelected] = useState(false);
 
     return (
@@ -33,9 +36,7 @@ const Style = () => {
         <tbody className="bg-primary-background divide-y divide-gray-200">
         <tr>
             <td className="px-6 py-4 text-white">
-                {/* This div might be used to contain a static image or a mock-up if you're not embedding the actual Sidebar */}
                 <div className="flex items-center">
-                    {/* If you decide to include the actual Sidebar component, ensure it's visually and functionally compatible within this constrained space */}
                     <Sidebar />
                 </div>
             </td>
@@ -48,9 +49,7 @@ const Style = () => {
         </tr>
         <tr>
             <td className="px-6 py-4 ">
-                {/* This div might be used to contain a static image or a mock-up if you're not embedding the actual Sidebar */}
                 <div className="flex items-center">
-                    {/* If you decide to include the actual Sidebar component, ensure it's visually and functionally compatible within this constrained space */}
                     <Sidebar />
                 </div>
             </td>
@@ -224,6 +223,19 @@ const Style = () => {
         </tr>
         <tr>
             <td className="px-6 py-4">
+                <div className="flex items-center gap-4">
+                    <RegularInputBox />
+                </div>
+            </td>
+            <td className="px-6 py-4 text-sm text-gray-500">
+                RegularInputBox
+            </td>
+            <td className="px-6 py-4 text-sm font-mono text-gray-500">
+                <code>{`import { RegularInput } from '../../components/inputs/InputBar';`}</code>
+            </td>
+        </tr>
+        <tr>
+            <td className="px-6 py-4">
                 <LoginModalButton />
             </td>
             <td className="px-6 py-4 text-sm text-gray-500">
@@ -249,7 +261,7 @@ const Style = () => {
         </tbody>
     </table>
     <MarketsTable ></MarketsTable>
-
+    <MarketDetailsTable ></MarketDetailsTable>
     </div>
     );
 };
