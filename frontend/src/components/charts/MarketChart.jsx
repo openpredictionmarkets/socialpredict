@@ -27,17 +27,19 @@ const MarketChart = ({ data, title, className }) => {
         x.domain(d3.extent(data, d => parseDate(d.timestamp)));
         y.domain([0, d3.max(data, d => d.probability)]);
 
-        const line = d3.line()
+        // Create an area generator
+        const area = d3.area()
             .x(d => x(parseDate(d.timestamp)))
-            .y(d => y(d.probability))
-            .curve(d3.curveStepAfter);
+            .y0(height)  // This sets the lower bound of the area (baseline)
+            .y1(d => y(d.probability)) // This sets the upper bound of the area (data value)
+            .curve(d3.curveStepAfter); // This makes the area step-based
 
+        // Append the area path using the area generator
         svg.append("path")
             .data([data])
-            .attr("class", "line")
-            .attr("d", line)
-            .attr("fill", "none")
-            .attr("stroke", "steelblue");
+            .attr("class", "area") // You can style this with CSS
+            .attr("d", area)
+            .attr("fill", "steelblue"); // This will fill the area with the steelblue color
 
         svg.append("g")
             .attr("transform", `translate(0,${height})`)
