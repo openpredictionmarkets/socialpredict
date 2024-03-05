@@ -10,7 +10,8 @@ import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector
 import LoginModalButton from '../../components/modals/LoginModalClick';
 import MarketsTable from '../../components/tables/MarketTables';
 import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
-
+import MarketChart from '../../components/charts/MarketChart';
+import TestMarketData from '../../tests/TestData'
 
 const Style = () => {
 
@@ -262,6 +263,11 @@ const Style = () => {
     </table>
     <MarketsTable ></MarketsTable>
     <MarketDetailsTable ></MarketDetailsTable>
+    <MarketChart
+        data={TestMarketData.probabilityChanges}
+        title={TestMarketData.market.questionTitle}
+        className="shadow-md border border-custom-gray-light"
+    />
     </div>
     );
 };
