@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import MarketChart from '../charts/MarketChart';
 
 function MarketDetailsTable(
     { market, numUsers, totalVolume, currentProbability, chartData, formatDateTimeForGrid, formatDateForAxis, isLoggedIn, openBetModal, handleBetAmountChange, betAmount, submitBet, setShowBetModal, openResolveModal, setSelectedResolution, setResolutionPercentage, resolutionPercentage, resolveMarket, isMarketClosed, showBetModal, showResolveModal, isActivityModalOpen, ActivityModalContent, activeTab, changeTab, bets, username }) {
@@ -52,8 +53,9 @@ function MarketDetailsTable(
                     </div>
                     <div className="flex">
                     <div className="flex-1 px-6 py-4">
-                        LineChart Here
-                        {/* Implement your LineChart component */}
+                        <MarketChart
+                            className="shadow-md border border-custom-gray-light"
+                        />
                     </div>
                     </div>
                 </div>

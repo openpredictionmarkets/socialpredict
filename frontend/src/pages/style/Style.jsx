@@ -262,7 +262,53 @@ const Style = () => {
         </tbody>
     </table>
     <MarketsTable ></MarketsTable>
+    <table className="min-w-full divide-y divide-gray-200 bg-primary-background">
+        <thead className="bg-gray-50">
+        <tr>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Description
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Import
+            </th>
+        </tr>
+        </thead>
+        <tbody className="bg-primary-background divide-y divide-gray-200">
+        <tr>
+            <td className="px-6 py-4 text-sm text-gray-500">
+                MarketChartDetailsTable
+            </td>
+            <td className="px-6 py-4 text-sm font-mono text-gray-500">
+                <code>import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';</code>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    <hr></hr>
+    <p></p>
     <MarketDetailsTable ></MarketDetailsTable>
+    <table className="min-w-full divide-y divide-gray-200 bg-primary-background">
+        <thead className="bg-gray-50">
+        <tr>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Description
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Import
+            </th>
+        </tr>
+        </thead>
+        <tbody className="bg-primary-background divide-y divide-gray-200">
+        <tr>
+            <td className="px-6 py-4 text-sm text-gray-500">
+                MarketChart
+            </td>
+            <td className="px-6 py-4 text-sm font-mono text-gray-500">
+                <code>import MarketChart from '../../components/charts/MarketChart';</code>
+            </td>
+        </tr>
+        </tbody>
+    </table>
     <MarketChart
         data={TestMarketData.probabilityChanges}
         title={TestMarketData.market.questionTitle}
