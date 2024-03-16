@@ -7,31 +7,34 @@ export default {
         'primary-background': {
           DEFAULT: '#0e121d',
         },
+        'custom-gray-verylight': {
+          DEFAULT: '#DBD4D3',
+        },
         'custom-gray-light': {
-          DEFAULT: '#708090',
+          DEFAULT: '#67697C',
         },
         'custom-gray-dark': {
           DEFAULT: '#303030',
         },
         'green-btn': {
-          DEFAULT: '#00bf9a',
+          DEFAULT: '#054A29',
           hover: '#00cca4',
-          'border-default': '#00f2c3',
+          'border-default': '#054A29',
           'border-hover': '#00cca4',
         },
         'red-btn': {
-          DEFAULT: '#ec250d', // #dc3545
-          hover: '#fd5d93', // #ff69b4
-          'border-default': '#fd5d93',
-          'border-hover': '#ec250d',
+          DEFAULT: '#D00000',
+          hover: '#FF8484',
+          'border-default': '#D00000',
+          'border-hover': '#FF8484',
         },
         'neutral-btn': {
-          DEFAULT: '#ba54f5',
-          hover: '#344675',
-          active: '#263148',
+          DEFAULT: '#8A1C7C', // '#ba54f5',
+          hover: '#8A1C7C', // '#344675',
+          active: '#8A1C7C', // '#263148',
         },
         'primary-pink': {
-          DEFAULT: '#ff69b4',
+          DEFAULT: '#F72585',
         },
         'info-blue': {
           DEFAULT: '#17a2b8',
