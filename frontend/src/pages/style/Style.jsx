@@ -261,6 +261,28 @@ const Style = () => {
         </tr>
         </tbody>
     </table>
+    <table className="min-w-full divide-y divide-gray-200 bg-primary-background">
+        <thead className="bg-gray-50">
+        <tr>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Description
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Import
+            </th>
+        </tr>
+        </thead>
+        <tbody className="bg-primary-background divide-y divide-gray-200">
+        <tr>
+            <td className="px-6 py-4 text-sm text-gray-500">
+                MarketsTable
+            </td>
+            <td className="px-6 py-4 text-sm font-mono text-gray-500">
+                <code>import MarketsTable from '../../components/tables/MarketTables';</code>
+            </td>
+        </tr>
+        </tbody>
+    </table>
     <MarketsTable ></MarketsTable>
     <table className="min-w-full divide-y divide-gray-200 bg-primary-background">
         <thead className="bg-gray-50">
