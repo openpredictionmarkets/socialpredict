@@ -1,5 +1,4 @@
 import React from 'react';
-import './Markets.css';
 import MarketsTable from '../../components/tables/MarketTables';
 
 function Markets() {
@@ -10,7 +9,6 @@ function Markets() {
             <h1>Markets</h1>
             </div>
             <div className='Center-content-table'>
-            {/* Directly use MarketsTable component here */}
             <MarketsTable />
             </div>
         </div>

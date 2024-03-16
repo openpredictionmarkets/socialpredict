@@ -232,7 +232,7 @@ const Style = () => {
                 RegularInputBox
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-                <code>{`import { RegularInput } from '../../components/inputs/InputBar';`}</code>
+                <code>{`import { RegularInputBox } from '../../components/inputs/InputBox';`}</code>
             </td>
         </tr>
         <tr>
