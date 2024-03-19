@@ -1,4 +1,5 @@
 import React, { useState, useContext } from 'react';
+import ReactDOM from 'react-dom';
 import { useHistory } from 'react-router-dom';
 import { PersonInput, LockInput } from '../inputs/InputBar';
 import SiteButton from '../buttons/SiteButtons';
@@ -33,7 +34,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
 
     if (!isOpen) return null;
 
-    return (
+    return ReactDOM.createPortal(
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
             <div className="relative bg-blue-900 p-6 rounded-lg text-white max-w-sm mx-auto">
                 <h2 className="text-xl mb-4">Login</h2>
@@ -52,7 +53,8 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
                     ✕
                 </button>
             </div>
-        </div>
+        </div>,
+        document.getElementById('modal-root')
     );
 };
 

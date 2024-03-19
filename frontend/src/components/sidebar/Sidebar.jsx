@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import LoginModalButton from '../../components/modals/LoginModalClick';
 
 const Sidebar = ({ isLoggedIn, onLogout }) => {
     const handleLogoutClick = () => {
@@ -41,7 +42,7 @@ return (
             // Logged Out Navbar Items
             <>
             <li>
-                <Link to="/login" className="sidebar-link">Login</Link>
+                <LoginModalButton />
             </li>
             <li>
                 <Link to="/markets" className="sidebar-link">Markets</Link>

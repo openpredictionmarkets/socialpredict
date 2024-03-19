@@ -29,9 +29,9 @@ export default {
           'border-hover': '#FF8484',
         },
         'neutral-btn': {
-          DEFAULT: '#8A1C7C', // '#ba54f5',
-          hover: '#8A1C7C', // '#344675',
-          active: '#8A1C7C', // '#263148',
+          DEFAULT: '#8A1C7C',
+          hover: '#8A1C7C',
+          active: '#8A1C7C',
         },
         'primary-pink': {
           DEFAULT: '#F72585',
