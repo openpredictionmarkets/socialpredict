@@ -6,7 +6,7 @@ import {
   Switch,
   Redirect,
 } from 'react-router-dom';
-// import './App.css';
+import { AuthProvider } from './helpers//AuthContent';
 import Login from './components/login/Login';
 import Navbar from './components/navbar/Navbar';
 import NavbarLoggedOut from './components/navbar/NavbarLoggedOut';
@@ -81,6 +81,7 @@ function App() {
   }, []);
 
   return (
+    <AuthProvider>
     <UserProvider value={{ username, setUsername, isLoggedIn }}>
       <Router>
       <div className='App bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar h-screen'>
@@ -139,6 +140,7 @@ function App() {
         </div>
       </Router>
     </UserProvider>
+    </AuthProvider>
   );
 }
 

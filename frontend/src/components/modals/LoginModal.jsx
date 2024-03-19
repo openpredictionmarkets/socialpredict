@@ -1,34 +1,31 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useHistory } from 'react-router-dom';
 import { PersonInput, LockInput } from '../inputs/InputBar';
 import SiteButton from '../buttons/SiteButtons';
-import UserContext from '../../helpers/UserContext'; // Adjust the path as necessary
+import { UseAuth } from '../../helpers/AuthContent';
 
-
-const LoginModal = ({ isOpen, onClose, onLogin }) => {
+const LoginModal = ({ isOpen, onClose }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const history = useHistory();
-
-    const { setUsername: setContextUsername } = useContext(UserContext);
+    const { login } = UseAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        if (onLogin) {
-            try {
-                await onLogin(username, password); // Execute login logic
-                setContextUsername(username); // Update username in context
+        try {
+            const loginSuccess = await login(username, password);
+            if (loginSuccess) {
                 onClose(); // Close the modal on successful login
-                history.push('/'); // Redirect to home
-            } catch (loginError) {
-                console.error('Login error:', loginError);
-                setError('Incorrect login credentials'); // Set error message
-            }
+                history.push('/markets'); // Redirect to markets page
             } else {
-            console.error('onLogin prop is not a function');
+                setError('Error logging in.');
+            }
+        } catch (loginError) {
+            console.error('Login error:', loginError);
+            setError('An error occurred during login. Please try again.');
         }
     };
 
@@ -46,10 +43,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
                         <SiteButton type="submit">Login</SiteButton>
                     </div>
                 </form>
-                <button
-                    className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white"
-                    onClick={onClose}
-                >
+                <button className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white" onClick={onClose}>
                     ✕
                 </button>
             </div>
