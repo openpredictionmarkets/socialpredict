@@ -1,17 +1,21 @@
-import { API_URL } from '../config';
+import { API_URL } from './../config';
 import React, { createContext, useContext, useState } from 'react';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
-function UseAuth() {
+function useAuth() {
     return useContext(AuthContext);
 }
 
 const AuthProvider = ({ children }) => {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    // Add more state as needed
+    const [authState, setAuthState] = useState({
+        isLoggedIn: false,
+        token: localStorage.getItem('token'),
+        username: localStorage.getItem('username'),
+    });
 
     const login = async (username, password) => {
+        console.log('login function received:', username, password);
         try {
             const response = await fetch(`${API_URL}/api/v0/login`, {
                 method: 'POST',
@@ -23,34 +27,39 @@ const AuthProvider = ({ children }) => {
 
             if (response.ok) {
                 const data = await response.json();
-                // Set login state, store token, etc.
-                setIsLoggedIn(true);
-                console.log('Login successful', data);
-                // Store token in localStorage or manage it as needed
                 localStorage.setItem('token', data.token);
-                // Redirect or perform additional actions
+                setAuthState({
+                    isLoggedIn: true,
+                    token: data.token,
+                    username: username,
+                });
+                return true;
             } else {
-                console.error('Login failed');
-                // Handle failure (e.g., set error state, show message)
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Login failed');
             }
         } catch (error) {
             console.error('Login error:', error);
-            // Handle error (e.g., set error state, show message)
+            throw error;
         }
     };
 
+
     const logout = () => {
-        // Perform logout logic
-        setIsLoggedIn(false);
-        // Clear token from localStorage or manage as needed
         localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        setAuthState({
+        isLoggedIn: false,
+        token: null,
+        username: null,
+        });
     };
 
     return (
-        <AuthContext.Provider value={{ isLoggedIn, login, logout }}>
-            {children}
+        <AuthContext.Provider value={{ ...authState, login, logout }}>
+        {children}
         </AuthContext.Provider>
     );
 };
 
-export { UseAuth, AuthProvider };
+export { useAuth, AuthProvider, AuthContext };
