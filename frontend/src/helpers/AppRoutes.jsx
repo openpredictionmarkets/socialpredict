@@ -17,32 +17,26 @@ import Style from '../pages/style/Style';
 const AppRoutes = ({ isLoggedIn }) => {
     return (
         <Switch>
-        <Route exact path='/'>
-            {isLoggedIn ? <Redirect to='/markets' /> : <Redirect to='/login' />}
+        {/* Public Routes */}
+        <Route exact path='/' />
+        <Route path='/about' component={About} />
+        <Route path='/markets/:marketId' component={MarketDetails} />
+        <Route path='/markets' component={Markets}/>
+        <Route path='/polls' component={Polls}/>
+        <Route path='/user/:username' component={User} />
+        <Route path='/style' component={Style} />
+        {/* Private Routes */}
+        <Route path='/create'>
+            {isLoggedIn ? <Create /> : <Redirect to='/' />}
+        </Route>
+        <Route path='/notifications'>
+            {isLoggedIn ? <Notifications /> : <Redirect to='/' />}
         </Route>
         <Route path='/profile'>
-            {isLoggedIn ? <Profile /> : <Redirect to='/login' />}
+            {isLoggedIn ? <Profile /> : <Redirect to='/' />}
         </Route>
-        <Route path='/markets/:marketId' component={MarketDetails} />
-        <Route path='/markets'>
-            {isLoggedIn ? <Markets /> : <Redirect to='/login' />}
-        </Route>
-        <Route path='/polls'>
-            {isLoggedIn ? <Polls /> : <Redirect to='/login' />}
-        </Route>
-        <Route path='/user/:username' component={User} />
-        <Route path='/notifications'>
-            {isLoggedIn ? <Notifications /> : <Redirect to='/login' />}
-        </Route>
-        <Route path='/create'>
-            {isLoggedIn ? <Create /> : <Redirect to='/login' />}
-        </Route>
-        <Route path='/about' component={About} />
-        <Route path='/style' component={Style} />
-        {/* Define other routes as needed */}
-        {/* ... */}
         {/* If no other route matches, redirect to home or login */}
-        <Route render={() => isLoggedIn ? <Redirect to='/' /> : <Redirect to='/login' />} />
+        <Route render={() => isLoggedIn ? <Redirect to='/' /> : <Redirect to='/' />} />
         </Switch>
     );
 };

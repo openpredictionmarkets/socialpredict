@@ -38,7 +38,7 @@ const Style = () => {
         <tr>
             <td className="px-6 py-4 text-white">
                 <div className="flex items-center">
-                    <Sidebar />
+                    <Header />
                 </div>
             </td>
             <td className="px-6 py-4 text-sm text-gray-500">

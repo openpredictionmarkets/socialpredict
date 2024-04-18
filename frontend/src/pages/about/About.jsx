@@ -5,7 +5,6 @@ function About() {
     return (
         <div className="App">
             <div className="Center-content-header"><h1>About SocialPredict</h1></div>
-
             <div className="left-content">
                 <h4>Empowering Communities with Domain-Specific Insights</h4>
 

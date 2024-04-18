@@ -5,6 +5,8 @@ import Navbar from './components/navbar/Navbar';
 import NavbarLoggedOut from './components/navbar/NavbarLoggedOut';
 import Footer from './components/footer/Footer';
 import AppRoutes from './helpers/AppRoutes';
+import '../index.css';
+import Sidebar from './components/sidebar/Sidebar';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -14,8 +16,8 @@ function App() {
       <Router>
         <div className='App bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar h-screen'>
           <header className='App-header'>
-            {isLoggedIn ? <Navbar onLogout={handleLogout} /> : <NavbarLoggedOut />}
-            <AppRoutes isLoggedIn={isLoggedIn} onLogin={handleLogin} onLogout={handleLogout} />
+            <Sidebar />
+            <AppRoutes />
           </header>
           <Footer />
         </div>
