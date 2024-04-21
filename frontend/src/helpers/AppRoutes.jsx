@@ -4,6 +4,7 @@ import {
     Switch,
     Redirect,
 } from 'react-router-dom';
+import { useAuth } from './AuthContent';
 import Profile from '../pages/profile/Profile';
 import Markets from '../pages/markets/Markets';
 import Polls from '../pages/polls/Polls';
@@ -14,7 +15,10 @@ import MarketDetails from '../pages/marketDetails/MarketDetails';
 import User from '../pages/user/User';
 import Style from '../pages/style/Style';
 
-const AppRoutes = ({ isLoggedIn }) => {
+const AppRoutes = () => {
+
+    const { isLoggedIn } = useAuth();
+
     return (
         <Switch>
         {/* Public Routes */}
