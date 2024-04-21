@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { AuthProvider } from './helpers/AuthContent';
-import Navbar from './components/navbar/Navbar';
-import NavbarLoggedOut from './components/navbar/NavbarLoggedOut';
 import Footer from './components/footer/Footer';
 import AppRoutes from './helpers/AppRoutes';
 import '../index.css';
 import Sidebar from './components/sidebar/Sidebar';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
   return (
     <AuthProvider>
       <Router>

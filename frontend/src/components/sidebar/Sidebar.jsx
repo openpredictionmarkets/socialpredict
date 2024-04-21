@@ -1,20 +1,22 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../helpers/AuthContent';
 import LoginModalButton from '../../components/modals/LoginModalClick';
 
-const Sidebar = ({ isLoggedIn, onLogout }) => {
+const Sidebar = () => {
+    // useAuth hook to get auth state and logout function
+    const { isLoggedIn, logout } = useAuth();
+
     const handleLogoutClick = () => {
-    if (onLogout) {
-      onLogout(); // Call the onLogout function
-    }
-};
+        logout();
+    };
 
 return (
     <aside className="fixed top-0 left-0 z-sidebar w-sidebar h-screen transition-transform -translate-x-full sm:translate-x-0" aria-label="Sidebar">
     <div className="h-full px-3 py-4 dark:bg-custom-gray-dark">
         <ul className="space-y-2 font-medium">
             {isLoggedIn ? (
-            // Logged In Navbar Items
+            // Logged In Sidebar Items
             <>
             <li>
                 <Link to="/profile" className="sidebar-link">Profile</Link>
@@ -39,7 +41,7 @@ return (
             </li>
             </>
             ) : (
-            // Logged Out Navbar Items
+            // Logged Out Sidebar Items
             <>
             <li>
                 <LoginModalButton />

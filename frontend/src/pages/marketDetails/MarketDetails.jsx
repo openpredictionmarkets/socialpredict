@@ -370,7 +370,6 @@ function MarketDetails() {
 
   return (
     <div>
-      <Sidebar />
       <h3>{market.questionTitle}</h3>
       <table className='skinny-table'>
         <tbody>
