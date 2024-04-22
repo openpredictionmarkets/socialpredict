@@ -2,16 +2,18 @@ import { API_URL } from '../../config';
 import React, { useState, useContext } from 'react';
 import { useHistory } from 'react-router-dom';
 import UserContext from '../../helpers/UserContext';
+import getEndofDayDateTime from '../../components/utils/dateTimeTools/FormDateTimeTools';
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
 import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
-import SiteButton from '../../components/buttons/SiteButtons'; // Import SiteButton
+import SiteButton from '../../components/buttons/SiteButtons';
+
 import '../../App.css';
 
 function Create() {
     const [questionTitle, setQuestionTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [resolutionDateTime, setResolutionDateTime] = useState('');
+    const [resolutionDateTime, setResolutionDateTime] = useState(getEndofDayDateTime());
     const [error, setError] = useState('');
 
 // Get the logged-in user's ID from context or another state management solution
@@ -66,6 +68,8 @@ const handleSubmit = async (event) => {
     };
 
     console.log('marketData:', marketData);
+
+    console.log(JSON.stringify(marketData));
 
     const response = await fetch(`${API_URL}/api/v0/create`, {
         method: 'POST',
@@ -127,7 +131,12 @@ return (
             Resolution Date Time:
             <DatetimeSelector
             value={resolutionDateTime}
-            onChange={(e) => setResolutionDateTime(e.target.value)}
+
+            onChange={(e) => {
+                console.log("New date-time:", e.target.value); // Log the new date-time value
+                setResolutionDateTime(e.target.value);
+            }}
+
             />
         </label>
         </div>

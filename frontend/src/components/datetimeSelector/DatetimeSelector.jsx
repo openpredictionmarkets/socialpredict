@@ -1,27 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-const DatetimeSelector = () => {
-    const [selectedDate, setSelectedDate] = useState('');
+const DatetimeSelector = ({ value, onChange }) => {
+    const [internalValue, setInternalValue] = useState(value);
 
+    // Set internalValue when component mounts
     useEffect(() => {
-        // Construct default date-time string with time set to 11:59 PM
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth() + 1; // getMonth() returns 0-11
-        const day = now.getDate();
-        // Format month and day to ensure they are in 'MM' and 'DD' format
-        const formattedMonth = month < 10 ? `0${month}` : month;
-        const formattedDay = day < 10 ? `0${day}` : day;
-
-        // Set default date-time value
-        const defaultDateTime = `${year}-${formattedMonth}-${formattedDay}T23:59`;
-        setSelectedDate(defaultDateTime);
-    }, []);
+        if (!value) { // Only set default if no value is provided
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const day = now.getDate();
+            const formattedMonth = month < 10 ? `0${month}` : `${month}`;
+            const formattedDay = day < 10 ? `0${day}` : `${day}`;
+            const defaultDateTime = `${year}-${formattedMonth}-${formattedDay}T23:59`;
+            setInternalValue(defaultDateTime);
+        }
+    }, [value]);
 
     const handleChange = (event) => {
-        setSelectedDate(event.target.value);
+        setInternalValue(event.target.value);
+        onChange(event); // Propagate changes to parent
     };
-
 
     return (
         <div className="p-4 bg-custom-gray-light text-white rounded-lg shadow-md max-w-md mx-auto my-4">
@@ -32,7 +31,7 @@ const DatetimeSelector = () => {
                 id="datetime-selector"
                 type="datetime-local"
                 className="w-full p-2 rounded border-gray-300 shadow-sm bg-white text-black"
-                value={selectedDate}
+                value={internalValue}
                 onChange={handleChange}
             />
         </div>
