@@ -1,5 +1,5 @@
 import { API_URL } from './../config';
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -13,6 +13,18 @@ const AuthProvider = ({ children }) => {
         token: localStorage.getItem('token'),
         username: localStorage.getItem('username'),
     });
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        // Additional validation or expiry check can be performed here
+        if (token) {
+            setAuthState(prevState => ({
+                ...prevState,
+                isLoggedIn: true, // Assume token is still valid
+                token: token,
+            }));
+        }
+    }, []);
 
     const login = async (username, password) => {
         console.log('login function received:', username, password);
@@ -49,15 +61,15 @@ const AuthProvider = ({ children }) => {
         localStorage.removeItem('token');
         localStorage.removeItem('username');
         setAuthState({
-        isLoggedIn: false,
-        token: null,
-        username: null,
+            isLoggedIn: false,
+            token: null,
+            username: null,
         });
     };
 
     return (
         <AuthContext.Provider value={{ ...authState, login, logout }}>
-        {children}
+            {children}
         </AuthContext.Provider>
     );
 };
