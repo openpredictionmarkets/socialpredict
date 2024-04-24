@@ -4,7 +4,6 @@ const RegularInput = ({ value, onChange }) => {
     return (
         <input
         type="text"
-        placeholder="Regular"
         value={value}
         onChange={onChange}
         className="w-full px-4 py-2 border-2 border-blue-500 rounded-md text-white bg-transparent focus:outline-none"
