@@ -1,0 +1,55 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Line } from 'recharts';
+
+const YourComponent = () => {
+    const [market, setMarket] = useState(null);
+    const [numUsers, setNumUsers] = useState(0);
+    const [totalVolume, setTotalVolume] = useState(0);
+    const [creator, setCreator] = useState(null);
+    const [currentProbability, setCurrentProbability] = useState(0);
+    const [chartData, setChartData] = useState([]);
+    const [marketId, setMarketId] = useState(/* initial market id */);
+
+    const API_URL = '/* your API base URL */';
+
+    const fetchMarketData = useCallback(() => {
+        fetch(`${API_URL}/api/v0/markets/${marketId}`)
+        .then((response) => response.json())
+        .then((data) => {
+            setMarket(data.market);
+            setNumUsers(data.numUsers);
+            setTotalVolume(data.totalVolume);
+            setCreator(data.creator);
+
+            const probabilityChanges = data.probabilityChanges;
+            const newCurrentProbability =
+            probabilityChanges.length > 0
+                ? probabilityChanges[probabilityChanges.length - 1].probability
+                : data.market.initialProbability;
+
+            const roundedProbability = parseFloat(newCurrentProbability.toFixed(3));
+            setCurrentProbability(roundedProbability);
+
+            let chartData = probabilityChanges.map((change) => ({
+            time: new Date(change.timestamp).getTime(),
+            P: change.probability,
+            }));
+            const currentTimeStamp = new Date().getTime();
+            chartData.push({ time: currentTimeStamp, P: roundedProbability });
+            setChartData(chartData);
+        })
+        .catch((error) => console.error('Error:', error));
+    }, [API_URL, marketId]);
+
+    useEffect(() => {
+        fetchMarketData();
+    }, [fetchMarketData]);
+
+    if (!market) {
+        return <div>Loading...</div>;
+    }
+
+
+
+export default YourComponent;

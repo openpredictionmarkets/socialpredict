@@ -3,7 +3,7 @@ import React from 'react';
 const Footer = () => {
     return (
         <footer className="footer">
-            <p>© 2024 SocialPredict</p>
+            <p>📈 Built with SocialPredict. <a href="https://github.com/openpredictionmarkets/socialpredict" target="_blank" rel="noopener noreferrer">⭐ Star Us on Github!</a></p>
         </footer>
     );
 };
