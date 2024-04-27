@@ -1,6 +1,5 @@
 import { API_URL } from '../../config';
 import React from 'react';
-import MarketChart from '../../components/charts/MarketChart';
 import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
 import TestMarketData from '../../tests/TestData'
 
@@ -10,11 +9,14 @@ function MarketDetails() {
             <MarketDetailsTable
                 data={TestMarketData.probabilityChanges}
                 title={TestMarketData.market.questionTitle}
-                className="shadow-md border border-custom-gray-light"
+                market={TestMarketData.market}
+                creator={TestMarketData.creator}
+                probabilityChanges={TestMarketData.probabilityChanges}
+                numUsers={TestMarketData.numUsers}
+                totalVolume={TestMarketData.totalVolume}
             />
         </div>
     );
-
 }
 
 export default MarketDetails;
