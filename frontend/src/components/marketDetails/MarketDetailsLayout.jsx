@@ -1,12 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import MarketChart from '../charts/MarketChart';
+import { formatDateTimeForGrid } from '../utils/dateTimeTools/FormDateTimeTools'
 
 function MarketDetailsTable({ market, creator, probabilityChanges, numUsers, totalVolume }) {
-    //const currentProbability = market.isResolved
-    //    ? probabilityChanges[probabilityChanges.length - 1].probability
-    //    : probabilityChanges.find(change => new Date(change.timestamp) <= new Date()).probability;
-    console.log("Data received in MarketChart:", probabilityChanges);
 
     return (
         <div className="bg-primary-background text-white p-6">
@@ -23,7 +20,19 @@ function MarketDetailsTable({ market, creator, probabilityChanges, numUsers, tot
                     </div>
                     <div className="flex-1 px-6 py-4 text-sm text-gray-500">👤 {numUsers}</div>
                     <div className="flex-1 px-6 py-4 text-sm text-gray-500">📊 {totalVolume.toFixed(2)}</div>
-                    {/* Additional data fields can be added here */}
+                    <div className="flex-1 px-6 py-4 text-sm text-gray-500">💬 {/* 0 */}</div>
+                    <div className="flex-1 px-6 py-4 text-sm text-gray-500">
+                        {market.isResolved ? (
+                            <span>
+                                RESOLVED: {market.resolutionResult} <p>@ {formatDateTimeForGrid(market.finalResolutionDateTime).toLocaleString()}</p>
+                            </span>
+                        ) : (
+                            <>
+                                <div>CLOSE DATE:</div>
+                                <div>📅 {formatDateTimeForGrid(market.resolutionDateTime).toLocaleString()}</div>
+                            </>
+                        )}
+                    </div>
                 </div>
                 <div className="flex">
                     <div className="flex-1 px-6 py-4">

@@ -2,7 +2,7 @@ import { API_URL } from '../../config';
 import React, { useState, useContext } from 'react';
 import { useHistory } from 'react-router-dom';
 import UserContext from '../../helpers/UserContext';
-import getEndofDayDateTime from '../../components/utils/dateTimeTools/FormDateTimeTools';
+import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDateTimeTools';
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
 import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';

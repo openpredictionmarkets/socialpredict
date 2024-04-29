@@ -308,7 +308,6 @@ const Style = () => {
     </table>
     <hr></hr>
     <p></p>
-    <MarketDetailsTable ></MarketDetailsTable>
     <table className="min-w-full divide-y divide-gray-200 bg-primary-background">
         <thead className="bg-gray-50">
         <tr>
