@@ -1,7 +1,7 @@
 import { API_URL } from '../../config';
 import React, { useState, useContext } from 'react';
 import { useHistory } from 'react-router-dom';
-import UserContext from '../../helpers/UserContext';
+import { useAuth } from '../../helpers/AuthContent';
 import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDateTimeTools';
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
 import { RegularInput } from '../../components/inputs/InputBar';
@@ -18,7 +18,7 @@ function Create() {
 
 // Get the logged-in user's ID from context or another state management solution
 // User Context
-const { username } = useContext(UserContext);
+const { username, isLoggedIn } = useAuth();
 
 // User should already have been logged in to be able to access Create()
 // const isLoggedIn = username !== null;

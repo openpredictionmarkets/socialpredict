@@ -5,19 +5,17 @@ import { PersonInput, LockInput } from '../inputs/InputBar';
 import SiteButton from '../buttons/SiteButtons';
 import { useAuth } from '../../helpers/AuthContent';
 
-const LoginModal = ({ isOpen, onClose }) => {
+const LoginModal = ({ isOpen, onClose, onLogin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const history = useHistory();
-    const { login } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        console.log('Attempting to log in with:', username, password);
         try {
-            const loginSuccess = await login(username, password);
+            const loginSuccess = await onLogin(username, password);
             if (loginSuccess) {
                 onClose(); // Close the modal on successful login
                 history.push('/markets'); // Redirect to markets page
@@ -38,12 +36,10 @@ const LoginModal = ({ isOpen, onClose }) => {
                 <h2 className="text-xl mb-4">Login</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <PersonInput value={username} onChange={(e) => {
-                        console.log('Username input:', e.target.value);
                         setUsername(e.target.value);
                     }} />
 
                     <LockInput value={password} onChange={(e) => {
-                        console.log('Password input:', e.target.value);
                         setPassword(e.target.value);
                     }} />
                     {error && <div className='error-message'>{error}</div>}

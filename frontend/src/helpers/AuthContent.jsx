@@ -1,11 +1,15 @@
 import { API_URL } from './../config';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext({
+    username: null,
+    setUsername: () => {},
+    isLoggedIn: false
+});
 
-function useAuth() {
-    return useContext(AuthContext);
-}
+const useAuth = () => useContext(
+    AuthContext
+);
 
 const AuthProvider = ({ children }) => {
     const [authState, setAuthState] = useState({
@@ -22,12 +26,12 @@ const AuthProvider = ({ children }) => {
                 ...prevState,
                 isLoggedIn: true, // Assume token is still valid
                 token: token,
+                username: localStorage.getItem('username'),
             }));
         }
     }, []);
 
     const login = async (username, password) => {
-        console.log('login function received:', username, password);
         try {
             const response = await fetch(`${API_URL}/api/v0/login`, {
                 method: 'POST',
@@ -40,10 +44,11 @@ const AuthProvider = ({ children }) => {
             if (response.ok) {
                 const data = await response.json();
                 localStorage.setItem('token', data.token);
+                localStorage.setItem('username', data.username);
                 setAuthState({
                     isLoggedIn: true,
                     token: data.token,
-                    username: username,
+                    username: data.username,
                 });
                 return true;
             } else {
@@ -56,10 +61,8 @@ const AuthProvider = ({ children }) => {
         }
     };
 
-
     const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
+        localStorage.clear();
         setAuthState({
             isLoggedIn: false,
             token: null,

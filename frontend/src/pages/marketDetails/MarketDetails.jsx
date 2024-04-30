@@ -5,19 +5,20 @@ import { useAuth } from '../../helpers/AuthContent';
 
 
 const MarketDetails = () => {
-    const { username } = useAuth();
+    const { username, isLoggedIn } = useAuth();
     const details = fetchMarketDataHook();
-
+    // check if username is the creator of this market
+    console.log("details.creator.username: ", details?.creator?.username)
     console.log("username: ", username)
+
+    const isCreator = username === details?.creator?.username;
+    console.log("isCreator: ", isCreator)
 
     if (!details) {
         return <div>Loading...</div>;
     }
 
     const currentProbability = calculateCurrentProbability(details);
-
-    // Check if the logged-in user is the creator
-    const isCreator = username === details.creator.username;
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -31,9 +32,9 @@ const MarketDetails = () => {
                     probabilityChanges={details.probabilityChanges}
                 />
             </div>
-            {isCreator && (
+            {isLoggedIn && isCreator && (
                 <div className="w-full bg-white p-4 shadow-md fixed inset-x-0 bottom-0">
-                    <NeutralButton label="Resolve Market" />
+
                 </div>
             )}
         </div>
