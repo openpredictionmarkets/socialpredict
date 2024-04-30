@@ -1,7 +1,6 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
 import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
-import { fetchMarketDataHook } from './marketDetailsUtils'
+import { fetchMarketDataHook, calculateCurrentProbability } from './marketDetailsUtils'
 import { useAuth } from '../../helpers/AuthContent';
 
 
@@ -15,6 +14,8 @@ const MarketDetails = () => {
         return <div>Loading...</div>;
     }
 
+    const currentProbability = calculateCurrentProbability(details);
+
     // Check if the logged-in user is the creator
     const isCreator = username === details.creator.username;
 
@@ -24,9 +25,10 @@ const MarketDetails = () => {
                 <MarketDetailsTable
                     market={details.market}
                     creator={details.creator}
-                    probabilityChanges={details.probabilityChanges}
                     numUsers={details.numUsers}
                     totalVolume={details.totalVolume}
+                    currentProbability={currentProbability}
+                    probabilityChanges={details.probabilityChanges}
                 />
             </div>
             {isCreator && (

@@ -11,7 +11,7 @@ export const fetchMarketDataHook = () => {
             try {
                 const response = await fetch(`${API_URL}/api/v0/markets/${marketId}`);
                 const data = await response.json();
-                setDetails(data);  // Assuming data is structured as in your example
+                setDetails(data);
             } catch (error) {
                 console.error('Error fetching market data:', error);
             }
@@ -21,3 +21,23 @@ export const fetchMarketDataHook = () => {
 
     return details;
 };
+
+export const calculateCurrentProbability = (details) => {
+
+    const currentProbability =
+        details.probabilityChanges.length > 0
+            ? details.probabilityChanges[details.probabilityChanges.length - 1].probability
+            : details.market.initialProbability;
+
+    return parseFloat(currentProbability.toFixed(3));
+}
+
+
+
+
+//const roundedProbability = parseFloat(newCurrentProbability.toFixed(3));
+
+        // Append the current time with the last known probability, converted to Unix time
+//        const [currentProbability, setCurrentProbability] = useState(null);
+//        const currentTimeStamp = new Date().getTime();
+//        chartData.push({ time: currentTimeStamp, P: roundedProbability });
