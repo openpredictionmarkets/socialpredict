@@ -17,7 +17,6 @@ function Create() {
     const [error, setError] = useState('');
 
 // Get the logged-in user's ID from context or another state management solution
-// User Context
 const { username, isLoggedIn } = useAuth();
 
 // User should already have been logged in to be able to access Create()

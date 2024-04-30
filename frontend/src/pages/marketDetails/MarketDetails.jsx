@@ -34,7 +34,7 @@ const MarketDetails = () => {
             </div>
             {isLoggedIn && isCreator && (
                 <div className="w-full bg-white p-4 shadow-md fixed inset-x-0 bottom-0">
-
+                    RESOLVE
                 </div>
             )}
         </div>
