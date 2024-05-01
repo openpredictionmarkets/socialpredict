@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom';
 import { useHistory } from 'react-router-dom';
 import { PersonInput, LockInput } from '../inputs/InputBar';
 import SiteButton from '../buttons/SiteButtons';
-import { useAuth } from '../../helpers/AuthContent';
 
 const LoginModal = ({ isOpen, onClose, onLogin }) => {
     const [username, setUsername] = useState('');
@@ -18,7 +17,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
             const loginSuccess = await onLogin(username, password);
             if (loginSuccess) {
                 onClose(); // Close the modal on successful login
-                history.push('/markets'); // Redirect to markets page
+                history.push(redirectAfterLogin); // redirect to page on previously
             } else {
                 setError('Error logging in.');
             }
