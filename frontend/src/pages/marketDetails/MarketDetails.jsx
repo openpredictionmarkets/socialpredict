@@ -2,7 +2,7 @@ import React from 'react';
 import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
 import { fetchMarketDataHook, calculateCurrentProbability } from './marketDetailsUtils'
 import { useAuth } from '../../helpers/AuthContent';
-
+import { ResolveButton, ConfirmNoButton, ConfirmYesButton } from '../../components/buttons/ResolveButtons';
 
 const MarketDetails = () => {
     const { username, isLoggedIn } = useAuth();
@@ -21,20 +21,22 @@ const MarketDetails = () => {
     const currentProbability = calculateCurrentProbability(details);
 
     return (
-        <div className="flex flex-col min-h-screen">
-            <div className="flex-grow">
-                <MarketDetailsTable
-                    market={details.market}
-                    creator={details.creator}
-                    numUsers={details.numUsers}
-                    totalVolume={details.totalVolume}
-                    currentProbability={currentProbability}
-                    probabilityChanges={details.probabilityChanges}
-                />
+        <div className="flex-col min-h-screen">
+            <div className="flex-grow flex">
+                <div className="flex-1"> {/* Table takes the majority of the space */}
+                    <MarketDetailsTable
+                        market={details.market}
+                        creator={details.creator}
+                        numUsers={details.numUsers}
+                        totalVolume={details.totalVolume}
+                        currentProbability={currentProbability}
+                        probabilityChanges={details.probabilityChanges}
+                    />
+                </div>
             </div>
-            {isLoggedIn && isCreator && (
-                <div className="w-full bg-white p-4 shadow-md fixed inset-x-0 bottom-0">
-                    RESOLVE
+            {isCreator && (
+                <div className="flex-none" style={{ width: '10%' }}>
+                    <ResolveButton className="text-xs px-2 py-1" />
                 </div>
             )}
         </div>

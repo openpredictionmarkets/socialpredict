@@ -5,12 +5,13 @@ const buttonBaseStyle = "w-full px-4 py-2 text-white border rounded focus:outlin
 // Toggle buttons between initial and selected states
 const ResolveButton = () => {
     const [isSelected, setIsSelected] = useState(false);
-    const initialButtonStyle = "bg-custom-gray-light"; // Assuming this is your neutral initial state
-    const selectedButtonStyle = "bg-neutral-btn"; // Assuming this is your selected state color
+    const initialButtonStyle = "bg-custom-gray-light";
+    const selectedButtonStyle = "bg-neutral-btn";
+    const buttonBaseStyle = "w-full px-4 py-2 text-white border rounded focus:outline-none";
 
     return (
         <button
-            className={`${buttonBaseStyle} ${isSelected ? selectedButtonStyle : initialButtonStyle}`}
+            className={`${buttonBaseStyle} ${isSelected ? selectedButtonStyle : initialButtonStyle} min-w-32 text-xs sm:text-sm md:text-base`}
             onClick={() => setIsSelected(!isSelected)}
         >
             RESOLVE
