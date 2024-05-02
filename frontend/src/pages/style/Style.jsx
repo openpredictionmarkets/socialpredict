@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {BetYesButton, BetNoButton} from '../../components/buttons/BetButtons';
-import {ResolveButton, ConfirmNoButton, ConfirmYesButton} from '../../components/buttons/ResolveButtons';
+import {ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton} from '../../components/buttons/ResolveButtons';
 import SiteButton from '../../components/buttons/SiteButtons';
 import Sidebar from '../../components/sidebar/Sidebar';
 import Header from '../../components/header/Header';
@@ -112,33 +112,49 @@ const Style = () => {
         <tr>
             <td className="px-6 py-4">
             <div className="flex flex-wrap items-center gap-4">
-                <ConfirmNoButton
+                <SelectNoButton
                 isSelected={isSelected}
                 onClick={() => setIsSelected(!isSelected)}
                 />
             </div>
             </td>
             <td className="px-6 py-4 text-sm text-gray-500">
-            Confirm No Button (Resolutions)
+            Select No Button (Resolutions)
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-            <code>{`import ConfirmNoButton from '../../components/buttons/ResolveButtons';`}</code>
+            <code>{`import SelectNoButton from '../../components/buttons/ResolveButtons';`}</code>
             </td>
         </tr>
         <tr>
             <td className="px-6 py-4">
             <div className="flex flex-wrap items-center gap-4">
-                <ConfirmYesButton
+                <SelectYesButton
                 isSelected={isSelected}
                 onClick={() => setIsSelected(!isSelected)}
                 />
             </div>
             </td>
             <td className="px-6 py-4 text-sm text-gray-500">
-            Confirm Yes Button (Resolutions)
+            Select Yes Button (Resolutions)
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-            <code>{`import ConfirmYesButton from '../../components/buttons/ResolveButtons';`}</code>
+            <code>{`import SelectYesButton from '../../components/buttons/ResolveButtons';`}</code>
+            </td>
+        </tr>
+        <tr>
+            <td className="px-6 py-4">
+            <div className="flex flex-wrap items-center gap-4">
+                <ConfirmResolveButton
+                isSelected={isSelected}
+                onClick={() => setIsSelected(!isSelected)}
+                />
+            </div>
+            </td>
+            <td className="px-6 py-4 text-sm text-gray-500">
+            ConfirmResolveButton (Resolutions)
+            </td>
+            <td className="px-6 py-4 text-sm font-mono text-gray-500">
+            <code>{`import ConfirmResolveButton from '../../components/buttons/ResolveButtons';`}</code>
             </td>
         </tr>
         <tr>

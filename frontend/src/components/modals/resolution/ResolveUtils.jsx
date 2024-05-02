@@ -1,8 +1,8 @@
+import { API_URL } from '../../../config';
 
-export const resolveMarket = () => {
+export const resolveMarket = (marketId, token, selectedResolution) => {
     const resolutionData = {
         outcome: selectedResolution,
-        percentage: resolutionPercentage,
     };
 
     const requestOptions = {
@@ -14,7 +14,8 @@ export const resolveMarket = () => {
         body: JSON.stringify(resolutionData),
     };
 
-    fetch(`${API_URL}/api/v0/resolve/${marketId}`, requestOptions)
+    // Returning fetch promise to allow handling of the response in the component
+    return fetch(`${API_URL}/api/v0/resolve/${marketId}`, requestOptions)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -23,11 +24,10 @@ export const resolveMarket = () => {
         })
         .then(data => {
             console.log('Market resolved successfully:', data);
-            window.location.reload(); // Reload or redirect
+            return data;
         })
         .catch(error => {
             console.error('Error resolving market:', error);
+            throw error;
         });
-
-    setShowResolveModal(false);
 };
