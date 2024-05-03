@@ -11,6 +11,8 @@ const MarketDetails = () => {
 
     // check if username is the creator of this market
     const isCreator = username === details?.creator?.username;
+    // check if market is resolved
+    const isResolved = details?.market?.isResolved === true;
 
     useEffect(() => {
         setToken(localStorage.getItem('token'));
@@ -36,7 +38,7 @@ const MarketDetails = () => {
                     />
                 </div>
             </div>
-            {isCreator && (
+            {isCreator && !isResolved && (
                 <div className="flex-none ml-6" style={{ width: '10%' }}>
                     <ResolveModalButton marketId={details.market.id} token={token} className="text-xs px-2 py-1" />
                 </div>
