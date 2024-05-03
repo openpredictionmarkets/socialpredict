@@ -1,7 +1,6 @@
 import React from 'react';
 
 const buttonBaseStyle = "w-full px-4 py-2 text-white border border-transparent rounded focus:outline-none focus:ring-2 focus:ring-offset-2";
-// Updated to use Tailwind's custom colors
 const yesButtonStyle = `bg-green-btn hover:bg-green-btn-hover`;
 const yesButtonHoverStyle = `bg-green-btn-hover hover:bg-green-btn`;
 const noButtonStyle = `bg-red-btn hover:bg-red-btn`;
@@ -25,5 +24,38 @@ const BetNoButton = ({ isSelected }) => (
 </button>
 );
 
+const ConfirmBetButton = ({ onClick, selectedDirection }) => {
+    const getButtonStyle = () => {
+        switch (selectedDirection) {
+            case 'NO':
+                return "bg-red-500 hover:bg-red-700";
+            case 'YES':
+                return "bg-green-500 hover:bg-green-700";
+            default:
+                return "bg-custom-gray-light";
+        }
+    };
 
-export { BetYesButton, BetNoButton };
+    const buttonText = () => {
+        switch (selectedDirection) {
+            case 'NO':
+                return "CONFIRM BET NO";
+            case 'YES':
+                return "CONFIRM BET YES";
+            default:
+                return "CONFIRM";
+        }
+    };
+
+    return (
+        <button
+            className={`w-full px-4 py-2 text-white border rounded focus:outline-none ${getButtonStyle()}`}
+            onClick={onClick}
+        >
+            {buttonText()}
+        </button>
+    );
+};
+
+
+export { BetYesButton, BetNoButton, ConfirmBetButton };
