@@ -3,6 +3,7 @@ import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayo
 import { fetchMarketDataHook, calculateCurrentProbability } from './marketDetailsUtils'
 import { useAuth } from '../../helpers/AuthContent';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal'
+import BetModalButton from '../../components/modals/bet/BetModal'
 
 const MarketDetails = () => {
     const { username } = useAuth();
@@ -41,6 +42,11 @@ const MarketDetails = () => {
             {isCreator && !isResolved && (
                 <div className="flex-none ml-6" style={{ width: '10%' }}>
                     <ResolveModalButton marketId={details.market.id} token={token} className="text-xs px-2 py-1" />
+                </div>
+            )}
+            {!isResolved && (
+                <div className="flex-none ml-6" style={{ width: '10%' }}>
+                    <BetModalButton />
                 </div>
             )}
         </div>
