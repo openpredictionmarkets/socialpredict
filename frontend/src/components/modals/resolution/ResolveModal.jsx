@@ -13,6 +13,7 @@ const ResolveModalButton = ({ marketId, token }) => {
     const handleSelectYes = () => setSelectedResolution('YES');
 
     const handleConfirm = () => {
+        console.log("selectedResolution: ", selectedResolution)
         resolveMarket(marketId, token, selectedResolution)
             .then(data => {
                 console.log("Resolution successful:", data);
@@ -27,13 +28,26 @@ const ResolveModalButton = ({ marketId, token }) => {
         <div>
             <ResolveButton onClick={toggleResolveModal} className="ml-6 w-10%" />
             {showResolveModal && (
-                <div className='fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full' id="my-modal">
-                    <div className='resolve-modal p-4 bg-white shadow-lg rounded-lg m-4 max-w-sm mx-auto'>
-                        <SelectYesButton onClick={handleSelectYes} isSelected={selectedResolution === 'YES'} />
-                        <SelectNoButton onClick={handleSelectNo} isSelected={selectedResolution === 'NO'} />
-                        <ConfirmResolveButton onClick={handleConfirm} selectedResolution={selectedResolution} />
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
+                    <div className="resolve-modal relative bg-blue-900 p-6 rounded-lg text-white m-6 mx-auto" style={{ width: '350px' }}>
+                        <h2 className="text-xl mb-4">Resolve Market</h2>
+
+                        <div className="flex justify-center space-x-4 mb-4"> {/* Add flex layout here */}
+                            <div>
+                                <SelectYesButton onClick={handleSelectYes} isSelected={selectedResolution === 'YES'} />
+                            </div>
+                            <div>
+                                <SelectNoButton onClick={handleSelectNo} isSelected={selectedResolution === 'NO'} />
+                            </div>
+                        </div>
+
+                        <div className="border-t border-gray-200 my-2"></div> {/* Divider line */}
+
+                        <div className="mt-4">
+                            <ConfirmResolveButton onClick={handleConfirm} selectedResolution={selectedResolution} />
+                        </div>
                         <button className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white" onClick={toggleResolveModal}>
-                        ✕
+                            ✕
                         </button>
                     </div>
                 </div>

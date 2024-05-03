@@ -1,19 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
 import { fetchMarketDataHook, calculateCurrentProbability } from './marketDetailsUtils'
 import { useAuth } from '../../helpers/AuthContent';
-import { ResolveButton } from '../../components/buttons/ResolveButtons';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal'
 
 const MarketDetails = () => {
-    const { username, isLoggedIn } = useAuth();
+    const { username } = useAuth();
+    const [token, setToken] = useState(null);
     const details = fetchMarketDataHook();
-    // check if username is the creator of this market
-    console.log("details.creator.username: ", details?.creator?.username)
-    console.log("username: ", username)
 
+    // check if username is the creator of this market
     const isCreator = username === details?.creator?.username;
-    console.log("isCreator: ", isCreator)
+
+    useEffect(() => {
+        setToken(localStorage.getItem('token'));
+    }, []);
 
     if (!details) {
         return <div>Loading...</div>;
@@ -37,7 +38,7 @@ const MarketDetails = () => {
             </div>
             {isCreator && (
                 <div className="flex-none ml-6" style={{ width: '10%' }}>
-                    <ResolveModalButton className="text-xs px-2 py-1" />
+                    <ResolveModalButton marketId={details.market.id} token={token} className="text-xs px-2 py-1" />
                 </div>
             )}
         </div>

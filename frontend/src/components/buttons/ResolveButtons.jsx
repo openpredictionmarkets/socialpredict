@@ -30,7 +30,7 @@ const SelectNoButton = ({ onClick }) => {
             className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-500`}
             onClick={onClick}
         >
-            NO
+            RESOLVE NO
         </button>
     );
 };
@@ -41,13 +41,13 @@ const SelectYesButton = ({ onClick }) => {
             className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-500`}
             onClick={onClick}
         >
-            YES
+            RESOLVE YES
         </button>
     );
 };
 
 
-const ConfirmResolveButton = ({ selectedResolution }) => {
+const ConfirmResolveButton = ({ onClick, selectedResolution }) => {
     const getButtonStyle = () => {
         switch (selectedResolution) {
             case 'NO':
@@ -73,6 +73,7 @@ const ConfirmResolveButton = ({ selectedResolution }) => {
     return (
         <button
             className={`w-full px-4 py-2 text-white border rounded focus:outline-none ${getButtonStyle()}`}
+            onClick={onClick}
         >
             {buttonText()}
         </button>
