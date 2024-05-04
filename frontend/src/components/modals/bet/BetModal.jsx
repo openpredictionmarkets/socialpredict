@@ -1,23 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BetButton, BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
 import { submitBet } from './BetUtils'
 
-const BetModalButton = ({ marketId, token }) => {
+const BetModalButton = ({ marketId }) => {
     const [showBetModal, setShowBetModal] = useState(false);
     const [betAmount, setBetAmount] = useState(20);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
+    const [token, setToken] = useState(null);
 
     const toggleBetModal = () => setShowBetModal(prev => !prev);
 
+    useEffect(() => {
+        setToken(localStorage.getItem('token'));
+    }, []);
+
     const handleBetAmountChange = (event) => {
-        let value = event.target.value;
-        value = value.replace(/[^0-9]/g, '');
-        const newAmount = parseInt(value, 10);
-        if (!isNaN(newAmount) && newAmount > 0) {
+        const newAmount = parseInt(event.target.value, 10);
+        if (!isNaN(newAmount) && newAmount >= 0) { // Make sure to handle zero and positive integers
             setBetAmount(newAmount);
         } else {
-            setBetAmount('');
+            setBetAmount(''); // Clear the field or set it to a minimum value if invalid input
         }
+    };
+
+    const handleBetSubmission = () => {
+        const betData = {
+            marketId,
+            amount: betAmount,
+            outcome: selectedOutcome,
+        };
+
+        submitBet(betData, token,
+            (data) => {
+                alert(`Bet placed successfully! Bet ID: ${data.id}`);
+                setShowBetModal(false);
+            },
+            (error) => {
+                alert(`Error placing bet: ${error.message}`);
+            }
+        );
     };
 
     return (

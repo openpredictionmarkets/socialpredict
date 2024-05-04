@@ -4,7 +4,7 @@ import { useHistory } from 'react-router-dom';
 import { PersonInput, LockInput } from '../inputs/InputBar';
 import SiteButton from '../buttons/SiteButtons';
 
-const LoginModal = ({ isOpen, onClose, onLogin }) => {
+const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -16,8 +16,8 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
         try {
             const loginSuccess = await onLogin(username, password);
             if (loginSuccess) {
-                onClose(); // Close the modal on successful login
-                history.push(redirectAfterLogin); // redirect to page on previously
+                onClose();
+                history.push(redirectAfterLogin);
             } else {
                 setError('Error logging in.');
             }
