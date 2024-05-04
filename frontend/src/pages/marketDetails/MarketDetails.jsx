@@ -39,16 +39,24 @@ const MarketDetails = () => {
                     />
                 </div>
             </div>
-            {isCreator && !isResolved && (
-                <div className="flex-none ml-6" style={{ width: '10%' }}>
-                    <ResolveModalButton marketId={details.market.id} token={token} className="text-xs px-2 py-1" />
-                </div>
-            )}
-            {!isResolved && (
-                <div className="flex-none ml-6" style={{ width: '10%' }}>
-                    <BetModalButton />
-                </div>
-            )}
+            <div className="flex items-center space-x-14" style={{ width: '110%' }}>
+                {isCreator && !isResolved && (
+                    <div className="flex-none ml-6 mr-6" style={{ width: '10%' }}>
+                        <ResolveModalButton
+                            marketId={details.market.id}
+                            token={token}
+                            className="text-xs px-2 py-1" />
+                    </div>
+                )}
+                {!isResolved && (
+                    <div className="flex-none ml-6 mr-6" style={{ width: '10%' }}>
+                        <BetModalButton
+                            marketId={details.market.id}
+                            token={token}
+                            className="text-xs px-2 py-1" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

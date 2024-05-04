@@ -46,7 +46,8 @@ const ResolveModalButton = ({ marketId, token }) => {
                         <div className="mt-4">
                             <ConfirmResolveButton onClick={handleConfirm} selectedResolution={selectedResolution} />
                         </div>
-                        <button className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white" onClick={toggleResolveModal}>
+
+                        <button onClick={toggleResolveModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">
                             ✕
                         </button>
                     </div>

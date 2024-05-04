@@ -11,6 +11,17 @@ const RegularInput = ({ value, onChange }) => {
     );
 };
 
+const NumberInput = ({ value, onChange }) => {
+    return (
+        <input
+            type="number"
+            value={value}
+            onChange={onChange}
+            className="w-full px-4 py-2 border-2 border-blue-500 rounded-md text-white bg-transparent focus:outline-none"
+        />
+    );
+};
+
 const SuccessInput = ({ value, onChange }) => {
     return (
     <div className="flex items-center border-2 border-green-500 bg-transparent rounded-md">
@@ -71,4 +82,4 @@ const LockInput = ({ value, onChange }) => {
     );
 };
 
-export { RegularInput, SuccessInput, ErrorInput, PersonInput, LockInput };
+export { RegularInput, NumberInput, SuccessInput, ErrorInput, PersonInput, LockInput };

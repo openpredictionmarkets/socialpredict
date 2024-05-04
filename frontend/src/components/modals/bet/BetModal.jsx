@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { BetButton, BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
+import { submitBet } from './BetUtils'
 
 const BetModalButton = ({ marketId, token }) => {
     const [showBetModal, setShowBetModal] = useState(false);
@@ -8,57 +10,44 @@ const BetModalButton = ({ marketId, token }) => {
     const toggleBetModal = () => setShowBetModal(prev => !prev);
 
     const handleBetAmountChange = (event) => {
-        setBetAmount(parseFloat(event.target.value) || 0);
-    };
-
-    const submitBet = () => {
-        if (!token) {
-            alert('Please log in to place a bet.');
-            return;
+        let value = event.target.value;
+        value = value.replace(/[^0-9]/g, '');
+        const newAmount = parseInt(value, 10);
+        if (!isNaN(newAmount) && newAmount > 0) {
+            setBetAmount(newAmount);
+        } else {
+            setBetAmount('');
         }
-
-        const betData = {
-            username: localStorage.getItem('username'),  // Assuming username is stored in localStorage
-            marketId,
-            amount: betAmount,
-            outcome: selectedOutcome,
-        };
-
-        console.log('Sending bet data:', betData);
-
-        fetch(`${API_URL}/api/v0/bet`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(betData),
-        }).then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            return response.json();
-        }).then(data => {
-            console.log('Success:', data);
-            alert(`Bet placed successfully! Bet ID: ${data.id}`);
-            setShowBetModal(false);
-        }).catch(error => {
-            console.error('Error:', error);
-            alert(`Error placing bet: ${error.message}`);
-        });
     };
 
     return (
         <div>
-            <button onClick={toggleBetModal}>Place Bet</button>
+            <BetButton onClick={toggleBetModal} className="ml-6 w-10%" />
             {showBetModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
                     <div className="bet-modal relative bg-blue-900 p-6 rounded-lg text-white m-6 mx-auto" style={{ width: '350px' }}>
-                        <h2 className="text-xl mb-4">Place Your Bet</h2>
-                        <input type="number" value={betAmount} onChange={handleBetAmountChange} className="text-black mb-4"/>
-                        <button onClick={() => setSelectedOutcome('YES')} className="mr-4">Bet YES</button>
-                        <button onClick={() => setSelectedOutcome('NO')}>Bet NO</button>
-                        <button onClick={submitBet} className="mt-4">Confirm Bet</button>
+                        <h2 className="text-xl mb-4">Purchase Shares</h2>
+
+                        <div className="flex justify-center space-x-4 mb-4">
+                            <div>
+                                <BetNoButton onClick={() => setSelectedOutcome('NO')} />
+                            </div>
+                            <div>
+                                <BetYesButton onClick={() => setSelectedOutcome('YES')} />
+                            </div>
+                        </div>
+
+                        <div className="border-t border-gray-200 my-2"></div>
+
+                        <div className="flex items-center space-x-4 mb-4">
+                            <h2 className="text-xl">Amount</h2>
+                            <BetInputAmount value={betAmount} onChange={handleBetAmountChange} />
+                        </div>
+
+                        <div className="mt-4">
+                            <ConfirmBetButton onClick={submitBet} selectedDirection={selectedOutcome} />
+                        </div>
+
                         <button onClick={toggleBetModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">
                             ✕
                         </button>

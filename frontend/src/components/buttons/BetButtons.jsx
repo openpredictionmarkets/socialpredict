@@ -1,36 +1,67 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { buttonBaseStyle } from './BaseButton';
+import { NumberInput } from '../inputs/InputBar';
 
-const buttonBaseStyle = "w-full px-4 py-2 text-white border border-transparent rounded focus:outline-none focus:ring-2 focus:ring-offset-2";
-const yesButtonStyle = `bg-green-btn hover:bg-green-btn-hover`;
-const yesButtonHoverStyle = `bg-green-btn-hover hover:bg-green-btn`;
-const noButtonStyle = `bg-red-btn hover:bg-red-btn`;
-const noButtonHoverStyle = `bg-red-btn-hover hover:bg-red-btn`;
-const neutralButtonStyle = `bg-neutral-btn hover:bg-neutral-btn-hover`;
-const neutralButtonHoverStyle = `bg-neutral-btn-hover hover:bg-neutral-btn`;
+// Toggle buttons between initial and selected states
+const BetButton = ({ onClick }) => {
+    const [isSelected, setIsSelected] = useState(false);
+    const initialButtonStyle = "bg-custom-gray-light";
+    const selectedButtonStyle = "bg-neutral-btn";
+    const buttonBaseStyle = "w-full px-4 py-2 text-white border rounded focus:outline-none";
 
-const BetYesButton = ({ isSelected }) => (
-<button
-    className={`${buttonBaseStyle} ${isSelected ? yesButtonStyle : yesButtonHoverStyle}`}
->
-    YES
-</button>
-);
+    const handleClick = () => {
+        setIsSelected(!isSelected);
+        onClick && onClick();
+    };
 
-const BetNoButton = ({ isSelected }) => (
-<button
-    className={`${buttonBaseStyle} ${isSelected ? noButtonStyle : noButtonHoverStyle}`}
->
-    NO
-</button>
-);
+    return (
+        <button
+            className={`${buttonBaseStyle} ${isSelected ? selectedButtonStyle : initialButtonStyle} min-w-32 text-xs sm:text-sm md:text-base`}
+            onClick={handleClick}
+        >
+            TRADE
+        </button>
+    );
+};
+
+const BetNoButton = ({ onClick }) => {
+    return (
+        <button
+        className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-btn`}
+            onClick={onClick}
+        >
+            NO
+        </button>
+    );
+};
+
+const BetYesButton = ({ onClick }) => {
+    return (
+        <button
+        className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-btn`}
+            onClick={onClick}
+        >
+            YES
+        </button>
+    );
+};
+
+const BetInputAmount = ({ value, onChange }) => {
+    return (
+        <NumberInput
+            value={value}
+            onChange={onChange}
+        />
+    );
+};
 
 const ConfirmBetButton = ({ onClick, selectedDirection }) => {
     const getButtonStyle = () => {
         switch (selectedDirection) {
             case 'NO':
-                return "bg-red-500 hover:bg-red-700";
+                return "bg-red-btn hover:bg-red-btn";
             case 'YES':
-                return "bg-green-500 hover:bg-green-700";
+                return "bg-green-btn hover:bg-green-btn";
             default:
                 return "bg-custom-gray-light";
         }
@@ -39,11 +70,11 @@ const ConfirmBetButton = ({ onClick, selectedDirection }) => {
     const buttonText = () => {
         switch (selectedDirection) {
             case 'NO':
-                return "CONFIRM BET NO";
+                return "CONFIRM PURCHASE NO";
             case 'YES':
-                return "CONFIRM BET YES";
+                return "CONFIRM PURCHASE YES";
             default:
-                return "CONFIRM";
+                return "CONFIRM TRADE";
         }
     };
 
@@ -58,4 +89,5 @@ const ConfirmBetButton = ({ onClick, selectedDirection }) => {
 };
 
 
-export { BetYesButton, BetNoButton, ConfirmBetButton };
+
+export { BetButton, BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton };

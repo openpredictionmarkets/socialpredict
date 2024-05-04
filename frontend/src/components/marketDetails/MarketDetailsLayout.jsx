@@ -20,7 +20,7 @@ function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentPro
                                 @{market.creatorUsername}
                             </Link>
                         </div>
-                        <div className="text-2xl font-semibold">{currentProbability}%</div>
+                        <div className="text-2xl font-semibold">🪙 {currentProbability}</div>
                     </div>
                     {/* Right section for details, inline and tightly grouped */}
                     <div className="flex space-x-4 items-center">

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-
-const buttonBaseStyle = "w-full px-4 py-2 text-white border rounded focus:outline-none";
+import { buttonBaseStyle } from './BaseButton';
 
 // Toggle buttons between initial and selected states
 const ResolveButton = ({ onClick }) => {
@@ -27,7 +26,7 @@ const ResolveButton = ({ onClick }) => {
 const SelectNoButton = ({ onClick }) => {
     return (
         <button
-            className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-500`}
+            className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-btn`}
             onClick={onClick}
         >
             RESOLVE NO
@@ -38,7 +37,7 @@ const SelectNoButton = ({ onClick }) => {
 const SelectYesButton = ({ onClick }) => {
     return (
         <button
-            className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-500`}
+            className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-btn`}
             onClick={onClick}
         >
             RESOLVE YES
@@ -51,9 +50,9 @@ const ConfirmResolveButton = ({ onClick, selectedResolution }) => {
     const getButtonStyle = () => {
         switch (selectedResolution) {
             case 'NO':
-                return "bg-red-500 hover:bg-red-700";
+                return "bg-red-btn hover:bg-red-btn";
             case 'YES':
-                return "bg-green-500 hover:bg-green-700";
+                return "bg-green-btn hover:bg-green-btn";
             default:
                 return "bg-custom-gray-light";
         }
