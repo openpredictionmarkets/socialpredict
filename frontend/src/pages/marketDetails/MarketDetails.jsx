@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
-import { fetchMarketDataHook, calculateCurrentProbability } from './marketDetailsUtils'
+import { useFetchMarketData, calculateCurrentProbability } from './marketDetailsUtils'
 import { useAuth } from '../../helpers/AuthContent';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal'
 import BetModalButton from '../../components/modals/bet/BetModal'
@@ -8,7 +8,13 @@ import BetModalButton from '../../components/modals/bet/BetModal'
 const MarketDetails = () => {
     const { username } = useAuth();
     const [token, setToken] = useState(null);
-    const details = fetchMarketDataHook();
+    const details = useFetchMarketData();
+
+    // refresh market details and chart after bets or resolution
+    const refreshMarketDetails = async () => {
+        const updatedDetails = await useFetchMarketData();
+        setDetails(updatedDetails);
+    };
 
     // check if username is the creator of this market
     const isCreator = username === details?.creator?.username;
@@ -45,6 +51,7 @@ const MarketDetails = () => {
                         <ResolveModalButton
                             marketId={details.market.id}
                             token={token}
+                            disabled={!token}
                             className="text-xs px-2 py-1" />
                     </div>
                 )}
@@ -53,6 +60,8 @@ const MarketDetails = () => {
                         <BetModalButton
                             marketId={details.market.id}
                             token={token}
+                            disabled={!token}
+                            onBetSuccess={() => useFetchMarketData()}
                             className="text-xs px-2 py-1" />
                     </div>
                 )}

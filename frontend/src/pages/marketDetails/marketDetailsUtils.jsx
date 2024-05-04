@@ -22,6 +22,32 @@ export const fetchMarketDataHook = () => {
     return details;
 };
 
+export const useFetchMarketData = () => {
+    const [details, setDetails] = useState(null);
+    const { marketId } = useParams();
+    const [triggerRefresh, setTriggerRefresh] = useState(false);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/v0/markets/${marketId}`);
+                const data = await response.json();
+                setDetails(data);
+            } catch (error) {
+                console.error('Error fetching market data:', error);
+            }
+        };
+
+        fetchData();
+    }, [marketId, triggerRefresh]);
+
+    const refetchData = () => {
+        setTriggerRefresh(prev => !prev);
+    };
+
+    return { details, refetchData };
+};
+
 export const calculateCurrentProbability = (details) => {
 
     const currentProbability =

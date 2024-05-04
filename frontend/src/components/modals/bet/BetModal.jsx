@@ -2,28 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { BetButton, BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
 import { submitBet } from './BetUtils'
 
-const BetModalButton = ({ marketId }) => {
+const BetModalButton = ({ marketId, token, onBetSuccess }) => {
     const [showBetModal, setShowBetModal] = useState(false);
-    const [betAmount, setBetAmount] = useState(20);
+    const [betAmount, setBetAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
-    const [token, setToken] = useState(null);
 
     const toggleBetModal = () => setShowBetModal(prev => !prev);
 
-    useEffect(() => {
-        setToken(localStorage.getItem('token'));
-    }, []);
-
     const handleBetAmountChange = (event) => {
         const newAmount = parseInt(event.target.value, 10);
-        if (!isNaN(newAmount) && newAmount >= 0) { // Make sure to handle zero and positive integers
+        if (!isNaN(newAmount) && newAmount >= 0) {
             setBetAmount(newAmount);
         } else {
-            setBetAmount(''); // Clear the field or set it to a minimum value if invalid input
+            setBetAmount('');
         }
     };
 
     const handleBetSubmission = () => {
+        if (!token) {
+            alert('Please log in to place a bet.');
+            return;
+        }
+
         const betData = {
             marketId,
             amount: betAmount,
@@ -34,6 +34,7 @@ const BetModalButton = ({ marketId }) => {
             (data) => {
                 alert(`Bet placed successfully! Bet ID: ${data.id}`);
                 setShowBetModal(false);
+                onBetSuccess();
             },
             (error) => {
                 alert(`Error placing bet: ${error.message}`);
@@ -66,7 +67,7 @@ const BetModalButton = ({ marketId }) => {
                         </div>
 
                         <div className="mt-4">
-                            <ConfirmBetButton onClick={submitBet} selectedDirection={selectedOutcome} />
+                            <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} />
                         </div>
 
                         <button onClick={toggleBetModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">
