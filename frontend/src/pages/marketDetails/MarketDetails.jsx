@@ -8,7 +8,7 @@ import BetModalButton from '../../components/modals/bet/BetModal'
 const MarketDetails = () => {
     const { username } = useAuth();
     const [token, setToken] = useState(null);
-    const details = useFetchMarketData();
+    const { details, refetchData } = useFetchMarketData();
 
     // refresh market details and chart after bets or resolution
     const refreshMarketDetails = async () => {
@@ -61,7 +61,7 @@ const MarketDetails = () => {
                             marketId={details.market.id}
                             token={token}
                             disabled={!token}
-                            onBetSuccess={() => useFetchMarketData()}
+                            onBetSuccess={refetchData}
                             className="text-xs px-2 py-1" />
                     </div>
                 )}

@@ -49,14 +49,17 @@ export const useFetchMarketData = () => {
 };
 
 export const calculateCurrentProbability = (details) => {
+    if (!details || !details.probabilityChanges) return 0;
 
-    const currentProbability =
-        details.probabilityChanges.length > 0
-            ? details.probabilityChanges[details.probabilityChanges.length - 1].probability
-            : details.market.initialProbability;
+    const currentProbability = details.probabilityChanges.length > 0
+        ? details.probabilityChanges[details.probabilityChanges.length - 1].probability
+        : details.market.initialProbability;
 
     return parseFloat(currentProbability.toFixed(3));
-}
+};
+
+
+
 
 
 
