@@ -4,17 +4,12 @@ import { useFetchMarketData, calculateCurrentProbability } from './marketDetails
 import { useAuth } from '../../helpers/AuthContent';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal'
 import BetModalButton from '../../components/modals/bet/BetModal'
+import ActivityModalButton from '../../components/modals/activity/ActivityModal';
 
 const MarketDetails = () => {
     const { username } = useAuth();
     const [token, setToken] = useState(null);
     const { details, refetchData } = useFetchMarketData();
-
-    // refresh market details and chart after bets or resolution
-    const refreshMarketDetails = async () => {
-        const updatedDetails = await useFetchMarketData();
-        setDetails(updatedDetails);
-    };
 
     // check if username is the creator of this market
     const isCreator = username === details?.creator?.username;
@@ -65,6 +60,11 @@ const MarketDetails = () => {
                             className="text-xs px-2 py-1" />
                     </div>
                 )}
+            </div>
+            <div className="flex items-center space-x-14" style={{ width: '110%' }}>
+                <div className="flex-none ml-6 mr-6" style={{ width: '10%' }}>
+                    <ActivityModalButton />
+                </div>
             </div>
         </div>
     );

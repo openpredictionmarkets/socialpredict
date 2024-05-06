@@ -3,37 +3,45 @@ import CanvasJSReact from '@canvasjs/react-charts';
 
 const CanvasJSChart = CanvasJSReact.CanvasJSChart;
 
-const MarketChart = ({ data, title, className }) => {
+const MarketChart = ({ data, currentProbability, title, className }) => {
+
     const generateDataPoints = (data) => {
-    // Check if data is not undefined and is indeed an array before trying to map it
-    if (data && Array.isArray(data)) {
-        return data.map(item => ({
-        x: new Date(item.timestamp),
-        y: item.probability
-        }));
-    }
-    return [];
+        let dataPoints = [];
+        if (data && Array.isArray(data)) {
+            dataPoints = data.map(item => ({
+                x: new Date(item.timestamp),
+                y: item.probability
+            }));
+        }
+        // Append the current probability with the current timestamp if available
+        if (currentProbability !== undefined && currentProbability !== null) {
+            dataPoints.push({
+                x: new Date(),
+                y: currentProbability
+            });
+        }
+        return dataPoints;
     };
 
     const options = {
-    animationEnabled: true,
-    backgroundColor: "transparent",
-    zoomEnabled: true,
-    axisX: {
-        valueFormatString: "DD MMM YY HH:mm",
-        labelFontColor: "#708090",
-    },
-    axisY: {
-        includeZero: true,
-        minimum: 0,
-        maximum: 1,
-        labelFontColor: "#708090",
-        suffix: ""
-    },
-    data: [{
-        type: "stepArea",
-        dataPoints: generateDataPoints(data)
-    }]
+        animationEnabled: true,
+        backgroundColor: "transparent",
+        zoomEnabled: true,
+        axisX: {
+            valueFormatString: "DD MMM YY HH:mm",
+            labelFontColor: "#708090",
+        },
+        axisY: {
+            includeZero: true,
+            minimum: 0,
+            maximum: 1,
+            labelFontColor: "#708090",
+            suffix: ""
+        },
+        data: [{
+            type: "stepArea",
+            dataPoints: generateDataPoints(data)
+        }]
     };
 
     return (

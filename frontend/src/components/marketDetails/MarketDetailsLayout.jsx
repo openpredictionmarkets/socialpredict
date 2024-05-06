@@ -43,8 +43,9 @@ function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentPro
                 </div>
                 <div className="px-6 py-4">
                     <MarketChart
-                        className="shadow-md border border-custom-gray-light"
                         data={probabilityChanges}
+                        currentProbability={currentProbability}
+                        className="shadow-md border border-custom-gray-light"
                     />
                 </div>
             </div>
