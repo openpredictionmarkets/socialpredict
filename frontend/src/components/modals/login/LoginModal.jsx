@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { useHistory } from 'react-router-dom';
-import { PersonInput, LockInput } from '../inputs/InputBar';
-import SiteButton from '../buttons/SiteButtons';
+import { PersonInput, LockInput } from '../../inputs/InputBar';
+import SiteButton from '../../buttons/SiteButtons';
 
 const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
     const [username, setUsername] = useState('');
@@ -18,6 +18,7 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
             if (loginSuccess) {
                 onClose();
                 history.push(redirectAfterLogin);
+                window.location.reload(); // this is a hack which goes against the principle of reloading the state
             } else {
                 setError('Error logging in.');
             }

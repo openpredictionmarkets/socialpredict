@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import ActivityModal from './ActivityModal'; // Ensure this is the correct import path
+import ActivityModal from './ActivityModal';
 
-const ActivityModalButton = ({ marketId, token }) => {
+const BetsActivityLayout = ({ marketId, token }) => {
     const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('Comments');
     const [bets, setBets] = useState([]);
@@ -44,4 +44,4 @@ const ActivityModalButton = ({ marketId, token }) => {
     );
 };
 
-export default ActivityModalButton;
+export default BetsActivityLayout;

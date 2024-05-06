@@ -2,20 +2,26 @@ import React, { useState } from 'react';
 import {BetYesButton, BetNoButton} from '../../components/buttons/BetButtons';
 import {ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton} from '../../components/buttons/ResolveButtons';
 import SiteButton from '../../components/buttons/SiteButtons';
+import SiteTabs from '../../components/tabs/SiteTabs';
 import Sidebar from '../../components/sidebar/Sidebar';
 import Header from '../../components/header/Header';
 import {RegularInput, SuccessInput, ErrorInput, PersonInput, LockInput} from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
-import LoginModalButton from '../../components/modals/LoginModalClick';
+import LoginModalButton from '../../components/modals/login/LoginModalClick';
 import MarketsTable from '../../components/tables/MarketTables';
-import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
 import MarketChart from '../../components/charts/MarketChart';
 import TestMarketData from '../../tests/TestData'
 
 const Style = () => {
 
     const [isSelected, setIsSelected] = useState(false);
+
+    const tabsData = [
+        { label: 'Comments', content: <div>Comments Go here...</div> },
+        { label: 'Positions', content: <div>Positions Go here...</div> },
+        { label: 'Bets', content: <div>Bets go here...</div> },
+    ];
 
     return (
     <div className="overflow-auto">
@@ -273,6 +279,19 @@ const Style = () => {
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
             <code>{`import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';`}</code>
+            </td>
+        </tr>
+        <tr>
+            <td className="px-6 py-4">
+            <div className="flex flex-wrap items-center gap-4">
+                <SiteTabs tabs={tabsData} />
+            </div>
+            </td>
+            <td className="px-6 py-4 text-sm text-gray-500">
+            Tabs
+            </td>
+            <td className="px-6 py-4 text-sm font-mono text-gray-500">
+            <code>{`import SiteTabs from '../../components/tabs/SiteTabs';`}</code>
             </td>
         </tr>
         </tbody>

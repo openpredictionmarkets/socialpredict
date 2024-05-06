@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import LoginModal from './LoginModal';
-import { useAuth } from '../../helpers/AuthContent';
+import { useAuth } from '../../../helpers/AuthContent';
 import { useHistory } from 'react-router-dom';
 
 const LoginModalButton = () => {

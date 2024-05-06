@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent';
-import LoginModalButton from '../../components/modals/LoginModalClick';
+import LoginModalButton from '../modals/login/LoginModalClick';
 
 const Sidebar = () => {
     // useAuth hook to get auth state and logout function

@@ -4,11 +4,13 @@ import { useFetchMarketData, calculateCurrentProbability } from './marketDetails
 import { useAuth } from '../../helpers/AuthContent';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal'
 import BetModalButton from '../../components/modals/bet/BetModal'
-import ActivityModalButton from '../../components/modals/activity/ActivityModal';
+import ActivityTabs from '../../components/tabs/ActivityTabs';
+
 
 const MarketDetails = () => {
     const { username } = useAuth();
     const [token, setToken] = useState(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const { details, refetchData } = useFetchMarketData();
 
     // check if username is the creator of this market
@@ -17,7 +19,9 @@ const MarketDetails = () => {
     const isResolved = details?.market?.isResolved === true;
 
     useEffect(() => {
-        setToken(localStorage.getItem('token'));
+        const fetchedToken = localStorage.getItem('token');
+        setToken(fetchedToken);
+        setIsLoggedIn(!!fetchedToken);
     }, []);
 
     if (!details) {
@@ -50,7 +54,7 @@ const MarketDetails = () => {
                             className="text-xs px-2 py-1" />
                     </div>
                 )}
-                {!isResolved && (
+                {!isResolved && isLoggedIn && (
                     <div className="flex-none ml-6 mr-6" style={{ width: '10%' }}>
                         <BetModalButton
                             marketId={details.market.id}
@@ -61,10 +65,8 @@ const MarketDetails = () => {
                     </div>
                 )}
             </div>
-            <div className="flex items-center space-x-14" style={{ width: '110%' }}>
-                <div className="flex-none ml-6 mr-6" style={{ width: '10%' }}>
-                    <ActivityModalButton />
-                </div>
+            <div className="max-w-4xl mx-auto mt-8">
+                <ActivityTabs />
             </div>
         </div>
     );
