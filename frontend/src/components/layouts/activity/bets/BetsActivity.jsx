@@ -40,4 +40,3 @@ const BetsActivityLayout = ({ marketId }) => {
 };
 
 export default BetsActivityLayout;
-
