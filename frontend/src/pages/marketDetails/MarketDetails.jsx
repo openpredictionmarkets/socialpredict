@@ -66,7 +66,7 @@ const MarketDetails = () => {
                 )}
             </div>
             <div className="max-w-4xl mx-auto mt-8">
-                <ActivityTabs />
+                <ActivityTabs marketId={details.market.id} />
             </div>
         </div>
     );
