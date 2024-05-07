@@ -1,3 +1,4 @@
+import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -6,13 +7,13 @@ const PositionsActivityLayout = ({ marketId }) => {
 
     useEffect(() => {
         const fetchPositions = async () => {
-            const response = await fetch(`${API_URL}/api/v0/markets/positions/${marketId}`, {
-            });
+            const response = await fetch(`${API_URL}/api/v0/markets/positions/${marketId}`);
             if (response.ok) {
                 const data = await response.json();
-                // Sort and filter users based on their shares owned
+                console.log("API Data:", data);
                 const sortedAndFiltered = data.filter(user => user.NoSharesOwned > 0 || user.YesSharesOwned > 0)
-                                            .sort((a, b) => b.NoSharesOwned + b.YesSharesOwned - (a.NoSharesOwned + a.YesSharesOwned));
+                                            .sort((a, b) => (b.NoSharesOwned + b.YesSharesOwned) - (a.NoSharesOwned + a.YesSharesOwned));
+                console.log("Filtered and Sorted Data:", sortedAndFiltered);
                 setPositions(sortedAndFiltered);
             } else {
                 console.error('Error fetching positions:', response.statusText);

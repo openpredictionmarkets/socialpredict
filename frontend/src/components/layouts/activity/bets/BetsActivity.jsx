@@ -20,22 +20,32 @@ const BetsActivityLayout = ({ marketId }) => {
     }, [marketId]);
 
     return (
-        <div className="flex flex-col gap-2 p-4">
+        <div className="p-4">
+            <div className="bg-gray-800 p-3 rounded-lg shadow">
+                <div className="grid grid-cols-5 gap-2 text-white font-bold">
+                    <div>Username</div>
+                    <div>Outcome</div>
+                    <div>Amount</div>
+                    <div>Probability</div>
+                    <div>Placed</div>
+                </div>
+            </div>
             {bets.map((bet, index) => (
-                <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex items-center">
-                    <div className="flex-1 font-bold text-blue-500">
+                <div key={index} className="bg-gray-800 p-3 rounded-lg shadow mt-2 grid grid-cols-5 gap-2 items-center">
+                    <div className="text-blue-500 font-bold">
                         <Link to={`/user/${bet.username}`} className="underline hover:text-blue-700">
                             {bet.username}
                         </Link>
                     </div>
-                    <div className="flex-1 text-gray-300">Outcome: {bet.outcome}</div>
-                    <div className="flex-1 text-gray-300">Amount: {bet.amount}</div>
-                    <div className="flex-1 text-gray-300">Probability: {bet.probability.toFixed(3)}</div>
-                    <div className="flex-1 text-gray-400 text-xs">Placed: {new Date(bet.placedAt).toLocaleString()}</div>
+                    <div className="text-gray-300">{bet.outcome}</div>
+                    <div className="text-gray-300">{bet.amount}</div>
+                    <div className="text-gray-300">{bet.probability.toFixed(3)}</div>
+                    <div className="text-gray-400 text-xs">{new Date(bet.placedAt).toLocaleString()}</div>
                 </div>
             ))}
         </div>
     );
+
 
 };
 
