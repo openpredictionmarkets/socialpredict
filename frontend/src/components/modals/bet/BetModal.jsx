@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BetButton, BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
+import BuySharesLayout from '../../layouts/trade/BuySharesLayout'
+import TradeTabs from '../../tabs/TradeTabs';
 import { submitBet } from './BetUtils'
 
 const BetModalButton = ({ marketId, token, onBetSuccess }) => {
@@ -48,27 +50,12 @@ const BetModalButton = ({ marketId, token, onBetSuccess }) => {
             {showBetModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
                     <div className="bet-modal relative bg-blue-900 p-6 rounded-lg text-white m-6 mx-auto" style={{ width: '350px' }}>
-                        <h2 className="text-xl mb-4">Purchase Shares</h2>
 
-                        <div className="flex justify-center space-x-4 mb-4">
-                            <div>
-                                <BetNoButton onClick={() => setSelectedOutcome('NO')} />
-                            </div>
-                            <div>
-                                <BetYesButton onClick={() => setSelectedOutcome('YES')} />
-                            </div>
-                        </div>
-
-                        <div className="border-t border-gray-200 my-2"></div>
-
-                        <div className="flex items-center space-x-4 mb-4">
-                            <h2 className="text-xl">Amount</h2>
-                            <BetInputAmount value={betAmount} onChange={handleBetAmountChange} />
-                        </div>
-
-                        <div className="mt-4">
-                            <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} />
-                        </div>
+                    <TradeTabs
+                        marketId={marketId}
+                        token={token}
+                        onBetSuccess={() => setShowBetModal(false)}
+                    />
 
                         <button onClick={toggleBetModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">
                             ✕

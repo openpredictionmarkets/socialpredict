@@ -34,7 +34,7 @@ const PositionsActivityLayout = ({ marketId }) => {
                                     {pos.Username}
                                 </Link>
                             </div>
-                            <div className="text-gray-300">Shares: {pos.NoSharesOwned}</div>
+                            <div className="text-gray-300">{pos.NoSharesOwned}</div>
                         </div>
                     ))}
                 </div>
@@ -49,7 +49,7 @@ const PositionsActivityLayout = ({ marketId }) => {
                                     {pos.Username}
                                 </Link>
                             </div>
-                            <div className="text-gray-300">Shares: {pos.YesSharesOwned}</div>
+                            <div className="text-gray-300">{pos.YesSharesOwned}</div>
                         </div>
                     ))}
                 </div>

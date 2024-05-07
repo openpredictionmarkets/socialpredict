@@ -26,10 +26,10 @@ export const submitBet = (betData, token, onSuccess, onError) => {
     })
     .then(data => {
         console.log('Success:', data);
-        onSuccess(data);  // Handle success outside this utility function
+        onSuccess(data);
     })
     .catch(error => {
         console.error('Error:', error);
-        onError(error);  // Handle error outside this utility function
+        onError(error);
     });
 };
