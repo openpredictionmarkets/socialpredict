@@ -26,7 +26,7 @@ const BetsActivityLayout = ({ marketId }) => {
                     <div>Username</div>
                     <div>Outcome</div>
                     <div>Amount</div>
-                    <div>Probability</div>
+                    <div>🪙 After</div>
                     <div>Placed</div>
                 </div>
             </div>
