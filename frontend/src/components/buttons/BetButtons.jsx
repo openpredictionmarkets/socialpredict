@@ -74,7 +74,7 @@ const ConfirmBetButton = ({ onClick, selectedDirection }) => {
             case 'YES':
                 return "CONFIRM PURCHASE YES";
             default:
-                return "CONFIRM TRADE";
+                return "CONFIRM PURCHASE";
         }
     };
 

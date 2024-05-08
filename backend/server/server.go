@@ -51,7 +51,7 @@ func Start() {
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
 	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler).Methods("POST")
-	router.HandleFunc("/v0/userposition", usershandlers.UserMarketPositionHandler)
+	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
 	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler).Methods("POST")
 	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler)
 
