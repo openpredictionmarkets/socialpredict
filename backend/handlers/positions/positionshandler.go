@@ -25,3 +25,21 @@ func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(marketDBPMPositions)
 }
+
+func MarketDBPMUserPositionsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	marketIdStr := vars["marketId"]
+	userNameStr := vars["username"]
+
+	// open up database to utilize connection pooling
+	db := util.GetDB()
+
+	marketDBPMPositions, err := CalculateMarketPositionForUser_WPAM_DBPM(db, marketIdStr, userNameStr)
+	if errors.HandleHTTPError(w, err, http.StatusBadRequest, "Invalid request or data processing error.") {
+		return // Stop execution if there was an error.
+	}
+
+	// Respond with the bets display information
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(marketDBPMPositions)
+}
