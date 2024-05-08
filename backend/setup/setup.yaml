@@ -1,7 +1,7 @@
 economics:
   marketcreation:
     initialMarketProbability: 0.5
-    initialMarketSubsidization: 10
+    initialMarketSubsidization: 1
     initialMarketYes: 0
     initialMarketNo: 0
   marketincentives:

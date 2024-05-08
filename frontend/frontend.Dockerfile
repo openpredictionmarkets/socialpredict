@@ -1,8 +1,6 @@
 # syntax=docker/dockerfile:1.3-labs
 FROM node:21.0.0
 
-RUN echo "No op change"
-
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install

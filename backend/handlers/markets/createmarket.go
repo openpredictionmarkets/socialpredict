@@ -40,9 +40,12 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set the creator username from the authenticated user
+	newMarket.CreatorUsername = user.Username
+
 	// Validate the newMarket data as needed
 
-	// Find the User by username
+	// Find the User by username to validate
 	result := db.Where("username = ?", newMarket.CreatorUsername).First(&user)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
