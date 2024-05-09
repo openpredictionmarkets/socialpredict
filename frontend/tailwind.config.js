@@ -16,6 +16,11 @@ export default {
         'custom-gray-dark': {
           DEFAULT: '#303030',
         },
+        'beige': {
+          DEFAULT: '#F9D3A5',
+          hover: '#F9D3A5',
+          active: '#F9D3A5'
+        },
         'green-btn': {
           DEFAULT: '#054A29',
           hover: '#00cca4',
@@ -27,6 +32,11 @@ export default {
           hover: '#FF8484',
           'border-default': '#D00000',
           'border-hover': '#FF8484',
+        },
+        'gold-btn': {
+          DEFAULT: '#FFC107',
+          hover: '#FFC107',
+          active: '#FFC107',
         },
         'neutral-btn': {
           DEFAULT: '#8A1C7C',
@@ -42,6 +52,9 @@ export default {
         'warning-orange': {
           DEFAULT: '#ffc107',
         },
+      },
+      borderRadius: {
+        'badge': '12px'
       },
       spacing: {
         'sidebar': '8rem', // more rem means sidebar thicker

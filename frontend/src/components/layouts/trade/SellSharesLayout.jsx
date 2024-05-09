@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 // import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
+import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/SellButtons';
 import { fetchUserShares, submitSale } from './TradeUtils'
 
 const SellSharesLayout = ({ marketId, token, onSaleSuccess }) => {
@@ -31,8 +32,8 @@ const SellSharesLayout = ({ marketId, token, onSaleSuccess }) => {
 
     const handleSaleSubmission = () => {
         const saleData = {
-            marketId: selectedMarketId,
-            outcome: selectedOutcome, // 'YES' or 'NO'
+            marketId: marketId,
+            outcome: selectedOutcome,
             amount: sellAmount,
         };
 
@@ -47,27 +48,35 @@ const SellSharesLayout = ({ marketId, token, onSaleSuccess }) => {
         );
     };
 
+
     return (
         <div className="p-6 bg-blue-900 rounded-lg text-white">
             <h2 className="text-xl mb-4">Shares Owned</h2>
-            <div className="flex justify-center space-x-4 mb-4">
-                {shares.NoSharesOwned > 0 && (
-                    <button onClick={() => setSelectedOutcome('NO')} className={selectedOutcome === 'NO' ? 'selected' : ''}>
-                        NO: {shares.NoSharesOwned}
-                    </button>
-                )}
-                {shares.YesSharesOwned > 0 && (
-                    <button onClick={() => setSelectedOutcome('YES')} className={selectedOutcome === 'YES' ? 'selected' : ''}>
-                        YES: {shares.YesSharesOwned}
-                    </button>
-                )}
-            </div>
-            <div className="border-t border-gray-200 my-2"></div>
-            <div className="flex items-center space-x-4 mb-4">
-                <h2 className="text-xl">Sale Amount</h2>
-                <input type="number" value={sellAmount} onChange={handleSellAmountChange} />
-            </div>
-            <button onClick={handleSaleSubmission}>Confirm Sale</button>
+            {shares.NoSharesOwned < 1 && shares.YesSharesOwned < 1 ? (
+                <div className="text-center">
+                    <p>No Shares Owned In This Market</p>
+                </div>
+            ) : (
+                <>
+                    <div className="flex justify-center space-x-4 mb-4">
+                        {shares.NoSharesOwned > 0 &&
+                            <SharesBadge type="NO" count={shares.NoSharesOwned} />}
+                        {shares.YesSharesOwned > 0 &&
+                            <SharesBadge type="YES" count={shares.YesSharesOwned} />}
+                    </div>
+                    <div className="border-t border-gray-200 my-2"></div>
+                    <div className="flex items-center space-x-4 mb-4">
+                        <h2 className="text-xl">Sale Amount</h2>
+                        <SaleInputAmount value={sellAmount} onChange={handleSellAmountChange} />
+                    </div>
+                    <div className="flex justify-center">
+                        {shares.NoSharesOwned > 0 &&
+                            <ConfirmSaleButton onClick={() => handleSaleSubmission('NO')} selectedDirection="NO">Sell NO</ConfirmSaleButton>}
+                        {shares.YesSharesOwned > 0 &&
+                            <ConfirmSaleButton onClick={() => handleSaleSubmission('YES')} selectedDirection="YES">Sell YES</ConfirmSaleButton>}
+                    </div>
+                </>
+            )}
         </div>
     );
 };
