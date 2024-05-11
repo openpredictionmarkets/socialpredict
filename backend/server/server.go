@@ -31,7 +31,7 @@ func Start() {
 	router.HandleFunc("/v0/login", middleware.LoginHandler)
 
 	// markets display, market information
-	router.HandleFunc("/v0/markets", marketshandlers.ListMarketsHandler)
+	router.HandleFunc("/v0/markets", marketshandlers.ListMarketsHandler).Methods("GET")
 	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")
 	// handle market positions, get trades
 	router.HandleFunc("/v0/markets/bets/{marketId}", betshandlers.MarketBetsDisplayHandler).Methods("GET")
