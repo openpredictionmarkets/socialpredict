@@ -40,7 +40,6 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 	betutils.CheckMarketStatus(db, redeemRequest.MarketID)
 
 	// Calculate the net aggregate positions for the user
-
 	userNetPosition, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(db, marketIDStr, user.Username)
 	if userNetPosition.NoSharesOwned == 0 && userNetPosition.YesSharesOwned == 0 {
 		http.Error(w, "No position found for the given market", http.StatusBadRequest)
@@ -57,11 +56,19 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 	// Proceed with redemption logic
 	// For simplicity, we're just creating a negative bet to represent the sale
 	redeemRequest.Amount = -redeemRequest.Amount // Negate the amount to indicate sale
-	redeemRequest.PlacedAt = time.Now()          // Set the current time as the redemption time
 
-	result := db.Create(&redeemRequest)
-	if result.Error != nil {
-		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+	// Create a new Bet object
+	bet := models.Bet{
+		Username: user.Username,
+		MarketID: redeemRequest.MarketID,
+		Amount:   redeemRequest.Amount,
+		PlacedAt: time.Now(), // Set the current time as the placement time
+		Outcome:  redeemRequest.Outcome,
+	}
+
+	// Validate the final bet before putting into database
+	if err := betutils.ValidateSale(db, &bet); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -71,6 +78,12 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 	// Update the user's balance in the database
 	if err := db.Save(&user).Error; err != nil {
 		http.Error(w, "Error updating user balance: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	result := db.Create(&bet)
+	if result.Error != nil {
+		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
 		return
 	}
 
