@@ -1,20 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import MarketChart from '../charts/MarketChart';
-import { formatDateTimeForGrid } from '../utils/dateTimeTools/FormDateTimeTools';
-import DescriptionButton from '../buttons/DescriptionButton';
+import { formatDateTimeForGrid } from '../utils/dateTimeTools/FormDateTimeTools'
 
-function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentProbability, probabilityChanges }) {
-    const [showFullDescription, setShowFullDescription] = useState(false); // State to toggle description visibility
-
-    // Function to truncate the description to 50 characters
-    const truncateDescription = (description) => {
-        if (description.length > 50) {
-            return `${description.substring(0, 100)}...`;
-        }
-        return description;
-    };
-
+function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentProbability, probabilityChanges}) {
     return (
         <div className="bg-primary-background text-white p-6">
             <h3 className="text-lg font-large tracking-wider">{market.questionTitle}</h3>
@@ -52,7 +41,6 @@ function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentPro
                         </div>
                     </div>
                 </div>
-                </div>
                 <div className="px-6 py-4">
                     <MarketChart
                         data={probabilityChanges}
@@ -60,15 +48,8 @@ function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentPro
                         className="shadow-md border border-custom-gray-light"
                     />
                 </div>
-                <div className="px-6 py-4">
-                    <DescriptionButton onClick={() => setShowFullDescription(!showFullDescription)}>
-                            {showFullDescription ? 'Hide Description' : 'Show Full Description'}
-                    </DescriptionButton>
-                    <div className="mt-4 bg-gray-700 p-4 rounded text-gray-200">
-                            <p>{showFullDescription ? market.description : truncateDescription(market.description)}</p>
-                    </div>
-                </div>
             </div>
+        </div>
     );
 }
 
