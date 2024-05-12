@@ -56,6 +56,7 @@ const SaleInputAmount = ({ value, onChange }) => {
         <NumberInput
             value={value}
             onChange={onChange}
+            max={max}
         />
     );
 };
