@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/SellButtons';
 import { fetchUserShares, submitSale } from './TradeUtils'
 
-const SellSharesLayout = ({ marketId, token, onSaleSuccess }) => {
+const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     const [shares, setShares] = useState({ NoSharesOwned: 0, YesSharesOwned: 0 });
     const [sellAmount, setSellAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
@@ -40,7 +40,7 @@ const SellSharesLayout = ({ marketId, token, onSaleSuccess }) => {
         submitSale(saleData, token, (data) => {
                 alert(`Sale successful! Sale ID: ${data.id}`);
                 console.log('Sale response:', data);
-                onSaleSuccess();
+                onTransactionSuccess();
             }, (error) => {
                 alert(`Sale failed: ${error.message}`);
                 console.error('Sale error:', error);

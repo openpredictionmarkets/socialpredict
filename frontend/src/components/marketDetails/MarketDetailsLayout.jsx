@@ -5,7 +5,7 @@ import { formatDateTimeForGrid } from '../utils/dateTimeTools/FormDateTimeTools'
 import DescriptionButton from '../buttons/DescriptionButton';
 
 function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentProbability, probabilityChanges }) {
-    const [showFullDescription, setShowFullDescription] = useState(false); // State to toggle description visibility
+    const [showFullDescription, setShowFullDescription] = useState(false);
 
     // Function to truncate the description to 50 characters
     const truncateDescription = (description) => {

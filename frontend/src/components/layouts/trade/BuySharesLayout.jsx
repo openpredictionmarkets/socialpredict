@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
 import { submitBet } from './TradeUtils'
 
-const BuySharesLayout = ({ marketId, token, onBetSuccess }) => {
+
+const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     const [betAmount, setBetAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
 
@@ -25,7 +26,7 @@ const BuySharesLayout = ({ marketId, token, onBetSuccess }) => {
 
         submitBet(betData, token, (data) => {
             alert(`Bet placed successfully! Bet ID: ${data.id}`);
-            onBetSuccess();
+            onTransactionSuccess();
         }, (error) => {
             alert(`Error placing bet: ${error.message}`);
         });

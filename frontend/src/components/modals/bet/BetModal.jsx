@@ -1,47 +1,17 @@
 import React, { useState } from 'react';
-import { BetButton, BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
-import BuySharesLayout from '../../layouts/trade/BuySharesLayout'
+import { BetButton } from '../../buttons/BetButtons';
 import TradeTabs from '../../tabs/TradeTabs';
 import { submitBet } from './BetUtils'
 
-const BetModalButton = ({ marketId, token, onBetSuccess }) => {
+const BetModalButton = ({ marketId, token, onTransactionSuccess }) => {
     const [showBetModal, setShowBetModal] = useState(false);
-    const [betAmount, setBetAmount] = useState(1);
-    const [selectedOutcome, setSelectedOutcome] = useState(null);
-
     const toggleBetModal = () => setShowBetModal(prev => !prev);
 
-    const handleBetAmountChange = (event) => {
-        const newAmount = parseInt(event.target.value, 10);
-        if (!isNaN(newAmount) && newAmount >= 0) {
-            setBetAmount(newAmount);
-        } else {
-            setBetAmount('');
+    const handleTransactionSuccess = () => {
+        setShowBetModal(false);  // Close modal
+        if (onTransactionSuccess) {
+            onTransactionSuccess();  // Trigger data refresh
         }
-    };
-
-    const handleBetSubmission = () => {
-        if (!token) {
-            alert('Please log in to place a bet.');
-            return;
-        }
-
-        const betData = {
-            marketId,
-            amount: betAmount,
-            outcome: selectedOutcome,
-        };
-
-        submitBet(betData, token,
-            (data) => {
-                alert(`Bet placed successfully! Bet ID: ${data.id}`);
-                setShowBetModal(false);
-                onBetSuccess();
-            },
-            (error) => {
-                alert(`Error placing bet: ${error.message}`);
-            }
-        );
     };
 
     return (
@@ -54,7 +24,7 @@ const BetModalButton = ({ marketId, token, onBetSuccess }) => {
                     <TradeTabs
                         marketId={marketId}
                         token={token}
-                        onBetSuccess={() => setShowBetModal(false)}
+                        onTransactionSuccess={handleTransactionSuccess}
                     />
 
                         <button onClick={toggleBetModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">

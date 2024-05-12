@@ -60,7 +60,7 @@ const MarketDetails = () => {
                             marketId={details.market.id}
                             token={token}
                             disabled={!token}
-                            onBetSuccess={refetchData}
+                            onTransactionSuccess={refetchData}
                             className="text-xs px-2 py-1" />
                     </div>
                 )}
