@@ -51,7 +51,7 @@ const SharesBadge = ({ type, count }) => {
     );
 };
 
-const SaleInputAmount = ({ value, onChange }) => {
+const SaleInputAmount = ({ value, onChange, max }) => {
     return (
         <NumberInput
             value={value}
