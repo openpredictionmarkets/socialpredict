@@ -1,0 +1,23 @@
+package test
+
+import (
+	"socialpredict/handlers/math/outcomes/dbpm"
+	"testing"
+)
+
+func TestNetAggregateMarketPositions(t *testing.T) {
+
+	for _, tc := range TestCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			result := dbpm.NetAggregateMarketPositions(tc.AggregatedPositions)
+			if len(result) != len(tc.AggregatedPositions) {
+				t.Fatalf("Test %s failed: expected %d results, got %d", tc.Name, len(tc.NetPositions), len(result))
+			}
+			for i, pos := range result {
+				if pos.Username != tc.NetPositions[i].Username || pos.YesSharesOwned != tc.NetPositions[i].YesSharesOwned || pos.NoSharesOwned != tc.NetPositions[i].NoSharesOwned {
+					t.Errorf("Test %s failed at index %d: expected %+v, got %+v", tc.Name, i, tc.NetPositions[i], pos)
+				}
+			}
+		})
+	}
+}

@@ -137,20 +137,20 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 	if C_YES_SUM > 0 {
 		F_YES = float64(S_YES) / C_YES_SUM
 	} else {
-		F_YES = 1 // Avoid division by zero
+		F_YES = 0
 	}
 
 	// Calculate normalization factor for NO
 	if C_NO_SUM > 0 {
 		F_NO = float64(S_NO) / C_NO_SUM
 	} else {
-		F_NO = 1 // Avoid division by zero
+		F_NO = 0
 	}
 
 	logging.LogAnyType(F_YES, "F_YES")
 	logging.LogAnyType(F_NO, "F_NO")
 
-	return F_YES, F_NO
+	return math.Abs(F_YES), math.Abs(F_NO)
 }
 
 // max returns the minimum of two float64 values.
@@ -207,6 +207,17 @@ func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
 		}
 	}
 
+	// Loop to add from newest to oldest until there's no excess
+	for excess < 0 {
+		for i := len(scaledPayouts) - 1; i >= 0; i-- {
+			scaledPayouts[i] += 1 // add surplus to newest
+			excess += 1           // increment excess until we get to zero
+			if excess == 0 {
+				break
+			}
+		}
+	}
+
 	return scaledPayouts
 }
 
@@ -249,23 +260,23 @@ func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []int64) []MarketP
 // Function to normalize market positions such that for each user,
 // only one of YesSharesOwned or NoSharesOwned is greater than 0,
 // with the other being 0, and the value is the net difference.
-func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
-	var normalizedPositions []MarketPosition
+//func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
+//	var normalizedPositions []MarketPosition
 
-	for _, position := range positions {
-		var normalizedPosition MarketPosition
-		normalizedPosition.Username = position.Username
+//	for _, position := range positions {
+//		var normalizedPosition MarketPosition
+//		normalizedPosition.Username = position.Username
 
-		if position.YesSharesOwned > position.NoSharesOwned {
-			normalizedPosition.YesSharesOwned = position.YesSharesOwned - position.NoSharesOwned
-			normalizedPosition.NoSharesOwned = 0
-		} else {
-			normalizedPosition.NoSharesOwned = position.NoSharesOwned - position.YesSharesOwned
-			normalizedPosition.YesSharesOwned = 0
-		}
+//		if position.YesSharesOwned > position.NoSharesOwned {
+//			normalizedPosition.YesSharesOwned = position.YesSharesOwned - position.NoSharesOwned
+//			normalizedPosition.NoSharesOwned = 0
+//		} else {
+//			normalizedPosition.NoSharesOwned = position.NoSharesOwned - position.YesSharesOwned
+//			normalizedPosition.YesSharesOwned = 0
+//		}
 
-		normalizedPositions = append(normalizedPositions, normalizedPosition)
-	}
+//		normalizedPositions = append(normalizedPositions, normalizedPosition)
+//	}
 
-	return normalizedPositions
-}
+//	return normalizedPositions
+//}

@@ -2,63 +2,42 @@ package test
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"
-	"socialpredict/models"
 	"testing"
 )
 
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
-	tests := []struct {
-		name           string
-		bets           []models.Bet
-		finalPayouts   []int64
-		expectedResult []dbpm.MarketPosition
-	}{
-		{
-			name: "single user multiple bets",
-			bets: []models.Bet{
-				{Username: "user1", Outcome: "YES", Amount: 100},
-				{Username: "user1", Outcome: "NO", Amount: 50},
-			},
-			finalPayouts: []int64{100, 50},
-			expectedResult: []dbpm.MarketPosition{
-				{Username: "user1", YesSharesOwned: 100, NoSharesOwned: 50},
-			},
-		},
-		{
-			name: "multiple users",
-			bets: []models.Bet{
-				{Username: "user1", Outcome: "YES", Amount: 100},
-				{Username: "user2", Outcome: "NO", Amount: 50},
-			},
-			finalPayouts: []int64{100, 50},
-			expectedResult: []dbpm.MarketPosition{
-				{Username: "user1", YesSharesOwned: 100, NoSharesOwned: 0},
-				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 50},
-			},
-		},
-		{
-			name: "negative payouts adjusted",
-			bets: []models.Bet{
-				{Username: "user1", Outcome: "YES", Amount: 100},
-				{Username: "user1", Outcome: "NO", Amount: 50},
-			},
-			finalPayouts: []int64{100, -10},
-			expectedResult: []dbpm.MarketPosition{
-				{Username: "user1", YesSharesOwned: 100, NoSharesOwned: 0}, // Negative payout adjusted to 0
-			},
-		},
-	}
+	for _, tc := range TestCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			result := dbpm.AggregateUserPayoutsDBPM(tc.Bets, tc.AdjustedScaledPayouts)
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := dbpm.AggregateUserPayoutsDBPM(tc.bets, tc.finalPayouts)
-			if len(result) != len(tc.expectedResult) {
-				t.Fatalf("Test %s failed: expected %d results, got %d", tc.name, len(tc.expectedResult), len(result))
+			// Create a map for expected results for easy lookup
+			expectedResults := make(map[string]dbpm.MarketPosition)
+			for _, pos := range tc.AggregatedPositions {
+				expectedResults[pos.Username] = pos
 			}
-			for i, pos := range result {
-				expected := tc.expectedResult[i]
-				if pos.Username != expected.Username || pos.YesSharesOwned != expected.YesSharesOwned || pos.NoSharesOwned != expected.NoSharesOwned {
-					t.Errorf("Test %s failed at index %d: expected %+v, got %+v", tc.name, i, expected, pos)
+
+			// Create a map from the results for comparison
+			resultsMap := make(map[string]dbpm.MarketPosition)
+			for _, pos := range result {
+				resultsMap[pos.Username] = pos
+			}
+
+			// Check if the results match expected results for each user
+			for username, expectedPos := range expectedResults {
+				resultPos, ok := resultsMap[username]
+				if !ok {
+					t.Errorf("Test %s failed: missing position for username %s", tc.Name, username)
+					continue
+				}
+				if resultPos.YesSharesOwned != expectedPos.YesSharesOwned || resultPos.NoSharesOwned != expectedPos.NoSharesOwned {
+					t.Errorf("Test %s failed for %s: expected %+v, got %+v", tc.Name, username, expectedPos, resultPos)
+				}
+			}
+
+			// Check for any unexpected extra users in the results
+			for username := range resultsMap {
+				if _, ok := expectedResults[username]; !ok {
+					t.Errorf("Test %s failed: unexpected position for username %s", tc.Name, username)
 				}
 			}
 		})

@@ -68,9 +68,9 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	// Aggregate user payouts into market positions
 	aggreatedPositions := dbpm.AggregateUserPayoutsDBPM(allBetsOnMarket, finalPayouts)
 
-	marketPositions := dbpm.NetAggregateMarketPositions(aggreatedPositions)
+	// marketPositions := dbpm.NetAggregateMarketPositions(aggreatedPositions)
 
-	return marketPositions, nil
+	return aggreatedPositions, nil
 }
 
 // CalculateMarketPositionForUser_WPAM_DBPM fetches and summarizes the position for a given user in a specific market.
