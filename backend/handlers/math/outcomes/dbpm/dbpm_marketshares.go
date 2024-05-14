@@ -1,6 +1,7 @@
 package dbpm
 
 import (
+	"fmt"
 	"math"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
@@ -35,15 +36,61 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	S := float64(marketmath.GetMarketVolume(bets))
 	logging.LogAnyType(S, "S")
 
+	// initial condition, shares set to zero
+	S_YES := int64(0)
+	S_NO := int64(0)
+
+	// Check case where ther is single share, output
 	// Calculate YES and NO pools using floating-point arithmetic
 	// Note, fractional shares will be lost here
-	S_YES := math.Round(S * R)
-	logging.LogAnyType(S_YES, "S_YES")
-	S_NO := math.Round(S * (1 - R))
-	logging.LogAnyType(S_NO, "S_NO")
+	if marketmath.GetMarketVolume(bets) == 1 {
+		singleShareDirection := SingleShareYesNoAllocator(bets)
+		if singleShareDirection == "YES" {
+			logging.LogMsg("Evaluating single share direction YES")
+			S_YES = 1
+			logging.LogAnyType(S_YES, "S_YES")
+			logging.LogAnyType(S_NO, "S_NO")
+		} else {
+			logging.LogMsg("Evaluating single share direction NO")
+			S_NO = 1
+			logging.LogAnyType(S_YES, "S_YES")
+			logging.LogAnyType(S_NO, "S_NO")
+		}
+	} else {
+		logging.LogMsg("No single share direction")
+		S_YES = int64(math.Round(S * R))
+		logging.LogAnyType(S_YES, "S_YES")
+		S_NO = int64(math.Round(S * (1 - R)))
+		logging.LogAnyType(S_NO, "S_NO")
+	}
 
 	// Convert results to int64, rounding in predictable way
-	return int64(S_YES), int64(S_NO)
+	return S_YES, S_NO
+}
+
+// Returns "YES", "NO", or "", indicating the outcome of the single share or no outcome if shares > 1.
+func SingleShareYesNoAllocator(bets []models.Bet) string {
+
+	logging.LogMsg("Evaluating SingleShareYesNoAllocator()")
+
+	total := int64(0)
+	for _, bet := range bets {
+		logging.LogMsg(fmt.Sprintf("Bet Outcome: %s", bet.Outcome))
+		logging.LogMsg(fmt.Sprintf("Bet Amount: %d", bet.Amount))
+		if bet.Outcome == "YES" {
+			total += bet.Amount
+		} else if bet.Outcome == "NO" {
+			total -= bet.Amount
+		}
+	}
+
+	if total > 0 {
+		return "YES"
+	} else if total < 0 {
+		return "NO"
+	} else {
+		return "" // indeterminite
+	}
 }
 
 // CalculateCoursePayoutsDBPM calculates the course payout for each bet in the market,

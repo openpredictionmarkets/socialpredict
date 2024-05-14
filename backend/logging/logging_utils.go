@@ -35,3 +35,7 @@ func LogAnyType(variable interface{}, variableName string) {
 		log.Printf("[%s] Variable Name: '%s', Type: %s, Value: %v\n", location, variableName, varType, varValue)
 	}
 }
+
+func LogMsg(input string) {
+	log.Printf("%s", input)
+}
