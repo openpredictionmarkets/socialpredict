@@ -2,11 +2,12 @@ package test
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"
+	test "socialpredict/tests"
 	"testing"
 )
 
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	for _, tc := range test.TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			result := dbpm.AggregateUserPayoutsDBPM(tc.Bets, tc.AdjustedScaledPayouts)
 

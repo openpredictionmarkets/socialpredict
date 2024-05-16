@@ -2,34 +2,26 @@ package test
 
 import (
 	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/models"
+	test "socialpredict/tests"
 	"testing"
-	"time"
 )
 
 func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
-	// Define the test case
-	bets := []models.Bet{
-		{Amount: 1, Outcome: "YES"},
-		{Amount: -1, Outcome: "YES"},
-		{Amount: 1, Outcome: "NO"},
-		{Amount: -1, Outcome: "NO"},
-		{Amount: 1, Outcome: "NO"},
-		{Amount: 1, Outcome: "NO"},
-		{Amount: -1, Outcome: "NO"},
-		{Amount: -1, Outcome: "NO"},
-		{Amount: 500, Outcome: "YES"},
-		{Amount: 500, Outcome: "NO"},
-		{Amount: 500, Outcome: "NO"},
-		{Amount: 500, Outcome: "YES"},
-	}
-	marketCreatedAt := time.Now()
+	for _, tc := range test.TestCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			// Call the function under test
+			probChanges := wpam.CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
 
-	// Call the function under test
-	probChanges := wpam.CalculateMarketProbabilitiesWPAM(marketCreatedAt, bets)
+			if len(probChanges) != len(tc.ProbabilityChanges) {
+				t.Fatalf("expected %d probability changes, got %d", len(tc.ProbabilityChanges), len(probChanges))
+			}
 
-	// Print results (or you can add assertions here to automatically check expected results)
-	for _, pc := range probChanges {
-		t.Logf("At %v, Probability: %f", pc.Timestamp, pc.Probability)
+			for i, pc := range probChanges {
+				expected := tc.ProbabilityChanges[i]
+				if pc.Probability != expected.Probability {
+					t.Errorf("at index %d, expected probability %f, got %f", i, expected.Probability, pc.Probability)
+				}
+			}
+		})
 	}
 }

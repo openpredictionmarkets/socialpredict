@@ -198,8 +198,8 @@ func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
 	for excess > 0 {
 		for i := len(scaledPayouts) - 1; i >= 0; i-- {
 			if scaledPayouts[i] > 0 { // Ensure we don't deduct from a zero payout
-				scaledPayouts[i] -= 1
-				excess -= 1
+				scaledPayouts[i] -= 1 // deduct surplus from newest
+				excess -= 1           // decrease excess until we get to zero
 				if excess == 0 {
 					break
 				}
@@ -207,16 +207,18 @@ func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
 		}
 	}
 
-	// Loop to add from newest to oldest until there's no excess
+	// Loop to add from oldest to newest until there's no excess
 	for excess < 0 {
-		for i := len(scaledPayouts) - 1; i >= 0; i-- {
-			scaledPayouts[i] += 1 // add surplus to newest
-			excess += 1           // increment excess until we get to zero
+		for i := 0; i < len(scaledPayouts); i++ { // Iterate from the beginning to the end
+			scaledPayouts[i] += 1 // Add surplus to oldest
+			excess += 1           // Increment excess until we get to zero
 			if excess == 0 {
 				break
 			}
 		}
 	}
+
+	logging.LogAnyType(scaledPayouts, "scaledPayouts")
 
 	return scaledPayouts
 }

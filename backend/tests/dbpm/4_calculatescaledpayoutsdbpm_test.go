@@ -2,11 +2,12 @@ package test
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"
+	test "socialpredict/tests"
 	"testing"
 )
 
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	for _, tc := range test.TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := dbpm.CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.F_YES, tc.F_NO)
 			if len(actualPayouts) != len(tc.ScaledPayouts) {

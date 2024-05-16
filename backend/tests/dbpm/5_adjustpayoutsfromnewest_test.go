@@ -2,12 +2,13 @@ package test
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"
+	test "socialpredict/tests"
 	"testing"
 )
 
 func TestAdjustPayoutsFromNewest(t *testing.T) {
 
-	for _, tc := range TestCases {
+	for _, tc := range test.TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			adjustedPayouts := dbpm.AdjustPayoutsFromNewest(tc.Bets, tc.ScaledPayouts)
 			for i, payout := range adjustedPayouts {

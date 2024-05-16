@@ -2,11 +2,12 @@ package test
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"
+	test "socialpredict/tests"
 	"testing"
 )
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	for _, tc := range test.TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			yes, no := dbpm.DivideUpMarketPoolSharesDBPM(tc.Bets, tc.ProbabilityChanges)
 			if yes != tc.S_YES || no != tc.S_NO {
