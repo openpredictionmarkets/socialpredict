@@ -2,12 +2,13 @@ package usershandlers
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
+	"socialpredict/handlers/positions"
 	"socialpredict/models"
 	"socialpredict/util"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -15,11 +16,16 @@ import (
 )
 
 type PortfolioItem struct {
-	MarketID      uint      `json:"marketId"`
-	QuestionTitle string    `json:"questionTitle"`
-	TotalYesBets  int64     `json:"totalYesBets"`
-	TotalNoBets   int64     `json:"totalNoBets"`
-	LastBetPlaced time.Time `json:"lastBetPlaced"`
+	MarketID       uint      `json:"marketId"`
+	QuestionTitle  string    `json:"questionTitle"`
+	YesSharesOwned int64     `json:"yesSharesOwned"`
+	NoSharesOwned  int64     `json:"noSharesOwned"`
+	LastBetPlaced  time.Time `json:"lastBetPlaced"`
+}
+
+type PortfolioTotal struct {
+	PortfolioItems   []PortfolioItem `json:"portfolioItems"`
+	TotalSharesOwned int64           `json:"totalSharesOwned"`
 }
 
 func GetPublicUserPortfolio(w http.ResponseWriter, r *http.Request) {
@@ -37,37 +43,41 @@ func GetPublicUserPortfolio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// fetch all markets that user has bet on, order by most recently bet on
-	userportfolio, err := processUserBets(userbets)
+	// Create a market map from the user's bets
+	marketMap := makeUserMarketMap(userbets)
+
+	// Process the market map to calculate positions and fetch market titles
+	userPositionsPortfolio, err := processMarketMap(db, marketMap, username)
 	if err != nil {
-		log.Printf("Error processing user bets: %v", err)
-		http.Error(w, "Error processing user bets", http.StatusInternalServerError)
+		log.Printf("Error processing market map: %v", err)
+		http.Error(w, "Error processing market map", http.StatusInternalServerError)
 		return
 	}
 
+	totalSharesOwned := calculateTotalShares(userPositionsPortfolio)
+
+	portfolioTotal := PortfolioTotal{
+		PortfolioItems:   userPositionsPortfolio,
+		TotalSharesOwned: totalSharesOwned,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(userportfolio)
+	json.NewEncoder(w).Encode(portfolioTotal)
 }
 
 // fetchUserBets retrieves all bets made by a specific user
 func fetchUserBets(db *gorm.DB, username string) ([]models.Bet, error) {
-	// First, get the user info
-	userInfo := GetPublicUserInfo(db, username)
-	if userInfo.Username == "" {
-		log.Printf("User not found for username: %v", username)
-		return nil, errors.New("user not found")
-	}
-
 	var userbets []models.Bet
 	// Retrieve all bets made by the user
-	if err := db.Where("username = ?", userInfo.Username).Order("placed_at desc").Find(&userbets).Error; err != nil {
+	if err := db.Where("username = ?", username).Order("placed_at desc").Find(&userbets).Error; err != nil {
 		return nil, err
 	}
 
 	return userbets, nil
 }
 
-func processUserBets(userbets []models.Bet) ([]PortfolioItem, error) {
+// makeUserMarketMap creates a map of PortfolioItem from the user's bets
+func makeUserMarketMap(userbets []models.Bet) map[uint]PortfolioItem {
 	marketMap := make(map[uint]PortfolioItem)
 
 	// Iterate over all bets
@@ -81,13 +91,6 @@ func processUserBets(userbets []models.Bet) ([]PortfolioItem, error) {
 			}
 		}
 
-		// Aggregate YES and NO bets
-		if bet.Outcome == "YES" {
-			item.TotalYesBets += bet.Amount
-		} else if bet.Outcome == "NO" {
-			item.TotalNoBets += bet.Amount
-		}
-
 		// Update the last bet placed time if this bet is more recent
 		if bet.PlacedAt.After(item.LastBetPlaced) {
 			item.LastBetPlaced = bet.PlacedAt
@@ -97,14 +100,27 @@ func processUserBets(userbets []models.Bet) ([]PortfolioItem, error) {
 		marketMap[bet.MarketID] = item
 	}
 
-	db := util.GetDB()
+	return marketMap
+}
 
-	// Fetch and append market names
-	for marketID, item := range marketMap {
+func processMarketMap(db *gorm.DB, marketMap map[uint]PortfolioItem, username string) ([]PortfolioItem, error) {
+	// Calculate market positions for each market
+	for marketID := range marketMap {
+		position, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(db, strconv.Itoa(int(marketID)), username)
+		if err != nil {
+			return nil, err
+		}
+
+		// Fetch market title
 		var market models.Market
 		if err := db.Where("id = ?", marketID).First(&market).Error; err != nil {
 			return nil, err
 		}
+
+		// Update the market item with the calculated positions and market title
+		item := marketMap[marketID]
+		item.YesSharesOwned = position.YesSharesOwned
+		item.NoSharesOwned = position.NoSharesOwned
 		item.QuestionTitle = market.QuestionTitle
 		marketMap[marketID] = item
 	}
@@ -121,4 +137,12 @@ func processUserBets(userbets []models.Bet) ([]PortfolioItem, error) {
 	})
 
 	return userportfolio, nil
+}
+
+func calculateTotalShares(portfolio []PortfolioItem) int64 {
+	var totalShares int64
+	for _, item := range portfolio {
+		totalShares += item.YesSharesOwned + item.NoSharesOwned
+	}
+	return totalShares
 }

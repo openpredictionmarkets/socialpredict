@@ -30,10 +30,10 @@ func main() {
 	// Migrate the database
 	migration.MigrateDB(db)
 
-	// Seed the admin user
+	// Seed the users
 	seed.SeedUsers(db)
 	seed.SeedMarket(db)
-	seed.SeedBets(db)
+	// seed.SeedBets(db)
 
 	server.Start()
 }

@@ -8,7 +8,6 @@ import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
 import SiteButton from '../../components/buttons/SiteButtons';
 
-import '../../App.css';
 
 function Create() {
     const [questionTitle, setQuestionTitle] = useState('');
