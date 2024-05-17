@@ -1,4 +1,4 @@
-package handlers
+package usershandlers
 
 import (
 	"encoding/json"
@@ -12,17 +12,17 @@ import (
 
 // PublicUserType is a struct for user data that is safe to send to the client for Profiles
 type PublicUserType struct {
-	Username              string  `json:"username"`
-	DisplayName           string  `json:"displayname" gorm:"unique;not null"`
-	UserType              string  `json:"usertype"`
-	InitialAccountBalance float64 `json:"initialAccountBalance"`
-	AccountBalance        float64 `json:"accountBalance"`
-	PersonalEmoji         string  `json:"personalEmoji,omitempty"`
-	Description           string  `json:"description,omitempty"`
-	PersonalLink1         string  `json:"personalink1,omitempty"`
-	PersonalLink2         string  `json:"personalink2,omitempty"`
-	PersonalLink3         string  `json:"personalink3,omitempty"`
-	PersonalLink4         string  `json:"personalink4,omitempty"`
+	Username              string `json:"username"`
+	DisplayName           string `json:"displayname" gorm:"unique;not null"`
+	UserType              string `json:"usertype"`
+	InitialAccountBalance int64  `json:"initialAccountBalance"`
+	AccountBalance        int64  `json:"accountBalance"`
+	PersonalEmoji         string `json:"personalEmoji,omitempty"`
+	Description           string `json:"description,omitempty"`
+	PersonalLink1         string `json:"personalink1,omitempty"`
+	PersonalLink2         string `json:"personalink2,omitempty"`
+	PersonalLink3         string `json:"personalink3,omitempty"`
+	PersonalLink4         string `json:"personalink4,omitempty"`
 }
 
 func GetPublicUserResponse(w http.ResponseWriter, r *http.Request) {

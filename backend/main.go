@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"socialpredict/middleware"
 	"socialpredict/migration"
+	"socialpredict/seed"
 	"socialpredict/server"
 	"socialpredict/util"
 )
@@ -29,9 +30,9 @@ func main() {
 	// Migrate the database
 	migration.MigrateDB(db)
 
-	// Seed the admin user
-	// seed.SeedUsers(db)
-	// seed.SeedMarket(db)
+	// Seed the users
+	seed.SeedUsers(db)
+	seed.SeedMarket(db)
 	// seed.SeedBets(db)
 
 	server.Start()

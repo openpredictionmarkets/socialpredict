@@ -1,4 +1,4 @@
-package handlers
+package marketshandlers
 
 import (
 	"encoding/json"
@@ -9,9 +9,21 @@ import (
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
-
-	"gorm.io/gorm"
 )
+
+func checkQuestionTitleLength(title string) error {
+	if len(title) > 160 || len(title) < 1 {
+		return errors.New("Question Title exceeds 160 characters or is blank")
+	}
+	return nil
+}
+
+func checkQuestionDescriptionLength(description string) error {
+	if len(description) > 2000 {
+		return errors.New("Question Description exceeds 2000 characters")
+	}
+	return nil
+}
 
 func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -29,10 +41,10 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 
 	var newMarket models.Market
 
-	// Decode the request body into newMarket
+	newMarket.CreatorUsername = user.Username
+
 	err = json.NewDecoder(r.Body).Decode(&newMarket)
 	if err != nil {
-		// Log the error and the request body for debugging
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
 		log.Printf("Error reading request body: %v, Body: %s", err, string(bodyBytes))
 
@@ -40,21 +52,27 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate the newMarket data as needed
+	if err = checkQuestionTitleLength(newMarket.QuestionTitle); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// Find the User by username
-	result := db.Where("username = ?", newMarket.CreatorUsername).First(&user)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			http.Error(w, "Creator user not found", http.StatusNotFound)
+	if err = checkQuestionDescriptionLength(newMarket.Description); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err = util.CheckUserIsReal(db, newMarket.CreatorUsername); err != nil {
+		if err.Error() == "creator user not found" {
+			http.Error(w, err.Error(), http.StatusNotFound)
 		} else {
-			http.Error(w, "Error finding creator user", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
 	// Create the market in the database
-	result = db.Create(&newMarket)
+	result := db.Create(&newMarket)
 	if result.Error != nil {
 		log.Printf("Error creating new market: %v", result.Error)
 		http.Error(w, "Error creating new market", http.StatusInternalServerError)
