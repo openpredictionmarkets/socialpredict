@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { buttonBaseStyle } from './BaseButton';
-import { NumberInput } from '../inputs/InputBar';
+import { buttonBaseStyle } from '../BaseButton';
+import { NumberInput } from '../../inputs/InputBar';
 
 // Toggle buttons between initial and selected states
 const BetButton = ({ onClick }) => {

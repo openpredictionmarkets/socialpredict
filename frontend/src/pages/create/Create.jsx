@@ -1,5 +1,5 @@
 import { API_URL } from '../../config';
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent';
 import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDateTimeTools';
@@ -15,21 +15,21 @@ function Create() {
     const [resolutionDateTime, setResolutionDateTime] = useState(getEndofDayDateTime());
     const [error, setError] = useState('');
 
-// Get the logged-in user's ID from context or another state management solution
-const { username, isLoggedIn } = useAuth();
+    // Get the logged-in user's ID from context or another state management solution
+    const { username, isLoggedIn } = useAuth();
 
-// User should already have been logged in to be able to access Create()
-// const isLoggedIn = username !== null;
+    // User should already have been logged in to be able to access Create()
+    // const isLoggedIn = username !== null;
 
-// history for redirect after market creation
-const history = useHistory();
+    // history for redirect after market creation
+    const history = useHistory();
 
-// Get the timezone offset from the user
-const utcOffset = new Date().getTimezoneOffset();
+    // Get the timezone offset from the user
+    const utcOffset = new Date().getTimezoneOffset();
 
-const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setError('');
 
     let isoDateTime = resolutionDateTime; // Default to the original value
 

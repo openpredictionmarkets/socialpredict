@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { buttonBaseStyle } from './BaseButton';
+import { buttonBaseStyle } from '../BaseButton';
 
 // Toggle buttons between initial and selected states
 const ResolveButton = ({ onClick }) => {
@@ -9,8 +9,8 @@ const ResolveButton = ({ onClick }) => {
     const buttonBaseStyle = "w-full px-4 py-2 text-white border rounded focus:outline-none";
 
     const handleClick = () => {
-        setIsSelected(!isSelected); // Toggle the internal selected state
-        onClick && onClick(); // Call the external onClick handler
+        setIsSelected(!isSelected);
+        onClick && onClick();
     };
 
     return (

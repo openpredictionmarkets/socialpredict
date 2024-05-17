@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/BetButtons';
+import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/trade/BetButtons';
 import { submitBet } from './TradeUtils'
 
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton } from '../../buttons/ResolveButtons';
+import { ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton } from '../../buttons/marketDetails/ResolveButtons';
 import { resolveMarket } from './ResolveUtils';
 
 const ResolveModalButton = ({ marketId, token }) => {

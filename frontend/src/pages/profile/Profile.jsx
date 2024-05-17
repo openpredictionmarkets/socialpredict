@@ -1,9 +1,9 @@
 
 import { API_URL } from '../../config';
 import React, { useState, useEffect } from 'react';
-import PublicUserInfoLayout from '../../components/layouts/profile/public/PublicUserInfoLayout'
+import PrivateUserLayout from '../../components/layouts/profile/private/PrivateUserLayout'
 import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout'
-
+import { useAuth } from '../../helpers/AuthContent';
 
 const Profile = () => {
 
@@ -26,7 +26,7 @@ const Profile = () => {
 
     return (
         <div>
-        <PublicUserInfoLayout
+        <PrivateUserLayout
             userData={userData}
         />
         <PublicUserPortfolioLayout

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import MarketChart from '../charts/MarketChart';
 import { formatDateTimeForGrid } from '../utils/dateTimeTools/FormDateTimeTools';
-import DescriptionButton from '../buttons/DescriptionButton';
+import DescriptionButton from '../buttons/marketDetails/DescriptionButton';
 
 function MarketDetailsTable({ market, creator, numUsers, totalVolume, currentProbability, probabilityChanges }) {
     const [showFullDescription, setShowFullDescription] = useState(false);

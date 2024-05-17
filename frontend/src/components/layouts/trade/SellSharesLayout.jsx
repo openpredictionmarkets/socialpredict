@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/SellButtons';
+import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons';
 import { fetchUserShares, submitSale } from './TradeUtils'
 
 const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {

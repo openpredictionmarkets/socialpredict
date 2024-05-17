@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { buttonBaseStyle } from './BaseButton';
+import { buttonBaseStyle } from '../BaseButton';
 
-const DescriptionButton = ({ onClick, children }) => {
+const PersonalEmojiButton = ({ onClick, children }) => {
     const [isSelected, setIsSelected] = useState(false);
     const initialButtonStyle = "bg-custom-gray-light border-transparent";
     const selectedButtonStyle = "bg-primary-pink border-transparent";
 
     const handleButtonClick = () => {
         setIsSelected(!isSelected);
-        if (onClick) onClick(); // Call external onClick if provided
+        if (onClick) onClick();
     };
 
     return (
@@ -21,4 +21,4 @@ const DescriptionButton = ({ onClick, children }) => {
     );
 };
 
-export default DescriptionButton;
+export default PersonalEmojiButton;

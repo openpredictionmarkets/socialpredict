@@ -1,5 +1,5 @@
 import React from 'react';
-import { buttonBaseStyle } from './BaseButton';
+import { buttonBaseStyle } from '../BaseButton';
 
 const ActivityModal = ({ activeTab, changeTab, bets, toggleModal }) => {
     return (

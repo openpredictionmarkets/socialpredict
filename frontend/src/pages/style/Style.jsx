@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import {BetYesButton, BetNoButton} from '../../components/buttons/BetButtons';
-import {ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton} from '../../components/buttons/ResolveButtons';
+import {BetYesButton, BetNoButton} from '../../components/buttons/trade/BetButtons';
+import {ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton} from '../../components/buttons/marketDetails/ResolveButtons';
 import SiteButton from '../../components/buttons/SiteButtons';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import Sidebar from '../../components/sidebar/Sidebar';
@@ -80,7 +80,7 @@ const Style = () => {
             Bet YES Button
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-            <code>{`import BetYesButton from '../../components/buttons/BetButtons';`}</code>
+            <code>{`import BetYesButton from '../../components/buttons/trade/BetButtons';`}</code>
             </td>
         </tr>
         <tr>
@@ -112,7 +112,7 @@ const Style = () => {
             Neutral Button (Resolve)
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-            <code>{`import NeutralButton from '../../components/buttons/ResolveButtons';`}</code>
+            <code>{`import NeutralButton from '../../components/buttons/marketDetails/ResolveButtons';`}</code>
             </td>
         </tr>
         <tr>
@@ -128,7 +128,7 @@ const Style = () => {
             Select No Button (Resolutions)
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-            <code>{`import SelectNoButton from '../../components/buttons/ResolveButtons';`}</code>
+            <code>{`import SelectNoButton from '../../components/buttons/marketDetails/ResolveButtons';`}</code>
             </td>
         </tr>
         <tr>
@@ -144,7 +144,7 @@ const Style = () => {
             Select Yes Button (Resolutions)
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-            <code>{`import SelectYesButton from '../../components/buttons/ResolveButtons';`}</code>
+            <code>{`import SelectYesButton from '../../components/buttons/marketDetails/ResolveButtons';`}</code>
             </td>
         </tr>
         <tr>
@@ -160,7 +160,7 @@ const Style = () => {
             ConfirmResolveButton (Resolutions)
             </td>
             <td className="px-6 py-4 text-sm font-mono text-gray-500">
-            <code>{`import ConfirmResolveButton from '../../components/buttons/ResolveButtons';`}</code>
+            <code>{`import ConfirmResolveButton from '../../components/buttons/marketDetails/ResolveButtons';`}</code>
             </td>
         </tr>
         <tr>
