@@ -26,40 +26,64 @@ var now = time.Now() // Capture current time for consistent test data
 
 var TestCases = []TestCase{
 	{
+		Name: "Prevent simultaneous shares held",
+		Bets: []models.Bet{
+			{
+				Amount:   3,
+				Outcome:  "YES",
+				Username: "user1",
+				PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
+				MarketID: 3,
+			},
+			{
+				Amount:   1,
+				Outcome:  "NO",
+				Username: "user1",
+				PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
+				MarketID: 3,
+			},
+		},
+		ProbabilityChanges: []wpam.ProbabilityChange{
+			{Probability: 0.5},
+			{Probability: 0.875},
+			{Probability: 0.7},
+		},
+	},
+	{
 		Name: "infinity avoidance",
 		Bets: []models.Bet{
 			{
 				Amount:   1,
 				Outcome:  "YES",
-				Username: "user2", // Assigning user2 to YES bets
+				Username: "user2",
 				PlacedAt: now,
 				MarketID: 1,
 			},
 			{
 				Amount:   -1,
 				Outcome:  "YES",
-				Username: "user2", // Assigning user2 to YES bets
+				Username: "user2",
 				PlacedAt: now.Add(time.Minute),
 				MarketID: 1,
 			},
 			{
 				Amount:   1,
 				Outcome:  "NO",
-				Username: "user1", // Assigning user1 to NO bets
+				Username: "user1",
 				PlacedAt: now.Add(2 * time.Minute),
 				MarketID: 1,
 			},
 			{
 				Amount:   -1,
 				Outcome:  "NO",
-				Username: "user1", // Assigning user1 to NO bets
+				Username: "user1",
 				PlacedAt: now.Add(3 * time.Minute),
 				MarketID: 1,
 			},
 			{
 				Amount:   1,
 				Outcome:  "NO",
-				Username: "user1", // Assigning user1 to NO bets
+				Username: "user1",
 				PlacedAt: now.Add(4 * time.Minute),
 				MarketID: 1,
 			},
