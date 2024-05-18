@@ -33,9 +33,10 @@ SocialPredict's mission is to provide a versatile platform that:
 
 ## README/ Contents
 
-* [Info on Market Mathematics](/README/README-MATH.md)
-* [Info on How Economics Can Be Customized](/README/README-CONFIG.md)
-* [Info on Development Conventions](/README/README-CONVENTIONS.md)
-* [Info on Feature Roadmap](/README/README-ROADMAP.md)
+- [Info on Local Setup](/README/LOCAL_SETUP.md)
+- [Info on Market Mathematics](/README/README-MATH.md)
+- [Info on How Economics Can Be Customized](/README/README-CONFIG.md)
+- [Info on Development Conventions](/README/README-CONVENTIONS.md)
+- [Info on Feature Roadmap](/README/README-ROADMAP.md)
 
 .
