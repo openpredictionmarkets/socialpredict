@@ -48,6 +48,19 @@ var TestCases = []TestCase{
 			{Probability: 0.875},
 			{Probability: 0.7},
 		},
+		S_YES: 3,
+		S_NO:  1,
+		CoursePayouts: []dbpm.CourseBetPayout{
+			{Payout: 0.5999999999999999, Outcome: "YES"},
+			{Payout: 0.17500000000000004, Outcome: "NO"},
+		},
+		F_YES:                 0,
+		F_NO:                  2,
+		ScaledPayouts:         []int64{0, 0},
+		AdjustedScaledPayouts: []int64{0, 0},
+		AggregatedPositions: []dbpm.MarketPosition{
+			{Username: "user1", YesSharesOwned: 2, NoSharesOwned: 0},
+		},
 	},
 	{
 		Name: "infinity avoidance",
