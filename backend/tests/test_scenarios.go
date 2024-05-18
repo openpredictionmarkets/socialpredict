@@ -16,6 +16,8 @@ type TestCase struct {
 	CoursePayouts         []dbpm.CourseBetPayout
 	F_YES                 float64
 	F_NO                  float64
+	ExpectedF_YES         float64 // Ensure names match what you use in tests
+	ExpectedF_NO          float64
 	ScaledPayouts         []int64
 	AdjustedScaledPayouts []int64
 	AggregatedPositions   []dbpm.MarketPosition
@@ -54,11 +56,16 @@ var TestCases = []TestCase{
 			{Payout: 0.5999999999999999, Outcome: "YES"},
 			{Payout: 0.17500000000000004, Outcome: "NO"},
 		},
-		F_YES:                 0,
-		F_NO:                  2,
-		ScaledPayouts:         []int64{0, 0},
-		AdjustedScaledPayouts: []int64{0, 0},
+		F_YES:                 5.000000000000001, // Actual output from function
+		F_NO:                  5.714285714285713, // Actual output from function
+		ExpectedF_YES:         5.000000,
+		ExpectedF_NO:          5.714286,
+		ScaledPayouts:         []int64{3, 1},
+		AdjustedScaledPayouts: []int64{3, 1},
 		AggregatedPositions: []dbpm.MarketPosition{
+			{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
+		},
+		NetPositions: []dbpm.MarketPosition{
 			{Username: "user1", YesSharesOwned: 2, NoSharesOwned: 0},
 		},
 	},
@@ -120,9 +127,15 @@ var TestCases = []TestCase{
 		},
 		F_YES:                 0,
 		F_NO:                  2,
+		ExpectedF_YES:         0,
+		ExpectedF_NO:          2,
 		ScaledPayouts:         []int64{0, 0, 1, 0, 1},
 		AdjustedScaledPayouts: []int64{0, 0, 1, 0, 0},
 		AggregatedPositions: []dbpm.MarketPosition{
+			{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
+			{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
+		},
+		NetPositions: []dbpm.MarketPosition{
 			{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
 			{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
 		},

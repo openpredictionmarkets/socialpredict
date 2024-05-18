@@ -262,23 +262,23 @@ func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []int64) []MarketP
 // Function to normalize market positions such that for each user,
 // only one of YesSharesOwned or NoSharesOwned is greater than 0,
 // with the other being 0, and the value is the net difference.
-//func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
-//	var normalizedPositions []MarketPosition
+func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
+	var normalizedPositions []MarketPosition
 
-//	for _, position := range positions {
-//		var normalizedPosition MarketPosition
-//		normalizedPosition.Username = position.Username
+	for _, position := range positions {
+		var normalizedPosition MarketPosition
+		normalizedPosition.Username = position.Username
 
-//		if position.YesSharesOwned > position.NoSharesOwned {
-//			normalizedPosition.YesSharesOwned = position.YesSharesOwned - position.NoSharesOwned
-//			normalizedPosition.NoSharesOwned = 0
-//		} else {
-//			normalizedPosition.NoSharesOwned = position.NoSharesOwned - position.YesSharesOwned
-//			normalizedPosition.YesSharesOwned = 0
-//		}
+		if position.YesSharesOwned > position.NoSharesOwned {
+			normalizedPosition.YesSharesOwned = position.YesSharesOwned - position.NoSharesOwned
+			normalizedPosition.NoSharesOwned = 0
+		} else {
+			normalizedPosition.NoSharesOwned = position.NoSharesOwned - position.YesSharesOwned
+			normalizedPosition.YesSharesOwned = 0
+		}
 
-//		normalizedPositions = append(normalizedPositions, normalizedPosition)
-//	}
+		normalizedPositions = append(normalizedPositions, normalizedPosition)
+	}
 
-//	return normalizedPositions
-//}
+	return normalizedPositions
+}
