@@ -49,7 +49,7 @@ const Profile = () => {
     }
 
     return (
-        <div>
+        <div className="flex-col min-h-screen">
             <PrivateUserLayout userData={userData} />
             {portfolioTotal.portfolioItems.length > 0 && (
                 <PublicUserPortfolioLayout username={username} userData={userData} />

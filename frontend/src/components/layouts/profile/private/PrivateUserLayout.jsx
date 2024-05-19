@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import EmojiModal from '../../../buttons/profile/EmojiModal';
 import EmojiSelector from '../../../buttons/profile/EmojiSelector';
 
 const PrivateUserInfoLayout = ({ userData }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [personalEmoji, setPersonalEmoji] = useState(userData.personalEmoji);
+    const [personalEmoji, setPersonalEmoji] = useState(null);
+
+    useEffect(() => {
+        if (userData) {
+            setPersonalEmoji(userData.personalEmoji);
+        }
+    }, [userData]);
 
     if (!userData) {
         return <div>Loading...</div>;
@@ -43,7 +49,7 @@ const PrivateUserInfoLayout = ({ userData }) => {
     };
 
     return (
-        <div className="p-6 bg-primary-background shadow-md rounded-lg">
+        <div className="overflow-auto p-6 bg-primary-background shadow-md rounded-lg">
             <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">Profile Details</h3>
             <table className="min-w-full divide-y divide-custom-gray-dark">
                 <tbody className="bg-primary-background divide-y divide-custom-gray-dark">
@@ -63,7 +69,7 @@ const PrivateUserInfoLayout = ({ userData }) => {
                             <EmojiModal isOpen={isModalOpen} onClose={handleCloseModal}>
                                 <EmojiSelector
                                     username={userData.username}
-                                    // onSave={handleSaveEmoji}
+                                    onSave={handleSaveEmoji}
                                 />
                             </EmojiModal>
                         </td>
@@ -87,3 +93,4 @@ const PrivateUserInfoLayout = ({ userData }) => {
 };
 
 export default PrivateUserInfoLayout;
+
