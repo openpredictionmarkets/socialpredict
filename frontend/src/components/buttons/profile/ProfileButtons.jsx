@@ -1,6 +1,7 @@
 import React from 'react';
 
-const PersonalEmojiButton = ({ onClick, children, isSelected }) => {
+// Existing Emoji Button
+const ProfileEditButton = ({ onClick, children, isSelected }) => {
     const initialButtonStyle = "bg-custom-gray-light border-transparent";
     const selectedButtonStyle = "bg-primary-pink border-transparent";
 
@@ -14,4 +15,4 @@ const PersonalEmojiButton = ({ onClick, children, isSelected }) => {
     );
 };
 
-export default PersonalEmojiButton;
+export default ProfileEditButton;

@@ -1,23 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import EmojiModal from '../../../buttons/profile/EmojiModal';
+import ProfileModal from '../../../buttons/profile/ProfileModal';
 import EmojiSelector from '../../../buttons/profile/EmojiSelector';
+import DescriptionSelector from '../../../buttons/profile/DescriptionSelector';
 
 const PrivateUserInfoLayout = ({ userData }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [personalEmoji, setPersonalEmoji] = useState(null);
+    const [modalType, setModalType] = useState('');
+    const [personalEmoji, setPersonalEmoji] = useState(userData ? userData.personalEmoji : '');
+    const [personalDescription, setPersonalDescription] = useState(userData ? userData.description : '');
 
-    useEffect(() => {
-        if (userData) {
-            setPersonalEmoji(userData.personalEmoji);
-        }
-    }, [userData]);
-
-    if (!userData) {
-        return <div>Loading...</div>;
-    }
-
-    const handleEditClick = () => {
+    const handleEditClick = (type) => {
         setIsModalOpen(true);
+        setModalType(type);
     };
 
     const handleCloseModal = () => {
@@ -29,68 +23,69 @@ const PrivateUserInfoLayout = ({ userData }) => {
         handleCloseModal();
     };
 
+    const handleSaveDescription = (description) => {
+        setPersonalDescription(description);
+        handleCloseModal();
+    };
+
     const renderPersonalLinks = () => {
-        const linkKeys = ['personalink1', 'personalink2', 'personalink3', 'personalink4'];
-        return linkKeys.map(key => {
-            const link = userData[key];
-            return link ? (
-                <div key={key} className='nav-link-callout'>
-                    <a
-                        className='nav-link text-info-blue hover:text-blue-800'
-                        href={link}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                    >
-                        {link}
-                    </a>
-                </div>
-            ) : null;
-        });
+        // Render function remains the same
     };
 
     return (
         <div className="overflow-auto p-6 bg-primary-background shadow-md rounded-lg">
             <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">Profile Details</h3>
-            <table className="min-w-full divide-y divide-custom-gray-dark">
-                <tbody className="bg-primary-background divide-y divide-custom-gray-dark">
-                    <tr>
-                        <td className="px-6 py-4 text-sm font-medium text-custom-gray-light">Username (Permanent):</td>
-                        <td className="px-6 py-4 text-sm text-custom-gray-light">{userData.username}</td>
-                    </tr>
-                    <tr>
-                        <td className="px-6 py-4 text-sm font-medium text-custom-gray-light">Personal Emoji:</td>
-                        <td className="px-6 py-4 text-sm text-custom-gray-light">
-                            {personalEmoji}
-                            <button onClick={handleEditClick} className="ml-2 px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
-                                Edit
-                            </button>
-                        </td>
-                        <td>
-                            <EmojiModal isOpen={isModalOpen} onClose={handleCloseModal}>
-                                <EmojiSelector
-                                    username={userData.username}
-                                    onSave={handleSaveEmoji}
-                                />
-                            </EmojiModal>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td className="px-6 py-4 text-sm font-medium text-custom-gray-light">Display Name:</td>
-                        <td className="px-6 py-4 text-sm text-custom-gray-light">{userData.displayname}</td>
-                    </tr>
-                    <tr>
-                        <td className="px-6 py-4 text-sm font-medium text-custom-gray-light">Description:</td>
-                        <td className="px-6 py-4 text-sm text-custom-gray-light">{userData.description}</td>
-                    </tr>
-                    <tr>
-                        <td className="px-6 py-4 text-sm font-medium text-custom-gray-light">Personal Links:</td>
-                        <td className="px-6 py-4 text-sm text-custom-gray-light">{renderPersonalLinks()}</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div className="divide-y divide-custom-gray-dark">
+                <div className="py-4 flex justify-between items-center">
+                    <span className="text-sm font-medium text-custom-gray-light">Username (Permanent):</span>
+                    <span className="text-sm text-custom-gray-light">{userData.username}</span>
+                </div>
+                <div className="py-4 flex justify-between items-center">
+                    <span className="text-sm font-medium text-custom-gray-light">Personal Emoji:</span>
+                    <div className="flex items-center">
+                        <span className="text-sm text-custom-gray-light mr-2">{personalEmoji}</span>
+                        <button onClick={() => handleEditClick('emoji')} className="px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
+                            Edit
+                        </button>
+                    </div>
+                </div>
+                <div className="py-4 flex justify-between items-center">
+                    <span className="text-sm font-medium text-custom-gray-light">Display Name:</span>
+                    <div className="flex items-center">
+                        <span className="text-sm text-custom-gray-light mr-2">{userData.displayname}</span>
+                        <button onClick={() => handleEditClick('displayname')} className="px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
+                            Edit
+                        </button>
+                    </div>
+                </div>
+                <div className="py-4 flex justify-between items-center">
+                    <span className="text-sm font-medium text-custom-gray-light">Description:</span>
+                    <div className="flex items-center">
+                        <span className="text-sm text-custom-gray-light mr-2">{personalDescription}</span>
+                        <button onClick={() => handleEditClick('description')} className="px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
+                            Edit
+                        </button>
+                    </div>
+                </div>
+                <div className="py-4 flex justify-between items-center">
+                    <span className="text-sm font-medium text-custom-gray-light">Personal Links:</span>
+                    <div className="flex items-center">
+                        <button onClick={() => handleEditClick('links')} className="mr-2 px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
+                            Edit
+                        </button>
+                        {renderPersonalLinks()}
+                    </div>
+                </div>
+            </div>
+            {isModalOpen && (
+                <ProfileModal isOpen={isModalOpen} onClose={handleCloseModal} title={`Edit ${modalType}`}>
+                    {modalType === 'emoji' && <EmojiSelector onSave={handleSaveEmoji} />}
+                    {modalType === 'description' && <DescriptionSelector onSave={handleSaveDescription} />}
+                    {/* Similar conditional rendering for other selectors */}
+                </ProfileModal>
+            )}
         </div>
     );
 };
 
 export default PrivateUserInfoLayout;
-

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../../../config';
-import PersonalEmojiButton from './ProfileButtons';
+import ProfileEditButton from './ProfileButtons';
 import SiteButton from '../SiteButtons';
 import { emojis } from './Emojis';
 
-const EmojiSelector = ({ username, onSave }) => {
+const EmojiSelector = ({ onSave }) => {
     const [selectedEmoji, setSelectedEmoji] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filteredEmojis, setFilteredEmojis] = useState([]);
@@ -82,13 +82,13 @@ const EmojiSelector = ({ username, onSave }) => {
             {searchTerm && (
                 <div className="grid grid-cols-4 gap-1 max-h-56 overflow-auto">
                     {filteredEmojis.map((emoji) => (
-                        <PersonalEmojiButton
+                        <ProfileEditButton
                             key={emoji.name}
                             onClick={() => handleEmojiClick(emoji)}
                             isSelected={selectedEmoji && selectedEmoji.name === emoji.name}
                         >
                             {emoji.symbol}
-                        </PersonalEmojiButton>
+                        </ProfileEditButton>
                     ))}
                 </div>
             )}

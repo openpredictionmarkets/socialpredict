@@ -1,6 +1,6 @@
 import React from 'react';
 
-const EmojiModal = ({ isOpen, onClose, children }) => {
+const ProfileModal = ({ isOpen, onClose, children }) => {
     if (!isOpen) return null;
 
     return (
@@ -16,4 +16,4 @@ const EmojiModal = ({ isOpen, onClose, children }) => {
     );
 };
 
-export default EmojiModal;
+export default ProfileModal;
