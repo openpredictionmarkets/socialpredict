@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import ProfileModal from '../../../buttons/profile/ProfileModal';
 import EmojiSelector from '../../../buttons/profile/EmojiSelector';
 import DescriptionSelector from '../../../buttons/profile/DescriptionSelector';
+import DisplayNameSelector from '../../../buttons/profile/DisplayNameSelector';
 
 const PrivateUserInfoLayout = ({ userData }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState('');
     const [personalEmoji, setPersonalEmoji] = useState(userData ? userData.personalEmoji : '');
+    const [personalDisplayName, setPersonalDisplayName] = useState(userData ? userData.displayname : '');
     const [personalDescription, setPersonalDescription] = useState(userData ? userData.description : '');
 
     const handleEditClick = (type) => {
@@ -20,6 +22,11 @@ const PrivateUserInfoLayout = ({ userData }) => {
 
     const handleSaveEmoji = (emoji) => {
         setPersonalEmoji(emoji);
+        handleCloseModal();
+    };
+
+    const handleSaveDisplayName = (displayname) => {
+        setPersonalDisplayName(displayname);
         handleCloseModal();
     };
 
@@ -52,7 +59,7 @@ const PrivateUserInfoLayout = ({ userData }) => {
                 <div className="py-4 flex justify-between items-center">
                     <span className="text-sm font-medium text-custom-gray-light">Display Name:</span>
                     <div className="flex items-center">
-                        <span className="text-sm text-custom-gray-light mr-2">{userData.displayname}</span>
+                        <span className="text-sm text-custom-gray-light mr-2">{personalDisplayName}</span>
                         <button onClick={() => handleEditClick('displayname')} className="px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
                             Edit
                         </button>
@@ -79,8 +86,9 @@ const PrivateUserInfoLayout = ({ userData }) => {
             </div>
             {isModalOpen && (
                 <ProfileModal isOpen={isModalOpen} onClose={handleCloseModal} title={`Edit ${modalType}`}>
-                    {modalType === 'emoji' && <EmojiSelector onSave={handleSaveEmoji} />}
-                    {modalType === 'description' && <DescriptionSelector onSave={handleSaveDescription} />}
+                    {modalType === 'emoji' && <EmojiSelector onSave={handleSaveEmoji} personalfield="Emoji" />}
+                    {modalType === 'displayname' && <DisplayNameSelector onSave={handleSaveDisplayName} personalfield="Display Name" />}
+                    {modalType === 'description' && <DescriptionSelector onSave={handleSaveDescription} personalfield="Description" />}
                     {/* Similar conditional rendering for other selectors */}
                 </ProfileModal>
             )}
