@@ -29,7 +29,18 @@ const PublicUserPortfolioLayout = ({ username, userData }) => {
     const { portfolioItems, totalSharesOwned } = portfolioTotal;
 
     if (!portfolioItems || !portfolioItems.length) {
-        return <div>No Portfolio Found.</div>;
+        return <div className="bg-primary-background shadow-md rounded-lg">
+            <div className="p-6">
+                <td>
+                    <tr>
+                        No portfolio found.
+                    </tr>
+                    <tr>
+                        User has likely not made any trades yet.
+                    </tr>
+                </td>
+            </div>
+        </div>;
     }
 
     return (
