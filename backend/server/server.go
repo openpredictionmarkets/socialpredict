@@ -45,15 +45,19 @@ func Start() {
 	router.HandleFunc("/v0/portfolio/{username}", usershandlers.GetPublicUserPortfolio).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize
-	router.HandleFunc("/v0/user/privateprofile", usershandlers.GetPrivateProfileUserResponse)
-	// router.HandleFunc("/v0/profilechange", updateUserProfile).Methods("POST")
+	router.HandleFunc("/v0/privateprofile", usershandlers.GetPrivateProfileUserResponse)
+	// changing profile stuff
+	router.HandleFunc("/v0/profilechange/displayname", usershandlers.ChangeDisplayName).Methods("POST")
+	router.HandleFunc("/v0/profilechange/emoji", usershandlers.ChangeEmoji).Methods("POST")
+	router.HandleFunc("/v0/profilechange/description", usershandlers.ChangeDescription).Methods("POST")
+	router.HandleFunc("/v0/profilechange/links", usershandlers.ChangePersonalLinks).Methods("POST")
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
 	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler).Methods("POST")
 	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
 	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler).Methods("POST")
-	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler)
+	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler).Methods("POST")
 
 	// Apply the CORS middleware to the Gorilla Mux router
 	handler := c.Handler(router) // Use the Gorilla Mux router here

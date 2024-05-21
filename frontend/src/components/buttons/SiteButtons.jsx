@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
 import { buttonBaseStyle } from './BaseButton';
 
-
-// Default color is primary-pink, when selected has border
-const SiteButton = ({ children }) => { // Accept children as a prop
+const SiteButton = ({ onClick, children }) => {
     const [isSelected, setIsSelected] = useState(false);
     const initialButtonStyle = "bg-custom-gray-light border-transparent";
     const selectedButtonStyle = "bg-primary-pink border-transparent";
 
+    const handleClick = () => {
+        setIsSelected(!isSelected);
+        if (onClick) { // Only call onClick if it is provided
+            onClick();
+        }
+    };
+
     return (
         <button
             className={`${buttonBaseStyle} ${isSelected ? selectedButtonStyle : initialButtonStyle}`}
-            onClick={() => setIsSelected(!isSelected)}
+            onClick={handleClick}
         >
-            {children || 'SELECT'} {/* Use children if provided, otherwise default to 'SELECT' */}
+            {children || 'SELECT'}
         </button>
     );
 };

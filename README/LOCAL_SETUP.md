@@ -6,9 +6,10 @@ For more information about the project go to: [SocialPredict](https://github.com
 
 ### Setting Up the Project on Your Local Machine
 
-- **Clone the Repository**: Download the repository to your local machine. (`git clone https://github.com/openpredictionmarkets/socialpredict.git`)
-- **Install Docker**: Install Docker on your local machine. [Here is the link to the Docker installation guide.](https://docs.docker.com/get-docker/)
-- **Install docker-compose**: Install docker-compose on your local machine [Here is the link to the docker-compose installation guide](https://docs.docker.com/compose/install/)
+- **Clone the Repository**: Download the repository to your local machine.
+-- `git clone https://github.com/openpredictionmarkets/socialpredict.git`
+- **Install Docker**: Install Docker on your local machine. [Here is the link to the Docker installation guide.](https://docs.docker.com/get-docker/). We are assuming the latest version of Docker as of the date of this document.
+- **Install docker-compose**: Install docker-compose on your local machine [Here is the link to the docker-compose installation guide](https://docs.docker.com/compose/install/). We are assuming the latest version of docker-compose as of the date of this document.
 - **Currently supported platforms**: Currently, the project is supported on Ubuntu and MacOS. Windows support is not guaranteed.
 
 ### Backend Setup:

@@ -1,24 +1,18 @@
-import React, { useState } from 'react';
-import { buttonBaseStyle } from '../BaseButton';
+import React from 'react';
 
-const PersonalEmojiButton = ({ onClick, children }) => {
-    const [isSelected, setIsSelected] = useState(false);
+// Existing Emoji Button
+const ProfileEditButton = ({ onClick, children, isSelected }) => {
     const initialButtonStyle = "bg-custom-gray-light border-transparent";
     const selectedButtonStyle = "bg-primary-pink border-transparent";
 
-    const handleButtonClick = () => {
-        setIsSelected(!isSelected);
-        if (onClick) onClick();
-    };
-
     return (
         <button
-            className={`${buttonBaseStyle} ${isSelected ? selectedButtonStyle : initialButtonStyle}`}
-            onClick={handleButtonClick}
+            className={`p-1 rounded-sm text-lg ${isSelected ? selectedButtonStyle : initialButtonStyle} flex items-center justify-center`}
+            onClick={onClick}
         >
-            {children || 'SELECT'}
+            {children}
         </button>
     );
 };
 
-export default PersonalEmojiButton;
+export default ProfileEditButton;
