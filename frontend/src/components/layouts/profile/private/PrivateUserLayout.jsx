@@ -106,7 +106,14 @@ const PrivateUserInfoLayout = ({ userData }) => {
             <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">Profile Details</h3>
             <div className="divide-y divide-custom-gray-dark">
                 {[
-                    { label: 'Username (Permanent)', value: userData.username },
+                    {
+                        label: 'Username (Permanent) - View Public Profile --> ',
+                        value: (
+                            <a href={`/user/${userData.username}`} className="text-blue-500 hover:text-blue-700">
+                                {userData.username}
+                            </a>
+                        )
+                    },
                     { label: 'Personal Emoji', value: personalEmoji, type: 'emoji' },
                     { label: 'Display Name', value: personalDisplayName, type: 'displayname' },
                     { label: 'Description', value: personalDescription, type: 'description' },
