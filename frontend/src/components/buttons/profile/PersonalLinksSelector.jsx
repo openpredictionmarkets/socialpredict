@@ -4,10 +4,10 @@ import SiteButton from '../SiteButtons';
 
 const PersonalLinksSelector = ({ onSave, initialLinks }) => {
     const [links, setLinks] = useState({
-        link1: initialLinks?.link1 || '',
-        link2: initialLinks?.link2 || '',
-        link3: initialLinks?.link3 || '',
-        link4: initialLinks?.link4 || ''
+        personalLink1: initialLinks?.personalLink1 || '',
+        personalLink2: initialLinks?.personalLink2 || '',
+        personalLink3: initialLinks?.personalLink3 || '',
+        personalLink4: initialLinks?.personalLink4 || ''
     });
     const [successMessage, setSuccessMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -16,10 +16,10 @@ const PersonalLinksSelector = ({ onSave, initialLinks }) => {
     useEffect(() => {
         // Update component state when initialLinks prop changes
         setLinks({
-            link1: initialLinks?.link1 || '',
-            link2: initialLinks?.link2 || '',
-            link3: initialLinks?.link3 || '',
-            link4: initialLinks?.link4 || ''
+            personalLink1: initialLinks?.personalLink1 || '',
+            personalLink2: initialLinks?.personalLink2 || '',
+            personalLink3: initialLinks?.personalLink3 || '',
+            personalLink4: initialLinks?.personalLink4 || ''
         });
     }, [initialLinks]);
 
@@ -34,14 +34,19 @@ const PersonalLinksSelector = ({ onSave, initialLinks }) => {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify(links),
+                body: JSON.stringify({
+                    personalLink1: links.personalLink1,
+                    personalLink2: links.personalLink2,
+                    personalLink3: links.personalLink3,
+                    personalLink4: links.personalLink4
+                }),
             });
             const responseData = await response.json();
             if (response.ok) {
                 console.log('Links updated successfully:', responseData);
-                onSave(links); // Make sure this is passing the updated links
+                onSave(links);
                 setSuccessMessage('Links updated successfully.');
-                setTimeout(() => setSuccessMessage(''), 3000); // Clear message after delay
+                setTimeout(() => setSuccessMessage(''), 3000);
             } else {
                 throw new Error('Failed to update links');
             }
@@ -72,7 +77,6 @@ const PersonalLinksSelector = ({ onSave, initialLinks }) => {
             {successMessage && <p className="text-green-500">{successMessage}</p>}
         </div>
     );
-
 };
 
 export default PersonalLinksSelector;

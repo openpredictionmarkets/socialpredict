@@ -2,6 +2,7 @@ package usershandlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"socialpredict/middleware"
 	"socialpredict/util"
@@ -33,11 +34,21 @@ func ChangePersonalLinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Received links update: %+v", request)
+
+	// Directly map request fields to user model fields
 	user.PersonalLink1 = request.PersonalLink1
 	user.PersonalLink2 = request.PersonalLink2
 	user.PersonalLink3 = request.PersonalLink3
 	user.PersonalLink4 = request.PersonalLink4
-	if err := db.Save(&user).Error; err != nil {
+
+	// Use direct update with GORM to specify which fields to update
+	if err := db.Model(&user).Select("PersonalLink1", "PersonalLink2", "PersonalLink3", "PersonalLink4").Updates(map[string]interface{}{
+		"PersonalLink1": user.PersonalLink1,
+		"PersonalLink2": user.PersonalLink2,
+		"PersonalLink3": user.PersonalLink3,
+		"PersonalLink4": user.PersonalLink4,
+	}).Error; err != nil {
 		http.Error(w, "Failed to update personal links: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

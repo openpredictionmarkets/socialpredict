@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import ProfileModal from '../../../buttons/profile/ProfileModal';
 import EmojiSelector from '../../../buttons/profile/EmojiSelector';
 import DescriptionSelector from '../../../buttons/profile/DescriptionSelector';
