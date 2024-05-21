@@ -41,10 +41,6 @@ const EmojiSelector = ({ onSave }) => {
             return;
         }
 
-        console.log('Saving emoji:', selectedEmoji.symbol); // Log the emoji symbol being saved
-        console.log(`${API_URL}`)
-        console.log(`${API_URL}/api/v0/profilechange/emoji`);
-
         try {
             const response = await fetch(`${API_URL}/api/v0/profilechange/emoji`, {
                 method: 'POST',

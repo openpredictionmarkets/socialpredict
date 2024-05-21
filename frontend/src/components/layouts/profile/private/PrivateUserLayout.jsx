@@ -13,10 +13,10 @@ const PrivateUserInfoLayout = ({ userData }) => {
     const [personalDisplayName, setPersonalDisplayName] = useState(userData ? userData.displayname : '');
     const [personalDescription, setPersonalDescription] = useState(userData ? userData.description : '');
     const [personalLinks, setPersonalLinks] = useState({
-        link1: userData?.personalLink1 || '',
-        link2: userData?.personalLink2 || '',
-        link3: userData?.personalLink3 || '',
-        link4: userData?.personalLink4 || ''
+        personallink1: userData?.personalLink1 || '',
+        personallink2: userData?.personalLink2 || '',
+        personallink3: userData?.personalLink3 || '',
+        personallink4: userData?.personalLink4 || ''
     });
 
     const handleEditClick = (type) => {
@@ -44,22 +44,40 @@ const PrivateUserInfoLayout = ({ userData }) => {
     };
 
     const handleSavePersonalLinks = (newLinks) => {
-        setPersonalLinks(newLinks);
+        setPersonalLinks(prevLinks => ({
+            ...prevLinks,
+            ...newLinks
+        }));
         handleCloseModal();
     };
 
+    //const renderPersonalLinks = () => {
+    //    const linkKeys = ['personalink1', 'personalink2', 'personalink3', 'personalink4'];
+    //    return linkKeys.map(key => {
+    //        const link = userData[key];
+    //        return link ? (
+    //            <div key={key} className='nav-link text-info-blue hover:text-blue-800'>
+    //                <a
+    //                    href={link}
+    //                    target='_blank'
+    //                    rel='noopener noreferrer'
+    //                >
+    //                    {link}
+    //                </a>
+    //            </div>
+    //        ) : null;
+    //    });
+    //};
+
 
     const renderPersonalLinks = () => {
-        const linkKeys = ['personalink1', 'personalink2', 'personalink3', 'personalink4'];
+        // Match the keys with the state keys used in `setLinks`
+        const linkKeys = ['personalLink1', 'personalLink2', 'personalLink3', 'personalLink4'];
         return linkKeys.map(key => {
-            const link = userData[key];
+            const link = personalLinks[key];  // Use the current state to render links
             return link ? (
                 <div key={key} className='nav-link text-info-blue hover:text-blue-800'>
-                    <a
-                        href={link}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                    >
+                    <a href={link} target='_blank' rel='noopener noreferrer'>
                         {link}
                     </a>
                 </div>
@@ -87,49 +105,26 @@ const PrivateUserInfoLayout = ({ userData }) => {
         <div className="overflow-auto p-6 bg-primary-background shadow-md rounded-lg">
             <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">Profile Details</h3>
             <div className="divide-y divide-custom-gray-dark">
-                <div className="py-4 flex justify-between items-center">
-                    <span className="text-sm font-medium text-custom-gray-light">Username (Permanent):</span>
-                    <span className="text-sm text-custom-gray-light">{userData.username}</span>
-                </div>
-                <div className="py-4 flex justify-between items-center">
-                    <span className="text-sm font-medium text-custom-gray-light">Personal Emoji:</span>
-                    <div className="flex items-center">
-                        <span className="text-sm text-custom-gray-light mr-2">{personalEmoji}</span>
-                        <button onClick={() => handleEditClick('emoji')} className="px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
-                            Edit
-                        </button>
+                {[
+                    { label: 'Username (Permanent)', value: userData.username },
+                    { label: 'Personal Emoji', value: personalEmoji, type: 'emoji' },
+                    { label: 'Display Name', value: personalDisplayName, type: 'displayname' },
+                    { label: 'Description', value: personalDescription, type: 'description' },
+                    { label: 'Personal Links', value: renderPersonalLinks(), type: 'links' }
+                ].map(item => (
+                    <div key={item.label} className="py-4 grid grid-cols-3 items-center">
+                        <span className="text-sm font-medium text-custom-gray-light">{item.label}:</span>
+                        <span className="text-sm text-custom-gray-light col-span-1">{item.value}</span>
+                        {item.type && (
+                            <button onClick={() => handleEditClick(item.type)} className="justify-self-end px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
+                                Edit
+                            </button>
+                        )}
                     </div>
-                </div>
-                <div className="py-4 flex justify-between items-center">
-                    <span className="text-sm font-medium text-custom-gray-light">Display Name:</span>
-                    <div className="flex items-center">
-                        <span className="text-sm text-custom-gray-light mr-2">{personalDisplayName}</span>
-                        <button onClick={() => handleEditClick('displayname')} className="px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
-                            Edit
-                        </button>
-                    </div>
-                </div>
-                <div className="py-4 flex justify-between items-center">
-                    <span className="text-sm font-medium text-custom-gray-light">Description:</span>
-                    <div className="flex items-center">
-                        <span className="text-sm text-custom-gray-light mr-2">{personalDescription}</span>
-                        <button onClick={() => handleEditClick('description')} className="px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
-                            Edit
-                        </button>
-                    </div>
-                </div>
-                <div className="py-4 flex justify-between items-center">
-                    <span className="text-sm font-medium text-custom-gray-light">Personal Links:</span>
-                    <span className="text-sm text-custom-gray-light mr-2">{renderPersonalLinks()}</span>
-                    <div className="flex items-center">
-                        <button onClick={() => handleEditClick('links')} className="mr-2 px-2 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded">
-                            Edit
-                        </button>
-                    </div>
-                </div>
+                ))}
             </div>
             {isModalOpen && (
-                <ProfileModal isOpen={isModalOpen} onClose={handleCloseModal} title={`${getModalTitle(modalType)}`} >
+                <ProfileModal isOpen={isModalOpen} onClose={handleCloseModal} title={`${getModalTitle(modalType)}`}>
                     {modalType === 'emoji' && <EmojiSelector onSave={handleSaveEmoji} />}
                     {modalType === 'displayname' && <DisplayNameSelector onSave={handleSaveDisplayName} />}
                     {modalType === 'description' && <DescriptionSelector onSave={handleSaveDescription} />}
@@ -138,6 +133,7 @@ const PrivateUserInfoLayout = ({ userData }) => {
             )}
         </div>
     );
+
 };
 
 export default PrivateUserInfoLayout;
