@@ -4,8 +4,8 @@ import { useAuth } from '../../helpers/AuthContent';
 import LoginModalButton from '../modals/login/LoginModalClick';
 
 const Sidebar = () => {
-    // useAuth hook to get auth state and logout function
-    const { isLoggedIn, logout } = useAuth();
+    // Extend useAuth hook to get usertype along with isLoggedIn and logout
+    const { isLoggedIn, usertype, logout } = useAuth();
 
     const handleLogoutClick = () => {
         logout();
@@ -16,22 +16,37 @@ const Sidebar = () => {
             <div className="flex-grow overflow-y-auto px-3 py-4 dark:bg-custom-gray-dark">
                 <ul className="space-y-2 font-medium">
                     {isLoggedIn ? (
-                    <>
-                        <li><Link to="/profile" className="sidebar-link">Profile</Link></li>
-                        <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                        <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                        <li><Link to="/notifications" className="sidebar-link">Notifications</Link></li>
-                        <li><Link to="/create" className="sidebar-link">Create</Link></li>
-                        <li><Link to="/about" className="sidebar-link">About</Link></li>
-                        <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
-                    </>
+                        <>
+                            {usertype === 'ADMIN' ? (
+                                // Links for ADMIN
+                                <>
+                                    <li><Link to="/admin" className="sidebar-link">Admin</Link></li>
+                                    <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
+                                    <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
+                                    <li><Link to="/about" className="sidebar-link">About</Link></li>
+                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                </>
+                            ) : (
+                                // Links for Regular Users
+                                <>
+                                    <li><Link to="/profile" className="sidebar-link">Profile</Link></li>
+                                    <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
+                                    <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
+                                    <li><Link to="/notifications" className="sidebar-link">Notifications</Link></li>
+                                    <li><Link to="/create" className="sidebar-link">Create</Link></li>
+                                    <li><Link to="/about" className="sidebar-link">About</Link></li>
+                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                </>
+                            )}
+                        </>
                     ) : (
-                    <>
-                        <li><LoginModalButton /></li>
-                        <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                        <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                        <li><Link to="/about" className="sidebar-link">About</Link></li>
-                    </>
+                        // Links when not logged in
+                        <>
+                            <li><LoginModalButton /></li>
+                            <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
+                            <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
+                            <li><Link to="/about" className="sidebar-link">About</Link></li>
+                        </>
                     )}
                 </ul>
             </div>
@@ -43,6 +58,5 @@ const Sidebar = () => {
         </aside>
     );
 };
-
 
 export default Sidebar;

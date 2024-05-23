@@ -12,6 +12,15 @@ import (
 	"gorm.io/gorm"
 )
 
+type HTTPError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *HTTPError) Error() string {
+	return e.Message
+}
+
 func Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Here you would verify the JWT token or session
@@ -55,6 +64,14 @@ func ValidateTokenAndGetUser(r *http.Request, db *gorm.DB) (*models.User, error)
 			// Format the error message as JSON
 			return nil, fmt.Errorf(`{"error": "user not found"}`)
 		}
+		// Check if the user is an admin and restrict access
+		if user.UserType == "ADMIN" {
+			return nil, &HTTPError{
+				StatusCode: http.StatusForbidden,
+				Message:    "Access denied for ADMIN users.",
+			}
+		}
+
 		return &user, nil
 	}
 

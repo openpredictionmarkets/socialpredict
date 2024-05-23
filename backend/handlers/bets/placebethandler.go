@@ -22,7 +22,12 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	db := util.GetDB() // Get the database connection
 	user, err := middleware.ValidateTokenAndGetUser(r, db)
 	if err != nil {
-		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+		if httpErr, ok := err.(*middleware.HTTPError); ok {
+			http.Error(w, httpErr.Error(), httpErr.StatusCode)
+			return
+		}
+		// Handle other types of errors generically
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
