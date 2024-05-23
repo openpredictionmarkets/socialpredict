@@ -25,7 +25,7 @@ const PublicUserInfoLayout = ({ userData }) => {
 
     return (
         <div className="p-6 bg-primary-background shadow-md rounded-lg">
-            <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">Profile Details</h3>
+            <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">User Info</h3>
             <table className="min-w-full divide-y divide-custom-gray-dark">
                 <tbody className="bg-primary-background divide-y divide-custom-gray-dark">
                     <tr>

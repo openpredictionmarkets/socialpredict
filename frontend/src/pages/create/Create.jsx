@@ -95,8 +95,8 @@ function Create() {
 };
 
 return (
-    <div className='App'>
-    <div className='Center-content-header'>
+    <div className="p-6 bg-primary-background shadow-md rounded-lg">
+    <div className="text-lg font-medium text-custom-gray-verylight mb-4">
         <h1>Create a Market</h1>
     </div>
 

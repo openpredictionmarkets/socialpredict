@@ -1,15 +1,20 @@
 import React from 'react';
 
-const RegularInput = ({ value, onChange }) => {
+const RegularInput = ({ value, onChange, placeholder, type = 'text', id, name, autoComplete }) => {
     return (
         <input
-        type="text"
-        value={value}
-        onChange={onChange}
-        className="w-full px-4 py-2 border-2 border-blue-500 rounded-md text-white bg-transparent focus:outline-none"
+            type={type}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            id={id}
+            name={name}
+            autoComplete={autoComplete}
+            className="w-full px-4 py-2 border-2 border-blue-500 rounded-md text-white bg-transparent focus:outline-none"
         />
     );
 };
+
 
 const NumberInput = ({ value, onChange }) => {
     return (
