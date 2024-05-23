@@ -43,11 +43,18 @@ function AdminAddUser() {
         });
     };
 
+    const handleReset = () => {
+        setUsername('');
+        setPassword('');
+        setError('');
+        setCopied(false);
+    };
+
     return (
         <div className="p-6 bg-primary-background shadow-md rounded-lg text-white">
             <h1 className="text-2xl font-bold mb-4">Create User</h1>
                 <div className='Center-content-table'>
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-8">
                         <RegularInput
                             type="text"
                             value={username}
@@ -60,17 +67,25 @@ function AdminAddUser() {
                         </SiteButton>
                     </form>
                     {password && (
-                        <div onClick={handleCopyCredentials} className="mt-4 p-4 bg-blue-500 text-white font-bold text-lg rounded-lg shadow-lg cursor-pointer flex justify-between items-center">
-                            <div>
-                                <p>Username: {username}</p>
-                                <p>Password: {password}</p>
+                        <>
+                            <div onClick={handleCopyCredentials} className="mt-4 p-4 bg-blue-500 text-white font-bold text-lg rounded-lg shadow-lg cursor-pointer flex justify-between items-center">
+                                <div>
+                                    <p>Username: {username}</p>
+                                    <p>Password: {password}</p>
+                                </div>
+                                <div className="text-lg">
+                                    📋
+                                </div>
+                                {copied && <p className="text-green-500">COPIED!</p>}
                             </div>
-                            <div className="text-lg">
-                                📋
+                            <div className="mt-24">
+                                <SiteButton onClick={handleReset} className="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                                    Add Another User
+                                </SiteButton>
                             </div>
-                            {copied && <p className="text-green-500">COPIED!</p>}
-                        </div>
+                        </>
                     )}
+
                     {error && <p className="error">{error}</p>}
                 </div>
             </div>

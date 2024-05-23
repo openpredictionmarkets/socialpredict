@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"regexp"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 
 	"github.com/brianvoe/gofakeit"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -36,14 +36,18 @@ func AddUserHandler(w http.ResponseWriter, r *http.Request) {
 	db := util.GetDB()
 	var user models.User
 
+	// load the config constants
+	config := setup.LoadEconomicsConfig()
+
 	user = models.User{
 		Username:              req.Username,
-		DisplayName:           uniqueDisplayName(db),
-		Email:                 uniqueEmail(db),
+		DisplayName:           util.UniqueDisplayName(db),
+		Email:                 util.UniqueEmail(db),
 		UserType:              "REGULAR",
-		InitialAccountBalance: 0,
+		InitialAccountBalance: config.Economics.User.InitialAccountBalance,
+		AccountBalance:        config.Economics.User.InitialAccountBalance,
 		PersonalEmoji:         randomEmoji(),
-		ApiKey:                generateUniqueApiKey(db),
+		ApiKey:                util.GenerateUniqueApiKey(db),
 	}
 
 	// Check uniqueness of username, displayname, and email
@@ -85,41 +89,6 @@ func checkUniqueFields(db *gorm.DB, user *models.User) error {
 	}
 
 	return nil
-}
-
-func generateUniqueApiKey(db *gorm.DB) string {
-	for {
-		apiKey := uuid.NewString()
-		if count := countByField(db, "api_key", apiKey); count == 0 {
-			return apiKey
-		}
-	}
-}
-
-func uniqueDisplayName(db *gorm.DB) string {
-	// Generate display name and check for uniqueness
-	for {
-		name := gofakeit.Name()
-		if count := countByField(db, "display_name", name); count == 0 {
-			return name
-		}
-	}
-}
-
-func uniqueEmail(db *gorm.DB) string {
-	// Generate email and check for uniqueness
-	for {
-		email := gofakeit.Email()
-		if count := countByField(db, "email", email); count == 0 {
-			return email
-		}
-	}
-}
-
-func countByField(db *gorm.DB, field, value string) int64 {
-	var count int64
-	db.Model(&models.User{}).Where(fmt.Sprintf("%s = ?", field), value).Count(&count)
-	return count
 }
 
 func randomEmoji() string {
