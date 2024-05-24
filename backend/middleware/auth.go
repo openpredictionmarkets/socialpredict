@@ -12,15 +12,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type HTTPError struct {
-	StatusCode int
-	Message    string
-}
-
-func (e *HTTPError) Error() string {
-	return e.Message
-}
-
 func Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Here you would verify the JWT token or session

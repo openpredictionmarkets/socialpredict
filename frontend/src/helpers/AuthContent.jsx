@@ -14,8 +14,6 @@ const useAuth = () => useContext(
     AuthContext
 );
 
-
-
 const AuthProvider = ({ children }) => {
     const [authState, setAuthState] = useState({
         isLoggedIn: false,
@@ -55,27 +53,32 @@ const AuthProvider = ({ children }) => {
                 body: JSON.stringify({ username, password }),
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username);
-                localStorage.setItem('usertype', data.usertype);
-                setAuthState({
-                    isLoggedIn: true,
-                    token: data.token,
-                    username: data.username,
-                    usertype: data.usertype,
-                });
-                return true;
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Login failed');
+            const text = await response.text(); // First, get the text
+            try {
+                const data = JSON.parse(text); // Try parsing it
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', data.username);
+                    localStorage.setItem('usertype', data.usertype);
+                    setAuthState({
+                        isLoggedIn: true,
+                        token: data.token,
+                        username: data.username,
+                        usertype: data.usertype,
+                    });
+                    return true;
+                } else {
+                    throw new Error(data.message || 'Login failed');
+                }
+            } catch (e) {
+                throw new Error('Server response is not valid JSON or password was incorrect: ' + text);
             }
         } catch (error) {
             console.error('Login error:', error);
             throw error;
         }
     };
+
 
     const logout = () => {
         localStorage.clear();
