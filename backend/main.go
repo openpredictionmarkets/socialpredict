@@ -30,7 +30,7 @@ func main() {
 	// Migrate the database
 	migration.MigrateDB(db)
 
-	// Seed the users
+	// Seed the users and markets
 	seed.SeedUsers(db)
 	seed.SeedMarket(db)
 
