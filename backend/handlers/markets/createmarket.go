@@ -31,16 +31,11 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use database connection
+	// Use database connection, validate user based upon token
 	db := util.GetDB()
-	user, err := middleware.ValidateTokenAndGetUser(r, db)
-	if err != nil {
-		if httpErr, ok := err.(*middleware.HTTPError); ok {
-			http.Error(w, httpErr.Error(), httpErr.StatusCode)
-			return
-		}
-		// Handle other types of errors generically
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+	if httperr != nil {
+		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
 	}
 
@@ -48,11 +43,10 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 
 	newMarket.CreatorUsername = user.Username
 
-	err = json.NewDecoder(r.Body).Decode(&newMarket)
+	err := json.NewDecoder(r.Body).Decode(&newMarket)
 	if err != nil {
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
 		log.Printf("Error reading request body: %v, Body: %s", err, string(bodyBytes))
-
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}

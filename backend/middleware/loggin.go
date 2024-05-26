@@ -86,9 +86,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Send token, username, and usertype in the response
 	responseData := map[string]interface{}{
-		"token":    tokenString,
-		"username": user.Username,
-		"usertype": user.UserType, // Assuming this is the correct field from your User model
+		"token":              tokenString,
+		"username":           user.Username,
+		"usertype":           user.UserType,
+		"mustChangePassword": user.MustChangePassword,
 	}
 	json.NewEncoder(w).Encode(responseData)
 }

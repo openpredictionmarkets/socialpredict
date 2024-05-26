@@ -6,6 +6,7 @@ const AuthContext = createContext({
     setUsername: () => {},
     isLoggedIn: false,
     usertype: null,
+    changePasswordNeeded: true, // Default to true until login confirms otherwise
     login: () => {},
     logout: () => {},
 });
@@ -20,25 +21,25 @@ const AuthProvider = ({ children }) => {
         token: localStorage.getItem('token'),
         username: localStorage.getItem('username'),
         usertype: localStorage.getItem('usertype'),
+        changePasswordNeeded: null  // Initialized as null
     });
 
     useEffect(() => {
         if (authState.isLoggedIn && authState.usertype) {
-            console.log("Logged in as:", authState.usertype);
             // Redirect or perform other actions based on usertype
         }
     }, [authState.isLoggedIn, authState.usertype]);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        // Additional validation or expiry check can be performed here
         if (token) {
             setAuthState(prevState => ({
                 ...prevState,
-                isLoggedIn: true, // Assume token is still valid
+                isLoggedIn: true,
                 token: token,
                 username: localStorage.getItem('username'),
                 usertype: localStorage.getItem('usertype'),
+                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true', // assume password change needed until shown not
             }));
         }
     }, []);
@@ -53,25 +54,22 @@ const AuthProvider = ({ children }) => {
                 body: JSON.stringify({ username, password }),
             });
 
-            const text = await response.text(); // First, get the text
-            try {
-                const data = JSON.parse(text); // Try parsing it
-                if (response.ok) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('username', data.username);
-                    localStorage.setItem('usertype', data.usertype);
-                    setAuthState({
-                        isLoggedIn: true,
-                        token: data.token,
-                        username: data.username,
-                        usertype: data.usertype,
-                    });
-                    return true;
-                } else {
-                    throw new Error(data.message || 'Login failed');
-                }
-            } catch (e) {
-                throw new Error('Server response is not valid JSON or password was incorrect: ' + text);
+            const data = await response.json();
+            if (response.ok) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('username', data.username);
+                localStorage.setItem('usertype', data.usertype);
+                localStorage.setItem('changePasswordNeeded', data.mustChangePassword);
+                setAuthState({
+                    isLoggedIn: true,
+                    token: data.token,
+                    username: data.username,
+                    usertype: data.usertype,
+                    changePasswordNeeded: data.mustChangePassword,
+                });
+                return true;
+            } else {
+                throw new Error(data.message || 'Login failed');
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -87,6 +85,7 @@ const AuthProvider = ({ children }) => {
             token: null,
             username: null,
             usertype: null,
+            changePasswordNeeded: null,
         });
     };
 

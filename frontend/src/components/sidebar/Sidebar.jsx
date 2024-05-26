@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../helpers/AuthContent';
+import { useAuth } from '../../helpers/AuthContent'; // Ensure correct import path
 import LoginModalButton from '../modals/login/LoginModalClick';
 
 const Sidebar = () => {
-    // Extend useAuth hook to get usertype along with isLoggedIn and logout
-    const { isLoggedIn, usertype, logout } = useAuth();
+    // Extend useAuth hook to get changePasswordNeeded along with usertype, isLoggedIn, and logout
+    const { isLoggedIn, usertype, logout, changePasswordNeeded } = useAuth();
 
     const handleLogoutClick = () => {
         logout();
@@ -20,14 +20,20 @@ const Sidebar = () => {
                             {usertype === 'ADMIN' ? (
                                 // Links for ADMIN
                                 <>
-                                    <li><Link to="/admin" className="sidebar-link">Admin</Link></li>
+                                    <li><Link to="/admin" className="sidebar-link">Admin Dashboard</Link></li>
                                     <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
                                     <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
                                     <li><Link to="/about" className="sidebar-link">About</Link></li>
                                     <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
                                 </>
+                            ) : changePasswordNeeded ? (
+                                // Limited Links for Regular Users needing password change
+                                <>
+                                    <li><Link to="/changepassword" className="sidebar-link">Change Password</Link></li>
+                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                </>
                             ) : (
-                                // Links for Regular Users
+                                // Full Links for Regular Users
                                 <>
                                     <li><Link to="/profile" className="sidebar-link">Profile</Link></li>
                                     <li><Link to="/markets" className="sidebar-link">Markets</Link></li>

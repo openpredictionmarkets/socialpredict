@@ -1,9 +1,6 @@
 package middleware
 
 import (
-	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"socialpredict/models"
 	"strings"
@@ -20,51 +17,57 @@ func Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-// validateTokenAndGetUser validates the JWT token and returns the user info
-func ValidateTokenAndGetUser(r *http.Request, db *gorm.DB) (*models.User, error) {
-	// Extract the token from the Authorization header
+// ValidateUserAndEnforcePasswordChange performs user validation and checks if a password change is required.
+// It returns the user and any errors encountered.
+func ValidateUserAndEnforcePasswordChangeGetUser(r *http.Request, db *gorm.DB) (*models.User, *HTTPError) {
+	user, httpErr := ValidateTokenAndGetUser(r, db)
+	if httpErr != nil {
+		return nil, httpErr
+	}
+
+	// Check if a password change is required
+	if httpErr := CheckMustChangePasswordFlag(user); httpErr != nil {
+		return nil, httpErr
+	}
+
+	return user, nil
+}
+
+func ValidateTokenAndGetUser(r *http.Request, db *gorm.DB) (*models.User, *HTTPError) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return nil, errors.New("authorization header is required")
+		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Authorization header is required"}
 	}
 
-	// Typically, the Authorization header is in the format "Bearer {token}"
 	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-	// Define a function to handle token parsing and claims extraction
-	keyFunc := func(token *jwt.Token) (interface{}, error) {
-		// Here, you would return your JWT signing key, used to validate the token
+	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
-	}
-
-	// Parse the token
-	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, keyFunc)
+	})
 	if err != nil {
-		return nil, err
+		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
 	}
 
 	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-		log.Printf("claims.Username is %s", claims.Username)
-		if claims.Username == "" {
-			return nil, errors.New("username claim is empty")
-		}
-		log.Printf("Extracted username: %s", claims.Username)
 		var user models.User
 		result := db.Where("username = ?", claims.Username).First(&user)
 		if result.Error != nil {
-			// Format the error message as JSON
-			return nil, fmt.Errorf(`{"error": "user not found"}`)
+			return nil, &HTTPError{StatusCode: http.StatusNotFound, Message: "User not found"}
 		}
-		// Check if the user is an admin and restrict access
 		if user.UserType == "ADMIN" {
-			return nil, &HTTPError{
-				StatusCode: http.StatusForbidden,
-				Message:    "Access denied for ADMIN users.",
-			}
+			return nil, &HTTPError{StatusCode: http.StatusForbidden, Message: "Access denied for ADMIN users"}
 		}
-
 		return &user, nil
 	}
+	return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
+}
 
-	return nil, errors.New("invalid token")
+// CheckMustChangePasswordFlag checks if the user needs to change their password
+func CheckMustChangePasswordFlag(user *models.User) *HTTPError {
+	if user.MustChangePassword {
+		return &HTTPError{
+			StatusCode: http.StatusForbidden,
+			Message:    "Password change required",
+		}
+	}
+	return nil
 }

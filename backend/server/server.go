@@ -48,6 +48,7 @@ func Start() {
 	// handle private user stuff, display sensitive profile information to customize
 	router.HandleFunc("/v0/privateprofile", usershandlers.GetPrivateProfileUserResponse)
 	// changing profile stuff
+	router.HandleFunc("/v0/changepassword", usershandlers.ChangePassword).Methods("POST")
 	router.HandleFunc("/v0/profilechange/displayname", usershandlers.ChangeDisplayName).Methods("POST")
 	router.HandleFunc("/v0/profilechange/emoji", usershandlers.ChangeEmoji).Methods("POST")
 	router.HandleFunc("/v0/profilechange/description", usershandlers.ChangeDescription).Methods("POST")

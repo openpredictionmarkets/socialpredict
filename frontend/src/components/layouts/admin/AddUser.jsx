@@ -1,4 +1,4 @@
-import { API_URL } from '../../../config';
+import { API_URL, DOMAIN_URL } from '../../../config';
 import React, { useState } from 'react';
 import SiteButton from '../../buttons/SiteButtons';
 import { RegularInput } from '../../inputs/InputBar'
@@ -36,7 +36,7 @@ function AdminAddUser() {
     };
 
     const handleCopyCredentials = () => {
-        const credentials = `Username: ${username}\nPassword: ${password}`;
+        const credentials = `${DOMAIN_URL} \n Username: ${username}\nPassword: ${password}`;
         navigator.clipboard.writeText(credentials).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);  // Notification timeout

@@ -20,19 +20,14 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := util.GetDB() // Get the database connection
-	user, err := middleware.ValidateTokenAndGetUser(r, db)
-	if err != nil {
-		if httpErr, ok := err.(*middleware.HTTPError); ok {
-			http.Error(w, httpErr.Error(), httpErr.StatusCode)
-			return
-		}
-		// Handle other types of errors generically
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+	if httperr != nil {
+		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
 	}
 
 	var redeemRequest models.Bet
-	err = json.NewDecoder(r.Body).Decode(&redeemRequest)
+	err := json.NewDecoder(r.Body).Decode(&redeemRequest)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

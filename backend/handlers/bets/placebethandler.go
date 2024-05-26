@@ -20,20 +20,15 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Validate JWT token and extract user information
 	db := util.GetDB() // Get the database connection
-	user, err := middleware.ValidateTokenAndGetUser(r, db)
-	if err != nil {
-		if httpErr, ok := err.(*middleware.HTTPError); ok {
-			http.Error(w, httpErr.Error(), httpErr.StatusCode)
-			return
-		}
-		// Handle other types of errors generically
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+	if httperr != nil {
+		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
 	}
 
 	var betRequest models.Bet
 	// Decode the request body into betRequest
-	err = json.NewDecoder(r.Body).Decode(&betRequest)
+	err := json.NewDecoder(r.Body).Decode(&betRequest)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

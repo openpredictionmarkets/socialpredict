@@ -16,9 +16,9 @@ func UserMarketPositionHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Open up database to utilize connection pooling
 	db := util.GetDB()
-	user, err := middleware.ValidateTokenAndGetUser(r, db)
-	if err != nil {
-		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
+	if httperr != nil {
+		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
 	}
 

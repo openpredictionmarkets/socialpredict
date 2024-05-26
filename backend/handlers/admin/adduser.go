@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"regexp"
+	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"socialpredict/util"
@@ -34,6 +35,10 @@ func AddUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := util.GetDB()
+
+	// validate that the user performing this function is indeed admin
+	middleware.ValidateAdminToken(r, db)
+
 	var user models.User
 
 	// load the config constants
@@ -48,6 +53,7 @@ func AddUserHandler(w http.ResponseWriter, r *http.Request) {
 		AccountBalance:        config.Economics.User.InitialAccountBalance,
 		PersonalEmoji:         randomEmoji(),
 		ApiKey:                util.GenerateUniqueApiKey(db),
+		MustChangePassword:    true,
 	}
 
 	// Check uniqueness of username, displayname, and email
