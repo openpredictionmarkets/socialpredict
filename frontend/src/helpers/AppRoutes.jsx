@@ -100,8 +100,16 @@ const AppRoutes = () => {
             <Route path='/admin'>
                 {isLoggedIn && auth.usertype === 'ADMIN' ? <AdminDashboard /> : <Redirect to='/' />}
             </Route>
+
             {/* If no other route matches, redirect to home */}
-            <Route render={() => <Redirect to='/' />} />
+            <Route path='/'>
+            {isLoggedIn && !auth.usertype === 'ADMIN' && mustChangePassword ? (
+                    <Redirect to='/changepassword' />
+                ) : (
+                    <Redirect to='/' />
+                )}
+            </Route>
+
         </Switch>
     );
 };

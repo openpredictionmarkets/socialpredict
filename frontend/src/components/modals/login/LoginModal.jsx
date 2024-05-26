@@ -3,12 +3,14 @@ import ReactDOM from 'react-dom';
 import { useHistory } from 'react-router-dom';
 import { PersonInput, LockInput } from '../../inputs/InputBar';
 import SiteButton from '../../buttons/SiteButtons';
+import { useAuth } from '../../../helpers/AuthContent';
 
 const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const history = useHistory();
+    const { login, changePasswordNeeded } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
