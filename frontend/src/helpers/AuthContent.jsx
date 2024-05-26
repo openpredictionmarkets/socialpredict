@@ -4,7 +4,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext({
     username: null,
     setUsername: () => {},
-    isLoggedIn: false
+    isLoggedIn: false,
+    usertype: null,
+    changePasswordNeeded: true, // Default to true until login confirms otherwise
+    login: () => {},
+    logout: () => {},
 });
 
 const useAuth = () => useContext(
@@ -16,17 +20,26 @@ const AuthProvider = ({ children }) => {
         isLoggedIn: false,
         token: localStorage.getItem('token'),
         username: localStorage.getItem('username'),
+        usertype: localStorage.getItem('usertype'),
+        changePasswordNeeded: null  // Initialized as null
     });
 
     useEffect(() => {
+        if (authState.isLoggedIn && authState.usertype) {
+            // Redirect or perform other actions based on usertype
+        }
+    }, [authState.isLoggedIn, authState.usertype]);
+
+    useEffect(() => {
         const token = localStorage.getItem('token');
-        // Additional validation or expiry check can be performed here
         if (token) {
             setAuthState(prevState => ({
                 ...prevState,
-                isLoggedIn: true, // Assume token is still valid
+                isLoggedIn: true,
                 token: token,
                 username: localStorage.getItem('username'),
+                usertype: localStorage.getItem('usertype'),
+                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true', // assume password change needed until shown not
             }));
         }
     }, []);
@@ -41,19 +54,22 @@ const AuthProvider = ({ children }) => {
                 body: JSON.stringify({ username, password }),
             });
 
+            const data = await response.json();
             if (response.ok) {
-                const data = await response.json();
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);
+                localStorage.setItem('usertype', data.usertype);
+                localStorage.setItem('changePasswordNeeded', data.mustChangePassword);
                 setAuthState({
                     isLoggedIn: true,
                     token: data.token,
                     username: data.username,
+                    usertype: data.usertype,
+                    changePasswordNeeded: data.mustChangePassword,
                 });
                 return true;
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Login failed');
+                throw new Error(data.message || 'Login failed');
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -61,12 +77,15 @@ const AuthProvider = ({ children }) => {
         }
     };
 
+
     const logout = () => {
         localStorage.clear();
         setAuthState({
             isLoggedIn: false,
             token: null,
             username: null,
+            usertype: null,
+            changePasswordNeeded: null,
         });
     };
 

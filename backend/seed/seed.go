@@ -4,7 +4,6 @@ import (
 	"log"
 	"socialpredict/models"
 	"socialpredict/setup"
-	"socialpredict/util"
 	"time"
 
 	"gorm.io/gorm"
@@ -14,8 +13,6 @@ func SeedUsers(db *gorm.DB) {
 
 	// load the config constants
 	config := setup.LoadEconomicsConfig()
-	// Use the config as needed
-	initialAccountBalance := config.Economics.User.InitialAccountBalance
 
 	// Specific time: October 31st, 2023 at 11:59 PM CST
 	loc, err := time.LoadLocation("America/Chicago") // CST location
@@ -31,13 +28,18 @@ func SeedUsers(db *gorm.DB) {
 	if count == 0 {
 		// No admin user found, create one
 		adminUser := models.User{
-			Username:    "admin",
-			DisplayName: "Administrator",
-			Email:       "admin@example.com",
-			UserType:    "ADMIN",
-			ApiKey:      util.GenerateUniqueApiKey(),
+			Username:              "admin",
+			DisplayName:           "Administrator",
+			Email:                 "admin@example.com",
+			UserType:              "ADMIN",
+			InitialAccountBalance: config.Economics.User.InitialAccountBalance,
+			AccountBalance:        config.Economics.User.InitialAccountBalance,
+			ApiKey:                "NONE",
+			PersonalEmoji:         "NONE",
+			Description:           "Administrator",
+			MustChangePassword:    false,
 		}
-		adminUser.HashPassword("password") // Always use a strong, hashed password
+		adminUser.HashPassword("password")
 
 		db.Create(&adminUser)
 		// Then, update the CreatedAt field for debugging purposes
@@ -45,50 +47,6 @@ func SeedUsers(db *gorm.DB) {
 
 	}
 
-	// Check to see if user1 already exists
-	db.Model(&models.User{}).Where("username = ?", "user1").Count(&count)
-	if count == 0 {
-		// No user1 user found, create one
-		user1 := models.User{
-			Username:              "user1",
-			DisplayName:           "Eegabeep",
-			Email:                 "eegabeep@example.com",
-			UserType:              "REGULAR",
-			InitialAccountBalance: initialAccountBalance,
-			ApiKey:                util.GenerateUniqueApiKey(),
-			PersonalEmoji:         "😅",
-			Description:           "I like predicting things.",
-			PersonalLink1:         "https://www.google.com",
-		}
-		user1.HashPassword("password") // Always use a strong, hashed password
-
-		db.Create(&user1)
-		// Then, update the CreatedAt field for debugging purposes
-		db.Model(&user1).Update("CreatedAt", specificTime)
-	}
-
-	// Check to see if user2 already exists
-	db.Model(&models.User{}).Where("username = ?", "user2").Count(&count)
-	if count == 0 {
-		// No user2 user found, create one
-		user2 := models.User{
-			Username:              "user2",
-			DisplayName:           "Boom Bam",
-			Email:                 "BoomBam@example.com",
-			UserType:              "REGULAR",
-			InitialAccountBalance: initialAccountBalance,
-			ApiKey:                util.GenerateUniqueApiKey(),
-			PersonalEmoji:         "😅",
-			Description:           "Just a typical user. Like to predict stuff.",
-			PersonalLink1:         "https://www.duckduckgo.com",
-		}
-		user2.HashPassword("password") // Always use a strong, hashed password
-
-		db.Create(&user2)
-		// Then, update the CreatedAt field for debugging purposes
-		db.Model(&user2).Update("CreatedAt", specificTime)
-
-	}
 }
 
 func SeedMarket(db *gorm.DB) {

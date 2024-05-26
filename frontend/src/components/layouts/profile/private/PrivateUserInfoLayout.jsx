@@ -51,25 +51,6 @@ const PrivateUserInfoLayout = ({ userData }) => {
         handleCloseModal();
     };
 
-    //const renderPersonalLinks = () => {
-    //    const linkKeys = ['personalink1', 'personalink2', 'personalink3', 'personalink4'];
-    //    return linkKeys.map(key => {
-    //        const link = userData[key];
-    //        return link ? (
-    //            <div key={key} className='nav-link text-info-blue hover:text-blue-800'>
-    //                <a
-    //                    href={link}
-    //                    target='_blank'
-    //                    rel='noopener noreferrer'
-    //                >
-    //                    {link}
-    //                </a>
-    //            </div>
-    //        ) : null;
-    //    });
-    //};
-
-
     const renderPersonalLinks = () => {
         // Match the keys with the state keys used in `setLinks`
         const linkKeys = ['personalLink1', 'personalLink2', 'personalLink3', 'personalLink4'];
@@ -103,7 +84,7 @@ const PrivateUserInfoLayout = ({ userData }) => {
 
     return (
         <div className="overflow-auto p-6 bg-primary-background shadow-md rounded-lg">
-            <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">Profile Details</h3>
+            <h3 className="text-lg font-medium text-custom-gray-verylight mb-4">Profile Details & Edit</h3>
             <div className="divide-y divide-custom-gray-dark">
                 {[
                     {

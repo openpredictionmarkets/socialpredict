@@ -64,9 +64,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create UserClaim
 	claims := &UserClaims{
-		Username: user.Username, // Set this to the actual username
+		Username: user.Username,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(), // Token expires in 24 hours
+			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 		},
 	}
 
@@ -80,13 +80,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Log for debugging
 	log.Printf("Token issued for user: %s", user.Username)
 	log.Printf("Tokenstring: %s", tokenString)
 
-	// Send token and user ID in response
+	// Send token, username, and usertype in the response
 	responseData := map[string]interface{}{
-		"token":    tokenString,
-		"username": user.Username,
+		"token":              tokenString,
+		"username":           user.Username,
+		"usertype":           user.UserType,
+		"mustChangePassword": user.MustChangePassword,
 	}
 	json.NewEncoder(w).Encode(responseData)
 }

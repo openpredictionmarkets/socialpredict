@@ -32,7 +32,7 @@ func main() {
 
 	// Seed the users and markets
 	seed.SeedUsers(db)
-	seed.SeedMarket(db)
+	// seed.SeedMarket(db)
 
 	server.Start()
 }

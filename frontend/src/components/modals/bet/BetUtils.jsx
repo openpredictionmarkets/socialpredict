@@ -1,4 +1,3 @@
-// import API_URL from your config
 import { API_URL } from '../../../config';
 
 export const submitBet = (betData, token, onSuccess, onError) => {
@@ -20,7 +19,10 @@ export const submitBet = (betData, token, onSuccess, onError) => {
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
+            return response.json().then(err => {
+                // Construct a new error object and throw it
+                throw new Error(`Error placing bet: ${err.error || 'Unknown error'}`);
+            });
         }
         return response.json();
     })
@@ -30,6 +32,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
     })
     .catch(error => {
         console.error('Error:', error);
+        alert(error.message);  // Use error.message to display the custom error message
         onError(error);  // Handle error outside this utility function
     });
 };

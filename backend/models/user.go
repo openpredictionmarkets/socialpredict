@@ -22,6 +22,7 @@ type User struct {
 	PersonalLink2         string `json:"personalink2,omitempty"`
 	PersonalLink3         string `json:"personalink3,omitempty"`
 	PersonalLink4         string `json:"personalink4,omitempty"`
+	MustChangePassword    bool   `json:"mustChangePassword" gorm:"default:true"`
 }
 
 // HashPassword hashes given password
