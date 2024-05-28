@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent'; // Ensure correct import path
 import LoginModalButton from '../modals/login/LoginModalClick';
+import ProfileSVG from '../../assets/svg/ProfileSVG';
+
 
 const Sidebar = () => {
     // Extend useAuth hook to get changePasswordNeeded along with usertype, isLoggedIn, and logout
@@ -35,7 +37,7 @@ const Sidebar = () => {
                             ) : (
                                 // Full Links for Regular Users
                                 <>
-                                    <li><Link to="/profile" className="sidebar-link">Profile</Link></li>
+                                    <li><Link to="/profile" className="sidebar-link"><ProfileSVG className="mr-2" />Profile</Link></li>
                                     <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
                                     <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
                                     <li><Link to="/notifications" className="sidebar-link">Notifications</Link></li>
