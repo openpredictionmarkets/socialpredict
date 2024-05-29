@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent'; // Ensure correct import path
 import LoginModalButton from '../modals/login/LoginModalClick';
@@ -9,7 +9,6 @@ import { AboutSVG,
     CreateSVG,
     HomeSVG,
     LockPasswordSVG,
-    LoginSVG,
     LogoutSVG,
     MarketsSVG,
     MenuGrowSVG,
@@ -23,6 +22,14 @@ const Sidebar = () => {
     // Extend useAuth hook to get changePasswordNeeded along with usertype, isLoggedIn, and logout
     const { isLoggedIn, usertype, logout, changePasswordNeeded } = useAuth();
 
+    // responsive mobile function stuff
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    // Function to toggle sidebar visibility
+    const toggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
+
+    // logout click handling
     const handleLogoutClick = () => {
         logout();
     };
