@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import LoginModal from './LoginModal';
 import { useAuth } from '../../../helpers/AuthContent';
 import { useHistory } from 'react-router-dom';
+import { LoginSVG } from '../../../assets/components/SvgIcons';
 
 const LoginModalButton = () => {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -16,7 +17,13 @@ const LoginModalButton = () => {
 
     return (
         <div>
-            <button onClick={handleOpenModal}>Login</button>
+            <button
+                onClick={handleOpenModal}
+                className="flex items-center justify-center"
+            >
+                <LoginSVG className="mr-2" />
+                Login
+            </button>
             {isLoginModalOpen && <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} onLogin={login} redirectAfterLogin={redirectAfterLogin} />}
         </div>
     );

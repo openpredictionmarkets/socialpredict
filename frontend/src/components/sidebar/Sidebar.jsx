@@ -1,12 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent'; // Ensure correct import path
 import LoginModalButton from '../modals/login/LoginModalClick';
+import { AboutSVG,
+    AdminGearSVG,
+    ApiKeySVG,
+    CoinsSVG,
+    CreateSVG,
+    HomeSVG,
+    LockPasswordSVG,
+    LogoutSVG,
+    MarketsSVG,
+    MenuGrowSVG,
+    MenuShrinkSVG,
+    NotificationsSVG,
+    PollsSVG,
+    ProfileSVG }  from '../../assets/components/SvgIcons';
+
 
 const Sidebar = () => {
     // Extend useAuth hook to get changePasswordNeeded along with usertype, isLoggedIn, and logout
     const { isLoggedIn, usertype, logout, changePasswordNeeded } = useAuth();
 
+    // responsive mobile function stuff
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    // Function to toggle sidebar visibility
+    const toggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
+
+    // logout click handling
     const handleLogoutClick = () => {
         logout();
     };
@@ -20,38 +43,125 @@ const Sidebar = () => {
                             {usertype === 'ADMIN' ? (
                                 // Links for ADMIN
                                 <>
-                                    <li><Link to="/admin" className="sidebar-link">Admin Dashboard</Link></li>
-                                    <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                                    <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                                    <li><Link to="/about" className="sidebar-link">About</Link></li>
-                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                    <li>
+                                        <Link to="/admin" className="sidebar-link">
+                                            <AdminGearSVG className="mr-2" />
+                                            Dashboard
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/markets" className="sidebar-link flex items-center">
+                                            <MarketsSVG className="mr-2" />
+                                            Markets
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/polls" className="sidebar-link flex items-center">
+                                            <PollsSVG className="mr-2" />
+                                            Polls
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/about" className="sidebar-link flex items-center">
+                                            <AboutSVG className="mr-2" />
+                                            About
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/" onClick={handleLogoutClick} className="sidebar-link flex items-center">
+                                            <LogoutSVG className="mr-2" />
+                                            Logout
+                                        </Link>
+                                    </li>
                                 </>
                             ) : changePasswordNeeded ? (
                                 // Limited Links for Regular Users needing password change
                                 <>
-                                    <li><Link to="/changepassword" className="sidebar-link">Change Password</Link></li>
-                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                    <li>
+                                        <Link to="/changepassword" className="sidebar-link">
+                                            <LockPasswordSVG className="mr-2" />
+                                            Change Password
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/" onClick={handleLogoutClick} className="sidebar-link flex items-center">
+                                            <LogoutSVG className="mr-2" />
+                                            Logout
+                                        </Link>
+                                    </li>
                                 </>
                             ) : (
                                 // Full Links for Regular Users
                                 <>
-                                    <li><Link to="/profile" className="sidebar-link">Profile</Link></li>
-                                    <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                                    <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                                    <li><Link to="/notifications" className="sidebar-link">Notifications</Link></li>
-                                    <li><Link to="/create" className="sidebar-link">Create</Link></li>
-                                    <li><Link to="/about" className="sidebar-link">About</Link></li>
-                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                    <li>
+                                        <Link to="/profile" className="sidebar-link flex items-center">
+                                            <ProfileSVG className="mr-2" />
+                                            Profile
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/markets" className="sidebar-link flex items-center">
+                                            <MarketsSVG className="mr-2" />
+                                            Markets
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/polls" className="sidebar-link flex items-center">
+                                            <PollsSVG className="mr-2" />
+                                            Polls
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/notifications" className="sidebar-link flex items-center">
+                                            <NotificationsSVG className="mr-2" />
+                                            Alerts
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/create" className="sidebar-link flex items-center">
+                                            <CreateSVG className="mr-2" />
+                                            Create
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/about" className="sidebar-link flex items-center">
+                                            <AboutSVG className="mr-2" />
+                                            About
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/" onClick={handleLogoutClick} className="sidebar-link flex items-center">
+                                            <LogoutSVG className="mr-2" />
+                                            Logout
+                                        </Link>
+                                    </li>
                                 </>
                             )}
                         </>
                     ) : (
                         // Links when not logged in
                         <>
-                            <li><LoginModalButton /></li>
-                            <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                            <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                            <li><Link to="/about" className="sidebar-link">About</Link></li>
+                            <li>
+                                <LoginModalButton />
+                            </li>
+                            <li>
+                                <Link to="/markets" className="sidebar-link flex items-center">
+                                    <MarketsSVG className="mr-2" />
+                                    Markets
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/polls" className="sidebar-link flex items-center">
+                                    <PollsSVG className="mr-2" />
+                                    Polls
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/about" className="sidebar-link flex items-center">
+                                    <AboutSVG className="mr-2" />
+                                    About
+                                </Link>
+                            </li>
                         </>
                     )}
                 </ul>
