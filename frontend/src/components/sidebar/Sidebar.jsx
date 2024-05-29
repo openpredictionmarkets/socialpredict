@@ -35,17 +35,52 @@ const Sidebar = () => {
                             {usertype === 'ADMIN' ? (
                                 // Links for ADMIN
                                 <>
-                                    <li><Link to="/admin" className="sidebar-link">Admin Dashboard</Link></li>
-                                    <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                                    <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                                    <li><Link to="/about" className="sidebar-link">About</Link></li>
-                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                    <li>
+                                        <Link to="/admin" className="sidebar-link">
+                                            <AdminGearSVG className="mr-2" />
+                                            Dashboard
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/markets" className="sidebar-link flex items-center">
+                                            <MarketsSVG className="mr-2" />
+                                            Markets
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/polls" className="sidebar-link flex items-center">
+                                            <PollsSVG className="mr-2" />
+                                            Polls
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/about" className="sidebar-link flex items-center">
+                                            <AboutSVG className="mr-2" />
+                                            About
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/" onClick={handleLogoutClick} className="sidebar-link flex items-center">
+                                            <LogoutSVG className="mr-2" />
+                                            Logout
+                                        </Link>
+                                    </li>
                                 </>
                             ) : changePasswordNeeded ? (
                                 // Limited Links for Regular Users needing password change
                                 <>
-                                    <li><Link to="/changepassword" className="sidebar-link">Change Password</Link></li>
-                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                    <li>
+                                        <Link to="/changepassword" className="sidebar-link">
+                                            <LockPasswordSVG className="mr-2" />
+                                            Change Password
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/" onClick={handleLogoutClick} className="sidebar-link flex items-center">
+                                            <LogoutSVG className="mr-2" />
+                                            Logout
+                                        </Link>
+                                    </li>
                                 </>
                             ) : (
                                 // Full Links for Regular Users
@@ -99,9 +134,24 @@ const Sidebar = () => {
                         // Links when not logged in
                         <>
                             <li><LoginModalButton /></li>
-                            <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                            <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                            <li><Link to="/about" className="sidebar-link">About</Link></li>
+                            <li>
+                                <Link to="/markets" className="sidebar-link flex items-center">
+                                    <MarketsSVG className="mr-2" />
+                                    Markets
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/polls" className="sidebar-link flex items-center">
+                                    <PollsSVG className="mr-2" />
+                                    Polls
+                                </Link>
+                            </li>
+                            <li>
+                                <Link to="/about" className="sidebar-link flex items-center">
+                                    <AboutSVG className="mr-2" />
+                                    About
+                                </Link>
+                            </li>
                         </>
                     )}
                 </ul>
