@@ -9,6 +9,7 @@ import { AboutSVG,
     CreateSVG,
     HomeSVG,
     LockPasswordSVG,
+    LoginSVG,
     LogoutSVG,
     MarketsSVG,
     MenuGrowSVG,
@@ -133,7 +134,9 @@ const Sidebar = () => {
                     ) : (
                         // Links when not logged in
                         <>
-                            <li><LoginModalButton /></li>
+                            <li>
+                                <LoginModalButton />
+                            </li>
                             <li>
                                 <Link to="/markets" className="sidebar-link flex items-center">
                                     <MarketsSVG className="mr-2" />
