@@ -2,7 +2,20 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent'; // Ensure correct import path
 import LoginModalButton from '../modals/login/LoginModalClick';
-import ProfileSVG from '../../assets/svg/ProfileSVG';
+import { AboutSVG,
+    AdminGearSVG,
+    ApiKeySVG,
+    CoinsSVG,
+    CreateSVG,
+    HomeSVG,
+    LockPasswordSVG,
+    LogoutSVG,
+    MarketsSVG,
+    MenuGrowSVG,
+    MenuShrinkSVG,
+    NotificationsSVG,
+    PollsSVG,
+    ProfileSVG }  from '../../assets/components/SvgIcons';
 
 
 const Sidebar = () => {
@@ -37,13 +50,48 @@ const Sidebar = () => {
                             ) : (
                                 // Full Links for Regular Users
                                 <>
-                                    <li><Link to="/profile" className="sidebar-link"><ProfileSVG className="mr-2" />Profile</Link></li>
-                                    <li><Link to="/markets" className="sidebar-link">Markets</Link></li>
-                                    <li><Link to="/polls" className="sidebar-link">Polls</Link></li>
-                                    <li><Link to="/notifications" className="sidebar-link">Notifications</Link></li>
-                                    <li><Link to="/create" className="sidebar-link">Create</Link></li>
-                                    <li><Link to="/about" className="sidebar-link">About</Link></li>
-                                    <li><Link to="/" onClick={handleLogoutClick} className="sidebar-link">Logout</Link></li>
+                                    <li>
+                                        <Link to="/profile" className="sidebar-link flex items-center">
+                                            <ProfileSVG className="mr-2" />
+                                            Profile
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/markets" className="sidebar-link flex items-center">
+                                            <MarketsSVG className="mr-2" />
+                                            Markets
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/polls" className="sidebar-link flex items-center">
+                                            <PollsSVG className="mr-2" />
+                                            Polls
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/notifications" className="sidebar-link flex items-center">
+                                            <NotificationsSVG className="mr-2" />
+                                            Alerts
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/create" className="sidebar-link flex items-center">
+                                            <CreateSVG className="mr-2" />
+                                            Create
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/about" className="sidebar-link flex items-center">
+                                            <AboutSVG className="mr-2" />
+                                            About
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/" onClick={handleLogoutClick} className="sidebar-link flex items-center">
+                                            <LogoutSVG className="mr-2" />
+                                            Logout
+                                        </Link>
+                                    </li>
                                 </>
                             )}
                         </>
