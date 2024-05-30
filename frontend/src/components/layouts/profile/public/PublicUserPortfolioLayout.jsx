@@ -31,14 +31,20 @@ const PublicUserPortfolioLayout = ({ username, userData }) => {
     if (!portfolioItems || !portfolioItems.length) {
         return <div className="bg-primary-background shadow-md rounded-lg">
             <div className="p-6">
-                <td>
-                    <tr>
-                        No portfolio found.
-                    </tr>
-                    <tr>
-                        User has likely not made any trades yet.
-                    </tr>
-                </td>
+                <table className="w-full">
+                    <tbody>
+                        <tr>
+                            <td>
+                                No portfolio found.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                User has likely not made any trades yet.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>;
     }
