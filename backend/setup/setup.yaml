@@ -1,11 +1,11 @@
 economics:
   marketcreation:
     initialMarketProbability: 0.5
-    initialMarketSubsidization: 1
+    initialMarketSubsidization: 10
     initialMarketYes: 0
     initialMarketNo: 0
   marketincentives:
-    createMarketCost: 1
+    createMarketCost: 10
     traderBonus: 2
   user:
     initialAccountBalance: 0
