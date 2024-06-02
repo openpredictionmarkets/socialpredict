@@ -1,26 +1,57 @@
 version: '3.8'
 
 services:
-  backend:
-    image: "${BACKEND_IMAGE_NAME}"
-    environment:
-      - ENVIRONMENT=prod
-    env_file:
-      - .env.prod
-    ports: []
-
-  frontend:
-    image: "${FRONTEND_IMAGE_NAME}"
-    environment:
-      - ENVIRONMENT=production
-    env_file:
-      - .env.prod
-    ports:
-      - "80:80"
 
   db:
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    image: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
     volumes:
       - db-data:/var/lib/postgresql/data
+    networks:
+      - backend_network
+
+  backend:
+    container_name: ${BACKEND_CONTAINER_NAME}
+    image: ${BACKEND_IMAGE_NAME}
+    environment:
+      DB_HOST: db
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      - backend_network
+
+  frontend:
+    container_name: ${FRONTEND_CONTAINER_NAME}
+    image: ${FRONTEND_IMAGE_NAME}
+    depends_on:
+      - backend
+    networks:
+      - frontend_network
+
+  nginx:
+    container_name: ${NGINX_CONTAINER_NAME}
+    image: ${NGINX_IMAGE_NAME}
+    ports:
+      - "${NGINX_HOSTPORT}:80"
+    depends_on:
+      - frontend
+    volumes:
+      - ./nginx:/etc/nginx/
+    networks:
+      - frontend_network
+      - backend_network
+
+networks:
+  backend_network:
+    driver: bridge
+  frontend_network:
+    driver: bridge
 
 volumes:
   db-data:
