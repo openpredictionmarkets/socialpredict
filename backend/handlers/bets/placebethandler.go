@@ -2,6 +2,7 @@ package betshandlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
 	"socialpredict/logging"
@@ -14,6 +15,14 @@ import (
 
 // appConfig holds the loaded application configuration accessible within the package
 var appConfig *setup.EconomicConfig
+
+func init() {
+	var err error
+	appConfig, err = setup.LoadEconomicsConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+}
 
 func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
