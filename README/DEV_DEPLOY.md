@@ -10,7 +10,7 @@ This document is geared at helping those who might want to convert the developme
 
 ### Contents
 
-#### Setting Up Your Domain
+### Setting Up Your Domain
 
 First, you should purchase a domain, which you can do at any number of domain registrars. We are using Namecheap for this article.
 
@@ -26,13 +26,44 @@ Getting Started After Deploying Docker
 https://marketplace.digitalocean.com/apps/docker
 
 
-### Logging In
+### Logging In via SSH
 
-If you use ssh-keygen to start up a new key file, then do:
+If you use ssh-keygen to start up a new key file,
 
 ```
-ssh -i ~/.ssh/id_ed25519-do root@IPADDRESS
+ssh-keygen
+id_ed25519-do
 ```
+
+Adding the `-do` at the end allows concerns to be kept separate, e.g. if other keyfiles are created, they can have that suffix at the end to allow for different keys for different purposes.  After this has been created do the following to log in:
+
+```
+ssh -i ~/.ssh/id_ed25519-do root@{IP_ADDRESS}
+```
+Where `{IP_ADDRESS}` is your server ip address.
+
+#### Recovery
+
+If anything bad happens, the server can be re-built from scratch on Digital Ocean. However after the server is rebuilt, there will be a, "this server has changed," message.
+
+```
+ssh-keygen -R {IP_ADDRESS}
+```
+
+If you accidentally delete your key on your local machine or over-write it with a new key, you have to log in through the console on Digital Ocean for that droplet and add it.
+
+First, copy the new key on your local machine by doing the following and copying the key:
+
+```
+cat ~/.ssh/id_ed25519-do.pub
+```
+
+Then copy and paste that, and within the [Digital Ocean droplet console](https://docs.digitalocean.com/products/droplets/how-to/connect-with-console/), add it to your authoirzed_key file.
+
+```
+nano ~/.ssh/authorized_keys
+```
+
 
 ### Update and Upgrade
 
@@ -97,28 +128,44 @@ root@breirfoxforecast-alpha:~# docker buildx version
 github.com/docker/buildx v0.14.0 171fcbe
 
 
-### Clone the Repo
+### Verifying Networking and Domain
+
+To verify that the networking works and the domain is connected to Digital Ocean properly and serving the application as expected, a sample app can be installed first.
+
+Digital Ocean provides a sample, "hello world," app [here](https://github.com/digitalocean/sample-dockerfile/tree/main).
+
+Navigate to your `/home` directory or wherever this should be organized on your machine and clone the repo with:
 
 ```
-root@breirfoxforecast-alpha:# cd /home
-root@breirfoxforecast-alpha:/home# git version
-git version 2.34.1
+git clone https://github.com/digitalocean/sample-dockerfile.git
 ```
 
+To deploy this, after logging in via SSH, run the folowing, within the directory:
 
 ```
-root@breirfoxforecast-alpha:/home# git clone https://github.com/openpredictionmarkets/socialpredict.git
+docker build .
+```
+This will build the docker image. After having done this, the image ID can be verified with:
+
+```
+user@breirfoxforecast-alpha:/home/sample-dockerfile# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED         SIZE
+<none>       <none>    71dea4f9eb20   2 minutes ago   15.7MB
+```
+Having verified the image exists, launch the app with:
+
+```
+root@breirfoxforecast-alpha:/home/sample-dockerfile# docker run -ti -p 80:80 71dea4f9eb20
+```
+There will be an ASCII art image of a shark as well as `Server listening at :80 🚀`
+
+Then, navigate to the `{IP_ADDRESS}` on your browser for the droplet and the following message should be displayed.
+
+```
+Hello! you've requested /
 ```
 
-
-### Set Up Environmental Variables for Ports
-
-
-
-
-### Setting Up NGINX Production System
-
-
+This means that an app has been successfully deployed and is serving on 80.
 
 ### Link Domain Directly to Digital Ocean
 
@@ -129,15 +176,55 @@ https://www.namecheap.com/support/knowledgebase/article.aspx/10375/2208/how-do-i
 
 https://docs.digitalocean.com/products/networking/dns/getting-started/dns-registrars/
 
+### Add a Domain
 
-### Create a Record in The Control Panel
+Once the Domain has been pointed to Digital Ocean, add a Domain within the [Digital Ocean Networking Dashboard](https://cloud.digitalocean.com/networking/domains).
+
+
+### Create A Records in The Control Panel
+
+Once this application has been set up, as mentioned above, create A records for `www` and `@` for your droplet. This can be found by navigating to https://cloud.digitalocean.com/networking/domains/`{yourdomain}`
 
 https://docs.digitalocean.com/products/networking/dns/how-to/manage-records/#create-update-and-delete-records-using-the-control-panel
 
 
-### Create an A Record to Point to Droplet
-
 https://docs.digitalocean.com/products/networking/dns/how-to/manage-records/#a-records
+
+Ensure that both `www` and `@` are created.  After all of this has been updated, it may take 48 hours to take effect.
+
+* Status of your domain can be checked at https://www.whatsmydns.net/
+* The `dig` tool on the local command line can be used to check a domain's status (for all domains):
+
+```
+dig www.yourdomain.com
+dig yourdomain.com
+```
+
+### Clone the SocialPredict Repo
+
+Now that the domain has been pointed in the right direction and is working on propogating, the SocialPredict repo could be downloaded and run in the meantime.
+
+```
+root@breirfoxforecast-alpha:# cd /home
+root@breirfoxforecast-alpha:/home# git version
+git version 2.34.1
+```
+then...
+
+```
+root@breirfoxforecast-alpha:/home# git clone https://github.com/openpredictionmarkets/socialpredict.git
+```
+
+### Set Up Environmental Variables for Ports
+
+
+
+
+### Setting Up NGINX Production System
+
+
+
+
 
 ### Secure NGinx with SSL
 
