@@ -7,6 +7,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/logging"
 	"socialpredict/models"
+	"socialpredict/setup"
 )
 
 // holds betting payout information
@@ -21,6 +22,9 @@ type MarketPosition struct {
 	YesSharesOwned int64
 }
 
+// appConfig holds the loaded application configuration accessible within the package
+var appConfig *setup.EconomicConfig
+
 // DivideUpMarketPoolShares divides the market pool into YES and NO pools based on the resolution probability.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
 func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64) {
@@ -33,7 +37,8 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	logging.LogAnyType(R, "R")
 
 	// Get the total share pool S as a float for precision
-	S := float64(marketmath.GetMarketVolume(bets))
+	// Include the initial market subsidization in the displayed volume
+	S := float64(marketmath.GetMarketVolume(bets) + appConfig.Economics.MarketCreation.InitialMarketSubsidization)
 	logging.LogAnyType(S, "S")
 
 	// initial condition, shares set to zero

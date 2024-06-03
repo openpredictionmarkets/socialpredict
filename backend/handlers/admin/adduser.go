@@ -15,6 +15,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// appConfig holds the loaded application configuration accessible within the package
+var appConfig *setup.EconomicConfig
+
 func AddUserHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
@@ -41,16 +44,13 @@ func AddUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var user models.User
 
-	// load the config constants
-	config := setup.LoadEconomicsConfig()
-
 	user = models.User{
 		Username:              req.Username,
 		DisplayName:           util.UniqueDisplayName(db),
 		Email:                 util.UniqueEmail(db),
 		UserType:              "REGULAR",
-		InitialAccountBalance: config.Economics.User.InitialAccountBalance,
-		AccountBalance:        config.Economics.User.InitialAccountBalance,
+		InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
+		AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
 		PersonalEmoji:         randomEmoji(),
 		ApiKey:                util.GenerateUniqueApiKey(db),
 		MustChangePassword:    true,

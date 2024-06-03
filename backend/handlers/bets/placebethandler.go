@@ -7,9 +7,13 @@ import (
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 	"time"
 )
+
+// appConfig holds the loaded application configuration accessible within the package
+var appConfig *setup.EconomicConfig
 
 func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST requests
@@ -39,7 +43,7 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the user has enough balance to place the bet
 	// Use the appConfig for configuration values
-	maximumDebtAllowed := betutils.Appconfig.MaximumDebtAllowed
+	maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
 
 	// Check if the user's balance after the bet would be lower than the allowed maximum debt
 	// deduct fee in case of switching sides
