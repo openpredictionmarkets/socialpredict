@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DATABASE} # database named ${POSTGRES_DB} will be created inside container
+      POSTGRES_DB: ${POSTGRES_DATABASE}
 
     ports:
       - "${DB_PORT}:${POSTGRES_PORT}"
@@ -18,7 +18,7 @@ services:
     image: "${BACKEND_IMAGE_NAME}"
     environment:
       - CONTAINER_NAME=${BACKEND_CONTAINER_NAME}
-      - DB_HOST=db # docker-compose service name referred to in docker-compose.yaml
+      - DB_HOST=db
       - DB_USER=${POSTGRES_USER}
       - DB_PASS=${POSTGRES_PASSWORD}
     depends_on:
