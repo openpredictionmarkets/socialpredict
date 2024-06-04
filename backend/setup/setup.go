@@ -28,9 +28,12 @@ type EconomicConfig struct {
 			MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed"`
 		} `yaml:"user"`
 		Betting struct {
-			MinimumBet    int64 `yaml:"minimumBet"`
-			BetFee        int64 `yaml:"betFee"`
-			SellSharesFee int64 `yaml:"sellSharesFee"`
+			MinimumBet int64 `yaml:"minimumBet"`
+			BetFees    struct {
+				InitialBetFee int64 `yaml:"initialBetFee"`
+				EachBetFee    int64 `yaml:"eachBetFee"`
+				SellSharesFee int64 `yaml:"sellSharesFee"`
+			} `yaml:"betFees"`
 		} `yaml:"betting"`
 	} `yaml:"economics"`
 }
@@ -40,13 +43,14 @@ var economicConfig *EconomicConfig
 // load once as a singleton pattern
 var once sync.Once
 
-func LoadEconomicsConfig() *EconomicConfig {
+func LoadEconomicsConfig() (*EconomicConfig, error) {
 	once.Do(func() {
 		economicConfig = &EconomicConfig{}
 		err := yaml.Unmarshal(setupYaml, economicConfig)
 		if err != nil {
-			log.Fatalf("Error parsing YAML config: %v", err)
+			log.Println("Error parsing YAML config:", err) // Log here or just pass the error up
+			return
 		}
 	})
-	return economicConfig
+	return economicConfig, nil
 }
