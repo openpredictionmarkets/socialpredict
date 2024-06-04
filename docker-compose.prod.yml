@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+<<<<<<< HEAD
 
   db:
     container_name: ${POSTGRES_CONTAINER_NAME}
@@ -11,10 +12,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DATABASE}
     volumes:
       - db-data:/var/lib/postgresql/data
+=======
+  db:
+>>>>>>> main
     networks:
       - backend_network
 
   backend:
+<<<<<<< HEAD
     container_name: ${BACKEND_CONTAINER_NAME}
     image: ${BACKEND_IMAGE_NAME}
     environment:
@@ -23,10 +28,15 @@ services:
       DB_PASS: ${POSTGRES_PASSWORD}
     depends_on:
       - db
+=======
+    environment:
+      - ENVIRONMENT=production
+>>>>>>> main
     networks:
       - backend_network
 
   frontend:
+<<<<<<< HEAD
     container_name: ${FRONTEND_CONTAINER_NAME}
     image: ${FRONTEND_IMAGE_NAME}
     depends_on:
@@ -55,3 +65,22 @@ networks:
 
 volumes:
   db-data:
+=======
+    environment:
+      - ENVIRONMENT=production
+    networks:
+      - backend_network
+
+  nginx:
+    ports:
+      - "80:80"  # Only expose Nginx on port 80 in production
+    networks:
+      - backend_network
+      - frontend_network
+
+networks:
+  backend_network:
+    driver: bridge
+  frontend_network:
+    driver: bridge
+>>>>>>> main

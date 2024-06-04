@@ -11,8 +11,10 @@ import (
 
 func SeedUsers(db *gorm.DB) {
 
-	// load the config constants
-	config := setup.LoadEconomicsConfig()
+	config, err := setup.LoadEconomicsConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	// Specific time: October 31st, 2023 at 11:59 PM CST
 	loc, err := time.LoadLocation("America/Chicago") // CST location
@@ -61,8 +63,11 @@ func SeedMarket(db *gorm.DB) {
 	}
 	specificTime := time.Date(2023, time.November, 1, 23, 59, 0, 0, loc)
 
-	// load the config constants
-	config := setup.LoadEconomicsConfig()
+	config, err := setup.LoadEconomicsConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
 	// Use the config as needed
 	initialProbability := config.Economics.MarketCreation.InitialMarketProbability
 
