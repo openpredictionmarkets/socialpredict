@@ -6,10 +6,24 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 )
+
+// appConfig holds the loaded application configuration accessible within the package
+var appConfig *setup.EconomicConfig
+
+func init() {
+	// Load configuration
+	var err error
+	appConfig, err = setup.LoadEconomicsConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+}
 
 func checkQuestionTitleLength(title string) error {
 	if len(title) > 160 || len(title) < 1 {
@@ -67,6 +81,28 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
+		return
+	}
+
+	// Subtract any Market Creation Fees from Creator, up to maximum debt
+	marketCreateFee := appConfig.Economics.MarketIncentives.CreateMarketCost
+	maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
+
+	// Maximum debt allowed check
+	if user.AccountBalance-marketCreateFee < -maximumDebtAllowed {
+		http.Error(w, "Insufficient balance", http.StatusBadRequest)
+		return
+	}
+
+	// deduct fee
+	logging.LogAnyType(user.AccountBalance, "user.AccountBalance before")
+	// Deduct the bet and switching sides fee amount from the user's balance
+	user.AccountBalance -= marketCreateFee
+	logging.LogAnyType(user.AccountBalance, "user.AccountBalance after")
+
+	// Update the user's balance in the database
+	if err := db.Save(&user).Error; err != nil {
+		http.Error(w, "Error updating user balance: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

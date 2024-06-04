@@ -2,7 +2,6 @@ package wpam
 
 import (
 	"log"
-	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"
@@ -35,6 +34,9 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 	totalYes := appConfig.Economics.MarketCreation.InitialMarketYes
 	totalNo := appConfig.Economics.MarketCreation.InitialMarketNo
 
+	// Add initial state
+	probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: P_initial, Timestamp: marketCreatedAtTime})
+
 	// Calculate probabilities after each bet
 	for _, bet := range bets {
 		if bet.Outcome == "YES" {
@@ -46,8 +48,6 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 		newProbability := (P_initial*float64(I_initial) + float64(totalYes)) / (float64(I_initial) + float64(totalYes) + float64(totalNo))
 		probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: newProbability, Timestamp: bet.PlacedAt})
 	}
-
-	logging.LogAnyType(probabilityChanges, "probabilityChanges")
 
 	return probabilityChanges
 }
