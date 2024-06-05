@@ -2,6 +2,7 @@ package seed
 
 import (
 	"log"
+        "os"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"
