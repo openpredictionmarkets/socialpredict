@@ -29,7 +29,7 @@ services:
 
   nginx:
     container_name: "${NGINX_CONTAINER_NAME}"
-    image: "${NGINX_IMAGE_NAME}"
+    image: nginx:1.27.0
     depends_on:
       - backend
       - frontend

@@ -25,12 +25,16 @@ services:
       - "${REACT_HOSTPORT}:${REACT_PORT}"
 
   nginx:
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
     environment:
       - ENVIRONMENT=production
-    ports:
-      - "${NGINX_HOSTPORT}:80"
     volumes:
-      - ./nginx:/etc/nginx/
+      - "${PWD}/nginx/nginx.conf:/etc/nginx/nginx.conf"
+      # we may mount static asssets here in the future
     networks:
       - frontend_network
       - backend_network
