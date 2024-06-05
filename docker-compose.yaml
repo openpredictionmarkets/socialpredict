@@ -10,15 +10,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DATABASE}
 
-    ports:
-      - "${DB_PORT}:${POSTGRES_PORT}"
-
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
     image: "${BACKEND_IMAGE_NAME}"
     environment:
       - CONTAINER_NAME=${BACKEND_CONTAINER_NAME}
-      - DB_HOST=db
+      - DB_HOST=${POSTGRES_DATABASE}
       - DB_USER=${POSTGRES_USER}
       - DB_PASS=${POSTGRES_PASSWORD}
     depends_on:
