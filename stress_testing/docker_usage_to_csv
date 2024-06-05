@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Define the output CSV file
+output_file="docker_stats.csv"
+
+# Write the header to the CSV file
+echo "Timestamp,Container ID,Name,CPU %,Mem Usage (MiB),Mem Limit (GiB),Mem %,Net I/O Received (KB),Net I/O Transmitted (KB),Block I/O Read (KB),Block I/O Write (KB),PIDs" > $output_file
+
+# Function to convert memory to MiB
+convert_to_mib() {
+    echo "$1" | awk '{
+        gsub(/iB/, ""); # Remove the 'iB' part from GiB or MiB
+        if ($2 == "GiB") {
+            print $1 * 1024; # Convert GiB to MiB
+        } else if ($2 == "MiB") {
+            print $1; # Already in MiB
+        } else {
+            print $1 / 1024; # Convert KiB to MiB
+        }
+    }'
+}
+
+# Function to convert I/O to KB
+convert_to_kb() {
+    echo "$1" | awk '{
+        gsub(/B/, ""); # Remove the 'B' part from KB or MB
+        if ($2 == "MB") {
+            print $1 * 1024; # Convert MB to KB
+        } else if ($2 == "KB") {
+            print $1; # Already in KB
+        } else {
+            print $1 / 1024; # Convert GB to KB
+        }
+    }'
+}
+
+# Loop indefinitely
+while true; do
+    # Get stats from all running containers, skipping the header after the first iteration
+    docker stats --no-stream --format \
+    "{{.ID}},{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.MemPerc}},{{.NetIO}},{{.BlockIO}},{{.PIDs}}" \
+    | while IFS= read -r line; do
+        # Prepend the timestamp to each line and reformat the data
+        IFS=',' read -r id name cpu memusage memperc netio blockio pids <<< "$line"
+
+        mem_usage=$(echo $memusage | awk '{print $1$2}')
+        mem_limit=$(echo $memusage | awk '{print $3$4}')
+
+        netio_rx=$(echo $netio | awk -F'/' '{print $1}')
+        netio_tx=$(echo $netio | awk -F'/' '{print $2}')
+
+        blockio_r=$(echo $blockio | awk -F'/' '{print $1}')
+        blockio_w=$(echo $blockio | awk -F'/' '{print $2}')
+
+        # Convert values
+        mem_usage_mib=$(convert_to_mib "$mem_usage")
+        mem_limit_gib=$(convert_to_mib "$mem_limit")
+        netio_rx_kb=$(convert_to_kb "$netio_rx")
+        netio_tx_kb=$(convert_to_kb "$netio_tx")
+        blockio_r_kb=$(convert_to_kb "$blockio_r")
+        blockio_w_kb=$(convert_to_kb "$blockio_w")
+
+        echo "$(date '+%Y-%m-%d %H:%M:%S'),$id,$name,$cpu,$mem_usage_mib,$mem_limit_gib,$memperc,$netio_rx_kb,$netio_tx_kb,$blockio_r_kb,$blockio_w_kb,$pids"
+    done >> $output_file
+
+    # Wait for 10 seconds before the next iteration
+    sleep 10
+done
