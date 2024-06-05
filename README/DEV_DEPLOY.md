@@ -200,6 +200,16 @@ dig www.yourdomain.com
 dig yourdomain.com
 ```
 
+### Create a Firewall
+
+https://docs.digitalocean.com/products/networking/firewalls/how-to/create/#create-a-firewall-using-the-control-panel
+
+HTTP and HTTPS:
+
+* Use port 80 for HTTP.
+* HTTPS (HTTP Secure) is the secure version of HTTP, encrypted using TLS (SSL). Use port 443 for HTTPS.
+
+
 ### Clone the SocialPredict Repo
 
 Now that the domain has been pointed in the right direction and is working on propogating, the SocialPredict repo could be downloaded and run in the meantime.
