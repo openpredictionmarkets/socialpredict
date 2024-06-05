@@ -107,6 +107,12 @@ const Sidebar = () => {
                             // Full Links for Regular Users
                             <>
                                 <li>
+                                    <Link to="/" className="sidebar-link flex items-center">
+                                        <HomeSVG className="mr-2" />
+                                        Home
+                                    </Link>
+                                </li>
+                                <li>
                                     <Link to="/profile" className="sidebar-link flex items-center">
                                         <ProfileSVG className="mr-2" />
                                         Profile
@@ -153,6 +159,12 @@ const Sidebar = () => {
                     </>
                         ) : (
                             <>
+                                <li>
+                                    <Link to="/" className="sidebar-link flex items-center">
+                                        <HomeSVG className="mr-2" />
+                                        Home
+                                    </Link>
+                                </li>
                                 <li>
                                     <LoginModalButton />
                                 </li>
@@ -218,6 +230,11 @@ const Sidebar = () => {
                                     <div className="mr-6">
                                     <Link to="/profile"><ProfileSVG /></Link>
                                     </div>
+                                    <Link to="/" className="flex items-center space-x-4">
+                                        <div className="mr-6">
+                                            <HomeSVG />
+                                        </div>
+                                    </Link>
                                     <Link to="/markets" className="flex items-center space-x-4">
                                         <div className="mr-6">
                                             <MarketsSVG />
@@ -238,6 +255,11 @@ const Sidebar = () => {
                                     <div className="mr-6">
                                         <LoginModalButton />
                                     </div>
+                                    <Link to="/" className="flex items-center space-x-4">
+                                        <div className="mr-6">
+                                            <HomeSVG />
+                                        </div>
+                                    </Link>
                                     <Link to="/markets" className="flex items-center space-x-4">
                                         <div className="mr-6">
                                             <MarketsSVG />
