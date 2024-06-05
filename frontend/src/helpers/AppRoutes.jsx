@@ -12,6 +12,7 @@ import Polls from '../pages/polls/Polls';
 import Notifications from '../pages/notifications/Notifications';
 import Create from '../pages/create/Create';
 import About from '../pages/about/About';
+import Home from '../pages/home/Home'
 import MarketDetails from '../pages/marketDetails/MarketDetails';
 import User from '../pages/user/User';
 import Style from '../pages/style/Style';
@@ -69,36 +70,36 @@ const AppRoutes = () => {
 
             {/* Private Routes for Regular Users Only */}
             <Route path='/changepassword'>
-                {isRegularUser ? <ChangePassword /> : <Redirect to='/' />}
+                {isRegularUser ? <ChangePassword /> : <Home />}
             </Route>
             <Route path='/create'>
                 {!isLoggedIn ? (
-                        <Redirect to='/' />
+                        <Home />
                     ) : mustChangePassword ? (
                         <Redirect to='/changepassword' />
                     ) : isRegularUser ? (
                         <Create />
                     ) : (
-                        <Redirect to='/' /> // catch all for all other condtions, not a regular user
+                        <Home /> // catch all for all other condtions, not a regular user
                     )}
             </Route>
             <Route path='/notifications'>
                 {!isLoggedIn ? (
-                    <Redirect to='/' />
+                    <Home />
                 ) : mustChangePassword ? (
                     <Redirect to='/changepassword' />
                 ) : isRegularUser ? (
                     <Notifications />
                 ) : (
-                    <Redirect to='/' /> // catch all for all other condtions, not a regular user
+                    <Home /> // catch all for all other condtions, not a regular user
                 )}
             </Route>
             <Route path='/profile'>
-                {isRegularUser ? <Profile /> : <Redirect to='/' />}
+                {isRegularUser ? <Profile /> : <Home />}
             </Route>
             {/* Admin Routes */}
             <Route path='/admin'>
-                {isLoggedIn && auth.usertype === 'ADMIN' ? <AdminDashboard /> : <Redirect to='/' />}
+                {isLoggedIn && auth.usertype === 'ADMIN' ? <AdminDashboard /> : <Home />}
             </Route>
 
             {/* If no other route matches, redirect to home */}
@@ -106,7 +107,7 @@ const AppRoutes = () => {
             {isLoggedIn && !auth.usertype === 'ADMIN' && mustChangePassword ? (
                     <Redirect to='/changepassword' />
                 ) : (
-                    <Redirect to='/' />
+                    <Home />
                 )}
             </Route>
 
