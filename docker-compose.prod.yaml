@@ -6,7 +6,7 @@ services:
     environment:
       - ENVIRONMENT=production
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - backend_network
 
