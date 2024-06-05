@@ -15,13 +15,31 @@ import (
 	"github.com/rs/cors"
 )
 
+
+// MyCorsOptions abstracts CORS setup for reuse
+func SetCorsOptions() cors.Options {
+    return cors.Options{
+        AllowedOrigins: []string{
+            "http://brierfoxforecast.com",
+            "http://www.brierfoxforecast.com",
+            "https://brierfoxforecast.com",
+            "https://www.brierfoxforecast.com",
+        },
+        AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+        AllowedHeaders: []string{"Content-Type", "Authorization"},
+        AllowCredentials: true,
+    }
+}
+
 func Start() {
 	// CORS handler
+        c := cors.New(cors.SetCorsOptions())
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://172.29.0.10:5173/", "http://localhost:8089"},
+		AllowedOrigins: []string{"http://172.29.0.10:5173/", "http://localhost:80"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{"Content-Type", "Authorization"},
 	})
+
 
 	// Initialize mux router
 	router := mux.NewRouter()

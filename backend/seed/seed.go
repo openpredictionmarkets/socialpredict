@@ -41,7 +41,8 @@ func SeedUsers(db *gorm.DB) {
 			Description:           "Administrator",
 			MustChangePassword:    false,
 		}
-		adminUser.HashPassword("password")
+
+		adminUser.HashPassword(os.Getenv("ADMIN_PASSWORD"))
 
 		db.Create(&adminUser)
 		// Then, update the CreatedAt field for debugging purposes

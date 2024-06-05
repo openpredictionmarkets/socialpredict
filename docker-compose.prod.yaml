@@ -3,49 +3,41 @@ version: '3.8'
 services:
 
   db:
+    environment:
+      - ENVIRONMENT=production
     volumes:
       - db-data:/var/lib/postgresql/data
     networks:
       - backend_network
 
-  volumes:
-    postgres_data:
-      driver: local
-
   backend:
-    container_name: ${BACKEND_CONTAINER_NAME}
-    image: ${BACKEND_IMAGE_NAME}
-    depends_on:
-      - db
     environment:
-      DB_HOST: db
-      DB_USER: ${POSTGRES_USER}
-      DB_PASS: ${POSTGRES_PASSWORD}
-      ENVIRONMENT: production
+      - ENVIRONMENT=production
     networks:
       - backend_network
 
   frontend:
-    container_name: ${FRONTEND_CONTAINER_NAME}
-    image: ${FRONTEND_IMAGE_NAME}
-    depends_on:
-      - backend
+    environment:
+      - ENVIRONMENT=production
     networks:
       - frontend_network
+    ports:
+      - "${REACT_HOSTPORT}:${REACT_PORT}"
 
   nginx:
-    container_name: ${NGINX_CONTAINER_NAME}
-    image: ${NGINX_IMAGE_NAME}
+    environment:
+      - ENVIRONMENT=production
     ports:
       - "${NGINX_HOSTPORT}:80"
-    depends_on:
-      - frontend
-      - backend
     volumes:
       - ./nginx:/etc/nginx/
     networks:
       - frontend_network
       - backend_network
+
+volumes:
+  postgres_data:
+    driver: local
 
 networks:
   backend_network:
