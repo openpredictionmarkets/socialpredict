@@ -25,7 +25,7 @@ func Start() {
                     "https://brierfoxforecast.com",
                     "https://www.brierfoxforecast.com",
                     "http://172.29.0.10:5173/",
-                    "http://localhost:80"
+                    "http://localhost:80",
             },
             AllowedMethods: []string{"GET", "POST", "OPTIONS"},
             AllowedHeaders: []string{"Content-Type", "Authorization"},

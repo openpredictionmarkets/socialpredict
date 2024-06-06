@@ -15,9 +15,11 @@ services:
     image: "${BACKEND_IMAGE_NAME}"
     environment:
       - CONTAINER_NAME=${BACKEND_CONTAINER_NAME}
-      - DB_HOST=${POSTGRES_DATABASE}
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASS=${POSTGRES_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
+      - POSTGRES_PORT=${POSTGRES_PORT}
     depends_on:
       - db # db service will start prior to backend
 

@@ -8,13 +8,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - backend_network
+      - database_network
 
   backend:
     environment:
       - ENVIRONMENT=production
     networks:
-      - backend_network
+      - database_network
+      - frontend_network
 
   frontend:
     environment:
@@ -36,15 +37,15 @@ services:
       - "${PWD}/nginx/nginx.conf:/etc/nginx/nginx.conf"
       # we may mount static asssets here in the future
     networks:
+      - database_network
       - frontend_network
-      - backend_network
 
 volumes:
   postgres_data:
     driver: local
 
 networks:
-  backend_network:
+  database_network:
     driver: bridge
   frontend_network:
     driver: bridge
