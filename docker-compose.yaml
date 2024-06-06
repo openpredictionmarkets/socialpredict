@@ -14,6 +14,7 @@ services:
     container_name: "${BACKEND_CONTAINER_NAME}"
     image: "${BACKEND_IMAGE_NAME}"
     environment:
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - CONTAINER_NAME=${BACKEND_CONTAINER_NAME}
       - DB_HOST=${DB_HOST}
       - POSTGRES_USER=${POSTGRES_USER}

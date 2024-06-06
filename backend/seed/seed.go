@@ -10,6 +10,13 @@ import (
 	"gorm.io/gorm"
 )
 
+func getEnv(key string) (string, error) {
+    if value, ok := os.LookupEnv(key); ok {
+        return value, nil
+    }
+    return "", log.Fatalf("Environment variable %s not set", key)
+}
+
 func SeedUsers(db *gorm.DB) {
 
 	config, err := setup.LoadEconomicsConfig()
@@ -17,39 +24,36 @@ func SeedUsers(db *gorm.DB) {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Specific time: October 31st, 2023 at 11:59 PM CST
-	loc, err := time.LoadLocation("America/Chicago") // CST location
-	if err != nil {
-		log.Printf("Error loading location: %v", err)
-		return
-	}
-	specificTime := time.Date(2023, time.October, 31, 23, 59, 0, 0, loc)
-
-	// Check if the admin user already exists
-	var count int64
-	db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
-	if count == 0 {
+        adminPassword, err := getEnv("ADMIN_PASSWORD")
+        if err != nil {
+            log.Fatalf("Error retrieving ADMIN_PASSWORD: %v", err)
+        }
+        if adminPassword == "" {
+            log.Fatalf("ADMIN_PASSWORD is set but empty")
+        } else {
+    	    // Check if the admin user already exists
+	    var count int64
+	    db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
+	    if count == 0 {
 		// No admin user found, create one
 		adminUser := models.User{
-			Username:              "admin",
-			DisplayName:           "Administrator",
-			Email:                 "admin@example.com",
-			UserType:              "ADMIN",
-			InitialAccountBalance: config.Economics.User.InitialAccountBalance,
-			AccountBalance:        config.Economics.User.InitialAccountBalance,
-			ApiKey:                "NONE",
-			PersonalEmoji:         "NONE",
-			Description:           "Administrator",
-			MustChangePassword:    false,
+		    Username:              "admin",
+		    DisplayName:           "Administrator",
+                    Email:                 "admin@example.com",
+		    UserType:              "ADMIN",
+		    InitialAccountBalance: config.Economics.User.InitialAccountBalance,
+		    AccountBalance:        config.Economics.User.InitialAccountBalance,
+		    ApiKey:                "NONE",
+		    PersonalEmoji:         "NONE",
+		    Description:           "Administrator",
+		    MustChangePassword:    false,
 		}
 
-		adminUser.HashPassword(os.Getenv("ADMIN_PASSWORD"))
+		    adminUser.HashPassword(adminPassword)
 
-		db.Create(&adminUser)
-		// Then, update the CreatedAt field for debugging purposes
-		db.Model(&adminUser).Update("CreatedAt", specificTime)
-
-	}
+		    db.Create(&adminUser)
+	    }
+        }
 
 }
 
