@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"fmt"
 	"log"
         "os"
 	"socialpredict/models"
@@ -11,10 +12,11 @@ import (
 )
 
 func getEnv(key string) (string, error) {
-    if value, ok := os.LookupEnv(key); ok {
-        return value, nil
+    value, ok := os.LookupEnv(key)
+    if !ok {
+        return "", fmt.Errorf("environment variable %s not set", key)
     }
-    return "", log.Fatalf("Environment variable %s not set", key)
+    return value, nil
 }
 
 func SeedUsers(db *gorm.DB) {
