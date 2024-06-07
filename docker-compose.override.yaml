@@ -5,6 +5,8 @@ services:
   db:
     networks:
       - custom_network
+    ports:
+      - "${DB_PORT}:${POSTGRES_PORT}"
 
   backend:
     environment:

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Define variables
+SERVICE_NAME="socialpredict"
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
+WORKING_DIRECTORY="./"
+SCRIPT_PATH="$WORKING_DIRECTORY/compose-prod"
+
+# Check if running as root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "This script must be run as root" 1>&2
+    exit 1
+fi
+
+# Create systemd service file
+echo "Creating systemd service file at $SERVICE_FILE"
+cat <<EOF > $SERVICE_PROJECT_FILE
+[Unit]
+Description=Docker Compose Service for $SERVICE_NAME
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=$WORKING_DIRECTORY
+ExecStart=$SCRIPT_PATH up -d
+ExecStop=$SCRIPT_PATH down
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd to apply new changes
+echo "Reloading systemd daemon..."
+systemctl daemon-reload
+
+# Enable the service
+echo "Enabling $SERVICE_NAME service..."
+systemctl enable $SERVICE_NAME
+
+# Start the service
+echo "Starting $SERVICE_NAME service..."
+systemctl start $SERVICE_NAME
+
+echo "$SERVICE_NAME service setup completed."

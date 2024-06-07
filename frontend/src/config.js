@@ -1,2 +1,2 @@
 export const DOMAIN_URL = 'https://brierfoxforecast.com';
-export const API_URL = 'http://localhost:8089';
+export const API_URL = 'http://brierfoxforecast.com';

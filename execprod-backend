@@ -1,0 +1,3 @@
+#!/bin/bash
+
+docker exec -it "${BACKEND_CONTAINER_NAME}" /bin/bash

@@ -3,8 +3,6 @@
 set -e  # Stop script on error
 set -a  # Automatically export all variables
 
-source .env  # Load environment variables from .env file
-
 # Function to check if a command exists
 command_exists() {
     type "$1" &> /dev/null
@@ -15,10 +13,10 @@ run_docker_compose() {
     if command_exists docker-compose; then
         echo "Using docker-compose..."
         # No need for --env-file here as docker-compose picks .env by default
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+        docker-compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d
     elif command_exists docker && docker compose version &> /dev/null; then
         echo "Using docker compose..."
-        docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d
+        docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d
     else
         echo "Error: Docker Compose is not installed."
         exit 1
