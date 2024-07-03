@@ -241,3 +241,8 @@ root@breirfoxforecast-alpha:/home# git clone https://github.com/openpredictionma
 https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-22-04
 
 
+
+
+### Configure config.js Domains
+
+Make sure to mention config.js Domains to configure.
