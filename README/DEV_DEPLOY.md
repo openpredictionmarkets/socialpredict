@@ -202,9 +202,11 @@ dig yourdomain.com
 
 ### Create a Firewall
 
+* Firewalls are ways to restrict port accesses to only a narrow number of ports, or one port for a given purpose.
+
 https://docs.digitalocean.com/products/networking/firewalls/how-to/create/#create-a-firewall-using-the-control-panel
 
-HTTP and HTTPS:
+#### HTTP and HTTPS:
 
 * Use port 80 for HTTP.
 * HTTPS (HTTP Secure) is the secure version of HTTP, encrypted using TLS (SSL). Use port 443 for HTTPS.
@@ -228,17 +230,162 @@ root@breirfoxforecast-alpha:/home# git clone https://github.com/openpredictionma
 ### Set Up Environmental Variables for Ports
 
 
+* We have a script designed to inject environmental variables into your environment after having manually written them into a file.
+* It is important to not ever leak environmental variable values into your socialpredict repo itself, to anywhere that has git, so that you can't accidentally push them to the internet somewhere.
+* This is not the most secure, ideal practice, a better practice would be to use a secrets manager such as [Infisical](https://infisical.com/) or AWS Secrets Manager, but as long as you only manually change your environmental variable file locally on the Digital Ocean machine you're using for deployment, it should be fine.
+
+#### Elements of Automatically Injecting Environmental Variables
+
+* The env file should have the following values set:
+
+```
+BACKEND_IMAGE_NAME=socialpredict-backend-prod
+BACKEND_CONTAINER_NAME=socialpredict-backend-container-prod
+BACKEND_PORT=8080
+BACKEND_HOSTPORT=8086
+POSTGRES_CONTAINER_NAME=db-postgres-container-prod
+DB_PORT=5433
+DB_HOST=db
+POSTGRES_PORT=5432
+POSTGRES_USER={set custom value}
+POSTGRES_PASSWORD={set custom value}
+POSTGRES_DATABASE=proddb
+FRONTEND_IMAGE_NAME=socialpredict-frontend-prod
+FRONTEND_CONTAINER_NAME=socialpredict-frontend-container-prod
+REACT_PORT=5173
+REACT_HOSTPORT=5173
+NGINX_IMAGE_NAME=socialpredict-nginx-prod
+NGINX_CONTAINER_NAME=socialpredict-nginx-container-prod
+NGINX_PORT=80
+NGINX_HOSTPORT=80
+SSLPORT=443
+ADMIN_PASSWORD={set custom value}
+```
+
+* Then an executable env-writer file could look like this, and be activated with `./env-writer` to push all of the environment variables into the environment.
+
+```
+#!/bin/bash
+
+echo "Make sure to run 'source env_writer rather than ./env_writer to properly source variables."
+
+ENV_FILE="envfile"
+
+# Read each line from the environment file
+while IFS='=' read -r key value
+do
+  # Prepare the export command
+  echo "export $key=\"$value\"" >> ~/.bashrc
+
+  # Log the export to the terminal
+  echo "Appended 'export $key=\"$value\"' to ~/.bashrc"
+done < "$ENV_FILE"
+
+echo "Run 'source ~/.bashrc' to load the new environment variables."
+```
 
 
 ### Setting Up NGINX Production System
 
+* Rather than creating an NGNX dockerfile with a nginx.conf file that is already hard-written, it's easier to just mount a nginx.conf file to the container, so that it can be tweaked as necessary to make it work.
+* So within the docker-compose. file we mount our `nginx/nginx.conf` file to `/etc/nginx/nginx.conf` within the nginx docker container like so:
 
+```
+  nginx:
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+    environment:
+      - ENVIRONMENT=production
+    volumes:
+      - "${PWD}/nginx/nginx.conf:/etc/nginx/nginx.conf"
+      # we may mount static asssets here in the future
+    networks:
+      - database_network
+      - frontend_network
+```
 
+Then, the nginx.conf file itself should look like the following, in order to get HTTP working:
 
+```
+events {
+    worker_connections 1024;
+}
+
+http {
+    server {
+        listen 80;
+        listen [::]:80;
+
+        server_name brierfoxforecast.com www.brierfoxforecast.com;
+
+        # the following would redirect all http to https
+        # return 301 https://$host$request_uri;
+
+        # serve the frontend
+        location / {
+            # Docker DNS
+            resolver 127.0.0.11 valid=30s;
+            proxy_pass http://frontend:5173/;
+            proxy_redirect default;
+        }
+
+        # serve the backend
+        location /api/ {
+            # Docker DNS
+            resolver 127.0.0.11 valid=30s;
+            proxy_pass http://backend:8080/;
+            proxy_redirect default;
+        }
+    }
+}
+```
 
 ### Secure NGinx with SSL
 
+Follow the following guide, ensuring that you install certbot, etc.
+
 https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-22-04
+
+
+However, for the ufw status, the firewall, whereas in the DigitalOcean documentation you typically have:
+
+```
+Output
+Status: active
+
+To                         Action      From
+--                         ------      ----
+OpenSSH                    ALLOW       Anywhere
+Nginx HTTP                 ALLOW       Anywhere
+OpenSSH (v6)               ALLOW       Anywhere (v6)
+Nginx HTTP (v6)            ALLOW       Anywhere (v6)
+```
+
+For us, we typically should have `ufw status`
+
+```
+sudo ufw status
+Status: active
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     LIMIT       Anywhere
+2375/tcp                   ALLOW       Anywhere
+2376/tcp                   ALLOW       Anywhere
+22/tcp (v6)                LIMIT       Anywhere (v6)
+2375/tcp (v6)              ALLOW       Anywhere (v6)
+2376/tcp (v6)              ALLOW       Anywhere (v6)
+```
+
+To interpret these:
+
+* 22/tcp LIMIT Anywhere: Limits incoming connections to port 22 (typically used for SSH) from any IP address. The LIMIT action is often used to reduce the risk of brute-force attacks by limiting the number of connections allowed over a period of time.
+* 2375/tcp ALLOW Anywhere: Allows incoming connections to port 2375 (often used by Docker) from any IP address.
+* 2376/tcp ALLOW Anywhere: Allows incoming connections to port 2376 (also often used by Docker, typically for encrypted connections) from any IP address.
+* the v6 indicates ipv6 as opposed to ipv4.
 
 
 
@@ -246,3 +393,5 @@ https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-
 ### Configure config.js Domains
 
 Make sure to mention config.js Domains to configure.
+
+### Restarting SocialPredict Upon Upgrade
