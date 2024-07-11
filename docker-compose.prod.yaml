@@ -26,6 +26,8 @@ services:
       - "${REACT_HOSTPORT}:${REACT_PORT}"
 
   nginx:
+    network_mode: host
+    restart: always
     ports:
       - target: 80
         published: 80
@@ -33,16 +35,33 @@ services:
         mode: host
     environment:
       - ENVIRONMENT=production
+      #- DOMAIN="${DOMAIN}"
     volumes:
       - "${PWD}/nginx/nginx.conf:/etc/nginx/nginx.conf"
+      #- ./webroot:/var/www/gatekeeper
+      #- cert_data:/etc/letsencrypt
+      #- challenge:/var/www/challenge
       # we may mount static asssets here in the future
     networks:
       - database_network
       - frontend_network
 
+  #certbot:
+  #  image: certbot/certbot
+  #  volumes:
+  #    - cert_data:/etc/letsencrypt
+  #    - cert_logs:/var/lib/letsencrypt
+  #    - challenge:/var/www/challenge
+  #  command: renew
+  #  depends_on:
+  #    - nginx
+
 volumes:
   postgres_data:
     driver: local
+  cert_data:
+  cert_logs:
+  challenge:
 
 networks:
   database_network:
