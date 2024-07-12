@@ -1,9 +1,0 @@
-#!/bin/bash
-
-echo "This script assumes environment variables have already been properly set."
-
-# Determine the script's directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-# Build the Docker image
-docker build --progress=plain --no-cache -t "${FRONTEND_IMAGE_NAME}" -f "${SCRIPT_DIR}/frontend.Dockerfile" "${SCRIPT_DIR}"

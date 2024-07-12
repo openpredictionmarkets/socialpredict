@@ -4,7 +4,7 @@ FROM golang:1.21-bookworm
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 # Install Dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --allow-downgrades \
     inotify-tools=3.22.6.0-4             \
     openssl=3.0.11-1~deb12u2
 

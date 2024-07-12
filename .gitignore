@@ -22,3 +22,12 @@ go.work
 
 # Mac Stuff
 .DS_Store
+
+# Env File
+.env
+
+# Data files
+**/data/certbot
+**/data/postgres
+
+.first_run

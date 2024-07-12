@@ -1,0 +1,123 @@
+#!/bin/bash
+
+#################################################################
+#                                                               #
+# Script By Vasileios Ntoufoudis                                #
+# info@ntoufoudis.com                                           #
+#                                                               #
+#################################################################
+
+set -e # Stop script on error
+set -a # Automatically export all variables
+
+# Determine script's directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Calculate the absolute path to the .env file
+ENV_PATH="$( readlink -f "$SCRIPT_DIR/.env" )"
+ENV_FILE="--env-file $ENV_PATH"
+DOCKER_SSL="--file $( readlink -f "$SCRIPT_DIR/scripts/docker-compose-ssl.yaml" )"
+
+# Function to check if a command exists
+command_exists() {
+        type "$1" &> /dev/null
+}
+
+# Function to check if Docker && Docker Compose are installed
+docker_check() {
+        if command_exists docker-compose; then
+                echo "Error: Found docker-compose V1. Please update to V2."
+                echo "https://docs.docker.com/compose/migrate/"
+                exiit 1
+        elif command_exists docker && docker compose version &> /dev/null; then
+                echo "Found docker compose."
+                COMPOSE='docker compose'
+        else
+                echo "Error: Docker Compose is not installed."
+                exit 1
+        fi
+}
+
+# Function to Source the .env file
+source_env() {
+        echo "### Searching for .env file ..."
+        if [ -f "$ENV_PATH" ]; then
+                source "$ENV_PATH"
+                echo ".env file found."
+        else
+                echo "Error: .env file not found."
+                exit 1
+        fi
+}
+
+if [ "$1" = "install" ]; then
+	# Echo initial message
+	echo "### Building and Deploying SocialPredict ..."
+	echo
+	sleep 1;
+
+	# Check that docker is installed
+	echo "### Checking that docker compose is installed ..."
+	docker_check
+	echo
+	sleep 1;
+
+	# Check if script runs for the first time
+	if [[ ! -f "$SCRIPT_DIR/.first_run" ]]; then
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source ./scripts/env_writer.sh
+		unset CALLED_FROM_SOCIALPREDICT
+	fi
+
+	source_env
+
+	echo
+	sleep 1;
+
+	# Check if backend image exists
+	echo "Searching for Backend Image ..."
+	sleep 1;
+
+	export CALLED_FROM_SOCIALPREDICT=yes
+	source ./scripts/build.sh
+	unset CALLED_FROM_SOCIALPREDICT
+
+	# Issue SSL Certificate for ${DOMAIN}
+	echo "Using Domain ${DOMAIN} for the deployment."
+	sleep 1;
+	export CALLED_FROM_SOCIALPREDICT=yes
+	source ./scripts/ssl.sh
+	unset CALLED_FROM_SOCIALPREDICT
+
+	# Build rest of the images
+	$COMPOSE $ENV_FILE --file "./scripts/docker-compose-prod.yaml" pull
+fi
+
+# Run Docker Exec
+if [ "$1" = "exec" ]; then
+	source_env
+	export CALLED_FROM_SOCIALPREDICT=yes
+	if [ -z "$3" ]; then
+		source ./scripts/exec.sh "$2"
+	else
+		source ./scripts/exec.sh "$2" "$3"
+	fi
+	
+	unset CALLED_FROM_SOCIALPREDICT
+fi
+
+# Run docker compose up
+if [ "$1" = "up" ]; then
+	source_env
+	export CALLED_FROM_SOCIALPREDICT=yes
+	source ./scripts/compose.sh up -d
+	unset CALLED_FROM_SOCIALPREDICT
+fi
+
+# Run docker compose down
+if [ "$1" = "down" ]; then
+	source_env
+	export CALLED_FROM_SOCIALPREDICT=yes
+	source ./scripts/compose.sh down
+	unset CALLED_FROM_SOCIALPREDICT
+fi

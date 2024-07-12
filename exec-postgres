@@ -1,5 +1,0 @@
-#!/bin/bash
-
-source .env.dev
-
-docker exec -it "${POSTGRES_CONTAINER_NAME}" psql --username "${POSTGRES_USER}" --dbname "devdb"
