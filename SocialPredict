@@ -1,12 +1,5 @@
 #!/bin/bash
 
-#################################################################
-#                                                               #
-# Script By Vasileios Ntoufoudis                                #
-# info@ntoufoudis.com                                           #
-#                                                               #
-#################################################################
-
 set -e # Stop script on error
 set -a # Automatically export all variables
 

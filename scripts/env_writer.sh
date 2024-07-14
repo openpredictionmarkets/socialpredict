@@ -1,12 +1,5 @@
 #!/bin/bash
 
-#################################################################
-#                                                               #
-# Script By Vasileios Ntoufoudis                                #
-# info@ntoufoudis.com                                           #
-#                                                               #
-#################################################################
-
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
