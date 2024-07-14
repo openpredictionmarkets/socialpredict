@@ -18,6 +18,7 @@ services:
     restart: always
 
   certbot:
+    container_name: "{CERTBOT_CONTAINER_NAME}"
     image: certbot/certbot:latest
     volumes:
       - ../data/certbot/conf:/etc/letsencrypt

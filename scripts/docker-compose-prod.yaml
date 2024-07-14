@@ -82,6 +82,7 @@ services:
       - frontend
 
   certbot:
+    container_name: "${CERTBOT_CONTAINER_NAME}"
     image: certbot/certbot:latest
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     volumes:
