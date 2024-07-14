@@ -83,7 +83,7 @@ if [ "$1" = "install" ]; then
 	unset CALLED_FROM_SOCIALPREDICT
 
 	# Build rest of the images
-	$COMPOSE $ENV_FILE --file "./scripts/docker-compose-prod.yaml" pull
+#	$COMPOSE $ENV_FILE --file "./scripts/docker-compose-prod.yaml" pull
 fi
 
 # Run Docker Exec
