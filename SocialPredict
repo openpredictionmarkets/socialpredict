@@ -55,6 +55,27 @@ if [ "$1" = "install" ]; then
 	echo
 	sleep 1;
 
+	# Ask user input for Application Environment
+	echo "### Select Application Envrionment: "
+	PS3='Please enter your choice: '
+	options=("Development" "Production" "Quit")
+	select opt in "${options[@]}"
+	do
+		case $opt in
+			"Development")
+				echo "Development"
+				;;
+			"Production")
+				echo "Production"
+				;;
+			"Quit")
+				break
+				;;
+			*) echo "Invalid option $REPLY";;
+		esac
+	done
+	exit
+
 	# Check if script runs for the first time
 	if [[ ! -f "$SCRIPT_DIR/.first_run" ]]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
