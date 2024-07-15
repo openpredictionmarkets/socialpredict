@@ -33,10 +33,8 @@ docker_check() {
 
 # Function to Source the .env file
 source_env() {
-        echo "### Searching for .env file ..."
         if [ -f "$ENV_PATH" ]; then
                 source "$ENV_PATH"
-                echo ".env file found."
         else
                 echo "Error: .env file not found."
                 exit 1
@@ -63,7 +61,13 @@ if [ "$1" = "install" ]; then
 	do
 		case $opt in
 			"Development")
-				echo "Development"
+				echo
+				echo "Building for Development"
+				echo
+				export CALLED_FROM_SOCIALPREDICT=yes
+				source ./scripts/dev.sh
+				unset CALLED_FROM_SOCIALPREDICT
+				break
 				;;
 			"Production")
 				echo "Building for Production"
@@ -96,15 +100,27 @@ fi
 # Run docker compose up
 if [ "$1" = "up" ]; then
 	source_env
-	export CALLED_FROM_SOCIALPREDICT=yes
-	source ./scripts/compose.sh up -d
-	unset CALLED_FROM_SOCIALPREDICT
+	if [ "${APP_ENV}" = "development" ]; then
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" up -d
+		unset CALLED_FROM_SOCIALPREDICT
+	else
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh up -d"
+		unset CALLED_FROM_SOCIALPREDICT
+	fi
 fi
 
 # Run docker compose down
 if [ "$1" = "down" ]; then
 	source_env
-	export CALLED_FROM_SOCIALPREDICT=yes
-	source ./scripts/compose.sh down
-	unset CALLED_FROM_SOCIALPREDICT
+	if [ "${APP_ENV}" = "development" ]; then
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" down
+		unset CALLED_FROM_SOCIALPREDICT
+	else
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source ./scripts/compose.sh down
+		unset CALLED_FROM_SOCIALPREDICT
+	fi
 fi

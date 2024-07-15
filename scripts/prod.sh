@@ -24,10 +24,7 @@ source_env
 echo
 sleep 1;
 
-# Check if backend image exists
-echo "Searching for Backend Image ..."
-sleep 1;
-
+# Build Docker Images
 export CALLED_FROM_SOCIALPREDICT=yes
 source ./scripts/build.sh
 unset CALLED_FROM_SOCIALPREDICT

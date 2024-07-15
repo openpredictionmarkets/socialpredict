@@ -57,6 +57,26 @@ services:
     depends_on:
       - backend
 
+  webserver:
+    container_name: "${NGINX_CONTAINER_NAME}"
+    image: nginx:latest
+    environment:
+      ENVIRONMENT: ${APP_ENV}
+      BACKEND_PORT: ${BACKEND_PORT}
+      FRONTEND_PORT: ${REACT_PORT}
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ../data/nginx/vhosts/dev:/etc/nginx/templates/
+    restart: always
+    networks:
+      - database_network
+      - frontend_network
+    depends_on:
+      - backend
+      - frontend
+
 networks:
   database_network:
     driver: bridge

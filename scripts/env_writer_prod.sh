@@ -27,7 +27,7 @@ do
 done
 
 # Change the Domain setting:
-sed -i -e "s/DOMAIN=.*/DOMAIN=$domain_answer/g" .env
+sed -i -e "s/DOMAIN=.*/DOMAIN='$domain_answer'/g" .env
 echo "Setting DOMAIN to: $domain_answer"
 
 echo
@@ -41,7 +41,7 @@ do
 done
 
 # Change the Email setting:
-sed -i -e "s/EMAIL=.*/EMAIL=$email_answer/g" .env
+sed -i -e "s/EMAIL=.*/EMAIL='$email_answer'/g" .env
 echo "Setting EMAIL to: $email_answer"
 
 echo
@@ -50,7 +50,7 @@ echo
 read -r -p "Specify username for the Database User. (default: user) " db_user_answer
 if [ ! -z "$db_user_answer" ]; then
 	# Change DB User:
-	sed -i -e "s/POSTGRES_USER=.*/POSTGRES_USER=$db_user_answer/g" .env
+	sed -i -e "s/POSTGRES_USER=.*/POSTGRES_USER='$db_user_answer'/g" .env
 	echo "Setting Database User to: $db_user_answer"
 fi
 
@@ -60,7 +60,7 @@ echo
 read -r -p "Specify password for the Database User. (default: password) " db_pass_answer
 if [ ! -z "$db_pass_answer" ]; then
 	# Change DB Password:
-	sed -i -e "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$db_pass_answer/g" .env
+	sed -i -e "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD='$db_pass_answer'/g" .env
 	echo "Setting Database Password to: $db_pass_answer"
 fi
 
@@ -70,7 +70,7 @@ echo
 read -r -p "Specify the name for the Database. (default: socialpredict_db) " db_name_answer
 if [ ! -z "$db_name_answer" ]; then
 	# Change DB Name:
-	sed -i -e "s/POSTGRES_DATABASE=.*/POSTGRES_DATABASE=$db_name_answer/g" .env
+	sed -i -e "s/POSTGRES_DATABASE=.*/POSTGRES_DATABASE='$db_name_answer'/g" .env
 	echo "Setting Database Password to: $db_name_answer"
 fi
 
@@ -80,7 +80,7 @@ echo
 read -r -p "Specify the password for the Admin User. (default: adminpass) " admin_pass_answer
 if [ ! -z "$admin_pass_answer" ]; then
 	# Change Admin Password:
-	sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=$admin_pass_answer/g" .env
+	sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='$admin_pass_answer'/g" .env
 	echo "Setting Admin Password to: $admin_pass_answer"
 fi
 

@@ -81,3 +81,6 @@ fi
 echo
 sleep 1;
 
+echo "Images built."
+echo "Use "./SocialPredict up" to start the containers"
+echo "And "./SocialPredict down" to stop them."
