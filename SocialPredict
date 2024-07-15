@@ -9,7 +9,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Calculate the absolute path to the .env file
 ENV_PATH="$( readlink -f "$SCRIPT_DIR/.env" )"
 ENV_FILE="--env-file $ENV_PATH"
-DOCKER_SSL="--file $( readlink -f "$SCRIPT_DIR/scripts/docker-compose-ssl.yaml" )"
 
 # Function to check if a command exists
 command_exists() {
@@ -65,14 +64,16 @@ if [ "$1" = "install" ]; then
 				echo "Building for Development"
 				echo
 				export CALLED_FROM_SOCIALPREDICT=yes
-				source ./scripts/dev.sh
+				source "$SCRIPT_DIR/scripts/dev.sh"
 				unset CALLED_FROM_SOCIALPREDICT
 				break
 				;;
 			"Production")
+				echo
 				echo "Building for Production"
+				echo
 				export CALLED_FROM_SOCIALPREDICT=yes
-				source ./scripts/prod.sh
+				source "$SCRIPT_DIR/scripts/prod.sh"
 				unset CALLED_FROM_SOCIALPREDICT
 				break
 				;;
@@ -104,10 +105,13 @@ if [ "$1" = "up" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
 		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" up -d
 		unset CALLED_FROM_SOCIALPREDICT
-	else
+	elif [ "${APP_ENV}" = "production" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh up -d"
+		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" up -d
 		unset CALLED_FROM_SOCIALPREDICT
+	else
+		echo "Wrong Application Environment in .env"
+		exit 1
 	fi
 fi
 
@@ -118,9 +122,12 @@ if [ "$1" = "down" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
 		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" down
 		unset CALLED_FROM_SOCIALPREDICT
-	else
+	elif [ "${APP_ENV}" = "production" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
-		source ./scripts/compose.sh down
+		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" down
 		unset CALLED_FROM_SOCIALPREDICT
+	else
+		echo "Wrong Application Environment in .env"
+		exit 1
 	fi
 fi

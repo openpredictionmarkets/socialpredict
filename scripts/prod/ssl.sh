@@ -3,17 +3,6 @@
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
-
-DOCKERFILE="--file $DOCKER_SSL"
-
-# Function to replace API_URI in frontend/src/config.js
-frontend_api_uri() {
-        template="$SCRIPT_DIR/frontend/src/config.js.template"
-        file="$SCRIPT_DIR/frontend/src/config.js"
-        export DOMAIN="'https://${DOMAIN}'"
-        envsubst < $template > $file
-}
-
 DATA_PATH="$SCRIPT_DIR/data/certbot"
 
 # Check if files already exist
@@ -42,18 +31,18 @@ fi
 echo "### Creating dummy certificate for ${DOMAIN} ..."
 path="/etc/letsencrypt/live/${DOMAIN}"
 mkdir -p "$DATA_PATH/conf/live/${DOMAIN}"
-$COMPOSE $ENV_FILE $DOCKER_SSL run --rm --entrypoint "\
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-ssl.yaml" run --rm --entrypoint "\
 	openssl req -x509 -nodes -newkey rsa:4096 -days 1 \
 	-keyout '$path/privkey.pem' \
 	-out '$path/fullchain.pem' \
 	-subj '/CN=localhost'" certbot
 echo
 echo "### Starting Webserver ..."
-$COMPOSE $ENV_FILE $DOCKER_SSL up -d webserver
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-ssl.yaml" up -d webserver
 echo
 
 echo "### Deleting dummy certificate for ${DOMAIN} ..."
-$COMPOSE $ENV_FILE $DOCKER_SSL run --rm --entrypoint "\
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-ssl.yaml" run --rm --entrypoint "\
 	rm -Rf /etc/letsencrypt/live/${DOMAIN} && \
 	rm -Rf /etc/letsencrypt/archive/${DOMAIN} && \
 	rm -Rf /etc/letsencrypt/renewal/${DOMAIN}.conf" certbot
@@ -70,7 +59,7 @@ esac
 # Enable staging mode if needed
 if [ ${STAGING} != "0" ]; then staging_arg="--staging"; fi
 
-$COMPOSE $ENV_FILE $DOCKER_SSL run --rm --entrypoint "\
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-ssl.yaml" run --rm --entrypoint "\
 	certbot certonly --webroot -w /var/www/certbot \
 	$staging_arg \
 	$email_arg \
@@ -81,7 +70,4 @@ $COMPOSE $ENV_FILE $DOCKER_SSL run --rm --entrypoint "\
 
 echo
 echo "### Shutting down Webserver ..."
-$COMPOSE $ENV_FILE $DOCKER_SSL down
-
-# Update API_URI in Frontend
-frontend_api_uri
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-ssl.yaml" down

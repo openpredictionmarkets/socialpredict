@@ -7,9 +7,20 @@
 IMAGES=$( docker images -a | awk '{print $1}' )
 IMAGES_ARRAY=($IMAGES// / })
 
+# Function to replace API_URI in frontend/src/config.js
+frontend_api_uri() {
+	template="$SCRIPT_DIR/frontend/src/config.js.template"
+	file="$SCRIPT_DIR/frontend/src/config.js"
+	export DOMAIN="'https://${DOMAIN}'"
+	envsubst < $template > $file
+}
+
 # Function to build frontend image
 build_frontend() {
         echo "### Building Frontend Image ..."
+
+	# Update API_URI
+	frontend_api_uri
 
         # Get frontend directory
         FRONTEND_DIR="$( readlink -f "$SCRIPT_DIR/frontend" )"
@@ -81,3 +92,10 @@ fi
 echo
 sleep 1;
 
+# Pull remaining images
+echo "Pulling remaining images ..."
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-prod.yaml" pull db webserver certbot
+echo
+
+echo "Images built."
+echo
