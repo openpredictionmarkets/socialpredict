@@ -20,7 +20,7 @@ docker_check() {
         if command_exists docker-compose; then
                 echo "Error: Found docker-compose V1. Please update to V2."
                 echo "https://docs.docker.com/compose/migrate/"
-                exiit 1
+                exit 1
         elif command_exists docker && docker compose version &> /dev/null; then
                 echo "Found docker compose."
                 COMPOSE='docker compose'
@@ -94,7 +94,7 @@ if [ "$1" = "exec" ]; then
 	else
 		source ./scripts/exec.sh "$2" "$3"
 	fi
-	
+
 	unset CALLED_FROM_SOCIALPREDICT
 fi
 
