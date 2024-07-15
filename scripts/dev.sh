@@ -7,7 +7,7 @@
 frontend_api_uri() {
 	template="$SCRIPT_DIR/frontend/src/config.js.template"
 	file="$SCRIPT_DIR/frontend/src/config.js"
-	export DOMAIN="'http://localhost'"
+	export API_DOMAIN="'http://localhost'"
 	envsubst < $template > $file
 }
 

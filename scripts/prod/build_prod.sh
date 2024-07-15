@@ -11,7 +11,7 @@ IMAGES_ARRAY=($IMAGES// / })
 frontend_api_uri() {
 	template="$SCRIPT_DIR/frontend/src/config.js.template"
 	file="$SCRIPT_DIR/frontend/src/config.js"
-	export DOMAIN="'https://${DOMAIN}'"
+	export API_DOMAIN="'https://${DOMAIN}'"
 	envsubst < $template > $file
 }
 
