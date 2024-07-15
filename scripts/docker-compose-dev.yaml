@@ -1,0 +1,85 @@
+services:
+
+  db:
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    image: postgres
+    environment:
+      ENVIRONMENT: ${APP_ENV}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+    volumes:
+      - ../data/postgres:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT}:${POSTGRES_PORT}"
+    networks:
+      - database_network
+
+  backend:
+    container_name: "${BACKEND_CONTAINER_NAME}"
+    image: "${BACKEND_IMAGE_NAME}"
+    environment:
+      ENVIRONMENT: ${APP_ENV}
+      CONTAINER_NAME: ${BACKEND_CONTAINER_NAME}
+      DB_HOST: db
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+    env_file:
+      - ../.env
+    ports:
+      - "${BACKEND_HOSTPORT}:${BACKEND_PORT}"
+    volumes:
+      - ../backend:/backend
+      - ../.env:/backend/.env.dev
+    command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
+    tty: true
+    networks:
+      - database_network
+      - frontend_network
+    depends_on:
+      - db
+
+  frontend:
+    container_name: "${FRONTEND_CONTAINER_NAME}"
+    image: "${FRONTEND_IMAGE_NAME}"
+    environment:
+      ENVIRONMENT: ${APP_ENV}
+    networks:
+      - frontend_network
+    env_file:
+      - ../.env
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    stdin_open: true
+    ports:
+      - "${REACT_HOSTPORT}:${REACT_PORT}"
+    depends_on:
+      - backend
+
+  webserver:
+    container_name: "${NGINX_CONTAINER_NAME}"
+    image: nginx:latest
+    environment:
+      ENVIRONMENT: ${APP_ENV}
+      BACKEND_PORT: ${BACKEND_PORT}
+      FRONTEND_PORT: ${REACT_PORT}
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ../data/nginx/vhosts/dev:/etc/nginx/templates/
+    restart: always
+    networks:
+      - database_network
+      - frontend_network
+    depends_on:
+      - backend
+      - frontend
+
+networks:
+  database_network:
+    driver: bridge
+  frontend_network:
+    driver: bridge
+

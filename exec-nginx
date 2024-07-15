@@ -1,5 +1,0 @@
-#!/bin/bash
-
-source .env.dev
-
-docker exec -it "${NGINX_CONTAINER_NAME}" /bin/bash
