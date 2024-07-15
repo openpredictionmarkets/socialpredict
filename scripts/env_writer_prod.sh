@@ -7,6 +7,10 @@ echo "### First time running the script ..."
 echo "### Let's initialize the appliction ..."
 
 # Create .env file
+if [ -f "$SCRIPT_DIR/.env" ]; then
+       rm -f "$SCRIPT_DIR/.env"
+fi
+
 cp .env.example .env
 
 # Update .env file
@@ -80,7 +84,4 @@ if [ ! -z "$admin_pass_answer" ]; then
 	echo "Setting Admin Password to: $admin_pass_answer"
 fi
 
-touch "$SCRIPT_DIR/.first_run"
-
 echo
-

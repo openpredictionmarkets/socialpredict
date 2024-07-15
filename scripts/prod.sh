@@ -4,10 +4,19 @@
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
 # Check if script runs for the first time
-if [[ ! -f "$SCRIPT_DIR/.first_run" ]]; then
+if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
 	export CALLED_FROM_SOCIALPREDICT=yes
-	source ./scripts/env_writer.sh
+	source ./scripts/env_writer_prod.sh
 	unset CALLED_FROM_SOCIALPREDICT
+else
+	read -p ".env file found. Do you want to re-create it? (y/N) " DECISION
+	if [ "$DECISION" != "Y" ] && [ "$DECISION" != "y" ]; then
+		:
+	else
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source ./scripts/env_writer_prod.sh
+		unset CALLED_FROM_SOCIALPREDICT
+	fi
 fi
 
 source_env
