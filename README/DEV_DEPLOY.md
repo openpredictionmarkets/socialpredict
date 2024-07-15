@@ -395,3 +395,16 @@ To interpret these:
 Make sure to mention config.js Domains to configure.
 
 ### Restarting SocialPredict Upon Upgrade
+
+
+
+### Troubleshooting
+
+#### Cannot Program Address
+
+While attempting to re-build using `./compose-prod` you might find the following form of error:
+
+```
+Error response from daemon: failed to add interface veth17bdc95 to sandbox: error setting interface "veth17bdc95" IP to 172.20.0.4/16: cannot program address 172.20.0.4/16 in sandbox interface because it conflicts with existing route {Ifindex: 163 Dst: 172.20.0.0/16 Src: 172.20.0.1 Gw: <nil> Flags: [] Table: 254 Realm: 0}
+```
+
