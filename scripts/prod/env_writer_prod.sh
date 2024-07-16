@@ -6,7 +6,7 @@
 # Function to check if the password is strong
 check_password_strength() {
     local password=$1
-    if [[ ${#password} -ge 8 && "$password" =~ [A-Za-z] && "$password" =~ [0-9] && "$password" =~ [^A-Za-z0-9] ]]; then
+    if [[ ${#password} -ge 8 ]] && [[ "$password" =~ [A-Za-z] ]] && [[ "$password" =~ [0-9] ]] && [[ "$password" =~ [^A-Za-z0-9] ]]; then
         return 0  # Strong password
     else
         echo "Password must be at least 8 characters long, include letters, numbers, and special characters."
@@ -16,10 +16,10 @@ check_password_strength() {
 
 check_username_strength() {
     local username=$1
-    if [[ ${#username} -ge 5 && "$username" =~ [^A-Za-z0-9] ]]; then
+    if [[ ${#username} -ge 5 ]] && [[ "$username" =~ ^[A-Za-z0-9]+$ ]]; then
         return 0  # Strong username
     else
-        echo "Username must be at least 5 characters long and include special characters."
+        echo "Username must be at least 5 characters."
         return 1  # Not strong enough
     fi
 }
