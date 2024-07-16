@@ -31,52 +31,50 @@ build_backend() {
         echo "Backend Image Built"
 }
 
+check_and_build_image() {
+        local image_name=$1
+        local directory=$2
+        local dockerfile=$3
+
+        echo "### Checking for $image_name Image ..."
+        if docker image inspect "$image_name" > /dev/null 2>&1; then
+                read -p "$image_name Image Found. Do you want to re-build it? (y/N) " decision
+                if [[ "$decision" =~ ^[Yy]$ ]]; then
+                echo "Deleting Image..."
+                docker rmi "$image_name"
+                echo "Image Deleted."
+                else
+                return
+                fi
+        else
+                echo "$image_name Image Not Found."
+        fi
+        echo "Building $image_name now."
+        docker build --no-cache -t "$image_name" -f "$directory/$dockerfile" "$directory"
+        echo "$image_name Image Built"
+}
+
 # Search for images
 echo "### Searching for Docker Images ..."
 sleep 1;
 
-# Check if backend image exists
-echo "Searching for Backend Image ..."
-sleep 1;
-if [[ ${IMAGES_ARRAY[@]} =~ "${BACKEND_IMAGE_NAME}" ]]; then
-        read -p "Backend Image Found. Do you want to re-build it? (y/N) " DECISION
+# Backend and Frontend Image Names
+BACKEND_IMAGE_NAME="socialpredict-backend:latest"
+FRONTEND_IMAGE_NAME="socialpredict-frontend:latest"
 
-	if [ "$DECISION" = "Y" ] || [ "$DECISION" = "y" ]; then
-		echo "Deleting Image..."
-		docker rmi "${BACKEND_IMAGE_NAME}"
-		echo "Image Deleted."
-		echo "Re-building image."
-		build_backend
-	fi
-        sleep 1;
-else
-        echo "Backend Image Not Found."
-        echo "Building now."
-        sleep 1;
-        build_backend
-fi
+# Backend and Frontend Directory Paths
+BACKEND_DIR="$( readlink -f "$SCRIPT_DIR/backend" )"
+FRONTEND_DIR="$( readlink -f "$SCRIPT_DIR/frontend" )"
 
-# Check if frontend image exists
-echo
-echo "Searching for Frontend Image ..."
-if [[ ${IMAGES_ARRAY[@]} =~ "${FRONTEND_IMAGE_NAME}" ]]; then
-        read -p "Frontend Image Found. Do you want to re-build it? (y/N) " DECISION
+# Dockerfile Names
+BACKEND_DOCKERFILE="Dockerfile"
+FRONTEND_DOCKERFILE="Dockerfile"
 
-        if [ "$DECISION" = "Y" ] || [ "$DECISION" = "y" ]; then
-                echo "Deleting Image..."
-                docker rmi "${FRONTEND_IMAGE_NAME}"
-                echo "Image Deleted."
-                echo "Re-building image."
-                build_frontend
-        fi
-        sleep 1;
+# Check and build backend image
+check_and_build_image "$BACKEND_IMAGE_NAME" "$BACKEND_DIR" "$BACKEND_DOCKERFILE"
 
-else
-        echo "Frontend Image Not Found."
-        echo "Building now."
-        sleep 1;
-        build_frontend
-fi
+# Check and build frontend image
+check_and_build_image "$FRONTEND_IMAGE_NAME" "$FRONTEND_DIR" "$FRONTEND_DOCKERFILE"
 
 echo
 sleep 1;

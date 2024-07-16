@@ -3,13 +3,34 @@
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
+# Function to check if the password is strong
+check_password_strength() {
+    local password=$1
+    if [[ ${#password} -ge 8 && "$password" =~ [A-Za-z] && "$password" =~ [0-9] && "$password" =~ [^A-Za-z0-9] ]]; then
+        return 0  # Strong password
+    else
+        echo "Password must be at least 8 characters long, include letters, numbers, and special characters."
+        return 1  # Not strong enough
+    fi
+}
+
+check_username_strength() {
+    local username=$1
+    if [[ ${#username} -ge 5 && "$username" =~ [^A-Za-z0-9] ]]; then
+        return 0  # Strong username
+    else
+        echo "Username must be at least 5 characters long and include special characters."
+        return 1  # Not strong enough
+    fi
+}
+
 # Function to create and update .env file
 init_env() {
 	# Create .env file
 	cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env"
 
 	# Update .env file
-	
+
 	# Update APP_ENV
 	sed -i -e "s/APP_ENV=.*/APP_ENV=production/g" .env
 
@@ -42,42 +63,48 @@ init_env() {
 	echo
 
 	# Update Database User:
-	read -r -p "Specify username for the Database User. (default: user) " db_user_answer
-	if [ ! -z "$db_user_answer" ]; then
-		# Change DB User:
-		sed -i -e "s/POSTGRES_USER=.*/POSTGRES_USER='$db_user_answer'/g" .env
-		echo "Setting Database User to: $db_user_answer"
-	fi
+	while true; do
+		read -r -p "Specify a username for the Database User (default is insecure and not allowed): " db_user_answer
+		if check_username_strength "$db_user_answer"; then
+			sed -i -e "s/POSTGRES_USER=.*/POSTGRES_USER='$db_user_answer'/g" .env
+			echo "Setting Database User to: $db_user_answer"
+			break
+		fi
+	done
 
 	echo
 
 	# Update Database User Password:
-	read -r -p "Specify password for the Database User. (default: password) " db_pass_answer
-	if [ ! -z "$db_pass_answer" ]; then
-		# Change DB Password:
-		sed -i -e "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD='$db_pass_answer'/g" .env
-		echo "Setting Database Password to: $db_pass_answer"
-	fi
+	while true; do
+		read -r -p "Specify password for the Database User (default is insecure and not allowed): " db_pass_answer
+		if check_password_strength "$db_pass_answer"; then
+			sed -i -e "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD='$db_pass_answer'/g" .env
+			echo "Setting Database Password to: $db_pass_answer"
+			break
+		fi
+	done
 
 	echo
 
 	# Update Database Name:
-	read -r -p "Specify the name for the Database. (default: socialpredict_db) " db_name_answer
-	if [ ! -z "$db_name_answer" ]; then
-		# Change DB Name:
-		sed -i -e "s/POSTGRES_DATABASE=.*/POSTGRES_DATABASE='$db_name_answer'/g" .env
-		echo "Setting Database Password to: $db_name_answer"
+	read -r -p "Specify the name for the Database (default: socialpredict_db): " db_name_answer
+	if [ -z "$db_name_answer" ]; then
+		db_name_answer="socialpredict_db"  # Default value if no input
 	fi
+	sed -i -e "s/POSTGRES_DATABASE=.*/POSTGRES_DATABASE='$db_name_answer'/g" .env
+	echo "Setting Database Name to: $db_name_answer"
 
 	echo
 
 	# Update Admin Password:
-	read -r -p "Specify the password for the Admin User. (default: adminpass) " admin_pass_answer
-	if [ ! -z "$admin_pass_answer" ]; then
-		# Change Admin Password:
-		sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='$admin_pass_answer'/g" .env
-		echo "Setting Admin Password to: $admin_pass_answer"
-	fi
+	while true; do
+		read -r -p "Specify the password for the Admin User (default is insecure and not allowed): " admin_pass_answer
+		if check_password_strength "$admin_pass_answer"; then
+			sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='$admin_pass_answer'/g" .env
+			echo "Setting Admin Password to: $admin_pass_answer"
+			break
+		fi
+	done
 
 }
 
