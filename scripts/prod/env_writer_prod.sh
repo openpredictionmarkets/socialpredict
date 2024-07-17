@@ -66,7 +66,7 @@ init_env() {
 	while true; do
 		read -r -p "Specify a username for the Database User (default is insecure and not allowed): " db_user_answer
 		if check_username_strength "$db_user_answer"; then
-			sed -i -e "s/POSTGRES_USER=.*/POSTGRES_USER='$db_user_answer'/g" .env
+			sed -i -e "s/POSTGRES_USER=.*/POSTGRES_USER='${db_user_answer//&/\\&}'/g" .env
 			echo "Setting Database User to: $db_user_answer"
 			break
 		fi
@@ -78,7 +78,7 @@ init_env() {
 	while true; do
 		read -r -p "Specify password for the Database User (default is insecure and not allowed): " db_pass_answer
 		if check_password_strength "$db_pass_answer"; then
-			sed -i -e "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD='$db_pass_answer'/g" .env
+			sed -i -e "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD='${db_pass_answer//&/\\&}'/g" .env
 			echo "Setting Database Password to: $db_pass_answer"
 			break
 		fi
@@ -91,7 +91,7 @@ init_env() {
 	if [ -z "$db_name_answer" ]; then
 		db_name_answer="socialpredict_db"  # Default value if no input
 	fi
-	sed -i -e "s/POSTGRES_DATABASE=.*/POSTGRES_DATABASE='$db_name_answer'/g" .env
+	sed -i -e "s/POSTGRES_DATABASE=.*/POSTGRES_DATABASE='${db_name_answer//&/\\&}'/g" .env
 	echo "Setting Database Name to: $db_name_answer"
 
 	echo
@@ -100,7 +100,7 @@ init_env() {
 	while true; do
 		read -r -p "Specify the password for the Admin User (default is insecure and not allowed): " admin_pass_answer
 		if check_password_strength "$admin_pass_answer"; then
-			sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='$admin_pass_answer'/g" .env
+			sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='${admin_pass_answer//&/\\&}'/g" .env
 			echo "Setting Admin Password to: $admin_pass_answer"
 			break
 		fi
