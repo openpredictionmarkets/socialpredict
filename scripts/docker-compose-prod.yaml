@@ -70,7 +70,7 @@ services:
       - 80:80
       - 443:443
     volumes:
-      - ../data/nginx/vhosts:/etc/nginx/templates/
+      - ../data/nginx/vhosts/prod:/etc/nginx/templates/
       - ../data/certbot/conf:/etc/letsencrypt
       - ../data/certbot/www:/var/www/certbot
     restart: always
