@@ -15,19 +15,16 @@ import (
 	"github.com/rs/cors"
 )
 
-
 func Start() {
 	// CORS handler
-        c := cors.New(cors.Options{
-        AllowedOrigins: []string{
-            "https://brierfoxforecast.com",
-            "https://www.brierfoxforecast.com",
-            "http://localhost",
-        },
-        AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-        AllowedHeaders: []string{"Content-Type", "Authorization"},
-        AllowCredentials: true,
-        })
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{
+			"http://localhost:8089",
+		},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+	})
 
 	// Initialize mux router
 	router := mux.NewRouter()
