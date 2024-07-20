@@ -1,5 +1,16 @@
 # To-Do List for the SocialPredict script:
 
+### Essential
+
+* Passing criteria for this ticket has not been established. We still are unable to have a working `https` deployment in which we can access the backend at for example `/api/vp/home`. We have only been able to either do `http` and access the backend previous to this project starting having used the reverse nginx proxy or access the backend on dev. Suggest mounting an nginx.conf file to customize the reverse proxy.
+
+https://github.com/openpredictionmarkets/socialpredict/pull/202
+
+* Rationale...without the ability to deploy to prod in a controlled way, it will take a lot of manual work to allow our admin users to deploy and start experimenting with their own instances on the web...they can only currently do it on local. The idea is that we want multiple admins who can invite multiple of their own users, and their users filter up complaints which turn into tickets on the repo. Currently there is a bottleneck in getting feedback.
+* Things like backing up the database, renewing SSL, controlling names so everything looks cleaner, convenience functions will in fact help us a great deal later on when we have many admins making multiple deployments, but before we get to that point, we need to enable admins to deploy in the first place.
+
+### Nice to Have
+
 1. Fix certbot docker network on SSL initialization: - Only for Production.
    * Currently when certbot is run for the first time to generate a new certificate, it generate a random-named network in docker. Change this network name and make sure it is deleted when the certificate is issued.
 
@@ -22,7 +33,7 @@
        2. If they answer yes, create a postgres container.
        3. Restore the database with the user provided backup file.
        4. Remove postgres container.
-       5. Continue with the rest of the installation.  
+       5. Continue with the rest of the installation.
 
 7. Add option to remove Docker Images:
    * Add a command like './SocialPredict images remove' that will remove all the images built from docker. It will only remove the images built by our script.
@@ -48,7 +59,7 @@
 14. Add option to add script to user's path:
     * Either add a command or ask user on installation to add SocialPredict script on user's path so it can be run as "SocialPredict" from anywhere instead of using "./SocialPredict" inside the socialpredict folder.
 
-  
+
 15. Add option to backup database in S3:
     * Add option and necessary config files to allow users to backup database to an S3 type storage.
 
@@ -73,4 +84,4 @@
 
 22. Add option to clean up:
     * Add command to remove docker images/networks/volumes and also the posibility to remove all files like a 'unistall' process.
-  
+
