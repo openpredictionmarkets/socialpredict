@@ -15,6 +15,7 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
         try {
             const loginSuccess = await onLogin(username, password);
             if (loginSuccess) {
@@ -22,6 +23,7 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
                 history.push(redirectAfterLogin);
                 window.location.reload(); // this is a hack which goes against the principle of reloading the state
             } else {
+                console.error('Login failed:', response.status, await response.text());
                 setError('Error logging in.');
             }
         } catch (loginError) {

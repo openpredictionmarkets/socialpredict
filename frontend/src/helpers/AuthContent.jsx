@@ -54,7 +54,17 @@ const AuthProvider = ({ children }) => {
                 body: JSON.stringify({ username, password }),
             });
 
-            const data = await response.json();
+            // Check if the response is JSON before attempting to parse it
+            const contentType = response.headers.get("content-type");
+            let data;
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await response.json();
+            } else {
+                data = { message: await response.text() };
+            }
+
+            console.log('Received response:', response.status, data);
+
             if (response.ok) {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);

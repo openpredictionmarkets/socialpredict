@@ -80,7 +80,7 @@ sudo ./SocialPredict install
 * Database User: the name for the database user - Optional (defaults to user)
 * Database User Password: the password for the database user - Optional (defaults to password)
 * Database Name: the name for the database - Optional (defaults to socialpredict_db)
-* Admin Password: the password for the admin user - Optional (defaults to adminpass)
+* Admin Password: the password for the admin user - Optional (defaults to password)
 
 7. Then the script will proceed to build the required images and issue the SSL Certificate for the Domain.
 
