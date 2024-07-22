@@ -1,0 +1,133 @@
+#!/bin/bash
+
+set -e # Stop script on error
+set -a # Automatically export all variables
+
+# Determine script's directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Calculate the absolute path to the .env file
+ENV_PATH="$( readlink -f "$SCRIPT_DIR/.env" )"
+ENV_FILE="--env-file $ENV_PATH"
+
+# Function to check if a command exists
+command_exists() {
+        type "$1" &> /dev/null
+}
+
+# Function to check if Docker && Docker Compose are installed
+docker_check() {
+        if command_exists docker-compose; then
+                echo "Error: Found docker-compose V1. Please update to V2."
+                echo "https://docs.docker.com/compose/migrate/"
+                exit 1
+        elif command_exists docker && docker compose version &> /dev/null; then
+                echo "Found docker compose."
+                COMPOSE='docker compose'
+        else
+                echo "Error: Docker Compose is not installed."
+                exit 1
+        fi
+}
+
+# Function to Source the .env file
+source_env() {
+        if [ -f "$ENV_PATH" ]; then
+                source "$ENV_PATH"
+        else
+                echo "Error: .env file not found."
+                exit 1
+        fi
+}
+
+if [ "$1" = "install" ]; then
+	# Echo initial message
+	echo "### Building and Deploying SocialPredict ..."
+	echo
+	sleep 1;
+
+	# Check that docker is installed
+	echo "### Checking that docker compose is installed ..."
+	docker_check
+	echo
+	sleep 1;
+
+	# Ask user input for Application Environment
+	echo "### Select Application Envrionment: "
+	PS3='Please enter your choice: '
+	options=("Development" "Production" "Quit")
+	select opt in "${options[@]}"
+	do
+		case $opt in
+			"Development")
+				echo
+				echo "Building for Development"
+				echo
+				export CALLED_FROM_SOCIALPREDICT=yes
+				source "$SCRIPT_DIR/scripts/dev.sh"
+				unset CALLED_FROM_SOCIALPREDICT
+				break
+				;;
+			"Production")
+				echo
+				echo "Building for Production"
+				echo
+				export CALLED_FROM_SOCIALPREDICT=yes
+				source "$SCRIPT_DIR/scripts/prod.sh"
+				unset CALLED_FROM_SOCIALPREDICT
+				break
+				;;
+			"Quit")
+				break
+				;;
+			*) echo "Invalid option $REPLY";;
+		esac
+	done
+fi
+
+# Run Docker Exec
+if [ "$1" = "exec" ]; then
+	source_env
+	export CALLED_FROM_SOCIALPREDICT=yes
+	if [ -z "$3" ]; then
+		source ./scripts/exec.sh "$2"
+	else
+		source ./scripts/exec.sh "$2" "$3"
+	fi
+
+	unset CALLED_FROM_SOCIALPREDICT
+fi
+
+# Run docker compose up
+if [ "$1" = "up" ]; then
+	source_env
+	if [ "${APP_ENV}" = "development" ]; then
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" up -d
+		unset CALLED_FROM_SOCIALPREDICT
+	elif [ "${APP_ENV}" = "production" ]; then
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" up -d
+		unset CALLED_FROM_SOCIALPREDICT
+	else
+		echo "Wrong Application Environment in .env"
+		exit 1
+	fi
+fi
+
+# Run docker compose down
+if [ "$1" = "down" ]; then
+	source_env
+	if [ "${APP_ENV}" = "development" ]; then
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" down
+		unset CALLED_FROM_SOCIALPREDICT
+	elif [ "${APP_ENV}" = "production" ]; then
+		export CALLED_FROM_SOCIALPREDICT=yes
+		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" down
+		unset CALLED_FROM_SOCIALPREDICT
+	else
+		echo "Wrong Application Environment in .env"
+		exit 1
+	fi
+fi
