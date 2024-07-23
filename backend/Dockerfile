@@ -4,15 +4,19 @@ FROM golang:1.21-bookworm
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 # Install Dependencies
-RUN apt-get update && apt-get install -y --allow-downgrades \
-    inotify-tools=3.22.6.0-4             \
-    openssl=3.0.11-1~deb12u2
-
+#RUN apt-get update && apt-get install -y --allow-downgrades \
+#    inotify-tools=3.22.6.0-4             
+    
 # Set the Working Directory inside the container
 WORKDIR /backend
 
 # Copy the go.mod and go.sum files
 COPY go.mod go.sum ./
+
+
+RUN go env -w GO111MODULE=on
+RUN go env -w GOPROXY=https://goproxy.cn,direct
+
 
 # Download all dependencies.
 RUN go mod download

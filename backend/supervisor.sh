@@ -26,7 +26,8 @@ start_server
 
 # Keep the script running and wait for file changes
 while true; do
-    inotifywait -e modify -r .
-    stop_server
-    start_server
+    #inotifywait -e modify -r .
+    #stop_server
+    #start_server
+    sleep 1
 done

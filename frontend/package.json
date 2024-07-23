@@ -15,11 +15,10 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^5.3.0",
     "recharts": "^2.10.3",
+    "vite-plugin-commonjs": "^0.10.1",
     "web-vitals": "^2.1.4"
   },
-  "engines": {
-    "node": "21.0.0"
-  },
+  
   "scripts": {
     "start": "vite --host",
     "build": "vite build",
@@ -53,6 +52,7 @@
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.1.7"
+    "vite": "^5.1.7",
+    "vite-plugin-require-transform": "^1.0.21"
   }
 }
