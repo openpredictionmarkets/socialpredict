@@ -34,7 +34,13 @@ Currently, the project is supported on Ubuntu up to 23.10 LTS and MacOS. Windows
 
 #### Entering a Container
 
+##### Database
 
+* Log into the psql service directly:
+
+```
+docker exec -it -e PGPASSWORD=password socialpredict-postgres-container psql -U user -d socialpredict_db
+```
 
 ### Setting Up the Project on Production
 
