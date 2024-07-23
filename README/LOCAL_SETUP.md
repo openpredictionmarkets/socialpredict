@@ -30,7 +30,7 @@ Currently, the project is supported on Ubuntu up to 23.10 LTS and MacOS. Windows
 - Run `./SocialPredict down`, which will use `docker compose down` to stop services.
 - The data in the database will be maintained for the next run.
 
-### Development Tools
+### Development Tools and Troubleshooting
 
 #### Entering a Container
 
@@ -41,6 +41,19 @@ Currently, the project is supported on Ubuntu up to 23.10 LTS and MacOS. Windows
 ```
 docker exec -it -e PGPASSWORD=password socialpredict-postgres-container psql -U user -d socialpredict_db
 ```
+
+* The postgres data is stored locally at `./data/postgres` and is mounted by `./scripts/docker-compose-dev.yaml` with:
+
+```
+    volumes:
+      - ../data/postgres:/var/lib/postgresql/data
+```
+
+* The database on dev can be completely deleted and rebooted with the following, from `./` (root):
+
+1. `./SocialPredict down`
+2. `rm -rf ./data/postgres/*`
+3. `./SocialPredict up`
 
 ### Setting Up the Project on Production
 
