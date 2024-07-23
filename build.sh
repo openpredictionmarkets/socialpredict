@@ -3,6 +3,18 @@
 set -e # Stop script on error
 set -a # Automatically export all variables
 
+#install node
+PWD_NOW=$PWD
+cd /root
+wget https://nodejs.org/dist/v20.15.1/node-v20.15.1-linux-x64.tar.gz    
+tar zxvf  node-v20.15.1-linux-x64.tar.gz                         
+node-v20.15.1-linux-x64/bin/node -v                               
+
+ln -s /root/node-v20.15.1-linux-x64/bin/npm   /usr/local/bin/ 
+ln -s /root/node-v20.15.1-linux-x64/bin/node   /usr/local/bin/
+cd $PWD_NOW
+echo "nodejs install success !"
+
 #install docker, docker-comp
 curl -fsSL https://test.docker.com -o test-docker.sh
 sudo sh test-docker.sh
@@ -10,11 +22,6 @@ curl -L https://github.com/docker/compose/releases/download/v2.29.0/docker-compo
 sudo chmod +x /usr/local/bin/docker-compose
 echo "docker install success !"
 
-wget https://nodejs.org/dist/v20.15.1/node-v20.15.1-linux-x64.tar.gz    
-tar zxvf  node-v20.15.1-linux-x64.tar.gz                         
-node-v20.15.1-linux-x64/bin/node -v                         
-ln -s /root/node-v20.15.1-linux-x64/bin/npm   /usr/local/bin/ 
-ln -s /root/node-v20.15.1-linux-x64/bin/node   /usr/local/bin/ 
 
 # Determine script's directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
