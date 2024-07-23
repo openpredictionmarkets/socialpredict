@@ -1,5 +1,5 @@
 #!/bin/bash
-
+aaaaaaaaaa
 set -e # Stop script on error
 set -a # Automatically export all variables
 
