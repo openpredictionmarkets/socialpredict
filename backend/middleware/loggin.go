@@ -84,6 +84,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Token issued for user: %s", user.Username)
 	log.Printf("Tokenstring: %s", tokenString)
 
+	// Prepare to send JSON
+	w.Header().Set("Content-Type", "application/json")
+
 	// Send token, username, and usertype in the response
 	responseData := map[string]interface{}{
 		"token":              tokenString,

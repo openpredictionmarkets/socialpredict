@@ -12,27 +12,24 @@ import (
 
 func main() {
 
-	// Secure routes
 	http.Handle("/secure", middleware.Authenticate(http.HandlerFunc(secureEndpoint)))
 
-	// Load environment variables
 	err := util.GetEnv()
 	if err != nil {
 		log.Fatalf("Failed to load environment variables: %v", err)
 	}
 
-	// Initialize the database connection
 	util.InitDB()
 
-	// Now you can safely use the database connection
 	db := util.GetDB()
 
-	// Migrate the database
+	if err := seed.EnsureDBReady(db, 20); err != nil {
+		log.Fatalf("Database readiness check failed: %v", err)
+	}
+
 	migration.MigrateDB(db)
 
-	// Seed the users and markets
 	seed.SeedUsers(db)
-	// seed.SeedMarket(db)
 
 	server.Start()
 }

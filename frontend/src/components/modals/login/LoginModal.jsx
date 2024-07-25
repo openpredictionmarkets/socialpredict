@@ -21,7 +21,7 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
             if (loginSuccess) {
                 onClose();
                 history.push(redirectAfterLogin);
-                window.location.reload(); // this is a hack which goes against the principle of reloading the state
+                // window.location.reload(); // this is a hack which goes against the principle of reloading the state
             } else {
                 console.error('Login failed:', response.status, await response.text());
                 setError('Error logging in.');
