@@ -39,7 +39,8 @@ const AuthProvider = ({ children }) => {
                 token: token,
                 username: localStorage.getItem('username'),
                 usertype: localStorage.getItem('usertype'),
-                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true', // assume password change needed until shown not
+                // assume password change needed until shown not
+                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
             }));
         }
     }, []);
@@ -54,16 +55,7 @@ const AuthProvider = ({ children }) => {
                 body: JSON.stringify({ username, password }),
             });
 
-            // Check if the response is JSON before attempting to parse it
-            const contentType = response.headers.get("content-type");
-            let data;
-            if (contentType && contentType.indexOf("application/json") !== -1) {
-                data = await response.json();
-            } else {
-                data = { message: await response.text() };
-            }
-
-            console.log('Received response:', response.status, data);
+            const data = await response.json();
 
             if (response.ok) {
                 localStorage.setItem('token', data.token);

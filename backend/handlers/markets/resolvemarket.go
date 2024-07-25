@@ -2,10 +2,12 @@ package marketshandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"net/http"
 	dbpm "socialpredict/handlers/math/outcomes/dbpm"
 	usersHandlers "socialpredict/handlers/users"
+	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -17,24 +19,36 @@ import (
 )
 
 func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
+
+	logging.LogMsg("Attempting to use ResolveMarketHandler.")
+	logging.LogAnyType(r, "r")
+	logging.LogAnyType(w, "w")
+
 	// Use database connection
 	db := util.GetDB()
 
 	// Retrieve marketId from URL parameters
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
+
+	logging.LogAnyType(marketIdStr, "marketIdStr")
+
 	marketId, err := strconv.ParseUint(marketIdStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
 
+	logging.LogAnyType(marketId, "marketId")
+
 	// Validate token and get user
-	user, err := middleware.ValidateTokenAndGetUser(r, db)
-	if err != nil {
-		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
+	if httperr != nil {
+		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 		return
 	}
+
+	logging.LogAnyType(user, "user")
 
 	// Parse request body for resolution outcome
 	var resolutionData struct {
@@ -45,10 +59,20 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find the market by ID
 	var market models.Market
-	if result := db.First(&market, marketId); result.Error != nil {
-		http.Error(w, "Market not found", http.StatusNotFound)
+	result := db.First(&market, marketId)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			http.Error(w, "Market not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Error accessing database", http.StatusInternalServerError)
+		return
+	}
+
+	if &market == nil {
+		// handle nil market if necessary, this is just precautionary, as gorm.First should return found object or error
+		http.Error(w, "No market found with provided ID", http.StatusNotFound)
 		return
 	}
 
@@ -95,6 +119,10 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 
 // distributePayouts handles the logic for calculating and distributing payouts
 func distributePayouts(market *models.Market, db *gorm.DB) error {
+	if market == nil {
+		return errors.New("market is nil")
+	}
+
 	// Handle the N/A outcome by refunding all bets
 	if market.ResolutionResult == "N/A" {
 		var bets []models.Bet

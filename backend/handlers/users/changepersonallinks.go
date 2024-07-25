@@ -22,9 +22,9 @@ func ChangePersonalLinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := util.GetDB()
-	user, err := middleware.ValidateTokenAndGetUser(r, db)
-	if err != nil {
-		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
+	if httperr != nil {
+		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 		return
 	}
 
