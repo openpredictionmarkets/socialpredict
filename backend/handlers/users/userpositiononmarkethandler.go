@@ -18,7 +18,7 @@ func UserMarketPositionHandler(w http.ResponseWriter, r *http.Request) {
 	db := util.GetDB()
 	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
 	if httperr != nil {
-		http.Error(w, httperr.Error(), httperr.StatusCode)
+		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 		return
 	}
 
