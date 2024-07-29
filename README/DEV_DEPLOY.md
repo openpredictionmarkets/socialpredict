@@ -6,7 +6,7 @@ As of 28 July 2024, SocialPredict does not have a production version launched. S
 
 That being said, while not recommended, it is possible to adapt the development version of SocialPredict to run in a production environment in its current state, for small and experimental deployments.
 
-This document is geared at helping those who might want to convert the development version of SocialPredict into a web deployment. This document is not all-encompassing and users should exercise caution, but it is a set of guidelines to start deploying SocialPredict on the web.
+This document is geared toward setting up what we have provided thus far, which is really arguably a `dev` deployment, and serving it as a `prod` deployment for experimental purposes.
 
 ### Contents
 
