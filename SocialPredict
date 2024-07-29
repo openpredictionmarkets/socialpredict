@@ -1,7 +1,8 @@
 #!/bin/bash
 
-set -x # Stop script on error
-set -x # Automatically export all variables
+set -e # Stop script on error
+set -a # Automatically export all variables
+set -x # Verbose
 
 # Determine script's directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -17,8 +18,7 @@ command_exists() {
 
 # Function to check if Docker && Docker Compose are installed
 docker_check() {
-
-	    if command_exists docker && docker compose version &> /dev/null; then
+	if command_exists docker && docker compose version &> /dev/null; then
                 echo "Found docker compose."
                 COMPOSE='docker compose'
         elif command_exists docker-compose; then
