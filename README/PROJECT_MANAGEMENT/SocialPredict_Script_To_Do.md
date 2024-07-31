@@ -2,7 +2,7 @@
 
 ### Essential
 
-The following were moved from Nice to Have below.
+The following were moved from Nice to Have below into here, the essential category.
 
 4. Add database backup functionality:
    * Add a command like './SocialPredict db backup' that will backup current postgres database to the location specified by the user. Also add option to compress the backup.

@@ -55,6 +55,29 @@ docker exec -it -e PGPASSWORD=password socialpredict-postgres-container psql -U 
 2. `rm -rf ./data/postgres/*`
 3. `./SocialPredict up`
 
-### Setting Up the Project on Production
+##### Getting Logs from Different Containers
 
-See [./README/PROD_SETUP.md](./README/PROD_SETUP.md)
+* There are different containers which serve different purposes in our app, and `docker compose` is used to spin them all up and hook them together. If something goes wrong in the app, you can use a `docker compose -p scripts logs` command to view logs from all of the containers.
+
+* However, there are tons and tons of logs, so to be able to look at logs from a specific container, you should add `| grep {whatever}` where `wherever` is the container in question, to filter your logs to see what the problem may have been.
+
+```
+docker compose -p scripts logs | grep backend
+```
+
+* Errors from the `backend` container can be viewed by adding the `|` (pipe) and then `grep backend`, which is a way of filtering any lines which include, "backend," in them.
+
+* Likewise, frontend, nginx, database, certbot errors can be filtered out similarly with:
+
+```
+docker compose -p scripts logs | grep frontend
+docker compose -p scripts logs | grep nginx
+docker compose -p scripts logs | grep postgres
+docker compose -p scripts logs | grep certbot
+```
+
+### Setting Up a Staging Instance On the Web
+
+While we don't like to say we have an official, "prod," version yet per se, we do give the ability for you to run an staging instance online which for all intents and purposes is a functioning web app. However we don't endorse this app as being completely secure and recoverable without extra work. We're working on getting SocialPredict in a more reliable, secure state.
+
+See [Stage Setup](/README/STAGE_SETUP.md)
