@@ -245,7 +245,7 @@ If you want to spin down your SocialPredict instance, just type `./SocialPredict
 #### Logs
 
 * Logs can be useful for finding out what is going wrong under the hood.
-* To access logs, `ssh` in to your droplet and use the section on "Getting Logs from Different Containers" within the LOCAL_SETUP.md [here](/README/LOCAL_SETUP.md#getting-logs-from-different-containers) .
+* To access logs, `ssh` in to your droplet and use the section on "Getting Logs from Different Containers" within the LOCAL_SETUP.md [here](/README/LOCAL_SETUP.md#getting-logs-from-different-containers).
 
 #### Entering a Container
 
