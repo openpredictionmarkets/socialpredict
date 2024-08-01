@@ -5,7 +5,7 @@ import (
 	"socialpredict/models"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"gorm.io/gorm"
 )
 
