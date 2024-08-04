@@ -12,3 +12,7 @@ Nothing here yet.
 ## Windows (WSL2)
 **ERROR: unable to locate `docker-compose-plugin`**
 - Many solutions, but one solution that has been verified to work is running VSCode inside WSL2 and installing the Docker plugin from there.
+
+## Deploying to the web
+**Certbot failures**
+- Make sure that the IP address listed in your domain's A records and the IP address for your Droplet are the same.
