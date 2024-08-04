@@ -234,7 +234,35 @@ And run `./SocialPredict install`:
 root@DROPLET_NAME:/home/socialpredict ./SocialPredict install
 ```
 
-SocialPredict will prompt you to type `1` for development or `2` for production. Hit `2` on your keyboard and follow the instructions to enter your domain and set up an admin account. Once you're done, type `./SocialPredict up` to spin up a SocialPredict instance ready to deploy to the web, and navigate to your domain to see if it works.
+SocialPredict will prompt you to type `1` for development, `2` for production, or `3` to quit. Hit `2` on your keyboard to start.
+
+![Screenshot 2024-08-03 111737](https://github.com/user-attachments/assets/3423a047-213b-48cc-baf3-4eadb326c111)
+
+Next, SocialPredict will prompt you for the name of your domain.
+
+![Screenshot 2024-08-03 111838](https://github.com/user-attachments/assets/5c32618c-17be-4e0c-a74d-f5d546b0b8bf)
+
+It will also prompt you for the email address linked to your SSL certificate.
+
+![Screenshot 2024-08-03 111905](https://github.com/user-attachments/assets/d35a4ce8-991f-4389-96aa-e9920e87ccca)
+
+Type in the default username.
+
+![Screenshot 2024-08-03 111941](https://github.com/user-attachments/assets/1ad1062e-439e-40aa-ad2c-430b9c491801)
+
+Specify a default password.
+
+![Screenshot 2024-08-03 112119](https://github.com/user-attachments/assets/381dc8ac-3c43-4695-a477-6656c98be933)
+
+Specify a name for the database.
+
+![Screenshot 2024-08-03 112155](https://github.com/user-attachments/assets/36571a06-ae6b-464b-b974-bec11361a2e8)
+
+Lastly, choose an admin password.
+
+![Screenshot 2024-08-03 112236](https://github.com/user-attachments/assets/9bef37ff-8299-46f5-babd-6a2d54aef44d)
+
+Once you're done, type `./SocialPredict up` to spin up a SocialPredict instance ready to deploy to the web, and navigate to your domain to see if it works.
 
 If you want to spin down your SocialPredict instance, just type `./SocialPredict down` in your console.
 
