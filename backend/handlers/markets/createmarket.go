@@ -3,7 +3,7 @@ package marketshandlers
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"socialpredict/logging"
@@ -59,7 +59,7 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&newMarket)
 	if err != nil {
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyBytes, _ := io.ReadAll(r.Body)
 		log.Printf("Error reading request body: %v, Body: %s", err, string(bodyBytes))
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
