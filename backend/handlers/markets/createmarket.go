@@ -3,7 +3,8 @@ package marketshandlers
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"socialpredict/logging"
@@ -12,6 +13,8 @@ import (
 	"socialpredict/setup"
 	"socialpredict/util"
 )
+
+const maxQuestionTitleLength = 160
 
 // appConfig holds the loaded application configuration accessible within the package
 var appConfig *setup.EconomicConfig
@@ -26,8 +29,8 @@ func init() {
 }
 
 func checkQuestionTitleLength(title string) error {
-	if len(title) > 160 || len(title) < 1 {
-		return errors.New("Question Title exceeds 160 characters or is blank")
+	if len(title) > maxQuestionTitleLength || len(title) < 1 {
+		return fmt.Errorf("question title exceeds %d characters or is blank", maxQuestionTitleLength)
 	}
 	return nil
 }
@@ -59,7 +62,7 @@ func CreateMarketHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&newMarket)
 	if err != nil {
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyBytes, _ := io.ReadAll(r.Body)
 		log.Printf("Error reading request body: %v, Body: %s", err, string(bodyBytes))
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
