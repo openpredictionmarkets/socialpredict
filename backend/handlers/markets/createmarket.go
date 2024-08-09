@@ -3,6 +3,7 @@ package marketshandlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"socialpredict/setup"
 	"socialpredict/util"
 )
+
+const maxQuestionTitleLength = 160
 
 // appConfig holds the loaded application configuration accessible within the package
 var appConfig *setup.EconomicConfig
@@ -26,8 +29,8 @@ func init() {
 }
 
 func checkQuestionTitleLength(title string) error {
-	if len(title) > 160 || len(title) < 1 {
-		return errors.New("Question Title exceeds 160 characters or is blank")
+	if len(title) > maxQuestionTitleLength || len(title) < 1 {
+		return fmt.Errorf("question title exceeds %d characters or is blank", maxQuestionTitleLength)
 	}
 	return nil
 }
