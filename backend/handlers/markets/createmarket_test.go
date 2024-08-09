@@ -13,7 +13,7 @@ func TestCheckQuestionTitleLength_invalid(t *testing.T) {
 	}{
 		{
 			testname:      "TitleExceedsLength",
-			questionTitle: strings.Repeat("a", 161),
+			questionTitle: strings.Repeat("a", maxQuestionTitleLength+1),
 		},
 		{
 			testname:      "EmptyTitle",
