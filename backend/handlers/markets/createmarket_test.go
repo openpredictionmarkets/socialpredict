@@ -39,7 +39,7 @@ func TestCheckQuestionTitleLength_valid(t *testing.T) {
 		},
 		{
 			testname:      "Max length title",
-			questionTitle: strings.Repeat("a", 160),
+			questionTitle: strings.Repeat("a", maxQuestionTitleLength),
 		},
 	}
 	for _, test := range tests {
