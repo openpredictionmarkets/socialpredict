@@ -4,12 +4,8 @@ import { useMarketDetails } from '../../hooks/useMarketDetails';
 import { useAuth } from '../../helpers/AuthContent';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal';
 import BetModalButton from '../../components/modals/bet/BetModal';
+import ActivityTabs from '../../components/tabs/ActivityTabs';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
-const LoadingSpinner = () => (
-  <div className='flex justify-center items-center h-64'>
-    <div className='animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500'></div>
-  </div>
-);
 
 const MarketDetails = () => {
   const { username } = useAuth();
