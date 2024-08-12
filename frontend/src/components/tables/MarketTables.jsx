@@ -27,6 +27,17 @@ function MarketsTable() {
       });
   }, []);
 
+  const formatResolutionDate = (resolutionDateTime) => {
+    const now = new Date();
+    const resolutionDate = new Date(resolutionDateTime);
+
+    if (resolutionDate < now) {
+      return 'CLOSED';
+    } else {
+      return resolutionDate.toLocaleDateString();
+    }
+  };
+
   if (loading) {
     return <div className='p-6 text-center'>Loading markets...</div>;
   }
@@ -99,9 +110,7 @@ function MarketsTable() {
                 </Link>
               </td>
               <td className='px-6 py-4 text-sm text-gray-500'>
-                {new Date(
-                  marketData.market.resolutionDateTime
-                ).toLocaleDateString()}
+                {formatResolutionDate(marketData.market.resolutionDateTime)}
               </td>
               <td className='px-6 py-4 text-sm text-gray-500'>
                 <Link
