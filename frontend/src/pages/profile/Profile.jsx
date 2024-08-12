@@ -3,12 +3,7 @@ import PrivateUserInfoLayout from '../../components/layouts/profile/private/Priv
 import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout';
 import useUserData from '../../hooks/useUserData';
 import usePortfolio from '../../hooks/usePortfolio';
-
-const LoadingSpinner = () => (
-  <div className='flex justify-center items-center h-64'>
-    <div className='animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500'></div>
-  </div>
-);
+import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 
 const ErrorMessage = ({ message }) => (
   <div
