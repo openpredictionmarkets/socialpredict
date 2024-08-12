@@ -1,71 +1,61 @@
-import React, { useState, useEffect } from 'react';
-import { API_URL } from '../../config';
+import { useAuth } from '../../helpers/AuthContent';
 import PrivateUserInfoLayout from '../../components/layouts/profile/private/PrivateUserInfoLayout';
 import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout';
-import { useAuth } from '../../helpers/AuthContent';
+import useUserData from '../../hooks/useUserData';
+import usePortfolio from '../../hooks/usePortfolio';
+
+const LoadingSpinner = () => (
+  <div className='flex justify-center items-center h-64'>
+    <div className='animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500'></div>
+  </div>
+);
+
+const ErrorMessage = ({ message }) => (
+  <div
+    className='bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative'
+    role='alert'
+  >
+    <strong className='font-bold'>Error:</strong>
+    <span className='block sm:inline'> {message}</span>
+  </div>
+);
+
+const NoPortfolio = () => (
+  <div className='bg-primary-background shadow-md rounded-lg p-6 text-center text-gray-600'>
+    No portfolio found. User has likely not made any trades yet.
+  </div>
+);
 
 const Profile = () => {
-    const { username } = useAuth();
-    const [userData, setUserData] = useState({ data: null, loading: true, error: null });
-    const [portfolio, setPortfolio] = useState({ data: { portfolioItems: [] }, loading: true, error: null });
+  const { username } = useAuth();
+  const { userData, userLoading, userError } = useUserData(username);
+  const { portfolio, portfolioLoading, portfolioError } =
+    usePortfolio(username);
 
-    useEffect(() => {
-        const fetchUserData = async () => {
-            try {
-                const response = await fetch(`${API_URL}/api/v0/userinfo/${username}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setUserData({ data, loading: false, error: null });
-                } else {
-                    throw new Error('Failed to fetch user data');
-                }
-            } catch (error) {
-                console.error('Error fetching user data:', error);
-                setUserData({ data: null, loading: false, error: error.toString() });
-            }
-        };
+  if (userLoading || portfolioLoading) {
+    return <LoadingSpinner />;
+  }
 
-        const fetchPortfolio = async () => {
-            try {
-                const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setPortfolio({ data: { ...data, portfolioItems: data.portfolioItems || [] }, loading: false, error: null });
-                } else {
-                    throw new Error('Failed to fetch portfolio');
-                }
-            } catch (error) {
-                console.error('Error fetching portfolio:', error);
-                setPortfolio({ data: { portfolioItems: [] }, loading: false, error: error.toString() });
-            }
-        };
+  if (userError) {
+    return <ErrorMessage message={`Error loading user data: ${userError}`} />;
+  }
 
-        if (username) {
-            fetchUserData();
-            fetchPortfolio();
-        }
-    }, [username]);
-
-    if (userData.loading || portfolio.loading) {
-        return <div>Loading...</div>;
-    }
-
-    if (userData.error) {
-        return <div>Error loading user data: {userData.error}</div>;
-    }
-
+  if (portfolioError) {
     return (
-        <div className="flex-col min-h-screen">
-            <PrivateUserInfoLayout userData={userData.data} />
-            {portfolio.data && portfolio.data.portfolioItems.length > 0 ? (
-                <PublicUserPortfolioLayout username={username} userData={userData.data} />
-            ) : (
-                <div className="bg-primary-background shadow-md rounded-lg p-6 text-center">
-                    No portfolio found. User has likely not made any trades yet.
-                </div>
-            )}
-        </div>
+      <ErrorMessage message={`Error loading portfolio: ${portfolioError}`} />
     );
+  }
+
+  return (
+    <div className='flex flex-col space-y-6 min-h-screen p-6 bg-gray-100'>
+      <PrivateUserInfoLayout userData={userData} />
+      {portfolio && portfolio.portfolioItems.length > 0 ? (
+        <PublicUserPortfolioLayout username={username} userData={userData} />
+      ) : (
+        <NoPortfolio />
+      )}
+    </div>
+  );
 };
 
 export default Profile;
