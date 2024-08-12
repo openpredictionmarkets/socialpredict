@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent';
+import LoginModalButton from '../modals/login/LoginModalClick';
 import {
   AboutSVG,
   AdminGearSVG,
@@ -14,7 +15,6 @@ import {
   PollsSVG,
   ProfileSVG,
   CreateSVG,
-  LoginSVG, // Assume we have a LoginSVG icon
 } from '../../assets/components/SvgIcons';
 
 const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
@@ -62,9 +62,9 @@ const Sidebar = () => {
           <SidebarLink to='/' icon={HomeSVG}>
             Home
           </SidebarLink>
-          <SidebarLink to='/login' icon={LoginSVG}>
-            Login
-          </SidebarLink>
+          <li>
+            <LoginModalButton />
+          </li>
           <SidebarLink to='/markets' icon={MarketsSVG}>
             Markets
           </SidebarLink>
