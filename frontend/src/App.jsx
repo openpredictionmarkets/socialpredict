@@ -10,7 +10,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className='App bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar h-screen'>
+        <div className='App bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar h-[calc(100vh-96px)]'>
           <header className='App-header'>
             <Sidebar />
             <AppRoutes />
