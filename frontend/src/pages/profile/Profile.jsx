@@ -1,3 +1,4 @@
+import React from 'react';
 import { useAuth } from '../../helpers/AuthContent';
 import PrivateUserInfoLayout from '../../components/layouts/profile/private/PrivateUserInfoLayout';
 import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout';
@@ -16,7 +17,7 @@ const ErrorMessage = ({ message }) => (
 );
 
 const NoPortfolio = () => (
-  <div className='bg-primary-background shadow-md rounded-lg p-6 text-center text-gray-600'>
+  <div className='bg-gray-800 shadow-md rounded-lg p-6 text-center text-gray-300'>
     No portfolio found. User has likely not made any trades yet.
   </div>
 );
@@ -42,13 +43,18 @@ const Profile = () => {
   }
 
   return (
-    <div className='flex flex-col space-y-6 min-h-screen p-6 bg-gray-100'>
-      <PrivateUserInfoLayout userData={userData} />
-      {portfolio && portfolio.portfolioItems.length > 0 ? (
-        <PublicUserPortfolioLayout username={username} userData={userData} />
-      ) : (
-        <NoPortfolio />
-      )}
+    <div className='flex flex-col space-y-6  text-white'>
+      <h1 className='text-2xl font-bold mb-4'>Profile Details & Edit</h1>
+      <div className='bg-gray-800 rounded-lg p-6 shadow-lg'>
+        <PrivateUserInfoLayout userData={userData} />
+      </div>
+      <div className='bg-gray-800 rounded-lg p-6 shadow-lg'>
+        {portfolio && portfolio.portfolioItems.length > 0 ? (
+          <PublicUserPortfolioLayout username={username} userData={userData} />
+        ) : (
+          <NoPortfolio />
+        )}
+      </div>
     </div>
   );
 };
