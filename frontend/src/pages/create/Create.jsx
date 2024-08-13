@@ -1,4 +1,3 @@
-import { API_URL } from '../../config';
 import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent';
@@ -7,54 +6,45 @@ import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector
 import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
 import SiteButton from '../../components/buttons/SiteButtons';
-
+import { API_URL } from '../../config';
 
 function Create() {
-    const [questionTitle, setQuestionTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [resolutionDateTime, setResolutionDateTime] = useState(getEndofDayDateTime());
-    const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    questionTitle: '',
+    description: '',
+    resolutionDateTime: getEndofDayDateTime(),
+  });
+  const [error, setError] = useState('');
+  const { username } = useAuth();
+  const history = useHistory();
 
-    // Get the logged-in user's ID from context or another state management solution
-    const { username, isLoggedIn } = useAuth();
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prevData) => ({ ...prevData, [name]: value }));
+  };
 
-    // User should already have been logged in to be able to access Create()
-    // const isLoggedIn = username !== null;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
 
-    // history for redirect after market creation
-    const history = useHistory();
+    const { questionTitle, description, resolutionDateTime } = formData;
 
-    // Get the timezone offset from the user
+    if (!questionTitle.trim() || !description.trim()) {
+      setError('Please fill in all fields.');
+      return;
+    }
+
+    const isoDateTime = new Date(resolutionDateTime).toISOString();
     const utcOffset = new Date().getTimezoneOffset();
-
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-        setError('');
-
-    let isoDateTime = resolutionDateTime; // Default to the original value
-
-    // Convert the resolutionDateTime to ISO format if it's a valid date-time string
-    if (resolutionDateTime) {
-    const dateTime = new Date(resolutionDateTime);
-    if (!isNaN(dateTime.getTime())) {
-        // Check if the date object is valid
-        isoDateTime = dateTime.toISOString();
-    } else {
-        console.error('Invalid date-time value:', resolutionDateTime);
-        setError('Invalid date-time value');
-        return; // Optionally, return early if the date-time is invalid
-    }
-    }
-
-    // Retrieve the JWT token from localStorage
     const token = localStorage.getItem('token');
+
     if (!token) {
-    alert('Authentication token not found. Please log in again.');
-    throw new Error('Token not found');
+      setError('Authentication token not found. Please log in again.');
+      return;
     }
 
     try {
-    const marketData = {
+      const marketData = {
         questionTitle,
         description,
         outcomeType: 'BINARY',
@@ -63,88 +53,87 @@ function Create() {
         creatorUsername: username,
         isResolved: false,
         utcOffset: utcOffset,
-    };
+      };
 
-    console.log('marketData:', marketData);
-
-    console.log(JSON.stringify(marketData));
-
-    const response = await fetch(`${API_URL}/api/v0/create`, {
+      const response = await fetch(`${API_URL}/api/v0/create`, {
         method: 'POST',
         headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(marketData),
-    });
+      });
 
-    if (response.ok) {
-        const responseData = await response.json();
-        console.log('Market creation successful:', responseData);
-        const marketId = responseData.id;
-        history.push(`/markets/${marketId}`);
-    } else {
-        const errorText = await response.text(); // Read response as text instead of JSON
-        console.error('Market creation failed:', errorText);
-        setError('Market creation failed: ' + errorText);
-    }
+      if (response.ok) {
+        const { id } = await response.json();
+        history.push(`/markets/${id}`);
+      } else {
+        const errorText = await response.text();
+        setError(`Market creation failed: ${errorText}`);
+      }
     } catch (error) {
-    console.error('Error during market creation:', error);
-    setError('Error during market creation: ' + error.message);
+      setError(`Error during market creation: ${error.message}`);
     }
-};
+  };
 
-return (
-    <div className="p-6 bg-primary-background shadow-md rounded-lg">
-    <div className="text-lg font-medium text-custom-gray-verylight mb-4">
-        <h1>Create a Market</h1>
-    </div>
+  return (
+    <div className='w-full max-w-2xl mx-auto p-4 sm:p-6 bg-gray-800 shadow-lg rounded-lg'>
+      <h1 className='text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6'>
+        Create a Market
+      </h1>
 
-    <form onSubmit={handleSubmit} className='create-form'>
-        {/* Use RegularInput for Question Title */}
+      <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
         <div>
-        <label>
-            Question Title:
-            <RegularInput
+          <label className='block text-sm font-medium text-gray-300 mb-1'>
+            Question Title
+          </label>
+          <RegularInput
             type='text'
-            value={questionTitle}
-            onChange={(e) => setQuestionTitle(e.target.value)}
-            />
-        </label>
+            name='questionTitle'
+            value={formData.questionTitle}
+            onChange={handleChange}
+            placeholder='Enter the market question'
+            className='w-full'
+          />
         </div>
-        {/* Use RegularInput for Description, ensuring it renders as a textarea */}
-        <div>
-        <label>
-            Description:
-            <RegularInputBox
-            as='textarea'
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            />
-        </label>
-        </div>
-        {/* Use DatetimeSelector for Resolution Date Time */}
-        <div>
-        <label>
-            Resolution Date Time:
-            <DatetimeSelector
-            value={resolutionDateTime}
 
-            onChange={(e) => {
-                console.log("New date-time:", e.target.value); // Log the new date-time value
-                setResolutionDateTime(e.target.value);
-            }}
-
-            />
-        </label>
+        <div>
+          <label className='block text-sm font-medium text-gray-300 mb-1'>
+            Description
+          </label>
+          <RegularInputBox
+            name='description'
+            value={formData.description}
+            onChange={handleChange}
+            placeholder='Provide details about the market'
+            className='h-32 resize-y'
+          />
         </div>
-        {error && <div className='error-message'>{error}</div>}
-        <SiteButton type="submit">
-                    Create Market
+
+        <div>
+          <label className='block text-sm font-medium text-gray-300 mb-1'>
+            Resolution Date Time
+          </label>
+          <DatetimeSelector
+            name='resolutionDateTime'
+            value={formData.resolutionDateTime}
+            onChange={handleChange}
+            className='w-full'
+          />
+        </div>
+
+        {error && (
+          <div className='bg-red-600 text-white p-3 rounded-md text-sm'>
+            {error}
+          </div>
+        )}
+
+        <SiteButton type='submit' className='w-full'>
+          Create Market
         </SiteButton>
-    </form>
+      </form>
     </div>
-);
+  );
 }
 
 export default Create;
