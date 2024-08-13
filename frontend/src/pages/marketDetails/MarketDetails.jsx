@@ -4,7 +4,6 @@ import { useMarketDetails } from '../../hooks/useMarketDetails';
 import { useAuth } from '../../helpers/AuthContent';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal';
 import BetModalButton from '../../components/modals/bet/BetModal';
-import ActivityTabs from '../../components/tabs/ActivityTabs';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 
 const MarketDetails = () => {
@@ -20,7 +19,7 @@ const MarketDetails = () => {
   const isResolved = details?.market?.isResolved === true;
 
   return (
-    <div className='flex flex-col min-h-screen p-6 space-y-8'>
+    <div className='flex flex-col space-y-8'>
       <div className='flex-grow'>
         <MarketDetailsTable
           market={details.market}
@@ -29,9 +28,10 @@ const MarketDetails = () => {
           totalVolume={details.totalVolume}
           currentProbability={currentProbability}
           probabilityChanges={details.probabilityChanges}
+          marketId={details.market.id}
         />
       </div>
-      <div className='flex items-center justify-start space-x-4'>
+      <div className='flex items-center justify-center  space-x-4'>
         {isCreator && !isResolved && (
           <ResolveModalButton
             marketId={details.market.id}
@@ -49,9 +49,6 @@ const MarketDetails = () => {
             className='text-xs px-4 py-2'
           />
         )}
-      </div>
-      <div className='max-w-4xl mx-auto mt-8 w-full'>
-        <ActivityTabs marketId={details.market.id} />
       </div>
     </div>
   );
