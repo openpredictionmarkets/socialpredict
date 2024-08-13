@@ -4,7 +4,6 @@ import { useMarketDetails } from '../../hooks/useMarketDetails';
 import { useAuth } from '../../helpers/AuthContent';
 import ResolveModalButton from '../../components/modals/resolution/ResolveModal';
 import BetModalButton from '../../components/modals/bet/BetModal';
-import ActivityTabs from '../../components/tabs/ActivityTabs';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 
 const MarketDetails = () => {
