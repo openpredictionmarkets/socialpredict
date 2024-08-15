@@ -15,16 +15,10 @@ function MarketDetailsTable({
 }) {
   const [showFullDescription, setShowFullDescription] = useState(false);
 
-  const truncateDescription = (description, length = 100) => {
-    return description.length > length
-      ? `${description.substring(0, length)}...`
-      : description;
-  };
-
   return (
-    <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg max-w-full overflow-hidden'>
+    <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full overflow-hidden'>
       <div className='mb-4'>
-        <h1 className='text-xl font-semibold text-white mb-2'>
+        <h1 className='text-xl font-semibold text-white mb-2 break-words'>
           {market.questionTitle}
         </h1>
         <div className='flex items-center space-x-2 text-sm text-gray-400'>
@@ -47,7 +41,7 @@ function MarketDetailsTable({
           data={probabilityChanges}
           currentProbability={currentProbability}
           title='Probability Changes'
-          className='w-full '
+          className='w-full'
         />
       </div>
 
@@ -61,10 +55,19 @@ function MarketDetailsTable({
       </div>
 
       <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
-        <p className='text-sm'>
-          {showFullDescription
-            ? market.description
-            : truncateDescription(market.description)}
+        <p
+          className={`text-sm break-words whitespace-pre-wrap ${
+            showFullDescription
+              ? ''
+              : 'sm:max-h-24 h-16 overflow-y-auto sm:overflow-hidden'
+          }`}
+          style={{
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
+            hyphens: 'auto',
+          }}
+        >
+          {market.description}
         </p>
       </div>
 
@@ -92,7 +95,7 @@ function MarketDetailsTable({
         </div>
       </div>
 
-      <div className=' mx-auto mt-8 w-full'>
+      <div className='mx-auto mt-8 w-full'>
         <ActivityTabs marketId={marketId} />
       </div>
     </div>

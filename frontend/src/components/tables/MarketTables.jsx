@@ -49,7 +49,8 @@ const MarketRow = ({ marketData }) => (
     <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300'>
       <Link
         to={`/markets/${marketData.market.id}`}
-        className='hover:text-blue-400 transition-colors duration-200'
+        className='hover:text-blue-400 transition-colors duration-200 block max-w-xs overflow-hidden overflow-ellipsis'
+        title={marketData.market.questionTitle}
       >
         {marketData.market.questionTitle}
       </Link>
