@@ -9,35 +9,33 @@ import SiteButton from '../../components/buttons/SiteButtons';
 import { API_URL } from '../../config';
 
 function Create() {
-  const [formData, setFormData] = useState({
-    questionTitle: '',
-    description: '',
-    resolutionDateTime: getEndofDayDateTime(),
-  });
+  const [questionTitle, setQuestionTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [resolutionDateTime, setResolutionDateTime] = useState(
+    getEndofDayDateTime()
+  );
   const [error, setError] = useState('');
   const { username } = useAuth();
   const history = useHistory();
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prevData) => ({ ...prevData, [name]: value }));
-  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
 
-    const { questionTitle, description, resolutionDateTime } = formData;
+    let isoDateTime = resolutionDateTime;
 
-    if (!questionTitle.trim() || !description.trim()) {
-      setError('Please fill in all fields.');
-      return;
+    if (resolutionDateTime) {
+      const dateTime = new Date(resolutionDateTime);
+      if (!isNaN(dateTime.getTime())) {
+        isoDateTime = dateTime.toISOString();
+      } else {
+        console.error('Invalid date-time value:', resolutionDateTime);
+        setError('Invalid date-time value');
+        return;
+      }
     }
 
-    const isoDateTime = new Date(resolutionDateTime).toISOString();
-    const utcOffset = new Date().getTimezoneOffset();
     const token = localStorage.getItem('token');
-
     if (!token) {
       setError('Authentication token not found. Please log in again.');
       return;
@@ -52,8 +50,11 @@ function Create() {
         initialProbability: 0.5,
         creatorUsername: username,
         isResolved: false,
-        utcOffset: utcOffset,
+        utcOffset: new Date().getTimezoneOffset(),
       };
+
+      console.log('marketData:', marketData);
+      console.log(JSON.stringify(marketData));
 
       const response = await fetch(`${API_URL}/api/v0/create`, {
         method: 'POST',
@@ -65,13 +66,16 @@ function Create() {
       });
 
       if (response.ok) {
-        const { id } = await response.json();
-        history.push(`/markets/${id}`);
+        const responseData = await response.json();
+        console.log('Market creation successful:', responseData);
+        history.push(`/markets/${responseData.id}`);
       } else {
         const errorText = await response.text();
+        console.error('Market creation failed:', errorText);
         setError(`Market creation failed: ${errorText}`);
       }
     } catch (error) {
+      console.error('Error during market creation:', error);
       setError(`Error during market creation: ${error.message}`);
     }
   };
@@ -89,9 +93,8 @@ function Create() {
           </label>
           <RegularInput
             type='text'
-            name='questionTitle'
-            value={formData.questionTitle}
-            onChange={handleChange}
+            value={questionTitle}
+            onChange={(e) => setQuestionTitle(e.target.value)}
             placeholder='Enter the market question'
             className='w-full'
           />
@@ -102,9 +105,8 @@ function Create() {
             Description
           </label>
           <RegularInputBox
-            name='description'
-            value={formData.description}
-            onChange={handleChange}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             placeholder='Provide details about the market'
             className='h-32 resize-y'
           />
@@ -115,9 +117,11 @@ function Create() {
             Resolution Date Time
           </label>
           <DatetimeSelector
-            name='resolutionDateTime'
-            value={formData.resolutionDateTime}
-            onChange={handleChange}
+            value={resolutionDateTime}
+            onChange={(e) => {
+              console.log('New date-time:', e.target.value);
+              setResolutionDateTime(e.target.value);
+            }}
             className='w-full'
           />
         </div>

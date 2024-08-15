@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { formatDateTimeForGrid } from '../utils/dateTimeTools/FormDateTimeTools';
 import MarketChart from '../charts/MarketChart';
 import ActivityTabs from '../../components/tabs/ActivityTabs';
+import formatResolutionDate from '../../helpers/formatResolutionDate';
 
 function MarketDetailsTable({
   market,
@@ -74,9 +74,7 @@ function MarketDetailsTable({
           { label: 'Comments', value: '💬 0' },
           {
             label: 'Closes',
-            value: `📅 ${formatDateTimeForGrid(
-              market.resolutionDateTime
-            ).toLocaleString()}`,
+            value: `📅 ${formatResolutionDate(market.resolutionDateTime)}`,
           },
         ].map((item, index) => (
           <div key={index} className='bg-gray-800 p-2 rounded-lg'>
