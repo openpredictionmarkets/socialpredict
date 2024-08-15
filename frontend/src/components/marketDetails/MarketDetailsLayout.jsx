@@ -61,12 +61,18 @@ function MarketDetailsTable({
           {showFullDescription ? 'Hide Description' : 'Show Full Description'}
         </button>
       </div>
-
       <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
         <p
-          className={`text-sm break-words ${
-            showFullDescription ? '' : 'line-clamp-3'
+          className={`text-sm break-words whitespace-pre-wrap ${
+            showFullDescription
+              ? ''
+              : 'sm:max-h-24 h-16 overflow-y-auto sm:overflow-hidden'
           }`}
+          style={{
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
+            hyphens: 'auto',
+          }}
         >
           {market.description}
         </p>
