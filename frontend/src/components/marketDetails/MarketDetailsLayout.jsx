@@ -16,12 +16,15 @@ function MarketDetailsTable({
   const [showFullDescription, setShowFullDescription] = useState(false);
 
   return (
-    <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full overflow-hidden'>
+    <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
       <div className='mb-4'>
-        <h1 className='text-xl font-semibold text-white mb-2 break-words'>
+        <h1
+          className='text-xl font-semibold text-white mb-2 break-words line-clamp-2'
+          title={market.questionTitle}
+        >
           {market.questionTitle}
         </h1>
-        <div className='flex items-center space-x-2 text-sm text-gray-400'>
+        <div className='flex flex-wrap items-center gap-2 text-sm text-gray-400'>
           <Link
             to={`/user/${market.creatorUsername}`}
             className='hover:text-blue-400 transition-colors duration-200'
@@ -56,43 +59,31 @@ function MarketDetailsTable({
 
       <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
         <p
-          className={`text-sm break-words whitespace-pre-wrap ${
-            showFullDescription
-              ? ''
-              : 'sm:max-h-24 h-16 overflow-y-auto sm:overflow-hidden'
+          className={`text-sm break-words ${
+            showFullDescription ? '' : 'line-clamp-3'
           }`}
-          style={{
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            hyphens: 'auto',
-          }}
         >
           {market.description}
         </p>
       </div>
 
       <div className='grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-4'>
-        <div className='bg-gray-800 p-2 rounded-lg'>
-          <div className='text-xs text-gray-400'>Users</div>
-          <div className='text-sm font-semibold'>👤 {numUsers}</div>
-        </div>
-        <div className='bg-gray-800 p-2 rounded-lg'>
-          <div className='text-xs text-gray-400'>Volume</div>
-          <div className='text-sm font-semibold'>
-            📊 {totalVolume.toFixed(2)}
+        {[
+          { label: 'Users', value: `👤 ${numUsers}` },
+          { label: 'Volume', value: `📊 ${totalVolume.toFixed(2)}` },
+          { label: 'Comments', value: '💬 0' },
+          {
+            label: 'Closes',
+            value: `📅 ${formatDateTimeForGrid(
+              market.resolutionDateTime
+            ).toLocaleString()}`,
+          },
+        ].map((item, index) => (
+          <div key={index} className='bg-gray-800 p-2 rounded-lg'>
+            <div className='text-xs text-gray-400'>{item.label}</div>
+            <div className='text-sm font-semibold truncate'>{item.value}</div>
           </div>
-        </div>
-        <div className='bg-gray-800 p-2 rounded-lg'>
-          <div className='text-xs text-gray-400'>Comments</div>
-          <div className='text-sm font-semibold'>💬 0</div>
-        </div>
-        <div className='bg-gray-800 p-2 rounded-lg'>
-          <div className='text-xs text-gray-400'>Closes</div>
-          <div className='text-sm font-semibold'>
-            📅{' '}
-            {formatDateTimeForGrid(market.resolutionDateTime).toLocaleString()}
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className='mx-auto mt-8 w-full'>
