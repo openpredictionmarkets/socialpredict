@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { AuthProvider } from './helpers/AuthContent';
 import Footer from './components/footer/Footer';
@@ -10,11 +10,13 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className='App bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar h-screen'>
-          <header className='App-header'>
+        <div className='flex flex-col h-[calc(100vh-6rem)] bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar'>
+          <div className='flex-grow'>
             <Sidebar />
-            <AppRoutes />
-          </header>
+            <main className='h-full'>
+              <AppRoutes />
+            </main>
+          </div>
           <Footer />
         </div>
       </Router>
