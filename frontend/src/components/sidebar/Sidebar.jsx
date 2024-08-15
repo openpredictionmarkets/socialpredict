@@ -77,8 +77,69 @@ const Sidebar = () => {
         </>
       );
     }
+    if (usertype === 'ADMIN') {
+      return (
+        <>
+          <SidebarLink to='/admin' icon={AdminGearSVG}>
+            Dashboard
+          </SidebarLink>
+          <SidebarLink to='/markets' icon={MarketsSVG}>
+            Markets
+          </SidebarLink>
+          <SidebarLink to='/polls' icon={PollsSVG}>
+            Polls
+          </SidebarLink>
+          <SidebarLink to='/about' icon={AboutSVG}>
+            About
+          </SidebarLink>
+          <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
+            Logout
+          </SidebarLink>
+        </>
+      );
+    }
 
-    // ... (rest of the renderLinks function remains the same)
+    if (changePasswordNeeded) {
+      return (
+        <>
+          <SidebarLink to='/changepassword' icon={LockPasswordSVG}>
+            Change Password
+          </SidebarLink>
+          <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
+            Logout
+          </SidebarLink>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <SidebarLink to='/' icon={HomeSVG}>
+          Home
+        </SidebarLink>
+        <SidebarLink to='/profile' icon={ProfileSVG}>
+          Profile
+        </SidebarLink>
+        <SidebarLink to='/markets' icon={MarketsSVG}>
+          Markets
+        </SidebarLink>
+        <SidebarLink to='/polls' icon={PollsSVG}>
+          Polls
+        </SidebarLink>
+        <SidebarLink to='/notifications' icon={NotificationsSVG}>
+          Alerts
+        </SidebarLink>
+        <SidebarLink to='/create' icon={CreateSVG}>
+          Create
+        </SidebarLink>
+        <SidebarLink to='/about' icon={AboutSVG}>
+          About
+        </SidebarLink>
+        <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
+          Logout
+        </SidebarLink>
+      </>
+    );
   };
 
   return (
