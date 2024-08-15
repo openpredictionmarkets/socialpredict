@@ -14,6 +14,7 @@ const TableHeader = () => (
         '👤 Users',
         '📊 Size',
         '💬',
+        'Status',
       ].map((header, index) => (
         <th
           key={index}
@@ -76,11 +77,26 @@ const MarketRow = ({ marketData }) => (
       {marketData.totalVolume}
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>0</td>
+    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
+      {marketData.market.isResolved ? (
+        <span
+          className={
+            marketData.market.resolutionResult === 'YES'
+              ? 'text-green-400'
+              : 'text-red-400'
+          }
+        >
+          {marketData.market.resolutionResult}
+        </span>
+      ) : (
+        'Open'
+      )}
+    </td>
   </tr>
 );
 
 function MarketsTable() {
-  const [marketsData, setMarketsData] = useState(null);
+  const [marketsData, setMarketsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -105,7 +121,7 @@ function MarketsTable() {
   if (loading) return <div className='p-4 text-center'>Loading markets...</div>;
   if (error)
     return <div className='p-4 text-center text-red-500'>Error: {error}</div>;
-  if (!marketsData || marketsData.length === 0)
+  if (marketsData.length === 0)
     return <div className='p-4 text-center'>No markets found.</div>;
 
   return (
