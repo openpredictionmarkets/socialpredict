@@ -68,7 +68,7 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 func processBetsForDisplay(marketCreatedAtTime time.Time, bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(appConfig, marketCreatedAtTime, bets)
 
 	var betsDisplayInfo []BetDisplayInfo
 

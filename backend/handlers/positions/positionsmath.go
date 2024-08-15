@@ -7,10 +7,21 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"strconv"
 
 	"gorm.io/gorm"
 )
+
+var appConfig *setup.EconomicConfig
+
+func init() {
+	var err error
+	appConfig, err = setup.LoadEconomicsConfig()
+	if err != nil {
+		panic("unable to load app config")
+	}
+}
 
 // holds the number of YES and NO shares owned by all users in a market
 type MarketPosition struct {
@@ -48,7 +59,7 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	allBetsOnMarket = tradingdata.GetBetsForMarket(db, marketIDUint)
 
 	// Get a timeline of probability changes for the market
-	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
+	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(appConfig, publicResponseMarket.CreatedAt, allBetsOnMarket)
 
 	// Calculate the distribution of YES and NO shares based on DBPM
 	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)

@@ -11,31 +11,43 @@ import (
 //go:embed setup.yaml
 var setupYaml []byte
 
+type MarketCreation struct {
+	InitialMarketProbability   float64 `yaml:"initialMarketProbability"`
+	InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization"`
+	InitialMarketYes           int64   `yaml:"initialMarketYes"`
+	InitialMarketNo            int64   `yaml:"initialMarketNo"`
+}
+
+type MarketIncentives struct {
+	CreateMarketCost int64 `yaml:"createMarketCost"`
+	TraderBonus      int64 `yaml:"traderBonus"`
+}
+
+type User struct {
+	InitialAccountBalance int64 `yaml:"initialAccountBalance"`
+	MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed"`
+}
+
+type BetFees struct {
+	InitialBetFee int64 `yaml:"initialBetFee"`
+	EachBetFee    int64 `yaml:"eachBetFee"`
+	SellSharesFee int64 `yaml:"sellSharesFee"`
+}
+
+type Betting struct {
+	MinimumBet int64   `yaml:"minimumBet"`
+	BetFees    BetFees `yaml:"betFees"`
+}
+
+type Economics struct {
+	MarketCreation   MarketCreation   `yaml:"marketcreation"`
+	MarketIncentives MarketIncentives `yaml:"marketincentives"`
+	User             User             `yaml:"user"`
+	Betting          Betting          `yaml:"betting"`
+}
+
 type EconomicConfig struct {
-	Economics struct {
-		MarketCreation struct {
-			InitialMarketProbability   float64 `yaml:"initialMarketProbability"`
-			InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization"`
-			InitialMarketYes           int64   `yaml:"initialMarketYes"`
-			InitialMarketNo            int64   `yaml:"initialMarketNo"`
-		} `yaml:"marketcreation"`
-		MarketIncentives struct {
-			CreateMarketCost int64 `yaml:"createMarketCost"`
-			TraderBonus      int64 `yaml:"traderBonus"`
-		} `yaml:"marketincentives"`
-		User struct {
-			InitialAccountBalance int64 `yaml:"initialAccountBalance"`
-			MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed"`
-		} `yaml:"user"`
-		Betting struct {
-			MinimumBet int64 `yaml:"minimumBet"`
-			BetFees    struct {
-				InitialBetFee int64 `yaml:"initialBetFee"`
-				EachBetFee    int64 `yaml:"eachBetFee"`
-				SellSharesFee int64 `yaml:"sellSharesFee"`
-			} `yaml:"betFees"`
-		} `yaml:"betting"`
-	} `yaml:"economics"`
+	Economics Economics `yaml:"economics"`
 }
 
 var economicConfig *EconomicConfig

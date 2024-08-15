@@ -50,7 +50,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(appConfig, publicResponseMarket.CreatedAt, bets)
 
 	// find the number of users on the market
 	numUsers := usersHandlers.GetNumMarketUsers(bets)

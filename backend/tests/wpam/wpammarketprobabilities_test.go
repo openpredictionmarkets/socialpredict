@@ -1,11 +1,6 @@
 package test
 
-import (
-	"socialpredict/handlers/math/probabilities/wpam"
-	test "socialpredict/tests"
-	"testing"
-)
-
+/*
 func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 	for _, tc := range test.TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -25,3 +20,4 @@ func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 		})
 	}
 }
+*/

@@ -25,7 +25,7 @@ func init() {
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
-func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+func CalculateMarketProbabilitiesWPAM(conf *setup.EconomicConfig, marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
 	var probabilityChanges []ProbabilityChange
 
 	// Initial state using values from appConfig
@@ -45,9 +45,15 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 			totalNo += bet.Amount
 		}
 
-		newProbability := (P_initial*float64(I_initial) + float64(totalYes)) / (float64(I_initial) + float64(totalYes) + float64(totalNo))
+		newProbability := calcProbability(P_initial, I_initial, totalYes, totalNo)
 		probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: newProbability, Timestamp: bet.PlacedAt})
 	}
 
 	return probabilityChanges
+}
+
+func calcProbability(initialProbability float64, initialInvestment int64, totalYes int64, totalNo int64) float64 {
+	res := (initialProbability*float64(initialInvestment) + float64(totalYes)) / (float64(initialInvestment) + float64(totalYes) + float64(totalNo))
+	log.Printf("res: %f, prob: %f, inv: %d, yes: %d, no: %d", res, initialProbability, initialInvestment, totalYes, totalNo)
+	return res
 }
