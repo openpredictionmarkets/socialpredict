@@ -10,6 +10,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+
         <div className='App bg-primary-background text-white flex h-[calc(100vh-96px)]'>
           <Sidebar />
           <div className='flex flex-col flex-grow'>
