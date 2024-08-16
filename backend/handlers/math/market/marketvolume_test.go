@@ -1,11 +1,11 @@
-package test
+package marketmath
 
 import (
-	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/models"
 	"testing"
 )
 
+// TestGetMarketVolume tests that the total volume of trades is returned correctly
 func TestGetMarketVolume(t *testing.T) {
 	tests := []struct {
 		Name           string
@@ -66,11 +66,11 @@ func TestGetMarketVolume(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.Name, func(t *testing.T) {
-			volume := marketmath.GetMarketVolume(tc.Bets)
-			if volume != tc.ExpectedVolume {
-				t.Errorf("%s: expected %d, got %d", tc.Name, tc.ExpectedVolume, volume)
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			volume := GetMarketVolume(test.Bets)
+			if volume != test.ExpectedVolume {
+				t.Errorf("%s: expected %d, got %d", test.Name, test.ExpectedVolume, volume)
 			}
 		})
 	}
