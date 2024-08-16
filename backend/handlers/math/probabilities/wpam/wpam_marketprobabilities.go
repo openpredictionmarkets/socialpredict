@@ -52,6 +52,7 @@ func CalculateMarketProbabilitiesWPAM(conf *setup.EconomicConfig, marketCreatedA
 	return probabilityChanges
 }
 
+// calcProbability calculates the overall probability given the initial market conditions and the current bet allocation
 func calcProbability(initialProbability float64, initialInvestment int64, totalYes int64, totalNo int64) float64 {
 	res := (initialProbability*float64(initialInvestment) + float64(totalYes)) / (float64(initialInvestment) + float64(totalYes) + float64(totalNo))
 	log.Printf("res: %f, prob: %f, inv: %d, yes: %d, no: %d", res, initialProbability, initialInvestment, totalYes, totalNo)

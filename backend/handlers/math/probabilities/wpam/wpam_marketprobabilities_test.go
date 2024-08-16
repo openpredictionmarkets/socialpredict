@@ -179,14 +179,14 @@ func TestCalcProbability(t *testing.T) {
 	}{
 		{
 			name:      "no bets",
-			appConfig: buildAppConfig(t, .5, 10, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
+			appConfig: buildInitialMarketAppConfig(t, .5, 10, 0, 0), //buildAppConfig(t, .5, 10, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
 			no:        0,
 			yes:       0,
 			want:      .5,
 		},
 		{
 			name:      "3 yes",
-			appConfig: buildAppConfig(t, .5, 1, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
+			appConfig: buildInitialMarketAppConfig(t, .5, 1, 3, 0), //buildAppConfig(t, .5, 1, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
 			no:        0,
 			yes:       3,
 			want:      .875,
@@ -202,8 +202,23 @@ func TestCalcProbability(t *testing.T) {
 	}
 }
 
-// {{{0.5 10 0 0} {10 1} {0 500} {1 {1 0 0}}}},
-func buildAppConfig(t *testing.T, initProbability float64, initSubsidization int64, initYes int64, initNo int64, createCost int64, bonus int64, initBalance int64, maxDebt int64, minBet int64, initBetFee int64, betFee int64, sellFee int64) *setup.EconomicConfig {
+// buildInitialMarketAppConfig builds the MarketCreation portion of the app config
+func buildInitialMarketAppConfig(t *testing.T, probability float64, subsidization, yes, no int64) *setup.EconomicConfig {
+	t.Helper()
+	return &setup.EconomicConfig{
+		Economics: setup.Economics{
+			MarketCreation: setup.MarketCreation{
+				InitialMarketProbability:   probability,
+				InitialMarketSubsidization: subsidization,
+				InitialMarketYes:           yes,
+				InitialMarketNo:            no,
+			},
+		},
+	}
+}
+
+// buildAppConfig builds an entire appConfig
+func buildAppConfig(t *testing.T, initProbability float64, initSubsidization, initYes, initNo, createCost, bonus, initBalance, maxDebt, minBet, initBetFee, betFee, sellFee int64) *setup.EconomicConfig {
 	t.Helper()
 	return &setup.EconomicConfig{
 		Economics: setup.Economics{
