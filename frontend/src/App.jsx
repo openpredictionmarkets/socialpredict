@@ -10,14 +10,14 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className='flex flex-col h-[calc(100vh-6rem)] bg-primary-background text-white sm:pl-sidebar sm:pr-sidebar'>
-          <div className='flex-grow'>
-            <Sidebar />
-            <main className='h-full'>
+        <div className='App bg-primary-background text-white flex h-[calc(100vh-96px)]'>
+          <Sidebar />
+          <div className='flex flex-col flex-grow'>
+            <main className='flex-grow p-0 sm:p-4'>
               <AppRoutes />
             </main>
+            <Footer />
           </div>
-          <Footer />
         </div>
       </Router>
     </AuthProvider>
