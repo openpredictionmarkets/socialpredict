@@ -2,47 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
-
-const MobileMarketCard = ({ marketData }) => (
-  <div className='bg-gray-800 p-4 mb-4 rounded-lg'>
-    <div className='flex justify-between items-center mb-2'>
-      <div className='flex items-center flex-grow mr-2 min-w-0'>
-        <span role='img' aria-label='Creator' className='mr-2 flex-shrink-0'>
-          {marketData.creator.personalEmoji}
-        </span>
-        <Link
-          to={`/markets/${marketData.market.id}`}
-          className='text-blue-400 hover:text-blue-300 font-medium truncate'
-        >
-          {marketData.market.questionTitle}
-        </Link>
-      </div>
-      <Link
-        to={`/markets/${marketData.market.id}`}
-        className='bg-blue-500 text-white px-3 py-1 rounded-full text-sm flex-shrink-0'
-      >
-        Bet
-      </Link>
-    </div>
-    <div className='flex justify-between text-sm text-gray-400'>
-      <span>👤 {marketData.numUsers}</span>
-      <span>{marketData.lastProbability.toFixed(2)}%</span>
-      {marketData.market.isResolved ? (
-        <span
-          className={
-            marketData.market.resolutionResult === 'YES'
-              ? 'text-green-400'
-              : 'text-red-400'
-          }
-        >
-          {marketData.market.resolutionResult}
-        </span>
-      ) : (
-        <span className='text-green-400'>Placeholder</span>
-      )}
-    </div>
-  </div>
-);
+import MobileMarketCard from '../../components/tables/MobileMarketCard';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -124,7 +84,7 @@ const MarketRow = ({ marketData }) => (
           {marketData.market.resolutionResult}
         </span>
       ) : (
-        'Open'
+        'Pending'
       )}
     </td>
   </tr>
@@ -160,7 +120,7 @@ function MarketsTable() {
     return <div className='p-4 text-center'>No markets found.</div>;
 
   return (
-    <div className='w-screen md:w-full h-full overflow-y-auto px-4 md:px-6 lg:px-8'>
+    <div className='w-screen md:w-full h-[calc(100vh-40px)] sm:h-full overflow-y-auto px-4 md:px-6 lg:px-8'>
       <h1 className='text-2xl font-semibold text-gray-300 mb-6'>Markets</h1>
       <div className='md:hidden'>
         {marketsData.map((marketData, index) => (
