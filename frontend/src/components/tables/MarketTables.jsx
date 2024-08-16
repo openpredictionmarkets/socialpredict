@@ -16,7 +16,7 @@ const TableHeader = () => (
         '👤 Users',
         '📊 Size',
         '💬',
-        'Status',
+        'Resolution',
       ].map((header, index) => (
         <th
           key={index}
@@ -81,7 +81,9 @@ const MarketRow = ({ marketData }) => (
               : 'text-red-400'
           }
         >
-          {marketData.market.resolutionResult}
+          {marketData.market.resolutionResult === 'YES'
+            ? 'Resolved YES'
+            : 'Resolved NO'}
         </span>
       ) : (
         'Pending'

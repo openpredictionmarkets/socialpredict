@@ -48,11 +48,13 @@ const MobileMarketCard = ({ marketData }) => {
               ? marketData.market.resolutionResult === 'YES'
                 ? 'text-green-400'
                 : 'text-red-400'
-              : 'text-green-400'
+              : 'text-gray-400'
           }`}
         >
           {marketData.market.isResolved
-            ? marketData.market.resolutionResult
+            ? marketData.market.resolutionResult === 'YES'
+              ? 'Resolved YES'
+              : 'Resolved NO'
             : 'Pending'}
         </span>
       </div>
