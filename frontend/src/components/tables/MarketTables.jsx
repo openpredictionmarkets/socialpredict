@@ -5,6 +5,7 @@ import formatResolutionDate from '../../helpers/formatResolutionDate';
 import MobileMarketCard from '../../components/tables/MobileMarketCard';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 
+
 const TableHeader = () => (
   <thead className='bg-gray-900'>
     <tr>
@@ -116,6 +117,7 @@ function MarketsTable() {
     fetchMarkets();
   }, []);
 
+
   if (loading)
     return (
       <div className='p-4 text-center'>
@@ -152,6 +154,7 @@ function MarketsTable() {
           </div>
         </>
       )}
+
     </div>
   );
 }

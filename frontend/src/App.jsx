@@ -27,6 +27,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 
 function App() {
   return (
+
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
       onReset={() => {
@@ -47,6 +48,7 @@ function App() {
         </Router>
       </AuthProvider>
     </ErrorBoundary>
+
   );
 }
 

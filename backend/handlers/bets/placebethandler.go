@@ -61,11 +61,6 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logging.LogAnyType(user.AccountBalance, "user.AccountBalance before")
-	// Deduct the bet and switching sides fee amount from the user's balance
-	user.AccountBalance -= betRequest.Amount
-	logging.LogAnyType(user.AccountBalance, "user.AccountBalance after")
-
 	// Update the user's balance in the database
 	if err := db.Save(&user).Error; err != nil {
 		http.Error(w, "Error updating user balance: "+err.Error(), http.StatusInternalServerError)
