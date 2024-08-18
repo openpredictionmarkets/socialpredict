@@ -104,12 +104,12 @@ function MarketsTable() {
         const response = await fetch(`${API_URL}/api/v0/markets`);
         if (!response.ok) throw new Error('Failed to fetch markets');
         const data = await response.json();
-        setMarketsData(data.markets || []); // Ensure marketsData is always an array
+        setMarketsData(data.markets || []);
       } catch (error) {
         console.error('Error fetching market data:', error);
         setError(error.toString());
       } finally {
-        setLoading(true);
+        setTimeout(() => setLoading(false), 300);
       }
     };
 
