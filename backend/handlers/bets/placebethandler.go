@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
-	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/setup"
