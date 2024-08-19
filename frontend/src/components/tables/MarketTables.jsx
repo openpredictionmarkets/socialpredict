@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import MobileMarketCard from '../../components/tables/MobileMarketCard';
+import LoadingSpinner from '../../components/loaders/LoadingSpinner';
+
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -103,44 +105,56 @@ function MarketsTable() {
         const response = await fetch(`${API_URL}/api/v0/markets`);
         if (!response.ok) throw new Error('Failed to fetch markets');
         const data = await response.json();
-        setMarketsData(data.markets);
+        setMarketsData(data.markets || []);
       } catch (error) {
         console.error('Error fetching market data:', error);
         setError(error.toString());
       } finally {
-        setLoading(false);
+        setTimeout(() => setLoading(false), 300);
       }
     };
 
     fetchMarkets();
   }, []);
 
-  if (loading) return <div className='p-4 text-center'>Loading markets...</div>;
+
+  if (loading)
+    return (
+      <div className='p-4 text-center'>
+        <LoadingSpinner />
+        Loading markets...
+      </div>
+    );
   if (error)
     return <div className='p-4 text-center text-red-500'>Error: {error}</div>;
-  if (marketsData.length === 0)
-    return <div className='p-4 text-center'>No markets found.</div>;
 
   return (
     <div className='w-screen md:w-full h-[calc(100vh-40px)] sm:h-full overflow-y-auto px-4 md:px-6 lg:px-8'>
       <h1 className='text-2xl font-semibold text-gray-300 mb-6'>Markets</h1>
-      <div className='md:hidden'>
-        {marketsData.map((marketData, index) => (
-          <MobileMarketCard key={index} marketData={marketData} />
-        ))}
-      </div>
-      <div className='hidden md:block bg-gray-800 shadow-md rounded-lg overflow-hidden'>
-        <div className='overflow-x-auto'>
-          <table className='min-w-full divide-y divide-gray-700'>
-            <TableHeader />
-            <tbody className='bg-gray-800 divide-y divide-gray-700'>
-              {marketsData.map((marketData, index) => (
-                <MarketRow key={index} marketData={marketData} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {marketsData.length === 0 ? (
+        <div className='p-4 text-center text-gray-400'>No markets found.</div>
+      ) : (
+        <>
+          <div className='md:hidden'>
+            {marketsData.map((marketData, index) => (
+              <MobileMarketCard key={index} marketData={marketData} />
+            ))}
+          </div>
+          <div className='hidden md:block bg-gray-800 shadow-md rounded-lg overflow-hidden'>
+            <div className='overflow-x-auto'>
+              <table className='min-w-full divide-y divide-gray-700'>
+                <TableHeader />
+                <tbody className='bg-gray-800 divide-y divide-gray-700'>
+                  {marketsData.map((marketData, index) => (
+                    <MarketRow key={index} marketData={marketData} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
     </div>
   );
 }
