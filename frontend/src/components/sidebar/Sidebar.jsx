@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../helpers/AuthContent';
+import { useAuth } from '../../helpers/AuthContent'
+import useUserCredit from '../utils/userFinanceTools/FetchUserCredit';
 import LoginModalButton from '../modals/login/LoginModalClick';
 import {
   AboutSVG,
   AdminGearSVG,
+  CoinsSVG,
   HomeSVG,
   LockPasswordSVG,
   LogoutSVG,
@@ -31,10 +33,18 @@ const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
 );
 
 const Sidebar = () => {
-  const { isLoggedIn, usertype, logout, changePasswordNeeded } = useAuth();
+  const { isLoggedIn, usertype, logout, changePasswordNeeded, username } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { userCredit, loading, error } = useUserCredit(username); // Correct destructuring
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  const renderCredit = () => {
+    if (loading) return <p>Loading...</p>;  // Check usage here
+    if (error) return <p>Error: {error}</p>;
+    if (userCredit !== null) return <p>🪙 {userCredit}</p>;
+    return <p>No credit information available</p>;
+  };
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -115,6 +125,9 @@ const Sidebar = () => {
 
     return (
       <>
+        <SidebarLink to='/profile' icon={CoinsSVG} >
+          {renderCredit()}
+        </SidebarLink>      
         <SidebarLink to='/' icon={HomeSVG}>
           Home
         </SidebarLink>
