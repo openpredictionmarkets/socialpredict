@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-type UserCreditResponse struct {
+type UserCredit struct {
 	Credit int `json:"credit"`
 }
 
@@ -44,7 +44,7 @@ func GetUserCreditResponse(w http.ResponseWriter, r *http.Request) {
 
 	userCredit := calculateUserCredit(db, username)
 
-	response := UserCreditResponse{
+	response := UserCredit{
 		Credit: userCredit,
 	}
 
