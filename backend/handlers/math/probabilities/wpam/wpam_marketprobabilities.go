@@ -25,7 +25,7 @@ func init() {
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
-func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) ([]ProbabilityChange, int, int) {
 	var probabilityChanges []ProbabilityChange
 
 	// Initial state using values from appConfig
@@ -49,5 +49,5 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 		probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: newProbability, Timestamp: bet.PlacedAt})
 	}
 
-	return probabilityChanges
+	return probabilityChanges, int(totalYes), int(totalNo)
 }

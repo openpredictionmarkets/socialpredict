@@ -9,6 +9,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	usersHandlers "socialpredict/handlers/users"
+	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
@@ -47,7 +48,9 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	var marketOverviews []MarketOverview
 	for _, market := range markets {
 		bets := tradingdata.GetBetsForMarket(db, uint(market.ID))
-		probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
+		probabilityChanges, totalYes, totalNo := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
+		logging.LogAnyType(totalYes, "totalYes")
+		logging.LogAnyType(totalNo, "totalNo")
 		numUsers := models.GetNumMarketUsers(bets)
 		marketVolume := marketmath.GetMarketVolume(bets)
 		lastProbability := probabilityChanges[len(probabilityChanges)-1].Probability

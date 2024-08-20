@@ -8,6 +8,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	usersHandlers "socialpredict/handlers/users"
+	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
@@ -51,7 +52,9 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, bets)
+	probabilityChanges, totalYes, totalNo := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, bets)
+	logging.LogAnyType(totalYes, "totalYes")
+	logging.LogAnyType(totalNo, "totalNo")
 
 	// find the number of users on the market
 	numUsers := models.GetNumMarketUsers(bets)
