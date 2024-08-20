@@ -26,7 +26,7 @@ type UserCredit struct {
 	Credit int `json:"credit"`
 }
 
-// for usage on sidebar or continuously throughout application in order to continuously show available spend
+// gets the user's available credits for display
 func GetUserCreditResponse(w http.ResponseWriter, r *http.Request) {
 
 	// accept get requests
