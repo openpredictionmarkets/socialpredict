@@ -27,7 +27,7 @@ type UserCredit struct {
 }
 
 // gets the user's available credits for display
-func GetUserCreditResponse(w http.ResponseWriter, r *http.Request) {
+func GetUserCreditHandler(w http.ResponseWriter, r *http.Request) {
 
 	// accept get requests
 	if r.Method != http.MethodGet {
