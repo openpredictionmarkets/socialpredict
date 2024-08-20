@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"socialpredict/middleware"
 	"socialpredict/setup"
 	"socialpredict/util"
 
+	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
@@ -35,18 +35,12 @@ func GetUserCreditResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract username from the URL path
+	vars := mux.Vars(r)
+	username := vars["username"]
+
 	// Use database connection
 	db := util.GetDB()
-
-	// Validate the token and get the user
-	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
-	if httperr != nil {
-		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	// The username is extracted from the token
-	username := user.Username
 
 	userCredit := calculateUserCredit(db, username)
 
