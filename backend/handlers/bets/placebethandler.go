@@ -76,7 +76,7 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate the final bet before putting into database
-	if err := betutils.ValidateBuy(db, &bet); err != nil {
+	if err := bet.ValidateBuy(db); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
