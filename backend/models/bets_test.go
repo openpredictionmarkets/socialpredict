@@ -1,7 +1,10 @@
 package models
 
 import (
+	"errors"
 	"testing"
+
+	"gorm.io/gorm"
 )
 
 func TestGetNumMarketUsers(t *testing.T) {
@@ -36,6 +39,29 @@ func TestGetNumMarketUsers(t *testing.T) {
 			got := GetNumMarketUsers(test.bets)
 			if got != test.want {
 				t.Errorf("%d market users, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestValidateBuy_invalid(t *testing.T) {
+	tests := []struct {
+		name string
+		bet  Bet
+		db   gorm.DB
+		want error
+	}{
+		{
+			name: "invalid user",
+			bet:  buildBet(t, 1, "u1"),
+			db:   gorm.DB{},
+			want: errors.New("invalid username"),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.bet.ValidateBuy(&test.db); err == nil {
+				t.Errorf("No error received, want %v", test.want)
 			}
 		})
 	}
