@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -28,4 +29,31 @@ func GetNumMarketUsers(bets []Bet) int {
 	}
 
 	return len(userMap)
+}
+
+func (bet *Bet) ValidateBuy(db *gorm.DB) error {
+	var user User
+	var market Market
+
+	// Check if username exists
+	if err := db.First(&user, "username = ?", bet.Username).Error; err != nil {
+		return errors.New("invalid username")
+	}
+
+	// Check if market exists and is open
+	if err := db.First(&market, "id = ? AND is_resolved = false", bet.MarketID).Error; err != nil {
+		return errors.New("invalid or closed market")
+	}
+
+	// Check for valid amount: it should be greater than or equal to 1
+	if bet.Amount < 1 {
+		return errors.New("amount must be greater than or equal to 1 for buying")
+	}
+
+	// Validate bet outcome: it should be either 'YES' or 'NO'
+	if bet.Outcome != "YES" && bet.Outcome != "NO" {
+		return errors.New("bet outcome must be 'YES' or 'NO'")
+	}
+
+	return nil
 }
