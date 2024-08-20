@@ -45,6 +45,7 @@ func Start() {
 
 	// handle public user stuff
 	router.HandleFunc("/v0/userinfo/{username}", usershandlers.GetPublicUserResponse).Methods("GET")
+	router.HandleFunc("/v0/usercredit/{username}", usershandlers.GetUserCreditResponse).Methods("GET")
 	// user portfolio, (which is public)
 	router.HandleFunc("/v0/portfolio/{username}", usershandlers.GetPublicUserPortfolio).Methods("GET")
 
