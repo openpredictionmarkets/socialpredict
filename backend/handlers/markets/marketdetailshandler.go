@@ -82,6 +82,8 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		ProbabilityChanges: probabilityChanges,
 		NumUsers:           numUsers,
 		TotalVolume:        marketVolume,
+		TotalYes:           totalYes,
+		TotalNo:            totalNo,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
