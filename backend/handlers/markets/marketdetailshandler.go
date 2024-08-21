@@ -23,6 +23,8 @@ type MarketDetailHandlerResponse struct {
 	ProbabilityChanges []wpam.ProbabilityChange                  `json:"probabilityChanges"`
 	NumUsers           int                                       `json:"numUsers"`
 	TotalVolume        int64                                     `json:"totalVolume"`
+	TotalYes           int64                                     `json:"totalYes"`
+	TotalNo            int64                                     `json:"totalNo"`
 }
 
 func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
