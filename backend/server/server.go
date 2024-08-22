@@ -8,6 +8,7 @@ import (
 	betshandlers "socialpredict/handlers/bets"
 	marketshandlers "socialpredict/handlers/markets"
 	"socialpredict/handlers/positions"
+	setuphandlers "socialpredict/handlers/setup"
 	usershandlers "socialpredict/handlers/users"
 	"socialpredict/middleware"
 
@@ -34,6 +35,8 @@ func Start() {
 	router.HandleFunc("/v0/home", handlers.HomeHandler)
 	router.HandleFunc("/v0/login", middleware.LoginHandler)
 
+	// application setup information
+	router.HandleFunc("/v0/setup", setuphandlers.GetSetupHandler).Methods("GET")
 	// markets display, market information
 	router.HandleFunc("/v0/markets", marketshandlers.ListMarketsHandler).Methods("GET")
 	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")

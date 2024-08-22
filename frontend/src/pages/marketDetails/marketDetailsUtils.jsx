@@ -37,16 +37,3 @@ export const calculateCurrentProbability = (details) => {
 
     return parseFloat(currentProbability.toFixed(3));
 };
-
-
-
-
-
-
-
-//const roundedProbability = parseFloat(newCurrentProbability.toFixed(3));
-
-        // Append the current time with the last known probability, converted to Unix time
-//        const [currentProbability, setCurrentProbability] = useState(null);
-//        const currentTimeStamp = new Date().getTime();
-//        chartData.push({ time: currentTimeStamp, P: roundedProbability });
