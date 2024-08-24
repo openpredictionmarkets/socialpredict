@@ -1,4 +1,4 @@
-package setuphandlers
+package setup
 
 import (
 	"encoding/json"
