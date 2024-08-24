@@ -7,6 +7,7 @@ import (
 )
 
 func GetSetupHandler(w http.ResponseWriter, r *http.Request) {
+
 	appConfig, err := setup.LoadEconomicsConfig()
 	if err != nil {
 		http.Error(w, "Failed to load economic config", http.StatusInternalServerError)
