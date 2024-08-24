@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// Define a variable to allow mocking
 var loadEconomicsConfig = setup.LoadEconomicsConfig
 
 func TestGetSetupHandler(t *testing.T) {
