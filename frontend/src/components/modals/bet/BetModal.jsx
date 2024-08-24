@@ -3,7 +3,7 @@ import { BetButton } from '../../buttons/trade/BetButtons';
 import TradeTabs from '../../tabs/TradeTabs';
 import { submitBet } from './BetUtils'
 
-const BetModalButton = ({ marketId, token, onTransactionSuccess }) => {
+const BetModalButton = ({ marketId, token, onTransactionSuccess, currentProbability, totalYes, totalNo }) => {
     const [showBetModal, setShowBetModal] = useState(false);
     const toggleBetModal = () => setShowBetModal(prev => !prev);
 
@@ -25,6 +25,9 @@ const BetModalButton = ({ marketId, token, onTransactionSuccess }) => {
                         marketId={marketId}
                         token={token}
                         onTransactionSuccess={handleTransactionSuccess}
+                        currentProbability={currentProbability}
+                        totalYes={totalYes}
+                        totalNo={totalNo}                        
                     />
 
                         <button onClick={toggleBetModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">

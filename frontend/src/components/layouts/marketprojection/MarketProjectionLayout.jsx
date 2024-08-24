@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 const MarketProjectionLayout = ({ currentProbability, totalYes, totalNo, addedYes = 0, addedNo = 0 }) => {
     const [setupData, setSetupData] = useState(null);
 
+
     useEffect(() => {
-        fetch('/api/getSetup')
+        fetch('/api/v0/setup')
             .then(response => response.json())
             .then(data => setSetupData(data))
             .catch(error => console.error('Error fetching setup data:', error));
@@ -25,10 +26,8 @@ const MarketProjectionLayout = ({ currentProbability, totalYes, totalNo, addedYe
 
     return (
         <div className="market-projection-layout">
-            <h2>Market Projections</h2>
             <div className="projection-details">
-                <p>Current Probability: {currentProbability.toFixed(4)}</p>
-                <p>Projected Probability: {nextProbability.toFixed(4)}</p>
+                <p>New Market Probability: {nextProbability.toFixed(4)}</p>
             </div>
         </div>
     );

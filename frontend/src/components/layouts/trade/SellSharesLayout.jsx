@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons';
 import { fetchUserShares, submitSale } from './TradeUtils'
+import MarketProjectionLayout from '../marketprojection/MarketProjectionLayout';
 
-const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
+const SellSharesLayout = ({ marketId, token, onTransactionSuccess, currentProbability, totalYes, totalNo }) => {
     const [shares, setShares] = useState({ NoSharesOwned: 0, YesSharesOwned: 0 });
     const [sellAmount, setSellAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
@@ -91,8 +92,17 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
                         {shares.NoSharesOwned > 0 &&
                             <ConfirmSaleButton onClick={() => handleSaleSubmission('NO')} selectedDirection="NO">Sell NO</ConfirmSaleButton>}
                         {shares.YesSharesOwned > 0 &&
-                            <ConfirmSaleButton onClick={() => handleSaleSubmission('YES')} selectedDirection="YES">Sell YES</ConfirmSaleButton>}
+                            <ConfirmSaleButton onClick={() => handleSaleSubmission('YES')} selectedDirection="YES">Sell YES</ConfirmSaleButton>
+                        }
                     </div>
+                    <div className="border-t border-gray-200 my-2"></div>
+                    <MarketProjectionLayout
+                        currentProbability={currentProbability}
+                        totalYes={totalYes}
+                        totalNo={totalNo}
+                        addedYes={selectedOutcome === 'YES' ? sellAmount : 0}
+                        addedNo={selectedOutcome === 'NO' ? sellAmount : 0}
+                    />                    
                 </>
             )}
         </div>

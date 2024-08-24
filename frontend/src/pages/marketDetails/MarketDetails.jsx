@@ -46,6 +46,9 @@ const MarketDetails = () => {
             token={token}
             disabled={!token}
             onTransactionSuccess={refetchData}
+            currentProbability={currentProbability}
+            totalYes={details.totalYes}
+            totalNo={details.totalNo}
             className='text-xs px-4 py-2'
           />
         )}

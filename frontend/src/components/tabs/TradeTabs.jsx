@@ -3,7 +3,7 @@ import SiteTabs from './SiteTabs';
 import BuySharesLayout from '../layouts/trade/BuySharesLayout'
 import SellSharesLayout from '../layouts/trade/SellSharesLayout'
 
-const TradeTabs = ({ marketId, token, onTransactionSuccess }) => {
+const TradeTabs = ({ marketId, token, onTransactionSuccess, currentProbability, totalYes, totalNo }) => {
     const tabsData = [
         {
             label: 'Purchase Shares',
@@ -11,6 +11,9 @@ const TradeTabs = ({ marketId, token, onTransactionSuccess }) => {
                         marketId={marketId}
                         token={token}
                         onTransactionSuccess={onTransactionSuccess}
+                        currentProbability={currentProbability}
+                        totalYes={totalYes}
+                        totalNo={totalNo}                        
                     />
         },
         {
@@ -19,6 +22,9 @@ const TradeTabs = ({ marketId, token, onTransactionSuccess }) => {
                         marketId={marketId}
                         token={token}
                         onTransactionSuccess={onTransactionSuccess}
+                        currentProbability={currentProbability}
+                        totalYes={-totalYes}
+                        totalNo={-totalNo}
                     />
         },
     ];

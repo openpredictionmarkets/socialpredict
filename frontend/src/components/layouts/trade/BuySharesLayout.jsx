@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/trade/BetButtons';
-import { submitBet } from './TradeUtils'
+import { submitBet } from './TradeUtils';
+import MarketProjectionLayout from '../marketprojection/MarketProjectionLayout';
 
-
-const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
+const BuySharesLayout = ({ marketId, token, onTransactionSuccess, currentProbability, totalYes, totalNo }) => {
     const [betAmount, setBetAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
 
@@ -45,6 +45,16 @@ const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
                 <BetInputAmount value={betAmount} onChange={handleBetAmountChange} />
             </div>
             <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} />
+            <div>
+            <div className="border-t border-gray-200 my-2"></div>           
+            <MarketProjectionLayout
+                currentProbability={currentProbability}
+                totalYes={totalYes}
+                totalNo={totalNo}
+                addedYes={selectedOutcome === 'YES' ? betAmount : 0}
+                addedNo={selectedOutcome === 'NO' ? betAmount : 0}
+            />
+            </div>
         </div>
     );
 };
