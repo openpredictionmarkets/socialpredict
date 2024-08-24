@@ -264,7 +264,17 @@ Lastly, choose an admin password.
 
 Once you're done, type `./SocialPredict up` to spin up a SocialPredict instance ready to deploy to the web, and navigate to your domain to see if it works.
 
-If you want to spin down your SocialPredict instance, just type `./SocialPredict down` in your console.
+If you want to spin down your SocialPredict instance, just type `./SocialPredict down` in your console. **If you need to reinstall SocialPredict, make sure to run `./SocialPredict down` first**.
+
+#### Using SocialPredict on the web
+
+Congratulations, you should now have a version of SocialPredict deployed to the web! To get started with it, log in with your admin credentials. From here, you will not be able to create markets, but you will be able to create new users who do not have admin powers but can create markets.
+
+Navigate to the little cog icon to create your first user. Copy the user credentials to your clipboard, then log out of your admin account and log in as the new user.
+
+You will be prompted to change your password. Do this, and you will then be logged out automatically. Log in as your new user account with your changed password and you will now be able to create markets. If other people want accounts, they will have to contact the administrator for manual account creation.
+
+By default users start with an initial account balance of 0 credits and can go up to 500 credits in debt. This can be changed by editing `setup.yaml` **prior to installing SocialPredict**.
 
 ### Prod Tools
 
