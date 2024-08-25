@@ -3,7 +3,6 @@ package betutils
 import (
 	"errors"
 	"socialpredict/models"
-	"time"
 
 	"gorm.io/gorm"
 )
@@ -23,12 +22,8 @@ func CheckMarketStatus(db *gorm.DB, marketID uint) error {
 		return errors.New("error fetching market")
 	}
 
-	if market.IsResolved {
-		return errors.New("cannot place a bet on a resolved market")
-	}
-
-	if time.Now().After(market.ResolutionDateTime) {
-		return errors.New("cannot place a bet on a closed market")
+	if market.IsClosed() {
+		return errors.New("cannot place an order on a closed market")
 	}
 
 	return nil

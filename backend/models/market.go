@@ -21,3 +21,21 @@ type Market struct {
 	CreatorUsername         string    `json:"creatorUsername" gorm:"not null"`
 	Creator                 User      `gorm:"foreignKey:CreatorUsername;references:Username"`
 }
+
+func (m *Market) IsClosed() bool {
+	if !m.IsResolved {
+		return false
+	}
+
+	// TODO: Decide if we should be using one or both of the below conditions
+	if time.Now().Before(m.ResolutionDateTime) {
+		return false
+	}
+
+	if time.Now().Before(m.FinalResolutionDateTime) {
+		return false
+	}
+
+	return true
+
+}
