@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ func TestHandleHTTPError(t *testing.T) {
 			testName:       "Nil",
 			w:              httptest.NewRecorder(),
 			err:            nil,
-			statusCode:     200,
+			statusCode:     http.StatusOK,
 			userMessage:    "",
 			output:         "",
 			wrappedMessage: "",
@@ -34,7 +35,7 @@ func TestHandleHTTPError(t *testing.T) {
 			testName:       "Server Error 500",
 			w:              httptest.NewRecorder(),
 			err:            errors.New("foo"),
-			statusCode:     500,
+			statusCode:     http.StatusInternalServerError,
 			userMessage:    "bar",
 			output:         "Error: foo",
 			wrappedMessage: "{\"error\":\"bar\"}",
