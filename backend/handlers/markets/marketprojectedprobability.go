@@ -32,6 +32,12 @@ func ProjectNewProbabilityHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
+
+	if marketIDUint64 > uint64(^uint(0)) {
+		http.Error(w, "Market ID is out of range", http.StatusBadRequest)
+		return
+	}
+
 	marketIDUint := uint(marketIDUint64)
 
 	// Convert amount to int64
