@@ -2,6 +2,7 @@ package marketshandlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"socialpredict/handlers/marketpublicresponse"
 	"socialpredict/handlers/math/probabilities/wpam"
@@ -16,6 +17,9 @@ import (
 
 // ProjectNewProbabilityHandler handles the projection of a new probability based on a new bet.
 func ProjectNewProbabilityHandler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Activated ProjectNewProbabilityHandler.")
+
 	// Parse market ID, amount, and outcome from the URL
 	vars := mux.Vars(r)
 	marketId := vars["marketId"]
