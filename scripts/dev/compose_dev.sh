@@ -6,6 +6,8 @@
 if [ "$1" = "up" ]; then
 	docker compose --env-file $ENV_PATH --file "$SCRIPT_DIR/scripts/docker-compose-dev.yaml" up -d && \
 	echo "SocialPredict may be found at http://localhost . This may take a few seconds to load initially."
+  	echo "Here are the initial settings. These can be changed in setup.yaml"
+	cat $SCRIPT_DIR/backend/setup/setup.yaml
 elif [ "$1" = "down" ]; then
 	docker compose --env-file $ENV_PATH --file "$SCRIPT_DIR/scripts/docker-compose-dev.yaml" down
 else
