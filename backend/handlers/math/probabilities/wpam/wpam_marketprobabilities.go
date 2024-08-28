@@ -12,15 +12,9 @@ type ProbabilityChange struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
-// appConfig holds the loaded application configuration accessible within the package
-var appConfig *setup.EconomicConfig
-
-func init() {
-	appConfig = setup.MustLoadEconomicsConfig()
-}
-
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
-func CalculateMarketProbabilitiesWPAM(conf *setup.EconomicConfig, marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+func CalculateMarketProbabilitiesWPAM(loadEconomicsConfig func() *setup.EconomicConfig, marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+	appConfig := loadEconomicsConfig()
 	var probabilityChanges []ProbabilityChange
 
 	// Initial state using values from appConfig
