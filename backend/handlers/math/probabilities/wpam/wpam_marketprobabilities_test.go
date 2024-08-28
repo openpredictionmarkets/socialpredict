@@ -1,6 +1,7 @@
 package wpam_test
 
 import (
+	"fmt"
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
@@ -48,8 +49,8 @@ var TestCases = []TestCase{
 		},
 		ProbabilityChanges: []wpam.ProbabilityChange{
 			{Probability: 0.5},
-			{Probability: 0.615385},
-			{Probability: 0.571429},
+			{Probability: 0.61538461538461542},
+			{Probability: 0.57142857142857140},
 		},
 		S_YES: 3,
 		S_NO:  1,
@@ -111,11 +112,11 @@ var TestCases = []TestCase{
 		},
 		ProbabilityChanges: []wpam.ProbabilityChange{
 			{Probability: 0.50},
-			{Probability: 0.545455},
+			{Probability: 0.54545454545454541},
 			{Probability: 0.50},
-			{Probability: 0.454545},
+			{Probability: 0.45454545454545453},
 			{Probability: 0.50},
-			{Probability: 0.454545},
+			{Probability: 0.45454545454545453},
 		},
 		S_YES: 0,
 		S_NO:  1,
@@ -146,6 +147,7 @@ var TestCases = []TestCase{
 func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 	for _, tc := range TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
+
 			// Call the function under test
 			probChanges := wpam.CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
 
@@ -155,10 +157,14 @@ func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 
 			for i, pc := range probChanges {
 				expected := tc.ProbabilityChanges[i]
+
+				fmt.Printf("at index %d, expected probability %.17f, got %.17f\n", i, expected.Probability, pc.Probability)
+
 				if pc.Probability != expected.Probability {
-					t.Errorf("at index %d, expected probability %f, got %f", i, expected.Probability, pc.Probability)
+					t.Errorf("at index %d, expected probability %.17f, got %.17f", i, expected.Probability, pc.Probability)
 				}
 			}
+
 		})
 	}
 }
