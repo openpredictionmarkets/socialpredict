@@ -15,75 +15,70 @@ import (
 	"gorm.io/gorm"
 )
 
-// appConfig holds the loaded application configuration accessible within the package
-var appConfig *setup.EconomicConfig
+func AddUserHandler(loadEconomicsConfig func() *setup.EconomicConfig) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+			return
+		}
 
-func init() {
-	appConfig = setup.MustLoadEconomicsConfig()
-}
+		var req struct {
+			Username string `json:"username"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			return
+		}
 
-func AddUserHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
-		return
+		if match, _ := regexp.MatchString("^[a-zA-Z0-9]+$", req.Username); !match {
+			http.Error(w, "Username must only contain letters and numbers", http.StatusBadRequest)
+			return
+		}
+
+		db := util.GetDB()
+
+		// validate that the user performing this function is indeed admin
+		middleware.ValidateAdminToken(r, db)
+
+		appConfig := loadEconomicsConfig()
+
+		user := models.User{
+			Username:              req.Username,
+			DisplayName:           util.UniqueDisplayName(db),
+			Email:                 util.UniqueEmail(db),
+			UserType:              "REGULAR",
+			InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
+			AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
+			PersonalEmoji:         randomEmoji(),
+			ApiKey:                util.GenerateUniqueApiKey(db),
+			MustChangePassword:    true,
+		}
+
+		// Check uniqueness of username, displayname, and email
+		if err := checkUniqueFields(db, &user); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		password := gofakeit.Password(true, true, true, false, false, 12)
+		if err := user.HashPassword(password); err != nil {
+			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			return
+		}
+
+		if result := db.Create(&user); result.Error != nil {
+			http.Error(w, "Failed to create user", http.StatusInternalServerError)
+			return
+		}
+
+		responseData := map[string]interface{}{
+			"message":  "User created successfully",
+			"username": user.Username,
+			"password": password,
+			"usertype": user.UserType,
+		}
+		json.NewEncoder(w).Encode(responseData)
 	}
-
-	var req struct {
-		Username string `json:"username"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Error decoding request body", http.StatusBadRequest)
-		return
-	}
-
-	if match, _ := regexp.MatchString("^[a-zA-Z0-9]+$", req.Username); !match {
-		http.Error(w, "Username must only contain letters and numbers", http.StatusBadRequest)
-		return
-	}
-
-	db := util.GetDB()
-
-	// validate that the user performing this function is indeed admin
-	middleware.ValidateAdminToken(r, db)
-
-	var user models.User
-
-	user = models.User{
-		Username:              req.Username,
-		DisplayName:           util.UniqueDisplayName(db),
-		Email:                 util.UniqueEmail(db),
-		UserType:              "REGULAR",
-		InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
-		AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
-		PersonalEmoji:         randomEmoji(),
-		ApiKey:                util.GenerateUniqueApiKey(db),
-		MustChangePassword:    true,
-	}
-
-	// Check uniqueness of username, displayname, and email
-	if err := checkUniqueFields(db, &user); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	password := gofakeit.Password(true, true, true, false, false, 12)
-	if err := user.HashPassword(password); err != nil {
-		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
-		return
-	}
-
-	if result := db.Create(&user); result.Error != nil {
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
-		return
-	}
-
-	responseData := map[string]interface{}{
-		"message":  "User created successfully",
-		"username": user.Username,
-		"password": password,
-		"usertype": user.UserType,
-	}
-	json.NewEncoder(w).Encode(responseData)
 }
 
 func checkUniqueFields(db *gorm.DB, user *models.User) error {

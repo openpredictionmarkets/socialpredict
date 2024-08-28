@@ -10,6 +10,7 @@ import (
 	"socialpredict/handlers/positions"
 	usershandlers "socialpredict/handlers/users"
 	"socialpredict/middleware"
+	"socialpredict/setup"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -65,7 +66,7 @@ func Start() {
 	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler).Methods("POST")
 
 	// admin stuff
-	router.HandleFunc("/v0/admin/createuser", adminhandlers.AddUserHandler).Methods("POST")
+	router.HandleFunc("/v0/admin/createuser", adminhandlers.AddUserHandler(setup.MustLoadEconomicsConfig)).Methods("POST")
 
 	// Apply the CORS middleware to the Gorilla Mux router
 	handler := c.Handler(router) // Use the Gorilla Mux router here
