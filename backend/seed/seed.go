@@ -21,10 +21,7 @@ func getEnv(key string) (string, error) {
 
 func SeedUsers(db *gorm.DB) {
 
-	config, err := setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
+	config := setup.MustLoadEconomicsConfig()
 
 	adminPassword, err := getEnv("ADMIN_PASSWORD")
 	if err != nil {

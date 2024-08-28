@@ -2,7 +2,6 @@ package dbpm
 
 import (
 	"fmt"
-	"log"
 	"math"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
@@ -27,11 +26,7 @@ type MarketPosition struct {
 var appConfig *setup.EconomicConfig
 
 func init() {
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
+	appConfig = setup.MustLoadEconomicsConfig()
 }
 
 // DivideUpMarketPoolShares divides the market pool into YES and NO pools based on the resolution probability.

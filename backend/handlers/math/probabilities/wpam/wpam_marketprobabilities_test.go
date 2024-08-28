@@ -145,10 +145,7 @@ var TestCases = []TestCase{
 }
 
 func TestCalculateMarketProbabilities(t *testing.T) {
-	appConfig, err := setup.LoadEconomicsConfig()
-	if err != nil {
-		t.Fatalf("Unable to load economics config")
-	}
+	appConfig := setup.MustLoadEconomicsConfig()
 	log.Printf("app config: %v", appConfig)
 	for _, tc := range TestCases {
 		t.Run(tc.Name, func(t *testing.T) {

@@ -3,7 +3,6 @@ package adminhandlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"regexp"
@@ -20,11 +19,7 @@ import (
 var appConfig *setup.EconomicConfig
 
 func init() {
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
+	appConfig = setup.MustLoadEconomicsConfig()
 }
 
 func AddUserHandler(w http.ResponseWriter, r *http.Request) {

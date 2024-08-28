@@ -16,11 +16,7 @@ import (
 var appConfig *setup.EconomicConfig
 
 func init() {
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		panic("unable to load app config")
-	}
+	appConfig = setup.MustLoadEconomicsConfig()
 }
 
 // holds the number of YES and NO shares owned by all users in a market

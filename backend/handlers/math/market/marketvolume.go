@@ -1,7 +1,6 @@
 package marketmath
 
 import (
-	"log"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
@@ -11,11 +10,7 @@ var appConfig *setup.EconomicConfig
 
 func init() {
 	// Load configuration
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
+	appConfig = setup.MustLoadEconomicsConfig()
 }
 
 // getMarketVolume returns the total volume of trades for a given market

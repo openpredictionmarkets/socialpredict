@@ -55,14 +55,17 @@ var economicConfig *EconomicConfig
 // load once as a singleton pattern
 var once sync.Once
 
-func LoadEconomicsConfig() (*EconomicConfig, error) {
+func MustLoadEconomicsConfig() *EconomicConfig {
 	once.Do(func() {
 		economicConfig = &EconomicConfig{}
 		err := yaml.Unmarshal(setupYaml, economicConfig)
 		if err != nil {
-			log.Println("Error parsing YAML config:", err) // Log here or just pass the error up
-			return
+			log.Fatal("Error parsing YAML config:", err) // If the config cannot be loaded, the application cannot recover.
 		}
 	})
-	return economicConfig, nil
+	return economicConfig
+}
+
+func init() {
+	MustLoadEconomicsConfig()
 }

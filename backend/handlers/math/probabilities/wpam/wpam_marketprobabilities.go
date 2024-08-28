@@ -16,12 +16,7 @@ type ProbabilityChange struct {
 var appConfig *setup.EconomicConfig
 
 func init() {
-	// Load configuration
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
+	appConfig = setup.MustLoadEconomicsConfig()
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.

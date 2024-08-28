@@ -2,7 +2,6 @@ package betshandlers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
 	"socialpredict/logging"
@@ -17,11 +16,7 @@ import (
 var appConfig *setup.EconomicConfig
 
 func init() {
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
+	appConfig = setup.MustLoadEconomicsConfig()
 }
 
 func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
