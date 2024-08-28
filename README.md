@@ -1,3 +1,7 @@
+## Staging
+
+Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.com/) to see what the latest deployed version of master looks like. May be down if we are testing something.
+
 ## README/ Contents
 
 - [Info on Local Setup](/README/LOCAL_SETUP.md)

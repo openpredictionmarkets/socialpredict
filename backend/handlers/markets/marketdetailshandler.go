@@ -9,6 +9,7 @@ import (
 	"socialpredict/handlers/tradingdata"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/setup"
+	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
 
@@ -54,7 +55,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(setup.MustLoadEconomicsConfig, publicResponseMarket.CreatedAt, bets)
 
 	// find the number of users on the market
-	numUsers := usersHandlers.GetNumMarketUsers(bets)
+	numUsers := models.GetNumMarketUsers(bets)
 	if err != nil {
 		http.Error(w, "Error retrieving number of users.", http.StatusInternalServerError)
 		return

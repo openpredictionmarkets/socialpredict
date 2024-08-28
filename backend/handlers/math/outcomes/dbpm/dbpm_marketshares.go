@@ -38,12 +38,10 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 
 	// Get the last probability change which is the resolution probability
 	R := probabilityChanges[len(probabilityChanges)-1].Probability
-	logging.LogAnyType(R, "R")
 
 	// Get the total share pool S as a float for precision
 	// Include the initial market subsidization in the displayed volume
 	S := float64(marketmath.GetMarketVolume(bets) + appConfig.Economics.MarketCreation.InitialMarketSubsidization)
-	logging.LogAnyType(S, "S")
 
 	// initial condition, shares set to zero
 	S_YES := int64(0)
@@ -57,20 +55,14 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 		if singleShareDirection == "YES" {
 			logging.LogMsg("Evaluating single share direction YES")
 			S_YES = 1
-			logging.LogAnyType(S_YES, "S_YES")
-			logging.LogAnyType(S_NO, "S_NO")
 		} else {
 			logging.LogMsg("Evaluating single share direction NO")
 			S_NO = 1
-			logging.LogAnyType(S_YES, "S_YES")
-			logging.LogAnyType(S_NO, "S_NO")
 		}
 	} else {
 		logging.LogMsg("No single share direction")
 		S_YES = int64(math.Round(S * R))
-		logging.LogAnyType(S_YES, "S_YES")
 		S_NO = int64(math.Round(S * (1 - R)))
-		logging.LogAnyType(S_NO, "S_NO")
 	}
 
 	// Convert results to int64, rounding in predictable way
@@ -79,8 +71,6 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 
 // Returns "YES", "NO", or "", indicating the outcome of the single share or no outcome if shares > 1.
 func SingleShareYesNoAllocator(bets []models.Bet) string {
-
-	logging.LogMsg("Evaluating SingleShareYesNoAllocator()")
 
 	total := int64(0)
 	for _, bet := range bets {
@@ -121,8 +111,6 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: C_i, Outcome: bet.Outcome})
 	}
 
-	logging.LogAnyType(coursePayouts, "coursePayouts")
-
 	return coursePayouts
 }
 
@@ -139,9 +127,6 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 		}
 	}
 
-	logging.LogAnyType(C_YES_SUM, "C_YES_SUM")
-	logging.LogAnyType(C_NO_SUM, "C_NO_SUM")
-
 	// Calculate normalization factor for YES
 	if C_YES_SUM > 0 {
 		F_YES = float64(S_YES) / C_YES_SUM
@@ -155,9 +140,6 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 	} else {
 		F_NO = 0
 	}
-
-	logging.LogAnyType(F_YES, "F_YES")
-	logging.LogAnyType(F_NO, "F_NO")
 
 	return math.Abs(F_YES), math.Abs(F_NO)
 }
@@ -184,8 +166,6 @@ func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []Co
 
 		scaledPayouts[i] = int64(math.Round(scaledPayout))
 	}
-
-	logging.LogAnyType(scaledPayouts, "scaledPayouts")
 
 	return scaledPayouts
 }
@@ -226,8 +206,6 @@ func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
 			}
 		}
 	}
-
-	logging.LogAnyType(scaledPayouts, "scaledPayouts")
 
 	return scaledPayouts
 }

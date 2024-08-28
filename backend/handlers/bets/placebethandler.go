@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
-	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/setup"
@@ -55,11 +54,6 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Insufficient balance", http.StatusBadRequest)
 		return
 	}
-
-	logging.LogAnyType(user.AccountBalance, "user.AccountBalance before")
-	// Deduct the bet and switching sides fee amount from the user's balance
-	user.AccountBalance -= betRequest.Amount
-	logging.LogAnyType(user.AccountBalance, "user.AccountBalance after")
 
 	// Update the user's balance in the database
 	if err := db.Save(&user).Error; err != nil {

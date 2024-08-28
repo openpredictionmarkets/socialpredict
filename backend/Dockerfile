@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM golang:1.21-bookworm
+FROM golang:1.23-bookworm
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 

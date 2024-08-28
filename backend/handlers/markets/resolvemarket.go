@@ -21,8 +21,6 @@ import (
 func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 
 	logging.LogMsg("Attempting to use ResolveMarketHandler.")
-	logging.LogAnyType(r, "r")
-	logging.LogAnyType(w, "w")
 
 	// Use database connection
 	db := util.GetDB()
@@ -31,15 +29,11 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
 
-	logging.LogAnyType(marketIdStr, "marketIdStr")
-
 	marketId, err := strconv.ParseUint(marketIdStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
-
-	logging.LogAnyType(marketId, "marketId")
 
 	// Validate token and get user
 	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
@@ -47,8 +41,6 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 		return
 	}
-
-	logging.LogAnyType(user, "user")
 
 	// Parse request body for resolution outcome
 	var resolutionData struct {
