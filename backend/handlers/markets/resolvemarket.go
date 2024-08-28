@@ -90,7 +90,6 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 	market.IsResolved = true
 	market.ResolutionResult = resolutionData.Outcome
 	market.FinalResolutionDateTime = time.Now()
-	// TODO: Do we also need to set market.ResolutionDateTime here?
 
 	// Handle payouts (if applicable)
 	err = distributePayouts(&market, db)
