@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-var loadEconomicsConfig = setup.LoadEconomicsConfig
-
 func TestGetSetupHandler(t *testing.T) {
 	tests := []struct {
 		Name             string
@@ -31,14 +29,21 @@ func TestGetSetupHandler(t *testing.T) {
 				"User":{"InitialAccountBalance":0,"MaximumDebtAllowed":500},
 				"Betting":{"MinimumBet":1,"BetFees":{"InitialBetFee":1,"EachBetFee":0,"SellSharesFee":0}}}`,
 			IsJSONResponse: true,
+		}, {
+			Name: "failed to load config",
+			MockConfigLoader: func() (*setup.EconomicConfig, error) {
+				return nil, http.ErrBodyNotAllowed
+			},
+			ExpectedStatus:   http.StatusInternalServerError,
+			ExpectedResponse: "Failed to load economic config",
+			IsJSONResponse:   false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
 			// Replace the actual loader function with the mock
-			loadEconomicsConfig = test.MockConfigLoader
-			defer func() { loadEconomicsConfig = setup.LoadEconomicsConfig }()
+			loadEconomicsConfig := test.MockConfigLoader
 
 			req, err := http.NewRequest("GET", "/setup", nil)
 			if err != nil {
@@ -46,7 +51,7 @@ func TestGetSetupHandler(t *testing.T) {
 			}
 
 			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(GetSetupHandler)
+			handler := http.HandlerFunc(GetSetupHandler(loadEconomicsConfig))
 
 			handler.ServeHTTP(rr, req)
 
