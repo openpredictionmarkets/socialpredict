@@ -12,7 +12,7 @@ import (
 
 func TestHandleHTTPError(t *testing.T) {
 	tests := []struct {
-		testName       string
+		name           string
 		w              *httptest.ResponseRecorder
 		err            error
 		statusCode     int
@@ -22,7 +22,7 @@ func TestHandleHTTPError(t *testing.T) {
 		res            bool
 	}{
 		{
-			testName:       "Nil",
+			name:           "Nil",
 			w:              httptest.NewRecorder(),
 			err:            nil,
 			statusCode:     http.StatusOK,
@@ -32,7 +32,7 @@ func TestHandleHTTPError(t *testing.T) {
 			res:            false,
 		},
 		{
-			testName:       "Server Error 500",
+			name:           "Server Error 500",
 			w:              httptest.NewRecorder(),
 			err:            errors.New("foo"),
 			statusCode:     http.StatusInternalServerError,
@@ -43,22 +43,25 @@ func TestHandleHTTPError(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		currentWriter := log.Writer()
-		var buf bytes.Buffer
-		log.SetOutput(&buf)
-		res := HandleHTTPError(test.w, test.err, test.statusCode, test.userMessage)
-		log.SetOutput(currentWriter)
-		if test.res != res {
-			t.Errorf("%s: expected %t, got %t", test.testName, test.res, res)
-		}
-		if test.w.Code != test.statusCode {
-			t.Errorf("%s: expected %d, got %d", test.testName, test.statusCode, test.w.Code)
-		}
-		if !strings.Contains(test.w.Body.String(), test.wrappedMessage) {
-			t.Errorf("%s: expected %s, got %s", test.testName, strings.TrimRight(test.w.Body.String(), "\n"), test.wrappedMessage)
-		}
-		if !strings.Contains(buf.String(), test.output) {
-			t.Errorf("%s: expected Error%s, got %s", test.testName, strings.SplitN(strings.TrimRight(buf.String(), "\n"), "Error", 1)[0], test.output)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			currentWriter := log.Writer()
+			var buf bytes.Buffer
+			log.SetOutput(&buf)
+			res := HandleHTTPError(test.w, test.err, test.statusCode, test.userMessage)
+			log.SetOutput(currentWriter)
+			if test.res != res {
+				t.Errorf("got %t, want %t", test.res, res)
+			}
+			if test.w.Code != test.statusCode {
+				t.Errorf("got %d, want %d", test.statusCode, test.w.Code)
+			}
+			if !strings.Contains(test.w.Body.String(), test.wrappedMessage) {
+				t.Errorf("got %s, want %s", strings.TrimRight(test.w.Body.String(), "\n"), test.wrappedMessage)
+			}
+			if !strings.Contains(buf.String(), test.output) {
+				t.Errorf("got Error%s, want %s", strings.SplitN(strings.TrimRight(buf.String(), "\n"), "Error", 1)[0], test.output)
+			}
+		})
+
 	}
 }
