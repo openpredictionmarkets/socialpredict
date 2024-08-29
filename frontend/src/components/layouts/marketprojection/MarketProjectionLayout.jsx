@@ -16,15 +16,17 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
         setError(null);
 
         try {
-            const response = await fetch(`${API_URL}/v0/marketprojection/${marketId}/${amount}/${direction}/`);
+            const response = await fetch(`${API_URL}/api/v0/marketprojection/${marketId}/${amount}/${direction}/`);
             if (!response.ok) {
                 throw new Error(`Error fetching data: ${response.statusText}`);
             }
 
-            // Log the raw response
-            console.log('Raw response:', response);
+            // Log the raw text of the response
+            const responseText = await response.text();
+            console.log('Response text:', responseText);
 
-            const data = await response.json();
+            // Try parsing the response as JSON
+            const data = JSON.parse(responseText);
 
             // Log the parsed JSON data
             console.log('Parsed JSON data:', data);
