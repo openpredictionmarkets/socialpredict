@@ -26,20 +26,14 @@ func ProjectNewProbabilityHandler(w http.ResponseWriter, r *http.Request) {
 	amountStr := vars["amount"]
 	outcome := vars["outcome"]
 
-	// Convert market ID to uint
-	marketIDUint64, err := strconv.ParseUint(marketId, 10, 64)
+	// Parse marketId string directly into a uint
+	marketIDUint64, err := strconv.ParseUint(marketId, 10, strconv.IntSize)
 	if err != nil {
 		http.Error(w, "Invalid market ID", http.StatusBadRequest)
 		return
 	}
 
-	log.Panicln("Hello World")
-
-	if marketIDUint64 > uint64(^uint(0)) {
-		http.Error(w, "Market ID is out of range", http.StatusBadRequest)
-		return
-	}
-
+	// Convert to uint (will be either uint32 or uint64 depending on platform)
 	marketIDUint := uint(marketIDUint64)
 
 	// Convert amount to int64
