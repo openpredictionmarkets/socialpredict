@@ -49,12 +49,15 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate the request (check if market exists, if not closed/resolved, etc.)
 	betutils.CheckMarketStatus(db, betRequest.MarketID)
 
+	// Extract fee based upon Economics configuration
+	// eachBetFee := appConfig.Economics.Betting.BetFees.EachBetFee
+
 	// Check if the user has enough balance to place the bet
 	// Use the appConfig for configuration values
 	maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
 
 	// Check if the user's balance after the bet would be lower than the allowed maximum debt
-	// deduct fee in case of switching sides
+	// deduct fees
 	if user.AccountBalance-betRequest.Amount < -maximumDebtAllowed {
 		http.Error(w, "Insufficient balance", http.StatusBadRequest)
 		return

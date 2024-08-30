@@ -16,3 +16,4 @@ economics:
       initialBetFee: 1
       eachBetFee: 0
       sellSharesFee: 0
+      switchSidesFee: 0
