@@ -18,7 +18,7 @@ import (
 // ProjectNewProbabilityHandler handles the projection of a new probability based on a new bet.
 func ProjectNewProbabilityHandler(w http.ResponseWriter, r *http.Request) {
 
-	log.Printf("Activated ProjectNewProbabilityHandler.")
+	log.Print("Activated ProjectNewProbabilityHandler.")
 
 	// Parse market ID, amount, and outcome from the URL
 	vars := mux.Vars(r)
