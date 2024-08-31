@@ -1,9 +1,10 @@
 package betutils
 
 import (
-	"errors"
+	"log"
+	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
-	"time"
+	"socialpredict/setup"
 
 	"gorm.io/gorm"
 )
@@ -21,20 +22,56 @@ func init() {
 
 // Get initial bet fee, if applicable, for user on market.
 // If this is the first bet on this market, apply a fee.
-func GetUserInitialBetFee(db *gorm.DB, marketID uint, user *models.User) initialBetFee int64 {
+func getUserInitialBetFee(db *gorm.DB, marketID uint, user *models.User) int64 {
 
 	var initialBetFee int64
 
 	// Fetch bets for the market
-	var allBetsOnMarket []models.Bet
-	allBetsOnMarket = tradingdata.GetBetsForMarket(db, marketID)
+	allBetsOnMarket := tradingdata.GetBetsForMarket(db, marketID)
 
-	var market models.Market
-	if result := db.First(allBetsOnMarket.username, user); result.Error != nil {
-		initialBetFee = appConfig.Economics.Betting.BetFees.initialBetFee
+	var totalBetCount int64 = 0
+
+	for _, bet := range allBetsOnMarket {
+		if bet.Username == user.Username {
+			totalBetCount += 1
+		}
+	}
+
+	if totalBetCount == 0 {
+		// no fee
+	} elseif
+
+	if result := db.First(&allBetsOnMarket.Username, "Username = ?", user.Username); result.Error != nil {
+		initialBetFee = appConfig.Economics.Betting.BetFees.InitialBetFee
 	} else {
 		initialBetFee = 0
 	}
 
 	return initialBetFee
+}
+
+func getTransactionFee(betRequest models.Bet) int64 {
+
+	var transactionFee int64
+
+	// if amount > 0, buying share, else selling share
+	if betRequest.Amount > 0 {
+		transactionFee = appConfig.Economics.Betting.BetFees.BuySharesFee
+	} else {
+		transactionFee = appConfig.Economics.Betting.BetFees.SellSharesFee
+	}
+
+	return transactionFee
+}
+
+func GetSumBetFees(db *gorm.DB, user *models.User, betRequest models.Bet) int64 {
+
+	MarketID := betRequest.MarketID
+
+	initialBetFee := getUserInitialBetFee(db, MarketID, user)
+	transactionFee := getTransactionFee(betRequest)
+
+	sumOfBetFees := initialBetFee + transactionFee
+
+	return sumOfBetFees
 }
