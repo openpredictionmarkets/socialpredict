@@ -27,7 +27,6 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 
 function App() {
   return (
-
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
       onReset={() => {
@@ -36,19 +35,17 @@ function App() {
     >
       <AuthProvider>
         <Router>
-          <div className='App bg-primary-background text-white flex h-[calc(100vh-96px)]'>
+          <div className='App bg-primary-background min-h-screen text-white flex flex-col md:flex-row'>
             <Sidebar />
             <div className='flex flex-col flex-grow'>
-              <main className='flex-grow p-0 sm:p-4'>
+              <main className='flex-grow p-4 sm:p-6 overflow-y-auto'>
                 <AppRoutes />
               </main>
-              <Footer />
             </div>
           </div>
         </Router>
       </AuthProvider>
     </ErrorBoundary>
-
   );
 }
 

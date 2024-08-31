@@ -19,8 +19,8 @@ const MarketDetails = () => {
   const isResolved = details?.market?.isResolved === true;
 
   return (
-    <div className='flex flex-col space-y-8'>
-      <div className='flex-grow'>
+    <div className='flex flex-col h-full'>
+      <div className='flex-grow overflow-y-auto'>
         <MarketDetailsTable
           market={details.market}
           creator={details.creator}
@@ -31,7 +31,7 @@ const MarketDetails = () => {
           marketId={details.market.id}
         />
       </div>
-      <div className='flex items-center justify-center  space-x-4'>
+      <div className='flex items-center justify-center mb-8 space-x-4 py-4'>
         {isCreator && !isResolved && (
           <ResolveModalButton
             marketId={details.market.id}
