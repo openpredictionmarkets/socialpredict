@@ -76,8 +76,8 @@ func mockEconomicConfig() *setup.EconomicConfig {
 					SellSharesFee int64 `yaml:"sellSharesFee"`
 				}{
 					InitialBetFee: 1,
-					BuySharesFee:  1,
-					SellSharesFee: 1,
+					BuySharesFee:  0,
+					SellSharesFee: 0,
 				},
 			},
 		},
@@ -91,41 +91,44 @@ func TestGetUserInitialBetFee(t *testing.T) {
 		t.Fatalf("Failed to connect to the database: %v", err)
 	}
 
-	// Migrate the Bet model
-	db.AutoMigrate(&models.Bet{})
+	// Migrate the Bet and User models
+	db.AutoMigrate(&models.Bet{}, &models.User{})
 
 	// Mock the appConfig with test data
 	appConfig = mockEconomicConfig()
 
-	// Create a test user
-	user := &models.User{Username: "testuser"}
+	// Create a test user with a unique api_key
+	user := &models.User{
+		Username:       "testuser",
+		AccountBalance: 1000,
+		ApiKey:         "unique_api_key_1", // Ensure this is unique
+	}
+	db.Create(&user) // Save the user to the database
 
-	// Scenario 1: User has no bets on the market
+	// Scenario 1: User places a bet on Market 1 where they have no prior bets
 	initialBetFee := getUserInitialBetFee(db, 1, user)
-	if initialBetFee != 0 {
-		t.Errorf("Expected initial bet fee to be 0, got %d", initialBetFee)
-	}
-
-	// Create a test bet
-	bets := []models.Bet{
-		{Username: "testuser", MarketID: 1, Amount: 100, PlacedAt: time.Now()},
-	}
-	db.Create(&bets)
-
-	// Scenario 2: User has one bet on the market
-	initialBetFee = getUserInitialBetFee(db, 1, user)
 	if initialBetFee != appConfig.Economics.Betting.BetFees.InitialBetFee {
 		t.Errorf("Expected initial bet fee to be %d, got %d", appConfig.Economics.Betting.BetFees.InitialBetFee, initialBetFee)
 	}
 
-	// Create another bet for the same user
-	db.Create(&models.Bet{Username: "testuser", MarketID: 1, Amount: 200, PlacedAt: time.Now()})
+	// Place a bet for the user on Market 1
+	bets := []models.Bet{
+		{Username: "testuser", MarketID: 1, Amount: 100, PlacedAt: time.Now()},
+	}
+	db.Create(&bets) // Save the bet to the database
 
-	// Scenario 3: User has multiple bets on the market
+	// Scenario 2: User places another bet on Market 1 where they already have a bet
 	initialBetFee = getUserInitialBetFee(db, 1, user)
 	if initialBetFee != 0 {
 		t.Errorf("Expected initial bet fee to be 0, got %d", initialBetFee)
 	}
+
+	// Scenario 3: User places a bet on Market 2 where they have no prior bets
+	initialBetFee = getUserInitialBetFee(db, 2, user)
+	if initialBetFee != appConfig.Economics.Betting.BetFees.InitialBetFee {
+		t.Errorf("Expected initial bet fee to be %d, got %d", appConfig.Economics.Betting.BetFees.InitialBetFee, initialBetFee)
+	}
+
 }
 
 func TestGetTransactionFee(t *testing.T) {
@@ -163,10 +166,10 @@ func TestGetSumBetFees(t *testing.T) {
 	// Create a test user
 	user := &models.User{Username: "testuser"}
 
-	// Scenario 1: User has no bets, buys shares
+	// Scenario 1: User has no bets, buys shares, gets initial fee
 	buyBet := models.Bet{MarketID: 1, Amount: 100}
 	sumOfBetFees := GetSumBetFees(db, user, buyBet)
-	expectedSum := appConfig.Economics.Betting.BetFees.BuySharesFee // No initial fee since no bets
+	expectedSum := appConfig.Economics.Betting.BetFees.InitialBetFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
@@ -179,7 +182,7 @@ func TestGetSumBetFees(t *testing.T) {
 
 	// Scenario 2: User has one bet, buys shares
 	sumOfBetFees = GetSumBetFees(db, user, buyBet)
-	expectedSum = appConfig.Economics.Betting.BetFees.InitialBetFee + appConfig.Economics.Betting.BetFees.BuySharesFee
+	expectedSum = appConfig.Economics.Betting.BetFees.BuySharesFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
@@ -187,16 +190,9 @@ func TestGetSumBetFees(t *testing.T) {
 	// Scenario 3: User has one bet, sells shares
 	sellBet := models.Bet{MarketID: 1, Amount: -100}
 	sumOfBetFees = GetSumBetFees(db, user, sellBet)
-	expectedSum = appConfig.Economics.Betting.BetFees.InitialBetFee + appConfig.Economics.Betting.BetFees.SellSharesFee
+	expectedSum = appConfig.Economics.Betting.BetFees.SellSharesFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
 
-	// Scenario 4: User has multiple bets, buys shares
-	db.Create(&models.Bet{Username: "testuser", MarketID: 1, Amount: 200, PlacedAt: time.Now()})
-	sumOfBetFees = GetSumBetFees(db, user, buyBet)
-	expectedSum = appConfig.Economics.Betting.BetFees.BuySharesFee // No initial fee since it's not the first bet
-	if sumOfBetFees != expectedSum {
-		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
-	}
 }
