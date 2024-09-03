@@ -38,10 +38,8 @@ func getUserInitialBetFee(db *gorm.DB, marketID uint, user *models.User) int64 {
 	}
 
 	if totalBetCount == 0 {
-		// no fee
-	} elseif
-
-	if result := db.First(&allBetsOnMarket.Username, "Username = ?", user.Username); result.Error != nil {
+		initialBetFee = 0
+	} else if totalBetCount == 1 {
 		initialBetFee = appConfig.Economics.Betting.BetFees.InitialBetFee
 	} else {
 		initialBetFee = 0
