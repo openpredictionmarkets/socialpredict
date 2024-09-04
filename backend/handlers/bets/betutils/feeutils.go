@@ -3,7 +3,6 @@ package betutils
 import (
 	"log"
 	"socialpredict/handlers/tradingdata"
-	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/setup"
 
@@ -45,8 +44,6 @@ func getUserInitialBetFee(db *gorm.DB, marketID uint, user *models.User) int64 {
 		initialBetFee = 0
 	}
 
-	logging.LogAnyType(initialBetFee, "initialBetFee")
-
 	return initialBetFee
 }
 
@@ -61,8 +58,6 @@ func getTransactionFee(betRequest models.Bet) int64 {
 		transactionFee = appConfig.Economics.Betting.BetFees.SellSharesFee
 	}
 
-	logging.LogAnyType(transactionFee, "transactionFee")
-
 	return transactionFee
 }
 
@@ -74,8 +69,6 @@ func GetSumBetFees(db *gorm.DB, user *models.User, betRequest models.Bet) int64 
 	transactionFee := getTransactionFee(betRequest)
 
 	sumOfBetFees := initialBetFee + transactionFee
-
-	logging.LogAnyType(sumOfBetFees, "sumOfBetFees in summing function")
 
 	return sumOfBetFees
 }
