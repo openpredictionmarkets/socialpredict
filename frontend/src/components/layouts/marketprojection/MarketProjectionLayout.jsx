@@ -55,7 +55,7 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
                     <p>New Market Probability: {projectionData.projectedprobability.toFixed(4)}</p>
                 )}
                 {!projectionData && !error && !loading && (
-                    <p>Click "Update Projection" to see the market probability.</p>
+                    <p>Click "Update Projection" to see the new market probability after this trade.</p>
                 )}
             </div>
         </div>
