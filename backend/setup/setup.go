@@ -31,7 +31,7 @@ type EconomicConfig struct {
 			MinimumBet int64 `yaml:"minimumBet"`
 			BetFees    struct {
 				InitialBetFee int64 `yaml:"initialBetFee"`
-				EachBetFee    int64 `yaml:"eachBetFee"`
+				BuySharesFee  int64 `yaml:"buySharesFee"`
 				SellSharesFee int64 `yaml:"sellSharesFee"`
 			} `yaml:"betFees"`
 		} `yaml:"betting"`
