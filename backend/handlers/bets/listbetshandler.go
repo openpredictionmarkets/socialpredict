@@ -67,7 +67,7 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func processBetsForDisplay(marketCreatedAtTime time.Time, bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
-
+	_ = db //silences warning about db parameter being unused
 	// Calculate probabilities using the fetched bets
 	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(setup.MustLoadEconomicsConfig, marketCreatedAtTime, bets)
 

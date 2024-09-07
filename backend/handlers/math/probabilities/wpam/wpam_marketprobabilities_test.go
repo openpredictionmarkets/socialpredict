@@ -14,7 +14,7 @@ func TestCalculateMarketProbabilities(t *testing.T) {
 		Name               string
 		Bets               []models.Bet
 		ProbabilityChanges []ProbabilityChange
-		appConfig          func() *setup.EconomicConfig
+		appConfig          setup.EconConfigLoader
 	}{
 		{
 			Name: "Prevent simultaneous shares held",
@@ -39,7 +39,7 @@ func TestCalculateMarketProbabilities(t *testing.T) {
 				{Probability: 0.875},
 				{Probability: 0.7},
 			},
-			appConfig: func() *setup.EconomicConfig { return buildInitialMarketAppConfig(t, .5, 1, 0, 0) },
+			appConfig: func() *setup.EconomicConfig { return setup.BuildInitialMarketAppConfig(t, .5, 1, 0, 0) },
 		},
 		{
 			Name: "infinity avoidance",
@@ -88,7 +88,7 @@ func TestCalculateMarketProbabilities(t *testing.T) {
 				{Probability: 0.50},
 				{Probability: 0.25},
 			},
-			appConfig: func() *setup.EconomicConfig { return buildInitialMarketAppConfig(t, .5, 1, 0, 0) },
+			appConfig: func() *setup.EconomicConfig { return setup.BuildInitialMarketAppConfig(t, .5, 1, 0, 0) },
 		},
 	}
 	for _, test := range tests {
@@ -113,14 +113,14 @@ func TestCalculateMarketProbabilities(t *testing.T) {
 func TestCalcProbability(t *testing.T) {
 	tests := []struct {
 		name      string
-		appConfig func() *setup.EconomicConfig
+		appConfig setup.EconConfigLoader
 		no        int64
 		yes       int64
 		want      float64
 	}{
 		{
 			name:      "NoBets",
-			appConfig: func() *setup.EconomicConfig { return buildInitialMarketAppConfig(t, .5, 10, 0, 0) }, //buildAppConfig(t, .5, 10, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
+			appConfig: func() *setup.EconomicConfig { return setup.BuildInitialMarketAppConfig(t, .5, 10, 0, 0) }, //buildAppConfig(t, .5, 10, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
 
 			no:   0,
 			yes:  0,
@@ -128,7 +128,7 @@ func TestCalcProbability(t *testing.T) {
 		},
 		{
 			name:      "3YesBets",
-			appConfig: func() *setup.EconomicConfig { return buildInitialMarketAppConfig(t, .5, 1, 3, 0) }, //buildAppConfig(t, .5, 1, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
+			appConfig: func() *setup.EconomicConfig { return setup.BuildInitialMarketAppConfig(t, .5, 1, 3, 0) }, //buildAppConfig(t, .5, 1, 0, 0, 10, 1, 0, 500, 1, 1, 0, 0),
 			no:        0,
 			yes:       3,
 			want:      .875,
@@ -142,20 +142,5 @@ func TestCalcProbability(t *testing.T) {
 				t.Errorf("Unexpected return value calculating probability, want %f, got %f", test.want, got)
 			}
 		})
-	}
-}
-
-// buildInitialMarketAppConfig builds the MarketCreation portion of the app config
-func buildInitialMarketAppConfig(t *testing.T, probability float64, subsidization, yes, no int64) *setup.EconomicConfig {
-	t.Helper()
-	return &setup.EconomicConfig{
-		Economics: setup.Economics{
-			MarketCreation: setup.MarketCreation{
-				InitialMarketProbability:   probability,
-				InitialMarketSubsidization: subsidization,
-				InitialMarketYes:           yes,
-				InitialMarketNo:            no,
-			},
-		},
 	}
 }

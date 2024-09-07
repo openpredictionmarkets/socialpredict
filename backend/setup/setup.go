@@ -55,6 +55,9 @@ var economicConfig *EconomicConfig
 // load once as a singleton pattern
 var once sync.Once
 
+// EconConfigLoader allows functions to use this type as a parameter to load an EconomicConfig Dependency
+type EconConfigLoader func() *EconomicConfig
+
 func MustLoadEconomicsConfig() *EconomicConfig {
 	once.Do(func() {
 		economicConfig = &EconomicConfig{}
@@ -66,6 +69,7 @@ func MustLoadEconomicsConfig() *EconomicConfig {
 	return economicConfig
 }
 
+// TODO before submission: determine if this removes the necessitation for the sync.Once var
 func init() {
 	MustLoadEconomicsConfig()
 }

@@ -13,7 +13,8 @@ type ProbabilityChange struct {
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
-func CalculateMarketProbabilitiesWPAM(loadEconomicsConfig func() *setup.EconomicConfig, marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+func CalculateMarketProbabilitiesWPAM(loadEconomicsConfig setup.EconConfigLoader, marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+	// TODO: decision: this technically only needs a portion of the config: loadEconomicsConfig().Economics.MarketCreation. We should consider another abstraction for this
 	appConfig := loadEconomicsConfig()
 	var probabilityChanges []ProbabilityChange
 

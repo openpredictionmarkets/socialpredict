@@ -52,7 +52,7 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(setup.MustLoadEconomicsConfig, publicResponseMarket.CreatedAt, allBetsOnMarket)
 
 	// Calculate the distribution of YES and NO shares based on DBPM
-	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
+	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(setup.MustLoadEconomicsConfig, allBetsOnMarket, allProbabilityChangesOnMarket)
 
 	// Calculate course payout pools
 	coursePayouts := dbpm.CalculateCoursePayoutsDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)

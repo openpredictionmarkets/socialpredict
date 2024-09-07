@@ -49,7 +49,7 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	for _, market := range markets {
 		bets := tradingdata.GetBetsForMarket(db, uint(market.ID))
 		probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(setup.MustLoadEconomicsConfig, market.CreatedAt, bets)
-		numUsers := usersHandlers.GetNumMarketUsers(bets)
+		numUsers := models.GetNumMarketUsers(bets)
 		marketVolume := marketmath.GetMarketVolume(bets)
 		lastProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 

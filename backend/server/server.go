@@ -37,7 +37,7 @@ func Start() {
 	router.HandleFunc("/v0/login", middleware.LoginHandler)
 
 	// application setup information
-	router.HandleFunc("/v0/setup", setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)).Methods("GET")
+	router.HandleFunc("/v0/setup", setuphandlers.GetSetupHandler(setup.MustLoadEconomicsConfig)).Methods("GET")
 	// markets display, market information
 	router.HandleFunc("/v0/markets", marketshandlers.ListMarketsHandler).Methods("GET")
 	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")
@@ -49,7 +49,7 @@ func Start() {
 
 	// handle public user stuff
 	router.HandleFunc("/v0/userinfo/{username}", usershandlers.GetPublicUserResponse).Methods("GET")
-	router.HandleFunc("/v0/usercredit/{username}", usershandlers.GetUserCreditHandler).Methods("GET")
+	router.HandleFunc("/v0/usercredit/{username}", usershandlers.GetUserCreditHandler(setup.MustLoadEconomicsConfig)).Methods("GET")
 	// user portfolio, (which is public)
 	router.HandleFunc("/v0/portfolio/{username}", usershandlers.GetPublicUserPortfolio).Methods("GET")
 
@@ -64,10 +64,10 @@ func Start() {
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
-	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler).Methods("POST")
+	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler(setup.MustLoadEconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
 	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler).Methods("POST")
-	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler(setup.MustLoadEconomicsConfig)).Methods("POST")
 
 	// admin stuff
 	router.HandleFunc("/v0/admin/createuser", adminhandlers.AddUserHandler(setup.MustLoadEconomicsConfig)).Methods("POST")

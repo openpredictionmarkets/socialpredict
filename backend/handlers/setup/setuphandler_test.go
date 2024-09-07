@@ -9,18 +9,19 @@ import (
 	"testing"
 )
 
+// TODO Before submitting: Review these tests to ensure they make sense with the new config loader
 func TestGetSetupHandler(t *testing.T) {
 	tests := []struct {
 		Name             string
-		MockConfigLoader func() (*setup.EconomicConfig, error)
+		MockConfigLoader setup.EconConfigLoader
 		ExpectedStatus   int
 		ExpectedResponse string
 		IsJSONResponse   bool
 	}{
 		{
-			Name: "successful load",
-			MockConfigLoader: func() (*setup.EconomicConfig, error) {
-				return setup.LoadEconomicsConfig()
+			Name: "LoadProductionConfig",
+			MockConfigLoader: func() *setup.EconomicConfig {
+				return setup.MustLoadEconomicsConfig()
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedResponse: `{
@@ -29,14 +30,6 @@ func TestGetSetupHandler(t *testing.T) {
 				"User":{"InitialAccountBalance":0,"MaximumDebtAllowed":500},
 				"Betting":{"MinimumBet":1,"BetFees":{"InitialBetFee":1,"EachBetFee":0,"SellSharesFee":0}}}`,
 			IsJSONResponse: true,
-		}, {
-			Name: "failed to load config",
-			MockConfigLoader: func() (*setup.EconomicConfig, error) {
-				return nil, http.ErrBodyNotAllowed
-			},
-			ExpectedStatus:   http.StatusInternalServerError,
-			ExpectedResponse: "Failed to load economic config",
-			IsJSONResponse:   false,
 		},
 	}
 

@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func AddUserHandler(loadEconomicsConfig func() *setup.EconomicConfig) func(http.ResponseWriter, *http.Request) {
+func AddUserHandler(loadEconomicsConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)

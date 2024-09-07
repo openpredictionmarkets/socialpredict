@@ -22,16 +22,10 @@ type MarketPosition struct {
 	YesSharesOwned int64
 }
 
-// appConfig holds the loaded application configuration accessible within the package
-var appConfig *setup.EconomicConfig
-
-func init() {
-	appConfig = setup.MustLoadEconomicsConfig()
-}
-
 // DivideUpMarketPoolShares divides the market pool into YES and NO pools based on the resolution probability.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
-func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64) {
+func DivideUpMarketPoolSharesDBPM(loadEconomicsConfig setup.EconConfigLoader, bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64) {
+	appConfig := loadEconomicsConfig()
 	if len(probabilityChanges) == 0 {
 		return 0, 0
 	}
