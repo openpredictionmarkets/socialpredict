@@ -1,10 +1,14 @@
+## Staging
+
+Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.com/) to see what the latest deployed version of master looks like. May be down if we are testing something.
+
 ## README/ Contents
 
 - [Info on Local Setup](/README/LOCAL_SETUP.md)
-- [Info on Market Mathematics](/README/README-MATH.md)
+- [Info on Market Mathematics](/README/MATH/README-MATH.md)
 - [Info on How Economics Can Be Customized](/README/README-CONFIG.md)
 - [Info on Development Conventions](/README/README-CONVENTIONS.md)
-- [Info on Feature Roadmap](/README/README-ROADMAP.md)
+- [Info on Feature Roadmap](/README/PROJECT_MANAGEMENT/README-ROADMAP.md)
 
 # About SocialPredict
 

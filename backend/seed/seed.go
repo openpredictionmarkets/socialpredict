@@ -1,13 +1,23 @@
 package seed
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"
 
 	"gorm.io/gorm"
 )
+
+func getEnv(key string) (string, error) {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return "", fmt.Errorf("environment variable %s not set", key)
+	}
+	return value, nil
+}
 
 func SeedUsers(db *gorm.DB) {
 
@@ -16,102 +26,66 @@ func SeedUsers(db *gorm.DB) {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Specific time: October 31st, 2023 at 11:59 PM CST
-	loc, err := time.LoadLocation("America/Chicago") // CST location
+	adminPassword, err := getEnv("ADMIN_PASSWORD")
 	if err != nil {
-		log.Printf("Error loading location: %v", err)
-		return
+		log.Fatalf("Error retrieving ADMIN_PASSWORD: %v", err)
 	}
-	specificTime := time.Date(2023, time.October, 31, 23, 59, 0, 0, loc)
+	if adminPassword == "" {
+		log.Fatalf("ADMIN_PASSWORD is set but empty")
+	} else {
+		// Check if the admin user already exists
+		var count int64
+		db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
+		if count == 0 {
+			// No admin user found, create one
+			adminUser := models.User{
+				Username:              "admin",
+				DisplayName:           "Administrator",
+				Email:                 "admin@example.com",
+				UserType:              "ADMIN",
+				InitialAccountBalance: config.Economics.User.InitialAccountBalance,
+				AccountBalance:        config.Economics.User.InitialAccountBalance,
+				ApiKey:                "NONE",
+				PersonalEmoji:         "NONE",
+				Description:           "Administrator",
+				MustChangePassword:    false,
+			}
 
-	// Check if the admin user already exists
-	var count int64
-	db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
-	if count == 0 {
-		// No admin user found, create one
-		adminUser := models.User{
-			Username:              "admin",
-			DisplayName:           "Administrator",
-			Email:                 "admin@example.com",
-			UserType:              "ADMIN",
-			InitialAccountBalance: config.Economics.User.InitialAccountBalance,
-			AccountBalance:        config.Economics.User.InitialAccountBalance,
-			ApiKey:                "NONE",
-			PersonalEmoji:         "NONE",
-			Description:           "Administrator",
-			MustChangePassword:    false,
+			adminUser.HashPassword(adminPassword)
+
+			db.Create(&adminUser)
+
+			// Database default for must_change_password is true, the following force resets to false.
+			if result := db.Model(&adminUser).Update("must_change_password", false); result.Error != nil {
+				log.Printf("Failed to update MustChangePassword: %v", result.Error)
+				return
+			}
 		}
-		adminUser.HashPassword("password")
-
-		db.Create(&adminUser)
-		// Then, update the CreatedAt field for debugging purposes
-		db.Model(&adminUser).Update("CreatedAt", specificTime)
-
 	}
 
 }
 
-func SeedMarket(db *gorm.DB) {
-	var count int64
-	db.Model(&models.Market{}).Count(&count) // Count all markets
+func EnsureDBReady(db *gorm.DB, maxAttempts int) error {
+	var err error
+	for attempts := 1; attempts <= maxAttempts; attempts++ {
+		// Attempt to perform a simple operation like pinging the database
+		sqlDB, err := db.DB()
+		if err != nil {
+			log.Printf("Unable to get database/sql DB from GORM DB: %v", err)
+			time.Sleep(time.Second * 5)
+			continue
+		}
 
-	// Specific time: November 1st, 2023 at 11:59 PM CST
-	loc, err := time.LoadLocation("America/Chicago") // CST location
-	if err != nil {
-		log.Printf("Error loading location: %v", err)
-		return
+		err = sqlDB.Ping()
+		if err != nil {
+			log.Printf("Failed to connect to the database, attempt %d/%d: %v", attempts, maxAttempts, err)
+			time.Sleep(time.Second * 5) // Wait before retrying
+			continue
+		}
+
+		log.Println("Database is ready.")
+		return nil
 	}
-	specificTime := time.Date(2023, time.November, 1, 23, 59, 0, 0, loc)
 
-	config, err := setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
-
-	// Use the config as needed
-	initialProbability := config.Economics.MarketCreation.InitialMarketProbability
-
-	if count == 0 {
-		// No markets found, create a couple
-		market1 := models.Market{
-			// ... initialize the market fields ...
-			QuestionTitle:      "Will Atlantis Invade Aqua City by the End of 2027?",
-			Description:        "This is a sample market description.",
-			OutcomeType:        "Binary",
-			ResolutionDateTime: time.Now().AddDate(0, 1, 0), // e.g., one month from now
-			UTCOffset:          0,
-			IsResolved:         false,
-			InitialProbability: initialProbability,
-			CreatorUsername:    "user1",
-		}
-
-		result := db.Create(&market1)
-		if result.Error != nil {
-			log.Printf("Error seeding market: %v", result.Error)
-		}
-
-		// Then, update the CreatedAt field for debugging purposes
-		db.Model(&market1).Update("CreatedAt", specificTime)
-
-		market2 := models.Market{
-			// ... initialize the market fields ...
-			QuestionTitle:      "Will Humans Harvest Anything from Ancient DNA >1MYA by 2030?",
-			Description:        "This is a sample market description.",
-			OutcomeType:        "Binary",
-			ResolutionDateTime: time.Now().AddDate(0, 1, 0), // e.g., one month from now
-			UTCOffset:          0,
-			IsResolved:         false,
-			InitialProbability: 0.5,
-			CreatorUsername:    "user1",
-		}
-
-		result = db.Create(&market2)
-		if result.Error != nil {
-			log.Printf("Error seeding market: %v", result.Error)
-		}
-
-		// Then, update the CreatedAt field for debugging purposes
-		db.Model(&market2).Update("CreatedAt", specificTime)
-
-	}
+	return fmt.Errorf("database is not ready after %d attempts: %v", maxAttempts, err)
 }

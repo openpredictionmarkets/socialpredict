@@ -1,4 +1,4 @@
-package test
+package tests
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"

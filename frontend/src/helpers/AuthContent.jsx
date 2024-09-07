@@ -39,7 +39,8 @@ const AuthProvider = ({ children }) => {
                 token: token,
                 username: localStorage.getItem('username'),
                 usertype: localStorage.getItem('usertype'),
-                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true', // assume password change needed until shown not
+                // assume password change needed until shown not
+                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
             }));
         }
     }, []);
@@ -55,6 +56,7 @@ const AuthProvider = ({ children }) => {
             });
 
             const data = await response.json();
+
             if (response.ok) {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);

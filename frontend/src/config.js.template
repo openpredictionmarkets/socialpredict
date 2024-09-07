@@ -1,0 +1,2 @@
+export const DOMAIN_URL = $API_DOMAIN;
+export const API_URL = $API_DOMAIN;

@@ -7,9 +7,11 @@ import (
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
 	marketshandlers "socialpredict/handlers/markets"
-	"socialpredict/handlers/positions"
+	positions "socialpredict/handlers/positions"
+	setuphandlers "socialpredict/handlers/setup"
 	usershandlers "socialpredict/handlers/users"
 	"socialpredict/middleware"
+	"socialpredict/setup"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -18,9 +20,12 @@ import (
 func Start() {
 	// CORS handler
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://172.29.0.10:5173/", "http://localhost:8089"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders: []string{"Content-Type", "Authorization"},
+		AllowedOrigins: []string{
+			"http://localhost:8089",
+		},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
 	})
 
 	// Initialize mux router
@@ -31,9 +36,13 @@ func Start() {
 	router.HandleFunc("/v0/home", handlers.HomeHandler)
 	router.HandleFunc("/v0/login", middleware.LoginHandler)
 
+	// application setup information
+	router.HandleFunc("/v0/setup", setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)).Methods("GET")
 	// markets display, market information
 	router.HandleFunc("/v0/markets", marketshandlers.ListMarketsHandler).Methods("GET")
 	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")
+	router.HandleFunc("/v0/marketprojection/{marketId}/{amount}/{outcome}/", marketshandlers.ProjectNewProbabilityHandler).Methods("GET")
+
 	// handle market positions, get trades
 	router.HandleFunc("/v0/markets/bets/{marketId}", betshandlers.MarketBetsDisplayHandler).Methods("GET")
 	router.HandleFunc("/v0/markets/positions/{marketId}", positions.MarketDBPMPositionsHandler).Methods("GET")
@@ -42,6 +51,7 @@ func Start() {
 
 	// handle public user stuff
 	router.HandleFunc("/v0/userinfo/{username}", usershandlers.GetPublicUserResponse).Methods("GET")
+	router.HandleFunc("/v0/usercredit/{username}", usershandlers.GetUserCreditHandler).Methods("GET")
 	// user portfolio, (which is public)
 	router.HandleFunc("/v0/portfolio/{username}", usershandlers.GetPublicUserPortfolio).Methods("GET")
 
