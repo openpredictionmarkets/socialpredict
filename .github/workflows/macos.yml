@@ -1,0 +1,57 @@
+name: Linux
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: "macos-test"
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [ '1.23.x' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Get Dependencies
+      working-directory: ./backend
+      run: |
+        go mod download
+    - name: Run tests
+      working-directory: ./backend
+      run: |
+        go build -o ./main && ./main &
+        SERVER_PID=$!
+        sleep 10
+        kill $SERVER_PID
+  unit:
+    needs: smoke
+    if: |
+      ! startsWith(github.head_ref, 'main')
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [ '1.23.x' ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Get Dependencies
+        working-directory: ./backend
+        run: |
+          go get .
+      - name: Run tests
+        working-directory: ./backend
+        run: go test ./...
