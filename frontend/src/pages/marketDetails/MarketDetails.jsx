@@ -17,10 +17,11 @@ const MarketDetails = () => {
 
   const isCreator = username === details?.creator?.username;
   const isResolved = details?.market?.isResolved === true;
+  const isActive = new Date(details?.market?.resolutionDateTime) > new Date();
 
   return (
-    <div className='flex flex-col space-y-8'>
-      <div className='flex-grow'>
+    <div className='flex flex-col h-full'>
+      <div className='flex-grow overflow-y-auto'>
         <MarketDetailsTable
           market={details.market}
           creator={details.creator}
@@ -31,7 +32,7 @@ const MarketDetails = () => {
           marketId={details.market.id}
         />
       </div>
-      <div className='flex items-center justify-center  space-x-4'>
+      <div className='flex items-center justify-center mb-8 space-x-4 py-4'>
         {isCreator && !isResolved && (
           <ResolveModalButton
             marketId={details.market.id}
@@ -40,7 +41,7 @@ const MarketDetails = () => {
             className='text-xs px-4 py-2'
           />
         )}
-        {!isResolved && isLoggedIn && (
+        {!isResolved && isLoggedIn && isActive && (
           <BetModalButton
             marketId={details.market.id}
             token={token}
