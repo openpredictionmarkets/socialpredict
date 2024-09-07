@@ -16,18 +16,6 @@ type ProjectedProbability struct {
 	Probability float64 `json:"projectedprobability"`
 }
 
-// appConfig holds the loaded application configuration accessible within the package
-var appConfig *setup.EconomicConfig
-
-func init() {
-	// Load configuration
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
-}
-
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
 func CalculateMarketProbabilitiesWPAM(loadEconomicsConfig setup.EconConfigLoader, marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
 	// TODO: decision: this technically only needs a portion of the config: loadEconomicsConfig().Economics.MarketCreation. We should consider another abstraction for this
@@ -64,10 +52,10 @@ func calcProbability(initialProbability float64, initialInvestment int64, totalY
 	return res
 }
 
-//ProjectNewProbabilityWPAM determines what the probability would be if a newBet is placed
-func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
+// ProjectNewProbabilityWPAM determines what the probability would be if a newBet is placed
+func ProjectNewProbabilityWPAM(loadEconomicsConfig setup.EconConfigLoader, marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
 	updatedBets := append(currentBets, newBet)
-	probabilityChanges := CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, updatedBets)
+	probabilityChanges := CalculateMarketProbabilitiesWPAM(loadEconomicsConfig, marketCreatedAtTime, updatedBets)
 	finalProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 	return ProjectedProbability{Probability: finalProbability}
 }
