@@ -29,16 +29,16 @@ func getUserInitialBetFee(db *gorm.DB, marketID uint, user *models.User) int64 {
 	// Fetch bets for the market
 	allBetsOnMarket := tradingdata.GetBetsForMarket(db, marketID)
 
-	var totalBetCount int64 = 0
+	var userBetCount int64 = 0
 
 	for _, bet := range allBetsOnMarket {
 		if bet.Username == user.Username {
-			totalBetCount += 1
+			userBetCount += 1
 		}
 	}
 
 	// if we have no bets on this market yet, then this is our first bet
-	if totalBetCount == 0 {
+	if userBetCount == 0 {
 		initialBetFee = appConfig.Economics.Betting.BetFees.InitialBetFee
 	} else {
 		initialBetFee = 0
