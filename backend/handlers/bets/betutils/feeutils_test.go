@@ -109,8 +109,10 @@ func TestGetUserInitialBetFee(t *testing.T) {
 		t.Fatalf("Failed to save user to database: %v", err)
 	}
 
-	// Scenario 1: User places a bet on Market 1 where they have no prior bets
+	// Initialize the market ID
 	marketID := uint(1)
+
+	// Scenario 1: User places a bet on Market 1 where they have no prior bets
 	initialBetFee := getUserInitialBetFee(db, marketID, user)
 	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee
 	if initialBetFee != wantFee {
@@ -118,7 +120,7 @@ func TestGetUserInitialBetFee(t *testing.T) {
 	}
 
 	// Place a bet for the user on Market 1
-	bet := models.Bet{Username: "testuser", MarketID: 1, Amount: 100, PlacedAt: time.Now()}
+	bet := models.Bet{Username: "testuser", MarketID: marketID, Amount: 100, PlacedAt: time.Now()}
 	if err := db.Create(&bet).Error; err != nil {
 		t.Fatalf("Failed to save bet to database: %v", err)
 	}
@@ -130,8 +132,10 @@ func TestGetUserInitialBetFee(t *testing.T) {
 		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d after placing a bet", marketID, user.Username, initialBetFee, wantFee)
 	}
 
-	// Scenario 3: User places a bet on Market 2 where they have no prior bets
+	// Update the market ID for a new scenario
 	marketID = 2
+
+	// Scenario 3: User places a bet on Market 2 where they have no prior bets
 	initialBetFee = getUserInitialBetFee(db, marketID, user)
 	if initialBetFee != appConfig.Economics.Betting.BetFees.InitialBetFee {
 		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d", marketID, user.Username, initialBetFee, appConfig.Economics.Betting.BetFees.InitialBetFee)
