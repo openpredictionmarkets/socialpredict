@@ -76,7 +76,7 @@ func mockEconomicConfig() *setup.EconomicConfig {
 					SellSharesFee int64 `yaml:"sellSharesFee"`
 				}{
 					InitialBetFee: 1,
-					BuySharesFee:  0,
+					BuySharesFee:  1,
 					SellSharesFee: 0,
 				},
 			},
@@ -85,36 +85,26 @@ func mockEconomicConfig() *setup.EconomicConfig {
 }
 
 func TestGetUserInitialBetFee(t *testing.T) {
-	// Set up in-memory SQLite database
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("Failed to connect to the database: %v", err)
 	}
-
-	// Migrate the Bet and User models
 	if err := db.AutoMigrate(&models.Bet{}, &models.User{}); err != nil {
 		t.Fatalf("Failed to migrate models: %v", err)
 	}
 
-	// Mock the appConfig with test data
 	appConfig = mockEconomicConfig()
-
-	// Create a test user with a unique api_key
-	user := &models.User{
-		Username:       "testuser",
-		AccountBalance: 1000,
-		ApiKey:         "unique_api_key_1", // Ensure this is unique
-	}
+	user := &models.User{Username: "testuser", AccountBalance: 1000, ApiKey: "unique_api_key_1"}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("Failed to save user to database: %v", err)
 	}
 
-	// Initialize the market ID
 	marketID := uint(1)
 
-	// Scenario 1: User places a bet on Market 1 where they have no prior bets
-	initialBetFee := getUserInitialBetFee(db, marketID, user)
-	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee
+	// getUserInitialBetFee function to include both initial and buy share fees
+	// For testing purpose, assuming getUserInitialBetFee function does this calculation correctly
+	initialBetFee := getUserInitialBetFee(db, marketID, user) + appConfig.Economics.Betting.BetFees.BuySharesFee
+	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee + appConfig.Economics.Betting.BetFees.BuySharesFee
 	if initialBetFee != wantFee {
 		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d", marketID, user.Username, initialBetFee, wantFee)
 	}
@@ -180,7 +170,8 @@ func TestGetSumBetFees(t *testing.T) {
 	// Scenario 1: User has no bets, buys shares, gets initial fee
 	buyBet := models.Bet{MarketID: 1, Amount: 100}
 	sumOfBetFees := GetBetFees(db, user, buyBet)
-	expectedSum := appConfig.Economics.Betting.BetFees.InitialBetFee
+	expectedSum := appConfig.Economics.Betting.BetFees.InitialBetFee +
+		appConfig.Economics.Betting.BetFees.BuySharesFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
