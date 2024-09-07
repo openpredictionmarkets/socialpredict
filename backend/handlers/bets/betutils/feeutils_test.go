@@ -190,7 +190,7 @@ func TestGetSumBetFees(t *testing.T) {
 	}
 
 	// Scenario 3: User has one bet, sells shares
-	sellBet := models.Bet{MarketID: 1, Amount: -100}
+	sellBet := models.Bet{MarketID: 1, Amount: -1}
 	sumOfBetFees = GetBetFees(db, user, sellBet)
 	expectedSum = appConfig.Economics.Betting.BetFees.SellSharesFee
 	if sumOfBetFees != expectedSum {
