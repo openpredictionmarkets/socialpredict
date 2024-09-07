@@ -51,7 +51,7 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	betutils.CheckMarketStatus(db, betRequest.MarketID)
 
 	// sum up fees
-	sumOfBetFees := betutils.GetSumBetFees(db, user, betRequest)
+	sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
 
 	logging.LogAnyType(sumOfBetFees, "sumOfBetFees")
 

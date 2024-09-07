@@ -52,7 +52,7 @@ func getTransactionFee(betRequest models.Bet) int64 {
 	return transactionFee
 }
 
-func GetSumBetFees(db *gorm.DB, user *models.User, betRequest models.Bet) int64 {
+func GetBetFees(db *gorm.DB, user *models.User, betRequest models.Bet) int64 {
 
 	MarketID := betRequest.MarketID
 
