@@ -3,7 +3,6 @@ package setup
 import (
 	_ "embed"
 	"log"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -52,24 +51,21 @@ type EconomicConfig struct {
 
 var economicConfig *EconomicConfig
 
-// load once as a singleton pattern
-var once sync.Once
-
 // EconConfigLoader allows functions to use this type as a parameter to load an EconomicConfig Dependency
 type EconConfigLoader func() *EconomicConfig
 
 func MustLoadEconomicsConfig() *EconomicConfig {
-	once.Do(func() {
-		economicConfig = &EconomicConfig{}
-		err := yaml.Unmarshal(setupYaml, economicConfig)
-		if err != nil {
-			log.Fatal("Error parsing YAML config:", err) // If the config cannot be loaded, the application cannot recover.
-		}
-	})
 	return economicConfig
 }
 
-// TODO before submission: determine if this removes the necessitation for the sync.Once var
+func mustLoadEconomicsConfig() {
+	economicConfig = &EconomicConfig{}
+	err := yaml.Unmarshal(setupYaml, economicConfig)
+	if err != nil {
+		log.Fatal("Error parsing YAML config:", err) // If the config cannot be loaded, the application cannot recover.
+	}
+}
+
 func init() {
-	MustLoadEconomicsConfig()
+	mustLoadEconomicsConfig()
 }

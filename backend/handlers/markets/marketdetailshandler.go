@@ -8,8 +8,8 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	usersHandlers "socialpredict/handlers/users"
-	"socialpredict/setup"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 	"strconv"
 
@@ -56,10 +56,6 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// find the number of users on the market
 	numUsers := models.GetNumMarketUsers(bets)
-	if err != nil {
-		http.Error(w, "Error retrieving number of users.", http.StatusInternalServerError)
-		return
-	}
 
 	// market volume is equivalent to the sum of all bets
 	marketVolume := marketmath.GetMarketVolume(bets)

@@ -10,7 +10,7 @@ import (
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 	for _, tc := range test.TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			yes, no := dbpm.DivideUpMarketPoolSharesDBPM(setup.MustLoadEconomicsConfig, tc.Bets, tc.ProbabilityChanges)
+			yes, no := dbpm.DivideUpMarketPoolSharesDBPM(func() *setup.EconomicConfig { return setup.BuildInitialMarketAppConfig(t, .5, 1, 0, 0) }, tc.Bets, tc.ProbabilityChanges)
 			if yes != tc.S_YES || no != tc.S_NO {
 				t.Errorf("%s: expected (%d, %d), got (%d, %d)", tc.Name, tc.S_YES, tc.S_NO, yes, no)
 			}
