@@ -12,6 +12,22 @@ type ProbabilityChange struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
+type ProjectedProbability struct {
+	Probability float64 `json:"projectedprobability"`
+}
+
+// appConfig holds the loaded application configuration accessible within the package
+var appConfig *setup.EconomicConfig
+
+func init() {
+	// Load configuration
+	var err error
+	appConfig, err = setup.LoadEconomicsConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+}
+
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
 func CalculateMarketProbabilitiesWPAM(loadEconomicsConfig setup.EconConfigLoader, marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
 	// TODO: decision: this technically only needs a portion of the config: loadEconomicsConfig().Economics.MarketCreation. We should consider another abstraction for this
@@ -24,7 +40,6 @@ func CalculateMarketProbabilitiesWPAM(loadEconomicsConfig setup.EconConfigLoader
 	totalYes := appConfig.Economics.MarketCreation.InitialMarketYes
 	totalNo := appConfig.Economics.MarketCreation.InitialMarketNo
 
-	// Add initial state
 	probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: P_initial, Timestamp: marketCreatedAtTime})
 
 	// Calculate probabilities after each bet
@@ -47,4 +62,12 @@ func calcProbability(initialProbability float64, initialInvestment int64, totalY
 	res := (initialProbability*float64(initialInvestment) + float64(totalYes)) / (float64(initialInvestment) + float64(totalYes) + float64(totalNo))
 	log.Printf("res: %f, prob: %f, inv: %d, yes: %d, no: %d", res, initialProbability, initialInvestment, totalYes, totalNo)
 	return res
+}
+
+//ProjectNewProbabilityWPAM determines what the probability would be if a newBet is placed
+func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
+	updatedBets := append(currentBets, newBet)
+	probabilityChanges := CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, updatedBets)
+	finalProbability := probabilityChanges[len(probabilityChanges)-1].Probability
+	return ProjectedProbability{Probability: finalProbability}
 }

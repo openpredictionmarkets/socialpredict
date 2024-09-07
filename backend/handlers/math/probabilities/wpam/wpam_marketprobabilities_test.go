@@ -1,10 +1,14 @@
-package wpam
+package wpam_test
 
 import (
-	"socialpredict/models"
-	"socialpredict/setup"
+	"fmt"
 	"testing"
 	"time"
+  
+  "socialpredict/handlers/math/outcomes/dbpm"
+	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/models"
+  "socialpredict/setup"
 )
 
 var now = time.Now() // Capture current time for consistent test data
