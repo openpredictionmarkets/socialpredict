@@ -23,6 +23,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: Get Dependencies
+      working-directory: ./backend
       run: |
         go mod download
     - name: Run tests
@@ -48,6 +49,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Get Dependencies
+        working-directory: ./backend
         run: |
           go get .
       - name: Run tests
