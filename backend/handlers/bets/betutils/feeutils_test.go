@@ -168,7 +168,7 @@ func TestGetSumBetFees(t *testing.T) {
 
 	// Scenario 1: User has no bets, buys shares, gets initial fee
 	buyBet := models.Bet{MarketID: 1, Amount: 100}
-	sumOfBetFees := GetSumBetFees(db, user, buyBet)
+	sumOfBetFees := GetBetFees(db, user, buyBet)
 	expectedSum := appConfig.Economics.Betting.BetFees.InitialBetFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
@@ -181,7 +181,7 @@ func TestGetSumBetFees(t *testing.T) {
 	db.Create(&bets)
 
 	// Scenario 2: User has one bet, buys shares
-	sumOfBetFees = GetSumBetFees(db, user, buyBet)
+	sumOfBetFees = GetBetFees(db, user, buyBet)
 	expectedSum = appConfig.Economics.Betting.BetFees.BuySharesFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
@@ -189,7 +189,7 @@ func TestGetSumBetFees(t *testing.T) {
 
 	// Scenario 3: User has one bet, sells shares
 	sellBet := models.Bet{MarketID: 1, Amount: -100}
-	sumOfBetFees = GetSumBetFees(db, user, sellBet)
+	sumOfBetFees = GetBetFees(db, user, sellBet)
 	expectedSum = appConfig.Economics.Betting.BetFees.SellSharesFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
