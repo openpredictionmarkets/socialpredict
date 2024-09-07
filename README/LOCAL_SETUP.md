@@ -76,6 +76,7 @@ docker compose -p scripts logs | grep backend
 * Likewise, frontend, nginx, database, certbot errors can be filtered out similarly with:
 
 ```
+docker compose -p scripts logs | grep backend
 docker compose -p scripts logs | grep frontend
 docker compose -p scripts logs | grep nginx
 docker compose -p scripts logs | grep postgres
