@@ -6,6 +6,24 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     const [shares, setShares] = useState({ NoSharesOwned: 0, YesSharesOwned: 0 });
     const [sellAmount, setSellAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
+    const [feeData, setFeeData] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchFeeData = async () => {
+            try {
+                const response = await fetch('http://localhost/api/v0/setup');
+                const data = await response.json();
+                setFeeData(data.Betting.BetFees);
+                setIsLoading(false); // Set loading state to false after fetching
+            } catch (error) {
+                console.error('Error fetching fee data:', error);
+                setIsLoading(false);
+            }
+        };
+
+        fetchFeeData();
+    }, []);
 
     useEffect(() => {
         fetchUserShares(marketId, token)
@@ -95,6 +113,32 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
                     </div>
                 </>
             )}
+
+            <div className="border-t border-gray-200 my-2"></div>
+
+            {!isLoading && feeData && (
+                <div className="mb-4">
+                    {feeData.InitialBetFee === 0 && feeData.SellSharesFee === 0 ? (
+                        <p className="text-sm text-gray-300">No fees</p>
+                    ) : (
+                        <>
+                            {feeData.InitialBetFee > 0 && (
+                                <p className="text-sm text-gray-300">
+                                    Initial Trade Fee: {feeData.InitialBetFee}
+                                    <span className="block">Does not apply if already traded on this market.</span>
+                                </p>
+                            )}
+                            {feeData.SellSharesFee > 0 && (
+                                <p className="text-sm text-gray-300">
+                                    Trading Fee (Selling Share): {feeData.SellSharesFee}
+                                </p>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+
         </div>
     );
 };
