@@ -5,6 +5,7 @@ import formatResolutionDate from '../../helpers/formatResolutionDate';
 import MobileMarketCard from '../../components/tables/MobileMarketCard';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 
+
 const TableHeader = () => (
   <thead className='bg-gray-900'>
     <tr>
@@ -116,6 +117,7 @@ function MarketsTable() {
     fetchMarkets();
   }, []);
 
+
   if (loading)
     return (
       <div className='p-4 text-center'>
@@ -127,7 +129,7 @@ function MarketsTable() {
     return <div className='p-4 text-center text-red-500'>Error: {error}</div>;
 
   return (
-    <div className='w-full md:w-full h-[calc(100vh-40px)] sm:h-full overflow-y-auto px-4 md:px-6 lg:px-8'>
+    <div className='w-screen md:w-full h-[calc(100vh-40px)] sm:h-full overflow-y-auto px-4 md:px-6 lg:px-8'>
       <h1 className='text-2xl font-semibold text-gray-300 mb-6'>Markets</h1>
       {marketsData.length === 0 ? (
         <div className='p-4 text-center text-gray-400'>No markets found.</div>
@@ -152,6 +154,7 @@ function MarketsTable() {
           </div>
         </>
       )}
+
     </div>
   );
 }

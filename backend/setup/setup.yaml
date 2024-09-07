@@ -14,5 +14,5 @@ economics:
     minimumBet: 1
     betFees:
       initialBetFee: 1
-      buySharesFee: 0
+      eachBetFee: 0
       sellSharesFee: 0

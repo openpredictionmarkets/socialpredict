@@ -47,11 +47,14 @@ func DivideUpMarketPoolSharesDBPM(loadEconomicsConfig setup.EconConfigLoader, be
 	if marketmath.GetMarketVolume(bets) == 1 {
 		singleShareDirection := SingleShareYesNoAllocator(bets)
 		if singleShareDirection == "YES" {
+			logging.LogMsg("Evaluating single share direction YES")
 			S_YES = 1
 		} else {
+			logging.LogMsg("Evaluating single share direction NO")
 			S_NO = 1
 		}
 	} else {
+		logging.LogMsg("No single share direction")
 		S_YES = int64(math.Round(S * R))
 		S_NO = int64(math.Round(S * (1 - R)))
 	}

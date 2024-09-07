@@ -8,6 +8,10 @@ import (
 	"gorm.io/gorm"
 )
 
+func init() {
+
+}
+
 // CheckMarketStatus checks if the market is resolved or closed.
 // It returns an error if the market is not suitable for placing a bet.
 func CheckMarketStatus(db *gorm.DB, marketID uint) error {
