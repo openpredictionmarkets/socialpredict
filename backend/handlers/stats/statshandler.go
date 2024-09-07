@@ -65,16 +65,17 @@ func calculateTotalMoney(db *gorm.DB) (int64, error) {
 	// Load economic configuration
 	economicConfig, err := setup.LoadEconomicsConfig()
 	if err != nil {
-		return 0, err // Return zero and the error if config can't be loaded
+		return 0, err
 	}
 
 	// Count the number of regular users
 	var userCount int64
 	if err := db.Model(&models.User{}).Where("user_type = ?", "REGULAR").Count(&userCount).Error; err != nil {
-		return 0, err // Return zero and the error if the query fails
+		return 0, err
 	}
 
 	// Calculate total money based on the initial account balance and user count
-	totalMoney := economicConfig.Economics.User.InitialAccountBalance * userCount
+	totalMoney := economicConfig.Economics.User.MaximumDebtAllowed * userCount
+
 	return totalMoney, nil
 }
