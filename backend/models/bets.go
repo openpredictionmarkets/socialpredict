@@ -18,6 +18,7 @@ type Bet struct {
 	PlacedAt time.Time `json:"placedAt"`
 	Outcome  string    `json:"outcome,omitempty"`
 }
+
 type Bets []Bet
 
 // getMarketUsers returns the number of unique users for a given market

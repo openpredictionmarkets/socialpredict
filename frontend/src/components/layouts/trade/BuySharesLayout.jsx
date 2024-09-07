@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/trade/BetButtons';
 import MarketProjectionLayout from '../marketprojection/MarketProjectionLayout';
 import { submitBet } from './TradeUtils'
@@ -7,6 +7,25 @@ import { submitBet } from './TradeUtils'
 const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     const [betAmount, setBetAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
+    const [feeData, setFeeData] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchFeeData = async () => {
+            try {
+                const response = await fetch('http://localhost/api/v0/setup');
+                const data = await response.json();
+                setFeeData(data.Betting.BetFees);
+                setIsLoading(false); // Set loading state to false after fetching
+            } catch (error) {
+                console.error('Error fetching fee data:', error);
+                setIsLoading(false);
+            }
+        };
+
+        fetchFeeData();
+    }, []);
+
 
     const handleBetAmountChange = (event) => {
         const newAmount = parseInt(event.target.value, 10);
@@ -47,6 +66,31 @@ const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
             </div>
             <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} />
             <div>
+            <div className="border-t border-gray-200 my-2"></div>
+
+            {!isLoading && feeData && (
+                <div className="mb-4">
+                    {feeData.InitialBetFee === 0 && feeData.BuySharesFee === 0 ? (
+                        <p className="text-sm text-gray-300">No fees</p>
+                    ) : (
+                        <>
+                            {feeData.InitialBetFee > 0 && (
+                                <p className="text-sm text-gray-300">
+                                    Initial Trade Fee: {feeData.InitialBetFee}
+                                    <span className="block">Does not apply if already traded on this market.</span>
+                                </p>
+                            )}
+                            {feeData.BuySharesFee > 0 && (
+                                <p className="text-sm text-gray-300">
+                                    Trading Fee (Buying Share): {feeData.BuySharesFee}
+                                </p>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            
             <div className="border-t border-gray-200 my-2"></div>           
             <MarketProjectionLayout
                 marketId={marketId}
