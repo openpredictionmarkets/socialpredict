@@ -92,7 +92,9 @@ func TestGetUserInitialBetFee(t *testing.T) {
 	}
 
 	// Migrate the Bet and User models
-	db.AutoMigrate(&models.Bet{}, &models.User{})
+	if err := db.AutoMigrate(&models.Bet{}, &models.User{}); err != nil {
+		t.Fatalf("Failed to migrate models: %v", err)
+	}
 
 	// Mock the appConfig with test data
 	appConfig = mockEconomicConfig()
@@ -103,32 +105,37 @@ func TestGetUserInitialBetFee(t *testing.T) {
 		AccountBalance: 1000,
 		ApiKey:         "unique_api_key_1", // Ensure this is unique
 	}
-	db.Create(&user) // Save the user to the database
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("Failed to save user to database: %v", err)
+	}
 
 	// Scenario 1: User places a bet on Market 1 where they have no prior bets
-	initialBetFee := getUserInitialBetFee(db, 1, user)
-	if initialBetFee != appConfig.Economics.Betting.BetFees.InitialBetFee {
-		t.Errorf("Expected initial bet fee to be %d, got %d", appConfig.Economics.Betting.BetFees.InitialBetFee, initialBetFee)
+	marketID := uint(1)
+	initialBetFee := getUserInitialBetFee(db, marketID, user)
+	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee
+	if initialBetFee != wantFee {
+		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d", marketID, user.Username, initialBetFee, wantFee)
 	}
 
 	// Place a bet for the user on Market 1
-	bets := []models.Bet{
-		{Username: "testuser", MarketID: 1, Amount: 100, PlacedAt: time.Now()},
+	bet := models.Bet{Username: "testuser", MarketID: 1, Amount: 100, PlacedAt: time.Now()}
+	if err := db.Create(&bet).Error; err != nil {
+		t.Fatalf("Failed to save bet to database: %v", err)
 	}
-	db.Create(&bets) // Save the bet to the database
 
 	// Scenario 2: User places another bet on Market 1 where they already have a bet
-	initialBetFee = getUserInitialBetFee(db, 1, user)
-	if initialBetFee != 0 {
-		t.Errorf("Expected initial bet fee to be 0, got %d", initialBetFee)
+	initialBetFee = getUserInitialBetFee(db, marketID, user)
+	wantFee = 0
+	if initialBetFee != wantFee {
+		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d after placing a bet", marketID, user.Username, initialBetFee, wantFee)
 	}
 
 	// Scenario 3: User places a bet on Market 2 where they have no prior bets
-	initialBetFee = getUserInitialBetFee(db, 2, user)
+	marketID = 2
+	initialBetFee = getUserInitialBetFee(db, marketID, user)
 	if initialBetFee != appConfig.Economics.Betting.BetFees.InitialBetFee {
-		t.Errorf("Expected initial bet fee to be %d, got %d", appConfig.Economics.Betting.BetFees.InitialBetFee, initialBetFee)
+		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d", marketID, user.Username, initialBetFee, appConfig.Economics.Betting.BetFees.InitialBetFee)
 	}
-
 }
 
 func TestGetTransactionFee(t *testing.T) {
