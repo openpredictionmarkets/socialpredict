@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
+	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/setup"
@@ -49,16 +50,24 @@ func PlaceBetHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate the request (check if market exists, if not closed/resolved, etc.)
 	betutils.CheckMarketStatus(db, betRequest.MarketID)
 
+	// sum up fees
+	sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
+
+	logging.LogAnyType(sumOfBetFees, "sumOfBetFees")
+
 	// Check if the user has enough balance to place the bet
 	// Use the appConfig for configuration values
 	maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
 
 	// Check if the user's balance after the bet would be lower than the allowed maximum debt
-	// deduct fee in case of switching sides
-	if user.AccountBalance-betRequest.Amount < -maximumDebtAllowed {
+	// deduct fees along with calculation to ensure fees can be paid.
+	if user.AccountBalance-betRequest.Amount-sumOfBetFees < -maximumDebtAllowed {
 		http.Error(w, "Insufficient balance", http.StatusBadRequest)
 		return
 	}
+
+	// make entry for user.AccountBalance
+	user.AccountBalance = user.AccountBalance - betRequest.Amount - sumOfBetFees
 
 	// Update the user's balance in the database
 	if err := db.Save(&user).Error; err != nil {

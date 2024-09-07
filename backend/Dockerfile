@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM golang:1.22.5-bookworm
+FROM golang:1.23-bookworm
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 # Install Dependencies
 RUN apt-get update && apt-get install -y --allow-downgrades \
     inotify-tools=3.22.6.0-4             \
-    openssl=3.0.11-1~deb12u2
+    openssl=3.0.14-1~deb12u2
 
 # Set the Working Directory inside the container
 WORKDIR /backend

@@ -10,6 +10,8 @@ A `setup.yaml` file is used to configure custom conditions and fees for the game
 
 ### Testing Guidelines
 
+- **General Golang Style Guidelines** Style guidelines can be found within the Golang language specification for the version and question as well as [here](https://google.github.io/styleguide/go/best-practices) for best practices.
+
 - **Pre-deployment Testing:** The goal is to ensure that all tests pass before deploying new software changes. This is particularly important when custom, non-standard conditions are introduced, as these could potentially cause issues that existing tests do not cover. If such conditions arise, it's important to document them so that administrators are aware of potential risks.
 
 - **Infinity Avoidance:** One of the specific test conditions that have been identified is the need to avoid infinity in market calculations. An example of such a test is available [here](https://github.com/openpredictionmarkets/socialpredict/blob/main/backend/tests/market_math/marketvolume_test.go).
