@@ -21,30 +21,21 @@ func init() {
 }
 
 // Get initial bet fee, if applicable, for user on market.
-// If this is the first bet on this market, apply a fee.
+// If this is the first bet on this market for the user, apply a fee.
 func getUserInitialBetFee(db *gorm.DB, marketID uint, user *models.User) int64 {
-
-	var initialBetFee int64
-
 	// Fetch bets for the market
 	allBetsOnMarket := tradingdata.GetBetsForMarket(db, marketID)
 
-	var userBetCount int64 = 0
-
+	// Check if the user has placed any bets on this market
 	for _, bet := range allBetsOnMarket {
 		if bet.Username == user.Username {
-			userBetCount += 1
+			// User has placed a bet, so no initial fee is applicable
+			return 0
 		}
 	}
 
-	// if we have no bets on this market yet, then this is our first bet
-	if userBetCount == 0 {
-		initialBetFee = appConfig.Economics.Betting.BetFees.InitialBetFee
-	} else {
-		initialBetFee = 0
-	}
-
-	return initialBetFee
+	// This is the user's first bet on this market, apply the initial bet fee
+	return appConfig.Economics.Betting.BetFees.InitialBetFee
 }
 
 func getTransactionFee(betRequest models.Bet) int64 {
