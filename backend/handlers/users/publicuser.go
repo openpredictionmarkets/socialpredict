@@ -58,3 +58,35 @@ func GetPublicUserInfo(db *gorm.DB, username string) PublicUserType {
 		PersonalLink4:         user.PersonalLink4,
 	}
 }
+
+// GetAllPublicUsers fetches all users from the database and converts them to PublicUserType.
+func GetAllPublicUsers(db *gorm.DB) ([]PublicUserType, error) {
+	var users []models.User
+	var publicUsers []PublicUserType
+
+	// Fetch all users from the database
+	result := db.Find(&users)
+	if result.Error != nil {
+		return nil, result.Error // Handle potential database errors
+	}
+
+	// Convert each User model to PublicUserType
+	for _, user := range users {
+		publicUser := PublicUserType{
+			Username:              user.Username,
+			DisplayName:           user.DisplayName,
+			UserType:              user.UserType,
+			InitialAccountBalance: user.InitialAccountBalance,
+			AccountBalance:        user.AccountBalance,
+			PersonalEmoji:         user.PersonalEmoji,
+			Description:           user.Description,
+			PersonalLink1:         user.PersonalLink1,
+			PersonalLink2:         user.PersonalLink2,
+			PersonalLink3:         user.PersonalLink3,
+			PersonalLink4:         user.PersonalLink4,
+		}
+		publicUsers = append(publicUsers, publicUser)
+	}
+
+	return publicUsers, nil
+}
