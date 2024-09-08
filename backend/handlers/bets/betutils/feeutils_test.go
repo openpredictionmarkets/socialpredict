@@ -2,87 +2,13 @@ package betutils
 
 import (
 	"socialpredict/models"
-	"socialpredict/setup"
+	"socialpredict/setup/setuptesting"
 	"testing"
 	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
-
-func mockEconomicConfig() *setup.EconomicConfig {
-	return &setup.EconomicConfig{
-		Economics: struct {
-			MarketCreation struct {
-				InitialMarketProbability   float64 `yaml:"initialMarketProbability"`
-				InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization"`
-				InitialMarketYes           int64   `yaml:"initialMarketYes"`
-				InitialMarketNo            int64   `yaml:"initialMarketNo"`
-			} `yaml:"marketcreation"`
-			MarketIncentives struct {
-				CreateMarketCost int64 `yaml:"createMarketCost"`
-				TraderBonus      int64 `yaml:"traderBonus"`
-			} `yaml:"marketincentives"`
-			User struct {
-				InitialAccountBalance int64 `yaml:"initialAccountBalance"`
-				MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed"`
-			} `yaml:"user"`
-			Betting struct {
-				MinimumBet int64 `yaml:"minimumBet"`
-				BetFees    struct {
-					InitialBetFee int64 `yaml:"initialBetFee"`
-					BuySharesFee  int64 `yaml:"buySharesFee"`
-					SellSharesFee int64 `yaml:"sellSharesFee"`
-				} `yaml:"betFees"`
-			} `yaml:"betting"`
-		}{
-			MarketCreation: struct {
-				InitialMarketProbability   float64 `yaml:"initialMarketProbability"`
-				InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization"`
-				InitialMarketYes           int64   `yaml:"initialMarketYes"`
-				InitialMarketNo            int64   `yaml:"initialMarketNo"`
-			}{
-				InitialMarketProbability:   0.5,
-				InitialMarketSubsidization: 10,
-				InitialMarketYes:           0,
-				InitialMarketNo:            0,
-			},
-			MarketIncentives: struct {
-				CreateMarketCost int64 `yaml:"createMarketCost"`
-				TraderBonus      int64 `yaml:"traderBonus"`
-			}{
-				CreateMarketCost: 10,
-				TraderBonus:      1,
-			},
-			User: struct {
-				InitialAccountBalance int64 `yaml:"initialAccountBalance"`
-				MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed"`
-			}{
-				InitialAccountBalance: 1000,
-				MaximumDebtAllowed:    500,
-			},
-			Betting: struct {
-				MinimumBet int64 `yaml:"minimumBet"`
-				BetFees    struct {
-					InitialBetFee int64 `yaml:"initialBetFee"`
-					BuySharesFee  int64 `yaml:"buySharesFee"`
-					SellSharesFee int64 `yaml:"sellSharesFee"`
-				} `yaml:"betFees"`
-			}{
-				MinimumBet: 1,
-				BetFees: struct {
-					InitialBetFee int64 `yaml:"initialBetFee"`
-					BuySharesFee  int64 `yaml:"buySharesFee"`
-					SellSharesFee int64 `yaml:"sellSharesFee"`
-				}{
-					InitialBetFee: 1,
-					BuySharesFee:  1,
-					SellSharesFee: 0,
-				},
-			},
-		},
-	}
-}
 
 func TestGetUserInitialBetFee(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -93,7 +19,7 @@ func TestGetUserInitialBetFee(t *testing.T) {
 		t.Fatalf("Failed to migrate models: %v", err)
 	}
 
-	appConfig = mockEconomicConfig()
+	appConfig = setuptesting.MockEconomicConfig()
 	user := &models.User{Username: "testuser", AccountBalance: 1000, ApiKey: "unique_api_key_1"}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("Failed to save user to database: %v", err)
@@ -103,8 +29,8 @@ func TestGetUserInitialBetFee(t *testing.T) {
 
 	// getUserInitialBetFee function to include both initial and buy share fees
 	// For testing purpose, assuming getUserInitialBetFee function does this calculation correctly
-	initialBetFee := getUserInitialBetFee(db, marketID, user) + appConfig.Economics.Betting.BetFees.BuySharesFee
-	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee + appConfig.Economics.Betting.BetFees.BuySharesFee
+	initialBetFee := getUserInitialBetFee(db, marketID, user) + appConfig.Economics.Betting.BetFees.EachBetFee
+	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee + appConfig.Economics.Betting.BetFees.EachBetFee
 	if initialBetFee != wantFee {
 		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d", marketID, user.Username, initialBetFee, wantFee)
 	}
@@ -134,13 +60,13 @@ func TestGetUserInitialBetFee(t *testing.T) {
 
 func TestGetTransactionFee(t *testing.T) {
 	// Mock the appConfig with test data
-	appConfig = mockEconomicConfig()
+	appConfig = setuptesting.MockEconomicConfig()
 
 	// Test buy scenario
 	buyBet := models.Bet{Amount: 100}
 	transactionFee := getTransactionFee(buyBet)
-	if transactionFee != appConfig.Economics.Betting.BetFees.BuySharesFee {
-		t.Errorf("Expected buy transaction fee to be %d, got %d", appConfig.Economics.Betting.BetFees.BuySharesFee, transactionFee)
+	if transactionFee != appConfig.Economics.Betting.BetFees.EachBetFee {
+		t.Errorf("Expected buy transaction fee to be %d, got %d", appConfig.Economics.Betting.BetFees.EachBetFee, transactionFee)
 	}
 
 	// Test sell scenario
@@ -162,7 +88,7 @@ func TestGetSumBetFees(t *testing.T) {
 	db.AutoMigrate(&models.Bet{})
 
 	// Mock the appConfig with test data
-	appConfig = mockEconomicConfig()
+	appConfig = setuptesting.MockEconomicConfig()
 
 	// Create a test user
 	user := &models.User{Username: "testuser"}
@@ -171,7 +97,7 @@ func TestGetSumBetFees(t *testing.T) {
 	buyBet := models.Bet{MarketID: 1, Amount: 100}
 	sumOfBetFees := GetBetFees(db, user, buyBet)
 	expectedSum := appConfig.Economics.Betting.BetFees.InitialBetFee +
-		appConfig.Economics.Betting.BetFees.BuySharesFee
+		appConfig.Economics.Betting.BetFees.EachBetFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
@@ -184,7 +110,7 @@ func TestGetSumBetFees(t *testing.T) {
 
 	// Scenario 2: User has one bet, buys shares
 	sumOfBetFees = GetBetFees(db, user, buyBet)
-	expectedSum = appConfig.Economics.Betting.BetFees.BuySharesFee
+	expectedSum = appConfig.Economics.Betting.BetFees.EachBetFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
