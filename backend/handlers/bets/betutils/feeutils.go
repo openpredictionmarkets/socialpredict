@@ -44,7 +44,7 @@ func getTransactionFee(betRequest models.Bet) int64 {
 
 	// if amount > 0, buying share, else selling share
 	if betRequest.Amount > 0 {
-		transactionFee = appConfig.Economics.Betting.BetFees.BuySharesFee
+		transactionFee = appConfig.Economics.Betting.BetFees.EachBetFee
 	} else {
 		transactionFee = appConfig.Economics.Betting.BetFees.SellSharesFee
 	}
