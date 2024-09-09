@@ -127,7 +127,7 @@ const Sidebar = () => {
       <>
         <SidebarLink to='/profile' icon={CoinsSVG} >
           {renderCredit()}
-        </SidebarLink>
+        </SidebarLink>      
         <SidebarLink to='/' icon={HomeSVG}>
           Home
         </SidebarLink>
@@ -160,8 +160,9 @@ const Sidebar = () => {
     <>
       <aside
         id='sidebar'
-        className={`fixed top-0 left-0 z-30 w-48 h-screen bg-gray-800 text-white flex flex-col transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:relative md:translate-x-0`}
+        className={`fixed top-0 left-0 z-30 w-48 h-screen bg-gray-800 text-white flex flex-col transition-transform duration-300 ease-in-out ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:relative md:translate-x-0`}
       >
         <div className='flex items-center justify-between p-3 border-b border-gray-700'>
           <h2 className='text-lg font-bold'>SocialPredict</h2>
