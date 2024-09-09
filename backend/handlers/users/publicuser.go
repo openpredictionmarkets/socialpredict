@@ -2,8 +2,10 @@ package usershandlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"socialpredict/models"
+	"socialpredict/repository"
 	"socialpredict/util"
 
 	"github.com/gorilla/mux"
@@ -65,9 +67,10 @@ func GetAllPublicUsers(db *gorm.DB) ([]PublicUserType, error) {
 	var publicUsers []PublicUserType
 
 	// Fetch all users from the database
-	result := db.Find(&users)
-	if result.Error != nil {
-		return nil, result.Error // Handle potential database errors
+	repo := repository.NewUserRepository(db)
+	users, err := repo.GetAllUsers()
+	if err != nil {
+		log.Fatalf("Failed to get all users: %v", err)
 	}
 
 	// Convert each User model to PublicUserType

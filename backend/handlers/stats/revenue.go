@@ -4,8 +4,8 @@ import (
 	"log"
 	"socialpredict/handlers/bets/betutils"
 	marketshandlers "socialpredict/handlers/markets"
-	usershandlers "socialpredict/handlers/users"
 	"socialpredict/models"
+	"socialpredict/repository"
 
 	"gorm.io/gorm"
 )
@@ -37,20 +37,20 @@ func calculateTotalRevenue(db *gorm.DB) int64 {
 func calculateMarketRevenue(db *gorm.DB, marketID uint) int64 {
 	var totalMarketRevenue int64 = 0
 
-	// Use GetAllPublicUsers to fetch all users
-	publicUsers, err := usershandlers.GetAllPublicUsers(db)
+	// Fetch all users from the database
+	repo := repository.NewUserRepository(db)
+	users, err := repo.GetAllUsers()
 	if err != nil {
-		log.Printf("Error fetching public user info: %v", err)
-		return 0
+		log.Fatalf("Failed to get all users: %v", err)
 	}
 
-	for _, publicUser := range publicUsers {
+	for _, user := range users {
 		betRequest := models.Bet{
 			MarketID: marketID,
 			// Ensure you populate other necessary fields as required
 		}
 		// Assume GetBetFees uses PublicUserType and is adjusted to work with it
-		fees := betutils.GetBetFees(db, &publicUser, betRequest)
+		fees := betutils.GetBetFees(db, &user, betRequest)
 		totalMarketRevenue += fees
 	}
 
