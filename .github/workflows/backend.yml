@@ -36,7 +36,9 @@ jobs:
   unit:
     needs: smoke
     if: |
-      ! startsWith(github.head_ref, 'main')
+      startsWith(github.head_ref, 'feature/')
+      || startsWith(github.head_ref, 'fix/')
+      || startsWith(github.head_ref, 'refactor/')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
