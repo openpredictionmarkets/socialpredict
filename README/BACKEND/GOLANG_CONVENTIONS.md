@@ -17,8 +17,12 @@ handlers/
     user_handler_test.go
 ```
 
+## 3. Data Conventions
 
-## 3. Development Environment
+* The entire application should be as stateless as possible, meaning we have a one-way writeable database of users, markets, bets and calculate all relevant states of the application from as few possible columns within those models.
+* We should separate the data logic from the business logic as much as possible with a Domain Driven Design (DDD), meaning we have a repository/ directory which is designed to be the central location to keep functions that extract data from the databases. This should ideally help slow the growth of the codebase over time and keep data extraction more testable, which should make our startless architecture more reliable.
+
+## 4. Development Environment
 
 We recommend using Visual Studio Code (VsCode) with the official Golang extension for development. This extension includes linting, debugging, and other useful features. Ensure that the main Golang linter is enabled for consistent code quality.
 
