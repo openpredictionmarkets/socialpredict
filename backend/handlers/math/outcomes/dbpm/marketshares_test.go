@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+var now = time.Now()
+
 func TestAdjustPayoutsFromNewest(t *testing.T) {
 	testcases := []struct {
 		Name                  string
@@ -18,7 +20,7 @@ func TestAdjustPayoutsFromNewest(t *testing.T) {
 		AdjustedScaledPayouts []int64
 	}{
 		{
-			Name: "Prevent simultaneous shares held",
+			Name: "PreventSimultaneousSharesHeld",
 			Bets: []models.Bet{
 				{
 					Amount:   3,
@@ -39,7 +41,7 @@ func TestAdjustPayoutsFromNewest(t *testing.T) {
 			AdjustedScaledPayouts: []int64{3, 1},
 		},
 		{
-			Name: "infinity avoidance",
+			Name: "InfinityAvoidance",
 			Bets: []models.Bet{
 				{
 					Amount:   1,
@@ -101,7 +103,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		AggregatedPositions   []MarketPosition
 	}{
 		{
-			Name: "Prevent simultaneous shares held",
+			Name: "PreventSimultaneousSharesHeld",
 			Bets: []models.Bet{
 				{
 					Amount:   3,
@@ -124,7 +126,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 			},
 		},
 		{
-			Name: "infinity avoidance",
+			Name: "InfinityAvoidance",
 			Bets: []models.Bet{
 				{
 					Amount:   1,
@@ -215,7 +217,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		CoursePayouts      []CourseBetPayout
 	}{
 		{
-			Name: "Prevent simultaneous shares held",
+			Name: "PreventSimultaneousSharesHeld",
 			Bets: []models.Bet{
 				{
 					Amount:   3,
@@ -243,7 +245,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 			},
 		},
 		{
-			Name: "infinity avoidance",
+			Name: "InfinityAvoidance",
 			Bets: []models.Bet{
 				{
 					Amount:   1,
@@ -322,14 +324,14 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 		ExpectedF_NO  float64
 	}{
 		{
-			Name:          "Prevent simultaneous shares held",
+			Name:          "PreventSimultaneousSharesHeld",
 			F_YES:         5.000000000000001, // Actual output from function
 			F_NO:          5.714285714285713, // Actual output from function
 			ExpectedF_YES: 5.000000,
 			ExpectedF_NO:  5.714286,
 		},
 		{
-			Name:          "infinity avoidance",
+			Name:          "InfinityAvoidance",
 			F_YES:         0,
 			F_NO:          2,
 			ExpectedF_YES: 0,
@@ -359,7 +361,7 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		ScaledPayouts []int64
 	}{
 		{
-			Name: "Prevent simultaneous shares held",
+			Name: "PreventSimultaneousSharesHeld",
 			Bets: []models.Bet{
 				{
 					Amount:   3,
@@ -385,7 +387,7 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 			ScaledPayouts: []int64{3, 1},
 		},
 		{
-			Name: "infinity avoidance",
+			Name: "InfinityAvoidance",
 			Bets: []models.Bet{
 				{
 					Amount:   1,
@@ -459,7 +461,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		S_NO               int64
 	}{
 		{
-			Name: "Prevent simultaneous shares held",
+			Name: "PreventSimultaneousSharesHeld",
 			Bets: []models.Bet{
 				{
 					Amount:   3,
@@ -485,7 +487,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 			S_NO:  1,
 		},
 		{
-			Name: "infinity avoidance",
+			Name: "InfinityAvoidance",
 			Bets: []models.Bet{
 				{
 					Amount:   1,
@@ -556,7 +558,7 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 		NetPositions        []MarketPosition
 	}{
 		{
-			Name: "Prevent simultaneous shares held",
+			Name: "PreventSimultaneousSharesHeldPreventSimultaneousSharesHeldPreventSimultaneousSharesHeld",
 			AggregatedPositions: []MarketPosition{
 				{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
 			},
@@ -565,7 +567,7 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 			},
 		},
 		{
-			Name: "infinity avoidance",
+			Name: "InfinityAvoidance",
 			AggregatedPositions: []MarketPosition{
 				{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
 				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
