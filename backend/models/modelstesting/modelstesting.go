@@ -4,6 +4,8 @@ package modelstesting
 import (
 	"testing"
 
+	"socialpredict/migration"
+
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -15,5 +17,6 @@ func NewFakeDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to the database: %v", err)
 	}
+	migration.MigrateDB(db)
 	return db
 }
