@@ -8,7 +8,7 @@ import (
 func TestNewFakeDB(t *testing.T) {
 	db := NewFakeDB(t)
 	if db == nil {
-		t.Error("Failed to create fake db")
+		t.Fatal("Failed to create fake db")
 	}
 	tests := []struct {
 		Name     string
