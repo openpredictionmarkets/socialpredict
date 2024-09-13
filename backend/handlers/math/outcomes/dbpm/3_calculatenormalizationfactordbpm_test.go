@@ -1,14 +1,13 @@
-package test
+package dbpm
 
 import (
 	"math"
-	test "socialpredict/tests"
 	"testing"
 )
 
 func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 
-	for _, tc := range test.TestCases {
+	for _, tc := range TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			roundedF_YES := math.Round(tc.F_YES*1000000) / 1000000
 			roundedF_NO := math.Round(tc.F_NO*1000000) / 1000000

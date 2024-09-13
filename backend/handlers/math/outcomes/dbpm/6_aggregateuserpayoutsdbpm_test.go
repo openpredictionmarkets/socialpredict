@@ -1,24 +1,22 @@
-package test
+package dbpm
 
 import (
-	"socialpredict/handlers/math/outcomes/dbpm"
-	test "socialpredict/tests"
 	"testing"
 )
 
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
-	for _, tc := range test.TestCases {
+	for _, tc := range TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			result := dbpm.AggregateUserPayoutsDBPM(tc.Bets, tc.AdjustedScaledPayouts)
+			result := AggregateUserPayoutsDBPM(tc.Bets, tc.AdjustedScaledPayouts)
 
 			// Create a map for expected results for easy lookup
-			expectedResults := make(map[string]dbpm.MarketPosition)
+			expectedResults := make(map[string]MarketPosition)
 			for _, pos := range tc.AggregatedPositions {
 				expectedResults[pos.Username] = pos
 			}
 
 			// Create a map from the results for comparison
-			resultsMap := make(map[string]dbpm.MarketPosition)
+			resultsMap := make(map[string]MarketPosition)
 			for _, pos := range result {
 				resultsMap[pos.Username] = pos
 			}

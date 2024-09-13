@@ -1,7 +1,6 @@
-package tests
+package dbpm
 
 import (
-	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"time"
@@ -13,15 +12,15 @@ type TestCase struct {
 	ProbabilityChanges    []wpam.ProbabilityChange
 	S_YES                 int64
 	S_NO                  int64
-	CoursePayouts         []dbpm.CourseBetPayout
+	CoursePayouts         []CourseBetPayout
 	F_YES                 float64
 	F_NO                  float64
 	ExpectedF_YES         float64 // Ensure names match what you use in tests
 	ExpectedF_NO          float64
 	ScaledPayouts         []int64
 	AdjustedScaledPayouts []int64
-	AggregatedPositions   []dbpm.MarketPosition
-	NetPositions          []dbpm.MarketPosition
+	AggregatedPositions   []MarketPosition
+	NetPositions          []MarketPosition
 }
 
 var now = time.Now() // Capture current time for consistent test data
@@ -52,7 +51,7 @@ var TestCases = []TestCase{
 		},
 		S_YES: 3,
 		S_NO:  1,
-		CoursePayouts: []dbpm.CourseBetPayout{
+		CoursePayouts: []CourseBetPayout{
 			{Payout: 0.5999999999999999, Outcome: "YES"},
 			{Payout: 0.17500000000000004, Outcome: "NO"},
 		},
@@ -62,10 +61,10 @@ var TestCases = []TestCase{
 		ExpectedF_NO:          5.714286,
 		ScaledPayouts:         []int64{3, 1},
 		AdjustedScaledPayouts: []int64{3, 1},
-		AggregatedPositions: []dbpm.MarketPosition{
+		AggregatedPositions: []MarketPosition{
 			{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
 		},
-		NetPositions: []dbpm.MarketPosition{
+		NetPositions: []MarketPosition{
 			{Username: "user1", YesSharesOwned: 2, NoSharesOwned: 0},
 		},
 	},
@@ -118,7 +117,7 @@ var TestCases = []TestCase{
 		},
 		S_YES: 0,
 		S_NO:  1,
-		CoursePayouts: []dbpm.CourseBetPayout{
+		CoursePayouts: []CourseBetPayout{
 			{Payout: 0.25, Outcome: "YES"},
 			{Payout: -0.5, Outcome: "YES"},
 			{Payout: 0.25, Outcome: "NO"},
@@ -131,11 +130,11 @@ var TestCases = []TestCase{
 		ExpectedF_NO:          2,
 		ScaledPayouts:         []int64{0, 0, 1, 0, 1},
 		AdjustedScaledPayouts: []int64{0, 0, 1, 0, 0},
-		AggregatedPositions: []dbpm.MarketPosition{
+		AggregatedPositions: []MarketPosition{
 			{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
 			{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
 		},
-		NetPositions: []dbpm.MarketPosition{
+		NetPositions: []MarketPosition{
 			{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
 			{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
 		},
