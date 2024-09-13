@@ -44,11 +44,8 @@ func CalculateMarketProbabilitiesWPAM(mcl setup.MarketCreationLoader, marketCrea
 }
 
 func ProjectNewProbabilityWPAM(mcl setup.MarketCreationLoader, marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
-
 	updatedBets := append(currentBets, newBet)
-
 	probabilityChanges := CalculateMarketProbabilitiesWPAM(mcl, marketCreatedAtTime, updatedBets)
-
 	finalProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
 	return ProjectedProbability{Probability: finalProbability}
