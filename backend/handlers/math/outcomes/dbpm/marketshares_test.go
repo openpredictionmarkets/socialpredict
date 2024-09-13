@@ -3,11 +3,85 @@ package dbpm
 import (
 	"math"
 	"reflect"
+	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/models"
+	"socialpredict/setup"
 	"testing"
+	"time"
 )
 
 func TestAdjustPayoutsFromNewest(t *testing.T) {
-	for _, tc := range TestCases {
+	testcases := []struct {
+		Name                  string
+		Bets                  []models.Bet
+		ScaledPayouts         []int64
+		AdjustedScaledPayouts []int64
+	}{
+		{
+			Name: "Prevent simultaneous shares held",
+			Bets: []models.Bet{
+				{
+					Amount:   3,
+					Outcome:  "YES",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
+					MarketID: 3,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
+					MarketID: 3,
+				},
+			},
+			ScaledPayouts:         []int64{3, 1},
+			AdjustedScaledPayouts: []int64{3, 1},
+		},
+		{
+			Name: "infinity avoidance",
+			Bets: []models.Bet{
+				{
+					Amount:   1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now,
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now.Add(time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(2 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(3 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(4 * time.Minute),
+					MarketID: 1,
+				},
+			},
+			ScaledPayouts:         []int64{0, 0, 1, 0, 1},
+			AdjustedScaledPayouts: []int64{0, 0, 1, 0, 0},
+		},
+	}
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			adjustedPayouts := AdjustPayoutsFromNewest(tc.Bets, tc.ScaledPayouts)
 			for i, payout := range adjustedPayouts {
@@ -20,7 +94,82 @@ func TestAdjustPayoutsFromNewest(t *testing.T) {
 }
 
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	testcases := []struct {
+		Name                  string
+		Bets                  []models.Bet
+		AdjustedScaledPayouts []int64
+		AggregatedPositions   []MarketPosition
+	}{
+		{
+			Name: "Prevent simultaneous shares held",
+			Bets: []models.Bet{
+				{
+					Amount:   3,
+					Outcome:  "YES",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
+					MarketID: 3,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
+					MarketID: 3,
+				},
+			},
+			AdjustedScaledPayouts: []int64{3, 1},
+			AggregatedPositions: []MarketPosition{
+				{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
+			},
+		},
+		{
+			Name: "infinity avoidance",
+			Bets: []models.Bet{
+				{
+					Amount:   1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now,
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now.Add(time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(2 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(3 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(4 * time.Minute),
+					MarketID: 1,
+				},
+			},
+			AdjustedScaledPayouts: []int64{0, 0, 1, 0, 0},
+			AggregatedPositions: []MarketPosition{
+				{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
+				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
+			},
+		},
+	}
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			result := AggregateUserPayoutsDBPM(tc.Bets, tc.AdjustedScaledPayouts)
 
@@ -59,7 +208,97 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 }
 
 func TestCalculateCoursePayoutsDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	testcases := []struct {
+		Name               string
+		Bets               []models.Bet
+		ProbabilityChanges []wpam.ProbabilityChange
+		CoursePayouts      []CourseBetPayout
+	}{
+		{
+			Name: "Prevent simultaneous shares held",
+			Bets: []models.Bet{
+				{
+					Amount:   3,
+					Outcome:  "YES",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
+					MarketID: 3,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
+					MarketID: 3,
+				},
+			},
+			ProbabilityChanges: []wpam.ProbabilityChange{
+				{Probability: 0.5},
+				{Probability: 0.875},
+				{Probability: 0.7},
+			},
+			CoursePayouts: []CourseBetPayout{
+				{Payout: 0.5999999999999999, Outcome: "YES"},
+				{Payout: 0.17500000000000004, Outcome: "NO"},
+			},
+		},
+		{
+			Name: "infinity avoidance",
+			Bets: []models.Bet{
+				{
+					Amount:   1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now,
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now.Add(time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(2 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(3 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(4 * time.Minute),
+					MarketID: 1,
+				},
+			},
+			ProbabilityChanges: []wpam.ProbabilityChange{
+				{Probability: 0.50},
+				{Probability: 0.75},
+				{Probability: 0.50},
+				{Probability: 0.25},
+				{Probability: 0.50},
+				{Probability: 0.25},
+			},
+			CoursePayouts: []CourseBetPayout{
+				{Payout: 0.25, Outcome: "YES"},
+				{Payout: -0.5, Outcome: "YES"},
+				{Payout: 0.25, Outcome: "NO"},
+				{Payout: -0, Outcome: "NO"}, // golang math.Round() rounds to -0 and +0
+				{Payout: 0.25, Outcome: "NO"},
+			},
+		},
+	}
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateCoursePayoutsDBPM(tc.Bets, tc.ProbabilityChanges)
 			if len(actualPayouts) != len(tc.CoursePayouts) {
@@ -75,7 +314,29 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 }
 
 func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	testcases := []struct {
+		Name          string
+		F_YES         float64
+		F_NO          float64
+		ExpectedF_YES float64
+		ExpectedF_NO  float64
+	}{
+		{
+			Name:          "Prevent simultaneous shares held",
+			F_YES:         5.000000000000001, // Actual output from function
+			F_NO:          5.714285714285713, // Actual output from function
+			ExpectedF_YES: 5.000000,
+			ExpectedF_NO:  5.714286,
+		},
+		{
+			Name:          "infinity avoidance",
+			F_YES:         0,
+			F_NO:          2,
+			ExpectedF_YES: 0,
+			ExpectedF_NO:  2,
+		},
+	}
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			roundedF_YES := math.Round(tc.F_YES*1000000) / 1000000
 			roundedF_NO := math.Round(tc.F_NO*1000000) / 1000000
@@ -89,7 +350,92 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 }
 
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	testcases := []struct {
+		Name          string
+		Bets          []models.Bet
+		CoursePayouts []CourseBetPayout
+		F_YES         float64
+		F_NO          float64
+		ScaledPayouts []int64
+	}{
+		{
+			Name: "Prevent simultaneous shares held",
+			Bets: []models.Bet{
+				{
+					Amount:   3,
+					Outcome:  "YES",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
+					MarketID: 3,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
+					MarketID: 3,
+				},
+			},
+			CoursePayouts: []CourseBetPayout{
+				{Payout: 0.5999999999999999, Outcome: "YES"},
+				{Payout: 0.17500000000000004, Outcome: "NO"},
+			},
+			F_YES:         5.000000000000001, // Actual output from function
+			F_NO:          5.714285714285713, // Actual output from function
+			ScaledPayouts: []int64{3, 1},
+		},
+		{
+			Name: "infinity avoidance",
+			Bets: []models.Bet{
+				{
+					Amount:   1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now,
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now.Add(time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(2 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(3 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(4 * time.Minute),
+					MarketID: 1,
+				},
+			},
+			CoursePayouts: []CourseBetPayout{
+				{Payout: 0.25, Outcome: "YES"},
+				{Payout: -0.5, Outcome: "YES"},
+				{Payout: 0.25, Outcome: "NO"},
+				{Payout: -0, Outcome: "NO"}, // golang math.Round() rounds to -0 and +0
+				{Payout: 0.25, Outcome: "NO"},
+			},
+			F_YES:         0,
+			F_NO:          2,
+			ScaledPayouts: []int64{0, 0, 1, 0, 1},
+		},
+	}
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.F_YES, tc.F_NO)
 			if len(actualPayouts) != len(tc.ScaledPayouts) {
@@ -105,7 +451,95 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 }
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
-	for _, tc := range TestCases {
+	testcases := []struct {
+		Name               string
+		Bets               []models.Bet
+		ProbabilityChanges []wpam.ProbabilityChange
+		S_YES              int64
+		S_NO               int64
+	}{
+		{
+			Name: "Prevent simultaneous shares held",
+			Bets: []models.Bet{
+				{
+					Amount:   3,
+					Outcome:  "YES",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
+					MarketID: 3,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
+					MarketID: 3,
+				},
+			},
+			ProbabilityChanges: []wpam.ProbabilityChange{
+				{Probability: 0.5},
+				{Probability: 0.875},
+				{Probability: 0.7},
+			},
+			S_YES: 3,
+			S_NO:  1,
+		},
+		{
+			Name: "infinity avoidance",
+			Bets: []models.Bet{
+				{
+					Amount:   1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now,
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "YES",
+					Username: "user2",
+					PlacedAt: now.Add(time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(2 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   -1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(3 * time.Minute),
+					MarketID: 1,
+				},
+				{
+					Amount:   1,
+					Outcome:  "NO",
+					Username: "user1",
+					PlacedAt: now.Add(4 * time.Minute),
+					MarketID: 1,
+				},
+			},
+			ProbabilityChanges: []wpam.ProbabilityChange{
+				{Probability: 0.50},
+				{Probability: 0.75},
+				{Probability: 0.50},
+				{Probability: 0.25},
+				{Probability: 0.50},
+				{Probability: 0.25},
+			},
+			S_YES: 0,
+			S_NO:  1,
+		},
+	}
+	ec := setup.EconomicsConfig()
+	ec.Economics.MarketCreation.InitialMarketSubsidization = 0
+	ec.Economics.MarketIncentives.CreateMarketCost = 1
+
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			yes, no := DivideUpMarketPoolSharesDBPM(tc.Bets, tc.ProbabilityChanges)
 			if yes != tc.S_YES || no != tc.S_NO {
@@ -116,7 +550,33 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 }
 
 func TestNetAggregateMarketPositions(t *testing.T) {
-	for _, tc := range TestCases {
+	testcases := []struct {
+		Name                string
+		AggregatedPositions []MarketPosition
+		NetPositions        []MarketPosition
+	}{
+		{
+			Name: "Prevent simultaneous shares held",
+			AggregatedPositions: []MarketPosition{
+				{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
+			},
+			NetPositions: []MarketPosition{
+				{Username: "user1", YesSharesOwned: 2, NoSharesOwned: 0},
+			},
+		},
+		{
+			Name: "infinity avoidance",
+			AggregatedPositions: []MarketPosition{
+				{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
+				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
+			},
+			NetPositions: []MarketPosition{
+				{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
+				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
+			},
+		},
+	}
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actual := NetAggregateMarketPositions(tc.AggregatedPositions)
 			expected := tc.NetPositions
