@@ -8,16 +8,16 @@ import (
 )
 
 func MigrateDB(db *gorm.DB) {
-	// Migrate the User and Market models first
+	// Migrate the User modelsfirst
 	err := db.AutoMigrate(&models.User{})
 	if err != nil {
-		log.Fatalf("Error migrating User and Market models: %v", err)
+		log.Fatalf("Error migrating User model: %v", err)
 	}
 
-	// Then, migrate the Bet model
+	// Then, migrate the Market model
 	err = db.AutoMigrate(&models.Market{})
 	if err != nil {
-		log.Fatalf("Error migrating Bet model: %v", err)
+		log.Fatalf("Error migrating Market model: %v", err)
 	}
 
 	// Then, migrate the Bet model
