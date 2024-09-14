@@ -30,8 +30,8 @@ func MarketDetailsHandler(mcl setup.MarketCreationLoader) func(http.ResponseWrit
 		vars := mux.Vars(r)
 		marketId := vars["marketId"]
 
-		// Parsing a String to an Unsigned Integer, base10, 64bits
-		marketIDUint64, err := strconv.ParseUint(marketId, 10, 64)
+		// Parsing a String to an Unsigned Integer, base10, 32bits
+		marketIDUint64, err := strconv.ParseUint(marketId, 10, 32)
 		if err != nil {
 			http.Error(w, "Invalid market ID", http.StatusBadRequest)
 			return
@@ -57,10 +57,6 @@ func MarketDetailsHandler(mcl setup.MarketCreationLoader) func(http.ResponseWrit
 
 		// find the number of users on the market
 		numUsers := models.GetNumMarketUsers(bets)
-		if err != nil {
-			http.Error(w, "Error retrieving number of users.", http.StatusInternalServerError)
-			return
-		}
 
 		// market volume is equivalent to the sum of all bets
 		marketVolume := marketmath.GetMarketVolume(bets)
