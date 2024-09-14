@@ -7,6 +7,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 	"sort"
 	"strconv"
@@ -24,51 +25,53 @@ type BetDisplayInfo struct {
 	PlacedAt    time.Time `json:"placedAt"`
 }
 
-func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	marketIdStr := vars["marketId"]
+func MarketBetsDisplayHandler(mcl setup.MarketCreationLoader) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		marketIdStr := vars["marketId"]
 
-	// Convert marketId to uint
-	parsedUint64, err := strconv.ParseUint(marketIdStr, 10, 32)
-	if err != nil {
-		// handle error
-	}
-
-	// Convert uint64 to uint safely.
-	marketIDUint := uint(parsedUint64)
-
-	// Database connection
-	db := util.GetDB()
-
-	// Fetch bets for the market
-	bets := tradingdata.GetBetsForMarket(db, marketIDUint)
-
-	// feed in the time created
-	// note we are not using GetPublicResponseMarketByID because of circular import
-	var market models.Market
-	result := db.Where("ID = ?", marketIdStr).First(&market)
-	if result.Error != nil {
-		// Handle error, for example:
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			// Market not found
-		} else {
-			// Other error fetching market
+		// Convert marketId to uint
+		parsedUint64, err := strconv.ParseUint(marketIdStr, 10, 32)
+		if err != nil {
+			// handle error
 		}
-		return // Make sure to return or appropriately handle the error
+
+		// Convert uint64 to uint safely.
+		marketIDUint := uint(parsedUint64)
+
+		// Database connection
+		db := util.GetDB()
+
+		// Fetch bets for the market
+		bets := tradingdata.GetBetsForMarket(db, marketIDUint)
+
+		// feed in the time created
+		// note we are not using GetPublicResponseMarketByID because of circular import
+		var market models.Market
+		result := db.Where("ID = ?", marketIdStr).First(&market)
+		if result.Error != nil {
+			// Handle error, for example:
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				// Market not found
+			} else {
+				// Other error fetching market
+			}
+			return // Make sure to return or appropriately handle the error
+		}
+
+		// Process bets and calculate market probability at the time of each bet
+		betsDisplayInfo := processBetsForDisplay(mcl, market.CreatedAt, bets, db)
+
+		// Respond with the bets display information
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(betsDisplayInfo)
 	}
-
-	// Process bets and calculate market probability at the time of each bet
-	betsDisplayInfo := processBetsForDisplay(market.CreatedAt, bets, db)
-
-	// Respond with the bets display information
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(betsDisplayInfo)
 }
 
-func processBetsForDisplay(marketCreatedAtTime time.Time, bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
+func processBetsForDisplay(mcl setup.MarketCreationLoader, marketCreatedAtTime time.Time, bets []models.Bet, db *gorm.DB) []BetDisplayInfo {
 
 	// Calculate probabilities using the fetched bets
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(mcl, marketCreatedAtTime, bets)
 
 	var betsDisplayInfo []BetDisplayInfo
 
