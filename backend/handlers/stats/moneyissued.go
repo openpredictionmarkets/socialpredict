@@ -10,10 +10,7 @@ import (
 // calculateTotalMoney calculates the total initial money in the system based on the number of regular users.
 func calculateTotalMoneyIssued(db *gorm.DB) (int64, error) {
 
-	debtExtendedToUsersOnCreation, err := calculateDebtExtendedToUsersOnCreation(db)
-	if err != nil {
-		return debtExtendedToUsersOnCreation, err
-	}
+	debtExtendedToUsersOnCreation := calculateDebtExtendedToRegularUsers(db)
 
 	// totalMoney will be the sum of all types of debt extended to accounts
 	totalMoney := debtExtendedToUsersOnCreation
@@ -21,7 +18,22 @@ func calculateTotalMoneyIssued(db *gorm.DB) (int64, error) {
 	return totalMoney, nil
 }
 
-func calculateDebtExtendedToUsersOnCreation(db *gorm.DB) (int64, error) {
+// Example placeholders for other calculations
+func calculateDebtExtendedToRegularUsers(db *gorm.DB) int64 {
+	// Implement actual database query to sum up debt to regular users
+	// Catchall for any type of universal debt besides debt upon creation
+
+	debtExtendedToRegularUsersOnCreation, err := calculateDebtExtendedToRegularUsersOnCreation(db)
+	if err != nil {
+		return 0
+	}
+
+	totalRegularUserDebt := debtExtendedToRegularUsersOnCreation
+
+	return totalRegularUserDebt
+}
+
+func calculateDebtExtendedToRegularUsersOnCreation(db *gorm.DB) (int64, error) {
 	// Load economic configuration
 	economicConfig, err := setup.LoadEconomicsConfig()
 	if err != nil {
@@ -37,12 +49,6 @@ func calculateDebtExtendedToUsersOnCreation(db *gorm.DB) (int64, error) {
 	// Calculate total money based on the initial account balance and user count
 	return economicConfig.Economics.User.MaximumDebtAllowed * userCount, nil
 
-}
-
-// Example placeholders for other calculations
-func calculateDebtExtendedToRegularUsers(db *gorm.DB) int64 {
-	// Implement actual database query to sum up debt to regular users
-	return 0 // Placeholder
 }
 
 func calculateAdditionalDebtExtended(db *gorm.DB) int64 {
