@@ -33,7 +33,8 @@ func MarketBetsDisplayHandler(mcl setup.MarketCreationLoader) func(http.Response
 		// Convert marketId to uint
 		parsedUint64, err := strconv.ParseUint(marketIdStr, 10, 32)
 		if err != nil {
-			// handle error
+			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			return
 		}
 
 		// Convert uint64 to uint safely.

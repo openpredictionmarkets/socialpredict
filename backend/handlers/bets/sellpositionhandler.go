@@ -42,7 +42,7 @@ func SellPositionHandler(mcl setup.MarketCreationLoader) func(http.ResponseWrite
 		betutils.CheckMarketStatus(db, redeemRequest.MarketID)
 
 		// Calculate the net aggregate positions for the user
-		userNetPosition, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(mcl, db, marketIDStr, user.Username)
+		userNetPosition, _ := positions.CalculateMarketPositionForUser_WPAM_DBPM(mcl, db, marketIDStr, user.Username)
 		if userNetPosition.NoSharesOwned == 0 && userNetPosition.YesSharesOwned == 0 {
 			http.Error(w, "No position found for the given market", http.StatusBadRequest)
 			return
