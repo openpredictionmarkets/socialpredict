@@ -2,19 +2,14 @@ package betutils
 
 import (
 	"socialpredict/models"
+	"socialpredict/models/modelstesting"
 	"socialpredict/setup/setuptesting"
 	"testing"
 	"time"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestGetUserInitialBetFee(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to connect to the database: %v", err)
-	}
+	db := modelstesting.NewFakeDB(t)
 	if err := db.AutoMigrate(&models.Bet{}, &models.User{}); err != nil {
 		t.Fatalf("Failed to migrate models: %v", err)
 	}
@@ -79,13 +74,12 @@ func TestGetTransactionFee(t *testing.T) {
 
 func TestGetSumBetFees(t *testing.T) {
 	// Set up in-memory SQLite database
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to connect to the database: %v", err)
-	}
+	db := modelstesting.NewFakeDB(t)
 
 	// Migrate the Bet model
-	db.AutoMigrate(&models.Bet{})
+	if err := db.AutoMigrate(&models.Bet{}); err != nil {
+		t.Fatalf("Failed to auto migrate bets model %v", err)
+	}
 
 	// Mock the appConfig with test data
 	appConfig = setuptesting.MockEconomicConfig()
