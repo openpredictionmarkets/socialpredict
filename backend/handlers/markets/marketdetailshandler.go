@@ -68,7 +68,11 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get market creator
 	// Fetch the Creator's public information using utility function
-	publicCreator := usersHandlers.GetPublicUserInfo(db, publicResponseMarket.CreatorUsername)
+	publicCreator, err := usersHandlers.GetPublicUserInfo(db, publicResponseMarket.CreatorUsername)
+	if err != nil {
+		http.Error(w, "Can't retrieve user public info.", http.StatusBadRequest)
+		return
+	}
 
 	// Manually construct the response
 	response := MarketDetailHandlerResponse{

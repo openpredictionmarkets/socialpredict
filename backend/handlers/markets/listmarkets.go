@@ -52,7 +52,11 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 		marketVolume := marketmath.GetMarketVolume(bets)
 		lastProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
-		creatorInfo := usersHandlers.GetPublicUserInfo(db, market.CreatorUsername)
+		creatorInfo, err := usersHandlers.GetPublicUserInfo(db, market.CreatorUsername)
+		if err != nil {
+			http.Error(w, "Can't retrieve user public info.", http.StatusBadRequest)
+			return
+		}
 
 		// return the PublicResponse type with information about the market
 		marketIDStr := strconv.FormatUint(uint64(market.ID), 10)

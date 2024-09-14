@@ -7,7 +7,6 @@ import (
 	"net/http"
 	dbpm "socialpredict/handlers/math/outcomes/dbpm"
 	usersHandlers "socialpredict/handlers/users"
-	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -19,8 +18,6 @@ import (
 )
 
 func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
-
-	logging.LogMsg("Attempting to use ResolveMarketHandler.")
 
 	// Use database connection
 	db := util.GetDB()

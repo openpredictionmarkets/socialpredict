@@ -14,29 +14,29 @@ type Database interface {
 }
 
 type GormDatabase struct {
-	db *gorm.DB
+	DB *gorm.DB
 }
 
 func (g *GormDatabase) Find(dest interface{}, conds ...interface{}) Database {
-	g.db = g.db.Find(dest, conds...)
+	g.DB = g.DB.Find(dest, conds...)
 	return g
 }
 
 func (g *GormDatabase) First(dest interface{}, conds ...interface{}) Database {
-	g.db = g.db.First(dest, conds...)
+	g.DB = g.DB.First(dest, conds...)
 	return g
 }
 
 func (g *GormDatabase) Preload(query string, args ...interface{}) Database {
-	g.db = g.db.Preload(query, args...)
+	g.DB = g.DB.Preload(query, args...)
 	return g
 }
 
 func (g *GormDatabase) Where(query interface{}, args ...interface{}) Database {
-	g.db = g.db.Where(query, args...)
+	g.DB = g.DB.Where(query, args...)
 	return g
 }
 
 func (g *GormDatabase) Error() error {
-	return g.db.Error
+	return g.DB.Error
 }

@@ -37,11 +37,12 @@ func calculateTotalRevenue(db *gorm.DB) int64 {
 func calculateMarketRevenue(db *gorm.DB, marketID uint) int64 {
 	var totalMarketRevenue int64 = 0
 
-	// Fetch all users from the database
-	repo := repository.NewUserRepository(db)
+	gormDatabase := &repository.GormDatabase{DB: db}
+	repo := repository.NewUserRepository(gormDatabase)
+
 	users, err := repo.GetAllUsers()
 	if err != nil {
-		log.Fatalf("Failed to get all users: %v", err)
+		return 0
 	}
 
 	for _, user := range users {

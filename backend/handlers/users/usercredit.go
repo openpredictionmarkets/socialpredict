@@ -55,7 +55,10 @@ func GetUserCreditHandler(w http.ResponseWriter, r *http.Request) {
 
 func calculateUserCredit(db *gorm.DB, username string) int {
 
-	userPublicInfo := GetPublicUserInfo(db, username)
+	userPublicInfo, err := GetPublicUserInfo(db, username)
+	if err != nil {
+		return 0
+	}
 
 	// add the maximum debt from the setup file and he account balance, which may be negative
 	userCredit := appConfig.Economics.User.MaximumDebtAllowed + userPublicInfo.AccountBalance
