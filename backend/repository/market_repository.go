@@ -29,3 +29,11 @@ func (repo *MarketRepository) GetMarketByID(id int64) (*models.Market, error) {
 	}
 	return &market, nil
 }
+
+func (repo *MarketRepository) CountMarkets() (int64, error) {
+	var count int64
+	if err := repo.db.Model(&models.Market{}).Count(&count).Error(); err != nil {
+		return 0, err
+	}
+	return count, nil
+}

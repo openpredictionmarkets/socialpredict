@@ -51,3 +51,24 @@ func TestGetUserByUsername(t *testing.T) {
 		t.Errorf("Expected user %+v, got %+v", expectedUser, user)
 	}
 }
+
+func TestCountUsers(t *testing.T) {
+	mockUsers := []models.User{
+		{Username: "user1"},
+		{Username: "user2"},
+	}
+
+	mockDB := &MockDatabase{
+		users: mockUsers,
+	}
+
+	userRepo := repository.NewUserRepository(mockDB)
+	count, err := userRepo.CountUsers()
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if count != int64(len(mockUsers)) {
+		t.Errorf("Expected count %d, got %d", len(mockUsers), count)
+	}
+}

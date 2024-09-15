@@ -1,40 +1,56 @@
 package statshandlers
 
 import (
-	"log"
 	"socialpredict/handlers/bets/betutils"
-	marketshandlers "socialpredict/handlers/markets"
 	"socialpredict/models"
 	"socialpredict/repository"
+	"socialpredict/setup"
 
 	"gorm.io/gorm"
 )
 
 // calculateTotalRevenue sums up all revenue components from betting fees across all markets
 func calculateTotalRevenue(db *gorm.DB) int64 {
-	totalRevenue := int64(0)
 
-	// Use the existing ListMarkets function to get all markets
-	markets, err := marketshandlers.ListMarkets(db)
-	if err != nil {
-		log.Printf("Error fetching markets: %v", err)
-		return 0
-	}
+	// fees asssessed from the initial market creation fee, for all markets
+	marketCreationFees := sumAllMarketCreationFees(db)
+	// initial transaction fees
 
-	// Assuming you have a way to fetch all users or calculate fees without needing each user
-	// If you need each user, you should fetch them or iterate over users differently
-	for _, market := range markets {
-		marketID := uint(market.ID)
-		// This assumes you have a function or a way to calculate the total fees for a market
-		marketRevenue := calculateMarketRevenue(db, marketID)
-		totalRevenue += marketRevenue
-	}
+	// buying fees across all bets
+
+	// selling fees across all bets
+
+	totalRevenue := marketCreationFees
 
 	return totalRevenue
 }
 
-// calculateMarketRevenue calculates the total fees collected from a specific market
-func calculateMarketRevenue(db *gorm.DB, marketID uint) int64 {
+func sumAllMarketCreationFees(db *gorm.DB) int64 {
+
+	economicConfig, err := setup.LoadEconomicsConfig()
+	if err != nil {
+		return 0
+	}
+
+	gormDatabase := &repository.GormDatabase{DB: db}
+
+	marketRepo := repository.NewMarketRepository(gormDatabase)
+	marketsCount, err := marketRepo.CountMarkets()
+	if err != nil {
+		return 0
+	}
+
+	return economicConfig.Economics.MarketIncentives.CreateMarketCost * marketsCount
+}
+
+// calculateMarketRevenue calculates the initial fees collected from a specific market
+func calculateMarketInitialFees(db *gorm.DB, marketID uint) int64 {
+
+	economicConfig, err := setup.LoadEconomicsConfig()
+	if err != nil {
+		return 0
+	}
+
 	var totalMarketRevenue int64 = 0
 
 	gormDatabase := &repository.GormDatabase{DB: db}

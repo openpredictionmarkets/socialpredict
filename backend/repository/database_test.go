@@ -14,6 +14,7 @@ type Condition struct {
 }
 
 type MockDatabase struct {
+	model      interface{}
 	users      []models.User
 	markets    []models.Market
 	conditions []Condition
@@ -31,6 +32,12 @@ func (m *MockDatabase) clone() *MockDatabase {
 		conditions: newConditions,
 		err:        m.err,
 	}
+}
+
+func (m *MockDatabase) Model(value interface{}) repository.Database {
+	clone := m.clone()
+	clone.model = value
+	return clone
 }
 
 func (m *MockDatabase) First(dest interface{}, conds ...interface{}) repository.Database {
@@ -181,6 +188,25 @@ func (m *MockDatabase) Where(query interface{}, args ...interface{}) repository.
 		clone.err = fmt.Errorf("unsupported query type in Where")
 	}
 	return clone
+}
+
+func (m *MockDatabase) Count(count *int64) repository.Database {
+	if m.err != nil {
+		return m
+	}
+	// Determine which dataset to count based on the last operation
+	// For simplicity, let's assume we're counting users
+	var dataToCount int64
+	switch {
+	case len(m.users) > 0:
+		dataToCount = int64(len(m.users))
+	case len(m.markets) > 0:
+		dataToCount = int64(len(m.markets))
+	default:
+		dataToCount = 0
+	}
+	*count = dataToCount
+	return m
 }
 
 func (m *MockDatabase) Error() error {

@@ -29,3 +29,11 @@ func (repo *UserRepository) GetUserByUsername(username string) (*models.User, er
 	}
 	return &user, nil
 }
+
+func (repo *UserRepository) CountUsers() (int64, error) {
+	var count int64
+	if err := repo.db.Model(&models.User{}).Count(&count).Error(); err != nil {
+		return 0, err
+	}
+	return count, nil
+}

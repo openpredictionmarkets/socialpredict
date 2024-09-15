@@ -34,7 +34,7 @@ func calculateDebtExtendedToRegularUsers(db *gorm.DB) int64 {
 }
 
 func calculateDebtExtendedToRegularUsersOnCreation(db *gorm.DB) (int64, error) {
-	// Load economic configuration
+
 	economicConfig, err := setup.LoadEconomicsConfig()
 	if err != nil {
 		return 0, err
