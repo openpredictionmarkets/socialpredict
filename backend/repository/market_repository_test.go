@@ -8,6 +8,7 @@ import (
 )
 
 func TestGetAllMarkets(t *testing.T) {
+
 	mockMarkets := []models.Market{
 		{ID: 1, QuestionTitle: "Market 1"},
 		{ID: 2, QuestionTitle: "Market 2"},

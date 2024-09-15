@@ -17,6 +17,8 @@ type Database interface {
 	Group(query string) Database
 	Joins(query string, args ...interface{}) Database
 	Scan(dest interface{}) Database
+	SubQuery() *gorm.DB
+	Raw(sql string, values ...interface{}) Database
 	Error() error
 }
 
@@ -76,6 +78,15 @@ func (g *GormDatabase) Joins(query string, args ...interface{}) Database {
 
 func (g *GormDatabase) Scan(dest interface{}) Database {
 	g.DB = g.DB.Scan(dest)
+	return g
+}
+
+func (g *GormDatabase) SubQuery() *gorm.DB {
+	return g.DB
+}
+
+func (g *GormDatabase) Raw(sql string, values ...interface{}) Database {
+	g.DB = g.DB.Raw(sql, values...)
 	return g
 }
 

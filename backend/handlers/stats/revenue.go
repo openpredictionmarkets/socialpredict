@@ -1,8 +1,7 @@
 package statshandlers
 
 import (
-	"socialpredict/handlers/bets/betutils"
-	"socialpredict/models"
+	"fmt"
 	"socialpredict/repository"
 	"socialpredict/setup"
 
@@ -43,33 +42,35 @@ func sumAllMarketCreationFees(db *gorm.DB) int64 {
 	return economicConfig.Economics.MarketIncentives.CreateMarketCost * marketsCount
 }
 
-// calculateMarketRevenue calculates the initial fees collected from a specific market
-func calculateMarketInitialFees(db *gorm.DB, marketID uint) int64 {
-
+func calculateMarketInitialFees(db *gorm.DB) int64 {
+	// Load the economic configuration
 	economicConfig, err := setup.LoadEconomicsConfig()
 	if err != nil {
+		fmt.Println("Error loading economics config:", err) // Debugging config load error
 		return 0
 	}
 
-	var totalMarketRevenue int64 = 0
-
+	// Create a new GormDatabase object wrapping the db
 	gormDatabase := &repository.GormDatabase{DB: db}
-	repo := repository.NewUserRepository(gormDatabase)
 
-	users, err := repo.GetAllUsers()
+	// Create a new BetsRepository
+	betsRepo := repository.NewBetsRepository(gormDatabase)
+
+	// Call FirstTimeBets to get the total number of initial bets across all markets
+	totalInitialBets, err := betsRepo.FirstTimeBets()
 	if err != nil {
+		fmt.Println("Error in FirstTimeBets:", err) // Debugging error output
 		return 0
 	}
 
-	for _, user := range users {
-		betRequest := models.Bet{
-			MarketID: marketID,
-			// Ensure you populate other necessary fields as required
-		}
-		// Assume GetBetFees uses PublicUserType and is adjusted to work with it
-		fees := betutils.GetBetFees(db, &user, betRequest)
-		totalMarketRevenue += fees
-	}
+	fmt.Println("Total initial bets:", totalInitialBets) // Debugging initial bets output
 
-	return totalMarketRevenue
+	// Multiply the total count of initial bets by the initial bet fee
+	initialBetFee := economicConfig.Economics.Betting.BetFees.InitialBetFee
+	fmt.Println("Initial bet fee:", initialBetFee) // Debugging initial bet fee output
+
+	totalInitialFees := totalInitialBets * initialBetFee
+	fmt.Println("Total initial fees:", totalInitialFees) // Debugging total fees output
+
+	return totalInitialFees
 }

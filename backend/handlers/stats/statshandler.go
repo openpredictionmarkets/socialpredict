@@ -86,6 +86,7 @@ func calculateFinancialStats(db *gorm.DB) (FinancialStats, error) {
 	// Revenue
 	result.Revenue.TotalRevenue = calculateTotalRevenue(db)
 	result.Revenue.MarketCreationFees = sumAllMarketCreationFees(db)
+	result.Revenue.TransactionFees = calculateMarketInitialFees(db)
 	// Expenditures
 	result.Expenditures.TotalExpenditures = calculateTotalExpenditures(db)
 	// Balance

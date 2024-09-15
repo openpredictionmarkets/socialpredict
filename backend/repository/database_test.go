@@ -17,6 +17,7 @@ type MockDatabase struct {
 	model        interface{}
 	users        []models.User
 	markets      []models.Market
+	bets         []models.Bet
 	conditions   []Condition
 	table        string
 	selectFields string
@@ -238,18 +239,40 @@ func (m *MockDatabase) Joins(query string, args ...interface{}) repository.Datab
 }
 
 func (m *MockDatabase) Scan(dest interface{}) repository.Database {
-	if m.err != nil {
-		return m
+	clone := m.clone()
+
+	if clone.err != nil {
+		return clone
 	}
-	// Mock filling the destination with the data
-	switch dest := dest.(type) {
+
+	// Simply assign a mock result, simulating a database query result.
+	switch d := dest.(type) {
 	case *int64:
-		// Simulate summing the fees from the first bets
-		*dest = int64(250) // This is mock data, you can change it as needed
+		*d = int64(4)                               // Example mock value, based on expected result
+		fmt.Println("Mock Scan result set to:", *d) // Debugging output
 	default:
-		m.err = fmt.Errorf("unsupported type in Scan")
+		clone.err = fmt.Errorf("unsupported type in Scan")
 	}
-	return m
+
+	return clone
+}
+
+func (m *MockDatabase) SubQuery() *gorm.DB {
+	// Since this is a mock, we'll simulate the SubQuery behavior by returning a gorm.DB placeholder.
+	// You could use a real GORM DB instance connected to an in-memory database or simulate it.
+	return &gorm.DB{}
+}
+
+func (m *MockDatabase) Raw(sql string, values ...interface{}) repository.Database {
+	clone := m.clone()
+	// Since this is a mock, we can simulate the result based on the query
+	// You can add conditionals to simulate different behaviors based on the SQL string
+	if sql == "SELECT SUM(total_unique_users) AS total_first_time_bets FROM (?) AS subquery" {
+		// Assuming a mock response for the total first-time bets
+		clone.err = nil
+		// You can set specific mock data here or store it in m.bets
+	}
+	return clone
 }
 
 func (m *MockDatabase) Error() error {
