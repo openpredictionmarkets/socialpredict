@@ -12,6 +12,11 @@ type Database interface {
 	Preload(query string, args ...interface{}) Database
 	Where(query interface{}, args ...interface{}) Database
 	Count(count *int64) Database
+	Table(name string) Database
+	Select(query string, args ...interface{}) Database
+	Group(query string) Database
+	Joins(query string, args ...interface{}) Database
+	Scan(dest interface{}) Database
 	Error() error
 }
 
@@ -48,6 +53,32 @@ func (g *GormDatabase) Count(count *int64) Database {
 	g.DB = g.DB.Count(count)
 	return g
 }
+
+func (g *GormDatabase) Table(name string) Database {
+	g.DB = g.DB.Table(name)
+	return g
+}
+
+func (g *GormDatabase) Select(query string, args ...interface{}) Database {
+	g.DB = g.DB.Select(query, args...)
+	return g
+}
+
+func (g *GormDatabase) Group(query string) Database {
+	g.DB = g.DB.Group(query)
+	return g
+}
+
+func (g *GormDatabase) Joins(query string, args ...interface{}) Database {
+	g.DB = g.DB.Joins(query, args...)
+	return g
+}
+
+func (g *GormDatabase) Scan(dest interface{}) Database {
+	g.DB = g.DB.Scan(dest)
+	return g
+}
+
 func (g *GormDatabase) Error() error {
 	return g.DB.Error
 }

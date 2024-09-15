@@ -14,11 +14,15 @@ type Condition struct {
 }
 
 type MockDatabase struct {
-	model      interface{}
-	users      []models.User
-	markets    []models.Market
-	conditions []Condition
-	err        error
+	model        interface{}
+	users        []models.User
+	markets      []models.Market
+	conditions   []Condition
+	table        string
+	selectFields string
+	group        string
+	joins        string
+	err          error
 }
 
 // Clone creates a copy of the MockDatabase, preserving the state.
@@ -206,6 +210,45 @@ func (m *MockDatabase) Count(count *int64) repository.Database {
 		dataToCount = 0
 	}
 	*count = dataToCount
+	return m
+}
+
+func (m *MockDatabase) Table(name string) repository.Database {
+	clone := m.clone()
+	clone.table = name
+	return clone
+}
+
+func (m *MockDatabase) Select(query string, args ...interface{}) repository.Database {
+	clone := m.clone()
+	clone.selectFields = query
+	return clone
+}
+
+func (m *MockDatabase) Group(query string) repository.Database {
+	clone := m.clone()
+	clone.group = query
+	return clone
+}
+
+func (m *MockDatabase) Joins(query string, args ...interface{}) repository.Database {
+	clone := m.clone()
+	clone.joins = query
+	return clone
+}
+
+func (m *MockDatabase) Scan(dest interface{}) repository.Database {
+	if m.err != nil {
+		return m
+	}
+	// Mock filling the destination with the data
+	switch dest := dest.(type) {
+	case *int64:
+		// Simulate summing the fees from the first bets
+		*dest = int64(250) // This is mock data, you can change it as needed
+	default:
+		m.err = fmt.Errorf("unsupported type in Scan")
+	}
 	return m
 }
 
