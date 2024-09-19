@@ -82,7 +82,6 @@ func calculateFinancialStats(db *gorm.DB) (FinancialStats, error) {
 	result.MoneyIssued.AdditionalDebtExtended = calculateAdditionalDebtExtended(db)
 	result.MoneyIssued.DebtExtendedToMarketMakers = calculateDebtExtendedToMarketMakers(db)
 
-	// Calculate and populate other financial details
 	// Revenue
 	result.Revenue.TotalRevenue = calculateTotalRevenue(db)
 	result.Revenue.MarketCreationFees = sumAllMarketCreationFees(db)
@@ -91,7 +90,7 @@ func calculateFinancialStats(db *gorm.DB) (FinancialStats, error) {
 	result.Expenditures.TotalExpenditures = calculateTotalExpenditures(db)
 	// Balance
 	result.FiscalBalance = result.Revenue.TotalRevenue - result.Expenditures.TotalExpenditures
-	result.TotalEquity = result.Revenue.TotalRevenue - result.Liabilities // Liabilities are typically zero in this setup
+	result.TotalEquity = result.Revenue.TotalRevenue - result.Liabilities
 
 	return result, nil
 }

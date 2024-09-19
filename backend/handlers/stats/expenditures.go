@@ -4,11 +4,13 @@ import "gorm.io/gorm"
 
 func calculateTotalExpenditures(db *gorm.DB) int64 {
 	// Sum up all expenditure components
-	return 0 // Placeholder
+
+	return sumMarketsSuccessfullyResolvedBonus(db)
 }
 
-func sumMarketsSuccessfullyResolvedBonus(gorm.DB) int64 {
+func sumMarketsSuccessfullyResolvedBonus(db *gorm.DB) int64 {
 	// sum up all markets successfully resolved as not N/A
 	// fee should have been paid out
+	// As of authoring there are no bonuses paid to market makers upon resolution
 	return 0
 }
