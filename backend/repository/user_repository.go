@@ -23,7 +23,8 @@ func (repo *UserRepository) GetAllUsers() ([]models.User, error) {
 
 func (repo *UserRepository) GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
-	result := repo.db.First(&user, username)
+	// Use Where to search by username column
+	result := repo.db.Where("username = ?", username).First(&user)
 	if err := result.Error(); err != nil {
 		return nil, err
 	}
