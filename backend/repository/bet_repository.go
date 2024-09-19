@@ -1,7 +1,5 @@
 package repository
 
-import "fmt"
-
 type BetsRepository struct {
 	db Database
 }
@@ -24,9 +22,6 @@ func (repo *BetsRepository) FirstTimeBets() (int64, error) {
 		GROUP BY market_id, username
 	`).Scan(&bets)
 
-	// Debugging: print the raw query result
-	fmt.Printf("Raw Query Result: %+v\n", bets)
-
 	if result.Error() != nil {
 		return 0, result.Error()
 	}
@@ -42,17 +37,11 @@ func (repo *BetsRepository) FirstTimeBets() (int64, error) {
 		usersByMarket[bet.MarketID] = append(usersByMarket[bet.MarketID], bet.Username)
 	}
 
-	// Debugging: print the usersByMarket map after population
-	fmt.Printf("Users by Market: %+v\n", usersByMarket)
-
 	// Count total first-time bets (users across markets)
 	var totalFirstTimeBets int64
 	for _, users := range usersByMarket {
 		totalFirstTimeBets += int64(len(users)) // Count all unique user-market pairs
 	}
-
-	// Debugging: print the total first-time bets
-	fmt.Printf("Total First-Time Bets: %d\n", totalFirstTimeBets)
 
 	return totalFirstTimeBets, nil
 }

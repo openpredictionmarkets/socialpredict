@@ -38,3 +38,11 @@ func (repo *UserRepository) CountUsers() (int64, error) {
 	}
 	return count, nil
 }
+
+func (repo *UserRepository) CountRegularUsers() (int64, error) {
+	var count int64
+	if err := repo.db.Model(&models.User{}).Where("user_type = ?", "REGULAR").Count(&count).Error(); err != nil {
+		return 0, err
+	}
+	return count, nil
+}

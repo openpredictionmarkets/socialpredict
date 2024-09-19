@@ -20,6 +20,7 @@ func calculateTotalRevenue(db *gorm.DB) int64 {
 
 	// selling fees across all bets
 
+	// add up total revenue
 	totalRevenue := marketCreationFees + totalInitialFees
 
 	return totalRevenue
@@ -64,14 +65,10 @@ func calculateMarketInitialFees(db *gorm.DB) int64 {
 		return 0
 	}
 
-	fmt.Println("Total initial bets:", totalInitialBets) // Debugging initial bets output
-
 	// Multiply the total count of initial bets by the initial bet fee
 	initialBetFee := economicConfig.Economics.Betting.BetFees.InitialBetFee
-	fmt.Println("Initial bet fee:", initialBetFee) // Debugging initial bet fee output
 
 	totalInitialFees := totalInitialBets * initialBetFee
-	fmt.Println("Total initial fees:", totalInitialFees) // Debugging total fees output
 
 	return totalInitialFees
 }
