@@ -13,13 +13,14 @@ func calculateTotalRevenue(db *gorm.DB) int64 {
 
 	// fees asssessed from the initial market creation fee, for all markets
 	marketCreationFees := sumAllMarketCreationFees(db)
-	// initial transaction fees
+	// initial transaction fees from frist time bets
+	totalInitialFees := calculateMarketInitialFees(db)
 
 	// buying fees across all bets
 
 	// selling fees across all bets
 
-	totalRevenue := marketCreationFees
+	totalRevenue := marketCreationFees + totalInitialFees
 
 	return totalRevenue
 }

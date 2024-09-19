@@ -1,6 +1,6 @@
 package repository
 
-import "socialpredict/models"
+import "fmt"
 
 type BetsRepository struct {
 	db Database
@@ -11,25 +11,48 @@ func NewBetsRepository(db Database) *BetsRepository {
 }
 
 func (repo *BetsRepository) FirstTimeBets() (int64, error) {
-
-	var bets []models.Bet
-
-	result := repo.db.Model(&models.Bet{}).Select("market_id", "username").Group("market_id").Find(&bets)
-	if err := result.Error(); err != nil {
-		return 0, err
+	// Define a struct to hold the query result
+	var bets []struct {
+		MarketID string
+		Username string
 	}
 
-	var usersByMarket map[uint][]string
+	// Execute the raw SQL query
+	result := repo.db.Raw(`
+		SELECT market_id, username 
+		FROM bets 
+		GROUP BY market_id, username
+	`).Scan(&bets)
 
+	// Debugging: print the raw query result
+	fmt.Printf("Raw Query Result: %+v\n", bets)
+
+	if result.Error() != nil {
+		return 0, result.Error()
+	}
+
+	// Initialize the usersByMarket map
+	usersByMarket := make(map[string][]string)
+
+	// Build the usersByMarket map
 	for _, bet := range bets {
+		if usersByMarket[bet.MarketID] == nil {
+			usersByMarket[bet.MarketID] = []string{} // Initialize the slice for each market_id
+		}
 		usersByMarket[bet.MarketID] = append(usersByMarket[bet.MarketID], bet.Username)
 	}
 
+	// Debugging: print the usersByMarket map after population
+	fmt.Printf("Users by Market: %+v\n", usersByMarket)
+
+	// Count total first-time bets (users across markets)
 	var totalFirstTimeBets int64
 	for _, users := range usersByMarket {
-		totalFirstTimeBets += int64(len(users))
+		totalFirstTimeBets += int64(len(users)) // Count all unique user-market pairs
 	}
 
-	return totalFirstTimeBets, nil
+	// Debugging: print the total first-time bets
+	fmt.Printf("Total First-Time Bets: %d\n", totalFirstTimeBets)
 
+	return totalFirstTimeBets, nil
 }
