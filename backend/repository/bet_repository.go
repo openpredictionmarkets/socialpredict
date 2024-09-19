@@ -1,5 +1,7 @@
 package repository
 
+import "socialpredict/models"
+
 type BetsRepository struct {
 	db Database
 }
@@ -9,20 +11,25 @@ func NewBetsRepository(db Database) *BetsRepository {
 }
 
 func (repo *BetsRepository) FirstTimeBets() (int64, error) {
+
+	var bets []models.Bet
+
+	result := repo.db.Model(&models.Bet{}).Select("market_id", "username").Group("market_id").Find(&bets)
+	if err := result.Error(); err != nil {
+		return 0, err
+	}
+
+	var usersByMarket map[uint][]string
+
+	for _, bet := range bets {
+		usersByMarket[bet.MarketID] = append(usersByMarket[bet.MarketID], bet.Username)
+	}
+
 	var totalFirstTimeBets int64
-
-	// Subquery for counting distinct users per market
-	subquery := repo.db.Table("bets").
-		Select("COUNT(DISTINCT username) AS total_unique_users").
-		Group("market_id").SubQuery()
-
-	// Use Raw() to execute the outer query with the subquery
-	result := repo.db.Raw("SELECT SUM(total_unique_users) AS total_first_time_bets FROM (?) AS subquery", subquery).
-		Scan(&totalFirstTimeBets)
-
-	if result.Error() != nil {
-		return 0, result.Error()
+	for _, users := range usersByMarket {
+		totalFirstTimeBets += int64(len(users))
 	}
 
 	return totalFirstTimeBets, nil
+
 }
