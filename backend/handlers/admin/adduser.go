@@ -3,6 +3,7 @@ package adminhandlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"regexp"
@@ -27,11 +28,14 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			log.Printf("AddUserHandler: %v", err)
 			return
 		}
 
 		if match, _ := regexp.MatchString("^[a-zA-Z0-9]+$", req.Username); !match {
-			http.Error(w, "Username must only contain letters and numbers", http.StatusBadRequest)
+			err := fmt.Errorf("username must only contain letters and numbers")
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Printf("AddUserHandler: %v", err)
 			return
 		}
 
@@ -56,17 +60,20 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 		// Check uniqueness of username, displayname, and email
 		if err := checkUniqueFields(db, &user); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Printf("AddUserHandler: %v", err)
 			return
 		}
 
 		password := gofakeit.Password(true, true, true, false, false, 12)
 		if err := user.HashPassword(password); err != nil {
 			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			log.Printf("AddUserHandler: %v", err)
 			return
 		}
 
 		if result := db.Create(&user); result.Error != nil {
 			http.Error(w, "Failed to create user", http.StatusInternalServerError)
+			log.Printf("AddUserHandler: %v", result.Error)
 			return
 		}
 
@@ -79,6 +86,7 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 		json.NewEncoder(w).Encode(responseData)
 	}
 }
+
 func checkUniqueFields(db *gorm.DB, user *models.User) error {
 	// Check for existing users with the same username, display name, email, or API key.
 	var count int64
