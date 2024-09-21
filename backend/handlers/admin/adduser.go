@@ -33,7 +33,7 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 		}
 
 		if match, _ := regexp.MatchString("^[a-zA-Z0-9]+$", req.Username); !match {
-			err := fmt.Errorf("username must only contain letters and numbers")
+			err := fmt.Errorf("username %s must only contain letters and numbers", req.Username)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			log.Printf("AddUserHandler: %v", err)
 			return
