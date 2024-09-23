@@ -2,19 +2,14 @@ package tradingdata
 
 import (
 	"socialpredict/models"
+	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestGetBetsForMarket(t *testing.T) {
 	// Set up in-memory SQLite database
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to connect to the database: %v", err)
-	}
+	db := modelstesting.NewFakeDB(t)
 
 	// Auto-migrate the Bet model
 	if err := db.AutoMigrate(&models.Bet{}); err != nil {
