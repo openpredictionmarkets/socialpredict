@@ -16,13 +16,8 @@ export default defineConfig(() => {
       outDir: 'build',
       commonjsOptions: { transformMixedEsModules: true },
     },
-<<<<<<< Updated upstream
-    plugins: [react()],
-    server: watchWSL,
-=======
     plugins: [
       react(),
     ],
->>>>>>> Stashed changes
   };
 });
