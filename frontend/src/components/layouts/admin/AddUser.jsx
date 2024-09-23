@@ -25,7 +25,8 @@ function AdminAddUser() {
                 body: JSON.stringify({ username })
             });
             if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
+                const errMessage = await response.text()
+                throw new Error(`HTTP error! Status: ${response.status} Reason: ${errMessage}`);
             }
             const data = await response.json();
             setPassword(data.password);
