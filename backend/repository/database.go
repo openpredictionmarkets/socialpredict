@@ -2,7 +2,7 @@ package repository
 
 import "gorm.io/gorm"
 
-// we set up a database interface which is will allow us to switch databases in the future
+// we set up a database interface which will allow us to switch databases in the future
 // the interface method also is defined to limit the SQL methods
 // this is to prevent unintended database manipulation to be added to the application
 type Database interface {
