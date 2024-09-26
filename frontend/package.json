@@ -16,6 +16,7 @@
     "react-error-boundary": "^4.0.13",
     "react-router-dom": "^5.3.0",
     "recharts": "^2.10.3",
+    "vite-plugin-commonjs": "^0.10.3",
     "web-vitals": "^2.1.4"
   },
   "engines": {
@@ -52,7 +53,6 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
-    "is-wsl": "^3.1.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.7"
