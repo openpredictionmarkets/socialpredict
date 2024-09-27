@@ -42,7 +42,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
           push: true
-          tags: ${{ steps.frontend-meta.outputs.tags }}
+          tags: ${{ steps.frontend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
           labels: ${{ steps.frontend-meta.outputs.labels }}
       - name: Generate artifact attestation Frontend
         uses: actions/attest-build-provenance@v1
@@ -63,7 +63,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ steps.backend-meta.outputs.tags }}
+          tags: ${{ steps.backend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
           labels: ${{ steps.backend-meta.outputs.labels }}
       - name: Generate artifact attestation Backend
         uses: actions/attest-build-provenance@v1
