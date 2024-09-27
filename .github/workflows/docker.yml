@@ -39,7 +39,7 @@ jobs:
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: ./frontend
-          file: Dockerfile.prod
+          file: ./frontend/Dockerfile.prod
           push: true
           tags: ${{ steps.meta.outputs.tags }}-frontend
           labels: ${{ steps.meta.outputs.labels }}
@@ -48,8 +48,9 @@ jobs:
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: ./backend
+          file: ./backend/Dockerfile.prod
           push: true
-          tags: ${{ steps.meta.outputs.tags }}-frontend
+          tags: ${{ steps.meta.outputs.tags }}-backend
           labels: ${{ steps.meta.outputs.labels }}
       
       - name: Generate artifact attestation
