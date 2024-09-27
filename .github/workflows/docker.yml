@@ -44,6 +44,12 @@ jobs:
           push: true
           tags: ${{ steps.frontend-meta.outputs.tags }}
           labels: ${{ steps.frontend-meta.outputs.labels }}
+      - name: Generate artifact attestation Frontend
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-frontend
+          subject-digest: ${{ steps.frontend.outputs.digest }}
+          push-to-registry: true
 
       - name: Extract metadata (tags, labels) for Backend
         id: backend-meta
@@ -59,13 +65,9 @@ jobs:
           push: true
           tags: ${{ steps.backend-meta.outputs.tags }}
           labels: ${{ steps.backend-meta.outputs.labels }}
-      
-      - name: Generate artifact attestation
+      - name: Generate artifact attestation Backend
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: |
-            ${{ steps.frontend.outputs.digest }}
-            ${{ steps.backend.outputs.digest }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-backend
+          subject-digest: ${{ steps.backend.outputs.digest }}
           push-to-registry: true
-      
