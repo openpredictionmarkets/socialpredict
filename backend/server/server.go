@@ -12,6 +12,8 @@ import (
 	statshandlers "socialpredict/handlers/stats"
 	usershandlers "socialpredict/handlers/users"
 	usercredit "socialpredict/handlers/users/credit"
+	privateuser "socialpredict/handlers/users/privateuserinfo"
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/middleware"
 	"socialpredict/setup"
 
@@ -53,13 +55,13 @@ func Start() {
 	// show comments on markets
 
 	// handle public user stuff
-	router.HandleFunc("/v0/userinfo/{username}", usershandlers.GetPublicUserResponse).Methods("GET")
+	router.HandleFunc("/v0/userinfo/{username}", publicuser.GetPublicUserResponse).Methods("GET")
 	router.HandleFunc("/v0/usercredit/{username}", usercredit.GetUserCreditHandler).Methods("GET")
 	// user portfolio, (which is public)
 	router.HandleFunc("/v0/portfolio/{username}", usershandlers.GetPublicUserPortfolio).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize
-	router.HandleFunc("/v0/privateprofile", usershandlers.GetPrivateProfileUserResponse)
+	router.HandleFunc("/v0/privateprofile", privateuser.GetPrivateProfileUserResponse)
 	// changing profile stuff
 	router.HandleFunc("/v0/changepassword", usershandlers.ChangePassword).Methods("POST")
 	router.HandleFunc("/v0/profilechange/displayname", usershandlers.ChangeDisplayName).Methods("POST")

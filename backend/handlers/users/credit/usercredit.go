@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	usershandlers "socialpredict/handlers/users"
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/setup"
 	"socialpredict/util"
 
@@ -53,7 +53,7 @@ func GetUserCreditHandler(w http.ResponseWriter, r *http.Request) {
 
 func CalculateUserCredit(db *gorm.DB, username string) int64 {
 
-	userPublicInfo := usershandlers.GetPublicUserInfo(db, username)
+	userPublicInfo := publicuser.GetPublicUserInfo(db, username)
 
 	// add the maximum debt from the setup file and he account balance, which may be negative
 	userCredit := appConfig.Economics.User.MaximumDebtAllowed + userPublicInfo.AccountBalance

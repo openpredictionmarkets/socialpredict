@@ -7,7 +7,7 @@ import (
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
-	usersHandlers "socialpredict/handlers/users"
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
@@ -18,7 +18,7 @@ import (
 // MarketDetailResponse defines the structure for the market detail response
 type MarketDetailHandlerResponse struct {
 	Market             marketpublicresponse.PublicResponseMarket `json:"market"`
-	Creator            usersHandlers.PublicUserType              `json:"creator"`
+	Creator            publicuser.PublicUserType                 `json:"creator"`
 	ProbabilityChanges []wpam.ProbabilityChange                  `json:"probabilityChanges"`
 	NumUsers           int                                       `json:"numUsers"`
 	TotalVolume        int64                                     `json:"totalVolume"`
@@ -68,7 +68,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get market creator
 	// Fetch the Creator's public information using utility function
-	publicCreator := usersHandlers.GetPublicUserInfo(db, publicResponseMarket.CreatorUsername)
+	publicCreator := publicuser.GetPublicUserInfo(db, publicResponseMarket.CreatorUsername)
 
 	// Manually construct the response
 	response := MarketDetailHandlerResponse{

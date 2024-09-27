@@ -1,4 +1,4 @@
-package usershandlers
+package publicuser
 
 import (
 	"encoding/json"

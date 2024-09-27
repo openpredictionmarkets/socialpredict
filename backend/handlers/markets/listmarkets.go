@@ -8,7 +8,7 @@ import (
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
-	usersHandlers "socialpredict/handlers/users"
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
@@ -23,7 +23,7 @@ type ListMarketsResponse struct {
 
 type MarketOverview struct {
 	Market          marketpublicresponse.PublicResponseMarket `json:"market"`
-	Creator         usersHandlers.PublicUserType              `json:"creator"`
+	Creator         publicuser.PublicUserType                 `json:"creator"`
 	LastProbability float64                                   `json:"lastProbability"`
 	NumUsers        int                                       `json:"numUsers"`
 	TotalVolume     int64                                     `json:"totalVolume"`
@@ -52,7 +52,7 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 		marketVolume := marketmath.GetMarketVolume(bets)
 		lastProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
-		creatorInfo := usersHandlers.GetPublicUserInfo(db, market.CreatorUsername)
+		creatorInfo := publicuser.GetPublicUserInfo(db, market.CreatorUsername)
 
 		// return the PublicResponse type with information about the market
 		marketIDStr := strconv.FormatUint(uint64(market.ID), 10)
