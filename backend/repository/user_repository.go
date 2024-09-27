@@ -1,7 +1,11 @@
 package repository
 
 import (
+	"errors"
+	"fmt"
 	"socialpredict/models"
+
+	"gorm.io/gorm"
 )
 
 type UserRepository struct {
@@ -11,6 +15,8 @@ type UserRepository struct {
 func NewUserRepository(db Database) *UserRepository {
 	return &UserRepository{db: db}
 }
+
+var ErrUserNotFound = errors.New("user not found")
 
 func (repo *UserRepository) GetAllUsers() ([]models.User, error) {
 	var users []models.User
@@ -22,12 +28,24 @@ func (repo *UserRepository) GetAllUsers() ([]models.User, error) {
 }
 
 func (repo *UserRepository) GetUserByUsername(username string) (*models.User, error) {
+
+	if repo.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
 	var user models.User
-	// Use Where to search by username column
+
 	result := repo.db.Where("username = ?", username).First(&user)
-	if err := result.Error(); err != nil {
+
+	err := result.Error()
+
+	if result.Error != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
 		return nil, err
 	}
+
 	return &user, nil
 }
 

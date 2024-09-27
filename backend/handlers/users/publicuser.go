@@ -79,7 +79,7 @@ func GetPublicUserInfo(db *gorm.DB, username string) (PublicUserType, error) {
 		PersonalLink2:         user.PersonalLink2,
 		PersonalLink3:         user.PersonalLink3,
 		PersonalLink4:         user.PersonalLink4,
-	}, err
+	}, nil
 }
 
 func GetAllPublicUsers(db *gorm.DB) ([]PublicUserType, error) {
