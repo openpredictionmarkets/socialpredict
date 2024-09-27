@@ -40,7 +40,11 @@ func GetUserCreditHandler(w http.ResponseWriter, r *http.Request) {
 
 	db := util.GetDB()
 
-	userCredit := CalculateUserCredit(db, username)
+	userCredit := CalculateUserCredit(
+		db,
+		username,
+		appConfig.Economics.User.MaximumDebtAllowed,
+	)
 
 	response := UserCredit{
 		Credit: userCredit,
@@ -51,12 +55,11 @@ func GetUserCreditHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func CalculateUserCredit(db *gorm.DB, username string) int64 {
+func CalculateUserCredit(db *gorm.DB, username string, maximumdebt int64) int64 {
 
 	userPublicInfo := publicuser.GetPublicUserInfo(db, username)
 
-	// add the maximum debt from the setup file and he account balance, which may be negative
-	userCredit := appConfig.Economics.User.MaximumDebtAllowed + userPublicInfo.AccountBalance
+	userCredit := maximumdebt + userPublicInfo.AccountBalance
 
 	return int64(userCredit)
 }
