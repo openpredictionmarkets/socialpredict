@@ -41,6 +41,9 @@ jobs:
         with:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          github-token: ${{ secrets.DOCKER_TOKEN }}
           push: true
           tags: ${{ steps.frontend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
           labels: ${{ steps.frontend-meta.outputs.labels }}
@@ -62,6 +65,9 @@ jobs:
         with:
           context: ./backend
           file: ./backend/Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          github-token: ${{ secrets.DOCKER_TOKEN }}
           push: true
           tags: ${{ steps.backend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
           labels: ${{ steps.backend-meta.outputs.labels }}
