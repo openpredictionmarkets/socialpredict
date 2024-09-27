@@ -29,11 +29,12 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.DOCKER_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+
+      - name: Extract metadata (tags, labels) for Frontend
+        id: frontend-meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
       - name: Build and push Frontend
         id: frontend
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
@@ -41,16 +42,22 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
           push: true
-          tags: ${{ steps.meta.outputs.tags }}-frontend
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-      - name: Build and push Frontend
+
+      - name: Extract metadata (tags, labels) for Backend
+        id: backend-meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+      - name: Build and push Backend
         id: backend
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: ./backend
-          file: ./backend/Dockerfile.prod
+          file: ./backend/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}-backend
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
       
       - name: Generate artifact attestation
