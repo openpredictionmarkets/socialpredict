@@ -11,6 +11,7 @@ import (
 	setuphandlers "socialpredict/handlers/setup"
 	statshandlers "socialpredict/handlers/stats"
 	usershandlers "socialpredict/handlers/users"
+	usercredit "socialpredict/handlers/users/credit"
 	"socialpredict/middleware"
 	"socialpredict/setup"
 
@@ -53,7 +54,7 @@ func Start() {
 
 	// handle public user stuff
 	router.HandleFunc("/v0/userinfo/{username}", usershandlers.GetPublicUserResponse).Methods("GET")
-	router.HandleFunc("/v0/usercredit/{username}", usershandlers.GetUserCreditHandler).Methods("GET")
+	router.HandleFunc("/v0/usercredit/{username}", usercredit.GetUserCreditHandler).Methods("GET")
 	// user portfolio, (which is public)
 	router.HandleFunc("/v0/portfolio/{username}", usershandlers.GetPublicUserPortfolio).Methods("GET")
 

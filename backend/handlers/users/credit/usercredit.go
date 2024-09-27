@@ -30,17 +30,14 @@ type UserCredit struct {
 // gets the user's available credits for display
 func GetUserCreditHandler(w http.ResponseWriter, r *http.Request) {
 
-	// accept get requests
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract username from the URL path
 	vars := mux.Vars(r)
 	username := vars["username"]
 
-	// Use database connection
 	db := util.GetDB()
 
 	userCredit := CalculateUserCredit(db, username)
