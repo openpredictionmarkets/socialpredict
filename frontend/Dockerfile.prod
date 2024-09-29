@@ -1,0 +1,16 @@
+# syntax=docker/dockerfile:1.3-labs
+FROM node:21.0.0 AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm install
+COPY . .
+
+RUN npm run build
+
+FROM nginx:latest
+
+COPY --from=builder /app/build /usr/share/nginx/html
+
+CMD ["nginx", "-g", "daemon off;"]
