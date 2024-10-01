@@ -24,8 +24,6 @@ services:
       DB_HOST: db
       DB_USER: ${POSTGRES_USER}
       DB_PASS: ${POSTGRES_PASSWORD}
-    env_file:
-      - ../.env
     ports:
       - "${BACKEND_HOSTPORT}:${BACKEND_PORT}"
     volumes:
@@ -47,8 +45,6 @@ services:
       DOMAIN: "https://${DOMAIN}"
     networks:
       - frontend_network
-    env_file:
-      - ../.env
     volumes:
       - ../frontend:/app
       - /app/node_modules
@@ -94,4 +90,3 @@ networks:
     driver: bridge
   frontend_network:
     driver: bridge
-

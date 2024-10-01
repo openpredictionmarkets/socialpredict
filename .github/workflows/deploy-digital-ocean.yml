@@ -1,0 +1,27 @@
+name: Deploy Prod configuration to Digital Ocean Staging
+
+on:
+  workflow_run:
+    workflows: ["Create and publish a Docker image"]
+    types: [completed]
+    branches:
+    - 'main'
+    - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout master
+      uses: actions/checkout@v2
+    - name: Deploy to Digital Ocean droplet via SSH action
+      uses: appleboy/ssh-action@v0.1.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.ACCESS_KEY }}
+        script: |
+            temp_env_file=$(mktemp)
+            
+            echo ${{secrets.COMPOSE_ENV}} >> $temp_env_file
+            docker-compose --env-file $temp_env_file up -d --no-deps -f ./scripts/docker-compose-prod.yaml frontend backend
