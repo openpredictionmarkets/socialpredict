@@ -22,7 +22,7 @@ jobs:
             temp_env_file=$(mktemp)
             
             echo ${{secrets.COMPOSE_ENV}} >> $temp_env_file
-            git clone ${{ github.event.GITHUB_SERVER_URL }}/${{ github.event.GITHUB_REPOSITORY }} socialpredict-deploy
-            git checkout ${{ github.event.GITHUB_SHA }}
+            git clone ${{ github.server_url }}/${{ github.repository }} socialpredict-deploy
+            git checkout ${{ github.sha }}
             cd socialpredict-deploy
             docker compose --env-file $temp_env_file -f ./scripts/docker-compose-prod.yaml up -d --no-deps frontend backend
