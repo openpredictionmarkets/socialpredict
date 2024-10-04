@@ -12,8 +12,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout master
-      uses: actions/checkout@v2
     - name: Deploy to Digital Ocean droplet via SSH action
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -24,4 +22,7 @@ jobs:
             temp_env_file=$(mktemp)
             
             echo ${{secrets.COMPOSE_ENV}} >> $temp_env_file
+            cd socialpredict
+            git fetch origin
+            git checkout ${{ github.GITHUB_SHA }}
             docker compose --env-file $temp_env_file -f ./scripts/docker-compose-prod.yaml up -d --no-deps frontend backend
