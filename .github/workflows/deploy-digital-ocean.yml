@@ -24,4 +24,4 @@ jobs:
             temp_env_file=$(mktemp)
             
             echo ${{secrets.COMPOSE_ENV}} >> $temp_env_file
-            docker-compose --env-file $temp_env_file up -d --no-deps -f ./scripts/docker-compose-prod.yaml frontend backend
+            docker compose --env-file $temp_env_file up -d --no-deps -f ./scripts/docker-compose-prod.yaml frontend backend
