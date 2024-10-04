@@ -28,7 +28,7 @@ services:
       - "${BACKEND_HOSTPORT}:${BACKEND_PORT}"
     volumes:
       - ../backend:/backend
-      - ../.env:/backend/.env.dev
+      - ${ENV_PATH}:/backend/.env.dev
     command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
     tty: true
     networks:
