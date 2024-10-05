@@ -11,6 +11,8 @@ No questions are too small (or too big) for our prediction market software. Set 
 
 ![Kenyon College Logo](README/IMG/logotype_kenyon-purple_rgb.png)
 
+* Kenyon College
+
 ## Staging
 
 Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.com/) to see what our software looks like in action. May be down if we are testing something.
