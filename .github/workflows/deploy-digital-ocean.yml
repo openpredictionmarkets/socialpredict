@@ -21,7 +21,7 @@ jobs:
         script: |
             temp_env_file=$(mktemp)
             
-            echo ${{secrets.COMPOSE_ENV}} >> $temp_env_file
+            echo """${{secrets.COMPOSE_ENV}}""" >> $temp_env_file
             echo "ENV_PATH=$temp_env_file" >> $temp_env_file
             if [ ! -d socialpredict-deploy ]
             then
@@ -34,4 +34,4 @@ jobs:
 
             docker compose -f ./scripts/docker-compose-prod.yaml \
              --env-file $temp_env_file \
-             up -d --no-deps backend
+             up -d --no-deps frontend backend
