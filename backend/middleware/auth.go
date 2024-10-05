@@ -33,6 +33,7 @@ func ValidateUserAndEnforcePasswordChangeGetUser(r *http.Request, db *gorm.DB) (
 	return user, nil
 }
 
+// ValidateTokenAndGetUser checks that the user is who they claim to be, and returns their information for use
 func ValidateTokenAndGetUser(r *http.Request, db *gorm.DB) (*models.User, *HTTPError) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
