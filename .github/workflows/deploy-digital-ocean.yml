@@ -32,5 +32,5 @@ jobs:
             git checkout ${{ github.sha }}
 
             docker compose -f ./scripts/docker-compose-prod.yaml \
-             up -d --no-deps frontend backend \
-             --env-file $temp_env_file
+             --env-file $temp_env_file \
+             up -d --no-deps frontend backend
