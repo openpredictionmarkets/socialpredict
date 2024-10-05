@@ -30,5 +30,8 @@ jobs:
                 git fetch origin
             fi
             git checkout ${{ github.sha }}
-            cat $temp_env_file
-            docker compose --env-file $temp_env_file -f ./scripts/docker-compose-prod.yaml -v $temp_env_file:.env:ro up -d --no-deps frontend backend
+
+            docker compose up -d --no-deps frontend backend \
+             -f ./scripts/docker-compose-prod.yaml \
+             -v $temp_env_file:.env:ro \
+             --env-file $temp_env_file
