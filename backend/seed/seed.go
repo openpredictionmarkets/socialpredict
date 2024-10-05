@@ -41,14 +41,16 @@ func SeedUsers(db *gorm.DB) {
 			adminUser := models.User{
 				Username:              "admin",
 				DisplayName:           "Administrator",
-				Email:                 "admin@example.com",
 				UserType:              "ADMIN",
 				InitialAccountBalance: config.Economics.User.InitialAccountBalance,
 				AccountBalance:        config.Economics.User.InitialAccountBalance,
-				ApiKey:                "NONE",
 				PersonalEmoji:         "NONE",
 				Description:           "Administrator",
-				MustChangePassword:    false,
+				PrivateUser: models.PrivateUser{
+					Email:  "admin@example.com",
+					APIKey: "NONE",
+				},
+				MustChangePassword: false,
 			}
 
 			adminUser.HashPassword(adminPassword)

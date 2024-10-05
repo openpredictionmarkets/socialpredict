@@ -15,7 +15,7 @@ func TestGetUserInitialBetFee(t *testing.T) {
 	}
 
 	appConfig = setuptesting.MockEconomicConfig()
-	user := &models.User{Username: "testuser", AccountBalance: 1000, ApiKey: "unique_api_key_1"}
+	user := &models.User{Username: "testuser", AccountBalance: 1000}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("Failed to save user to database: %v", err)
 	}
