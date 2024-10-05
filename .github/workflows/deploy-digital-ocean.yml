@@ -32,7 +32,7 @@ jobs:
             fi
             git checkout ${{ github.sha }}
 
-            echo ${{ secrets.DOCKER_TOKEN }} | docker login ghcr.io -u j4qfrost -password-stdin
+            echo "${{ secrets.DOCKER_TOKEN }}" | docker login ghcr.io -u j4qfrost --password-stdin
 
             docker compose -f ./scripts/docker-compose-prod.yaml \
              --env-file $temp_env_file \
