@@ -22,6 +22,7 @@ jobs:
             temp_env_file=$(mktemp)
             
             echo ${{secrets.COMPOSE_ENV}} >> $temp_env_file
+            echo "ENV_PATH=$temp_env_file" >> $temp_env_file
             if [ ! -d socialpredict-deploy ]
             then
                 git clone ${{ github.server_url }}/${{ github.repository }} socialpredict-deploy
