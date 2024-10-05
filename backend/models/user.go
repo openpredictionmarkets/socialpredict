@@ -9,9 +9,8 @@ type User struct {
 	gorm.Model
 	ID int64 `json:"id" gorm:"primary_key"`
 	PublicUser
-	Email              string `json:"email" gorm:"unique;not null"`
-	ApiKey             string `json:"apiKey,omitempty" gorm:"unique"`
-	MustChangePassword bool   `json:"mustChangePassword" gorm:"default:true"`
+	PrivateUser
+	MustChangePassword bool `json:"mustChangePassword" gorm:"default:true"`
 }
 
 type PublicUser struct {
@@ -27,6 +26,11 @@ type PublicUser struct {
 	PersonalLink2         string `json:"personalink2,omitempty"`
 	PersonalLink3         string `json:"personalink3,omitempty"`
 	PersonalLink4         string `json:"personalink4,omitempty"`
+}
+
+type PrivateUser struct {
+	Email  string `json:"email" gorm:"unique;not null"`
+	APIKey string `json:"apiKey,omitempty" gorm:"unique"`
 }
 
 // HashPassword hashes given password

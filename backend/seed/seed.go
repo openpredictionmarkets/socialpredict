@@ -48,8 +48,10 @@ func SeedUsers(db *gorm.DB) {
 					PersonalEmoji:         "NONE",
 					Description:           "Administrator",
 				},
-				Email:              "admin@example.com",
-				ApiKey:             "NONE",
+				PrivateUser: models.PrivateUser{
+					Email:  "admin@example.com",
+					APIKey: "NONE",
+				},
 				MustChangePassword: false,
 			}
 

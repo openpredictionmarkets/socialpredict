@@ -20,7 +20,6 @@ func TestGetUserInitialBetFee(t *testing.T) {
 			Username:       "testuser",
 			AccountBalance: 1000,
 		},
-		ApiKey: "unique_api_key_1",
 	}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("Failed to save user to database: %v", err)

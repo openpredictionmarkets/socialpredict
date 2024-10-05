@@ -54,8 +54,10 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 				AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
 				PersonalEmoji:         randomEmoji(),
 			},
-			Email:              util.UniqueEmail(db),
-			ApiKey:             util.GenerateUniqueApiKey(db),
+			PrivateUser: models.PrivateUser{
+				Email:  util.UniqueEmail(db),
+				APIKey: util.GenerateUniqueApiKey(db),
+			},
 			MustChangePassword: true,
 		}
 
@@ -94,7 +96,7 @@ func checkUniqueFields(db *gorm.DB, user *models.User) error {
 	var count int64
 	db.Model(&models.User{}).Where(
 		"username = ? OR display_name = ? OR email = ? OR api_key = ?",
-		user.Username, user.DisplayName, user.Email, user.ApiKey,
+		user.Username, user.DisplayName, user.Email, user.APIKey,
 	).Count(&count)
 
 	if count > 0 {
