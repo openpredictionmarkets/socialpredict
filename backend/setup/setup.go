@@ -70,9 +70,22 @@ func LoadEconomicsConfig() (*EconomicConfig, error) {
 // EconConfigLoader allows functions to use this type as a parameter to load an EconomicConfig Dependency
 type EconConfigLoader func() *EconomicConfig
 
+// MarketCreationLoader loads just the market creation component of the setup
+type MarketCreationLoader interface {
+	LoadMarketCreation() MarketCreation
+}
+
 // EconomicsConfig returns the entire config for the applications economics
 func EconomicsConfig() *EconomicConfig {
 	return economicConfig
+}
+
+func (ec *EconomicConfig) LoadMarketCreation() MarketCreation {
+	return ec.Economics.MarketCreation
+}
+
+func (mc *MarketCreation) LoadMarketCreation() MarketCreation {
+	return *mc
 }
 
 func mustLoadEconomicsConfig() {

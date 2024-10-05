@@ -6,7 +6,7 @@ import (
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
-	"socialpredict/models"
+	"socialpredict/setup"
 	"strconv"
 
 	"gorm.io/gorm"
@@ -27,7 +27,7 @@ type UserMarketPosition struct {
 
 // FetchMarketPositions fetches and summarizes positions for a given market.
 // It returns a slice of MarketPosition as defined in the dbpm package.
-func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm.MarketPosition, error) {
+func CalculateMarketPositions_WPAM_DBPM(mcl setup.MarketCreationLoader, db *gorm.DB, marketIdStr string) ([]dbpm.MarketPosition, error) {
 
 	// marketIDUint for needed areas
 	marketIDUint64, err := strconv.ParseUint(marketIdStr, 10, 64)
@@ -44,11 +44,10 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	}
 
 	// Fetch bets for the market
-	var allBetsOnMarket []models.Bet
-	allBetsOnMarket = tradingdata.GetBetsForMarket(db, marketIDUint)
+	allBetsOnMarket := tradingdata.GetBetsForMarket(db, marketIDUint)
 
 	// Get a timeline of probability changes for the market
-	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
+	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(mcl, publicResponseMarket.CreatedAt, allBetsOnMarket)
 
 	// Calculate the distribution of YES and NO shares based on DBPM
 	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(allBetsOnMarket, allProbabilityChangesOnMarket)
@@ -75,8 +74,8 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 }
 
 // CalculateMarketPositionForUser_WPAM_DBPM fetches and summarizes the position for a given user in a specific market.
-func CalculateMarketPositionForUser_WPAM_DBPM(db *gorm.DB, marketIdStr string, username string) (UserMarketPosition, error) {
-	marketPositions, err := CalculateMarketPositions_WPAM_DBPM(db, marketIdStr)
+func CalculateMarketPositionForUser_WPAM_DBPM(mcl setup.MarketCreationLoader, db *gorm.DB, marketIdStr string, username string) (UserMarketPosition, error) {
+	marketPositions, err := CalculateMarketPositions_WPAM_DBPM(mcl, db, marketIdStr)
 	if err != nil {
 		return UserMarketPosition{}, err
 	}
@@ -95,8 +94,8 @@ func CalculateMarketPositionForUser_WPAM_DBPM(db *gorm.DB, marketIdStr string, u
 
 // CheckOppositeSharesOwned determines the number of opposite shares a user holds and needs to sell,
 // as well as the type of those shares (YES or NO).
-func CheckOppositeSharesOwned(db *gorm.DB, marketIDStr string, username string, betRequestOutcome string) (int64, string, error) {
-	userMarketPositions, err := CalculateMarketPositionForUser_WPAM_DBPM(db, marketIDStr, username)
+func CheckOppositeSharesOwned(mcl setup.MarketCreationLoader, db *gorm.DB, marketIDStr string, username string, betRequestOutcome string) (int64, string, error) {
+	userMarketPositions, err := CalculateMarketPositionForUser_WPAM_DBPM(mcl, db, marketIDStr, username)
 	if err != nil {
 		return 0, "", err // Return the error if fetching the market positions fails.
 	}

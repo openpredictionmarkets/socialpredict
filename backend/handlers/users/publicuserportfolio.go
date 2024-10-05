@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"socialpredict/handlers/positions"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 	"sort"
 	"strconv"
@@ -28,41 +29,43 @@ type PortfolioTotal struct {
 	TotalSharesOwned int64           `json:"totalSharesOwned"`
 }
 
-func GetPublicUserPortfolio(w http.ResponseWriter, r *http.Request) {
-	// Extract the username from the URL
-	vars := mux.Vars(r)
-	username := vars["username"]
+func GetPublicUserPortfolio(mcl setup.MarketCreationLoader) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract the username from the URL
+		vars := mux.Vars(r)
+		username := vars["username"]
 
-	db := util.GetDB()
+		db := util.GetDB()
 
-	// fetch all bets made by a specific user
-	userbets, err := fetchUserBets(db, username)
-	if err != nil {
-		log.Printf("Error fetching user bets: %v", err)
-		http.Error(w, "Error fetching user bets", http.StatusInternalServerError)
-		return
+		// fetch all bets made by a specific user
+		userbets, err := fetchUserBets(db, username)
+		if err != nil {
+			log.Printf("Error fetching user bets: %v", err)
+			http.Error(w, "Error fetching user bets", http.StatusInternalServerError)
+			return
+		}
+
+		// Create a market map from the user's bets
+		marketMap := makeUserMarketMap(userbets)
+
+		// Process the market map to calculate positions and fetch market titles
+		userPositionsPortfolio, err := processMarketMap(mcl, db, marketMap, username)
+		if err != nil {
+			log.Printf("Error processing market map: %v", err)
+			http.Error(w, "Error processing market map", http.StatusInternalServerError)
+			return
+		}
+
+		totalSharesOwned := calculateTotalShares(userPositionsPortfolio)
+
+		portfolioTotal := PortfolioTotal{
+			PortfolioItems:   userPositionsPortfolio,
+			TotalSharesOwned: totalSharesOwned,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(portfolioTotal)
 	}
-
-	// Create a market map from the user's bets
-	marketMap := makeUserMarketMap(userbets)
-
-	// Process the market map to calculate positions and fetch market titles
-	userPositionsPortfolio, err := processMarketMap(db, marketMap, username)
-	if err != nil {
-		log.Printf("Error processing market map: %v", err)
-		http.Error(w, "Error processing market map", http.StatusInternalServerError)
-		return
-	}
-
-	totalSharesOwned := calculateTotalShares(userPositionsPortfolio)
-
-	portfolioTotal := PortfolioTotal{
-		PortfolioItems:   userPositionsPortfolio,
-		TotalSharesOwned: totalSharesOwned,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(portfolioTotal)
 }
 
 // fetchUserBets retrieves all bets made by a specific user
@@ -103,10 +106,10 @@ func makeUserMarketMap(userbets []models.Bet) map[uint]PortfolioItem {
 	return marketMap
 }
 
-func processMarketMap(db *gorm.DB, marketMap map[uint]PortfolioItem, username string) ([]PortfolioItem, error) {
+func processMarketMap(mcl setup.MarketCreationLoader, db *gorm.DB, marketMap map[uint]PortfolioItem, username string) ([]PortfolioItem, error) {
 	// Calculate market positions for each market
 	for marketID := range marketMap {
-		position, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(db, strconv.Itoa(int(marketID)), username)
+		position, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(mcl, db, strconv.Itoa(int(marketID)), username)
 		if err != nil {
 			return nil, err
 		}

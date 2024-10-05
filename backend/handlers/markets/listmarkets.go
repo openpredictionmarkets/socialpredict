@@ -10,6 +10,7 @@ import (
 	"socialpredict/handlers/tradingdata"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 	"strconv"
 
@@ -30,55 +31,57 @@ type MarketOverview struct {
 }
 
 // ListMarketsHandler handles the HTTP request for listing markets.
-func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("ListMarketsHandler: Request received")
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
-
-	db := util.GetDB()
-	markets, err := ListMarkets(db)
-	if err != nil {
-		http.Error(w, "Error fetching markets", http.StatusInternalServerError)
-		return
-	}
-
-	var marketOverviews []MarketOverview
-	for _, market := range markets {
-		bets := tradingdata.GetBetsForMarket(db, uint(market.ID))
-		probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
-		numUsers := models.GetNumMarketUsers(bets)
-		marketVolume := marketmath.GetMarketVolume(bets)
-		lastProbability := probabilityChanges[len(probabilityChanges)-1].Probability
-
-		creatorInfo := usersHandlers.GetPublicUserInfo(db, market.CreatorUsername)
-
-		// return the PublicResponse type with information about the market
-		marketIDStr := strconv.FormatUint(uint64(market.ID), 10)
-		publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketIDStr)
-		if err != nil {
-			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+func ListMarketsHandler(mcl setup.MarketCreationLoader) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("ListMarketsHandler: Request received")
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method is not supported.", http.StatusNotFound)
 			return
 		}
 
-		marketOverview := MarketOverview{
-			Market:          publicResponseMarket,
-			Creator:         creatorInfo,
-			LastProbability: lastProbability,
-			NumUsers:        numUsers,
-			TotalVolume:     marketVolume,
+		db := util.GetDB()
+		markets, err := ListMarkets(db)
+		if err != nil {
+			http.Error(w, "Error fetching markets", http.StatusInternalServerError)
+			return
 		}
-		marketOverviews = append(marketOverviews, marketOverview)
-	}
 
-	response := ListMarketsResponse{
-		Markets: marketOverviews,
-	}
+		var marketOverviews []MarketOverview
+		for _, market := range markets {
+			bets := tradingdata.GetBetsForMarket(db, uint(market.ID))
+			probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(mcl, market.CreatedAt, bets)
+			numUsers := models.GetNumMarketUsers(bets)
+			marketVolume := marketmath.GetMarketVolume(bets)
+			lastProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+			creatorInfo := usersHandlers.GetPublicUserInfo(db, market.CreatorUsername)
+
+			// return the PublicResponse type with information about the market
+			marketIDStr := strconv.FormatUint(uint64(market.ID), 10)
+			publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketIDStr)
+			if err != nil {
+				http.Error(w, "Invalid market ID", http.StatusBadRequest)
+				return
+			}
+
+			marketOverview := MarketOverview{
+				Market:          publicResponseMarket,
+				Creator:         creatorInfo,
+				LastProbability: lastProbability,
+				NumUsers:        numUsers,
+				TotalVolume:     marketVolume,
+			}
+			marketOverviews = append(marketOverviews, marketOverview)
+		}
+
+		response := ListMarketsResponse{
+			Markets: marketOverviews,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
