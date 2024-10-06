@@ -14,6 +14,8 @@ services:
       - "${DB_PORT}:${POSTGRES_PORT}"
     networks:
       - database_network
+    env_file:
+      - ${ENV_PATH}
 
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
@@ -34,6 +36,8 @@ services:
     networks:
       - database_network
       - frontend_network
+    env_file:
+      - ${ENV_PATH}
     depends_on:
       - db
 
@@ -45,6 +49,8 @@ services:
       DOMAIN: "https://${DOMAIN}"
     networks:
       - frontend_network
+    env_file:
+      - ${ENV_PATH}
     volumes:
       - ../frontend:/app
       - /app/node_modules
@@ -73,6 +79,8 @@ services:
     networks:
       - database_network
       - frontend_network
+    env_file:
+      - ${ENV_PATH}
     depends_on:
       - backend
       - frontend
