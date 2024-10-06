@@ -13,7 +13,7 @@ We welcome contributions from the community and are pleased that you're interest
 3. **Create a Branch**
    - Create a new branch in your local repository before starting your work.
    - Use a clear branch name that describes the intent of your work, such as `feature/add-login` or `fix/header-bug`.
-   - Make sure your branch name starts with `feature`, `fix`, or `refactor`.
+   - Make sure your branch name starts with `feature`, `fix`, `refactor` or `doc` followed by a `/` and description.
 
 4. **Commit Your Changes**
    - Keep your commits as atomic as possible, each addressing a single concern.
