@@ -46,12 +46,14 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 
 		appConfig := loadEconConfig()
 		user := models.User{
-			Username:              req.Username,
-			DisplayName:           util.UniqueDisplayName(db),
-			UserType:              "REGULAR",
-			InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
-			AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
-			PersonalEmoji:         randomEmoji(),
+			PublicUser: models.PublicUser{
+				Username:              req.Username,
+				DisplayName:           util.UniqueDisplayName(db),
+				UserType:              "REGULAR",
+				InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
+				AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
+				PersonalEmoji:         randomEmoji(),
+			},
 			PrivateUser: models.PrivateUser{
 				Email:  util.UniqueEmail(db),
 				APIKey: util.GenerateUniqueApiKey(db),
