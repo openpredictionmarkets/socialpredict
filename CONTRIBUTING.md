@@ -13,6 +13,7 @@ We welcome contributions from the community and are pleased that you're interest
 3. **Create a Branch**
    - Create a new branch in your local repository before starting your work.
    - Use a clear branch name that describes the intent of your work, such as `feature/add-login` or `fix/header-bug`.
+   - Make sure your branch name starts with `feature`, `fix`, `refactor` or `doc` followed by a `/` and description.
 
 4. **Commit Your Changes**
    - Keep your commits as atomic as possible, each addressing a single concern.
@@ -27,7 +28,7 @@ We welcome contributions from the community and are pleased that you're interest
 
 ## Reporting Issues
 
-If you find a bug or have a feature request, please use the GitHub Issues tab to report them. Before creating a new issue, check to ensure the issue hasn't already been reported. When filing an issue, please include:
+If you find a bug or have a feature request, please use the [GitHub Issues](https://github.com/openpredictionmarkets/socialpredict/issues) tab to report them. Before creating a new issue, check to ensure the issue hasn't already been reported. When filing an issue, please include:
 
 - A clear title and description.
 - As much relevant information as possible.
@@ -35,7 +36,7 @@ If you find a bug or have a feature request, please use the GitHub Issues tab to
 
 ## Conduct
 
-We are committed to providing a welcoming and inspiring community for all. Please take a moment to read our Code of Conduct before participating.
+We are committed to providing a welcoming and inspiring community for all. Please take a moment to read our [Code of Conduct](https://github.com/openpredictionmarkets/socialpredict/blob/main/CODE_OF_CONDUCT.md) before participating.
 
 ## Questions?
 

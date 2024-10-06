@@ -18,7 +18,7 @@ import (
 // MarketDetailResponse defines the structure for the market detail response
 type MarketDetailHandlerResponse struct {
 	Market             marketpublicresponse.PublicResponseMarket `json:"market"`
-	Creator            usersHandlers.PublicUserType              `json:"creator"`
+	Creator            models.PublicUser                         `json:"creator"`
 	ProbabilityChanges []wpam.ProbabilityChange                  `json:"probabilityChanges"`
 	NumUsers           int                                       `json:"numUsers"`
 	TotalVolume        int64                                     `json:"totalVolume"`
@@ -55,10 +55,6 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// find the number of users on the market
 	numUsers := models.GetNumMarketUsers(bets)
-	if err != nil {
-		http.Error(w, "Error retrieving number of users.", http.StatusInternalServerError)
-		return
-	}
 
 	// market volume is equivalent to the sum of all bets
 	marketVolume := marketmath.GetMarketVolume(bets)

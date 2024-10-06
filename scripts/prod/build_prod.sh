@@ -26,7 +26,7 @@ build_frontend() {
         FRONTEND_DIR="$( readlink -f "$SCRIPT_DIR/frontend" )"
 
         # Build Image
-        docker build --no-cache -t "${FRONTEND_IMAGE_NAME}" -f "$FRONTEND_DIR/Dockerfile" "$FRONTEND_DIR/."
+        docker build --no-cache -t "${FRONTEND_IMAGE_NAME}" -f "$FRONTEND_DIR/Dockerfile.prod" "$FRONTEND_DIR/."
         echo "Frontend Image Built"
 }
 
