@@ -3,9 +3,15 @@
 
 We empower people and organizations to harness the **wisdom of crowds** and **make better decisions** with free, open-source forecasting software.
 
-![Screenshot 2024-10-05 154211](https://github.com/user-attachments/assets/13f616f9-af04-47fc-a839-b24f82a419a8)
+![improvement_market_price_graph](https://github.com/user-attachments/assets/13f616f9-af04-47fc-a839-b24f82a419a8)
 
 No questions are too small (or too big) for our prediction market software. Set up your own instance and start forecasting anything from your next big event to next year's hottest tech breakthroughs.
+
+## Used By
+
+![Kenyon College Logo](README/IMG/logotype_kenyon-purple_rgb.png)
+
+* Kenyon College
 
 ## Staging
 
