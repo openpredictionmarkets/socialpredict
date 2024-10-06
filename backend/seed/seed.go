@@ -39,13 +39,15 @@ func SeedUsers(db *gorm.DB) {
 		if count == 0 {
 			// No admin user found, create one
 			adminUser := models.User{
-				Username:              "admin",
-				DisplayName:           "Administrator",
-				UserType:              "ADMIN",
-				InitialAccountBalance: config.Economics.User.InitialAccountBalance,
-				AccountBalance:        config.Economics.User.InitialAccountBalance,
-				PersonalEmoji:         "NONE",
-				Description:           "Administrator",
+				PublicUser: models.PublicUser{
+					Username:              "admin",
+					DisplayName:           "Administrator",
+					UserType:              "ADMIN",
+					InitialAccountBalance: config.Economics.User.InitialAccountBalance,
+					AccountBalance:        config.Economics.User.InitialAccountBalance,
+					PersonalEmoji:         "NONE",
+					Description:           "Administrator",
+				},
 				PrivateUser: models.PrivateUser{
 					Email:  "admin@example.com",
 					APIKey: "NONE",
