@@ -1,4 +1,4 @@
-name: Deploy Prod configuration to Digital Ocean Staging
+name: Deploy Prod configuration
 
 on:
   workflow_run:
@@ -12,7 +12,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Deploy to Digital Ocean droplet via SSH action
+    - name: Deploy to SSH target
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.HOST }}
