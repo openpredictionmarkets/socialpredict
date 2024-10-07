@@ -26,6 +26,7 @@ jobs:
             if [ ! -d socialpredict-deploy ]
             then
                 git clone ${{ github.server_url }}/${{ github.repository }} socialpredict-deploy
+                cd socialpredict-deploy
             else
                 cd socialpredict-deploy
                 git fetch origin
