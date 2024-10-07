@@ -14,6 +14,8 @@ services:
       - "${DB_PORT}:${POSTGRES_PORT}"
     networks:
       - database_network
+    env_file:
+      - ${ENV_PATH}
 
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
@@ -24,18 +26,18 @@ services:
       DB_HOST: db
       DB_USER: ${POSTGRES_USER}
       DB_PASS: ${POSTGRES_PASSWORD}
-    env_file:
-      - ../.env
     ports:
       - "${BACKEND_HOSTPORT}:${BACKEND_PORT}"
     volumes:
       - ../backend:/backend
-      - ../.env:/backend/.env.dev
+      - ${ENV_PATH}:/backend/.env.dev
     command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
     tty: true
     networks:
       - database_network
       - frontend_network
+    env_file:
+      - ${ENV_PATH}
     depends_on:
       - db
 
@@ -48,7 +50,7 @@ services:
     networks:
       - frontend_network
     env_file:
-      - ../.env
+      - ${ENV_PATH}
     volumes:
       - ../frontend:/app
       - /app/node_modules
@@ -77,6 +79,8 @@ services:
     networks:
       - database_network
       - frontend_network
+    env_file:
+      - ${ENV_PATH}
     depends_on:
       - backend
       - frontend
@@ -94,4 +98,3 @@ networks:
     driver: bridge
   frontend_network:
     driver: bridge
-
