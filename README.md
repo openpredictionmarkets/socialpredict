@@ -41,7 +41,7 @@ We welcome and appreciate every contribution. Get started by reading our [guide]
 
 ## Used By
 
-<img src="https://github.com/openpredictionmarkets/socialpredict/raw/main/README/IMG/logotype_kenyon-purple_rgb.png" alt = "Kenyon College Logo" width=50% height=50%>
+<img src="https://github.com/openpredictionmarkets/socialpredict/raw/main/README/IMG/logotype_kenyon-purple_rgb.png" alt = "Kenyon College Logo" width=40% height=40%>
 
 * Kenyon College (Political Science courses)
                         
