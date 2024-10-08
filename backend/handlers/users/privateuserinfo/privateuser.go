@@ -7,20 +7,11 @@ import (
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
-
-	"gorm.io/gorm"
 )
-
-// PrivateUserResponse is a struct for user data that is safe to send to the client for login
-type PrivateUserResponse struct {
-	Email  string `json:"email"`
-	ApiKey string `json:"apiKey,omitempty"`
-}
 
 type CombinedUserResponse struct {
 	// Private fields
-	Email  string `json:"email"`
-	ApiKey string `json:"apiKey,omitempty"`
+	models.PrivateUser
 	// Public fields
 	Username              string `json:"username"`
 	DisplayName           string `json:"displayname"`
@@ -36,12 +27,6 @@ type CombinedUserResponse struct {
 }
 
 func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
-	// accept get requests
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
-		return
-	}
-
 	// Use database connection
 	db := util.GetDB()
 
@@ -55,13 +40,16 @@ func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
 	// The username is extracted from the token
 	username := user.Username
 
+<<<<<<< HEAD:backend/handlers/users/privateuserinfo/privateuser.go
 	publicInfo := publicuser.GetPublicUserInfo(db, username)
 	privateInfo := GetPrivateUserInfo(db, username)
+=======
+	publicInfo := GetPublicUserInfo(db, username)
+>>>>>>> main:backend/handlers/users/privateuser.go
 
 	response := CombinedUserResponse{
 		// Private fields
-		Email:  privateInfo.Email,
-		ApiKey: privateInfo.ApiKey,
+		PrivateUser: user.PrivateUser,
 		// Public fields
 		Username:              publicInfo.Username,
 		DisplayName:           publicInfo.DisplayName,
@@ -78,15 +66,4 @@ func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-}
-
-// Function to get the Info From the Database
-func GetPrivateUserInfo(db *gorm.DB, username string) PrivateUserResponse {
-	var user models.User
-	db.Where("username = ?", username).First(&user)
-
-	return PrivateUserResponse{
-		Email:  user.Email,
-		ApiKey: user.ApiKey,
-	}
 }

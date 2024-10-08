@@ -23,7 +23,11 @@ type ListMarketsResponse struct {
 
 type MarketOverview struct {
 	Market          marketpublicresponse.PublicResponseMarket `json:"market"`
+<<<<<<< HEAD
 	Creator         publicuser.PublicUserType                 `json:"creator"`
+=======
+	Creator         models.PublicUser                         `json:"creator"`
+>>>>>>> main
 	LastProbability float64                                   `json:"lastProbability"`
 	NumUsers        int                                       `json:"numUsers"`
 	TotalVolume     int64                                     `json:"totalVolume"`

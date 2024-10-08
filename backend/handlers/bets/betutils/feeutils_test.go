@@ -15,7 +15,12 @@ func TestGetUserInitialBetFee(t *testing.T) {
 	}
 
 	appConfig = setuptesting.MockEconomicConfig()
-	user := &models.User{Username: "testuser", AccountBalance: 1000, ApiKey: "unique_api_key_1"}
+	user := &models.User{
+		PublicUser: models.PublicUser{
+			Username:       "testuser",
+			AccountBalance: 1000,
+		},
+	}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("Failed to save user to database: %v", err)
 	}
@@ -85,7 +90,7 @@ func TestGetSumBetFees(t *testing.T) {
 	appConfig = setuptesting.MockEconomicConfig()
 
 	// Create a test user
-	user := &models.User{Username: "testuser"}
+	user := &models.User{PublicUser: models.PublicUser{Username: "testuser"}}
 
 	// Scenario 1: User has no bets, buys shares, gets initial fee
 	buyBet := models.Bet{MarketID: 1, Amount: 100}
