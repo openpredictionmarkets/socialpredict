@@ -19,7 +19,11 @@ import (
 type MarketDetailHandlerResponse struct {
 	Market             marketpublicresponse.PublicResponseMarket `json:"market"`
 <<<<<<< HEAD
+<<<<<<< HEAD
 	Creator            publicuser.PublicUserType                 `json:"creator"`
+=======
+	Creator            models.PublicUser                         `json:"creator"`
+>>>>>>> main
 =======
 	Creator            models.PublicUser                         `json:"creator"`
 >>>>>>> main

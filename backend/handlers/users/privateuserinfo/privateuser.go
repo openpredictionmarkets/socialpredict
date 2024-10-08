@@ -41,8 +41,12 @@ func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
 	username := user.Username
 
 <<<<<<< HEAD:backend/handlers/users/privateuserinfo/privateuser.go
+<<<<<<< HEAD:backend/handlers/users/privateuserinfo/privateuser.go
 	publicInfo := publicuser.GetPublicUserInfo(db, username)
 	privateInfo := GetPrivateUserInfo(db, username)
+=======
+	publicInfo := GetPublicUserInfo(db, username)
+>>>>>>> main:backend/handlers/users/privateuser.go
 =======
 	publicInfo := GetPublicUserInfo(db, username)
 >>>>>>> main:backend/handlers/users/privateuser.go
