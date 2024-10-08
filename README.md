@@ -7,12 +7,6 @@ We empower people and organizations to harness the **wisdom of crowds** and **ma
 
 No questions are too small (or too big) for our prediction market software. Set up your own instance and start forecasting anything from your next big event to next year's hottest tech breakthroughs.
 
-## Used By
-
-![Kenyon College Logo](README/IMG/logotype_kenyon-purple_rgb.png)
-
-* Kenyon College
-
 ## Staging
 
 Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.com/) to see what our software looks like in action. May be down if we are testing something.
@@ -44,6 +38,12 @@ We welcome and appreciate every contribution. Get started by reading our [guide]
 - Have your say on [GitHub Discussions](https://github.com/orgs/openpredictionmarkets/discussions)
 
 ### Join us in shaping the future of prediction markets by building connections and expertise within your community!
+
+## Used By
+
+<img src="https://github.com/openpredictionmarkets/socialpredict/raw/main/README/IMG/logotype_kenyon-purple_rgb.png" alt = "Kenyon College Logo" width=40% height=40%>
+
+* Kenyon College (Political Science courses)
                         
 ## Stargazers over time
 [![Stargazers over time](https://starchart.cc/openpredictionmarkets/socialpredict.svg?variant=adaptive)](https://starchart.cc/openpredictionmarkets/socialpredict)
