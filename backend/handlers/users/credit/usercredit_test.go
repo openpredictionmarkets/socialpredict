@@ -13,9 +13,6 @@ type UserPublicInfo struct {
 func TestCalculateUserCredit(t *testing.T) {
 
 	db := modelstesting.NewFakeDB(t)
-	if err := db.AutoMigrate(&models.User{}); err != nil {
-		t.Fatalf("Failed to migrate models: %v", err)
-	}
 
 	tests := []struct {
 		username       string
