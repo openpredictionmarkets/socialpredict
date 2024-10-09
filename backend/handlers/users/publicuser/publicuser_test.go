@@ -13,11 +13,6 @@ func TestGetPublicUserInfo(t *testing.T) {
 	// Set up the in-memory SQLite database using modelstesting.NewFakeDB
 	db := modelstesting.NewFakeDB(t)
 
-	// Migrate the User model
-	if err := db.AutoMigrate(&models.User{}); err != nil {
-		t.Fatalf("Failed to migrate user model: %v", err)
-	}
-
 	// Create a test user in the database
 	user := models.PublicUser{
 		Username:              "testuser",
