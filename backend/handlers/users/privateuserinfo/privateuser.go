@@ -40,16 +40,7 @@ func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
 	// The username is extracted from the token
 	username := user.Username
 
-<<<<<<< HEAD:backend/handlers/users/privateuserinfo/privateuser.go
-<<<<<<< HEAD:backend/handlers/users/privateuserinfo/privateuser.go
 	publicInfo := publicuser.GetPublicUserInfo(db, username)
-	privateInfo := GetPrivateUserInfo(db, username)
-=======
-	publicInfo := GetPublicUserInfo(db, username)
->>>>>>> main:backend/handlers/users/privateuser.go
-=======
-	publicInfo := GetPublicUserInfo(db, username)
->>>>>>> main:backend/handlers/users/privateuser.go
 
 	response := CombinedUserResponse{
 		// Private fields

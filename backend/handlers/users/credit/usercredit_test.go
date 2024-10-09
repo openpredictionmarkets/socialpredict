@@ -43,16 +43,10 @@ func TestCalculateUserCredit(t *testing.T) {
 			t.Fatalf("Failed to clear users table: %v", err)
 		}
 
-		user := &models.User{
+		user := &models.PublicUser{
 			Username:       test.username,
-			Email:          test.email,
 			AccountBalance: test.accountBalance,
-			ApiKey:         test.apiKey,
 			Password:       "testpassword",
-		}
-
-		if err := user.HashPassword(user.Password); err != nil {
-			t.Fatalf("Failed to hash password for user %s: %v", user.Username, err)
 		}
 
 		if err := db.Create(user).Error; err != nil {

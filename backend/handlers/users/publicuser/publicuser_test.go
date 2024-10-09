@@ -19,7 +19,7 @@ func TestGetPublicUserInfo(t *testing.T) {
 	}
 
 	// Create a test user in the database
-	user := &models.User{
+	user := models.PublicUser{
 		Username:              "testuser",
 		DisplayName:           "Test User",
 		UserType:              "regular",
@@ -40,7 +40,7 @@ func TestGetPublicUserInfo(t *testing.T) {
 	retrievedUser := publicuser.GetPublicUserInfo(db, "testuser")
 
 	// Expected result
-	expectedUser := publicuser.PublicUserType{
+	expectedUser := models.PublicUser{
 		Username:              "testuser",
 		DisplayName:           "Test User",
 		UserType:              "regular",

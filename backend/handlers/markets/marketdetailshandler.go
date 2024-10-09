@@ -18,15 +18,7 @@ import (
 // MarketDetailResponse defines the structure for the market detail response
 type MarketDetailHandlerResponse struct {
 	Market             marketpublicresponse.PublicResponseMarket `json:"market"`
-<<<<<<< HEAD
-<<<<<<< HEAD
-	Creator            publicuser.PublicUserType                 `json:"creator"`
-=======
 	Creator            models.PublicUser                         `json:"creator"`
->>>>>>> main
-=======
-	Creator            models.PublicUser                         `json:"creator"`
->>>>>>> main
 	ProbabilityChanges []wpam.ProbabilityChange                  `json:"probabilityChanges"`
 	NumUsers           int                                       `json:"numUsers"`
 	TotalVolume        int64                                     `json:"totalVolume"`
