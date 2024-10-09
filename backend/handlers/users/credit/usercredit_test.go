@@ -1,56 +1,58 @@
 package usercredit
 
 import (
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"testing"
 )
 
-type UserPublicInfo struct {
-	AccountBalance int
-}
-
-func TestCalculateUserCredit(t *testing.T) {
+func TestGetPublicUserInfo(t *testing.T) {
 
 	db := modelstesting.NewFakeDB(t)
 
-	tests := []struct {
-		username       string
-		accountBalance int64
-		maxDebt        int64
-		expectedCredit int64
-	}{
-		// Test with maximum debt of 500
-		{"testuser1", -100, 500, 400},
-		{"testuser2", 0, 500, 500},
-		{"testuser3", 100, 500, 500 + 100},
-
-		// Test with maximum debt of 5000
-		{"testuser4", -100, 5000, 4900},
-		{"testuser5", 0, 5000, 5000},
-		{"testuser6", 100, 5000, 5100},
+	user := models.User{
+		PublicUser: models.PublicUser{
+			Username:              "testuser",
+			DisplayName:           "Test User",
+			UserType:              "regular",
+			InitialAccountBalance: 1000,
+			AccountBalance:        500,
+			PersonalEmoji:         "😊",
+			Description:           "Test description",
+			PersonalLink1:         "http://link1.com",
+			PersonalLink2:         "http://link2.com",
+			PersonalLink3:         "http://link3.com",
+			PersonalLink4:         "http://link4.com",
+		},
+		PrivateUser: models.PrivateUser{
+			Email:    "testuser@example.com",
+			Password: "password123",
+			APIKey:   "abcdefg",
+		},
 	}
 
-	for _, test := range tests {
-		// Clear the users table before each test run
-		if err := db.Exec("DELETE FROM users").Error; err != nil {
-			t.Fatalf("Failed to clear users table: %v", err)
-		}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("Failed to save user to database: %v", err)
+	}
 
-		user := &models.PublicUser{
-			Username:       test.username,
-			AccountBalance: test.accountBalance,
-			Password:       "testpassword",
-		}
+	retrievedUser := publicuser.GetPublicUserInfo(db, "testuser")
 
-		if err := db.Create(user).Error; err != nil {
-			t.Fatalf("Failed to save user to database: %v", err)
-		}
+	expectedUser := models.PublicUser{
+		Username:              "testuser",
+		DisplayName:           "Test User",
+		UserType:              "regular",
+		InitialAccountBalance: 1000,
+		AccountBalance:        500,
+		PersonalEmoji:         "😊",
+		Description:           "Test description",
+		PersonalLink1:         "http://link1.com",
+		PersonalLink2:         "http://link2.com",
+		PersonalLink3:         "http://link3.com",
+		PersonalLink4:         "http://link4.com",
+	}
 
-		userCredit := calculateUserCredit(db, test.username, test.maxDebt)
-
-		if userCredit != test.expectedCredit {
-			t.Errorf("For %s, with max debt %d, expected user credit to be %d, got %d", test.username, test.maxDebt, test.expectedCredit, userCredit)
-		}
+	if retrievedUser != expectedUser {
+		t.Errorf("GetPublicUserInfo(db, 'testuser') = %+v, want %+v", retrievedUser, expectedUser)
 	}
 }
