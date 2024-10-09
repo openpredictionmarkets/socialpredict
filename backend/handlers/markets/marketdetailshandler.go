@@ -7,7 +7,7 @@ import (
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
-	usersHandlers "socialpredict/handlers/users"
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
@@ -64,7 +64,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get market creator
 	// Fetch the Creator's public information using utility function
-	publicCreator := usersHandlers.GetPublicUserInfo(db, publicResponseMarket.CreatorUsername)
+	publicCreator := publicuser.GetPublicUserInfo(db, publicResponseMarket.CreatorUsername)
 
 	// Manually construct the response
 	response := MarketDetailHandlerResponse{
