@@ -8,12 +8,10 @@ import (
 	"testing"
 )
 
-// Test for GetPublicUserInfo using an in-memory SQLite database
 func TestGetPublicUserInfo(t *testing.T) {
-	// Set up the in-memory SQLite database using modelstesting.NewFakeDB
+
 	db := modelstesting.NewFakeDB(t)
 
-	// Create a test user in the database
 	user := models.PublicUser{
 		Username:              "testuser",
 		DisplayName:           "Test User",
@@ -31,10 +29,8 @@ func TestGetPublicUserInfo(t *testing.T) {
 		t.Fatalf("Failed to save user to database: %v", err)
 	}
 
-	// Call GetPublicUserInfo to retrieve the user
 	retrievedUser := publicuser.GetPublicUserInfo(db, "testuser")
 
-	// Expected result
 	expectedUser := models.PublicUser{
 		Username:              "testuser",
 		DisplayName:           "Test User",
@@ -49,7 +45,6 @@ func TestGetPublicUserInfo(t *testing.T) {
 		PersonalLink4:         "http://link4.com",
 	}
 
-	// Compare the retrieved user with the expected result
 	if retrievedUser != expectedUser {
 		t.Errorf("GetPublicUserInfo(db, 'testuser') = %+v, want %+v", retrievedUser, expectedUser)
 	}

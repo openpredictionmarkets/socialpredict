@@ -16,21 +16,19 @@ func TestCalculateUserCredit(t *testing.T) {
 
 	tests := []struct {
 		username       string
-		email          string
-		apiKey         string
 		accountBalance int64
 		maxDebt        int64
 		expectedCredit int64
 	}{
 		// Test with maximum debt of 500
-		{"testuser1", "testuser1@example.com", "api_key_testuser1", -100, 500, 400},
-		{"testuser2", "testuser2@example.com", "api_key_testuser2", 0, 500, 500},
-		{"testuser3", "testuser3@example.com", "api_key_testuser3", 100, 500, 500 + 100},
+		{"testuser1", -100, 500, 400},
+		{"testuser2", 0, 500, 500},
+		{"testuser3", 100, 500, 500 + 100},
 
 		// Test with maximum debt of 5000
-		{"testuser4", "testuser4@example.com", "api_key_testuser4", -100, 5000, 4900},
-		{"testuser5", "testuser5@example.com", "api_key_testuser5", 0, 5000, 5000},
-		{"testuser6", "testuser6@example.com", "api_key_testuser6", 100, 5000, 5100},
+		{"testuser4", -100, 5000, 4900},
+		{"testuser5", 0, 5000, 5000},
+		{"testuser6", 100, 5000, 5100},
 	}
 
 	for _, test := range tests {

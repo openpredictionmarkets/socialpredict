@@ -12,7 +12,7 @@ import (
 	statshandlers "socialpredict/handlers/stats"
 	usershandlers "socialpredict/handlers/users"
 	usercredit "socialpredict/handlers/users/credit"
-	privateuser "socialpredict/handlers/users/privateuserinfo"
+	privateuser "socialpredict/handlers/users/privateuser"
 	"socialpredict/handlers/users/publicuser"
 	"socialpredict/middleware"
 	"socialpredict/setup"
