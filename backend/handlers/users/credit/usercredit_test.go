@@ -1,7 +1,6 @@
-package usercredit_test
+package usercredit
 
 import (
-	usercredit "socialpredict/handlers/users/credit"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"testing"
@@ -53,7 +52,7 @@ func TestCalculateUserCredit(t *testing.T) {
 			t.Fatalf("Failed to save user to database: %v", err)
 		}
 
-		userCredit := usercredit.CalculateUserCredit(db, test.username, test.maxDebt)
+		userCredit := calculateUserCredit(db, test.username, test.maxDebt)
 
 		if userCredit != test.expectedCredit {
 			t.Errorf("For %s, with max debt %d, expected user credit to be %d, got %d", test.username, test.maxDebt, test.expectedCredit, userCredit)
