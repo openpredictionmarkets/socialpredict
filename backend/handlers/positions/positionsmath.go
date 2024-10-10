@@ -1,6 +1,7 @@
 package positions
 
 import (
+	"fmt"
 	"socialpredict/errors"
 	"socialpredict/handlers/marketpublicresponse"
 	"socialpredict/handlers/math/outcomes/dbpm"
@@ -116,4 +117,37 @@ func CheckOppositeSharesOwned(db *gorm.DB, marketIDStr string, username string, 
 
 	// If the user has no opposite shares to sell, return 0 and an empty string for the outcome.
 	return 0, "", nil
+}
+
+// GetMaxShares calculates the maximum shares owned by a user in a market.
+// It wraps around CalculateMarketPositionForUser_WPAM_DBPM and returns the maximum share count or an error.
+func GetMaxShares_WPAM_DBPM(db *gorm.DB, marketId string, username string) (int64, error) {
+	// Obtain the user's market position.
+	position, err := CalculateMarketPositionForUser_WPAM_DBPM(db, marketId, username)
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate market position: %w", err)
+	}
+
+	// Check for negative shares.
+	if position.NoSharesOwned < 0 || position.YesSharesOwned < 0 {
+		return 0, fmt.Errorf("share counts cannot be negative")
+	}
+
+	// Determine the maximum and the opposite share count.
+	var maxShares, oppositeShares int64
+	if position.NoSharesOwned >= position.YesSharesOwned {
+		maxShares = position.NoSharesOwned
+		oppositeShares = position.YesSharesOwned
+	} else {
+		maxShares = position.YesSharesOwned
+		oppositeShares = position.NoSharesOwned
+	}
+
+	// Check if the opposite share count is zero.
+	if oppositeShares == 0 {
+		return 0, fmt.Errorf("the opposite share count cannot be zero")
+	}
+
+	// Return the maximum share count.
+	return maxShares, nil
 }
