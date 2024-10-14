@@ -16,7 +16,6 @@ type User struct {
 type PublicUser struct {
 	Username              string `json:"username" gorm:"unique;not null"`
 	DisplayName           string `json:"displayname" gorm:"unique;not null"`
-	Password              string `json:"password,omitempty" gorm:"not null"`
 	UserType              string `json:"usertype" gorm:"not null"`
 	InitialAccountBalance int64  `json:"initialAccountBalance"`
 	AccountBalance        int64  `json:"accountBalance"`
@@ -29,8 +28,9 @@ type PublicUser struct {
 }
 
 type PrivateUser struct {
-	Email  string `json:"email" gorm:"unique;not null"`
-	APIKey string `json:"apiKey,omitempty" gorm:"unique"`
+	Email    string `json:"email" gorm:"unique;not null"`
+	APIKey   string `json:"apiKey,omitempty" gorm:"unique"`
+	Password string `json:"password,omitempty" gorm:"not null"`
 }
 
 // HashPassword hashes given password

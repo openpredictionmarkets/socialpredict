@@ -1,8 +1,9 @@
-package usershandlers
+package privateuser
 
 import (
 	"encoding/json"
 	"net/http"
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -39,7 +40,7 @@ func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
 	// The username is extracted from the token
 	username := user.Username
 
-	publicInfo := GetPublicUserInfo(db, username)
+	publicInfo := publicuser.GetPublicUserInfo(db, username)
 
 	response := CombinedUserResponse{
 		// Private fields
