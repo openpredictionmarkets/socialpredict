@@ -12,6 +12,9 @@ server {
 }
 
 server {
+	gzip on;
+    gzip_min_length 1000;
+    gunzip on;
 	listen 443 ssl;
 	server_name ${DOMAIN};
 

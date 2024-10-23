@@ -1,13 +1,11 @@
 name: Lighthouse CI
 
 on:
-  push:
-    branches:
-    - feature/ci-lighthouse-bench
   workflow_run:
     workflows: ["Deploy Prod configuration"]
     types: [completed]
     branches:
+    - feature/ci-lighthouse-bench
     - 'main'
     - 'v*'
 

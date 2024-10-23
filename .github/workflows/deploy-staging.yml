@@ -1,6 +1,9 @@
 name: Deploy Prod configuration
 
 on:
+  push:
+    branches:
+    - feature/ci-lighthouse-bench
   workflow_run:
     workflows: ["Create and publish a Docker image"]
     types: [completed]
