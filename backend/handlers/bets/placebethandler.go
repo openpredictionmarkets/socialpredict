@@ -2,6 +2,7 @@ package betshandlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
 	"socialpredict/logging"
@@ -43,26 +44,14 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 		sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
 		logging.LogAnyType(sumOfBetFees, "sumOfBetFees")
 
-		appConfig := loadEconConfig()
-		// Check if the user has enough balance to place the bet
-		// Use the appConfig for configuration values
-		maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
-
 		// Check if the user's balance after the bet would be lower than the allowed maximum debt
 		// deduct fees along with calculation to ensure fees can be paid.
-		if user.AccountBalance-betRequest.Amount-sumOfBetFees < -maximumDebtAllowed {
-			http.Error(w, "Insufficient balance", http.StatusBadRequest)
-			return
-		}
-
-		// make entry for user.AccountBalance
-		user.AccountBalance = user.AccountBalance - betRequest.Amount - sumOfBetFees
-
-		// Update the user's balance in the database
-		if err := db.Save(&user).Error; err != nil {
-			http.Error(w, "Error updating user balance: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
+		checkUserBalance(
+			user,
+			betRequest,
+			sumOfBetFees,
+			loadEconConfig,
+		)
 
 		// Create a new Bet object
 		bet := models.Bet{
@@ -90,4 +79,15 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(bet)
 	}
+}
+
+func checkUserBalance(user *models.User, betRequest models.Bet, sumOfBetFees int64, loadEconConfig setup.EconConfigLoader) error {
+	appConfig := loadEconConfig()
+	maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
+
+	// Check if the user's balance after the bet would be lower than the allowed maximum debt
+	if user.AccountBalance-betRequest.Amount-sumOfBetFees < -maximumDebtAllowed {
+		return fmt.Errorf("Insufficient balance")
+	}
+	return nil
 }
