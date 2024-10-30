@@ -2,6 +2,7 @@ package betshandlers
 
 import (
 	"testing"
+	"time"
 
 	"socialpredict/models"
 	"socialpredict/setup"
@@ -97,5 +98,33 @@ func TestCheckUserBalance_CustomConfig(t *testing.T) {
 				t.Errorf("got error = %v, expected error = %v", err != nil, tt.expectsError)
 			}
 		})
+	}
+}
+
+func TestCreateBet(t *testing.T) {
+	username := "testuser"
+	marketID := uint(123)
+	amount := int64(100)
+	outcome := "YES"
+
+	bet := createBet(username, marketID, amount, outcome)
+
+	// Check if the fields are set correctly
+	if bet.Username != username {
+		t.Errorf("expected Username %v, got %v", username, bet.Username)
+	}
+	if bet.MarketID != marketID {
+		t.Errorf("expected MarketID %v, got %v", marketID, bet.MarketID)
+	}
+	if bet.Amount != amount {
+		t.Errorf("expected Amount %v, got %v", amount, bet.Amount)
+	}
+	if bet.Outcome != outcome {
+		t.Errorf("expected Outcome %v, got %v", outcome, bet.Outcome)
+	}
+
+	// Check if PlacedAt is set to a recent time (within a reasonable range)
+	if time.Since(bet.PlacedAt) > time.Second {
+		t.Errorf("PlacedAt time is too far in the past: %v", bet.PlacedAt)
 	}
 }

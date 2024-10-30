@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
-	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/setup"
@@ -15,14 +14,13 @@ import (
 
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Only allow POST requests
+
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Validate JWT token and extract user information
-		db := util.GetDB() // Get the database connection
+		db := util.GetDB()
 		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
 		if httperr != nil {
 			http.Error(w, httperr.Error(), httperr.StatusCode)
@@ -30,7 +28,6 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 		}
 
 		var betRequest models.Bet
-		// Decode the request body into betRequest
 		err := json.NewDecoder(r.Body).Decode(&betRequest)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -42,25 +39,13 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 
 		// sum up fees
 		sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
-		logging.LogAnyType(sumOfBetFees, "sumOfBetFees")
 
 		// Check if the user's balance after the bet would be lower than the allowed maximum debt
 		// deduct fees along with calculation to ensure fees can be paid.
-		checkUserBalance(
-			user,
-			betRequest,
-			sumOfBetFees,
-			loadEconConfig,
-		)
+		checkUserBalance(user, betRequest, sumOfBetFees, loadEconConfig)
 
-		// Create a new Bet object
-		bet := models.Bet{
-			Username: user.Username,
-			MarketID: betRequest.MarketID,
-			Amount:   betRequest.Amount,
-			PlacedAt: time.Now(), // Set the current time as the placement time
-			Outcome:  betRequest.Outcome,
-		}
+		// Create a new Bet object, set at current time
+		bet := createBet(user.Username, betRequest.MarketID, betRequest.Amount, betRequest.Outcome)
 
 		// Validate the final bet before putting into database
 		if err := betutils.ValidateBuy(db, &bet); err != nil {
@@ -68,7 +53,7 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 			return
 		}
 
-		// Save the Bet to the database, if transaction was greater than 0.
+		// Save the Bet to the database
 		result := db.Create(&bet)
 		if result.Error != nil {
 			http.Error(w, result.Error.Error(), http.StatusInternalServerError)
@@ -90,4 +75,14 @@ func checkUserBalance(user *models.User, betRequest models.Bet, sumOfBetFees int
 		return fmt.Errorf("Insufficient balance")
 	}
 	return nil
+}
+
+func createBet(username string, marketID uint, amount int64, outcome string) models.Bet {
+	return models.Bet{
+		Username: username,
+		MarketID: marketID,
+		Amount:   amount,
+		PlacedAt: time.Now(),
+		Outcome:  outcome,
+	}
 }

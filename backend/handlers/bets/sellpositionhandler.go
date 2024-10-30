@@ -13,13 +13,13 @@ import (
 )
 
 func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
-	// Only allow POST requests
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
 		return
 	}
 
-	db := util.GetDB() // Get the database connection
+	db := util.GetDB()
 	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
 	if httperr != nil {
 		http.Error(w, httperr.Error(), httperr.StatusCode)
@@ -33,7 +33,7 @@ func SellPositionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get the marketID in string format
+	// get the marketID in string format to be able to use CalculateMarketPositionForUser_WPAM_DBPM
 	marketIDStr := strconv.FormatUint(uint64(redeemRequest.MarketID), 10)
 
 	// Validate the request similar to PlaceBetHandler
