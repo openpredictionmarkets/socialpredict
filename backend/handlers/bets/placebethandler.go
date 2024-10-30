@@ -13,6 +13,7 @@ import (
 )
 
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
+
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method != http.MethodPost {
@@ -37,7 +38,6 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 		// Validate the request (check if market exists, if not closed/resolved, etc.)
 		betutils.CheckMarketStatus(db, betRequest.MarketID)
 
-		// sum up fees
 		sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
 
 		// Check if the user's balance after the bet would be lower than the allowed maximum debt
