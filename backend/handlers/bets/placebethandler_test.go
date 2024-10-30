@@ -1,59 +1,98 @@
-package betshandlers_test
+package betshandlers
 
 import (
 	"testing"
 
-	betshandlers "socialpredict/handlers/bets"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
 
-func TestCheckUserBalance(t *testing.T) {
-	// Define a fake user
+func TestCheckUserBalance_CustomConfig(t *testing.T) {
 	user := &models.User{
-		Username:       "testuser",
-		AccountBalance: 500,
+		PublicUser: models.PublicUser{
+			Username:       "testuser",
+			AccountBalance: 0,
+		},
 	}
 
-	// Define EconConfigLoader
-	loadEconConfig := func() setup.EconConfig {
-		return setup.EconConfig{
-			Economics: setup.EconomicsConfig{
-				User: setup.UserConfig{
+	// Define a custom loadEconConfig function with MaximumDebtAllowed to use in the test
+	loadEconConfig := func() *setup.EconomicConfig {
+		return &setup.EconomicConfig{
+			Economics: setup.Economics{
+				User: setup.User{
 					MaximumDebtAllowed: 100,
 				},
 			},
 		}
 	}
 
-	// Test cases
 	tests := []struct {
 		name         string
 		betRequest   models.Bet
 		sumOfBetFees int64
 		expectsError bool
 	}{
+		// Buying Shares Cases
 		{
-			name: "Sufficient balance",
+			// Starting with AccountBalance 0, MaximumDebtAllowed 100, place a bet of 99, fee 1
+			name: "Sufficient balance.",
 			betRequest: models.Bet{
-				Amount: 50,
+				Amount: 99,
 			},
-			sumOfBetFees: 10,
+			sumOfBetFees: 1,
 			expectsError: false,
 		},
 		{
-			name: "Insufficient balance",
+			// Starting with AccountBalance 0, MaximumDebtAllowed 100, place a bet of 1, fee 99
+			name: "Sufficient balance.",
 			betRequest: models.Bet{
-				Amount: 450,
+				Amount: 1,
+			},
+			sumOfBetFees: 99,
+			expectsError: false,
+		},
+		{
+			// Starting with AccountBalance 0, MaximumDebtAllowed 100, place a bet of 100, fee 1
+			name: "Insufficient balance, fee prevents bet",
+			betRequest: models.Bet{
+				Amount: 100,
+			},
+			sumOfBetFees: 1,
+			expectsError: true,
+		},
+		{
+			// Starting with AccountBalance 0, MaximumDebtAllowed 100, place a bet of 1, fee 100
+			name: "Insufficient balance, fee prevents bet",
+			betRequest: models.Bet{
+				Amount: 1,
 			},
 			sumOfBetFees: 100,
+			expectsError: true,
+		},
+		// Selling Shares Cases
+		{
+			// Starting with AccountBalance 0, MaximumDebtAllowed 100, sell 1, fee 101
+			name: "Sufficient balance.",
+			betRequest: models.Bet{
+				Amount: -1,
+			},
+			sumOfBetFees: 101,
+			expectsError: false,
+		},
+		{
+			// Starting with AccountBalance 0, MaximumDebtAllowed 100, sell 1, fee 102
+			name: "Insufficient balance, fee prevents bet",
+			betRequest: models.Bet{
+				Amount: -1,
+			},
+			sumOfBetFees: 102,
 			expectsError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := betshandlers.CheckUserBalance(user, tt.betRequest, tt.sumOfBetFees, loadEconConfig)
+			err := checkUserBalance(user, tt.betRequest, tt.sumOfBetFees, loadEconConfig)
 			if (err != nil) != tt.expectsError {
 				t.Errorf("got error = %v, expected error = %v", err != nil, tt.expectsError)
 			}
