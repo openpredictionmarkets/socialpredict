@@ -71,28 +71,6 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	return S_YES, S_NO
 }
 
-// Returns "YES", "NO", or "", indicating the outcome of the single share or no outcome if shares > 1.
-func SingleShareYesNoAllocator(bets []models.Bet) string {
-	total := int64(0)
-	for _, bet := range bets {
-		logging.LogMsg(fmt.Sprintf("Bet Outcome: %s", bet.Outcome))
-		logging.LogMsg(fmt.Sprintf("Bet Amount: %d", bet.Amount))
-		if bet.Outcome == "YES" {
-			total += bet.Amount
-		} else if bet.Outcome == "NO" {
-			total -= bet.Amount
-		}
-	}
-
-	if total > 0 {
-		return "YES"
-	} else if total < 0 {
-		return "NO"
-	} else {
-		return "" // indeterminite
-	}
-}
-
 // CalculateCoursePayoutsDBPM calculates the course payout for each bet in the market,
 // separating the payouts for YES and NO outcomes.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
@@ -115,6 +93,9 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 	return coursePayouts
 }
 
+// F_YES calculates the normalization factor for "YES" by dividing the total stake by the cumulative payout for "YES".
+// F_NO calculates the normalization factor for "NO" by dividing the total stake by the cumulative payout for "NO".
+// Return absolute values of normalization factors to ensure non-negative values for further calculations.
 func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []CourseBetPayout) (float64, float64) {
 	var F_YES, F_NO float64
 	var C_YES_SUM, C_NO_SUM float64
@@ -261,4 +242,26 @@ func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
 	}
 
 	return normalizedPositions
+}
+
+// Returns "YES", "NO", or "", indicating the outcome of the single share or no outcome if shares > 1.
+func SingleShareYesNoAllocator(bets []models.Bet) string {
+	total := int64(0)
+	for _, bet := range bets {
+		logging.LogMsg(fmt.Sprintf("Bet Outcome: %s", bet.Outcome))
+		logging.LogMsg(fmt.Sprintf("Bet Amount: %d", bet.Amount))
+		if bet.Outcome == "YES" {
+			total += bet.Amount
+		} else if bet.Outcome == "NO" {
+			total -= bet.Amount
+		}
+	}
+
+	if total > 0 {
+		return "YES"
+	} else if total < 0 {
+		return "NO"
+	} else {
+		return "" // indeterminite
+	}
 }
