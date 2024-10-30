@@ -9,6 +9,7 @@ import (
 )
 
 func TestCheckUserBalance_CustomConfig(t *testing.T) {
+
 	user := &models.User{
 		PublicUser: models.PublicUser{
 			Username:       "testuser",

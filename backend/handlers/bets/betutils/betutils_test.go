@@ -11,7 +11,6 @@ func TestCheckMarketStatus(t *testing.T) {
 
 	db := modelstesting.NewFakeDB(t)
 
-	// Create test markets
 	resolvedMarket := models.Market{
 		ID:                 1,
 		IsResolved:         true,
