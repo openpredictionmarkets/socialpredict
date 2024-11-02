@@ -5,6 +5,7 @@ export default defineConfig(() => {
   return {
     build: {
       outDir: 'build',
+      commonjsOptions: { transformMixedEsModules: true },
     },
     plugins: [react()],
   };

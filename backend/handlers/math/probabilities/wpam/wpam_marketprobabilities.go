@@ -12,6 +12,10 @@ type ProbabilityChange struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
+type ProjectedProbability struct {
+	Probability float64 `json:"projectedprobability"`
+}
+
 // appConfig holds the loaded application configuration accessible within the package
 var appConfig *setup.EconomicConfig
 
@@ -34,7 +38,6 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 	totalYes := appConfig.Economics.MarketCreation.InitialMarketYes
 	totalNo := appConfig.Economics.MarketCreation.InitialMarketNo
 
-	// Add initial state
 	probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: P_initial, Timestamp: marketCreatedAtTime})
 
 	// Calculate probabilities after each bet
@@ -50,4 +53,15 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 	}
 
 	return probabilityChanges
+}
+
+func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
+
+	updatedBets := append(currentBets, newBet)
+
+	probabilityChanges := CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, updatedBets)
+
+	finalProbability := probabilityChanges[len(probabilityChanges)-1].Probability
+
+	return ProjectedProbability{Probability: finalProbability}
 }

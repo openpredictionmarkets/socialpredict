@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"os"
 	"socialpredict/models"
@@ -79,10 +78,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error creating token", http.StatusInternalServerError)
 		return
 	}
-
-	// Log for debugging
-	log.Printf("Token issued for user: %s", user.Username)
-	log.Printf("Tokenstring: %s", tokenString)
 
 	// Prepare to send JSON
 	w.Header().Set("Content-Type", "application/json")

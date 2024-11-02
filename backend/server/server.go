@@ -7,9 +7,15 @@ import (
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
 	marketshandlers "socialpredict/handlers/markets"
-	"socialpredict/handlers/positions"
+	positions "socialpredict/handlers/positions"
+	setuphandlers "socialpredict/handlers/setup"
+	statshandlers "socialpredict/handlers/stats"
 	usershandlers "socialpredict/handlers/users"
+	usercredit "socialpredict/handlers/users/credit"
+	privateuser "socialpredict/handlers/users/privateuser"
+	"socialpredict/handlers/users/publicuser"
 	"socialpredict/middleware"
+	"socialpredict/setup"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -34,9 +40,14 @@ func Start() {
 	router.HandleFunc("/v0/home", handlers.HomeHandler)
 	router.HandleFunc("/v0/login", middleware.LoginHandler)
 
+	// application setup and stats information
+	router.HandleFunc("/v0/setup", setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)).Methods("GET")
+	router.HandleFunc("/v0/stats", statshandlers.StatsHandler()).Methods("GET")
 	// markets display, market information
 	router.HandleFunc("/v0/markets", marketshandlers.ListMarketsHandler).Methods("GET")
 	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")
+	router.HandleFunc("/v0/marketprojection/{marketId}/{amount}/{outcome}/", marketshandlers.ProjectNewProbabilityHandler).Methods("GET")
+
 	// handle market positions, get trades
 	router.HandleFunc("/v0/markets/bets/{marketId}", betshandlers.MarketBetsDisplayHandler).Methods("GET")
 	router.HandleFunc("/v0/markets/positions/{marketId}", positions.MarketDBPMPositionsHandler).Methods("GET")
@@ -44,12 +55,13 @@ func Start() {
 	// show comments on markets
 
 	// handle public user stuff
-	router.HandleFunc("/v0/userinfo/{username}", usershandlers.GetPublicUserResponse).Methods("GET")
+	router.HandleFunc("/v0/userinfo/{username}", publicuser.GetPublicUserResponse).Methods("GET")
+	router.HandleFunc("/v0/usercredit/{username}", usercredit.GetUserCreditHandler).Methods("GET")
 	// user portfolio, (which is public)
-	router.HandleFunc("/v0/portfolio/{username}", usershandlers.GetPublicUserPortfolio).Methods("GET")
+	router.HandleFunc("/v0/portfolio/{username}", publicuser.GetPortfolio).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize
-	router.HandleFunc("/v0/privateprofile", usershandlers.GetPrivateProfileUserResponse)
+	router.HandleFunc("/v0/privateprofile", privateuser.GetPrivateProfileUserResponse)
 	// changing profile stuff
 	router.HandleFunc("/v0/changepassword", usershandlers.ChangePassword).Methods("POST")
 	router.HandleFunc("/v0/profilechange/displayname", usershandlers.ChangeDisplayName).Methods("POST")
@@ -59,13 +71,13 @@ func Start() {
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
-	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler).Methods("POST")
+	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
 	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler).Methods("POST")
-	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler(setup.EconomicsConfig)).Methods("POST")
 
 	// admin stuff
-	router.HandleFunc("/v0/admin/createuser", adminhandlers.AddUserHandler).Methods("POST")
+	router.HandleFunc("/v0/admin/createuser", adminhandlers.AddUserHandler(setup.EconomicsConfig)).Methods("POST")
 
 	// Apply the CORS middleware to the Gorilla Mux router
 	handler := c.Handler(router) // Use the Gorilla Mux router here

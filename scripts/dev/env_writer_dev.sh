@@ -12,7 +12,7 @@ init_env() {
 
 	# Update APP_ENV
 	sed -i -e "s/APP_ENV=.*/APP_ENV='development'/g" "$SCRIPT_DIR/.env"
-
+	echo "ENV_PATH=$SCRIPT_DIR/.env" >> "$SCRIPT_DIR/.env"
 }
 
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then

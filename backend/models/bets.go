@@ -18,3 +18,15 @@ type Bet struct {
 	PlacedAt time.Time `json:"placedAt"`
 	Outcome  string    `json:"outcome,omitempty"`
 }
+
+type Bets []Bet
+
+// getMarketUsers returns the number of unique users for a given market
+func GetNumMarketUsers(bets []Bet) int {
+	userMap := make(map[string]bool)
+	for _, bet := range bets {
+		userMap[bet.Username] = true
+	}
+
+	return len(userMap)
+}
