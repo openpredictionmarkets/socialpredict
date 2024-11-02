@@ -9,7 +9,6 @@ import (
 	"socialpredict/models"
 	"socialpredict/setup"
 	"socialpredict/util"
-	"time"
 )
 
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
@@ -39,7 +38,7 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 		checkUserBalance(user, betRequest, sumOfBetFees, loadEconConfig)
 
 		// Create a new Bet object, set at current time
-		bet := createBet(user.Username, betRequest.MarketID, betRequest.Amount, betRequest.Outcome)
+		bet := models.CreateBet(user.Username, betRequest.MarketID, betRequest.Amount, betRequest.Outcome)
 
 		// Validate the final bet before putting into database
 		if err := betutils.ValidateBuy(db, &bet); err != nil {
@@ -69,14 +68,4 @@ func checkUserBalance(user *models.User, betRequest models.Bet, sumOfBetFees int
 		return fmt.Errorf("Insufficient balance")
 	}
 	return nil
-}
-
-func createBet(username string, marketID uint, amount int64, outcome string) models.Bet {
-	return models.Bet{
-		Username: username,
-		MarketID: marketID,
-		Amount:   amount,
-		PlacedAt: time.Now(),
-		Outcome:  outcome,
-	}
 }

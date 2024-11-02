@@ -11,7 +11,7 @@ func TestCreateBet(t *testing.T) {
 	amount := int64(100)
 	outcome := "YES"
 
-	bet := createBet(username, marketID, amount, outcome)
+	bet := CreateBet(username, marketID, amount, outcome)
 
 	// Check if the fields are set correctly
 	if bet.Username != username {
