@@ -62,14 +62,14 @@ func TestCheckMarketStatus(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := CheckMarketStatus(db, tt.marketID)
-			if (err != nil) != tt.expectsErr {
-				t.Errorf("got error = %v, expected error = %v", err, tt.expectsErr)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := CheckMarketStatus(db, test.marketID)
+			if (err != nil) != test.expectsErr {
+				t.Errorf("got error = %v, expected error = %v", err, test.expectsErr)
 			}
-			if err != nil && tt.expectsErr && err.Error() != tt.errMsg {
-				t.Errorf("expected error message %v, got %v", tt.errMsg, err.Error())
+			if err != nil && test.expectsErr && err.Error() != test.errMsg {
+				t.Errorf("expected error message %v, got %v", test.errMsg, err.Error())
 			}
 		})
 	}
