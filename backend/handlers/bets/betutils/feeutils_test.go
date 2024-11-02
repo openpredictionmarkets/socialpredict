@@ -9,7 +9,6 @@ import (
 )
 
 func TestGetUserInitialBetFee(t *testing.T) {
-
 	db := modelstesting.NewFakeDB(t)
 	if err := db.AutoMigrate(&models.Bet{}, &models.User{}); err != nil {
 		t.Fatalf("Failed to migrate models: %v", err)

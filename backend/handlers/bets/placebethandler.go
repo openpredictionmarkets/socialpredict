@@ -15,12 +15,6 @@ import (
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
-			return
-		}
-
 		db := util.GetDB()
 		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
 		if httperr != nil {
