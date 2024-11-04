@@ -3,6 +3,7 @@ name: Create and publish a Docker image
 on:
   push:
     branches:
+    - feature/ci-lighthouse-bench
     - main
     tags:
     - 'v*'
