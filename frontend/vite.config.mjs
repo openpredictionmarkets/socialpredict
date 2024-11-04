@@ -8,5 +8,8 @@ export default defineConfig(() => {
       commonjsOptions: { transformMixedEsModules: true },
     },
     plugins: [react()],
+    css: {
+      target: 'async', // or 'defer' for older browsers
+    },
   };
 });

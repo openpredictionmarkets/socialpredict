@@ -1,6 +1,9 @@
 name: Deploy Prod configuration
 
 on:
+  push:
+    branches:
+    - feature/ci-lighthouse-bench
   workflow_run:
     workflows: ["Create and publish a Docker image"]
     types: [completed]
@@ -13,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to SSH target
-      uses: appleboy/ssh-action@v1.0.3
+      uses: appleboy/ssh-action@v1.1.0
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
@@ -36,4 +39,17 @@ jobs:
 
             docker compose -f ./scripts/docker-compose-prod.yaml \
              --env-file $temp_env_file \
-             up -d --no-deps frontend backend
+             up -d
+  lighthouse:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit URLs using Lighthouse
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            https://openprediction.xyz/
+          budgetPath: ./scripts/lighthouse # test performance budgets
+          uploadArtifacts: true # save results as an action artifacts
+          temporaryPublicStorage: true # upload lighthouse report to the temporary storage
