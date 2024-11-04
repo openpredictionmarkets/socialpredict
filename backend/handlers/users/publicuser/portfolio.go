@@ -1,4 +1,4 @@
-package usershandlers
+package publicuser
 
 import (
 	"encoding/json"
@@ -28,7 +28,7 @@ type PortfolioTotal struct {
 	TotalSharesOwned int64           `json:"totalSharesOwned"`
 }
 
-func GetPublicUserPortfolio(w http.ResponseWriter, r *http.Request) {
+func GetPortfolio(w http.ResponseWriter, r *http.Request) {
 	// Extract the username from the URL
 	vars := mux.Vars(r)
 	username := vars["username"]
