@@ -441,6 +441,83 @@ Thus, the normalization factors are:
 F_{\text{YES}} = 0, \quad F_{\text{NO}} \approx 6.01
 \]
 
+\newpage
+
+
+\section*{Scaled Payout Calculation for Second Transaction}
+
+\begin{itemize}
+    \item \textbf{Purpose of Scaled Payouts:}
+    \begin{itemize}
+        \item Scaled payouts use normalization factors to adjust the raw course payouts, ensuring they align proportionally with the total market shares for each outcome.
+        \item This prevents over-distribution of payouts and ensures fairness in the final allocations.
+        \item By scaling payouts, the process reflects market probabilities and bet contributions accurately while adhering to the market's constraints.
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Step Four: Calculate Scaled Payout for Each Bet}
+
+Given:
+\begin{itemize}
+    \item Normalization Factors: \( F_{\text{YES}} = 0 \), \( F_{\text{NO}} = 6.01 \)
+    \item Course Payouts:
+    \begin{itemize}
+        \item \( C_{\text{NO,1}} = 4.16 \) units
+        \item \( C_{\text{YES,2}} = 0 \) units
+    \end{itemize}
+\end{itemize}
+
+\textbf{For Bet 1 (NO):}
+
+\[
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(C_{\text{NO,1}} \times F_{\text{NO}})
+\]
+\[
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(4.16 \times 6.01) = \text{Round}(25.01) = 25 \text{ units}
+\]
+
+\textbf{For Bet 2 (YES):}
+
+\[
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(C_{\text{YES,2}} \times F_{\text{YES}})
+\]
+\[
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(0 \times 0) = \text{Round}(0) = 0 \text{ units}
+\]
+
+\subsubsection*{Final Scaled Payouts:}
+\[
+\text{Bet 1 (NO): } 25 \text{ units}
+\]
+\[
+\text{Bet 2 (YES): } 0 \text{ units}
+\]
+
+\begin{center}
+\begin{tikzpicture}[scale=0.5]
+
+% Scaled Payout for Bet 1 (NO)
+\foreach \x in {1,...,25}
+{
+    \draw[fill=red!50] (\x,0) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 1
+\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 25 \text{ units} \))};
+
+% Scaled Payout for Bet 2 (YES)
+\foreach \x in {1,...,1}
+{
+    \draw[fill=white!50] (\x,-3) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 2
+\node[above] at (3,-2) {Scaled Payout for Bet 2 (\( 0 \text{ units} \))};
+
+\end{tikzpicture}
+\end{center}
+
+
 % Double Divider Line To Next Step
 \begin{center}
 \begin{tikzpicture}[scale=0.5]
@@ -448,7 +525,6 @@ F_{\text{YES}} = 0, \quad F_{\text{NO}} \approx 6.01
 \draw[thick] (0,-1.1) -- (30,-1.1);
 \end{tikzpicture}
 \end{center}
-
 
 \newpage
 
@@ -736,6 +812,105 @@ F_{\text{YES}} = 20, \quad F_{\text{NO}} \approx 3.75
 \draw[thick] (0,-1.1) -- (30,-1.1);
 \end{tikzpicture}
 \end{center}
+
+\newpage
+
+
+\section*{Scaled Payout Calculation for Third Transaction}
+
+\begin{itemize}
+    \item \textbf{Purpose of Scaled Payouts:}
+    \begin{itemize}
+        \item Scaled payouts adjust raw course payouts proportionally based on normalization factors to ensure payouts align with the available shares in the market pool.
+        \item The adjustment ensures fairness, reflecting the market's allocation of shares while staying within constraints.
+        \item Scaled payouts provide accurate distributions of rewards based on contributions and probabilities in the market.
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Step Four: Calculate Scaled Payout for Each Bet}
+
+Given:
+\begin{itemize}
+    \item Normalization Factors: \( F_{\text{YES}} = 20 \), \( F_{\text{NO}} \approx 3.75 \)
+    \item Course Payouts:
+    \begin{itemize}
+        \item \( C_{\text{NO,1}} = 6.66 \) units
+        \item \( C_{\text{YES,2}} = 1.25 \) units
+        \item \( C_{\text{YES,3}} = 0 \) units
+    \end{itemize}
+\end{itemize}
+
+\textbf{For Bet 1 (NO):}
+
+\[
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(C_{\text{NO,1}} \times F_{\text{NO}})
+\]
+\[
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(6.66 \times 3.75) = \text{Round}(24.975) = 25 \text{ units}
+\]
+
+\textbf{For Bet 2 (YES):}
+
+\[
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(C_{\text{YES,2}} \times F_{\text{YES}})
+\]
+\[
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(1.25 \times 20) = \text{Round}(25) = 25 \text{ units}
+\]
+
+\textbf{For Bet 3 (YES):}
+
+\[
+\text{Scaled Payout}_{\text{YES,3}} = \text{Round}(C_{\text{YES,3}} \times F_{\text{YES}})
+\]
+\[
+\text{Scaled Payout}_{\text{YES,3}} = \text{Round}(0 \times 20) = \text{Round}(0) = 0 \text{ units}
+\]
+
+\subsubsection*{Final Scaled Payouts:}
+\[
+\text{Bet 1 (NO): } 25 \text{ units}
+\]
+\[
+\text{Bet 2 (YES): } 25 \text{ units}
+\]
+\[
+\text{Bet 3 (YES): } 0 \text{ units}
+\]
+
+\begin{center}
+\begin{tikzpicture}[scale=0.5]
+
+% Scaled Payout for Bet 1 (NO)
+\foreach \x in {1,...,25}
+{
+    \draw[fill=red!50] (\x,0) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 1
+\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 25 \text{ units} \))};
+
+% Scaled Payout for Bet 2 (YES)
+\foreach \x in {1,...,25}
+{
+    \draw[fill=green!50] (\x,-3) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 2
+\node[above] at (3,-2) {Scaled Payout for Bet 2 (\( 25 \text{ units} \))};
+
+% Scaled Payout for Bet 3 (YES)
+\foreach \x in {1,...,1}
+{
+    \draw[fill=white!50] (\x,-6) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 3
+\node[above] at (3,-5) {Scaled Payout for Bet 3 (\( 0 \text{ units} \))};
+
+\end{tikzpicture}
+\end{center}
+
 
 
 \newpage
@@ -1072,6 +1247,124 @@ Thus, the normalization factors are:
 \[
 F_{\text{YES}} \approx 6.67, \quad F_{\text{NO}} \approx 1.64
 \]
+
+
+\section*{Scaled Payout Calculation for Fourth Transaction}
+
+\begin{itemize}
+    \item \textbf{Fourth Transaction:}
+    \begin{itemize}
+        \item We can now see the effects of the course payout on scaling toward older transactions. While both Bet 2 and Bet 3 were of equal amounts, because Bet 2 was made at at a point when the YES outcome was less likely based upon the price, there is proportionally more weight given to this bet.
+        \item The fourth bet is a negative amount because it was a sale. Because the fourth bet occurs at the resolution price R, the Scaled Payout is zero. However in a future transaction, the Scaled Payout for this transaction could become negative, which would reduce the user's final payout, because they are no longer participating in the market at this amount.
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Step Four: Calculate Scaled Payout for Each Bet}
+
+Given:
+\begin{itemize}
+    \item Normalization Factors: \( F_{\text{YES}} \approx 6.67 \), \( F_{\text{NO}} \approx 1.64 \)
+    \item Course Payouts:
+    \begin{itemize}
+        \item \( C_{\text{NO,1}} = 9.16 \) units
+        \item \( C_{\text{YES,2}} = 2.5 \) units
+        \item \( C_{\text{YES,3}} = 1.25 \) units
+        \item \( C_{\text{NO,2}} = 0.0 \) units
+    \end{itemize}
+\end{itemize}
+
+\textbf{For Bet 1 (NO):}
+
+\[
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(C_{\text{NO,1}} \times F_{\text{NO}})
+\]
+\[
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(9.16 \times 1.64) = \text{Round}(15.03) = 15 \text{ units}
+\]
+
+\textbf{For Bet 2 (YES):}
+
+\[
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(C_{\text{YES,2}} \times F_{\text{YES}})
+\]
+\[
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(2.5 \times 6.67) = \text{Round}(16.68) = 17 \text{ units}
+\]
+
+\textbf{For Bet 3 (YES):}
+
+\[
+\text{Scaled Payout}_{\text{YES,3}} = \text{Round}(C_{\text{YES,3}} \times F_{\text{YES}})
+\]
+\[
+\text{Scaled Payout}_{\text{YES,3}} = \text{Round}(1.25 \times 6.67) = \text{Round}(8.34) = 8 \text{ units}
+\]
+
+\textbf{For Bet 4 (NO):}
+
+\[
+\text{Scaled Payout}_{\text{NO,2}} = \text{Round}(C_{\text{NO,2}} \times F_{\text{NO}})
+\]
+\[
+\text{Scaled Payout}_{\text{NO,2}} = \text{Round}(0.0 \times 1.64) = \text{Round}(0) = 0 \text{ units}
+\]
+
+\subsubsection*{Final Scaled Payouts:}
+\[
+\text{Bet 1 (NO): } 15 \text{ units}
+\]
+\[
+\text{Bet 2 (YES): } 17 \text{ units}
+\]
+\[
+\text{Bet 3 (YES): } 8 \text{ units}
+\]
+\[
+\text{Bet 4 (NO): } 0 \text{ units}
+\]
+
+\begin{center}
+\begin{tikzpicture}[scale=0.5]
+
+% Scaled Payout for Bet 1 (NO)
+\foreach \x in {1,...,15}
+{
+    \draw[fill=red!50] (\x,0) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 1
+\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 15 \text{ units} \))};
+
+% Scaled Payout for Bet 2 (YES)
+\foreach \x in {1,...,17}
+{
+    \draw[fill=green!50] (\x,-3) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 2
+\node[above] at (3,-2) {Scaled Payout for Bet 2 (\( 17 \text{ units} \))};
+
+% Scaled Payout for Bet 3 (YES)
+\foreach \x in {1,...,8}
+{
+    \draw[fill=green!50] (\x,-6) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 3
+\node[above] at (3,-5) {Scaled Payout for Bet 3 (\( 8 \text{ units} \))};
+
+% Scaled Payout for Bet 4 (NO)
+\foreach \x in {1,...,1}
+{
+    \draw[fill=white!50] (\x,-9) rectangle ++(1,1);
+}
+
+% Label for Scaled Payout of Bet 4
+\node[above] at (3,-8) {Scaled Payout for Bet 4 (\( 0 \text{ units} \))};
+
+\end{tikzpicture}
+\end{center}
+
 
 
 % Double Divider Line
