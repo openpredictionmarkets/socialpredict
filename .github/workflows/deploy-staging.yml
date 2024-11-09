@@ -26,10 +26,15 @@ jobs:
             if [ ! -d socialpredict-deploy ]
             then
                 git clone ${{ github.server_url }}/${{ github.repository }} socialpredict-deploy
+                cd socialpredict-deploy
             else
                 cd socialpredict-deploy
                 git fetch origin
             fi
+            template="./frontend/src/config.js.template"
+            file="./frontend/src/config.js"
+            export API_DOMAIN="'https://${DOMAIN}'"
+            envsubst < $template > $file
             git checkout ${{ github.sha }}
 
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login ghcr.io -u j4qfrost --password-stdin
