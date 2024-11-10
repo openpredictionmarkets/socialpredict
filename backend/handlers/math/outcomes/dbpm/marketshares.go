@@ -45,8 +45,8 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	R := probabilityChanges[len(probabilityChanges)-1].Probability
 
 	// Get the total share pool S as a float for precision
-	// Include the initial market subsidization in the displayed volume
-	S := float64(marketmath.GetMarketVolume(bets) + appConfig.Economics.MarketCreation.InitialMarketSubsidization)
+	// Do not Include the initial market subsidization in volume until market hits final resolution
+	S := float64(marketmath.GetMarketVolume(bets))
 
 	// initial condition, shares set to zero
 	S_YES := int64(0)
