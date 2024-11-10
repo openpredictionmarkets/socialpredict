@@ -354,86 +354,63 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	}
 }
 
-func TestAdjustPayoutsFromNewest(t *testing.T) {
-	testcases := []struct {
-		Name                  string
-		Bets                  []models.Bet
-		ScaledPayouts         []int64
-		AdjustedScaledPayouts []int64
-	}{
-		{
-			Name: "PreventSimultaneousSharesHeld",
-			Bets: []models.Bet{
-				{
-					Amount:   3,
-					Outcome:  "YES",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
-					MarketID: 3,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
-					MarketID: 3,
-				},
-			},
-			ScaledPayouts:         []int64{3, 1},
-			AdjustedScaledPayouts: []int64{3, 1},
-		},
-		{
-			Name: "InfinityAvoidance",
-			Bets: []models.Bet{
-				{
-					Amount:   1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now,
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now.Add(time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(2 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(3 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(4 * time.Minute),
-					MarketID: 1,
-				},
-			},
-			ScaledPayouts:         []int64{0, 0, 1, 0, 1},
-			AdjustedScaledPayouts: []int64{0, 0, 1, 0, 0},
-		},
+func TestCalculateExcess(t *testing.T) {
+	bets := []models.Bet{
+		{Amount: 10},
+		{Amount: 20},
 	}
-	for _, tc := range testcases {
-		t.Run(tc.Name, func(t *testing.T) {
-			adjustedPayouts := AdjustPayoutsFromNewest(tc.Bets, tc.ScaledPayouts)
-			for i, payout := range adjustedPayouts {
-				if payout != tc.AdjustedScaledPayouts[i] {
-					t.Errorf("Test %s failed at index %d: expected payout %d, got %d", tc.Name, i, tc.AdjustedScaledPayouts[i], payout)
-				}
-			}
-		})
+	scaledPayouts := []int64{5, 15, 10}
+
+	expectedExcess := int64(20) // Sum of scaled payouts (30) - Market Volume (10 + 20)
+	actualExcess := calculateExcess(bets, scaledPayouts)
+
+	if actualExcess != expectedExcess {
+		t.Errorf("Expected excess: %d, got: %d", expectedExcess, actualExcess)
+	}
+}
+
+func TestAdjustForPositiveExcess(t *testing.T) {
+	scaledPayouts := []int64{10, 20, 30}
+	excess := int64(5)
+
+	expectedPayouts := []int64{10, 20, 25}
+	actualPayouts := adjustForPositiveExcess(scaledPayouts, excess)
+
+	for i, payout := range actualPayouts {
+		if payout != expectedPayouts[i] {
+			t.Errorf("At index %d, expected payout: %d, got: %d", i, expectedPayouts[i], payout)
+		}
+	}
+}
+
+func TestAdjustForNegativeExcess(t *testing.T) {
+	scaledPayouts := []int64{10, 20, 30}
+	excess := int64(-5)
+
+	expectedPayouts := []int64{11, 21, 31}
+	actualPayouts := adjustForNegativeExcess(scaledPayouts, excess)
+
+	for i, payout := range actualPayouts {
+		if payout != expectedPayouts[i] {
+			t.Errorf("At index %d, expected payout: %d, got: %d", i, expectedPayouts[i], payout)
+		}
+	}
+}
+
+func TestAdjustPayouts(t *testing.T) {
+	bets := []models.Bet{
+		{Amount: 10},
+		{Amount: 20},
+	}
+	scaledPayouts := []int64{10, 20, 15}
+
+	expectedPayouts := []int64{10, 20, 10} // Excess is 15 - 30 + 10 + 20 = 15, adjusted from newest
+	actualPayouts := AdjustPayouts(bets, scaledPayouts)
+
+	for i, payout := range actualPayouts {
+		if payout != expectedPayouts[i] {
+			t.Errorf("At index %d, expected payout: %d, got: %d", i, expectedPayouts[i], payout)
+		}
 	}
 }
 

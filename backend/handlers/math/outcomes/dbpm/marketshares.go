@@ -144,41 +144,54 @@ func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []Co
 	return scaledPayouts
 }
 
-// adjust payouts to account for case where calculated payouts > available
-func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
-	// Calculate the sum of scaledPayouts
+// Calculate the excess amount based on available pool and scaled payouts
+func calculateExcess(bets []models.Bet, scaledPayouts []int64) int64 {
 	var sumScaledPayouts int64
 	for _, payout := range scaledPayouts {
 		sumScaledPayouts += payout
 	}
-
 	availablePool := marketmath.GetMarketVolume(bets)
+	return sumScaledPayouts - availablePool
+}
 
-	// Determine the excess amount
-	excess := sumScaledPayouts - availablePool
-
-	// Loop to deduct from newest to oldest until there's no excess
+// Adjust scaled payouts if excess is greater than 0
+func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
 	for excess > 0 {
 		for i := len(scaledPayouts) - 1; i >= 0; i-- {
 			if scaledPayouts[i] > 0 { // Ensure we don't deduct from a zero payout
-				scaledPayouts[i] -= 1 // deduct surplus from newest
-				excess -= 1           // decrease excess until we get to zero
+				scaledPayouts[i] -= 1 // Deduct surplus from newest
+				excess -= 1           // Decrease excess
 				if excess == 0 {
 					break
 				}
 			}
 		}
 	}
+	return scaledPayouts
+}
 
-	// Loop to add from oldest to newest until there's no excess
+// Adjust scaled payouts if excess is less than 0
+func adjustForNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
 	for excess < 0 {
-		for i := 0; i < len(scaledPayouts); i++ { // Iterate from the beginning to the end
+		for i := 0; i < len(scaledPayouts); i++ { // Iterate from oldest to newest
 			scaledPayouts[i] += 1 // Add surplus to oldest
-			excess += 1           // Increment excess until we get to zero
+			excess += 1           // Increment excess
 			if excess == 0 {
 				break
 			}
 		}
+	}
+	return scaledPayouts
+}
+
+// Adjust payouts to ensure they align with the available pool
+func AdjustPayouts(bets []models.Bet, scaledPayouts []int64) []int64 {
+	excess := calculateExcess(bets, scaledPayouts)
+
+	if excess > 0 {
+		scaledPayouts = adjustForPositiveExcess(scaledPayouts, excess)
+	} else if excess < 0 {
+		scaledPayouts = adjustForNegativeExcess(scaledPayouts, excess)
 	}
 
 	return scaledPayouts
