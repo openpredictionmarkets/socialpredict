@@ -28,6 +28,12 @@
     \item \textbf{Transparency and Unit Testing:} Given that pricing and distribution is fundamental to how the software works, it is essential to ensure the full algorithm is well understood in order to write proper unit tests and to communicate the rules to users and participants.
 \end{itemize}
 
+\section{Conventions}
+
+\begin{itemize}
+    \item \textbf{Course Payouts Divide By Zero Condition:} When Course Payouts calculations and further calculations derived from Course Payouts may include an inf (divide by zero) condition, we will define the output as zero. This situation arises in which the Market Value is measured as zero, since everyone has exited the market. Technically the market Value is still equal to the initial investment value until the resolution has been fulfilled, so the Course Payouts, which simply represent a link between the probability and the payout at a given market condition, are not representative of the final state of the market. Thus, calling the Course Payouts and anything calculated from the Course Payouts zero makes sense.
+\end{itemize}
+
 \section{Positions Flow Cart}
 
 \begin{itemize}
@@ -37,8 +43,8 @@
 
 
 \begin{tikzpicture}[
-    node distance=1cm,
-    every node/.style={rectangle, rounded corners, draw=black, align=center, font=\small, minimum width=3.5cm},
+    node distance=1.5cm,
+    every node/.style={rectangle, rounded corners, draw=black, align=center, font=\small, minimum width=4cm},
     arrow/.style={->, thick}
 ]
 
@@ -55,10 +61,15 @@
 % Scaled Payouts
 \node (scaledPayouts) [below=of normFactors, fill=orange!10] {Calculate scaled payouts \\ (dbpm.CalculateScaledPayoutsDBPM)};
 
-% Final Adjustments and Aggregation
-\node (adjustPayouts) [below=of scaledPayouts, fill=red!10] {Adjust payouts \\ (dbpm.AdjustPayoutsFromNewest)};
-\node (aggregatePayouts) [below=of adjustPayouts, fill=red!10] {Aggregate user payouts \\ (dbpm.AggregateUserPayoutsDBPM)};
-\node (netPositions) [below=of aggregatePayouts, fill=red!20] {Net aggregate market positions \\ (dbpm.NetAggregateMarketPositions)};
+% Adjust Payouts Nodes
+\node (calculateExcess) [below=of scaledPayouts, fill=red!10] {Calculate excess payments \\ (calculateExcess)};
+\node (adjustPosExcess) [below left=1cm and 0.5cm of calculateExcess, fill=red!10] {Adjust for positive excess \\ (adjustForPositiveExcess)};
+\node (adjustNegExcess) [below right=1cm and 0.5cm of calculateExcess, fill=red!10] {Adjust for negative excess \\ (adjustForNegativeExcess)};
+\node (adjustPayouts) [below=3cm of calculateExcess, fill=red!10] {Adjust payouts \\ (dbpm.AdjustPayouts)};
+
+% Aggregation and Final Steps
+\node (aggregatePayouts) [below=of adjustPayouts, fill=red!20] {Aggregate user payouts \\ (dbpm.AggregateUserPayoutsDBPM)};
+\node (netPositions) [below=of aggregatePayouts, fill=red!30] {Net aggregate market positions \\ (dbpm.NetAggregateMarketPositions)};
 \node (end) [below=of netPositions, fill=gray!20] {Return net positions};
 
 % Arrows
@@ -67,12 +78,17 @@
 \draw[arrow] (divideShares) -- (normFactors);
 \draw[arrow] (coursePayouts) -- (normFactors);
 \draw[arrow] (normFactors) -- (scaledPayouts);
-\draw[arrow] (scaledPayouts) -- (adjustPayouts);
+\draw[arrow] (scaledPayouts) -- (calculateExcess);
+\draw[arrow] (calculateExcess) -- (adjustPosExcess) node[midway, above left] {Excess > 0};
+\draw[arrow] (calculateExcess) -- (adjustNegExcess) node[midway, above right] {Excess < 0};
+\draw[arrow] (adjustPosExcess.south) -- ++(0,-1.2) -| (adjustPayouts.north);
+\draw[arrow] (adjustNegExcess.south) -- ++(0,-1.2) -| (adjustPayouts.north);
 \draw[arrow] (adjustPayouts) -- (aggregatePayouts);
 \draw[arrow] (aggregatePayouts) -- (netPositions);
 \draw[arrow] (netPositions) -- (end);
 
 \end{tikzpicture}
+
 
 \newpage
 
@@ -127,17 +143,18 @@ P_{\text{new}} = \frac{P_{\text{initial}} \times I_{\text{initial}} + A_{\text{Y
 \subsection*{Market Share Division}
 
 \begin{itemize}
-    \item \textbf{Banker's Rounded Share Pool:} First we look at how many total shares of YES and NO exist in the market pool as a whole by using the WPAM. The total share pool is equal to the Total Market Volume. The total share pool times the Probability will be the YES shares, while 1-(Probability) times the total share pool will be the NO shares.
+    \item \textbf{Banker's Rounded Share Pool:} First we look at how many total shares of YES and NO exist in the market pool as a whole by using the WPAM. The total share pool is equal to the Total Market Volume, not including the initial investment. The total share pool times the Probability will be the YES shares, while 1-(Probability) times the total share pool will be the NO shares.
+    \item  \textbf{Recuperating Initial Investment:} The initial investment paid in by the market maker can be recuperated at the end after the resolution has been made. In effect, the initial market investment is held in escrow in exchange for a fee by the computer. After the resolution, the market maker bonus can be paid out and the initial investment will be redistributed to all market participants.
 \end{itemize}
 
 \[
-S = \text{Total Market Volume} + I_{\text{initial}} = 20 + 10 = 30 \text{ units}
+S = \text{Total Market Volume} = 20 \text{ units}
 \]
 
 
 \begin{align*}
-S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 30 \times 0.167 \right\rceil = 5 \\
-S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 30 \times 0.833 \right\rceil = 25
+S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 20 \times 0.167 \right\rceil = 3 \\
+S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 20 \times 0.833 \right\rceil = 17
 \end{align*}
 
 
@@ -145,20 +162,20 @@ S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left
 \begin{tikzpicture}[scale=0.5]
 
 % YES Shares (Green Squares), set down by -6
-\foreach \x in {1,...,5}
+\foreach \x in {1,...,3}
 {
     \draw[fill=green!50] (\x,-6) rectangle ++(1,1);
 }
 
 % NO Shares (Red Squares), set down by -6
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,17}
 {
     \draw[fill=red!50] (\x,-9) rectangle ++(1,1);
 }
 
 % Labels
-\node[below] at (3,-6.2) {YES Shares (\(S_{\text{YES}} = 5\))};
-\node[below] at (3,-9.2) {NO Shares (\(S_{\text{NO}} = 25\))};
+\node[below] at (3,-6.2) {YES Shares (\(S_{\text{YES}} = 3\))};
+\node[below] at (3,-9.2) {NO Shares (\(S_{\text{NO}} = 17\))};
 
 \end{tikzpicture}
 \end{center}
@@ -226,32 +243,32 @@ P_{\text{new}} = \frac{0.5 \times 10 + 10}{10 + 10 + 20} = \frac{15}{40} \approx
 \subsection*{Market Share Division}
 
 \[
-S = \text{Total Market Volume} + I_{\text{initial}} = (10 + 20) + 10 = 40 \text{ units}
+S = \text{Total Market Volume} + I_{\text{initial}} = (10 + 20) = 30 \text{ units}
 \]
 
 \begin{align*}
-S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 40 \times 0.375 \right\rceil = 15 \\
-S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 40 \times 0.625 \right\rceil = 25
+S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 30 \times 0.375 \right\rceil = 11 \\
+S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 30 \times 0.625 \right\rceil = 19
 \end{align*}
 
 \begin{center}
 \begin{tikzpicture}[scale=0.5]
 
 % YES Shares (Green Squares), set down by -9
-\foreach \x in {1,...,15}
+\foreach \x in {1,...,11}
 {
     \draw[fill=green!50] (\x,-9) rectangle ++(1,1);
 }
 
 % NO Shares (Red Squares), set down by -9
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,19}
 {
     \draw[fill=red!50] (\x,-12) rectangle ++(1,1);
 }
 
 % Labels
-\node[below] at (8,-9.2) {YES Shares (\(S_{\text{YES}} = 15\))};
-\node[below] at (8,-12.2) {NO Shares (\(S_{\text{NO}} = 25\))};
+\node[below] at (8,-9.2) {YES Shares (\(S_{\text{YES}} = 11\))};
+\node[below] at (8,-12.2) {NO Shares (\(S_{\text{NO}} = 19\))};
 
 \end{tikzpicture}
 \end{center}
@@ -393,8 +410,8 @@ The normalization factor ensures that course payouts are proportional to the tot
 
 Given:
 \begin{itemize}
-    \item Total YES Shares: \( S_{\text{YES}} = 15 \)
-    \item Total NO Shares: \( S_{\text{NO}} = 25 \)
+    \item Total YES Shares: \( S_{\text{YES}} = 11 \)
+    \item Total NO Shares: \( S_{\text{NO}} = 19 \)
     \item Course Payouts:
     \begin{itemize}
         \item \( C_{\text{NO,1}} = 4.16 \) units
@@ -432,13 +449,13 @@ F_{\text{NO}} =
 Since \( C_{\text{NO\_SUM}} = 4.16 \), we have:
 
 \[
-F_{\text{NO}} = \frac{25}{4.16} \approx 6.01
+F_{\text{NO}} = \frac{19}{4.16} \approx 4.56
 \]
 
 Thus, the normalization factors are:
 
 \[
-F_{\text{YES}} = 0, \quad F_{\text{NO}} \approx 6.01
+F_{\text{YES}} = 0, \quad F_{\text{NO}} \approx 4.56
 \]
 
 \newpage
@@ -473,7 +490,7 @@ Given:
 \text{Scaled Payout}_{\text{NO,1}} = \text{Round}(C_{\text{NO,1}} \times F_{\text{NO}})
 \]
 \[
-\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(4.16 \times 6.01) = \text{Round}(25.01) = 25 \text{ units}
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(4.16 \times 4.56) = \text{Round}(18.96) = 19 \text{ units}
 \]
 
 \textbf{For Bet 2 (YES):}
@@ -487,7 +504,7 @@ Given:
 
 \subsubsection*{Final Scaled Payouts:}
 \[
-\text{Bet 1 (NO): } 25 \text{ units}
+\text{Bet 1 (NO): } 19 \text{ units}
 \]
 \[
 \text{Bet 2 (YES): } 0 \text{ units}
@@ -497,13 +514,13 @@ Given:
 \begin{tikzpicture}[scale=0.5]
 
 % Scaled Payout for Bet 1 (NO)
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,19}
 {
     \draw[fill=red!50] (\x,0) rectangle ++(1,1);
 }
 
 % Label for Scaled Payout of Bet 1
-\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 25 \text{ units} \))};
+\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 19 \text{ units} \))};
 
 % Scaled Payout for Bet 2 (YES)
 \foreach \x in {1,...,1}
@@ -588,32 +605,32 @@ P_{\text{new}} = \frac{0.5 \times 10 + 20}{10 + 20 + 20} = \frac{25}{50} = 0.5
 \subsection*{Market Share Division}
 
 \[
-S = \text{Total Market Volume} + I_{\text{initial}} = (20 + 20) + 10 = 50 \text{ units}
+S = \text{Total Market Volume} + I_{\text{initial}} = (20 + 20) = 40 \text{ units}
 \]
 
 \begin{align*}
-S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 50 \times 0.5 \right\rceil = 25 \\
-S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 50 \times 0.5 \right\rceil = 25
+S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 50 \times 0.5 \right\rceil = 20 \\
+S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 50 \times 0.5 \right\rceil = 20
 \end{align*}
 
 \begin{center}
 \begin{tikzpicture}[scale=0.5]
 
 % YES Shares (Green Squares), set down by -12
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,20}
 {
     \draw[fill=green!50] (\x,-12) rectangle ++(1,1);
 }
 
 % NO Shares (Red Squares), set down by -15
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,20}
 {
     \draw[fill=red!50] (\x,-15) rectangle ++(1,1);
 }
 
 % Labels
-\node[below] at (13,-12.2) {YES Shares (\(S_{\text{YES}} = 25\))};
-\node[below] at (13,-15.2) {NO Shares (\(S_{\text{NO}} = 25\))};
+\node[below] at (13,-12.2) {YES Shares (\(S_{\text{YES}} = 20\))};
+\node[below] at (13,-15.2) {NO Shares (\(S_{\text{NO}} = 20\))};
 
 \end{tikzpicture}
 
@@ -780,7 +797,7 @@ F_{\text{YES}} =
 Since \( C_{\text{YES\_SUM}} = 1.25 \), we have:
 
 \[
-F_{\text{YES}} = \frac{25}{1.25} = 20
+F_{\text{YES}} = \frac{20}{1.25} = 16
 \]
 
 \subsubsection*{Calculate NO Normalization Factor}
@@ -796,13 +813,13 @@ F_{\text{NO}} =
 Since \( C_{\text{NO\_SUM}} = 6.66 \), we have:
 
 \[
-F_{\text{NO}} = \frac{25}{6.66} \approx 3.75
+F_{\text{NO}} = \frac{20}{6.66} \approx 3.00
 \]
 
 Thus, the normalization factors are:
 
 \[
-F_{\text{YES}} = 20, \quad F_{\text{NO}} \approx 3.75
+F_{\text{YES}} = 16, \quad F_{\text{NO}} \approx 3.00
 \]
 
 % Double Divider Line To Next Step
@@ -846,7 +863,7 @@ Given:
 \text{Scaled Payout}_{\text{NO,1}} = \text{Round}(C_{\text{NO,1}} \times F_{\text{NO}})
 \]
 \[
-\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(6.66 \times 3.75) = \text{Round}(24.975) = 25 \text{ units}
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(6.66 \times 3.00) = \text{Round}(20.000) = 20 \text{ units}
 \]
 
 \textbf{For Bet 2 (YES):}
@@ -855,7 +872,7 @@ Given:
 \text{Scaled Payout}_{\text{YES,2}} = \text{Round}(C_{\text{YES,2}} \times F_{\text{YES}})
 \]
 \[
-\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(1.25 \times 20) = \text{Round}(25) = 25 \text{ units}
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(1.25 \times 16) = \text{Round}(20.00) = 20 \text{ units}
 \]
 
 \textbf{For Bet 3 (YES):}
@@ -869,10 +886,10 @@ Given:
 
 \subsubsection*{Final Scaled Payouts:}
 \[
-\text{Bet 1 (NO): } 25 \text{ units}
+\text{Bet 1 (NO): } 20 \text{ units}
 \]
 \[
-\text{Bet 2 (YES): } 25 \text{ units}
+\text{Bet 2 (YES): } 20 \text{ units}
 \]
 \[
 \text{Bet 3 (YES): } 0 \text{ units}
@@ -882,22 +899,22 @@ Given:
 \begin{tikzpicture}[scale=0.5]
 
 % Scaled Payout for Bet 1 (NO)
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,20}
 {
     \draw[fill=red!50] (\x,0) rectangle ++(1,1);
 }
 
 % Label for Scaled Payout of Bet 1
-\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 25 \text{ units} \))};
+\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 20 \text{ units} \))};
 
 % Scaled Payout for Bet 2 (YES)
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,20}
 {
     \draw[fill=green!50] (\x,-3) rectangle ++(1,1);
 }
 
 % Label for Scaled Payout of Bet 2
-\node[above] at (3,-2) {Scaled Payout for Bet 2 (\( 25 \text{ units} \))};
+\node[above] at (3,-2) {Scaled Payout for Bet 2 (\( 20 \text{ units} \))};
 
 % Scaled Payout for Bet 3 (YES)
 \foreach \x in {1,...,1}
@@ -982,38 +999,38 @@ Given:
 \end{center}
 
 \[
-P_{\text{new}} = \frac{0.5 \times 10 + 20}{10 + 20 + 10} = \frac{25}{40} = 0.625
+P_{\text{new}} = \frac{0.5 \times 10 + 20}{10 + 20} = \frac{25}{40} = 0.625
 \]
 
 \subsection*{Market Share Division}
 
 \[
-S = \text{Total Market Volume} + I_{\text{initial}} = (20 + 10) + 10 = 40 \text{ units}
+S = \text{Total Market Volume} + I_{\text{initial}} = (20 + 10) = 30 \text{ units}
 \]
 
 \begin{align*}
-S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 40 \times 0.625 \right\rceil = 25 \\
-S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 40 \times 0.375 \right\rceil = 15
+S_{\text{YES}} &= \left\lfloor S \times P_{\text{new}} \right\rceil = \left\lfloor 30 \times 0.625 \right\rceil = 19 \\
+S_{\text{NO}} &= \left\lfloor S \times (1 - P_{\text{new}}) \right\rceil = \left\lfloor 30 \times 0.375 \right\rceil = 11
 \end{align*}
 
 \begin{center}
 \begin{tikzpicture}[scale=0.5]
 
 % YES Shares (Green Squares), set down by -17
-\foreach \x in {1,...,25}
+\foreach \x in {1,...,19}
 {
     \draw[fill=green!50] (\x,-17) rectangle ++(1,1);
 }
 
 % NO Shares (Red Squares), set down by -20
-\foreach \x in {1,...,15}
+\foreach \x in {1,...,11}
 {
     \draw[fill=red!50] (\x,-20) rectangle ++(1,1);
 }
 
 % Labels
-\node[below] at (13,-17.2) {YES Shares (\(S_{\text{YES}} = 25\))};
-\node[below] at (8,-20.2) {NO Shares (\(S_{\text{NO}} = 15\))};
+\node[below] at (13,-17.2) {YES Shares (\(S_{\text{YES}} = 19\))};
+\node[below] at (8,-20.2) {NO Shares (\(S_{\text{NO}} = 11\))};
 
 \end{tikzpicture}
 \end{center}
@@ -1198,8 +1215,8 @@ C_4 = d_4 \times b_4 = 0 \times (-10) = 0 \text{ units}
 
 Given:
 \begin{itemize}
-    \item Total YES Shares: \( S_{\text{YES}} = 25 \)
-    \item Total NO Shares: \( S_{\text{NO}} = 15 \)
+    \item Total YES Shares: \( S_{\text{YES}} = 19 \)
+    \item Total NO Shares: \( S_{\text{NO}} = 11 \)
     \item Course Payouts:
     \begin{itemize}
         \item \( C_{\text{YES,1}} = 2.5 \) units
@@ -1223,7 +1240,7 @@ F_{\text{YES}} =
 Since \( C_{\text{YES\_SUM}} = 3.75 \), we have:
 
 \[
-F_{\text{YES}} = \frac{25}{3.75} = 6.67
+F_{\text{YES}} = \frac{19}{3.75} = 5.067
 \]
 
 \subsubsection*{Calculate NO Normalization Factor}
@@ -1239,13 +1256,13 @@ F_{\text{NO}} =
 Since \( C_{\text{NO\_SUM}} = 9.16 \), we have:
 
 \[
-F_{\text{NO}} = \frac{15}{9.16} \approx 1.64
+F_{\text{NO}} = \frac{11}{9.16} \approx 1.200
 \]
 
 Thus, the normalization factors are:
 
 \[
-F_{\text{YES}} \approx 6.67, \quad F_{\text{NO}} \approx 1.64
+F_{\text{YES}} \approx 5.067, \quad F_{\text{NO}} \approx 1.200
 \]
 
 
@@ -1263,7 +1280,7 @@ F_{\text{YES}} \approx 6.67, \quad F_{\text{NO}} \approx 1.64
 
 Given:
 \begin{itemize}
-    \item Normalization Factors: \( F_{\text{YES}} \approx 6.67 \), \( F_{\text{NO}} \approx 1.64 \)
+    \item Normalization Factors: \( F_{\text{YES}} \approx 5.067 \), \( F_{\text{NO}} \approx 1.200 \)
     \item Course Payouts:
     \begin{itemize}
         \item \( C_{\text{NO,1}} = 9.16 \) units
@@ -1279,7 +1296,7 @@ Given:
 \text{Scaled Payout}_{\text{NO,1}} = \text{Round}(C_{\text{NO,1}} \times F_{\text{NO}})
 \]
 \[
-\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(9.16 \times 1.64) = \text{Round}(15.03) = 15 \text{ units}
+\text{Scaled Payout}_{\text{NO,1}} = \text{Round}(9.16 \times 1.200) = \text{Round}(15.03) = 11 \text{ units}
 \]
 
 \textbf{For Bet 2 (YES):}
@@ -1288,7 +1305,7 @@ Given:
 \text{Scaled Payout}_{\text{YES,2}} = \text{Round}(C_{\text{YES,2}} \times F_{\text{YES}})
 \]
 \[
-\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(2.5 \times 6.67) = \text{Round}(16.68) = 17 \text{ units}
+\text{Scaled Payout}_{\text{YES,2}} = \text{Round}(2.5 \times 5.067) = \text{Round}(16.68) = 13 \text{ units}
 \]
 
 \textbf{For Bet 3 (YES):}
@@ -1297,7 +1314,7 @@ Given:
 \text{Scaled Payout}_{\text{YES,3}} = \text{Round}(C_{\text{YES,3}} \times F_{\text{YES}})
 \]
 \[
-\text{Scaled Payout}_{\text{YES,3}} = \text{Round}(1.25 \times 6.67) = \text{Round}(8.34) = 8 \text{ units}
+\text{Scaled Payout}_{\text{YES,3}} = \text{Round}(1.25 \times 5.067) = \text{Round}(8.34) = 6 \text{ units}
 \]
 
 \textbf{For Bet 4 (NO):}
@@ -1306,18 +1323,18 @@ Given:
 \text{Scaled Payout}_{\text{NO,2}} = \text{Round}(C_{\text{NO,2}} \times F_{\text{NO}})
 \]
 \[
-\text{Scaled Payout}_{\text{NO,2}} = \text{Round}(0.0 \times 1.64) = \text{Round}(0) = 0 \text{ units}
+\text{Scaled Payout}_{\text{NO,2}} = \text{Round}(0.0 \times 1.200) = \text{Round}(0) = 0 \text{ units}
 \]
 
 \subsubsection*{Final Scaled Payouts:}
 \[
-\text{Bet 1 (NO): } 15 \text{ units}
+\text{Bet 1 (NO): } 11 \text{ units}
 \]
 \[
-\text{Bet 2 (YES): } 17 \text{ units}
+\text{Bet 2 (YES): } 13 \text{ units}
 \]
 \[
-\text{Bet 3 (YES): } 8 \text{ units}
+\text{Bet 3 (YES): } 6 \text{ units}
 \]
 \[
 \text{Bet 4 (NO): } 0 \text{ units}
@@ -1327,31 +1344,31 @@ Given:
 \begin{tikzpicture}[scale=0.5]
 
 % Scaled Payout for Bet 1 (NO)
-\foreach \x in {1,...,15}
+\foreach \x in {1,...,11}
 {
     \draw[fill=red!50] (\x,0) rectangle ++(1,1);
 }
 
 % Label for Scaled Payout of Bet 1
-\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 15 \text{ units} \))};
+\node[above] at (3,1) {Scaled Payout for Bet 1 (\( 11 \text{ units} \))};
 
 % Scaled Payout for Bet 2 (YES)
-\foreach \x in {1,...,17}
+\foreach \x in {1,...,13}
 {
     \draw[fill=green!50] (\x,-3) rectangle ++(1,1);
 }
 
 % Label for Scaled Payout of Bet 2
-\node[above] at (3,-2) {Scaled Payout for Bet 2 (\( 17 \text{ units} \))};
+\node[above] at (3,-2) {Scaled Payout for Bet 2 (\( 13 \text{ units} \))};
 
 % Scaled Payout for Bet 3 (YES)
-\foreach \x in {1,...,8}
+\foreach \x in {1,...,6}
 {
     \draw[fill=green!50] (\x,-6) rectangle ++(1,1);
 }
 
 % Label for Scaled Payout of Bet 3
-\node[above] at (3,-5) {Scaled Payout for Bet 3 (\( 8 \text{ units} \))};
+\node[above] at (3,-5) {Scaled Payout for Bet 3 (\( 6 \text{ units} \))};
 
 % Scaled Payout for Bet 4 (NO)
 \foreach \x in {1,...,1}
