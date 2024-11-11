@@ -20,6 +20,18 @@ func init() {
 	}
 }
 
+func GetBetFees(db *gorm.DB, user *models.User, betRequest models.Bet) int64 {
+
+	MarketID := betRequest.MarketID
+
+	initialBetFee := getUserInitialBetFee(db, MarketID, user)
+	transactionFee := getTransactionFee(betRequest)
+
+	sumOfBetFees := initialBetFee + transactionFee
+
+	return sumOfBetFees
+}
+
 // Get initial bet fee, if applicable, for user on market.
 // If this is the first bet on this market for the user, apply a fee.
 func getUserInitialBetFee(db *gorm.DB, marketID uint, user *models.User) int64 {
@@ -50,16 +62,4 @@ func getTransactionFee(betRequest models.Bet) int64 {
 	}
 
 	return transactionFee
-}
-
-func GetBetFees(db *gorm.DB, user *models.User, betRequest models.Bet) int64 {
-
-	MarketID := betRequest.MarketID
-
-	initialBetFee := getUserInitialBetFee(db, MarketID, user)
-	transactionFee := getTransactionFee(betRequest)
-
-	sumOfBetFees := initialBetFee + transactionFee
-
-	return sumOfBetFees
 }
