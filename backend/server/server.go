@@ -73,7 +73,7 @@ func Start() {
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
 	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
-	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler).Methods("POST")
+	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler(setup.EconomicsConfig)).Methods("POST")
 
 	// admin stuff
