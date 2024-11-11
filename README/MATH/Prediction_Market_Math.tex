@@ -32,6 +32,7 @@
 
 \begin{itemize}
     \item \textbf{Course Payouts Divide By Zero Condition:} When Course Payouts calculations and further calculations derived from Course Payouts may include an inf (divide by zero) condition, we will define the output as zero. This situation arises in which the Market Value is measured as zero, since everyone has exited the market. Technically the market Value is still equal to the initial investment value until the resolution has been fulfilled, so the Course Payouts, which simply represent a link between the probability and the payout at a given market condition, are not representative of the final state of the market. Thus, calling the Course Payouts and anything calculated from the Course Payouts zero makes sense.
+    \item \textbf{Only NO or YES Positions Held:} By convention, a user can only hold either a NO or a YES position, but not both. There is a force sale in the selling function when one attempts to buy the opposite amount of shares currently held. One must neutralize one's own position prior to buying an opposite position.
 \end{itemize}
 
 \section{Positions Flow Cart}
@@ -770,6 +771,9 @@ The overall adjustment process is summarized as follows:
 \]
 
 
+\section*{Aggregate User Payouts}
+
+We will defer calculating aggregated user payouts until the last transaction in this paper for simplicity sake.
 
 % Double Divider Line To Next Step
 \begin{center}
@@ -1164,7 +1168,13 @@ Given:
 \end{tikzpicture}
 \end{center}
 
+\section*{Adjust Payouts Equations}
 
+There are no excess shares in our scenario so payout adjustment has no effect at this point.
+
+\section*{Aggregate User Payouts}
+
+We will defer calculating aggregated user payouts until the last transaction in this paper for simplicity sake.
 
 \newpage
 
@@ -1618,6 +1628,127 @@ Given:
 \end{tikzpicture}
 \end{center}
 
+\section*{Adjust Payouts Equations}
+
+There are no excess shares in our scenario so payout adjustment has no effect at this point.
+
+\section*{Aggregate User Payouts}
+
+Aggregation is simply taking the list of adjusted payouts and assigning it to the original user. The aggregation of user payouts is defined as follows:
+
+\subsection*{Input Definitions}
+
+\begin{itemize}
+    \item \(\text{Bets} = \{ \text{Bet}_i \,|\, i = 1, 2, \dots, n \}\): A set of bets, where each bet \(\text{Bet}_i\) has the following attributes:
+    \begin{itemize}
+        \item \(\text{Username}_i\): The username of the user who placed the bet.
+        \item \(\text{Outcome}_i \in \{\text{YES}, \text{NO}\}\): The outcome of the bet.
+    \end{itemize}
+    \item \(\text{FinalPayouts} = \{P_i \,|\, i = 1, 2, \dots, n\}\): The final scaled payouts for each bet.
+\end{itemize}
+
+\subsection*{Aggregation Equation}
+
+For each user \(\text{User}_u\), the total shares for YES and NO outcomes are calculated as follows:
+
+\[
+\text{YesSharesOwned}_u = \sum_{\substack{i \\ \text{Username}_i = \text{User}_u \\ \text{Outcome}_i = \text{YES}}} P_i
+\]
+
+\[
+\text{NoSharesOwned}_u = \sum_{\substack{i \\ \text{Username}_i = \text{User}_u \\ \text{Outcome}_i = \text{NO}}} P_i
+\]
+
+\subsection*{Negative Share Adjustment}
+
+If any aggregated share count is negative, it is adjusted to zero:
+
+\[
+\text{YesSharesOwned}_u =
+\begin{cases}
+\text{YesSharesOwned}_u & \text{if } \text{YesSharesOwned}_u \geq 0 \\
+0 & \text{if } \text{YesSharesOwned}_u < 0
+\end{cases}
+\]
+
+\[
+\text{NoSharesOwned}_u =
+\begin{cases}
+\text{NoSharesOwned}_u & \text{if } \text{NoSharesOwned}_u \geq 0 \\
+0 & \text{if } \text{NoSharesOwned}_u < 0
+\end{cases}
+\]
+
+\subsection*{Output}
+
+The final output is a set of market positions:
+
+\[
+\text{Positions} = \{ \text{MarketPosition}_u \,|\, u = 1, 2, \dots, m \}
+\]
+
+where each market position is represented as:
+
+\[
+\text{MarketPosition}_u = (\text{Username}_u, \text{YesSharesOwned}_u, \text{NoSharesOwned}_u)
+\]
+
+\section*{Normalize Market Positions}
+
+The normalization of market positions ensures that for each user, only one of \(\text{YesSharesOwned}\) or \(\text{NoSharesOwned}\) is greater than zero, with the other being set to zero. The resulting value represents the net difference between the two.  This is in line with the convention that users can only hold YES or NO shares but not both simultaneously on the same market.
+
+\subsection*{Input Definitions}
+
+\begin{itemize}
+    \item \(\text{Positions} = \{ \text{MarketPosition}_u \,|\, u = 1, 2, \dots, m \}\): A set of market positions, where each position \(\text{MarketPosition}_u\) has the following attributes:
+    \begin{itemize}
+        \item \(\text{Username}_u\): The username of the user.
+        \item \(\text{YesSharesOwned}_u\): The total YES shares owned by the user.
+        \item \(\text{NoSharesOwned}_u\): The total NO shares owned by the user.
+    \end{itemize}
+\end{itemize}
+
+\subsection*{Normalization Equation}
+
+For each user \(\text{User}_u\), the normalized market position is calculated as:
+
+\[
+\text{If } \text{YesSharesOwned}_u > \text{NoSharesOwned}_u:
+\]
+\[
+\text{YesSharesOwned}_u^\text{Normalized} = \text{YesSharesOwned}_u - \text{NoSharesOwned}_u
+\]
+\[
+\text{NoSharesOwned}_u^\text{Normalized} = 0
+\]
+
+\[
+\text{If } \text{NoSharesOwned}_u \geq \text{YesSharesOwned}_u:
+\]
+\[
+\text{NoSharesOwned}_u^\text{Normalized} = \text{NoSharesOwned}_u - \text{YesSharesOwned}_u
+\]
+\[
+\text{YesSharesOwned}_u^\text{Normalized} = 0
+\]
+
+\subsection*{Output}
+
+The final output is a set of normalized market positions:
+
+\[
+\text{NormalizedPositions} = \{ \text{MarketPosition}_u^\text{Normalized} \,|\, u = 1, 2, \dots, m \}
+\]
+
+where each normalized market position is represented as:
+
+\[
+\text{MarketPosition}_u^\text{Normalized} =
+\begin{cases}
+(\text{Username}_u, \text{YesSharesOwned}_u^\text{Normalized}, 0) & \text{if } \text{YesSharesOwned}_u > \text{NoSharesOwned}_u \\
+(\text{Username}_u, 0, \text{NoSharesOwned}_u^\text{Normalized}) & \text{if } \text{NoSharesOwned}_u \geq \text{YesSharesOwned}_u
+\end{cases}
+\]
 
 
 % Double Divider Line
