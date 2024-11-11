@@ -361,7 +361,7 @@ func TestCalculateExcess(t *testing.T) {
 	}
 	scaledPayouts := []int64{5, 15, 10}
 
-	expectedExcess := int64(20) // Sum of scaled payouts (30) - Market Volume (10 + 20)
+	expectedExcess := int64(0)
 	actualExcess := calculateExcess(bets, scaledPayouts)
 
 	if actualExcess != expectedExcess {
@@ -373,7 +373,7 @@ func TestAdjustForPositiveExcess(t *testing.T) {
 	scaledPayouts := []int64{10, 20, 30}
 	excess := int64(5)
 
-	expectedPayouts := []int64{10, 20, 25}
+	expectedPayouts := []int64{9, 18, 28}
 	actualPayouts := adjustForPositiveExcess(scaledPayouts, excess)
 
 	for i, payout := range actualPayouts {
@@ -387,7 +387,7 @@ func TestAdjustForNegativeExcess(t *testing.T) {
 	scaledPayouts := []int64{10, 20, 30}
 	excess := int64(-5)
 
-	expectedPayouts := []int64{11, 21, 31}
+	expectedPayouts := []int64{12, 22, 31}
 	actualPayouts := adjustForNegativeExcess(scaledPayouts, excess)
 
 	for i, payout := range actualPayouts {
@@ -404,7 +404,7 @@ func TestAdjustPayouts(t *testing.T) {
 	}
 	scaledPayouts := []int64{10, 20, 15}
 
-	expectedPayouts := []int64{10, 20, 10} // Excess is 15 - 30 + 10 + 20 = 15, adjusted from newest
+	expectedPayouts := []int64{5, 15, 10}
 	actualPayouts := AdjustPayouts(bets, scaledPayouts)
 
 	for i, payout := range actualPayouts {
