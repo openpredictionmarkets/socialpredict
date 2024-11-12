@@ -12,6 +12,105 @@ import (
 
 var now = time.Now()
 
+// Define shared test cases in a separate variable
+var largeTestCases = []struct {
+	Name               string
+	Bets               []models.Bet
+	ProbabilityChanges []wpam.ProbabilityChange
+	S_YES              int64
+	S_NO               int64
+}{
+	{
+		Name: "InitialMarketState",
+		Bets: []models.Bet{},
+		ProbabilityChanges: []wpam.ProbabilityChange{
+			{Probability: 0.500},
+		},
+		S_YES: 0,
+		S_NO:  0,
+	},
+	{
+		Name: "FirstBetNoDirection",
+		Bets: []models.Bet{
+			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
+		},
+		ProbabilityChanges: []wpam.ProbabilityChange{
+			{Probability: 0.500},
+			{Probability: 0.167},
+		},
+		S_YES: 3,
+		S_NO:  17,
+	},
+	{
+		Name: "SecondBetYesDirection",
+		Bets: []models.Bet{
+			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
+			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
+		},
+		ProbabilityChanges: []wpam.ProbabilityChange{
+			{Probability: 0.500},
+			{Probability: 0.167},
+			{Probability: 0.375},
+		},
+		S_YES: 11,
+		S_NO:  19,
+	},
+	{
+		Name: "ThirdBetYesDirection",
+		Bets: []models.Bet{
+			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
+			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
+			{Amount: 10, Outcome: "YES", Username: "three", PlacedAt: time.Now().Add(2 * time.Minute), MarketID: 1},
+		},
+		ProbabilityChanges: []wpam.ProbabilityChange{
+			{Probability: 0.500},
+			{Probability: 0.167},
+			{Probability: 0.375},
+			{Probability: 0.500},
+		},
+		S_YES: 20,
+		S_NO:  20,
+	},
+	{
+		Name: "NegativeBetNoDirection",
+		Bets: []models.Bet{
+			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
+			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
+			{Amount: 10, Outcome: "YES", Username: "three", PlacedAt: time.Now().Add(2 * time.Minute), MarketID: 1},
+			{Amount: -10, Outcome: "NO", Username: "one", PlacedAt: time.Now().Add(3 * time.Minute), MarketID: 1},
+		},
+		ProbabilityChanges: []wpam.ProbabilityChange{
+			{Probability: 0.500},
+			{Probability: 0.167},
+			{Probability: 0.375},
+			{Probability: 0.500},
+			{Probability: 0.625},
+		},
+		S_YES: 19,
+		S_NO:  11,
+	},
+	{
+		Name: "LargeBetYesDirection",
+		Bets: []models.Bet{
+			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
+			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
+			{Amount: 10, Outcome: "YES", Username: "three", PlacedAt: time.Now().Add(2 * time.Minute), MarketID: 1},
+			{Amount: -10, Outcome: "NO", Username: "one", PlacedAt: time.Now().Add(3 * time.Minute), MarketID: 1},
+			{Amount: 30, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(4 * time.Minute), MarketID: 1},
+		},
+		ProbabilityChanges: []wpam.ProbabilityChange{
+			{Probability: 0.500},
+			{Probability: 0.167},
+			{Probability: 0.375},
+			{Probability: 0.500},
+			{Probability: 0.625},
+			{Probability: 0.786},
+		},
+		S_YES: 47,
+		S_NO:  13,
+	},
+}
+
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 	testcases := []struct {
 		Name               string
