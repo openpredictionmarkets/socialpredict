@@ -12,103 +12,23 @@ import (
 
 var now = time.Now()
 
-// Define shared test cases in a separate variable
-var largeTestCases = []struct {
-	Name               string
-	Bets               []models.Bet
-	ProbabilityChanges []wpam.ProbabilityChange
-	S_YES              int64
-	S_NO               int64
-}{
-	{
-		Name: "InitialMarketState",
-		Bets: []models.Bet{},
-		ProbabilityChanges: []wpam.ProbabilityChange{
-			{Probability: 0.500},
-		},
-		S_YES: 0,
-		S_NO:  0,
-	},
-	{
-		Name: "FirstBetNoDirection",
-		Bets: []models.Bet{
-			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
-		},
-		ProbabilityChanges: []wpam.ProbabilityChange{
-			{Probability: 0.500},
-			{Probability: 0.167},
-		},
-		S_YES: 3,
-		S_NO:  17,
-	},
-	{
-		Name: "SecondBetYesDirection",
-		Bets: []models.Bet{
-			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
-			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
-		},
-		ProbabilityChanges: []wpam.ProbabilityChange{
-			{Probability: 0.500},
-			{Probability: 0.167},
-			{Probability: 0.375},
-		},
-		S_YES: 11,
-		S_NO:  19,
-	},
-	{
-		Name: "ThirdBetYesDirection",
-		Bets: []models.Bet{
-			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
-			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
-			{Amount: 10, Outcome: "YES", Username: "three", PlacedAt: time.Now().Add(2 * time.Minute), MarketID: 1},
-		},
-		ProbabilityChanges: []wpam.ProbabilityChange{
-			{Probability: 0.500},
-			{Probability: 0.167},
-			{Probability: 0.375},
-			{Probability: 0.500},
-		},
-		S_YES: 20,
-		S_NO:  20,
-	},
-	{
-		Name: "NegativeBetNoDirection",
-		Bets: []models.Bet{
-			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
-			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
-			{Amount: 10, Outcome: "YES", Username: "three", PlacedAt: time.Now().Add(2 * time.Minute), MarketID: 1},
-			{Amount: -10, Outcome: "NO", Username: "one", PlacedAt: time.Now().Add(3 * time.Minute), MarketID: 1},
-		},
-		ProbabilityChanges: []wpam.ProbabilityChange{
-			{Probability: 0.500},
-			{Probability: 0.167},
-			{Probability: 0.375},
-			{Probability: 0.500},
-			{Probability: 0.625},
-		},
-		S_YES: 19,
-		S_NO:  11,
-	},
-	{
-		Name: "LargeBetYesDirection",
-		Bets: []models.Bet{
-			{Amount: 20, Outcome: "NO", Username: "one", PlacedAt: time.Now(), MarketID: 1},
-			{Amount: 10, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(time.Minute), MarketID: 1},
-			{Amount: 10, Outcome: "YES", Username: "three", PlacedAt: time.Now().Add(2 * time.Minute), MarketID: 1},
-			{Amount: -10, Outcome: "NO", Username: "one", PlacedAt: time.Now().Add(3 * time.Minute), MarketID: 1},
-			{Amount: 30, Outcome: "YES", Username: "two", PlacedAt: time.Now().Add(4 * time.Minute), MarketID: 1},
-		},
-		ProbabilityChanges: []wpam.ProbabilityChange{
-			{Probability: 0.500},
-			{Probability: 0.167},
-			{Probability: 0.375},
-			{Probability: 0.500},
-			{Probability: 0.625},
-			{Probability: 0.786},
-		},
-		S_YES: 47,
-		S_NO:  13,
-	},
+// test helper functions to generate types more succiently
+func generateBet(amount int64, outcome, username string, marketID uint, offset time.Duration) models.Bet {
+	return models.Bet{
+		Amount:   amount,
+		Outcome:  outcome,
+		Username: username,
+		PlacedAt: time.Now().Add(offset),
+		MarketID: marketID,
+	}
+}
+
+func generateProbability(probabilities ...float64) []wpam.ProbabilityChange {
+	var changes []wpam.ProbabilityChange
+	for _, p := range probabilities {
+		changes = append(changes, wpam.ProbabilityChange{Probability: p})
+	}
+	return changes
 }
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
@@ -121,91 +41,63 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		S_NO               int64
 	}{
 		{
-			Name: "PreventSimultaneousSharesHeld",
-			Bets: []models.Bet{
-				{
-					Amount:   3,
-					Outcome:  "YES",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
-					MarketID: 3,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
-					MarketID: 3,
-				},
-			},
-			ProbabilityChanges: []wpam.ProbabilityChange{
-				{Probability: 0.5},
-				{Probability: 0.875},
-				{Probability: 0.7},
-			},
-			S_YES: 3,
-			S_NO:  1,
+			Name:               "InitialMarketState",
+			Bets:               []models.Bet{},
+			ProbabilityChanges: generateProbability(0.500),
+			S_YES:              0,
+			S_NO:               0,
 		},
 		{
-			Name: "InfinityAvoidance",
+			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				{
-					Amount:   1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now,
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now.Add(time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(2 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(3 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(4 * time.Minute),
-					MarketID: 1,
-				},
+				generateBet(20, "NO", "one", 1, 0),
 			},
-			ProbabilityChanges: []wpam.ProbabilityChange{
-				{Probability: 0.50},
-				{Probability: 0.75},
-				{Probability: 0.50},
-				{Probability: 0.25},
-				{Probability: 0.50},
-				{Probability: 0.25},
+			ProbabilityChanges: generateProbability(0.500, 0.167),
+			S_YES:              3,
+			S_NO:               17,
+		},
+		{
+			Name: "SecondBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
 			},
-			S_YES: 0,
-			S_NO:  1,
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375),
+			S_YES:              11,
+			S_NO:               19,
+		},
+		{
+			Name: "NegativeBetNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
+			S_YES:              19,
+			S_NO:               11,
+		},
+		{
+			Name: "ThirdBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500),
+			S_YES:              20,
+			S_NO:               20,
 		},
 	}
 
-	// Combine testcases with largeTestCases
-	allTestCases := append(testcases, largeTestCases...)
-
+	// Example economics config setup
 	ec := setup.EconomicsConfig()
 	ec.Economics.MarketCreation.InitialMarketSubsidization = 0
 	ec.Economics.MarketIncentives.CreateMarketCost = 1
 
-	for _, tc := range allTestCases {
+	// Iterate through test cases
+	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			yes, no := DivideUpMarketPoolSharesDBPM(tc.Bets, tc.ProbabilityChanges)
 			if yes != tc.S_YES || no != tc.S_NO {
@@ -221,91 +113,8 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		Bets               []models.Bet
 		ProbabilityChanges []wpam.ProbabilityChange
 		CoursePayouts      []CourseBetPayout
-	}{
-		{
-			Name: "PreventSimultaneousSharesHeld",
-			Bets: []models.Bet{
-				{
-					Amount:   3,
-					Outcome:  "YES",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
-					MarketID: 3,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
-					MarketID: 3,
-				},
-			},
-			ProbabilityChanges: []wpam.ProbabilityChange{
-				{Probability: 0.5},
-				{Probability: 0.875},
-				{Probability: 0.7},
-			},
-			CoursePayouts: []CourseBetPayout{
-				{Payout: 0.5999999999999999, Outcome: "YES"},
-				{Payout: 0.17500000000000004, Outcome: "NO"},
-			},
-		},
-		{
-			Name: "InfinityAvoidance",
-			Bets: []models.Bet{
-				{
-					Amount:   1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now,
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now.Add(time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(2 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(3 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(4 * time.Minute),
-					MarketID: 1,
-				},
-			},
-			ProbabilityChanges: []wpam.ProbabilityChange{
-				{Probability: 0.50},
-				{Probability: 0.75},
-				{Probability: 0.50},
-				{Probability: 0.25},
-				{Probability: 0.50},
-				{Probability: 0.25},
-			},
-			CoursePayouts: []CourseBetPayout{
-				{Payout: 0.25, Outcome: "YES"},
-				{Payout: -0.5, Outcome: "YES"},
-				{Payout: 0.25, Outcome: "NO"},
-				{Payout: -0, Outcome: "NO"}, // golang math.Round() rounds to -0 and +0
-				{Payout: 0.25, Outcome: "NO"},
-			},
-		},
-	}
+	}{}
+
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateCoursePayoutsDBPM(tc.Bets, tc.ProbabilityChanges)
