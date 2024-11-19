@@ -553,19 +553,69 @@ func TestAdjustForNegativeExcess(t *testing.T) {
 }
 
 func TestAdjustPayouts(t *testing.T) {
-	bets := []models.Bet{
-		{Amount: 10},
-		{Amount: 20},
+	testcases := []struct {
+		Name                    string
+		Bets                    []models.Bet
+		ScaledPayouts           []int64
+		ExpectedAdjustedPayouts []int64
+	}{
+		{
+			Name:                    "InitialMarketState",
+			Bets:                    []models.Bet{},
+			ScaledPayouts:           []int64{},
+			ExpectedAdjustedPayouts: []int64{},
+		},
+		{
+			Name: "FirstBetNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+			},
+			ScaledPayouts:           []int64{0},
+			ExpectedAdjustedPayouts: []int64{20},
+		},
+		{
+			Name: "SecondBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+			},
+			ScaledPayouts:           []int64{19, 0},
+			ExpectedAdjustedPayouts: []int64{25, 5},
+		},
+		{
+			Name: "ThirdBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+			},
+			ScaledPayouts:           []int64{20, 20, 0},
+			ExpectedAdjustedPayouts: []int64{20, 20, 0},
+		},
+		{
+			Name: "FourthBetNegativeNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+			},
+			ScaledPayouts:           []int64{11, 13, 6, 0},
+			ExpectedAdjustedPayouts: []int64{11, 13, 6, 0},
+		},
 	}
-	scaledPayouts := []int64{10, 20, 15}
-
-	expectedPayouts := []int64{5, 15, 10}
-	actualPayouts := AdjustPayouts(bets, scaledPayouts)
-
-	for i, payout := range actualPayouts {
-		if payout != expectedPayouts[i] {
-			t.Errorf("At index %d, expected payout: %d, got: %d", i, expectedPayouts[i], payout)
-		}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			actualResult := AdjustPayouts(tc.Bets, tc.ScaledPayouts)
+			for i, result := range actualResult {
+				if result != tc.ExpectedAdjustedPayouts[i] {
+					t.Errorf(
+						"Test %s failed at index %d: expected payout %d, got %d",
+						tc.Name, i, tc.ExpectedAdjustedPayouts[i], result,
+					)
+				}
+			}
+		})
 	}
 }
 
