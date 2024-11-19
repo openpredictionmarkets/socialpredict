@@ -321,99 +321,91 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	testcases := []struct {
-		Name          string
-		Bets          []models.Bet
-		CoursePayouts []CourseBetPayout
-		F_YES         float64
-		F_NO          float64
-		ScaledPayouts []int64
+		Name                  string
+		Bets                  []models.Bet
+		CoursePayouts         []CourseBetPayout
+		F_YES                 float64
+		F_NO                  float64
+		ExpectedScaledPayouts []int64
 	}{
 		{
-			Name: "PreventSimultaneousSharesHeld",
-			Bets: []models.Bet{
-				{
-					Amount:   3,
-					Outcome:  "YES",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
-					MarketID: 3,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
-					MarketID: 3,
-				},
-			},
-			CoursePayouts: []CourseBetPayout{
-				{Payout: 0.5999999999999999, Outcome: "YES"},
-				{Payout: 0.17500000000000004, Outcome: "NO"},
-			},
-			F_YES:         5.000000000000001, // Actual output from function
-			F_NO:          5.714285714285713, // Actual output from function
-			ScaledPayouts: []int64{3, 1},
+			Name:                  "InitialMarketState",
+			Bets:                  []models.Bet{},
+			CoursePayouts:         nil,
+			F_YES:                 0,
+			F_NO:                  0,
+			ExpectedScaledPayouts: []int64{},
 		},
 		{
-			Name: "InfinityAvoidance",
+			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				{
-					Amount:   1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now,
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now.Add(time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(2 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(3 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(4 * time.Minute),
-					MarketID: 1,
-				},
+				generateBet(20, "NO", "one", 1, 0),
 			},
-			CoursePayouts: []CourseBetPayout{
-				{Payout: 0.25, Outcome: "YES"},
-				{Payout: -0.5, Outcome: "YES"},
-				{Payout: 0.25, Outcome: "NO"},
-				{Payout: -0, Outcome: "NO"}, // golang math.Round() rounds to -0 and +0
-				{Payout: 0.25, Outcome: "NO"},
+			CoursePayouts: generateCoursePayouts(
+				[]float64{0},
+				[]string{"NO"},
+			),
+			F_YES:                 0,
+			F_NO:                  0,
+			ExpectedScaledPayouts: []int64{0},
+		},
+		{
+			Name: "SecondBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
 			},
-			F_YES:         0,
-			F_NO:          2,
-			ScaledPayouts: []int64{0, 0, 1, 0, 1},
+			CoursePayouts: generateCoursePayouts(
+				[]float64{4.1600000000000001, 0},
+				[]string{"NO", "YES"},
+			),
+			F_YES:                 0,
+			F_NO:                  0,
+			ExpectedScaledPayouts: []int64{0, 0},
+		},
+		{
+			Name: "ThirdBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+			},
+			CoursePayouts: generateCoursePayouts(
+				[]float64{6.6599999999999993, 1.25, 0},
+				[]string{"NO", "YES", "YES"},
+			),
+			F_YES:                 16,
+			F_NO:                  3.0030030030030033,
+			ExpectedScaledPayouts: []int64{20, 20, 0},
+		},
+		{
+			Name: "FourthBetNegativeNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+			},
+			CoursePayouts: generateCoursePayouts(
+				[]float64{9.1600000000000001, 2.5, 1.25, 0},
+				[]string{"NO", "YES", "YES", "NO"},
+			),
+			F_YES:                 5.066666666666666,
+			F_NO:                  1.2008733624454149,
+			ExpectedScaledPayouts: []int64{11, 13, 6, 0},
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.F_YES, tc.F_NO)
-			if len(actualPayouts) != len(tc.ScaledPayouts) {
-				t.Fatalf("Test %s failed: expected %d payouts, got %d", tc.Name, len(tc.ScaledPayouts), len(actualPayouts))
-			}
+
+			// Ensure payouts match exactly
 			for i, payout := range actualPayouts {
-				if payout != tc.ScaledPayouts[i] {
-					t.Errorf("Test %s failed at index %d: expected payout %d, got %d", tc.Name, i, tc.ScaledPayouts[i], payout)
+				if payout != tc.ExpectedScaledPayouts[i] {
+					t.Errorf(
+						"Test %s failed at index %d: expected payout %d, got %d",
+						tc.Name, i, tc.ExpectedScaledPayouts[i], payout,
+					)
 				}
 			}
 		})

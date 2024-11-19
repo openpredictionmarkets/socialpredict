@@ -5,7 +5,6 @@ import (
 	"math"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
@@ -126,9 +125,6 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 	} else {
 		F_NO = 0
 	}
-
-	logging.LogAnyType(math.Abs(F_YES), "math.Abs(F_YES)")
-	logging.LogAnyType(math.Abs(F_NO), "math.Abs(F_NO)")
 
 	return math.Abs(F_YES), math.Abs(F_NO)
 }
