@@ -49,7 +49,6 @@ func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayo
 }
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
-	// Define specific test cases
 	testcases := []struct {
 		Name               string
 		Bets               []models.Bet
@@ -105,6 +104,26 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			S_YES:              19,
 			S_NO:               11,
+		},
+		{
+			Name: "NOResolution",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.0), // Final resolution R = 0
+			S_YES:              0,
+			S_NO:               30, // All shares go to NO
+		},
+		{
+			Name: "YESResolution",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 1.0), // Final resolution R = 1
+			S_YES:              30,                                     // All shares go to YES
+			S_NO:               0,
 		},
 	}
 
