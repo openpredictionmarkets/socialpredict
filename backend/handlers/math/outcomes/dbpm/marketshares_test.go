@@ -439,8 +439,8 @@ func TestCalculateExcess(t *testing.T) {
 				generateBet(20, "NO", "one", 1, 0),
 				generateBet(10, "YES", "two", 1, time.Minute),
 			},
-			ScaledPayouts:  []int64{20, 20}, // Scaled payouts > market volume
-			ExpectedExcess: 20,              // Market volume = 30, scaled payout sum = 40
+			ScaledPayouts:  []int64{19, 0}, // Scaled payouts < market volume
+			ExpectedExcess: -11,            // marketVolume = 30, scaledPayouts = 19
 		},
 		{
 			Name: "ThirdBetYesDirection",
@@ -450,7 +450,7 @@ func TestCalculateExcess(t *testing.T) {
 				generateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			ScaledPayouts:  []int64{20, 20, 0},
-			ExpectedExcess: 10, // Market volume = 40, scaled payout sum = 50
+			ExpectedExcess: 0, // marketVolume = 40, scaledPayouts = 40
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
@@ -461,7 +461,7 @@ func TestCalculateExcess(t *testing.T) {
 				generateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			ScaledPayouts:  []int64{11, 13, 6, 0},
-			ExpectedExcess: -1, // Market volume = 30, scaled payout sum = 29
+			ExpectedExcess: 0, // marketVolume = 30, scaledPayouts = 30
 		},
 	}
 
