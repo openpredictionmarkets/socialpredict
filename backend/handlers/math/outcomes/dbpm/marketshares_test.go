@@ -1,7 +1,6 @@
 package dbpm
 
 import (
-	"math"
 	"reflect"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
@@ -243,37 +242,81 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 	testcases := []struct {
 		Name          string
-		F_YES         float64
-		F_NO          float64
+		CoursePayouts []CourseBetPayout
+		S_YES         int64
+		S_NO          int64
 		ExpectedF_YES float64
 		ExpectedF_NO  float64
 	}{
 		{
-			Name:          "PreventSimultaneousSharesHeld",
-			F_YES:         5.000000000000001, // Actual output from function
-			F_NO:          5.714285714285713, // Actual output from function
-			ExpectedF_YES: 5.000000,
-			ExpectedF_NO:  5.714286,
+			Name:          "InitialMarketState",
+			CoursePayouts: nil,
+			S_YES:         0,
+			S_NO:          0,
+			ExpectedF_YES: 0,
+			ExpectedF_NO:  0,
 		},
 		{
-			Name:          "InfinityAvoidance",
-			F_YES:         0,
-			F_NO:          2,
+			Name: "FirstBetNoDirection",
+			CoursePayouts: generateCoursePayouts(
+				[]float64{0}, // Payout = |0.167 - 0.167| * 20
+				[]string{"NO"},
+			),
+			S_YES:         3,
+			S_NO:          17,
 			ExpectedF_YES: 0,
-			ExpectedF_NO:  2,
+			ExpectedF_NO:  0,
+		},
+		{
+			Name: "SecondBetYesDirection",
+			CoursePayouts: generateCoursePayouts(
+				[]float64{4.1600000000000001, 0},
+				[]string{"NO", "YES"},
+			),
+			S_YES:         11,
+			S_NO:          19,
+			ExpectedF_YES: 0,
+			ExpectedF_NO:  4.5673076923076925,
+		},
+		{
+			Name: "ThirdBetYesDirection",
+			CoursePayouts: generateCoursePayouts(
+				[]float64{6.6599999999999993, 1.25, 0},
+				[]string{"NO", "YES", "YES"},
+			),
+			S_YES:         20,
+			S_NO:          20,
+			ExpectedF_YES: 16,
+			ExpectedF_NO:  3.0030030030030033,
+		},
+		{
+			Name: "FourthBetNegativeNoDirection",
+			CoursePayouts: generateCoursePayouts(
+				[]float64{9.1600000000000001, 2.5, 1.25, 0},
+				[]string{"NO", "YES", "YES", "NO"},
+			),
+			S_YES:         19,
+			S_NO:          11,
+			ExpectedF_YES: 5.066666666666666,
+			ExpectedF_NO:  1.2008733624454149,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			roundedF_YES := math.Round(tc.F_YES*1000000) / 1000000
-			roundedF_NO := math.Round(tc.F_NO*1000000) / 1000000
+			actualF_YES, actualF_NO := CalculateNormalizationFactorsDBPM(tc.S_YES, tc.S_NO, tc.CoursePayouts)
 
-			if roundedF_YES != tc.ExpectedF_YES || roundedF_NO != tc.ExpectedF_NO {
-				t.Errorf("Test %s failed: expected F_YES=%f, F_NO=%f, got F_YES=%f, F_NO=%f",
-					tc.Name, tc.ExpectedF_YES, tc.ExpectedF_NO, roundedF_YES, roundedF_NO)
+			// Log the results for manual verification
+			t.Logf("%s: F_YES=%f, F_NO=%f", tc.Name, actualF_YES, actualF_NO)
+
+			if actualF_YES != tc.ExpectedF_YES || actualF_NO != tc.ExpectedF_NO {
+				t.Errorf(
+					"%s: expected F_YES=%f, F_NO=%f; got F_YES=%f, F_NO=%f",
+					tc.Name, tc.ExpectedF_YES, tc.ExpectedF_NO, actualF_YES, actualF_NO,
+				)
 			}
 		})
 	}
+
 }
 
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {

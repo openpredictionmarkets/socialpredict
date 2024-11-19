@@ -1,7 +1,6 @@
 package dbpm
 
 import (
-	"fmt"
 	"log"
 	"math"
 	marketmath "socialpredict/handlers/math/market"
@@ -79,8 +78,6 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 		return nil
 	}
 
-	logging.LogAnyType(probabilityChanges, "probabilityChanges")
-
 	var coursePayouts []CourseBetPayout
 
 	// Iterate over each bet to calculate its course payout
@@ -91,14 +88,7 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 		// Get the current (final) probability for the market
 		R := probabilityChanges[len(probabilityChanges)-1].Probability
 
-		// Calculate payout based on |R - P| * bet amount
-		logging.LogAnyType(bet.Amount, "bet.Amount")
-		logging.LogAnyType(P, "P (probabilityChanges[i].Probability): ")
-		logging.LogAnyType(R, "R (final resolution probability): ")
-		logging.LogAnyType(float64(bet.Amount), "float64(bet.Amount): ")
-		logging.LogAnyType(math.Abs(R-P), "math.Abs(R - P): ")
 		C_i := math.Abs(R-P) * float64(bet.Amount)
-		logging.LogAnyType(C_i, "C_i (course payout): ")
 
 		// Append the calculated payout to the result
 		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: C_i, Outcome: bet.Outcome})
@@ -136,6 +126,9 @@ func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []
 	} else {
 		F_NO = 0
 	}
+
+	logging.LogAnyType(math.Abs(F_YES), "math.Abs(F_YES)")
+	logging.LogAnyType(math.Abs(F_NO), "math.Abs(F_NO)")
 
 	return math.Abs(F_YES), math.Abs(F_NO)
 }
@@ -275,8 +268,6 @@ func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
 func SingleShareYesNoAllocator(bets []models.Bet) string {
 	total := int64(0)
 	for _, bet := range bets {
-		logging.LogMsg(fmt.Sprintf("Bet Outcome: %s", bet.Outcome))
-		logging.LogMsg(fmt.Sprintf("Bet Amount: %d", bet.Amount))
 		if bet.Outcome == "YES" {
 			total += bet.Amount
 		} else if bet.Outcome == "NO" {
