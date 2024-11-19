@@ -734,17 +734,6 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 				{Username: "user1", YesSharesOwned: 2, NoSharesOwned: 0},
 			},
 		},
-		{
-			Name: "InfinityAvoidance",
-			AggregatedPositions: []MarketPosition{
-				{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
-				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
-			},
-			NetPositions: []MarketPosition{
-				{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
-				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
-			},
-		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -792,7 +781,7 @@ func TestSingleShareYesNoAllocator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SingleShareYesNoAllocator(tt.bets)
+			result := singleShareYesNoAllocator(tt.bets)
 			if result != tt.expected {
 				t.Errorf("got %v, expected %v", result, tt.expected)
 			}

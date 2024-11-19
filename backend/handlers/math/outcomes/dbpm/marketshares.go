@@ -54,7 +54,7 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	// Calculate YES and NO pools using floating-point arithmetic
 	// Note, fractional shares will be lost here
 	if marketmath.GetMarketVolume(bets) == 1 {
-		singleShareDirection := SingleShareYesNoAllocator(bets)
+		singleShareDirection := singleShareYesNoAllocator(bets)
 		if singleShareDirection == "YES" {
 			S_YES = 1
 		} else {
@@ -262,7 +262,7 @@ func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
 }
 
 // Returns "YES", "NO", or "", indicating the outcome of the single share or no outcome if shares > 1.
-func SingleShareYesNoAllocator(bets []models.Bet) string {
+func singleShareYesNoAllocator(bets []models.Bet) string {
 	total := int64(0)
 	for _, bet := range bets {
 		if bet.Outcome == "YES" {
