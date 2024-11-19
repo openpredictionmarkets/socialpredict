@@ -158,6 +158,7 @@ func calculateExcess(bets []models.Bet, scaledPayouts []int64) int64 {
 }
 
 // Adjust scaled payouts if excess is greater than 0
+// This  should not be possible given how the preceeding pipeline works, but we adjust for it anyway.
 func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
 	for excess > 0 {
 		for i := len(scaledPayouts) - 1; i >= 0; i-- {

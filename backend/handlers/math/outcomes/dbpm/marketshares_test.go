@@ -478,17 +478,41 @@ func TestCalculateExcess(t *testing.T) {
 	}
 }
 
+// theoretically this test case should never occur.
+// that being said, we're testing deducting from newest to oldest
 func TestAdjustForPositiveExcess(t *testing.T) {
-	scaledPayouts := []int64{10, 20, 30}
-	excess := int64(5)
+	testcases := []struct {
+		Name           string
+		ScaledPayouts  []int64
+		Excess         int64
+		ExpectedResult []int64
+	}{
+		{
+			Name:           "NoExcess",
+			ScaledPayouts:  []int64{10, 20, 30},
+			Excess:         0,
+			ExpectedResult: []int64{10, 20, 30}, // No adjustment needed
+		},
+		{
+			Name:           "SmallExcess",
+			ScaledPayouts:  []int64{10, 20, 30},
+			Excess:         2,
+			ExpectedResult: []int64{10, 19, 29},
+		},
+	}
 
-	expectedPayouts := []int64{9, 18, 28}
-	actualPayouts := adjustForPositiveExcess(scaledPayouts, excess)
-
-	for i, payout := range actualPayouts {
-		if payout != expectedPayouts[i] {
-			t.Errorf("At index %d, expected payout: %d, got: %d", i, expectedPayouts[i], payout)
-		}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			actualResult := adjustForPositiveExcess(tc.ScaledPayouts, tc.Excess)
+			for i, result := range actualResult {
+				if result != tc.ExpectedResult[i] {
+					t.Errorf(
+						"Test %s failed at index %d: expected payout %d, got %d",
+						tc.Name, i, tc.ExpectedResult[i], result,
+					)
+				}
+			}
+		})
 	}
 }
 
