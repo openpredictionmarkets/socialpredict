@@ -12,7 +12,7 @@ import (
 
 var now = time.Now()
 
-// test helper functions to generate types more succiently
+// helper function to generate bets succiently
 func generateBet(amount int64, outcome, username string, marketID uint, offset time.Duration) models.Bet {
 	return models.Bet{
 		Amount:   amount,
@@ -23,12 +23,29 @@ func generateBet(amount int64, outcome, username string, marketID uint, offset t
 	}
 }
 
+// helper function to create wpam.ProbabilityChange points succiently
 func generateProbability(probabilities ...float64) []wpam.ProbabilityChange {
 	var changes []wpam.ProbabilityChange
 	for _, p := range probabilities {
 		changes = append(changes, wpam.ProbabilityChange{Probability: p})
 	}
 	return changes
+}
+
+// helper function to create course payouts succiently
+func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayout {
+	if len(payouts) != len(outcomes) {
+		panic("payouts and outcomes slices must have the same length")
+	}
+
+	var coursePayouts []CourseBetPayout
+	for i, payout := range payouts {
+		coursePayouts = append(coursePayouts, CourseBetPayout{
+			Payout:  payout,
+			Outcome: outcomes[i],
+		})
+	}
+	return coursePayouts
 }
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
@@ -67,18 +84,6 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 			S_NO:               19,
 		},
 		{
-			Name: "NegativeBetNoDirection",
-			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
-				generateBet(-10, "NO", "one", 1, 3*time.Minute),
-			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
-			S_YES:              19,
-			S_NO:               11,
-		},
-		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
 				generateBet(20, "NO", "one", 1, 0),
@@ -88,6 +93,18 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500),
 			S_YES:              20,
 			S_NO:               20,
+		},
+		{
+			Name: "FourthBetNegativeNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
+			S_YES:              19,
+			S_NO:               11,
 		},
 	}
 
@@ -112,22 +129,96 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		Name               string
 		Bets               []models.Bet
 		ProbabilityChanges []wpam.ProbabilityChange
-		CoursePayouts      []CourseBetPayout
-	}{}
+		ExpectedPayouts    []CourseBetPayout
+	}{
+		{
+			Name:               "InitialMarketState",
+			Bets:               []models.Bet{},
+			ProbabilityChanges: generateProbability(0.500),
+			ExpectedPayouts:    nil, // No bets -> No payouts
+		},
+		{
+			Name: "FirstBetNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167),
+			ExpectedPayouts: generateCoursePayouts(
+				[]float64{0}, // Payout = |0.167 - 0.167| * 20
+				[]string{"NO"},
+			),
+		},
+		{
+			Name: "SecondBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375),
+			ExpectedPayouts: generateCoursePayouts(
+				[]float64{4.1600000000000001, 0},
+				[]string{"NO", "YES"},
+			),
+		},
+		{
+			Name: "ThirdBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500),
+			ExpectedPayouts: generateCoursePayouts(
+				[]float64{6.6599999999999993, 1.25, 0},
+				[]string{"NO", "YES", "YES"},
+			),
+		},
+		{
+			Name: "FourthBetNegativeNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+			},
+			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
+			ExpectedPayouts: generateCoursePayouts(
+				[]float64{9.1600000000000001, 2.5, 1.25, 0},
+				[]string{"NO", "YES", "YES", "NO"},
+			),
+		},
+	}
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateCoursePayoutsDBPM(tc.Bets, tc.ProbabilityChanges)
-			if len(actualPayouts) != len(tc.CoursePayouts) {
-				t.Fatalf("expected %d payouts, got %d", len(tc.CoursePayouts), len(actualPayouts))
-			}
+
+			// Log all actual payouts for debugging
 			for i, payout := range actualPayouts {
-				if payout.Payout != tc.CoursePayouts[i].Payout || payout.Outcome != tc.CoursePayouts[i].Outcome {
-					t.Errorf("Test %s failed at index %d: expected %+v, got %+v", tc.Name, i, tc.CoursePayouts[i], payout)
+				t.Logf(
+					"%s: Actual payout %d -> {Payout: %.17g, Outcome: %s}",
+					tc.Name, i, payout.Payout, payout.Outcome,
+				)
+			}
+
+			if len(actualPayouts) != len(tc.ExpectedPayouts) {
+				t.Fatalf("%s: expected %d payouts, got %d", tc.Name, len(tc.ExpectedPayouts), len(actualPayouts))
+			}
+
+			for i, payout := range actualPayouts {
+				expected := tc.ExpectedPayouts[i]
+
+				// Log both expected and actual for each mismatch
+				if payout.Payout != expected.Payout || payout.Outcome != expected.Outcome {
+					t.Errorf(
+						"%s: payout %d mismatch. Expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
+						tc.Name, i, expected.Payout, expected.Outcome, payout.Payout, payout.Outcome,
+					)
 				}
 			}
 		})
 	}
+
 }
 
 func TestCalculateNormalizationFactorsDBPM(t *testing.T) {

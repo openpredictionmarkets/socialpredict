@@ -1,7 +1,6 @@
 package dbpm
 
 import (
-	"socialpredict/logging"
 	"socialpredict/models"
 	"testing"
 )
@@ -64,7 +63,6 @@ func TestCalculatePayoutForOutcomeDBPM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			payout := CalculatePayoutForOutcomeDBPM(tt.bet, tt.totalYes, tt.totalNo, tt.betInput, tt.marketResolution)
-			logging.LogAnyType(payout, "payout")
 			if payout != tt.expectedPayout {
 				t.Errorf("%s: expected payout %f, got %f", tt.name, tt.expectedPayout, payout)
 			}

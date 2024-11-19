@@ -79,14 +79,28 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 		return nil
 	}
 
+	logging.LogAnyType(probabilityChanges, "probabilityChanges")
+
 	var coursePayouts []CourseBetPayout
 
-	// Get the last probability change which is the resolution probability
-	R := probabilityChanges[len(probabilityChanges)-1].Probability
-
+	// Iterate over each bet to calculate its course payout
 	for i, bet := range bets {
-		// Distance to last (current) probability times bet amount
-		C_i := math.Abs(R-probabilityChanges[i].Probability) * float64(bet.Amount)
+		// Probabilty at which the bet was placed is the bet index+1
+		// The probability index is always the length of the bet index+1 because of the initial probability
+		P := probabilityChanges[i+1].Probability
+		// Get the current (final) probability for the market
+		R := probabilityChanges[len(probabilityChanges)-1].Probability
+
+		// Calculate payout based on |R - P| * bet amount
+		logging.LogAnyType(bet.Amount, "bet.Amount")
+		logging.LogAnyType(P, "P (probabilityChanges[i].Probability): ")
+		logging.LogAnyType(R, "R (final resolution probability): ")
+		logging.LogAnyType(float64(bet.Amount), "float64(bet.Amount): ")
+		logging.LogAnyType(math.Abs(R-P), "math.Abs(R - P): ")
+		C_i := math.Abs(R-P) * float64(bet.Amount)
+		logging.LogAnyType(C_i, "C_i (course payout): ")
+
+		// Append the calculated payout to the result
 		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: C_i, Outcome: bet.Outcome})
 	}
 
