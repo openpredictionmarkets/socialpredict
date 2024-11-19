@@ -360,8 +360,8 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 				[]string{"NO", "YES"},
 			),
 			F_YES:                 0,
-			F_NO:                  0,
-			ExpectedScaledPayouts: []int64{0, 0},
+			F_NO:                  4.5673076923076925,
+			ExpectedScaledPayouts: []int64{19, 0},
 		},
 		{
 			Name: "ThirdBetYesDirection",
@@ -413,17 +413,68 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 }
 
 func TestCalculateExcess(t *testing.T) {
-	bets := []models.Bet{
-		{Amount: 10},
-		{Amount: 20},
+	testcases := []struct {
+		Name           string
+		Bets           []models.Bet
+		ScaledPayouts  []int64
+		ExpectedExcess int64
+	}{
+		{
+			Name:           "InitialMarketState",
+			Bets:           []models.Bet{},
+			ScaledPayouts:  []int64{},
+			ExpectedExcess: 0, // No bets, no excess
+		},
+		{
+			Name: "FirstBetNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+			},
+			ScaledPayouts:  []int64{0},
+			ExpectedExcess: -20,
+		},
+		{
+			Name: "SecondBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+			},
+			ScaledPayouts:  []int64{20, 20}, // Scaled payouts > market volume
+			ExpectedExcess: 20,              // Market volume = 30, scaled payout sum = 40
+		},
+		{
+			Name: "ThirdBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+			},
+			ScaledPayouts:  []int64{20, 20, 0},
+			ExpectedExcess: 10, // Market volume = 40, scaled payout sum = 50
+		},
+		{
+			Name: "FourthBetNegativeNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+			},
+			ScaledPayouts:  []int64{11, 13, 6, 0},
+			ExpectedExcess: -1, // Market volume = 30, scaled payout sum = 29
+		},
 	}
-	scaledPayouts := []int64{5, 15, 10}
 
-	expectedExcess := int64(0)
-	actualExcess := calculateExcess(bets, scaledPayouts)
-
-	if actualExcess != expectedExcess {
-		t.Errorf("Expected excess: %d, got: %d", expectedExcess, actualExcess)
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			actualExcess := calculateExcess(tc.Bets, tc.ScaledPayouts)
+			if actualExcess != tc.ExpectedExcess {
+				t.Errorf(
+					"Test %s failed: expected excess %d, got %d",
+					tc.Name, tc.ExpectedExcess, actualExcess,
+				)
+			}
+		})
 	}
 }
 
