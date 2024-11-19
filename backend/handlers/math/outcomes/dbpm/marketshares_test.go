@@ -5,6 +5,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/setup"
+	"sort"
 	"testing"
 	"time"
 )
@@ -621,112 +622,97 @@ func TestAdjustPayouts(t *testing.T) {
 
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
 	testcases := []struct {
-		Name                  string
-		Bets                  []models.Bet
-		AdjustedScaledPayouts []int64
-		AggregatedPositions   []MarketPosition
+		Name              string
+		Bets              []models.Bet
+		FinalPayouts      []int64
+		ExpectedPositions []MarketPosition
 	}{
 		{
-			Name: "PreventSimultaneousSharesHeld",
+			Name:              "InitialMarketState",
+			Bets:              []models.Bet{},
+			FinalPayouts:      []int64{},
+			ExpectedPositions: []MarketPosition{},
+		},
+		{
+			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				{
-					Amount:   3,
-					Outcome:  "YES",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 7, 31, 428975000, time.UTC),
-					MarketID: 3,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: time.Date(2024, 5, 18, 5, 8, 13, 922665000, time.UTC),
-					MarketID: 3,
-				},
+				generateBet(20, "NO", "one", 1, 0),
 			},
-			AdjustedScaledPayouts: []int64{3, 1},
-			AggregatedPositions: []MarketPosition{
-				{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
+			FinalPayouts: []int64{20},
+			ExpectedPositions: []MarketPosition{
+				{Username: "one", NoSharesOwned: 20, YesSharesOwned: 0},
 			},
 		},
 		{
-			Name: "InfinityAvoidance",
+			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				{
-					Amount:   1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now,
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "YES",
-					Username: "user2",
-					PlacedAt: now.Add(time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(2 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   -1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(3 * time.Minute),
-					MarketID: 1,
-				},
-				{
-					Amount:   1,
-					Outcome:  "NO",
-					Username: "user1",
-					PlacedAt: now.Add(4 * time.Minute),
-					MarketID: 1,
-				},
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
 			},
-			AdjustedScaledPayouts: []int64{0, 0, 1, 0, 0},
-			AggregatedPositions: []MarketPosition{
-				{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
-				{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
+			FinalPayouts: []int64{25, 5},
+			ExpectedPositions: []MarketPosition{
+				{Username: "one", NoSharesOwned: 25, YesSharesOwned: 0},
+				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 5},
+			},
+		},
+		{
+			Name: "ThirdBetYesDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+			},
+			FinalPayouts: []int64{20, 20, 0},
+			ExpectedPositions: []MarketPosition{
+				{Username: "one", NoSharesOwned: 20, YesSharesOwned: 0},
+				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 20},
+				{Username: "three", NoSharesOwned: 0, YesSharesOwned: 0},
+			},
+		},
+		{
+			Name: "FourthBetNegativeNoDirection",
+			Bets: []models.Bet{
+				generateBet(20, "NO", "one", 1, 0),
+				generateBet(10, "YES", "two", 1, time.Minute),
+				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+			},
+			FinalPayouts: []int64{11, 13, 6, 0},
+			ExpectedPositions: []MarketPosition{
+				{Username: "one", NoSharesOwned: 11, YesSharesOwned: 0},
+				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 13},
+				{Username: "three", NoSharesOwned: 0, YesSharesOwned: 6},
 			},
 		},
 	}
+
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			result := AggregateUserPayoutsDBPM(tc.Bets, tc.AdjustedScaledPayouts)
+			actualPositions := AggregateUserPayoutsDBPM(tc.Bets, tc.FinalPayouts)
 
-			// Create a map for expected results for easy lookup
-			expectedResults := make(map[string]MarketPosition)
-			for _, pos := range tc.AggregatedPositions {
-				expectedResults[pos.Username] = pos
+			// Sort both expected and actual results by Username for comparison
+			sort.Slice(tc.ExpectedPositions, func(i, j int) bool {
+				return tc.ExpectedPositions[i].Username < tc.ExpectedPositions[j].Username
+			})
+			sort.Slice(actualPositions, func(i, j int) bool {
+				return actualPositions[i].Username < actualPositions[j].Username
+			})
+
+			// Ensure lengths match
+			if len(actualPositions) != len(tc.ExpectedPositions) {
+				t.Fatalf("Test %s failed: expected %d positions, got %d", tc.Name, len(tc.ExpectedPositions), len(actualPositions))
 			}
 
-			// Create a map from the results for comparison
-			resultsMap := make(map[string]MarketPosition)
-			for _, pos := range result {
-				resultsMap[pos.Username] = pos
-			}
-
-			// Check if the results match expected results for each user
-			for username, expectedPos := range expectedResults {
-				resultPos, ok := resultsMap[username]
-				if !ok {
-					t.Errorf("Test %s failed: missing position for username %s", tc.Name, username)
-					continue
-				}
-				if resultPos.YesSharesOwned != expectedPos.YesSharesOwned || resultPos.NoSharesOwned != expectedPos.NoSharesOwned {
-					t.Errorf("Test %s failed for %s: expected %+v, got %+v", tc.Name, username, expectedPos, resultPos)
-				}
-			}
-
-			// Check for any unexpected extra users in the results
-			for username := range resultsMap {
-				if _, ok := expectedResults[username]; !ok {
-					t.Errorf("Test %s failed: unexpected position for username %s", tc.Name, username)
+			// Ensure positions match exactly
+			for i, position := range actualPositions {
+				expected := tc.ExpectedPositions[i]
+				if position.Username != expected.Username ||
+					position.NoSharesOwned != expected.NoSharesOwned ||
+					position.YesSharesOwned != expected.YesSharesOwned {
+					t.Errorf(
+						"Test %s failed at index %d: expected %+v, got %+v",
+						tc.Name, i, expected, position,
+					)
 				}
 			}
 		})
