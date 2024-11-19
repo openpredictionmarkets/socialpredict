@@ -517,17 +517,39 @@ func TestAdjustForPositiveExcess(t *testing.T) {
 }
 
 func TestAdjustForNegativeExcess(t *testing.T) {
-	scaledPayouts := []int64{10, 20, 30}
-	excess := int64(-5)
-
-	expectedPayouts := []int64{12, 22, 31}
-	actualPayouts := adjustForNegativeExcess(scaledPayouts, excess)
-
-	for i, payout := range actualPayouts {
-		if payout != expectedPayouts[i] {
-			t.Errorf("At index %d, expected payout: %d, got: %d", i, expectedPayouts[i], payout)
-		}
+	testcases := []struct {
+		Name           string
+		ScaledPayouts  []int64
+		Excess         int64
+		ExpectedResult []int64
+	}{
+		{
+			Name:           "NoExcess",
+			ScaledPayouts:  []int64{10, 20, 30},
+			Excess:         0,
+			ExpectedResult: []int64{10, 20, 30}, // No adjustment needed
+		},
+		{
+			Name:           "SmallNegativeExcess",
+			ScaledPayouts:  []int64{19, 0},
+			Excess:         -11,
+			ExpectedResult: []int64{25, 5}, // Adding to each sequentially
+		},
 	}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			actualResult := adjustForNegativeExcess(tc.ScaledPayouts, tc.Excess)
+			for i, result := range actualResult {
+				if result != tc.ExpectedResult[i] {
+					t.Errorf(
+						"Test %s failed at index %d: expected payout %d, got %d",
+						tc.Name, i, tc.ExpectedResult[i], result,
+					)
+				}
+			}
+		})
+	}
+
 }
 
 func TestAdjustPayouts(t *testing.T) {
