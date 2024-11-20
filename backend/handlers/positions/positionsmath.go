@@ -92,28 +92,3 @@ func CalculateMarketPositionForUser_WPAM_DBPM(db *gorm.DB, marketIdStr string, u
 
 	return UserMarketPosition{}, nil
 }
-
-// CheckOppositeSharesOwned determines the number of opposite shares a user holds and needs to sell,
-// as well as the type of those shares (YES or NO).
-func CheckOppositeSharesOwned(db *gorm.DB, marketIDStr string, username string, betRequestOutcome string) (int64, string, error) {
-	userMarketPositions, err := CalculateMarketPositionForUser_WPAM_DBPM(db, marketIDStr, username)
-	if err != nil {
-		return 0, "", err // Return the error if fetching the market positions fails.
-	}
-
-	switch betRequestOutcome {
-	case "NO":
-		// If the user wants to buy NO shares, check YES shares to sell.
-		if userMarketPositions.YesSharesOwned > 0 {
-			return userMarketPositions.YesSharesOwned, "YES", nil
-		}
-	case "YES":
-		// If the user wants to buy YES shares, check NO shares to sell.
-		if userMarketPositions.NoSharesOwned > 0 {
-			return userMarketPositions.NoSharesOwned, "NO", nil
-		}
-	}
-
-	// If the user has no opposite shares to sell, return 0 and an empty string for the outcome.
-	return 0, "", nil
-}

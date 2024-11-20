@@ -5,23 +5,13 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/setup"
+	"socialpredict/util"
 	"sort"
 	"testing"
 	"time"
 )
 
 var now = time.Now()
-
-// helper function to generate bets succiently
-func generateBet(amount int64, outcome, username string, marketID uint, offset time.Duration) models.Bet {
-	return models.Bet{
-		Amount:   amount,
-		Outcome:  outcome,
-		Username: username,
-		PlacedAt: time.Now().Add(offset),
-		MarketID: marketID,
-	}
-}
 
 // helper function to create wpam.ProbabilityChange points succiently
 func generateProbability(probabilities ...float64) []wpam.ProbabilityChange {
@@ -66,7 +56,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167),
 			S_YES:              3,
@@ -75,8 +65,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375),
 			S_YES:              11,
@@ -85,9 +75,9 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500),
 			S_YES:              20,
@@ -96,10 +86,10 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
-				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			S_YES:              19,
@@ -108,8 +98,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "NOResolution",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.0), // Final resolution R = 0
 			S_YES:              0,
@@ -118,8 +108,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "YESResolution",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 1.0), // Final resolution R = 1
 			S_YES:              30,                                     // All shares go to YES
@@ -159,7 +149,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167),
 			ExpectedPayouts: generateCoursePayouts(
@@ -170,8 +160,8 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375),
 			ExpectedPayouts: generateCoursePayouts(
@@ -182,9 +172,9 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500),
 			ExpectedPayouts: generateCoursePayouts(
@@ -195,10 +185,10 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
-				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			ExpectedPayouts: generateCoursePayouts(
@@ -340,7 +330,7 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{0},
@@ -353,8 +343,8 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{4.1600000000000001, 0},
@@ -367,9 +357,9 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{6.6599999999999993, 1.25, 0},
@@ -382,10 +372,10 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
-				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{9.1600000000000001, 2.5, 1.25, 0},
@@ -429,7 +419,7 @@ func TestCalculateExcess(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			ScaledPayouts:  []int64{0},
 			ExpectedExcess: -20,
@@ -437,8 +427,8 @@ func TestCalculateExcess(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ScaledPayouts:  []int64{19, 0}, // Scaled payouts < market volume
 			ExpectedExcess: -11,            // marketVolume = 30, scaledPayouts = 19
@@ -446,9 +436,9 @@ func TestCalculateExcess(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			ScaledPayouts:  []int64{20, 20, 0},
 			ExpectedExcess: 0, // marketVolume = 40, scaledPayouts = 40
@@ -456,10 +446,10 @@ func TestCalculateExcess(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
-				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			ScaledPayouts:  []int64{11, 13, 6, 0},
 			ExpectedExcess: 0, // marketVolume = 30, scaledPayouts = 30
@@ -569,7 +559,7 @@ func TestAdjustPayouts(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			ScaledPayouts:           []int64{0},
 			ExpectedAdjustedPayouts: []int64{20},
@@ -577,8 +567,8 @@ func TestAdjustPayouts(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ScaledPayouts:           []int64{19, 0},
 			ExpectedAdjustedPayouts: []int64{25, 5},
@@ -586,9 +576,9 @@ func TestAdjustPayouts(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			ScaledPayouts:           []int64{20, 20, 0},
 			ExpectedAdjustedPayouts: []int64{20, 20, 0},
@@ -596,10 +586,10 @@ func TestAdjustPayouts(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
-				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			ScaledPayouts:           []int64{11, 13, 6, 0},
 			ExpectedAdjustedPayouts: []int64{11, 13, 6, 0},
@@ -636,7 +626,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			FinalPayouts: []int64{20},
 			ExpectedPositions: []MarketPosition{
@@ -646,8 +636,8 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			FinalPayouts: []int64{25, 5},
 			ExpectedPositions: []MarketPosition{
@@ -658,9 +648,9 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			FinalPayouts: []int64{20, 20, 0},
 			ExpectedPositions: []MarketPosition{
@@ -672,10 +662,10 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				generateBet(20, "NO", "one", 1, 0),
-				generateBet(10, "YES", "two", 1, time.Minute),
-				generateBet(10, "YES", "three", 1, 2*time.Minute),
-				generateBet(-10, "NO", "one", 1, 3*time.Minute),
+				util.GenerateBet(20, "NO", "one", 1, 0),
+				util.GenerateBet(10, "YES", "two", 1, time.Minute),
+				util.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				util.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			FinalPayouts: []int64{11, 13, 6, 0},
 			ExpectedPositions: []MarketPosition{
