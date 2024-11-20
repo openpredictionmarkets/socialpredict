@@ -274,9 +274,7 @@ func singleShareYesNoAllocator(bets []models.Bet) string {
 
 	if total > 0 {
 		return "YES"
-	} else if total < 0 {
-		return "NO"
 	} else {
-		return "" // indeterminite
+		return "NO"
 	}
 }

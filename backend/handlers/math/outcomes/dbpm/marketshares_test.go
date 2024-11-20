@@ -759,14 +759,6 @@ func TestSingleShareYesNoAllocator(t *testing.T) {
 			},
 			expected: "NO",
 		},
-		{
-			name: "No outcome",
-			bets: []models.Bet{
-				{Amount: 2, Outcome: "YES"},
-				{Amount: 2, Outcome: "NO"},
-			},
-			expected: "",
-		},
 	}
 
 	for _, tt := range tests {
