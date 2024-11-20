@@ -7,12 +7,13 @@ import (
 
 func TestCalculatePayoutForOutcomeDBPM(t *testing.T) {
 	tests := []struct {
-		name              string
-		bet               models.Bet
-		totalYes, totalNo int64
-		betInput          string
-		marketResolution  string
-		expectedPayout    float64
+		name             string
+		bet              models.Bet
+		totalYes         int64
+		totalNo          int64
+		betInput         string
+		marketResolution string
+		expectedPayout   float64
 	}{
 		{
 			name: "Winning YES bet",
