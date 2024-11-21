@@ -1,4 +1,4 @@
-package util
+package modelstesting
 
 import (
 	"socialpredict/models"
