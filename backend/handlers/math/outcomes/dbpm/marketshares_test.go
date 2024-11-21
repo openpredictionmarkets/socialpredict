@@ -13,15 +13,6 @@ import (
 
 var now = time.Now()
 
-// helper function to create wpam.ProbabilityChange points succiently
-func generateProbability(probabilities ...float64) []wpam.ProbabilityChange {
-	var changes []wpam.ProbabilityChange
-	for _, p := range probabilities {
-		changes = append(changes, wpam.ProbabilityChange{Probability: p})
-	}
-	return changes
-}
-
 // helper function to create course payouts succiently
 func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayout {
 	if len(payouts) != len(outcomes) {
@@ -49,7 +40,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name:               "InitialMarketState",
 			Bets:               []models.Bet{},
-			ProbabilityChanges: generateProbability(0.500),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500),
 			S_YES:              0,
 			S_NO:               0,
 		},
@@ -58,7 +49,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 			Bets: []models.Bet{
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167),
 			S_YES:              3,
 			S_NO:               17,
 		},
@@ -68,7 +59,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375),
 			S_YES:              11,
 			S_NO:               19,
 		},
@@ -79,7 +70,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500),
 			S_YES:              20,
 			S_NO:               20,
 		},
@@ -91,7 +82,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			S_YES:              19,
 			S_NO:               11,
 		},
@@ -101,7 +92,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.0), // Final resolution R = 0
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.0), // Final resolution R = 0
 			S_YES:              0,
 			S_NO:               30, // All shares go to NO
 		},
@@ -111,8 +102,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 1.0), // Final resolution R = 1
-			S_YES:              30,                                     // All shares go to YES
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 1.0), // Final resolution R = 1
+			S_YES:              30,                                                   // All shares go to YES
 			S_NO:               0,
 		},
 	}
@@ -143,7 +134,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		{
 			Name:               "InitialMarketState",
 			Bets:               []models.Bet{},
-			ProbabilityChanges: generateProbability(0.500),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500),
 			ExpectedPayouts:    nil, // No bets -> No payouts
 		},
 		{
@@ -151,7 +142,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 			Bets: []models.Bet{
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167),
 			ExpectedPayouts: generateCoursePayouts(
 				[]float64{0}, // Payout = |0.167 - 0.167| * 20
 				[]string{"NO"},
@@ -163,7 +154,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375),
 			ExpectedPayouts: generateCoursePayouts(
 				[]float64{4.1600000000000001, 0},
 				[]string{"NO", "YES"},
@@ -176,7 +167,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500),
 			ExpectedPayouts: generateCoursePayouts(
 				[]float64{6.6599999999999993, 1.25, 0},
 				[]string{"NO", "YES", "YES"},
@@ -190,7 +181,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
-			ProbabilityChanges: generateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
+			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			ExpectedPayouts: generateCoursePayouts(
 				[]float64{9.1600000000000001, 2.5, 1.25, 0},
 				[]string{"NO", "YES", "YES", "NO"},
