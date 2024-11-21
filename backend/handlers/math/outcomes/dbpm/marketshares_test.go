@@ -202,25 +202,25 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateCoursePayoutsDBPM(tc.Bets, tc.ProbabilityChanges)
 
-			// Log all actual payouts for debugging
-			for i, payout := range actualPayouts {
+			// Debug output: Actual payouts
+			if t.Failed() {
 				t.Logf(
-					"%s: Actual payout %d -> {Payout: %.17g, Outcome: %s}",
-					tc.Name, i, payout.Payout, payout.Outcome,
+					"[DEBUG] %s: Actual payouts: %+v",
+					tc.Name, actualPayouts,
 				)
 			}
 
+			// Ensure payout counts match
 			if len(actualPayouts) != len(tc.ExpectedPayouts) {
-				t.Fatalf("%s: expected %d payouts, got %d", tc.Name, len(tc.ExpectedPayouts), len(actualPayouts))
+				t.Fatalf("%s: Expected %d payouts, got %d", tc.Name, len(tc.ExpectedPayouts), len(actualPayouts))
 			}
 
+			// Check each payout
 			for i, payout := range actualPayouts {
 				expected := tc.ExpectedPayouts[i]
-
-				// Log both expected and actual for each mismatch
 				if payout.Payout != expected.Payout || payout.Outcome != expected.Outcome {
 					t.Errorf(
-						"%s: payout %d mismatch. Expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
+						"%s: Payout %d mismatch. Expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
 						tc.Name, i, expected.Payout, expected.Outcome, payout.Payout, payout.Outcome,
 					)
 				}
