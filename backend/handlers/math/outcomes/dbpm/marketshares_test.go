@@ -379,6 +379,7 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 			ExpectedScaledPayouts: []int64{11, 13, 6, 0},
 		},
 	}
+
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.F_YES, tc.F_NO)
@@ -387,13 +388,14 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 			for i, payout := range actualPayouts {
 				if payout != tc.ExpectedScaledPayouts[i] {
 					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedScaledPayouts[i], payout,
+						"at index %d: expected payout %d, got %d",
+						i, tc.ExpectedScaledPayouts[i], payout,
 					)
 				}
 			}
 		})
 	}
+
 }
 
 func TestCalculateExcess(t *testing.T) {
