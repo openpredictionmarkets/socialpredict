@@ -14,9 +14,14 @@ server {
 server {
 	gzip on;
 	gzip_min_length 1000;
-	gunzip on;
+	gunzip on; 
 	gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+	listen 443 quic reuseport;
 	listen 443 ssl;
+	ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+	http2 on;
+	http3 on;
+	http3_hq on;
 	server_name ${DOMAIN};
 
 	ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
@@ -25,11 +30,8 @@ server {
 	include /etc/letsencrypt/options-ssl-nginx.conf;
 	ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-	location /api/ {
-		proxy_pass http://backend:8080/;
-	}
-
 	location / {
 		proxy_pass http://frontend:80;
+		add_header Alt-Svc 'h3=":$server_port"; ma=86400';
 	}
 }
