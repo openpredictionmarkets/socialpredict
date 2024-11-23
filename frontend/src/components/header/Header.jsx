@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import Logo from '../logo/Logo';
-import LoginModalButton from '../modals/login/LoginModalClick';
+import Logo from '../logo/Logo.jsx';
+import LoginModalButton from '../modals/login/LoginModalClick.jsx';
 
 // This function returns menu items, we can use it in both Sidebar and Header components
 const MenuItems = ({ isLoggedIn, onLogout }) => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import ChangePasswordLayout from '../../components/layouts/changepassword/ChangePasswordLayout';
+import ChangePasswordLayout from '../../components/layouts/changepassword/ChangePasswordLayout.jsx';
 
 function ChangePassword() {
 

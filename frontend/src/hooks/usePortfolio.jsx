@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_URL } from '../config';
+import { API_URL } from '../config.js';
 
 const usePortfolio = (username) => {
   const [portfolio, setPortfolio] = useState({ portfolioItems: [] });

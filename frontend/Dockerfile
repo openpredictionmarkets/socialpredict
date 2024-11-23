@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM node:21.0.0
+FROM deno:lastest
 
 WORKDIR /app
 
@@ -8,4 +8,4 @@ RUN npm install
 COPY . .
 
 EXPOSE 5173
-CMD ["npm", "run", "start"]
+CMD ["deno", "run", "start"]

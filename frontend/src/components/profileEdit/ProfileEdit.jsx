@@ -1,6 +1,4 @@
 // EmojiSelector.js
-import React, { useState } from 'react';
-
 const ProfileEdit = ({ onSelectEmoji }) => {
   const emojis = ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇'];
 

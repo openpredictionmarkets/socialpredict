@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import formatResolutionDate from '../../helpers/formatResolutionDate';
+import formatResolutionDate from '../../helpers/formatResolutionDate.js';
 
 const MobileMarketCard = ({ marketData }) => {
   const isMarketOpen =
@@ -43,13 +43,12 @@ const MobileMarketCard = ({ marketData }) => {
           {marketData.lastProbability.toFixed(2)}%
         </span>
         <span
-          className={`text-right ${
-            marketData.market.isResolved
-              ? marketData.market.resolutionResult === 'YES'
-                ? 'text-green-400'
-                : 'text-red-400'
-              : 'text-gray-400'
-          }`}
+          className={`text-right ${marketData.market.isResolved
+            ? marketData.market.resolutionResult === 'YES'
+              ? 'text-green-400'
+              : 'text-red-400'
+            : 'text-gray-400'
+            }`}
         >
           {marketData.market.isResolved
             ? marketData.market.resolutionResult === 'YES'

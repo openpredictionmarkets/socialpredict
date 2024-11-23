@@ -1,14 +1,14 @@
-import { API_URL } from './../config';
+import { API_URL } from './../config.js';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext({
     username: null,
-    setUsername: () => {},
+    setUsername: () => { },
     isLoggedIn: false,
     usertype: null,
     changePasswordNeeded: true, // Default to true until login confirms otherwise
-    login: () => {},
-    logout: () => {},
+    login: () => { },
+    logout: () => { },
 });
 
 const useAuth = () => useContext(

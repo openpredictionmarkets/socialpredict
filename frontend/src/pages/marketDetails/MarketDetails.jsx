@@ -1,10 +1,10 @@
 import React from 'react';
-import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
-import { useMarketDetails } from '../../hooks/useMarketDetails';
-import { useAuth } from '../../helpers/AuthContent';
-import ResolveModalButton from '../../components/modals/resolution/ResolveModal';
-import BetModalButton from '../../components/modals/bet/BetModal';
-import LoadingSpinner from '../../components/loaders/LoadingSpinner';
+import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout.jsx';
+import { useMarketDetails } from '../../hooks/useMarketDetails.jsx';
+import { useAuth } from '../../helpers/AuthContent.jsx';
+import ResolveModalButton from '../../components/modals/resolution/ResolveModal.jsx';
+import BetModalButton from '../../components/modals/bet/BetModal.jsx';
+import LoadingSpinner from '../../components/loaders/LoadingSpinner.jsx';
 
 const MarketDetails = () => {
   const { username } = useAuth();

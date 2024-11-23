@@ -1,5 +1,5 @@
 import React from 'react';
-import AdminAddUser from '../../components/layouts/admin/AddUser';
+import AdminAddUser from '../../components/layouts/admin/AddUser.jsx';
 
 function AdminDashboard() {
 

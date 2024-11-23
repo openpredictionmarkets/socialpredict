@@ -1,4 +1,4 @@
-import { API_URL } from '../../../config';
+import { API_URL } from '../../../config.js';
 
 export const submitBet = (betData, token, onSuccess, onError) => {
 
@@ -17,22 +17,22 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         },
         body: JSON.stringify(betData),
     })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(err => {
-                // Construct a new error object and throw it
-                throw new Error(`Error placing bet: ${err.error || 'Unknown error'}`);
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Success:', data);
-        onSuccess(data);  // Handle success outside this utility function
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert(error.message);  // Use error.message to display the custom error message
-        onError(error);  // Handle error outside this utility function
-    });
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    // Construct a new error object and throw it
+                    throw new Error(`Error placing bet: ${err.error || 'Unknown error'}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Success:', data);
+            onSuccess(data);  // Handle success outside this utility function
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(error.message);  // Use error.message to display the custom error message
+            onError(error);  // Handle error outside this utility function
+        });
 };

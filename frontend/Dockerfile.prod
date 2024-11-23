@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM node:21.0.0 AS builder
+FROM denoland/deno:alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm install
+COPY package.json deno.lock ./
+RUN deno i
 COPY . .
 
-RUN npm run build
+RUN deno run build
 
 FROM nginx:latest
 

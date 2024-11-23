@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useHistory } from 'react-router-dom';
-import { useAuth } from '../../helpers/AuthContent';
-import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDateTimeTools';
-import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
-import { RegularInput } from '../../components/inputs/InputBar';
-import RegularInputBox from '../../components/inputs/InputBox';
-import SiteButton from '../../components/buttons/SiteButtons';
-import { API_URL } from '../../config';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../helpers/AuthContent.jsx';
+import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDateTimeTools.jsx';
+import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector.jsx';
+import { RegularInput } from '../../components/inputs/InputBar.jsx';
+import RegularInputBox from '../../components/inputs/InputBox.jsx';
+import SiteButton from '../../components/buttons/SiteButtons.jsx';
+import { API_URL } from '../../config.js';
 
 function Create() {
   const [questionTitle, setQuestionTitle] = useState('');
@@ -16,7 +16,7 @@ function Create() {
   );
   const [error, setError] = useState('');
   const { username } = useAuth();
-  const history = useHistory();
+  const history = useNavigate();
 
   const handleSubmit = async (event) => {
     event.preventDefault();

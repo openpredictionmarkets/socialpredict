@@ -1,7 +1,7 @@
 import React from 'react';
-import SiteTabs from './SiteTabs';
-import BetsActivityLayout from '../layouts/activity/bets/BetsActivity';
-import PositionsActivityLayout from '../layouts/activity/positions/PositionsActivity';
+import SiteTabs from './SiteTabs.jsx';
+import BetsActivityLayout from '../layouts/activity/bets/BetsActivity.jsx';
+import PositionsActivityLayout from '../layouts/activity/positions/PositionsActivity.jsx';
 
 const ActivityTabs = ({ marketId }) => {
     const tabsData = [

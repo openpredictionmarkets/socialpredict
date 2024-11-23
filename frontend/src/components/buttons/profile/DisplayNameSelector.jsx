@@ -1,6 +1,6 @@
-import { API_URL } from '../../../config';
+import { API_URL } from '../../../config.js';
 import React, { useState } from 'react';
-import SiteButton from '../SiteButtons';
+import SiteButton from '../SiteButtons.jsx';
 
 const DisplayNameSelector = ({ onSave }) => {
     const [displayName, setDisplayName] = useState('');

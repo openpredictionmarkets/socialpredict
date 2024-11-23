@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import ProfileModal from '../../../buttons/profile/ProfileModal';
-import EmojiSelector from '../../../buttons/profile/EmojiSelector';
-import DescriptionSelector from '../../../buttons/profile/DescriptionSelector';
-import DisplayNameSelector from '../../../buttons/profile/DisplayNameSelector';
-import PersonalLinksSelector from '../../../buttons/profile/PersonalLinksSelector';
+import ProfileModal from '../../../buttons/profile/ProfileModal.jsx';
+import EmojiSelector from '../../../buttons/profile/EmojiSelector.jsx';
+import DescriptionSelector from '../../../buttons/profile/DescriptionSelector.jsx';
+import DisplayNameSelector from '../../../buttons/profile/DisplayNameSelector.jsx';
+import PersonalLinksSelector from '../../../buttons/profile/PersonalLinksSelector.jsx';
 
 const PrivateUserInfoLayout = ({ userData }) => {
 
