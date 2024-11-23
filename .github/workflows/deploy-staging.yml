@@ -29,7 +29,8 @@ jobs:
                 cd socialpredict-deploy
             else
                 cd socialpredict-deploy
-                git fetch origin
+                git remote add ${{ github.repository_owner }} ${{ github.server_url }}/${{ github.repository }}
+                git fetch ${{ github.repository_owner }}
             fi
             template="./frontend/src/config.js.template"
             file="./frontend/src/config.js"
