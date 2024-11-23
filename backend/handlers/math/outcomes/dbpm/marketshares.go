@@ -175,7 +175,7 @@ func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
 	return scaledPayouts
 }
 
-// Adjust scaled payouts if excess is less than 0
+// adjustForNegativeExcess distributes the remaining credits evenly across the winning bettors- prioritizing the earliest bets placed
 func adjustForNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
 	for excess < 0 {
 		for i := 0; i < len(scaledPayouts); i++ { // Iterate from oldest to newest
