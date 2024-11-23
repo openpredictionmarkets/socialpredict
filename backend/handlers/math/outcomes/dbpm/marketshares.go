@@ -79,13 +79,14 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 
 	var coursePayouts []CourseBetPayout
 
+	// Get the current (final) probability for the market
+	R := probabilityChanges[len(probabilityChanges)-1].Probability
+
 	// Iterate over each bet to calculate its course payout
 	for i, bet := range bets {
 		// Probability at which the bet was placed is the bet index+1
 		// The probability index is always the length of the bet index+1 because of the initial probability
 		P := probabilityChanges[i+1].Probability
-		// Get the current (final) probability for the market
-		R := probabilityChanges[len(probabilityChanges)-1].Probability
 
 		C_i := math.Abs(R-P) * float64(bet.Amount)
 
