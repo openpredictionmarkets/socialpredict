@@ -287,8 +287,10 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualF_YES, actualF_NO := CalculateNormalizationFactorsDBPM(tc.S_YES, tc.S_NO, tc.CoursePayouts)
 
-			// Log the results for manual verification
-			t.Logf("%s: F_YES=%f, F_NO=%f", tc.Name, actualF_YES, actualF_NO)
+			// Debug output for verbose mode
+			t.Logf(
+				"[DEBUG] %s: F_YES=%f, F_NO=%f", tc.Name, actualF_YES, actualF_NO,
+			)
 
 			if actualF_YES != tc.ExpectedF_YES || actualF_NO != tc.ExpectedF_NO {
 				t.Errorf(
