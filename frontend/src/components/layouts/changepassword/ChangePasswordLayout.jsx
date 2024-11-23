@@ -1,9 +1,9 @@
 import React, { useState, useContext } from 'react';
-import { API_URL } from '../../../config';
-import { useHistory } from 'react-router-dom';
-import SiteButton from '../../buttons/SiteButtons';
-import { RegularInput } from '../../inputs/InputBar';
-import { AuthContext } from '../../../helpers/AuthContent';
+import { API_URL } from '../../../config.js';
+import { useNavigate } from 'react-router-dom';
+import SiteButton from '../../buttons/SiteButtons.jsx';
+import { RegularInput } from '../../inputs/InputBar.jsx';
+import { AuthContext } from '../../../helpers/AuthContent.jsx';
 
 function ChangePasswordLayout() {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -11,7 +11,7 @@ function ChangePasswordLayout() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const history = useHistory();  // Initialize useHistory hook
+    const history = useNavigate();  // Initialize useNavigate hook
     const { logout } = useContext(AuthContext); // Use logout from AuthContext
 
     const handleCurrentPasswordChange = (event) => {

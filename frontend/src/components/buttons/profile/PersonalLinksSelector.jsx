@@ -1,6 +1,6 @@
-import { API_URL } from '../../../config';
+import { API_URL } from '../../../config.js';
 import React, { useState, useEffect } from 'react';
-import SiteButton from '../SiteButtons';
+import SiteButton from '../SiteButtons.jsx';
 
 const PersonalLinksSelector = ({ onSave, initialLinks }) => {
     const [links, setLinks] = useState({

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { buttonBaseStyle } from './BaseButton';
+import { buttonBaseStyle } from './BaseButton.jsx';
 
 const SiteButton = ({ onClick, children }) => {
     const [isSelected, setIsSelected] = useState(false);

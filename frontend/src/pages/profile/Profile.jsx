@@ -1,10 +1,10 @@
 import React from 'react';
-import { useAuth } from '../../helpers/AuthContent';
-import PrivateUserInfoLayout from '../../components/layouts/profile/private/PrivateUserInfoLayout';
-import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout';
-import useUserData from '../../hooks/useUserData';
-import usePortfolio from '../../hooks/usePortfolio';
-import LoadingSpinner from '../../components/loaders/LoadingSpinner';
+import { useAuth } from '../../helpers/AuthContent.jsx';
+import PrivateUserInfoLayout from '../../components/layouts/profile/private/PrivateUserInfoLayout.jsx';
+import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout.jsx';
+import useUserData from '../../hooks/useUserData.jsx';
+import usePortfolio from '../../hooks/usePortfolio.jsx';
+import LoadingSpinner from '../../components/loaders/LoadingSpinner.jsx';
 
 const ErrorMessage = ({ message }) => (
   <div

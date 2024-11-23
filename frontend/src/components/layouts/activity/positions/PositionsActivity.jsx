@@ -1,4 +1,4 @@
-import { API_URL } from '../../../../config';
+import { API_URL } from '../../../../config.js';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -12,7 +12,7 @@ const PositionsActivityLayout = ({ marketId }) => {
                 const data = await response.json();
                 console.log("API Data:", data);
                 const sortedAndFiltered = data.filter(user => user.NoSharesOwned > 0 || user.YesSharesOwned > 0)
-                                            .sort((a, b) => (b.NoSharesOwned + b.YesSharesOwned) - (a.NoSharesOwned + a.YesSharesOwned));
+                    .sort((a, b) => (b.NoSharesOwned + b.YesSharesOwned) - (a.NoSharesOwned + a.YesSharesOwned));
                 console.log("Filtered and Sorted Data:", sortedAndFiltered);
                 setPositions(sortedAndFiltered);
             } else {

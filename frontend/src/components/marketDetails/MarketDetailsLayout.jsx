@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import ResolutionAlert from '../resolutions/ResolutionAlert';
-import MarketChart from '../charts/MarketChart';
-import ActivityTabs from '../../components/tabs/ActivityTabs';
-import formatResolutionDate from '../../helpers/formatResolutionDate';
+import ResolutionAlert from '../resolutions/ResolutionAlert.jsx';
+import MarketChart from '../charts/MarketChart.jsx';
+import ActivityTabs from '../../components/tabs/ActivityTabs.jsx';
+import formatResolutionDate from '../../helpers/formatResolutionDate.js';
 
 function MarketDetailsTable({
   market,
@@ -63,11 +63,10 @@ function MarketDetailsTable({
       </div>
       <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
         <p
-          className={`text-sm break-words whitespace-pre-wrap ${
-            showFullDescription
-              ? ''
-              : 'sm:max-h-24 h-16 overflow-y-auto sm:overflow-hidden'
-          }`}
+          className={`text-sm break-words whitespace-pre-wrap ${showFullDescription
+            ? ''
+            : 'sm:max-h-24 h-16 overflow-y-auto sm:overflow-hidden'
+            }`}
           style={{
             wordBreak: 'break-word',
             overflowWrap: 'break-word',

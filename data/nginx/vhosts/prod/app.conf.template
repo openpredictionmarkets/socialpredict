@@ -19,8 +19,8 @@ map $request_method $purge_method {
 
 server {
 	gzip on;
-    gzip_min_length 1000;
-    gunzip on;
+	gzip_min_length 1000;
+	gunzip on;
 	gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 	listen 443 quic reuseport;
 	listen 443 ssl;
