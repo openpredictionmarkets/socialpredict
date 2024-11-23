@@ -13,7 +13,7 @@ import (
 
 var now = time.Now()
 
-// helper function to create course payouts succiently
+// helper function to create course payouts succinctly
 func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayout {
 	if len(payouts) != len(outcomes) {
 		panic("payouts and outcomes slices must have the same length")

@@ -188,7 +188,7 @@ func adjustForNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
 	return scaledPayouts
 }
 
-// Adjust payouts to ensure they align with the available pool
+// AdjustPayouts reconciles the additional or lacking funds from the betting pool by adjusting the payouts to past bets
 func AdjustPayouts(bets []models.Bet, scaledPayouts []int64) []int64 {
 	excess := calculateExcess(bets, scaledPayouts)
 

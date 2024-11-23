@@ -7,7 +7,7 @@ import (
 )
 
 // GenerateBet is used for Generating fake bets for testing purposes
-// helper function to generate bets succiently for testing
+// helper function to generate bets succinctly for testing
 func GenerateBet(amount int64, outcome, username string, marketID uint, offset time.Duration) models.Bet {
 	return models.Bet{
 		Amount:   amount,
@@ -18,7 +18,7 @@ func GenerateBet(amount int64, outcome, username string, marketID uint, offset t
 	}
 }
 
-// helper function to create wpam.ProbabilityChange points succiently
+// helper function to create wpam.ProbabilityChange points succinctly
 func GenerateProbability(probabilities ...float64) []wpam.ProbabilityChange {
 	var changes []wpam.ProbabilityChange
 	for _, p := range probabilities {
