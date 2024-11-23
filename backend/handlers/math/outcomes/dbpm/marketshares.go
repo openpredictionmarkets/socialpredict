@@ -47,8 +47,8 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	S := float64(marketmath.GetMarketVolume(bets))
 
 	// initial condition, shares set to zero
-	S_YES := int64(0)
-	S_NO := int64(0)
+	yesShares := int64(0)
+	noShares := int64(0)
 
 	// Check case where there is single share, output
 	// Calculate YES and NO pools using floating-point arithmetic
@@ -56,17 +56,17 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	if marketmath.GetMarketVolume(bets) == 1 {
 		singleShareDirection := singleShareYesNoAllocator(bets)
 		if singleShareDirection == "YES" {
-			S_YES = 1
+			yesShares = 1
 		} else {
-			S_NO = 1
+			noShares = 1
 		}
 	} else {
-		S_YES = int64(math.Round(S * R))
-		S_NO = int64(math.Round(S * (1 - R)))
+		yesShares = int64(math.Round(S * R))
+		noShares = int64(math.Round(S * (1 - R)))
 	}
 
 	// Convert results to int64, rounding in predictable way
-	return S_YES, S_NO
+	return yesShares, noShares
 }
 
 // CalculateCoursePayoutsDBPM calculates the course payout for each bet in the market,
@@ -80,18 +80,18 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 	var coursePayouts []CourseBetPayout
 
 	// Get the current (final) probability for the market
-	R := probabilityChanges[len(probabilityChanges)-1].Probability
+	currentProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
 	// Iterate over each bet to calculate its course payout
 	for i, bet := range bets {
 		// Probability at which the bet was placed is the bet index+1
 		// The probability index is always the length of the bet index+1 because of the initial probability
-		P := probabilityChanges[i+1].Probability
+		betProbabilityAtTimePlaced := probabilityChanges[i+1].Probability
 
-		C_i := math.Abs(R-P) * float64(bet.Amount)
+		coursePaymentForBet := math.Abs(currentProbability-betProbabilityAtTimePlaced) * float64(bet.Amount)
 
 		// Append the calculated payout to the result
-		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: C_i, Outcome: bet.Outcome})
+		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: coursePaymentForBet, Outcome: bet.Outcome})
 	}
 
 	return coursePayouts
