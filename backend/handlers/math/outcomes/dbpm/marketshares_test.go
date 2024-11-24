@@ -774,14 +774,14 @@ func TestSingleShareYesNoAllocator(t *testing.T) {
 			defer func() {
 				if r := recover(); r != nil {
 					if tc.expectFatal {
-						// Test passes if panic was expected
+						// Test passes if fatal was expected
 						t.Logf("[DEBUG] Test case %q: Expected fatal error occurred. Recovered: %v", tc.name, r)
 					} else {
 						// Test fails if panic was not expected
 						t.Errorf("Unexpected fatal error for case %q: %v", tc.name, r)
 					}
 				} else if tc.expectFatal {
-					// Test fails if no panic occurred but was expected
+					// Test fails if no fatal occurred but was expected
 					t.Errorf("Expected fatal error for case %q, but none occurred", tc.name)
 				}
 			}()

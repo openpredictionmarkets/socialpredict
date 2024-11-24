@@ -149,7 +149,7 @@ func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []Co
 	return scaledPayouts
 }
 
-// Calculate the excess amount based on available pool and scaled payouts
+// calculateExcess determines the amount of credits unaccounted for by comparing calculated scaledPayouts to availablePool
 func calculateExcess(bets []models.Bet, scaledPayouts []int64) int64 {
 	var sumScaledPayouts int64
 	for _, payout := range scaledPayouts {
