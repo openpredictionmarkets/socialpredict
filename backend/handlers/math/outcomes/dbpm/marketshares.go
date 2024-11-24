@@ -162,17 +162,30 @@ func calculateExcess(bets []models.Bet, scaledPayouts []int64) int64 {
 // Adjust scaled payouts if excess is greater than 0
 // This  should not be possible given how the preceeding pipeline works, but we adjust for it anyway.
 func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
-	for excess > 0 {
-		for i := len(scaledPayouts) - 1; i >= 0; i-- {
-			if scaledPayouts[i] > 0 { // Ensure we don't deduct from a zero payout
-				scaledPayouts[i] -= 1 // Deduct surplus from newest
-				excess -= 1           // Decrease excess
-				if excess == 0 {
-					break
-				}
-			}
-		}
+	// No adjustment needed if no payouts or excess is non-positive
+	if excess <= 0 || len(scaledPayouts) == 0 {
+		return scaledPayouts
 	}
+
+	numBets := int64(len(scaledPayouts)) // Total number of bets
+	absoluteExcess := excess             // No need to negate since it's already positive
+
+	// Calculate the base reduction for each bet and the leftover remainder
+	baseReduction := absoluteExcess / numBets
+	totalReduction := baseReduction * numBets
+	remainderReduction := absoluteExcess - totalReduction
+
+	// Apply the base reduction to all payouts
+	for betIndex := range scaledPayouts {
+		scaledPayouts[betIndex] -= baseReduction
+	}
+
+	// Apply the remainder reduction to the newest bets
+	for betIndex := int64(len(scaledPayouts)) - 1; remainderReduction > 0; betIndex-- {
+		scaledPayouts[betIndex] -= 1
+		remainderReduction--
+	}
+
 	return scaledPayouts
 }
 
