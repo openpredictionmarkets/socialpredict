@@ -65,14 +65,14 @@ func SellPositionHandler(loadEconConfig setup.EconConfigLoader) func(w http.Resp
 			return
 		}
 
-		redeemRequest.Amount = -redeemRequest.Amount
-		bet := createBet(redeemRequest, user.Username)
+		// the redeemRequest.Amount should be turned into negative to create the negativeBet
+		negativeBet := createNegativeBet(redeemRequest, user.Username)
 
-		err = betutils.ValidateSale(db, bet)
+		err = betutils.ValidateSale(db, negativeBet)
 
-		err = reduceUseAccountBalance(db, user, bet)
+		err = reduceUseAccountBalance(db, user, negativeBet)
 
-		err = createBetInDatabase(db, bet)
+		err = createBetInDatabase(db, negativeBet)
 
 		respondSuccess(w, redeemRequest)
 	}
@@ -95,11 +95,13 @@ func validateRedeemAmount(redeemRequest *models.Bet, userNetPosition positions.U
 	return nil
 }
 
-func createBet(redeemRequest *models.Bet, username string) *models.Bet {
+func createNegativeBet(redeemRequest *models.Bet, username string) *models.Bet {
+
+	// Ensure that the bet being created is a negative amount of the redeemed amount requested
 	return &models.Bet{
 		Username: username,
 		MarketID: redeemRequest.MarketID,
-		Amount:   redeemRequest.Amount,
+		Amount:   -redeemRequest.Amount,
 		PlacedAt: time.Now(),
 		Outcome:  redeemRequest.Outcome,
 	}
