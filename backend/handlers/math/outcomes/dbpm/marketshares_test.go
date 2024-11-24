@@ -35,15 +35,15 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		Name               string
 		Bets               []models.Bet
 		ProbabilityChanges []wpam.ProbabilityChange
-		S_YES              int64
-		S_NO               int64
+		yesShares          int64
+		noShares           int64
 	}{
 		{
 			Name:               "InitialMarketState",
 			Bets:               []models.Bet{},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500),
-			S_YES:              0,
-			S_NO:               0,
+			yesShares:          0,
+			noShares:           0,
 		},
 		{
 			Name: "FirstBetNoDirection",
@@ -51,8 +51,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167),
-			S_YES:              3,
-			S_NO:               17,
+			yesShares:          3,
+			noShares:           17,
 		},
 		{
 			Name: "SecondBetYesDirection",
@@ -61,8 +61,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375),
-			S_YES:              11,
-			S_NO:               19,
+			yesShares:          11,
+			noShares:           19,
 		},
 		{
 			Name: "ThirdBetYesDirection",
@@ -72,8 +72,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500),
-			S_YES:              20,
-			S_NO:               20,
+			yesShares:          20,
+			noShares:           20,
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
@@ -84,8 +84,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
-			S_YES:              19,
-			S_NO:               11,
+			yesShares:          19,
+			noShares:           11,
 		},
 		{
 			Name: "NOResolution",
@@ -94,8 +94,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.0), // Final resolution R = 0
-			S_YES:              0,
-			S_NO:               30, // All shares go to NO
+			yesShares:          0,
+			noShares:           30, // All shares go to NO
 		},
 		{
 			Name: "YESResolution",
@@ -104,8 +104,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 1.0), // Final resolution R = 1
-			S_YES:              30,                                                   // All shares go to YES
-			S_NO:               0,
+			yesShares:          30,                                                   // All shares go to YES
+			noShares:           0,
 		},
 	}
 
@@ -118,8 +118,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			yes, no := DivideUpMarketPoolSharesDBPM(tc.Bets, tc.ProbabilityChanges)
-			if yes != tc.S_YES || no != tc.S_NO {
-				t.Errorf("%s: expected (%d, %d), got (%d, %d)", tc.Name, tc.S_YES, tc.S_NO, yes, no)
+			if yes != tc.yesShares || no != tc.noShares {
+				t.Errorf("%s: expected (%d, %d), got (%d, %d)", tc.Name, tc.yesShares, tc.noShares, yes, no)
 			}
 		})
 	}
@@ -224,20 +224,20 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 
 func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 	testcases := []struct {
-		Name          string
-		CoursePayouts []CourseBetPayout
-		S_YES         int64
-		S_NO          int64
-		ExpectedF_YES float64
-		ExpectedF_NO  float64
+		Name                           string
+		CoursePayouts                  []CourseBetPayout
+		yesShares                      int64
+		noShares                       int64
+		ExpectedyesNormalizationFactor float64
+		ExpectednoNormalizationFactor  float64
 	}{
 		{
-			Name:          "InitialMarketState",
-			CoursePayouts: nil,
-			S_YES:         0,
-			S_NO:          0,
-			ExpectedF_YES: 0,
-			ExpectedF_NO:  0,
+			Name:                           "InitialMarketState",
+			CoursePayouts:                  nil,
+			yesShares:                      0,
+			noShares:                       0,
+			ExpectedyesNormalizationFactor: 0,
+			ExpectednoNormalizationFactor:  0,
 		},
 		{
 			Name: "FirstBetNoDirection",
@@ -245,10 +245,10 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 				[]float64{0}, // Payout = |0.167 - 0.167| * 20
 				[]string{"NO"},
 			),
-			S_YES:         3,
-			S_NO:          17,
-			ExpectedF_YES: 0,
-			ExpectedF_NO:  0,
+			yesShares:                      3,
+			noShares:                       17,
+			ExpectedyesNormalizationFactor: 0,
+			ExpectednoNormalizationFactor:  0,
 		},
 		{
 			Name: "SecondBetYesDirection",
@@ -256,10 +256,10 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 				[]float64{4.1600000000000001, 0},
 				[]string{"NO", "YES"},
 			),
-			S_YES:         11,
-			S_NO:          19,
-			ExpectedF_YES: 0,
-			ExpectedF_NO:  4.5673076923076925,
+			yesShares:                      11,
+			noShares:                       19,
+			ExpectedyesNormalizationFactor: 0,
+			ExpectednoNormalizationFactor:  4.5673076923076925,
 		},
 		{
 			Name: "ThirdBetYesDirection",
@@ -267,10 +267,10 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 				[]float64{6.6599999999999993, 1.25, 0},
 				[]string{"NO", "YES", "YES"},
 			),
-			S_YES:         20,
-			S_NO:          20,
-			ExpectedF_YES: 16,
-			ExpectedF_NO:  3.0030030030030033,
+			yesShares:                      20,
+			noShares:                       20,
+			ExpectedyesNormalizationFactor: 16,
+			ExpectednoNormalizationFactor:  3.0030030030030033,
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
@@ -278,25 +278,25 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 				[]float64{9.1600000000000001, 2.5, 1.25, 0},
 				[]string{"NO", "YES", "YES", "NO"},
 			),
-			S_YES:         19,
-			S_NO:          11,
-			ExpectedF_YES: 5.066666666666666,
-			ExpectedF_NO:  1.2008733624454149,
+			yesShares:                      19,
+			noShares:                       11,
+			ExpectedyesNormalizationFactor: 5.066666666666666,
+			ExpectednoNormalizationFactor:  1.2008733624454149,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			actualF_YES, actualF_NO := CalculateNormalizationFactorsDBPM(tc.S_YES, tc.S_NO, tc.CoursePayouts)
+			actualyesNormalizationFactor, actualnoNormalizationFactor := CalculateNormalizationFactorsDBPM(tc.yesShares, tc.noShares, tc.CoursePayouts)
 
 			// Debug output for verbose mode
 			t.Logf(
-				"[DEBUG] %s: F_YES=%f, F_NO=%f", tc.Name, actualF_YES, actualF_NO,
+				"[DEBUG] %s: yesNormalizationFactor=%f, noNormalizationFactor=%f", tc.Name, actualyesNormalizationFactor, actualnoNormalizationFactor,
 			)
 
-			if actualF_YES != tc.ExpectedF_YES || actualF_NO != tc.ExpectedF_NO {
+			if actualyesNormalizationFactor != tc.ExpectedyesNormalizationFactor || actualnoNormalizationFactor != tc.ExpectednoNormalizationFactor {
 				t.Errorf(
-					"%s: expected F_YES=%f, F_NO=%f; got F_YES=%f, F_NO=%f",
-					tc.Name, tc.ExpectedF_YES, tc.ExpectedF_NO, actualF_YES, actualF_NO,
+					"%s: expected yesNormalizationFactor=%f, noNormalizationFactor=%f; got yesNormalizationFactor=%f, noNormalizationFactor=%f",
+					tc.Name, tc.ExpectedyesNormalizationFactor, tc.ExpectednoNormalizationFactor, actualyesNormalizationFactor, actualnoNormalizationFactor,
 				)
 			}
 		})
@@ -306,20 +306,20 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	testcases := []struct {
-		Name                  string
-		Bets                  []models.Bet
-		CoursePayouts         []CourseBetPayout
-		F_YES                 float64
-		F_NO                  float64
-		ExpectedScaledPayouts []int64
+		Name                   string
+		Bets                   []models.Bet
+		CoursePayouts          []CourseBetPayout
+		yesNormalizationFactor float64
+		noNormalizationFactor  float64
+		ExpectedScaledPayouts  []int64
 	}{
 		{
-			Name:                  "InitialMarketState",
-			Bets:                  []models.Bet{},
-			CoursePayouts:         nil,
-			F_YES:                 0,
-			F_NO:                  0,
-			ExpectedScaledPayouts: []int64{},
+			Name:                   "InitialMarketState",
+			Bets:                   []models.Bet{},
+			CoursePayouts:          nil,
+			yesNormalizationFactor: 0,
+			noNormalizationFactor:  0,
+			ExpectedScaledPayouts:  []int64{},
 		},
 		{
 			Name: "FirstBetNoDirection",
@@ -330,9 +330,9 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 				[]float64{0},
 				[]string{"NO"},
 			),
-			F_YES:                 0,
-			F_NO:                  0,
-			ExpectedScaledPayouts: []int64{0},
+			yesNormalizationFactor: 0,
+			noNormalizationFactor:  0,
+			ExpectedScaledPayouts:  []int64{0},
 		},
 		{
 			Name: "SecondBetYesDirection",
@@ -344,9 +344,9 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 				[]float64{4.1600000000000001, 0},
 				[]string{"NO", "YES"},
 			),
-			F_YES:                 0,
-			F_NO:                  4.5673076923076925,
-			ExpectedScaledPayouts: []int64{19, 0},
+			yesNormalizationFactor: 0,
+			noNormalizationFactor:  4.5673076923076925,
+			ExpectedScaledPayouts:  []int64{19, 0},
 		},
 		{
 			Name: "ThirdBetYesDirection",
@@ -359,9 +359,9 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 				[]float64{6.6599999999999993, 1.25, 0},
 				[]string{"NO", "YES", "YES"},
 			),
-			F_YES:                 16,
-			F_NO:                  3.0030030030030033,
-			ExpectedScaledPayouts: []int64{20, 20, 0},
+			yesNormalizationFactor: 16,
+			noNormalizationFactor:  3.0030030030030033,
+			ExpectedScaledPayouts:  []int64{20, 20, 0},
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
@@ -375,15 +375,15 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 				[]float64{9.1600000000000001, 2.5, 1.25, 0},
 				[]string{"NO", "YES", "YES", "NO"},
 			),
-			F_YES:                 5.066666666666666,
-			F_NO:                  1.2008733624454149,
-			ExpectedScaledPayouts: []int64{11, 13, 6, 0},
+			yesNormalizationFactor: 5.066666666666666,
+			noNormalizationFactor:  1.2008733624454149,
+			ExpectedScaledPayouts:  []int64{11, 13, 6, 0},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.F_YES, tc.F_NO)
+			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.yesNormalizationFactor, tc.noNormalizationFactor)
 
 			// Ensure payouts match exactly
 			for i, payout := range actualPayouts {

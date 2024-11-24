@@ -101,46 +101,46 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 // F_YES calculates the normalization factor for "YES" by dividing the total stake by the cumulative payout for "YES".
 // F_NO calculates the normalization factor for "NO" by dividing the total stake by the cumulative payout for "NO".
 // Return absolute values of normalization factors to ensure non-negative values for further calculations.
-func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []CourseBetPayout) (float64, float64) {
-	var F_YES, F_NO float64
-	var C_YES_SUM, C_NO_SUM float64
+func CalculateNormalizationFactorsDBPM(yesShares int64, noShares int64, coursePayouts []CourseBetPayout) (float64, float64) {
+	var yesNormalizationFactor, noNormalizationFactor float64
+	var yesCoursePayoutsSum, noCoursePayoutsSum float64
 
 	// Iterate over coursePayouts to sum payouts based on outcome
 	for _, payout := range coursePayouts {
 		if payout.Outcome == "YES" {
-			C_YES_SUM += payout.Payout
+			yesCoursePayoutsSum += payout.Payout
 		} else if payout.Outcome == "NO" {
-			C_NO_SUM += payout.Payout
+			noCoursePayoutsSum += payout.Payout
 		}
 	}
 
 	// Calculate normalization factor for YES
-	if C_YES_SUM > 0 {
-		F_YES = float64(S_YES) / C_YES_SUM
+	if yesCoursePayoutsSum > 0 {
+		yesNormalizationFactor = float64(yesShares) / yesCoursePayoutsSum
 	} else {
-		F_YES = 0
+		yesNormalizationFactor = 0
 	}
 
 	// Calculate normalization factor for NO
-	if C_NO_SUM > 0 {
-		F_NO = float64(S_NO) / C_NO_SUM
+	if noCoursePayoutsSum > 0 {
+		noNormalizationFactor = float64(noShares) / noCoursePayoutsSum
 	} else {
-		F_NO = 0
+		noNormalizationFactor = 0
 	}
 
-	return math.Abs(F_YES), math.Abs(F_NO)
+	return math.Abs(yesNormalizationFactor), math.Abs(noNormalizationFactor)
 }
 
 // CalculateFinalPayouts calculates the final payouts for each bet, adjusted by normalization factors.
-func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, F_YES, F_NO float64) []int64 {
+func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, yesNormalizationFactor, noNormalizationFactor float64) []int64 {
 	scaledPayouts := make([]int64, len(allBetsOnMarket))
 
 	for i, payout := range coursePayouts {
 		var scaledPayout float64
 		if payout.Outcome == "YES" {
-			scaledPayout = payout.Payout * F_YES
+			scaledPayout = payout.Payout * yesNormalizationFactor
 		} else if payout.Outcome == "NO" {
-			scaledPayout = payout.Payout * F_NO
+			scaledPayout = payout.Payout * noNormalizationFactor
 		}
 
 		scaledPayouts[i] = int64(math.Round(scaledPayout))
