@@ -109,6 +109,7 @@ func createNegativeBet(redeemRequest *models.Bet, username string) *models.Bet {
 
 func reduceUseAccountBalance(db *gorm.DB, user *models.User, bet *models.Bet) error {
 
+	// we now increase the user account by subtracting the negative bet amount
 	user.AccountBalance -= bet.Amount
 	if err := db.Save(user).Error; err != nil {
 		return fmt.Errorf("error updating user balance: %w", err)
