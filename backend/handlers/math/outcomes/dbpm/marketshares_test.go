@@ -522,6 +522,12 @@ func TestAdjustForNegativeExcess(t *testing.T) {
 			Excess:         -11,
 			ExpectedResult: []int64{25, 5}, // Adding to each sequentially
 		},
+		{
+			Name:           "LargeNegativeExcess",
+			ScaledPayouts:  []int64{19, 0},
+			Excess:         -1001,
+			ExpectedResult: []int64{520, 500}, // Adding 500 to each
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {

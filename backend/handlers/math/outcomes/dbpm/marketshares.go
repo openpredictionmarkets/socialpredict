@@ -176,17 +176,31 @@ func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
 	return scaledPayouts
 }
 
-// adjustForNegativeExcess distributes the remaining credits evenly across the winning bettors- prioritizing the earliest bets placed
 func adjustForNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
-	for excess < 0 {
-		for i := 0; i < len(scaledPayouts); i++ { // Iterate from oldest to newest
-			scaledPayouts[i] += 1 // Add surplus to oldest
-			excess += 1           // Increment excess
-			if excess == 0 {
-				break
-			}
-		}
+	// No adjustment needed if no payouts or excess is non-negative
+	if excess >= 0 || len(scaledPayouts) == 0 {
+		return scaledPayouts
 	}
+
+	numBets := int64(len(scaledPayouts)) // Total number of bets
+	absoluteExcess := -excess            // Convert excess to positive for allocation
+
+	// Calculate the base addition for each bet and the leftover remainder
+	// int64 will apply floor division
+	baseAddition := int64(absoluteExcess / numBets)
+	totalAddition := baseAddition * numBets
+	remainderAddition := absoluteExcess - totalAddition
+
+	// Apply the base addition to all payouts
+	for betIndex := range scaledPayouts {
+		scaledPayouts[betIndex] += baseAddition
+	}
+
+	// Apply the remainder addition to the earliest bets
+	for betIndex := int64(0); betIndex < remainderAddition; betIndex++ {
+		scaledPayouts[betIndex] += 1
+	}
+
 	return scaledPayouts
 }
 
