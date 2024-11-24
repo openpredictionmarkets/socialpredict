@@ -3,6 +3,7 @@ package dbpm
 import (
 	"reflect"
 	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
@@ -734,33 +735,65 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 
 func TestSingleShareYesNoAllocator(t *testing.T) {
 	tests := []struct {
-		name     string
-		bets     []models.Bet
-		expected string
+		name        string
+		bets        []models.Bet
+		expectFatal bool
+		expected    string
 	}{
 		{
-			name: "Positive YES outcome",
-			bets: []models.Bet{
-				{Amount: 3, Outcome: "YES"},
-				{Amount: 1, Outcome: "NO"},
-			},
-			expected: "YES",
+			name:        "Single YES bet",
+			bets:        []models.Bet{modelstesting.GenerateBet(1, "YES", "one", 1, 0)},
+			expectFatal: false,
+			expected:    "YES",
 		},
 		{
-			name: "Negative NO outcome",
+			name:        "Single NO bet",
+			bets:        []models.Bet{modelstesting.GenerateBet(1, "NO", "one", 1, 0)},
+			expectFatal: false,
+			expected:    "NO",
+		},
+		{
+			name: "Multiple bets",
 			bets: []models.Bet{
-				{Amount: 1, Outcome: "YES"},
-				{Amount: 3, Outcome: "NO"},
+				modelstesting.GenerateBet(1, "YES", "one", 1, 0),
+				modelstesting.GenerateBet(1, "NO", "two", 1, 1),
 			},
-			expected: "NO",
+			expectFatal: true,
+		},
+		{
+			name:        "No bets",
+			bets:        []models.Bet{},
+			expectFatal: true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := singleShareYesNoAllocator(tt.bets)
-			if result != tt.expected {
-				t.Errorf("got %v, expected %v", result, tt.expected)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockLogger := &logging.MockLogger{}
+
+			defer func() {
+				if r := recover(); r != nil {
+					if tc.expectFatal {
+						// Test passes if panic was expected
+						t.Logf("[DEBUG] Test case %q: Expected fatal error occurred. Recovered: %v", tc.name, r)
+					} else {
+						// Test fails if panic was not expected
+						t.Errorf("Unexpected fatal error for case %q: %v", tc.name, r)
+					}
+				} else if tc.expectFatal {
+					// Test fails if no panic occurred but was expected
+					t.Errorf("Expected fatal error for case %q, but none occurred", tc.name)
+				}
+			}()
+
+			// Call the function
+			result := singleShareYesNoAllocator(tc.bets, mockLogger)
+
+			// If no fatal error was expected, check the result
+			if !tc.expectFatal {
+				if result != tc.expected {
+					t.Errorf("Expected outcome %q, got %q", tc.expected, result)
+				}
 			}
 		})
 	}

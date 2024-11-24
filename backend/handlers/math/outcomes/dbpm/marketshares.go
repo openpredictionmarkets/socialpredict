@@ -5,6 +5,7 @@ import (
 	"math"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
@@ -32,40 +33,40 @@ func init() {
 	}
 }
 
-// DivideUpMarketPoolShares divides the market pool into YES and NO pools based on the resolution probability.
+// DivideUpMarketPoolSharesDBPM divides the market pool into YES and NO pools based on the resolution probability.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
 func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64) {
 	if len(probabilityChanges) == 0 {
 		return 0, 0
 	}
 
-	// Get the last probability change which is the resolution probability
-	R := probabilityChanges[len(probabilityChanges)-1].Probability
+	// Get the last probability change, which is the resolution probability
+	currentProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
-	// Get the total share pool S as a float for precision
-	// Do not Include the initial market subsidization in volume until market hits final resolution
-	S := float64(marketmath.GetMarketVolume(bets))
+	// Get the total share pool as a float for precision
+	// Do not include the initial market subsidization in volume until market hits final resolution
+	totalSharePool := float64(marketmath.GetMarketVolume(bets))
 
-	// initial condition, shares set to zero
+	// Initial condition, shares set to zero
 	yesShares := int64(0)
 	noShares := int64(0)
 
-	// Check case where there is single share, output
-	// Calculate YES and NO pools using floating-point arithmetic
-	// Note, fractional shares will be lost here
+	// Check case where there is a single share, implying one bet
 	if marketmath.GetMarketVolume(bets) == 1 {
-		singleShareDirection := singleShareYesNoAllocator(bets)
+		singleShareDirection := singleShareYesNoAllocator(bets, logging.DefaultLogger{})
+
 		if singleShareDirection == "YES" {
 			yesShares = 1
 		} else {
 			noShares = 1
 		}
 	} else {
-		yesShares = int64(math.Round(S * R))
-		noShares = int64(math.Round(S * (1 - R)))
+		// Calculate YES and NO pools using floating-point arithmetic
+		yesShares = int64(math.Round(totalSharePool * currentProbability))
+		noShares = int64(math.Round(totalSharePool * (1 - currentProbability)))
 	}
 
-	// Convert results to int64, rounding in predictable way
+	// Return calculated shares
 	return yesShares, noShares
 }
 
@@ -262,20 +263,12 @@ func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
 	return normalizedPositions
 }
 
-// Returns "YES", "NO", or "", indicating the outcome of the single share or no outcome if shares > 1.
-func singleShareYesNoAllocator(bets []models.Bet) string {
-	total := int64(0)
-	for _, bet := range bets {
-		if bet.Outcome == "YES" {
-			total += bet.Amount
-		} else if bet.Outcome == "NO" {
-			total -= bet.Amount
-		}
+// singleShareYesNoAllocator determines the outcome of a single bet.
+// Logs a fatal error and exits if the input condition (len(bets) == 1) is not met.
+func singleShareYesNoAllocator(bets []models.Bet, logger logging.Logger) string {
+	if len(bets) != 1 {
+		logger.Fatalf("singleShareYesNoAllocator: expected len(bets) = 1, got %d", len(bets))
 	}
 
-	if total > 0 {
-		return "YES"
-	} else {
-		return "NO"
-	}
+	return bets[0].Outcome
 }
