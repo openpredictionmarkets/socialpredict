@@ -1,7 +1,6 @@
 package modelstesting
 
 import (
-	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"time"
 )
@@ -16,13 +15,4 @@ func GenerateBet(amount int64, outcome, username string, marketID uint, offset t
 		PlacedAt: time.Now().Add(offset),
 		MarketID: marketID,
 	}
-}
-
-// helper function to create wpam.ProbabilityChange points succinctly
-func GenerateProbability(probabilities ...float64) []wpam.ProbabilityChange {
-	var changes []wpam.ProbabilityChange
-	for _, p := range probabilities {
-		changes = append(changes, wpam.ProbabilityChange{Probability: p})
-	}
-	return changes
 }
