@@ -1,4 +1,4 @@
-package wpamtesting
+package wpam_test
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"
@@ -26,15 +26,6 @@ type TestCase struct {
 }
 
 var now = time.Now() // Capture current time for consistent test data
-
-// helper function to create wpam.ProbabilityChange points succinctly
-func GenerateProbability(probabilities ...float64) []wpam.ProbabilityChange {
-	var changes []wpam.ProbabilityChange
-	for _, p := range probabilities {
-		changes = append(changes, wpam.ProbabilityChange{Probability: p})
-	}
-	return changes
-}
 
 var TestCases = []TestCase{
 	{
@@ -157,7 +148,7 @@ func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 
 			// Call the function under test
-			probChanges := CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
+			probChanges := wpam.CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
 
 			if len(probChanges) != len(tc.ProbabilityChanges) {
 				t.Fatalf("expected %d probability changes, got %d", len(tc.ProbabilityChanges), len(probChanges))
