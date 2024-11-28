@@ -71,7 +71,7 @@ func TestCreateBet(t *testing.T) {
 	}
 	username := "testuser"
 
-	bet := models.CreateBet(redeemRequest, username)
+	bet := models.CreateBet(username, redeemRequest.MarketID, redeemRequest.Amount, redeemRequest.Outcome)
 	assert.Equal(t, redeemRequest.MarketID, bet.MarketID)
 	assert.Equal(t, redeemRequest.Amount, bet.Amount)
 	assert.Equal(t, redeemRequest.Outcome, bet.Outcome)
