@@ -1,7 +1,6 @@
 package dbpm
 
 import (
-	"fmt"
 	"log"
 	"math"
 	marketmath "socialpredict/handlers/math/market"
@@ -34,63 +33,41 @@ func init() {
 	}
 }
 
-// DivideUpMarketPoolShares divides the market pool into YES and NO pools based on the resolution probability.
+// DivideUpMarketPoolSharesDBPM divides the market pool into YES and NO pools based on the resolution probability.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
 func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64) {
 	if len(probabilityChanges) == 0 {
 		return 0, 0
 	}
 
-	// Get the last probability change which is the resolution probability
-	R := probabilityChanges[len(probabilityChanges)-1].Probability
+	// Get the last probability change, which is the resolution probability
+	currentProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
-	// Get the total share pool S as a float for precision
-	// Include the initial market subsidization in the displayed volume
-	S := float64(marketmath.GetMarketVolume(bets) + appConfig.Economics.MarketCreation.InitialMarketSubsidization)
+	// Get the total share pool as a float for precision
+	// Do not include the initial market subsidization in volume until market hits final resolution
+	totalSharePool := float64(marketmath.GetMarketVolume(bets))
 
-	// initial condition, shares set to zero
-	S_YES := int64(0)
-	S_NO := int64(0)
+	// Initial condition, shares set to zero
+	yesShares := int64(0)
+	noShares := int64(0)
 
-	// Check case where there is single share, output
-	// Calculate YES and NO pools using floating-point arithmetic
-	// Note, fractional shares will be lost here
+	// Check case where there is a single share, implying one bet
 	if marketmath.GetMarketVolume(bets) == 1 {
-		singleShareDirection := SingleShareYesNoAllocator(bets)
+		singleShareDirection := singleShareYesNoAllocator(bets, logging.DefaultLogger{})
+
 		if singleShareDirection == "YES" {
-			S_YES = 1
+			yesShares = 1
 		} else {
-			S_NO = 1
+			noShares = 1
 		}
 	} else {
-		S_YES = int64(math.Round(S * R))
-		S_NO = int64(math.Round(S * (1 - R)))
+		// Calculate YES and NO pools using floating-point arithmetic
+		yesShares = int64(math.Round(totalSharePool * currentProbability))
+		noShares = int64(math.Round(totalSharePool * (1 - currentProbability)))
 	}
 
-	// Convert results to int64, rounding in predictable way
-	return S_YES, S_NO
-}
-
-// Returns "YES", "NO", or "", indicating the outcome of the single share or no outcome if shares > 1.
-func SingleShareYesNoAllocator(bets []models.Bet) string {
-	total := int64(0)
-	for _, bet := range bets {
-		logging.LogMsg(fmt.Sprintf("Bet Outcome: %s", bet.Outcome))
-		logging.LogMsg(fmt.Sprintf("Bet Amount: %d", bet.Amount))
-		if bet.Outcome == "YES" {
-			total += bet.Amount
-		} else if bet.Outcome == "NO" {
-			total -= bet.Amount
-		}
-	}
-
-	if total > 0 {
-		return "YES"
-	} else if total < 0 {
-		return "NO"
-	} else {
-		return "" // indeterminite
-	}
+	// Return calculated shares
+	return yesShares, noShares
 }
 
 // CalculateCoursePayoutsDBPM calculates the course payout for each bet in the market,
@@ -103,58 +80,67 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 
 	var coursePayouts []CourseBetPayout
 
-	// Get the last probability change which is the resolution probability
-	R := probabilityChanges[len(probabilityChanges)-1].Probability
+	// Get the current (final) probability for the market
+	currentProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
+	// Iterate over each bet to calculate its course payout
 	for i, bet := range bets {
-		// Distance to last (current) probability times bet amount
-		C_i := math.Abs(R-probabilityChanges[i].Probability) * float64(bet.Amount)
-		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: C_i, Outcome: bet.Outcome})
+		// Probability at which the bet was placed is the bet index+1
+		// The probability index is always the length of the bet index+1 because of the initial probability
+		betProbabilityAtTimePlaced := probabilityChanges[i+1].Probability
+
+		coursePaymentForBet := math.Abs(currentProbability-betProbabilityAtTimePlaced) * float64(bet.Amount)
+
+		// Append the calculated payout to the result
+		coursePayouts = append(coursePayouts, CourseBetPayout{Payout: coursePaymentForBet, Outcome: bet.Outcome})
 	}
 
 	return coursePayouts
 }
 
-func CalculateNormalizationFactorsDBPM(S_YES int64, S_NO int64, coursePayouts []CourseBetPayout) (float64, float64) {
-	var F_YES, F_NO float64
-	var C_YES_SUM, C_NO_SUM float64
+// F_YES calculates the normalization factor for "YES" by dividing the total stake by the cumulative payout for "YES".
+// F_NO calculates the normalization factor for "NO" by dividing the total stake by the cumulative payout for "NO".
+// Return absolute values of normalization factors to ensure non-negative values for further calculations.
+func CalculateNormalizationFactorsDBPM(yesShares int64, noShares int64, coursePayouts []CourseBetPayout) (float64, float64) {
+	var yesNormalizationFactor, noNormalizationFactor float64
+	var yesCoursePayoutsSum, noCoursePayoutsSum float64
 
 	// Iterate over coursePayouts to sum payouts based on outcome
 	for _, payout := range coursePayouts {
 		if payout.Outcome == "YES" {
-			C_YES_SUM += payout.Payout
+			yesCoursePayoutsSum += payout.Payout
 		} else if payout.Outcome == "NO" {
-			C_NO_SUM += payout.Payout
+			noCoursePayoutsSum += payout.Payout
 		}
 	}
 
 	// Calculate normalization factor for YES
-	if C_YES_SUM > 0 {
-		F_YES = float64(S_YES) / C_YES_SUM
+	if yesCoursePayoutsSum > 0 {
+		yesNormalizationFactor = float64(yesShares) / yesCoursePayoutsSum
 	} else {
-		F_YES = 0
+		yesNormalizationFactor = 0
 	}
 
 	// Calculate normalization factor for NO
-	if C_NO_SUM > 0 {
-		F_NO = float64(S_NO) / C_NO_SUM
+	if noCoursePayoutsSum > 0 {
+		noNormalizationFactor = float64(noShares) / noCoursePayoutsSum
 	} else {
-		F_NO = 0
+		noNormalizationFactor = 0
 	}
 
-	return math.Abs(F_YES), math.Abs(F_NO)
+	return math.Abs(yesNormalizationFactor), math.Abs(noNormalizationFactor)
 }
 
 // CalculateFinalPayouts calculates the final payouts for each bet, adjusted by normalization factors.
-func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, F_YES, F_NO float64) []int64 {
+func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, yesNormalizationFactor, noNormalizationFactor float64) []int64 {
 	scaledPayouts := make([]int64, len(allBetsOnMarket))
 
 	for i, payout := range coursePayouts {
 		var scaledPayout float64
 		if payout.Outcome == "YES" {
-			scaledPayout = payout.Payout * F_YES
+			scaledPayout = payout.Payout * yesNormalizationFactor
 		} else if payout.Outcome == "NO" {
-			scaledPayout = payout.Payout * F_NO
+			scaledPayout = payout.Payout * noNormalizationFactor
 		}
 
 		scaledPayouts[i] = int64(math.Round(scaledPayout))
@@ -163,41 +149,82 @@ func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []Co
 	return scaledPayouts
 }
 
-// adjust payouts to account for case where calculated payouts > available
-func AdjustPayoutsFromNewest(bets []models.Bet, scaledPayouts []int64) []int64 {
-	// Calculate the sum of scaledPayouts
+// calculateExcess determines the amount of credits unaccounted for by comparing calculated scaledPayouts to availablePool
+func calculateExcess(bets []models.Bet, scaledPayouts []int64) int64 {
 	var sumScaledPayouts int64
 	for _, payout := range scaledPayouts {
 		sumScaledPayouts += payout
 	}
-
 	availablePool := marketmath.GetMarketVolume(bets)
+	return sumScaledPayouts - availablePool
+}
 
-	// Determine the excess amount
-	excess := sumScaledPayouts - availablePool
-
-	// Loop to deduct from newest to oldest until there's no excess
-	for excess > 0 {
-		for i := len(scaledPayouts) - 1; i >= 0; i-- {
-			if scaledPayouts[i] > 0 { // Ensure we don't deduct from a zero payout
-				scaledPayouts[i] -= 1 // deduct surplus from newest
-				excess -= 1           // decrease excess until we get to zero
-				if excess == 0 {
-					break
-				}
-			}
-		}
+// Adjust scaled payouts if excess is greater than 0
+// This  should not be possible given how the preceeding pipeline works, but we adjust for it anyway.
+func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
+	// No adjustment needed if no payouts or excess is non-positive
+	if excess <= 0 || len(scaledPayouts) == 0 {
+		return scaledPayouts
 	}
 
-	// Loop to add from oldest to newest until there's no excess
-	for excess < 0 {
-		for i := 0; i < len(scaledPayouts); i++ { // Iterate from the beginning to the end
-			scaledPayouts[i] += 1 // Add surplus to oldest
-			excess += 1           // Increment excess until we get to zero
-			if excess == 0 {
-				break
-			}
-		}
+	numBets := int64(len(scaledPayouts)) // Total number of bets
+	absoluteExcess := excess             // No need to negate since it's already positive
+
+	// Calculate the base reduction for each bet and the leftover remainder
+	baseReduction := absoluteExcess / numBets
+	totalReduction := baseReduction * numBets
+	remainderReduction := absoluteExcess - totalReduction
+
+	// Apply the base reduction to all payouts
+	for betIndex := range scaledPayouts {
+		scaledPayouts[betIndex] -= baseReduction
+	}
+
+	// Apply the remainder reduction to the newest bets
+	for betIndex := int64(len(scaledPayouts)) - 1; remainderReduction > 0; betIndex-- {
+		scaledPayouts[betIndex] -= 1
+		remainderReduction--
+	}
+
+	return scaledPayouts
+}
+
+func adjustForNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
+	// No adjustment needed if no payouts or excess is non-negative
+	if excess >= 0 || len(scaledPayouts) == 0 {
+		return scaledPayouts
+	}
+
+	numBets := int64(len(scaledPayouts)) // Total number of bets
+	absoluteExcess := -excess            // Convert excess to positive for allocation
+
+	// Calculate the base addition for each bet and the leftover remainder
+	// int64 will apply floor division
+	baseAddition := int64(absoluteExcess / numBets)
+	totalAddition := baseAddition * numBets
+	remainderAddition := absoluteExcess - totalAddition
+
+	// Apply the base addition to all payouts
+	for betIndex := range scaledPayouts {
+		scaledPayouts[betIndex] += baseAddition
+	}
+
+	// Apply the remainder addition to the earliest bets
+	for betIndex := int64(0); betIndex < remainderAddition; betIndex++ {
+		scaledPayouts[betIndex] += 1
+	}
+
+	return scaledPayouts
+}
+
+// AdjustPayouts reconciles the additional or lacking funds from the betting pool by adjusting the payouts to past bets
+func AdjustPayouts(bets []models.Bet, scaledPayouts []int64) []int64 {
+	excess := calculateExcess(bets, scaledPayouts)
+
+	if excess > 0 {
+		scaledPayouts = adjustForPositiveExcess(scaledPayouts, excess)
+	} else if excess < 0 {
+		scaledPayouts = adjustForNegativeExcess(scaledPayouts, excess)
 	}
 
 	return scaledPayouts
@@ -261,4 +288,14 @@ func NetAggregateMarketPositions(positions []MarketPosition) []MarketPosition {
 	}
 
 	return normalizedPositions
+}
+
+// singleShareYesNoAllocator determines the outcome of a single bet.
+// Logs a fatal error and exits if the input condition (len(bets) == 1) is not met.
+func singleShareYesNoAllocator(bets []models.Bet, logger logging.Logger) string {
+	if len(bets) != 1 {
+		logger.Fatalf("singleShareYesNoAllocator: expected len(bets) = 1, got %d", len(bets))
+	}
+
+	return bets[0].Outcome
 }
