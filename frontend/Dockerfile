@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM deno:lastest
+FROM deno:latest
 
 WORKDIR /app
 
