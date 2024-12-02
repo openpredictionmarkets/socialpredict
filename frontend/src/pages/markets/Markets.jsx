@@ -1,5 +1,5 @@
 import React from 'react';
-import MarketsTable from '../../components/tables/MarketTables';
+import MarketsTable from '../../components/tables/MarketTables.jsx';
 
 function Markets() {
     return (
@@ -8,7 +8,7 @@ function Markets() {
                 <div className='Center-content-header'>
                 </div>
                 <div className='Center-content-table'>
-                <MarketsTable />
+                    <MarketsTable />
                 </div>
             </div>
         </div>

@@ -1,11 +1,10 @@
 import React from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
-import { AuthProvider } from './helpers/AuthContent';
-import Footer from './components/footer/Footer';
-import AppRoutes from './helpers/AppRoutes';
+import { AuthProvider } from './helpers/AuthContent.jsx';
+import AppRoutes from './helpers/AppRoutes.jsx';
 import '../index.css';
-import Sidebar from './components/sidebar/Sidebar';
+import Sidebar from './components/sidebar/Sidebar.jsx';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
   return (

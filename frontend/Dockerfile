@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM node:22.4.0
+FROM denoland/deno:debian
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm install
+RUN deno i
 COPY . .
 
 EXPOSE 5173
-CMD ["npm", "run", "start"]
+CMD ["deno", "run", "start"]

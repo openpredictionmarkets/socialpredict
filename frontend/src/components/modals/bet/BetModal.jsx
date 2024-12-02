@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { BetButton } from '../../buttons/trade/BetButtons';
-import TradeTabs from '../../tabs/TradeTabs';
-import { submitBet } from './BetUtils'
+import { BetButton } from '../../buttons/trade/BetButtons.jsx';
+import TradeTabs from '../../tabs/TradeTabs.jsx';
 
 const BetModalButton = ({ marketId, token, onTransactionSuccess }) => {
     const [showBetModal, setShowBetModal] = useState(false);
@@ -21,11 +20,11 @@ const BetModalButton = ({ marketId, token, onTransactionSuccess }) => {
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
                     <div className="bet-modal relative bg-blue-900 p-6 rounded-lg text-white m-6 mx-auto" style={{ width: '350px' }}>
 
-                    <TradeTabs
-                        marketId={marketId}
-                        token={token}
-                        onTransactionSuccess={handleTransactionSuccess}
-                    />
+                        <TradeTabs
+                            marketId={marketId}
+                            token={token}
+                            onTransactionSuccess={handleTransactionSuccess}
+                        />
 
                         <button onClick={toggleBetModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">
                             ✕
