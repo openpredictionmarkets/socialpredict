@@ -3,7 +3,7 @@ FROM denoland/deno:debian
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json deno.lock ./
 RUN deno i
 COPY . .
 
