@@ -11,6 +11,12 @@ server {
 	}
 }
 
+proxy_cache_path /data/nginx/cache keys_zone=cache_zone:10m;
+map $request_method $purge_method {
+   PURGE   1;
+   default 0;
+}
+
 server {
 	gzip on;
 	gzip_min_length 1000;
