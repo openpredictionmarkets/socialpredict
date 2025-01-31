@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom/cjs/react-router-dom';
-import { API_URL } from '../config';
+import { useParams } from 'react-router-dom';
+import { API_URL } from '../config.js';
 
 const calculateCurrentProbability = (details) => {
   if (!details || !details.probabilityChanges) return 0;
@@ -8,7 +8,7 @@ const calculateCurrentProbability = (details) => {
   const currentProbability =
     details.probabilityChanges.length > 0
       ? details.probabilityChanges[details.probabilityChanges.length - 1]
-          .probability
+        .probability
       : details.market.initialProbability;
 
   return parseFloat(currentProbability.toFixed(3));

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { buttonBaseStyle } from '../BaseButton';
+import { buttonBaseStyle } from '../BaseButton.jsx';
 
 // Toggle buttons between initial and selected states
 const ResolveButton = ({ onClick }) => {

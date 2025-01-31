@@ -1,4 +1,4 @@
-import { API_URL } from '../../../config';
+import { API_URL } from '../../../config.js';
 import React, { useState } from 'react';
 
 const MarketProjectionLayout = ({ marketId, amount, direction }) => {
@@ -43,7 +43,7 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
     return (
         <div className="market-projection-layout">
             <div className="projection-details">
-                <button 
+                <button
                     className="btn btn-primary mb-4"
                     onClick={fetchProjectionData}
                     disabled={!amount || !direction || loading}

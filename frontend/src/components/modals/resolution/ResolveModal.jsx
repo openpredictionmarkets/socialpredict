@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton } from '../../buttons/marketDetails/ResolveButtons';
-import { resolveMarket } from './ResolveUtils';
+import { ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton } from '../../buttons/marketDetails/ResolveButtons.jsx';
+import { resolveMarket } from './ResolveUtils.jsx';
 
 const ResolveModalButton = ({ marketId, token }) => {
     const [showResolveModal, setShowResolveModal] = useState(false);

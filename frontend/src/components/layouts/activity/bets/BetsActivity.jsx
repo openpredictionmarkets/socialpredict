@@ -1,4 +1,4 @@
-import { API_URL } from '../../../../config';
+import { API_URL } from '../../../../config.js';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 

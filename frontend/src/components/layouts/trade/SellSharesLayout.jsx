@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons';
-import { fetchUserShares, submitSale } from './TradeUtils'
+import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons.jsx';
+import { fetchUserShares, submitSale } from './TradeUtils.jsx'
 
 const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     const [shares, setShares] = useState({ NoSharesOwned: 0, YesSharesOwned: 0 });
@@ -70,13 +70,13 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
         };
 
         submitSale(saleData, token, (data) => {
-                alert(`Sale successful! Sale ID: ${data.id}`);
-                console.log('Sale response:', data);
-                onTransactionSuccess();
-            }, (error) => {
-                alert(`Sale failed: ${error.message}`);
-                console.error('Sale error:', error);
-            }
+            alert(`Sale successful! Sale ID: ${data.id}`);
+            console.log('Sale response:', data);
+            onTransactionSuccess();
+        }, (error) => {
+            alert(`Sale failed: ${error.message}`);
+            console.error('Sale error:', error);
+        }
         );
     };
 

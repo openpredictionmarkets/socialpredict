@@ -6,6 +6,11 @@ export default defineConfig(() => {
     build: {
       outDir: 'build',
       commonjsOptions: { transformMixedEsModules: true },
+      rollupOptions: {
+        external: [
+          /react-chart/,
+        ]
+      }
     },
     plugins: [react()],
     css: {
