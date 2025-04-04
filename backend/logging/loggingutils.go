@@ -6,6 +6,23 @@ import (
 	"runtime"
 )
 
+// Logger interface for flexible logging.
+type Logger interface {
+	Fatalf(format string, args ...interface{})
+	Printf(format string, args ...interface{}) // Add other log levels as needed.
+}
+
+// DefaultLogger provides default implementations for Logger methods.
+type DefaultLogger struct{}
+
+func (DefaultLogger) Fatalf(format string, args ...interface{}) {
+	log.Fatalf(format, args...)
+}
+
+func (DefaultLogger) Printf(format string, args ...interface{}) {
+	log.Printf(format, args...)
+}
+
 // LogAnyType logs any type of variable with its type, value, and length (if applicable).
 func LogAnyType(variable interface{}, variableName string) {
 	// Get the variable type using reflection

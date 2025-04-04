@@ -1,7 +1,6 @@
 package wpam_test
 
 import (
-	"fmt"
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
@@ -158,7 +157,8 @@ func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 			for i, pc := range probChanges {
 				expected := tc.ProbabilityChanges[i]
 
-				fmt.Printf("at index %d, expected probability %.17f, got %.17f\n", i, expected.Probability, pc.Probability)
+				// Change fmt.Printf to t.Logf for debug logging
+				t.Logf("at index %d, expected probability %.17f, got %.17f", i, expected.Probability, pc.Probability)
 
 				if pc.Probability != expected.Probability {
 					t.Errorf("at index %d, expected probability %.17f, got %.17f", i, expected.Probability, pc.Probability)

@@ -8,10 +8,25 @@ Currently, the project is supported on Ubuntu up to 23.10 LTS and MacOS. Windows
 
 ### Setting Up the Project on Your Local Machine
 
+#### Prerequisites
+
+##### MacOS
+
+* Beyond docker as discussed below, you may also need to install `gettext` with: `brew install gettext` to get access to `envsubst` to run the install script.
+* You may also need to create a data file, which is in the `.gitignore`, as MacOS docker may not create this automatically upon installation. You might have to run the following commands from the main `./socialpredict` directory:
+
+```
+mkdir -p data/postgres data/certbot
+chown -R $(whoami):staff data
+```
+
+#### Instructions
+
 - **Clone the Repository**: Download the repository to your local machine.
 -- `git clone https://github.com/openpredictionmarkets/socialpredict.git`
 - **Install Docker**: Install Docker on your local machine. [Here is the link to the Docker installation guide.](https://docs.docker.com/get-docker/) We are assuming the latest version of Docker as of the date of this document. Windows users will need to follow the instructions for installing Docker on WSL2. [Here is the link to set up the Docker Desktop backend on WSL2.](https://docs.docker.com/desktop/wsl/)
 - **Install docker compose**: Install `docker compose` on your local machine. [Here is the link to the docker compose installation guide](https://docs.docker.com/compose/install/). We are assuming the latest version of docker compose as of the date of this document. NOTE: `docker-compose` is deprecated and the command to use should be `docker compose`.
+- If you have not run this previously, within the root of the `./socialpredict` directory, create a `.env` file which will be ignored in the gitignore.
 - Within the root of the `./socialpredict` repo, run the command, `./SocialPredict install`.
 - Select (1) Development, then select to rebuild the `.env` file and rebuild the images.
 - When this has completed, run `./SocialPredict up`...this will use `docker compose` to spin up the images into containers on your machine.
