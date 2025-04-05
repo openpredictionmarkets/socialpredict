@@ -20,6 +20,8 @@ mkdir -p data/postgres data/certbot
 chown -R $(whoami):staff data
 ```
 
+Next, for newer versions of MacOS, you may need to allow Docker within system settings, as well as terminal, because otherwise Apple adds some xattrs which maintain provenance over files, not allowing Docker to work with them properly. [This issue here explains a fix](https://github.com/docker/for-mac/issues/7636#issuecomment-2755395642).
+
 #### Instructions
 
 - **Clone the Repository**: Download the repository to your local machine.
