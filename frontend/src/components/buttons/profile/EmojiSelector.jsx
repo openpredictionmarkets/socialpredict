@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../../../config';
-import ProfileEditButton from './ProfileButtons';
-import SiteButton from '../SiteButtons';
-import { emojis } from './Emojis';
+import { API_URL } from '../../../config.js';
+import ProfileEditButton from './ProfileButtons.jsx';
+import SiteButton from '../SiteButtons.jsx';
+import { emojis } from './Emojis.jsx';
 
 const EmojiSelector = ({ onSave }) => {
     const [selectedEmoji, setSelectedEmoji] = useState(null);

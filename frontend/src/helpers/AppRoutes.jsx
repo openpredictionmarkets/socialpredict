@@ -1,19 +1,18 @@
-import React, { useEffect } from 'react';
-import { Route, Switch, Redirect } from 'react-router-dom';
-import { useAuth } from './AuthContent';
-import ChangePassword from '../pages/changepassword/ChangePassword';
-import Profile from '../pages/profile/Profile';
-import Markets from '../pages/markets/Markets';
-import Polls from '../pages/polls/Polls';
-import Notifications from '../pages/notifications/Notifications';
-import Create from '../pages/create/Create';
-import About from '../pages/about/About';
-import Home from '../pages/home/Home';
-import MarketDetails from '../pages/marketDetails/MarketDetails';
-import User from '../pages/user/User';
-import Style from '../pages/style/Style';
-import AdminDashboard from '../pages/admin/AdminDashboard';
-import NotFound from '../pages/notfound/NotFound';
+import { Route, Routes, Navigate } from 'react-router-dom';
+import { useAuth } from './AuthContent.jsx';
+import ChangePassword from '../pages/changepassword/ChangePassword.jsx';
+import Profile from '../pages/profile/Profile.jsx';
+import Markets from '../pages/markets/Markets.jsx';
+import Polls from '../pages/polls/Polls.jsx';
+import Notifications from '../pages/notifications/Notifications.jsx';
+import Create from '../pages/create/Create.jsx';
+import About from '../pages/about/About.jsx';
+import Home from '../pages/home/Home.jsx';
+import MarketDetails from '../pages/marketDetails/MarketDetails.jsx';
+import User from '../pages/user/User.jsx';
+import Style from '../pages/style/Style.jsx';
+import AdminDashboard from '../pages/admin/AdminDashboard.jsx';
+import NotFound from '../pages/notfound/NotFound.jsx';
 
 const AppRoutes = () => {
   const auth = useAuth();
@@ -23,42 +22,42 @@ const AppRoutes = () => {
   const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
 
   return (
-    <Switch>
+    <Routes>
       {/* Stylepage */}
       <Route exact path='/style' component={Style} />
 
       {/* Public Routes */}
       <Route exact path='/about'>
         {isLoggedIn && auth.usertype !== 'ADMIN' && mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : (
           <About />
         )}
       </Route>
       <Route exact path='/markets/:marketId'>
         {isLoggedIn && auth.usertype !== 'ADMIN' && mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : (
           <MarketDetails />
         )}
       </Route>
       <Route exact path='/markets'>
         {isLoggedIn && auth.usertype !== 'ADMIN' && mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : (
           <Markets />
         )}
       </Route>
       <Route exact path='/polls'>
         {isLoggedIn && auth.usertype !== 'ADMIN' && mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : (
           <Polls />
         )}
       </Route>
       <Route exact path='/user/:username'>
         {isLoggedIn && auth.usertype !== 'ADMIN' && mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : (
           <User />
         )}
@@ -66,32 +65,32 @@ const AppRoutes = () => {
 
       {/* Private Routes for Regular Users Only */}
       <Route exact path='/changepassword'>
-        {isRegularUser ? <ChangePassword /> : <Redirect to='/' />}
+        {isRegularUser ? <ChangePassword /> : <Navigate to='/' />}
       </Route>
       <Route exact path='/create'>
         {!isLoggedIn ? (
-          <Redirect to='/' />
+          <Navigate to='/' />
         ) : mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : isRegularUser ? (
           <Create />
         ) : (
-          <Redirect to='/' />
+          <RediNavigaterect to='/' />
         )}
       </Route>
       <Route exact path='/notifications'>
         {!isLoggedIn ? (
-          <Redirect to='/' />
+          <Navigate to='/' />
         ) : mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : isRegularUser ? (
           <Notifications />
         ) : (
-          <Redirect to='/' />
+          <Navigate to='/' />
         )}
       </Route>
       <Route exact path='/profile'>
-        {isRegularUser ? <Profile /> : <Redirect to='/' />}
+        {isRegularUser ? <Profile /> : <Navigate to='/' />}
       </Route>
 
       {/* Admin Routes */}
@@ -99,14 +98,14 @@ const AppRoutes = () => {
         {isLoggedIn && auth.usertype === 'ADMIN' ? (
           <AdminDashboard />
         ) : (
-          <Redirect to='/' />
+          <Navigate to='/' />
         )}
       </Route>
 
       {/* Home Route */}
       <Route exact path='/'>
         {isLoggedIn && auth.usertype !== 'ADMIN' && mustChangePassword ? (
-          <Redirect to='/changepassword' />
+          <Navigate to='/changepassword' />
         ) : (
           <Home />
         )}
@@ -116,7 +115,7 @@ const AppRoutes = () => {
       <Route path='*'>
         <NotFound />
       </Route>
-    </Switch>
+    </Routes>
   );
 };
 

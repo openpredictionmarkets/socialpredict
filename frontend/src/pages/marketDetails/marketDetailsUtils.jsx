@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { API_URL } from '../../config';
+import { API_URL } from '../../config.js';
 
 export const useFetchMarketData = () => {
     const [details, setDetails] = useState(null);
@@ -46,7 +46,7 @@ export const calculateCurrentProbability = (details) => {
 
 //const roundedProbability = parseFloat(newCurrentProbability.toFixed(3));
 
-        // Append the current time with the last known probability, converted to Unix time
+// Append the current time with the last known probability, converted to Unix time
 //        const [currentProbability, setCurrentProbability] = useState(null);
 //        const currentTimeStamp = new Date().getTime();
 //        chartData.push({ time: currentTimeStamp, P: roundedProbability });

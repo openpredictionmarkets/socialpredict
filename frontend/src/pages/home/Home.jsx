@@ -1,5 +1,4 @@
 import React from 'react';
-import BrierFoxLogoPNG from '../../assets/png/BrierFoxLogo.png';
 
 function Home() {
   return (
@@ -7,7 +6,7 @@ function Home() {
       <div className='max-w-4xl mx-auto w-full'>
         <div className='flex flex-col sm:flex-row items-center mb-8'>
           <img
-            src={BrierFoxLogoPNG}
+            src='../../assets/png/BrierFoxLogo.png'
             alt='BrierFoxForecast Logo'
             className='w-24 h-24 sm:w-32 sm:h-32 mb-4 sm:mb-0 sm:mr-6'
           />
