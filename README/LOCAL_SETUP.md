@@ -20,7 +20,7 @@ mkdir -p data/postgres data/certbot
 chown -R $(whoami):staff data
 ```
 
-* Next, for newer versions of MacOS, you may need to allow Docker within system settings, as well as terminal, because otherwise Apple adds some `xattrs` which maintain provenance over files, not allowing Docker to work with them properly. [This issue here explains a fix](https://github.com/docker/for-mac/issues/7636#issuecomment-2755395642). NOTE! This issue is still pending. We may need to re-write how docker-compose-dev.yaml runs things as it seems to be incompatible with new versions of MacOS due to the `xattrs`. See [here](https://developer.apple.com/forums/thread/723397).
+* For newer versions of MacOS, Apple adds some `xattrs` which maintain provenance over the files, not allowing Docker to work with them directly on the disk. Hence, we have to mount our database from local on development mode. See [here](https://developer.apple.com/forums/thread/723397).
 
 #### Instructions
 
