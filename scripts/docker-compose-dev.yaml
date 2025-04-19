@@ -81,3 +81,6 @@ networks:
     driver: bridge
   frontend_network:
     driver: bridge
+
+volumes:
+  pgdata:
