@@ -20,6 +20,8 @@ mkdir -p data/postgres data/certbot
 chown -R $(whoami):staff data
 ```
 
+* For newer versions of MacOS, Apple adds some `xattrs` which maintain provenance over the files, not allowing Docker to work with them directly on the disk. Hence, we have to mount our database from local on development mode. See [here](https://developer.apple.com/forums/thread/723397).
+
 #### Instructions
 
 - **Clone the Repository**: Download the repository to your local machine.
