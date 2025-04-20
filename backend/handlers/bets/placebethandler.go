@@ -9,15 +9,25 @@ import (
 	"socialpredict/models"
 	"socialpredict/setup"
 	"socialpredict/util"
+	"time"
 )
+
+type BetResponse struct {
+    ID        int    `json:"id"`
+    Username  string `json:"username"`
+    MarketID  int    `json:"marketId"`
+    Outcome   string `json:"outcome"`
+    Amount    int64  `json:"amount"`
+    PlacedAt  string `json:"placedAt"`
+}
 
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
-		if httperr != nil {
-			http.Error(w, httperr.Error(), httperr.StatusCode)
+		user, httpErr := middleware.GetAuthenticatedUser(r,db)
+		if httpErr != nil {
+			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return
 		}
 
@@ -53,9 +63,18 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 			return
 		}
 
+		response := BetResponse{
+			ID:       int(bet.ID),
+			Username: bet.Username,
+			MarketID: int(bet.MarketID),
+			Outcome:  bet.Outcome,
+			Amount:   bet.Amount,
+			PlacedAt: bet.CreatedAt.Format(time.RFC3339),
+		}
+		
 		// Return a success response
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(bet)
+		json.NewEncoder(w).Encode(response)
 	}
 }
 

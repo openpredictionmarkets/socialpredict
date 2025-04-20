@@ -36,7 +36,6 @@ func CreateBet(username string, marketID uint, amount int64, outcome string) Bet
 		Username: username,
 		MarketID: marketID,
 		Amount:   amount,
-		PlacedAt: time.Now(),
 		Outcome:  outcome,
 	}
 }
