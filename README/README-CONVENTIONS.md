@@ -10,6 +10,10 @@ The following is a documentation of various coding conventions used to keep Soci
 
 ## Backend
 
+### Follow All Golang Conventions First
+
+* Follow Golang conventions per the standard Golang documentation and do not deviate. For any disagreements, refer to this documentation first, in order of the documentation's statements on what to refer to.
+
 ### Ab Initio
 
 * The entire program should be as stateless as possible, bets should be ideally made in one ledger and all reporting from that point on are calculated in a stateless manner.
@@ -120,3 +124,21 @@ db := util.GetDB()
 ```
 
 * Then moving down from there, we should try to pass db into subsequent functions so that each query being done is using the same connection, rather than running `db := util.GetDB()` again and again within each subsequent function.
+
+
+### Usage of Higher Order Functions
+
+* Subject to Golang conventions, the use of higher order functions and polymorphism in general is encouraged to help with making things more testable and refactorable.
+
+#### When To Use Higher Order Functions
+
+- When you need to inject dependencies (like setup.EconConfigLoader) into an HTTP handler.
+- When you want to create reusable, customizable behavior.
+- When you want better testability (mocking dependencies easily).
+- When you want clean separation between configuration/setup and actual execution.
+
+#### When Not To Use Higher Order Functions
+
+- When there is no meaningful dependency that needs to be passed.
+- When it makes the code unnecessarily complex.
+- When simple handler functions would be more readable and sufficient.
