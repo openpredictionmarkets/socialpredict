@@ -4,6 +4,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"time"
+	"fmt"
 )
 
 // GenerateBet is used for Generating fake bets for testing purposes
@@ -25,4 +26,23 @@ func GenerateProbability(probabilities ...float64) []wpam.ProbabilityChange {
 		changes = append(changes, wpam.ProbabilityChange{Probability: p})
 	}
 	return changes
+}
+
+// GenerateUser creates a fake user for testing
+func GenerateUser(username string, startingBalance int64) models.User {
+    now := time.Now().UnixNano()
+    return models.User{
+        PublicUser: models.PublicUser{
+            Username:              username,
+            DisplayName:           fmt.Sprintf("%s_display", username),
+            UserType:              "regular",
+            InitialAccountBalance: startingBalance,
+            AccountBalance:        startingBalance,
+        },
+        PrivateUser: models.PrivateUser{
+            Email:   fmt.Sprintf("%s@example.com", username),
+            APIKey:  fmt.Sprintf("api-key-%d", now),  // <<< Random API key!
+            Password: "password",
+        },
+    }
 }

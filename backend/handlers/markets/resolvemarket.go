@@ -3,10 +3,10 @@ package marketshandlers
 import (
 	"encoding/json"
 	"errors"
-	"math"
 	"net/http"
 	dbpm "socialpredict/handlers/math/outcomes/dbpm"
 	usersHandlers "socialpredict/handlers/users"
+	wpam "socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
@@ -137,57 +137,47 @@ func distributePayouts(market *models.Market, db *gorm.DB) error {
 
 // calculate DBPM Payouts calculates and updates user balances based on the CPMM model.
 func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
-	// Step 1: Retrieve all bets associated with the market
-	var bets []models.Bet
-	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
-		return err
-	}
+    // Step 1: Retrieve all bets associated with the market
+    var bets []models.Bet
+    if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
+        return err
+    }
 
-	// Step 2: Retrieve all probability changes associated with the market
-	var probabilityChanges []wpam.ProbabilityChange
-	if err := db.Where("market_id = ?", market.ID).Order("created_at ASC").Find(&probabilityChanges).Error; err != nil {
-		return err
-	}
+    // Step 2: Compute probabilities dynamically
+    probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
 
-	// Sanity check: make sure we have some probability history
-	if len(probabilityChanges) == 0 {
-		return errors.New("no probability changes found for market")
-	}
+    // Sanity check: make sure we have some probability history
+    if len(probabilityChanges) == 0 {
+        return errors.New("no probability changes found for market")
+    }
 
-	// Step 3: Calculate course payouts for all bets
-	coursePayouts := dbpm.CalculateCoursePayoutsDBPM(bets, probabilityChanges)
+    // Step 3 onward: payout logic stays the same
+    coursePayouts := dbpm.CalculateCoursePayoutsDBPM(bets, probabilityChanges)
+    yesShares, noShares := dbpm.DivideUpMarketPoolSharesDBPM(bets, probabilityChanges)
+    yesNormFactor, noNormFactor := dbpm.CalculateNormalizationFactorsDBPM(yesShares, noShares, coursePayouts)
+    scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(bets, coursePayouts, yesNormFactor, noNormFactor)
+    adjustedPayouts := dbpm.AdjustPayouts(bets, scaledPayouts)
+    userPayouts := dbpm.AggregateUserPayoutsDBPM(bets, adjustedPayouts)
+    netPositions := dbpm.NetAggregateMarketPositions(userPayouts)
 
-	// Step 4: Calculate final scaled payouts based on normalization factors
-	yesShares, noShares := dbpm.DivideUpMarketPoolSharesDBPM(bets, probabilityChanges)
-	yesNormFactor, noNormFactor := dbpm.CalculateNormalizationFactorsDBPM(yesShares, noShares, coursePayouts)
-	scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(bets, coursePayouts, yesNormFactor, noNormFactor)
-	adjustedPayouts := dbpm.AdjustPayouts(bets, scaledPayouts)
+    for _, pos := range netPositions {
+        var winningShares int64
 
-	// Step 5: Aggregate user payouts
-	userPayouts := dbpm.AggregateUserPayoutsDBPM(bets, adjustedPayouts)
+        if market.ResolutionResult == "YES" {
+            winningShares = pos.YesSharesOwned
+        } else if market.ResolutionResult == "NO" {
+            winningShares = pos.NoSharesOwned
+        } else {
+            winningShares = 0
+        }
 
-	// Step 6: Net user positions (only one side YES or NO remains)
-	netPositions := dbpm.NetAggregateMarketPositions(userPayouts)
+        if winningShares > 0 {
+            if err := usersHandlers.UpdateUserBalance(pos.Username, winningShares, db, "win"); err != nil {
+                return err
+            }
+        }
+    }
 
-	// Step 7: Pay out users based on net winning position
-	for _, pos := range netPositions {
-		var winningShares int64
-
-		if market.ResolutionResult == "YES" {
-			winningShares = pos.YesSharesOwned
-		} else if market.ResolutionResult == "NO" {
-			winningShares = pos.NoSharesOwned
-		} else {
-			winningShares = 0
-		}
-
-		// Only payout users who are on the winning side
-		if winningShares > 0 {
-			if err := usersHandlers.UpdateUserBalance(pos.Username, winningShares, db, "win"); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+    return nil
 }
+
