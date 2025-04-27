@@ -1,10 +1,11 @@
 package modelstesting
 
 import (
+	"fmt"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"time"
-	"fmt"
 )
 
 // GenerateBet is used for Generating fake bets for testing purposes
@@ -30,19 +31,62 @@ func GenerateProbability(probabilities ...float64) []wpam.ProbabilityChange {
 
 // GenerateUser creates a fake user for testing
 func GenerateUser(username string, startingBalance int64) models.User {
-    now := time.Now().UnixNano()
-    return models.User{
-        PublicUser: models.PublicUser{
-            Username:              username,
-            DisplayName:           fmt.Sprintf("%s_display", username),
-            UserType:              "regular",
-            InitialAccountBalance: startingBalance,
-            AccountBalance:        startingBalance,
-        },
-        PrivateUser: models.PrivateUser{
-            Email:   fmt.Sprintf("%s@example.com", username),
-            APIKey:  fmt.Sprintf("api-key-%d", now),  // <<< Random API key!
-            Password: "password",
-        },
-    }
+	now := time.Now().UnixNano()
+	return models.User{
+		PublicUser: models.PublicUser{
+			Username:              username,
+			DisplayName:           fmt.Sprintf("%s_display", username),
+			UserType:              "regular",
+			InitialAccountBalance: startingBalance,
+			AccountBalance:        startingBalance,
+		},
+		PrivateUser: models.PrivateUser{
+			Email:    fmt.Sprintf("%s@example.com", username),
+			APIKey:   fmt.Sprintf("api-key-%d", now), // <<< Random API key!
+			Password: "password",
+		},
+	}
+}
+
+// GenerateMarket creates a minimal valid market for testing
+func GenerateMarket(id int64, creatorUsername string) models.Market {
+	return models.Market{
+		ID:                 id,
+		QuestionTitle:      "Test Market",
+		Description:        "Test Description",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: time.Now().Add(24 * time.Hour),
+		InitialProbability: 0.5,
+		CreatorUsername:    creatorUsername,
+	}
+}
+
+// GenerateEconomicConfig returns a standard fake EconomicConfig based on your real setup.yaml
+func GenerateEconomicConfig() *setup.EconomicConfig {
+	return &setup.EconomicConfig{
+		Economics: setup.Economics{
+			MarketCreation: setup.MarketCreation{
+				InitialMarketProbability:   0.5,
+				InitialMarketSubsidization: 10,
+				InitialMarketYes:           0,
+				InitialMarketNo:            0,
+			},
+			MarketIncentives: setup.MarketIncentives{
+				CreateMarketCost: 10,
+				TraderBonus:      1,
+			},
+			User: setup.User{
+				InitialAccountBalance: 0,
+				MaximumDebtAllowed:    500,
+			},
+			Betting: setup.Betting{
+				MinimumBet: 1,
+				BetFees: setup.BetFees{
+					InitialBetFee: 1,
+					BuySharesFee:  0,
+					SellSharesFee: 0,
+				},
+			},
+		},
+	}
 }
