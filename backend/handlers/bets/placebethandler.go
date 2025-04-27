@@ -38,14 +38,14 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 			return
 		}
 
-		bet, err := PlaceBetCore(user, betRequest, db, loadEconConfig)
+		response, err := PlaceBetCore(user, betRequest, db, loadEconConfig)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(bet)
+		json.NewEncoder(w).Encode(response)
 	}
 }
 
