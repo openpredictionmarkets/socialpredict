@@ -29,8 +29,8 @@ func TestGetUserInitialBetFee(t *testing.T) {
 
 	// getUserInitialBetFee function to include both initial and buy share fees
 	// For testing purpose, assuming getUserInitialBetFee function does this calculation correctly
-	initialBetFee := getUserInitialBetFee(db, marketID, user) + appConfig.Economics.Betting.BetFees.EachBetFee
-	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee + appConfig.Economics.Betting.BetFees.EachBetFee
+	initialBetFee := getUserInitialBetFee(db, marketID, user) + appConfig.Economics.Betting.BetFees.BuySharesFee
+	wantFee := appConfig.Economics.Betting.BetFees.InitialBetFee + appConfig.Economics.Betting.BetFees.BuySharesFee
 	if initialBetFee != wantFee {
 		t.Errorf("getUserInitialBetFee(db, %d, %s) = %d, want %d", marketID, user.Username, initialBetFee, wantFee)
 	}
@@ -65,8 +65,8 @@ func TestGetTransactionFee(t *testing.T) {
 	// Test buy scenario
 	buyBet := models.Bet{Amount: 100}
 	transactionFee := getTransactionFee(buyBet)
-	if transactionFee != appConfig.Economics.Betting.BetFees.EachBetFee {
-		t.Errorf("Expected buy transaction fee to be %d, got %d", appConfig.Economics.Betting.BetFees.EachBetFee, transactionFee)
+	if transactionFee != appConfig.Economics.Betting.BetFees.BuySharesFee {
+		t.Errorf("Expected buy transaction fee to be %d, got %d", appConfig.Economics.Betting.BetFees.BuySharesFee, transactionFee)
 	}
 
 	// Test sell scenario
@@ -96,7 +96,7 @@ func TestGetSumBetFees(t *testing.T) {
 	buyBet := models.Bet{MarketID: 1, Amount: 100}
 	sumOfBetFees := GetBetFees(db, user, buyBet)
 	expectedSum := appConfig.Economics.Betting.BetFees.InitialBetFee +
-		appConfig.Economics.Betting.BetFees.EachBetFee
+		appConfig.Economics.Betting.BetFees.BuySharesFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
@@ -109,7 +109,7 @@ func TestGetSumBetFees(t *testing.T) {
 
 	// Scenario 2: User has one bet, buys shares
 	sumOfBetFees = GetBetFees(db, user, buyBet)
-	expectedSum = appConfig.Economics.Betting.BetFees.EachBetFee
+	expectedSum = appConfig.Economics.Betting.BetFees.BuySharesFee
 	if sumOfBetFees != expectedSum {
 		t.Errorf("Expected sum of bet fees to be %d, got %d", expectedSum, sumOfBetFees)
 	}
