@@ -43,7 +43,7 @@ func MockEconomicConfig() *setup.EconomicConfig {
 				MinimumBet: 1,
 				BetFees: setup.BetFees{
 					InitialBetFee: 1,
-					EachBetFee:    1,
+					BuySharesFee:  1,
 					SellSharesFee: 0,
 				},
 			},
