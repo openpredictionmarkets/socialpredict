@@ -3,10 +3,10 @@ package marketshandlers
 import (
 	"encoding/json"
 	"errors"
-	"math"
 	"net/http"
 	dbpm "socialpredict/handlers/math/outcomes/dbpm"
 	usersHandlers "socialpredict/handlers/users"
+	wpam "socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
+
 
 func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -136,39 +137,47 @@ func distributePayouts(market *models.Market, db *gorm.DB) error {
 
 // calculate DBPM Payouts calculates and updates user balances based on the CPMM model.
 func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
-	// Retrieve all bets associated with the market
-	var bets []models.Bet
-	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
-		return err
-	}
+    // Step 1: Retrieve all bets associated with the market
+    var bets []models.Bet
+    if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
+        return err
+    }
 
-	// Initialize variables to calculate total amounts for each outcome
-	var totalYes, totalNo int64
-	for _, bet := range bets {
-		if bet.Outcome == "YES" {
-			totalYes += bet.Amount
-		} else if bet.Outcome == "NO" {
-			totalNo += bet.Amount
-		}
-	}
+    // Step 2: Compute probabilities dynamically
+    probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
 
-	// Calculate payouts based on DBPM for YES and NO outcomes
-	// See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
-	for _, bet := range bets {
+    // Sanity check: make sure we have some probability history
+    if len(probabilityChanges) == 0 {
+        return errors.New("no probability changes found for market")
+    }
 
-		// calculate the course, float64 based payout
-		payout := dbpm.CalculatePayoutForOutcomeDBPM(bet, totalYes, totalNo, bet.Outcome, market.ResolutionResult)
+    // Step 3 onward: payout logic stays the same
+    coursePayouts := dbpm.CalculateCoursePayoutsDBPM(bets, probabilityChanges)
+    yesShares, noShares := dbpm.DivideUpMarketPoolSharesDBPM(bets, probabilityChanges)
+    yesNormFactor, noNormFactor := dbpm.CalculateNormalizationFactorsDBPM(yesShares, noShares, coursePayouts)
+    scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(bets, coursePayouts, yesNormFactor, noNormFactor)
+    adjustedPayouts := dbpm.AdjustPayouts(bets, scaledPayouts)
+    userPayouts := dbpm.AggregateUserPayoutsDBPM(bets, adjustedPayouts)
+    netPositions := dbpm.NetAggregateMarketPositions(userPayouts)
 
-		// use rounding to see how to update user balance after payout calculation
-		int_payout := int64(math.Round(payout))
+    for _, pos := range netPositions {
+        var winningShares int64
 
-		// Update user balance with the payout
-		if payout > 0 {
-			if err := usersHandlers.UpdateUserBalance(bet.Username, int_payout, db, "win"); err != nil {
-				return err
-			}
-		}
-	}
+        if market.ResolutionResult == "YES" {
+            winningShares = pos.YesSharesOwned
+        } else if market.ResolutionResult == "NO" {
+            winningShares = pos.NoSharesOwned
+        } else {
+            winningShares = 0
+        }
 
-	return nil
+        if winningShares > 0 {
+            if err := usersHandlers.UpdateUserBalance(pos.Username, winningShares, db, "win"); err != nil {
+                return err
+            }
+        }
+    }
+
+    return nil
 }
+
