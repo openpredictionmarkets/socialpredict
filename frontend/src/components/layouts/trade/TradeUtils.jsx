@@ -1,6 +1,5 @@
 // import API_URL from your config
-import { API_URL } from '../../../config';
-import React, { useState, useEffect } from 'react';
+import { API_URL } from '../../../config.js';
 
 export const submitBet = (betData, token, onSuccess, onError) => {
 
@@ -19,34 +18,34 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         },
         body: JSON.stringify(betData),
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Success:', data);
-        onSuccess(data);
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        onError(error);
-    });
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Success:', data);
+            onSuccess(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            onError(error);
+        });
 };
 
 
 export const fetchUserShares = async (marketId, token) => {
     const response = await fetch(`${API_URL}/api/v0/userposition/${marketId}`, {
         headers: {
-        'Authorization': `Bearer ${token}` // Include the authorization token to validate user
+            'Authorization': `Bearer ${token}` // Include the authorization token to validate user
         }
     });
     if (!response.ok) {
         throw new Error('Failed to fetch user shares');
     }
     return response.json();
-    };
+};
 
 
 export const submitSale = (saleData, token, onSuccess, onError) => {
@@ -65,18 +64,18 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
         },
         body: JSON.stringify(saleData),
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Success:', data);
-        onSuccess(data);
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        onError(error);
-    });
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Success:', data);
+            onSuccess(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            onError(error);
+        });
 };

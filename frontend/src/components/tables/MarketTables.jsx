@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { API_URL } from '../../config';
-import formatResolutionDate from '../../helpers/formatResolutionDate';
-import MobileMarketCard from '../../components/tables/MobileMarketCard';
-import LoadingSpinner from '../../components/loaders/LoadingSpinner';
+import { API_URL } from '../../config.js';
+import formatResolutionDate from '../../helpers/formatResolutionDate.js';
+import MobileMarketCard from '../../components/tables/MobileMarketCard.jsx';
+import LoadingSpinner from '../../components/loaders/LoadingSpinner.jsx';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>

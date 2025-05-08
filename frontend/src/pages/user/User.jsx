@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { API_URL } from '../../config';
-import PublicUserInfoLayout from '../../components/layouts/profile/public/PublicUserInfoLayout'
-import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout'
+import { API_URL } from '../../config.js';
+import PublicUserInfoLayout from '../../components/layouts/profile/public/PublicUserInfoLayout.jsx'
+import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout.jsx'
 
 const User = () => {
   const [userData, setUserData] = useState(null);

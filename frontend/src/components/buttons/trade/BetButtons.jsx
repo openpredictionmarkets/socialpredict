@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { buttonBaseStyle } from '../BaseButton';
-import { NumberInput } from '../../inputs/InputBar';
+import { buttonBaseStyle } from '../BaseButton.jsx';
+import { NumberInput } from '../../inputs/InputBar.jsx';
 
 // Toggle buttons between initial and selected states
 const BetButton = ({ onClick }) => {
@@ -27,7 +27,7 @@ const BetButton = ({ onClick }) => {
 const BetNoButton = ({ onClick }) => {
     return (
         <button
-        className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-btn`}
+            className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-btn`}
             onClick={onClick}
         >
             NO
@@ -38,7 +38,7 @@ const BetNoButton = ({ onClick }) => {
 const BetYesButton = ({ onClick }) => {
     return (
         <button
-        className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-btn`}
+            className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-btn`}
             onClick={onClick}
         >
             YES

@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { buttonBaseStyle } from '../BaseButton';
-import { NumberInput } from '../../inputs/InputBar';
+import React from 'react';
+import { NumberInput } from '../../inputs/InputBar.jsx';
 
 
 const SharesBadgeSimple = ({ type, count }) => {
