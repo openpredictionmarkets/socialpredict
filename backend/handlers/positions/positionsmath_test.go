@@ -15,12 +15,12 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 	testcases := []struct {
 		Name              string
 		Bets              []models.Bet
-		ExpectedPositions []dbpm.MarketPosition
+		ExpectedPositions []dbpm.DBPMMarketPosition
 	}{
 		{
 			Name:              "InitialMarketState",
 			Bets:              []models.Bet{},
-			ExpectedPositions: []dbpm.MarketPosition{},
+			ExpectedPositions: []dbpm.DBPMMarketPosition{},
 		},
 		{
 			Name: "FirstBetNoDirection",
@@ -33,7 +33,7 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 					PlacedAt: time.Now(),
 				},
 			},
-			ExpectedPositions: []dbpm.MarketPosition{
+			ExpectedPositions: []dbpm.DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 20, YesSharesOwned: 0},
 			},
 		},
@@ -55,7 +55,7 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 					PlacedAt: time.Now().Add(time.Minute),
 				},
 			},
-			ExpectedPositions: []dbpm.MarketPosition{
+			ExpectedPositions: []dbpm.DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 25, YesSharesOwned: 0},
 				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 5},
 			},
@@ -85,7 +85,7 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 					PlacedAt: time.Now().Add(2 * time.Minute),
 				},
 			},
-			ExpectedPositions: []dbpm.MarketPosition{
+			ExpectedPositions: []dbpm.DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 20, YesSharesOwned: 0},
 				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 20},
 				{Username: "three", NoSharesOwned: 0, YesSharesOwned: 0},
@@ -123,7 +123,7 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 					PlacedAt: time.Now().Add(3 * time.Minute),
 				},
 			},
-			ExpectedPositions: []dbpm.MarketPosition{
+			ExpectedPositions: []dbpm.DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 11, YesSharesOwned: 0},
 				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 13},
 				{Username: "three", NoSharesOwned: 0, YesSharesOwned: 6},
