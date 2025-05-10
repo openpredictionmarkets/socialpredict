@@ -1,6 +1,7 @@
 package marketshandlers
 
 import (
+	"math"
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/positions"
 	usersHandlers "socialpredict/handlers/users"
@@ -61,7 +62,7 @@ func AllocateWinningSharePool(
 			userShares = pos.NoSharesOwned
 		}
 
-		payout := int64(float64(userShares) / float64(totalWinningShares) * float64(totalVolume))
+		payout := int64(math.Round(float64(userShares) / float64(totalWinningShares) * float64(totalVolume)))
 		sumPayouts += payout
 
 		if userShares > maxShares {
