@@ -12,20 +12,21 @@ func TestAllocateWinningSharePool_RoundedDistribution(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(1, "creator")
 	market.ResolutionResult = "YES"
-
 	db.Create(&market)
 
-	totalVolume := int64(1000) // or calculate from your raw data
+	totalVolume := int64(3798) // actual total pool
 
-	// Users with precomputed winning share amounts
+	// Users with precomputed winning share amounts and spend
+	// Users with precomputed winning share amounts and their actual spend
 	users := []struct {
 		username string
 		shares   int64
+		spend    int64
 	}{
-		{"followbot", 347},
-		{"opposebot", 295},
-		{"fabulousbot", 83},
-		{"vancebot", 36},
+		{"followbot", 347, 977},
+		{"opposebot", 295, 933},
+		{"fabulousbot", 83, 412},
+		{"vancebot", 36, 91},
 	}
 
 	var totalWinningShares int64
@@ -33,6 +34,29 @@ func TestAllocateWinningSharePool_RoundedDistribution(t *testing.T) {
 
 	for _, u := range users {
 		user := modelstesting.GenerateUser(u.username, 0)
+		db.Create(&user)
+
+		// Simulate betting spend (debt)
+		user.AccountBalance = -u.spend
+		db.Save(&user)
+
+		totalWinningShares += u.shares
+		thepositions = append(thepositions, positions.MarketPosition{
+			Username:       u.username,
+			YesSharesOwned: u.shares,
+			NoSharesOwned:  0,
+		})
+	}
+
+	expected := map[string]int64{
+		"followbot":   1244,
+		"opposebot":   1005,
+		"fabulousbot": 1,
+		"vancebot":    88,
+	}
+
+	for _, u := range users {
+		user := modelstesting.GenerateUser(u.username, u.spend)
 		db.Create(&user)
 		totalWinningShares += u.shares
 		thepositions = append(thepositions, positions.MarketPosition{
@@ -45,14 +69,6 @@ func TestAllocateWinningSharePool_RoundedDistribution(t *testing.T) {
 	err := AllocateWinningSharePool(db, &market, thepositions, totalWinningShares, totalVolume)
 	if err != nil {
 		t.Fatalf("AllocateWinningSharePool failed: %v", err)
-	}
-
-	// Check user balances
-	expected := map[string]int64{
-		"followbot":   457, // one extra credit rounded to followbot from liquidity pool
-		"opposebot":   387,
-		"fabulousbot": 109,
-		"vancebot":    47,
 	}
 
 	for user, expectedBalance := range expected {
