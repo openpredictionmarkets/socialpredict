@@ -36,14 +36,14 @@ func GenerateUser(username string, startingBalance int64) models.User {
 	return models.User{
 		PublicUser: models.PublicUser{
 			Username:              username,
-			DisplayName:           fmt.Sprintf("%s_display", username),
+			DisplayName:           fmt.Sprintf("%s_display_%d", username, now),
 			UserType:              "regular",
 			InitialAccountBalance: startingBalance,
 			AccountBalance:        startingBalance,
 		},
 		PrivateUser: models.PrivateUser{
-			Email:    fmt.Sprintf("%s@example.com", username),
-			APIKey:   fmt.Sprintf("api-key-%d", now), // <<< Random API key!
+			Email:    fmt.Sprintf("%s_%d@example.com", username, now),
+			APIKey:   fmt.Sprintf("api-key-%d", now),
 			Password: "password",
 		},
 	}

@@ -1,20 +1,63 @@
 package marketshandlers
 
 import (
+	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/positions"
 	"socialpredict/models"
 	modelstesting "socialpredict/models/modelstesting"
 	"testing"
 )
 
-func TestAllocateWinningSharePool_RoundedDistribution(t *testing.T) {
+func TestSelectWinningPositions_YesResolution(t *testing.T) {
+	rawPositions := []dbpm.DBPMMarketPosition{
+		{Username: "followbot", YesSharesOwned: 347, NoSharesOwned: 0},
+		{Username: "opposebot", YesSharesOwned: 295, NoSharesOwned: 0},
+		{Username: "fabulousbot", YesSharesOwned: 83, NoSharesOwned: 0},
+		{Username: "vancebot", YesSharesOwned: 36, NoSharesOwned: 0},
+	}
+
+	expectedTotalShares := int64(761)
+	expectedUsers := map[string]int64{
+		"followbot":   347,
+		"opposebot":   295,
+		"fabulousbot": 83,
+		"vancebot":    36,
+	}
+
+	winningPositions, totalShares := SelectWinningPositions("YES", rawPositions)
+
+	if totalShares != expectedTotalShares {
+		t.Errorf("totalShares = %d, want %d", totalShares, expectedTotalShares)
+	}
+
+	if len(winningPositions) != len(expectedUsers) {
+		t.Fatalf("got %d winning users, want %d", len(winningPositions), len(expectedUsers))
+	}
+
+	for _, pos := range winningPositions {
+		expectedShares, ok := expectedUsers[pos.Username]
+		if !ok {
+			t.Errorf("unexpected winner: %s", pos.Username)
+		}
+		if pos.YesSharesOwned != expectedShares {
+			t.Errorf("user %s shares = %d, want %d", pos.Username, pos.YesSharesOwned, expectedShares)
+		}
+		if pos.NoSharesOwned != 0 {
+			t.Errorf("user %s should have 0 NO shares, got %d", pos.Username, pos.NoSharesOwned)
+		}
+	}
+}
+
+func TestAllocateWinningSharePool_RoundedDistribution_With_Fee(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
 	market := modelstesting.GenerateMarket(1, "creator")
 	market.ResolutionResult = "YES"
 	db.Create(&market)
 
-	totalVolume := int64(3798) // actual total pool
+	totalVolume := int64(3798)
+
+	var initialBettingFee int64 = 1
 
 	// Users with precomputed winning share amounts and spend
 	// Users with precomputed winning share amounts and their actual spend
@@ -23,10 +66,10 @@ func TestAllocateWinningSharePool_RoundedDistribution(t *testing.T) {
 		shares   int64
 		spend    int64
 	}{
-		{"followbot", 347, 977},
-		{"opposebot", 295, 933},
-		{"fabulousbot", 83, 412},
-		{"vancebot", 36, 91},
+		{"followbot", 347, 488 + initialBettingFee},
+		{"opposebot", 295, 466 + initialBettingFee},
+		{"fabulousbot", 83, 412 + initialBettingFee},
+		{"vancebot", 36, 91 + initialBettingFee},
 	}
 
 	var totalWinningShares int64
@@ -49,21 +92,10 @@ func TestAllocateWinningSharePool_RoundedDistribution(t *testing.T) {
 	}
 
 	expected := map[string]int64{
-		"followbot":   1244,
+		"followbot":   1243,
 		"opposebot":   1005,
 		"fabulousbot": 1,
 		"vancebot":    88,
-	}
-
-	for _, u := range users {
-		user := modelstesting.GenerateUser(u.username, u.spend)
-		db.Create(&user)
-		totalWinningShares += u.shares
-		thepositions = append(thepositions, positions.MarketPosition{
-			Username:       u.username,
-			YesSharesOwned: u.shares,
-			NoSharesOwned:  0,
-		})
 	}
 
 	err := AllocateWinningSharePool(db, &market, thepositions, totalWinningShares, totalVolume)
