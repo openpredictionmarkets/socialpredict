@@ -27,7 +27,7 @@ type UserMarketPosition struct {
 
 // FetchMarketPositions fetches and summarizes positions for a given market.
 // It returns a slice of MarketPosition as defined in the dbpm package.
-func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm.MarketPosition, error) {
+func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm.DBPMMarketPosition, error) {
 
 	// marketIDUint for needed areas
 	marketIDUint64, err := strconv.ParseUint(marketIdStr, 10, 64)
