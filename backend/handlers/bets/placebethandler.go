@@ -46,6 +46,12 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 			return
 		}
 
+		user.AccountBalance -= betRequest.Amount + sumOfBetFees
+		if err := db.Save(&user).Error; err != nil {
+			http.Error(w, "Failed to update user balance", http.StatusInternalServerError)
+			return
+		}
+
 		// Save the Bet to the database
 		result := db.Create(&bet)
 		if result.Error != nil {
