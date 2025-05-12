@@ -617,13 +617,13 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		Name              string
 		Bets              []models.Bet
 		FinalPayouts      []int64
-		ExpectedPositions []MarketPosition
+		ExpectedPositions []DBPMMarketPosition
 	}{
 		{
 			Name:              "InitialMarketState",
 			Bets:              []models.Bet{},
 			FinalPayouts:      []int64{},
-			ExpectedPositions: []MarketPosition{},
+			ExpectedPositions: []DBPMMarketPosition{},
 		},
 		{
 			Name: "FirstBetNoDirection",
@@ -631,7 +631,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
 			},
 			FinalPayouts: []int64{20},
-			ExpectedPositions: []MarketPosition{
+			ExpectedPositions: []DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 20, YesSharesOwned: 0},
 			},
 		},
@@ -642,7 +642,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
 			},
 			FinalPayouts: []int64{25, 5},
-			ExpectedPositions: []MarketPosition{
+			ExpectedPositions: []DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 25, YesSharesOwned: 0},
 				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 5},
 			},
@@ -655,7 +655,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
 			},
 			FinalPayouts: []int64{20, 20, 0},
-			ExpectedPositions: []MarketPosition{
+			ExpectedPositions: []DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 20, YesSharesOwned: 0},
 				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 20},
 				{Username: "three", NoSharesOwned: 0, YesSharesOwned: 0},
@@ -670,7 +670,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
 			},
 			FinalPayouts: []int64{11, 13, 6, 0},
-			ExpectedPositions: []MarketPosition{
+			ExpectedPositions: []DBPMMarketPosition{
 				{Username: "one", NoSharesOwned: 11, YesSharesOwned: 0},
 				{Username: "two", NoSharesOwned: 0, YesSharesOwned: 13},
 				{Username: "three", NoSharesOwned: 0, YesSharesOwned: 6},
@@ -714,15 +714,15 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 func TestNetAggregateMarketPositions(t *testing.T) {
 	testcases := []struct {
 		Name                string
-		AggregatedPositions []MarketPosition
-		NetPositions        []MarketPosition
+		AggregatedPositions []DBPMMarketPosition
+		NetPositions        []DBPMMarketPosition
 	}{
 		{
 			Name: "PreventSimultaneousSharesHeldPreventSimultaneousSharesHeldPreventSimultaneousSharesHeld",
-			AggregatedPositions: []MarketPosition{
+			AggregatedPositions: []DBPMMarketPosition{
 				{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
 			},
-			NetPositions: []MarketPosition{
+			NetPositions: []DBPMMarketPosition{
 				{Username: "user1", YesSharesOwned: 2, NoSharesOwned: 0},
 			},
 		},
