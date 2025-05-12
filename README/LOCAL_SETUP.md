@@ -100,6 +100,31 @@ docker compose -p scripts logs | grep postgres
 docker compose -p scripts logs | grep certbot
 ```
 
+### Backing Up Database On Local Prior to Change
+
+* There may be instances in which you want to backup your database on local prior to implementing a new feature or fix coming in from a different branch, so that a desired state can be restored if the change or fix didn't work.
+
+Here are two quick steps to backup and restore your database:
+
+#### Backup
+
+```
+docker exec socialpredict-postgres-container sh -c 'pg_dump -U user -F c socialpredict_db' > backup_before_resolution.dump 2> pgdump_error.log
+```
+
+* This will create an error log at pgdump_error.log which you can inspect in case there are any problems.
+
+#### Restore
+
+```
+# Drop and recreate DB
+docker exec -it socialpredict-postgres-container psql -U user -c "DROP DATABASE socialpredict_db;"
+docker exec -it socialpredict-postgres-container psql -U user -c "CREATE DATABASE socialpredict_db;"
+
+# Restore
+cat backup_before_resolution.dump | docker exec -i socialpredict-postgres-container pg_restore --no-owner -U user -d socialpredict_db
+```
+
 ### Setting Up a Staging Instance On the Web
 
 While we don't like to say we have an official, "prod," version yet per se, we do give the ability for you to run an staging instance online which for all intents and purposes is a functioning web app. However we don't endorse this app as being completely secure and recoverable without extra work. We're working on getting SocialPredict in a more reliable, secure state.
