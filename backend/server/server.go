@@ -71,11 +71,15 @@ func Start() {
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
-	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
 	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler(setup.EconomicsConfig)).Methods("POST")
 
+	// api enabled actions
+	router.Handle("/v0/bet", middleware.APIKeyAuthMiddleware()(
+		http.HandlerFunc(betshandlers.PlaceBetHandler(setup.EconomicsConfig)),
+	)).Methods("POST")
+		
 	// admin stuff
 	router.HandleFunc("/v0/admin/createuser", adminhandlers.AddUserHandler(setup.EconomicsConfig)).Methods("POST")
 

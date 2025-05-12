@@ -17,6 +17,15 @@ func Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// GetAuthenticatedUser attempts to retrieve the user from API key context first,
+// then falls back to validating the JWT token (used for browser sessions).
+func GetAuthenticatedUser(r *http.Request, db *gorm.DB) (*models.User, *HTTPError) {
+	if user := GetAPIUserFromContext(r); user != nil {
+		return user, nil
+	}
+	return ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+}
+
 // ValidateUserAndEnforcePasswordChange performs user validation and checks if a password change is required.
 // It returns the user and any errors encountered.
 func ValidateUserAndEnforcePasswordChangeGetUser(r *http.Request, db *gorm.DB) (*models.User, *HTTPError) {
