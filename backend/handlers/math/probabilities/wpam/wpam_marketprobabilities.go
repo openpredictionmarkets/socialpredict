@@ -1,10 +1,14 @@
 package wpam
 
 import (
+	"fmt"
 	"log"
+	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type ProbabilityChange struct {
@@ -53,6 +57,21 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 	}
 
 	return probabilityChanges
+}
+
+func GetCurrentProbabilityFromMarketAndBets(db *gorm.DB, market models.Market) (float64, error) {
+
+	// Fetch bets for the market
+	var allBetsOnMarket []models.Bet
+	allBetsOnMarket = tradingdata.GetBetsForMarket(db, uint(market.ID))
+
+	probabilityChanges := CalculateMarketProbabilitiesWPAM(market.CreatedAt, allBetsOnMarket)
+
+	if len(probabilityChanges) == 0 {
+		return 0, fmt.Errorf("no probability changes calculated — market or bets invalid")
+	}
+
+	return probabilityChanges[len(probabilityChanges)-1].Probability, nil
 }
 
 func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {

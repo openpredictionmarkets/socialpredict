@@ -18,7 +18,7 @@ func init() {
 	}
 }
 
-// getMarketVolume returns the total volume of trades for a given market
+// getMarketVolume returns the total volume of trades for a given market given all bets
 func GetMarketVolume(bets []models.Bet) int64 {
 
 	var totalVolume int64
