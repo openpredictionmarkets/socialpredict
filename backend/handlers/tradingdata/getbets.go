@@ -19,8 +19,10 @@ type PublicBet struct {
 func GetBetsForMarket(db *gorm.DB, marketID uint) []models.Bet {
 	var bets []models.Bet
 
-	// Retrieve all bets for the market
-	if err := db.Where("market_id = ?", marketID).Find(&bets).Error; err != nil {
+	if err := db.
+		Where("market_id = ?", marketID).
+		Order("placed_at ASC").
+		Find(&bets).Error; err != nil {
 		return nil
 	}
 

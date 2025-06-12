@@ -27,7 +27,7 @@ func TestGetSetupHandler(t *testing.T) {
 				"MarketCreation":{"InitialMarketProbability":0.5,"InitialMarketSubsidization":10,"InitialMarketYes":0,"InitialMarketNo":0},
 				"MarketIncentives":{"CreateMarketCost":10,"TraderBonus":1},
 				"User":{"InitialAccountBalance":0,"MaximumDebtAllowed":500},
-				"Betting":{"MinimumBet":1,"BetFees":{"InitialBetFee":1,"EachBetFee":0,"SellSharesFee":0}}}`,
+				"Betting":{"MinimumBet":1,"BetFees":{"InitialBetFee":1,"BuySharesFee":0,"SellSharesFee":0}}}`,
 			IsJSONResponse: true,
 		}, {
 			Name: "failed to load config",
