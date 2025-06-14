@@ -3,6 +3,7 @@ package positions
 import (
 	"socialpredict/errors"
 	"socialpredict/handlers/marketpublicresponse"
+	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
@@ -14,15 +15,17 @@ import (
 
 // holds the number of YES and NO shares owned by all users in a market
 type MarketPosition struct {
-	Username       string
-	NoSharesOwned  int64
-	YesSharesOwned int64
+	Username       string `json:"username"`
+	NoSharesOwned  int64  `json:"noSharesOwned"`
+	YesSharesOwned int64  `json:"yesSharesOwned"`
+	Value          int64  `json:"value"`
 }
 
 // UserMarketPosition holds the number of YES and NO shares owned by a user in a market.
 type UserMarketPosition struct {
-	NoSharesOwned  int64
-	YesSharesOwned int64
+	NoSharesOwned  int64 `json:"noSharesOwned"`
+	YesSharesOwned int64 `json:"yesSharesOwned"`
+	Value          int64 `json:"value"`
 }
 
 // FetchMarketPositions fetches and summarizes positions for a given market.
@@ -71,7 +74,36 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	// enforce all users are betting on either one side or the other, or net zero
 	netPositions := dbpm.NetAggregateMarketPositions(aggreatedPositions)
 
+	// === Add valuation logic below ===
+
+	// Step 1: Map to positions.UserMarketPosition
+	userPositionMap := make(map[string]UserMarketPosition)
+	for _, p := range netPositions {
+		userPositionMap[p.Username] = UserMarketPosition{
+			YesSharesOwned: p.YesSharesOwned,
+			NoSharesOwned:  p.NoSharesOwned,
+		}
+	}
+
+	// Step 2: Get current market probability
+	currentProbability := wpam.GetCurrentProbability(allProbabilityChangesOnMarket)
+
+	// Step 3: Get total volume
+	totalVolume := marketmath.GetMarketVolume(allBetsOnMarket)
+
+	// Step 4: Calculate valuations
+	valuations := CalculateRoundedUserValuationsFromUserMarketPositions(userPositionMap, currentProbability, totalVolume)
+
+	// Step 5: Append valuation to each MarketPosition struct
+	for i := range netPositions {
+		username := netPositions[i].Username
+		if val, ok := valuations[username]; ok {
+			netPositions[i].Valuation = val.RoundedValue
+		}
+	}
+
 	return netPositions, nil
+
 }
 
 // CalculateMarketPositionForUser_WPAM_DBPM fetches and summarizes the position for a given user in a specific market.

@@ -11,7 +11,7 @@ type UserValuationResult struct {
 
 func CalculateRoundedUserValuationsFromUserMarketPositions(
 	userPositions map[string]UserMarketPosition,
-	currentProb float64,
+	currentProbability float64,
 	totalVolume int64,
 ) map[string]UserValuationResult {
 	result := make(map[string]UserValuationResult)
@@ -22,9 +22,9 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 	for username, pos := range userPositions {
 		var floatVal float64
 		if pos.YesSharesOwned > 0 {
-			floatVal = float64(pos.YesSharesOwned) * currentProb
+			floatVal = float64(pos.YesSharesOwned) * currentProbability
 		} else if pos.NoSharesOwned > 0 {
-			floatVal = float64(pos.NoSharesOwned) * (1 - currentProb)
+			floatVal = float64(pos.NoSharesOwned) * (1 - currentProbability)
 		}
 
 		roundedVal := int64(math.Round(floatVal))
