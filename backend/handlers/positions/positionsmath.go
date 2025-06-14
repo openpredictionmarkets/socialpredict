@@ -30,7 +30,7 @@ type UserMarketPosition struct {
 
 // FetchMarketPositions fetches and summarizes positions for a given market.
 // It returns a slice of MarketPosition as defined in the dbpm package.
-func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm.DBPMMarketPosition, error) {
+func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]MarketPosition, error) {
 
 	// marketIDUint for needed areas
 	marketIDUint64, err := strconv.ParseUint(marketIdStr, 10, 64)
@@ -95,14 +95,19 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]dbpm
 	valuations := CalculateRoundedUserValuationsFromUserMarketPositions(userPositionMap, currentProbability, totalVolume)
 
 	// Step 5: Append valuation to each MarketPosition struct
-	for i := range netPositions {
-		username := netPositions[i].Username
-		if val, ok := valuations[username]; ok {
-			netPositions[i].Valuation = val.RoundedValue
-		}
+	// Convert to []positions.MarketPosition for external use
+	var displayPositions []MarketPosition
+	for _, p := range netPositions {
+		val := valuations[p.Username]
+		displayPositions = append(displayPositions, MarketPosition{
+			Username:       p.Username,
+			YesSharesOwned: p.YesSharesOwned,
+			NoSharesOwned:  p.NoSharesOwned,
+			Value:          val.RoundedValue,
+		})
 	}
 
-	return netPositions, nil
+	return displayPositions, nil
 
 }
 
