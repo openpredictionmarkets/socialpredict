@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	marketmath "socialpredict/handlers/math/market"
+	"socialpredict/handlers/math/outcomes/dbpm"
 	"socialpredict/handlers/positions"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/models"
@@ -53,7 +54,17 @@ func calculateAndAllocateProportionalPayouts(market *models.Market, db *gorm.DB)
 		return err
 	}
 
-	winningPositions, totalWinningShares := SelectWinningPositions(market.ResolutionResult, positionsRaw)
+	var dbpmPositions []dbpm.DBPMMarketPosition
+	for _, p := range positionsRaw {
+		dbpmPositions = append(dbpmPositions, dbpm.DBPMMarketPosition{
+			Username:       p.Username,
+			NoSharesOwned:  p.NoSharesOwned,
+			YesSharesOwned: p.YesSharesOwned,
+			// Don't include Value field; it's not part of DBPMMarketPosition
+		})
+	}
+
+	winningPositions, totalWinningShares := SelectWinningPositions(market.ResolutionResult, dbpmPositions)
 
 	if totalWinningShares == 0 {
 		return nil
