@@ -2,6 +2,8 @@ package positions
 
 import (
 	"math"
+
+	"gorm.io/gorm"
 )
 
 type UserValuationResult struct {
@@ -10,10 +12,12 @@ type UserValuationResult struct {
 }
 
 func CalculateRoundedUserValuationsFromUserMarketPositions(
+	db *gorm.DB,
+	marketID uint,
 	userPositions map[string]UserMarketPosition,
 	currentProbability float64,
 	totalVolume int64,
-) map[string]UserValuationResult {
+) (map[string]UserValuationResult, error) {
 	result := make(map[string]UserValuationResult)
 	floatVals := make(map[string]float64)
 	for username, pos := range userPositions {
@@ -30,32 +34,10 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 			RoundedValue: roundedVal,
 		}
 	}
-	return AdjustUserValuationsToMarketVolume(result, totalVolume, floatVals)
-}
-
-// AdjustUserValuationsToMarketVolume ensures the sum of user valuations matches the market volume.
-// It adds or subtracts the delta to the user with the largest float valuation (by absolute value).
-func AdjustUserValuationsToMarketVolume(
-	userVals map[string]UserValuationResult,
-	targetTotal int64,
-	floatVals map[string]float64,
-) map[string]UserValuationResult {
-	// Compute sum of rounded
-	var totalRounded int64
-	var maxUser string
-	var maxFloatAbs float64
-	for username, uv := range userVals {
-		totalRounded += uv.RoundedValue
-		if math.Abs(floatVals[username]) > maxFloatAbs {
-			maxFloatAbs = math.Abs(floatVals[username])
-			maxUser = username
-		}
+	// Now call the improved adjustment function
+	adjusted, err := AdjustUserValuationsToMarketVolume(db, marketID, result, totalVolume)
+	if err != nil {
+		return nil, err
 	}
-	delta := targetTotal - totalRounded
-	if delta != 0 {
-		r := userVals[maxUser]
-		r.RoundedValue += delta
-		userVals[maxUser] = r
-	}
-	return userVals
+	return adjusted, nil
 }

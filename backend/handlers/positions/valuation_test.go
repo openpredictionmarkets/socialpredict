@@ -1,23 +1,32 @@
 package positions
 
 import (
+	"socialpredict/models/modelstesting"
 	"testing"
+
+	"gorm.io/gorm"
 )
 
-// Simple helper for easy map construction in tests.
-func makeUserPositions(data []struct {
+// Optional: Helper to create bets for test, mimics user position logic.
+func addTestBets(t *testing.T, db *gorm.DB, marketID uint, userPos []struct {
 	Username       string
 	YesSharesOwned int64
 	NoSharesOwned  int64
-}) map[string]UserMarketPosition {
-	result := make(map[string]UserMarketPosition)
-	for _, d := range data {
-		result[d.Username] = UserMarketPosition{
-			YesSharesOwned: d.YesSharesOwned,
-			NoSharesOwned:  d.NoSharesOwned,
+}) {
+	for _, pos := range userPos {
+		if pos.YesSharesOwned > 0 {
+			bet := modelstesting.GenerateBet(
+				pos.YesSharesOwned, "YES", pos.Username, marketID, 0,
+			)
+			db.Create(&bet)
+		}
+		if pos.NoSharesOwned > 0 {
+			bet := modelstesting.GenerateBet(
+				pos.NoSharesOwned, "NO", pos.Username, marketID, 0,
+			)
+			db.Create(&bet)
 		}
 	}
-	return result
 }
 
 func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
@@ -41,7 +50,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			}{
 				{"alice", 50, 0},
 			},
-			Probability: 1.0, // All YES
+			Probability: 1.0,
 			TotalVolume: 50,
 			Expected:    map[string]int64{"alice": 50},
 		},
@@ -54,7 +63,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			}{
 				{"bob", 0, 30},
 			},
-			Probability: 0.0, // All NO
+			Probability: 0.0,
 			TotalVolume: 30,
 			Expected:    map[string]int64{"bob": 30},
 		},
@@ -70,7 +79,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			},
 			Probability: 0.5,
 			TotalVolume: 20,
-			Expected:    map[string]int64{"alice": 15, "bob": 5},
+			Expected:    map[string]int64{"alice": 15, "bob": 5}, // or vice versa, depending on your tie logic
 		},
 		{
 			Name: "Rounding correction applied to largest holder",
@@ -82,16 +91,28 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 				{"alice", 3, 0},
 				{"bob", 2, 0},
 			},
-			Probability: 0.333, // (3 * .333) = 1.0, (2 * .333) = .666
+			Probability: 0.333,
 			TotalVolume: 2,
-			Expected:    nil, // We will print values for easy copying
+			Expected:    nil, // Will print for copying
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
+			db := modelstesting.NewFakeDB(t)
+			market := modelstesting.GenerateMarket(1, "creator")
+			db.Create(&market)
+
+			addTestBets(t, db, uint(market.ID), tc.UserPositions)
+
 			positions := makeUserPositions(tc.UserPositions)
-			actual := CalculateRoundedUserValuationsFromUserMarketPositions(positions, tc.Probability, tc.TotalVolume)
+			actual, err := CalculateRoundedUserValuationsFromUserMarketPositions(
+				db, uint(market.ID), positions, tc.Probability, tc.TotalVolume,
+			)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
 			if tc.Expected != nil {
 				for user, want := range tc.Expected {
 					got := actual[user].RoundedValue
@@ -100,7 +121,6 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 					}
 				}
 			} else {
-				// Print for inspection/copying
 				for user, val := range actual {
 					t.Logf("%s: %d", user, val.RoundedValue)
 				}
@@ -109,22 +129,18 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 	}
 }
 
-func TestAdjustUserValuationsToMarketVolume(t *testing.T) {
-	userVals := map[string]UserValuationResult{
-		"alice": {Username: "alice", RoundedValue: 3},
-		"bob":   {Username: "bob", RoundedValue: 2},
+// private helper function just for this specific use case
+func makeUserPositions(data []struct {
+	Username       string
+	YesSharesOwned int64
+	NoSharesOwned  int64
+}) map[string]UserMarketPosition {
+	result := make(map[string]UserMarketPosition)
+	for _, d := range data {
+		result[d.Username] = UserMarketPosition{
+			YesSharesOwned: d.YesSharesOwned,
+			NoSharesOwned:  d.NoSharesOwned,
+		}
 	}
-	floatVals := map[string]float64{
-		"alice": 3.1,
-		"bob":   1.9,
-	}
-	target := int64(7) // so delta = 2
-	adjusted := AdjustUserValuationsToMarketVolume(userVals, target, floatVals)
-	total := int64(0)
-	for _, v := range adjusted {
-		total += v.RoundedValue
-	}
-	if total != target {
-		t.Errorf("sum of adjusted valuations %d != target %d", total, target)
-	}
+	return result
 }

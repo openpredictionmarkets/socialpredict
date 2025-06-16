@@ -92,7 +92,16 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 	totalVolume := marketmath.GetMarketVolume(allBetsOnMarket)
 
 	// Step 4: Calculate valuations
-	valuations := CalculateRoundedUserValuationsFromUserMarketPositions(userPositionMap, currentProbability, totalVolume)
+	valuations, err := CalculateRoundedUserValuationsFromUserMarketPositions(
+		db,
+		marketIDUint,
+		userPositionMap,
+		currentProbability,
+		totalVolume,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Step 5: Append valuation to each MarketPosition struct
 	// Convert to []positions.MarketPosition for external use
