@@ -42,6 +42,54 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		Expected    map[string]int64
 	}{
 		{
+			Name: "Unresolved market, YES/NO users at 50%",
+			UserPositions: []struct {
+				Username       string
+				YesSharesOwned int64
+				NoSharesOwned  int64
+			}{
+				{"alice", 10, 0},
+				{"bob", 0, 10},
+			},
+			Probability:      0.5,
+			TotalVolume:      20,
+			IsResolved:       false,
+			ResolutionResult: "",
+			Expected:         map[string]int64{"alice": 10, "bob": 10},
+		},
+		{
+			Name: "Resolved YES market",
+			UserPositions: []struct {
+				Username       string
+				YesSharesOwned int64
+				NoSharesOwned  int64
+			}{
+				{"alice", 10, 0},
+				{"bob", 0, 10},
+			},
+			Probability:      0.5, // ignored if resolved
+			TotalVolume:      20,
+			IsResolved:       true,
+			ResolutionResult: "YES",
+			Expected:         map[string]int64{"alice": 20, "bob": 0}, // 100% payout to YES
+		},
+		{
+			Name: "Resolved NO market",
+			UserPositions: []struct {
+				Username       string
+				YesSharesOwned int64
+				NoSharesOwned  int64
+			}{
+				{"alice", 10, 0},
+				{"bob", 0, 10},
+			},
+			Probability:      0.5, // ignored if resolved
+			TotalVolume:      20,
+			IsResolved:       true,
+			ResolutionResult: "NO",
+			Expected:         map[string]int64{"alice": 0, "bob": 20}, // 100% payout to NO
+		},
+		{
 			Name: "Single YES user",
 			UserPositions: []struct {
 				Username       string
