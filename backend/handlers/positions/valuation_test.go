@@ -79,7 +79,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			},
 			Probability: 0.5,
 			TotalVolume: 20,
-			Expected:    map[string]int64{"alice": 15, "bob": 5}, // or vice versa, depending on your tie logic
+			Expected:    map[string]int64{"alice": 10, "bob": 10},
 		},
 		{
 			Name: "Rounding correction applied to largest holder",
