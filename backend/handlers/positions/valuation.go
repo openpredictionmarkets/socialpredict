@@ -1,6 +1,7 @@
 package positions
 
 import (
+	"fmt"
 	"math"
 
 	"gorm.io/gorm"
@@ -30,7 +31,7 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 		case "NO":
 			finalProb = 0.0
 		default:
-			finalProb = currentProbability // fallback
+			finalProb = currentProbability
 		}
 	} else {
 		finalProb = currentProbability
@@ -38,12 +39,27 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 
 	for username, pos := range userPositions {
 		var floatVal float64
-		if pos.YesSharesOwned > 0 {
-			floatVal = float64(pos.YesSharesOwned) * finalProb
-		} else if pos.NoSharesOwned > 0 {
-			floatVal = float64(pos.NoSharesOwned) * (1 - finalProb)
+
+		if isResolved {
+			floatVal = 0
+			if resolutionResult == "YES" {
+				floatVal = float64(pos.YesSharesOwned)
+			} else if resolutionResult == "NO" {
+				floatVal = float64(pos.NoSharesOwned)
+			}
+		} else {
+			if pos.YesSharesOwned > 0 {
+				floatVal = float64(pos.YesSharesOwned) * finalProb
+			} else if pos.NoSharesOwned > 0 {
+				floatVal = float64(pos.NoSharesOwned) * (1 - finalProb)
+			}
 		}
-		roundedVal := int64(math.Round(floatVal))
+
+		fmt.Printf("user=%s YES=%d NO=%d isResolved=%v result=%s val=%v\n",
+			username, pos.YesSharesOwned, pos.NoSharesOwned, isResolved, resolutionResult, floatVal)
+
+		roundedVal := int64(math.Round(floatVal)) // <- ROUNDING TO INT64 HERE
+
 		result[username] = UserValuationResult{
 			Username:     username,
 			RoundedValue: roundedVal,

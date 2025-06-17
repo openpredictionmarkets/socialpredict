@@ -29,6 +29,22 @@ func addTestBets(t *testing.T, db *gorm.DB, marketID uint, userPos []struct {
 	}
 }
 
+// private helper function just for this specific use case
+func makeUserPositions(data []struct {
+	Username       string
+	YesSharesOwned int64
+	NoSharesOwned  int64
+}) map[string]UserMarketPosition {
+	result := make(map[string]UserMarketPosition)
+	for _, d := range data {
+		result[d.Username] = UserMarketPosition{
+			YesSharesOwned: d.YesSharesOwned,
+			NoSharesOwned:  d.NoSharesOwned,
+		}
+	}
+	return result
+}
+
 func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 	testcases := []struct {
 		Name          string
@@ -37,9 +53,11 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			YesSharesOwned int64
 			NoSharesOwned  int64
 		}
-		Probability float64
-		TotalVolume int64
-		Expected    map[string]int64
+		Probability      float64
+		TotalVolume      int64
+		IsResolved       bool
+		ResolutionResult string
+		Expected         map[string]int64
 	}{
 		{
 			Name: "Unresolved market, YES/NO users at 50%",
@@ -58,7 +76,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			Expected:         map[string]int64{"alice": 10, "bob": 10},
 		},
 		{
-			Name: "Resolved YES market",
+			Name: "Resolved market: YES wins",
 			UserPositions: []struct {
 				Username       string
 				YesSharesOwned int64
@@ -71,10 +89,10 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			TotalVolume:      20,
 			IsResolved:       true,
 			ResolutionResult: "YES",
-			Expected:         map[string]int64{"alice": 20, "bob": 0}, // 100% payout to YES
+			Expected:         map[string]int64{"alice": 20, "bob": 0},
 		},
 		{
-			Name: "Resolved NO market",
+			Name: "Resolved market: NO wins",
 			UserPositions: []struct {
 				Username       string
 				YesSharesOwned int64
@@ -87,61 +105,39 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			TotalVolume:      20,
 			IsResolved:       true,
 			ResolutionResult: "NO",
-			Expected:         map[string]int64{"alice": 0, "bob": 20}, // 100% payout to NO
+			Expected:         map[string]int64{"alice": 0, "bob": 20},
 		},
 		{
-			Name: "Single YES user",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
-				{"alice", 50, 0},
-			},
-			Probability: 1.0,
-			TotalVolume: 50,
-			Expected:    map[string]int64{"alice": 50},
-		},
-		{
-			Name: "Single NO user",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
-				{"bob", 0, 30},
-			},
-			Probability: 0.0,
-			TotalVolume: 30,
-			Expected:    map[string]int64{"bob": 30},
-		},
-		{
-			Name: "YES and NO users at 50% prob, rounding needed",
+			Name: "Resolved market: All YES, NO wins (all get zero)",
 			UserPositions: []struct {
 				Username       string
 				YesSharesOwned int64
 				NoSharesOwned  int64
 			}{
 				{"alice", 10, 0},
-				{"bob", 0, 10},
+				{"bob", 5, 0},
 			},
-			Probability: 0.5,
-			TotalVolume: 20,
-			Expected:    map[string]int64{"alice": 10, "bob": 10},
+			Probability:      0.8,
+			TotalVolume:      15,
+			IsResolved:       true,
+			ResolutionResult: "NO",
+			Expected:         map[string]int64{"alice": 0, "bob": 0},
 		},
 		{
-			Name: "Rounding correction applied to largest holder",
+			Name: "Resolved market: All NO, YES wins (all get zero)",
 			UserPositions: []struct {
 				Username       string
 				YesSharesOwned int64
 				NoSharesOwned  int64
 			}{
-				{"alice", 3, 0},
-				{"bob", 2, 0},
+				{"alice", 0, 10},
+				{"bob", 0, 5},
 			},
-			Probability: 0.333,
-			TotalVolume: 2,
-			Expected:    nil, // Will print for copying
+			Probability:      0.2,
+			TotalVolume:      15,
+			IsResolved:       true,
+			ResolutionResult: "YES",
+			Expected:         map[string]int64{"alice": 0, "bob": 0},
 		},
 	}
 
@@ -150,15 +146,19 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			db := modelstesting.NewFakeDB(t)
 			market := modelstesting.GenerateMarket(1, "creator")
 			db.Create(&market)
-
 			addTestBets(t, db, uint(market.ID), tc.UserPositions)
-
 			positions := makeUserPositions(tc.UserPositions)
+
 			actual, err := CalculateRoundedUserValuationsFromUserMarketPositions(
-				db, uint(market.ID), positions, tc.Probability, tc.TotalVolume,
+				db, uint(market.ID), positions, tc.Probability, tc.TotalVolume, tc.IsResolved, tc.ResolutionResult,
 			)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Log for debug
+			for user, val := range actual {
+				t.Logf("user=%s: value=%d", user, val.RoundedValue)
 			}
 
 			if tc.Expected != nil {
@@ -175,20 +175,4 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			}
 		})
 	}
-}
-
-// private helper function just for this specific use case
-func makeUserPositions(data []struct {
-	Username       string
-	YesSharesOwned int64
-	NoSharesOwned  int64
-}) map[string]UserMarketPosition {
-	result := make(map[string]UserMarketPosition)
-	for _, d := range data {
-		result[d.Username] = UserMarketPosition{
-			YesSharesOwned: d.YesSharesOwned,
-			NoSharesOwned:  d.NoSharesOwned,
-		}
-	}
-	return result
 }

@@ -98,8 +98,8 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 		userPositionMap,
 		currentProbability,
 		totalVolume,
-		market.isResolved,
-		market.resolutionResult,
+		publicResponseMarket.IsResolved,
+		publicResponseMarket.ResolutionResult,
 	)
 	if err != nil {
 		return nil, err
