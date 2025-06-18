@@ -1,4 +1,4 @@
-package marketshandlers
+package payout
 
 import (
 	"socialpredict/handlers/math/outcomes/dbpm"

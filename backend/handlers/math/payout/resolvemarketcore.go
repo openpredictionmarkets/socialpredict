@@ -1,4 +1,4 @@
-package marketshandlers
+package payout
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func distributePayoutsWithRefund(market *models.Market, db *gorm.DB) error {
+func DistributePayoutsWithRefund(market *models.Market, db *gorm.DB) error {
 	if market == nil {
 		return errors.New("market is nil")
 	}

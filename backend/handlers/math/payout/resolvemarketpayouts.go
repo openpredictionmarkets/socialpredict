@@ -1,4 +1,4 @@
-package marketshandlers
+package payout
 
 import (
 	"math"

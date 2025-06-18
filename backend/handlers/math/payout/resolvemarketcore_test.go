@@ -1,4 +1,4 @@
-package marketshandlers
+package payout
 
 import (
 	"socialpredict/models"
@@ -18,7 +18,7 @@ func TestDistributePayoutsWithRefund_NARefund(t *testing.T) {
 	bet := modelstesting.GenerateBet(50, "YES", "refundbot", uint(market.ID), 0)
 	db.Create(&bet)
 
-	err := distributePayoutsWithRefund(&market, db)
+	err := DistributePayoutsWithRefund(&market, db)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestDistributePayoutsWithRefund_UnknownResolution(t *testing.T) {
 	market.ResolutionResult = "MAYBE" // Invalid
 	db.Create(&market)
 
-	err := distributePayoutsWithRefund(&market, db)
+	err := DistributePayoutsWithRefund(&market, db)
 	if err == nil {
 		t.Fatal("expected error for unknown resolution result")
 	}

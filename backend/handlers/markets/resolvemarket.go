@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"socialpredict/handlers/math/payout"
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
@@ -89,7 +90,7 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 	market.FinalResolutionDateTime = time.Now()
 
 	// Handle payouts (if applicable)
-	err = distributePayoutsWithRefund(&market, db)
+	err = payout.DistributePayoutsWithRefund(&market, db)
 	if err != nil {
 		http.Error(w, "Error distributing payouts: "+err.Error(), http.StatusInternalServerError)
 		return
