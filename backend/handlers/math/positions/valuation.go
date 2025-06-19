@@ -1,4 +1,4 @@
-package positions
+package positionsmath
 
 import (
 	"fmt"
@@ -24,18 +24,7 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 	result := make(map[string]UserValuationResult)
 	var finalProb float64
 
-	if isResolved {
-		switch resolutionResult {
-		case "YES":
-			finalProb = 1.0
-		case "NO":
-			finalProb = 0.0
-		default:
-			finalProb = currentProbability
-		}
-	} else {
-		finalProb = currentProbability
-	}
+	finalProb = getFinalProbabilityFromMarketModel(currentProbability, isResolved, resolutionResult)
 
 	for username, pos := range userPositions {
 		var floatVal float64
@@ -58,7 +47,7 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 		fmt.Printf("user=%s YES=%d NO=%d isResolved=%v result=%s val=%v\n",
 			username, pos.YesSharesOwned, pos.NoSharesOwned, isResolved, resolutionResult, floatVal)
 
-		roundedVal := int64(math.Round(floatVal)) // <- ROUNDING TO INT64 HERE
+		roundedVal := int64(math.Round(floatVal))
 
 		result[username] = UserValuationResult{
 			Username:     username,
@@ -71,4 +60,22 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 		return nil, err
 	}
 	return adjusted, nil
+}
+
+func getFinalProbabilityFromMarketModel(
+	currentProbability float64,
+	isResolved bool,
+	resolutionResult string,
+) float64 {
+	if isResolved {
+		switch resolutionResult {
+		case "YES":
+			return 1.0
+		case "NO":
+			return 0.0
+		default:
+			return currentProbability
+		}
+	}
+	return currentProbability
 }

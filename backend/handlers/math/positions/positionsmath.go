@@ -1,4 +1,4 @@
-package positions
+package positionsmath
 
 import (
 	"socialpredict/errors"
