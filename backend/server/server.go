@@ -6,6 +6,7 @@ import (
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
+	sellbetshandlers "socialpredict/handlers/bets/selling"
 	marketshandlers "socialpredict/handlers/markets"
 	positions "socialpredict/handlers/positions"
 	setuphandlers "socialpredict/handlers/setup"
@@ -73,7 +74,7 @@ func Start() {
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
 	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
-	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler(setup.EconomicsConfig)).Methods("POST")
+	router.HandleFunc("/v0/sell", sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler(setup.EconomicsConfig)).Methods("POST")
 
 	// admin stuff
