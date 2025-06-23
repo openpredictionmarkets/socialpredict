@@ -6,6 +6,7 @@ import (
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
+	buybetshandlers "socialpredict/handlers/bets/buying"
 	sellbetshandlers "socialpredict/handlers/bets/selling"
 	marketshandlers "socialpredict/handlers/markets"
 	positions "socialpredict/handlers/positions"
@@ -72,7 +73,7 @@ func Start() {
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
-	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler(setup.EconomicsConfig)).Methods("POST")
+	router.HandleFunc("/v0/bet", buybetshandlers.PlaceBetHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
 	router.HandleFunc("/v0/sell", sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)).Methods("POST")
 	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler(setup.EconomicsConfig)).Methods("POST")
