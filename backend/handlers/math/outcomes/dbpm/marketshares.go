@@ -293,11 +293,11 @@ func singleCreditYesNoAllocator(bets []models.Bet) (yesShares int64, noShares in
 			netNo += bet.Amount
 		}
 	}
-	if netYes > 0 {
+	if netYes > netNo {
 		return 1, 0
-	} else if netNo > 0 {
+	} else if netNo > netYes {
 		return 0, 1
 	}
-	// If equal, assign to neither (or define fallback rule)
+	// If equal or ambiguous, assign to neither (fallback)
 	return 0, 0
 }
