@@ -41,7 +41,7 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	}
 
 	// Get the last probability change, which is the resolution probability
-	currentProbability := probabilityChanges[len(probabilityChanges)-1].Probability
+	currentProbability := wpam.GetCurrentProbability(probabilityChanges)
 
 	// Get the total share pool as a float for precision
 	// Do not include the initial market subsidization in volume until market hits final resolution

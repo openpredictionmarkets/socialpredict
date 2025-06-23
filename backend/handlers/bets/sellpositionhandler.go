@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	betutils "socialpredict/handlers/bets/betutils"
-	"socialpredict/handlers/positions"
+	positionsmath "socialpredict/handlers/math/positions"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/setup"
@@ -38,7 +38,7 @@ func SellPositionHandler(loadEconConfig setup.EconConfigLoader) func(w http.Resp
 		marketIDStr := strconv.FormatUint(uint64(redeemRequest.MarketID), 10)
 
 		// Calculate the net aggregate positions for the user
-		userNetPosition, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(db, marketIDStr, user.Username)
+		userNetPosition, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(db, marketIDStr, user.Username)
 		if userNetPosition.NoSharesOwned == 0 && userNetPosition.YesSharesOwned == 0 {
 			http.Error(w, "No position found for the given market", http.StatusBadRequest)
 			return
