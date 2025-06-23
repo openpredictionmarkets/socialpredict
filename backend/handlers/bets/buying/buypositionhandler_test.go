@@ -1,4 +1,4 @@
-package betshandlers
+package buybetshandlers
 
 import (
 	"testing"
