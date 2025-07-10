@@ -10,6 +10,7 @@ import (
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
 )
@@ -37,6 +38,9 @@ func CreateMarketHandler(loadEconConfig setup.EconConfigLoader) func(http.Respon
 			return
 		}
 
+		// Initialize security service
+		securityService := security.NewSecurityService()
+
 		// Use database connection, validate user based upon token
 		db := util.GetDB()
 		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
@@ -57,6 +61,24 @@ func CreateMarketHandler(loadEconConfig setup.EconConfigLoader) func(http.Respon
 			return
 		}
 
+		// Validate and sanitize market input using security service
+		marketInput := security.MarketInput{
+			Title:       newMarket.QuestionTitle,
+			Description: newMarket.Description,
+			EndTime:     newMarket.ResolutionDateTime.String(), // Convert time to string for validation
+		}
+
+		sanitizedMarketInput, err := securityService.ValidateAndSanitizeMarketInput(marketInput)
+		if err != nil {
+			http.Error(w, "Invalid market data: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Update the market with sanitized data
+		newMarket.QuestionTitle = sanitizedMarketInput.Title
+		newMarket.Description = sanitizedMarketInput.Description
+
+		// Additional legacy validations (kept for backwards compatibility)
 		if err = checkQuestionTitleLength(newMarket.QuestionTitle); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
