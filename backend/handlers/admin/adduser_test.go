@@ -101,9 +101,10 @@ func TestUsernameSanitization(t *testing.T) {
 	securityService := security.NewSecurityService()
 
 	tests := []struct {
-		name     string
-		username string
-		expected string
+		name        string
+		username    string
+		expected    string
+		shouldError bool
 	}{
 		{
 			name:     "Normal username",
@@ -116,15 +117,22 @@ func TestUsernameSanitization(t *testing.T) {
 			expected: "testuser",
 		},
 		{
-			name:     "Username with mixed case",
-			username: "TestUser",
-			expected: "testuser", // Should be lowercased
+			name:        "Username with mixed case",
+			username:    "TestUser",
+			shouldError: true, // Should be rejected, not converted
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sanitized, err := securityService.Sanitizer.SanitizeUsername(tt.username)
+
+			if tt.shouldError {
+				if err == nil {
+					t.Errorf("Expected error but sanitization passed")
+				}
+				return
+			}
 
 			if err != nil {
 				t.Errorf("Sanitization failed: %v", err)
@@ -241,12 +249,12 @@ func TestUsernameLengthValidation(t *testing.T) {
 		shouldPass bool
 	}{
 		{"Empty", 0, false},
-		{"Single character", 1, true},
-		{"Short", 3, true},
+		{"Single character", 1, false}, // Minimum is 3 characters
+		{"Two characters", 2, false},
+		{"Minimum valid", 3, true},
 		{"Medium", 10, true},
-		{"Long", 30, true},
-		{"Max length", 50, true}, // Assuming 50 is the limit
-		{"Over limit", 51, false},
+		{"Maximum valid", 30, true},
+		{"Over limit", 31, false},
 		{"Way over limit", 100, false},
 	}
 

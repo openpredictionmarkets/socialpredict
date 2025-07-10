@@ -32,12 +32,12 @@ func TestDescriptionValidation(t *testing.T) {
 		{
 			name:          "Description with XSS",
 			description:   "Valid description<script>alert('xss')</script>",
-			expectedValid: true, // Should be sanitized, not rejected
+			expectedValid: false, // Should be rejected due to containsSuspiciousPatterns
 		},
 		{
 			name:          "Description with HTML",
 			description:   "Valid description with <b>bold</b> text",
-			expectedValid: true, // Should be sanitized
+			expectedValid: true, // Basic HTML tags like <b> are allowed by basic policy
 		},
 		{
 			name:          "Max length description",
