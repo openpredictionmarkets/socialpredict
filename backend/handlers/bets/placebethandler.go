@@ -7,6 +7,7 @@ import (
 	betutils "socialpredict/handlers/bets/betutils"
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
 )
@@ -14,6 +15,9 @@ import (
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Initialize security service
+		securityService := security.NewSecurityService()
+
 		db := util.GetDB()
 		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
 		if httperr != nil {
@@ -27,6 +31,24 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		// Validate and sanitize bet input using security service
+		betInput := security.BetInput{
+			MarketID: fmt.Sprintf("%d", betRequest.MarketID), // Convert uint to string
+			Amount:   float64(betRequest.Amount),             // Convert int64 to float64
+			Outcome:  betRequest.Outcome,
+		}
+
+		sanitizedBetInput, err := securityService.ValidateAndSanitizeBetInput(betInput)
+		if err != nil {
+			http.Error(w, "Invalid bet data: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Update the bet request with sanitized data - convert back to original types
+		// Note: MarketID should not be changed after sanitization since it's a database reference
+		betRequest.Amount = int64(sanitizedBetInput.Amount) // Convert float64 back to int64
+		betRequest.Outcome = sanitizedBetInput.Outcome
 
 		// Validate the request (check if market exists, if not closed/resolved, etc.)
 		betutils.CheckMarketStatus(db, betRequest.MarketID)

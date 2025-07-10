@@ -15,6 +15,7 @@ import (
 	privateuser "socialpredict/handlers/users/privateuser"
 	"socialpredict/handlers/users/publicuser"
 	"socialpredict/middleware"
+	"socialpredict/security"
 	"socialpredict/setup"
 
 	"github.com/gorilla/mux"
@@ -22,6 +23,9 @@ import (
 )
 
 func Start() {
+	// Initialize security service
+	securityService := security.NewSecurityService()
+
 	// CORS handler
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{
@@ -37,47 +41,52 @@ func Start() {
 
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
-	router.HandleFunc("/v0/home", handlers.HomeHandler)
-	router.HandleFunc("/v0/login", middleware.LoginHandler)
+
+	// Apply security middleware to all routes
+	securityMiddleware := securityService.SecurityMiddleware()
+	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
+
+	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
+	router.Handle("/v0/login", loginSecurityMiddleware(http.HandlerFunc(middleware.LoginHandler))).Methods("POST")
 
 	// application setup and stats information
-	router.HandleFunc("/v0/setup", setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)).Methods("GET")
-	router.HandleFunc("/v0/stats", statshandlers.StatsHandler()).Methods("GET")
+	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)))).Methods("GET")
+	router.Handle("/v0/stats", securityMiddleware(http.HandlerFunc(statshandlers.StatsHandler()))).Methods("GET")
+
 	// markets display, market information
-	router.HandleFunc("/v0/markets", marketshandlers.ListMarketsHandler).Methods("GET")
-	router.HandleFunc("/v0/markets/{marketId}", marketshandlers.MarketDetailsHandler).Methods("GET")
-	router.HandleFunc("/v0/marketprojection/{marketId}/{amount}/{outcome}/", marketshandlers.ProjectNewProbabilityHandler).Methods("GET")
+	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketshandlers.ListMarketsHandler))).Methods("GET")
+	router.Handle("/v0/markets/{marketId}", securityMiddleware(http.HandlerFunc(marketshandlers.MarketDetailsHandler))).Methods("GET")
+	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(http.HandlerFunc(marketshandlers.ProjectNewProbabilityHandler))).Methods("GET")
 
 	// handle market positions, get trades
-	router.HandleFunc("/v0/markets/bets/{marketId}", betshandlers.MarketBetsDisplayHandler).Methods("GET")
-	router.HandleFunc("/v0/markets/positions/{marketId}", positions.MarketDBPMPositionsHandler).Methods("GET")
-	router.HandleFunc("/v0/markets/positions/{marketId}/{username}", positions.MarketDBPMUserPositionsHandler).Methods("GET")
-	// show comments on markets
+	router.Handle("/v0/markets/bets/{marketId}", securityMiddleware(http.HandlerFunc(betshandlers.MarketBetsDisplayHandler))).Methods("GET")
+	router.Handle("/v0/markets/positions/{marketId}", securityMiddleware(http.HandlerFunc(positions.MarketDBPMPositionsHandler))).Methods("GET")
+	router.Handle("/v0/markets/positions/{marketId}/{username}", securityMiddleware(http.HandlerFunc(positions.MarketDBPMUserPositionsHandler))).Methods("GET")
 
 	// handle public user stuff
-	router.HandleFunc("/v0/userinfo/{username}", publicuser.GetPublicUserResponse).Methods("GET")
-	router.HandleFunc("/v0/usercredit/{username}", usercredit.GetUserCreditHandler).Methods("GET")
-	// user portfolio, (which is public)
-	router.HandleFunc("/v0/portfolio/{username}", publicuser.GetPortfolio).Methods("GET")
+	router.Handle("/v0/userinfo/{username}", securityMiddleware(http.HandlerFunc(publicuser.GetPublicUserResponse))).Methods("GET")
+	router.Handle("/v0/usercredit/{username}", securityMiddleware(http.HandlerFunc(usercredit.GetUserCreditHandler))).Methods("GET")
+	router.Handle("/v0/portfolio/{username}", securityMiddleware(http.HandlerFunc(publicuser.GetPortfolio))).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize
-	router.HandleFunc("/v0/privateprofile", privateuser.GetPrivateProfileUserResponse)
-	// changing profile stuff
-	router.HandleFunc("/v0/changepassword", usershandlers.ChangePassword).Methods("POST")
-	router.HandleFunc("/v0/profilechange/displayname", usershandlers.ChangeDisplayName).Methods("POST")
-	router.HandleFunc("/v0/profilechange/emoji", usershandlers.ChangeEmoji).Methods("POST")
-	router.HandleFunc("/v0/profilechange/description", usershandlers.ChangeDescription).Methods("POST")
-	router.HandleFunc("/v0/profilechange/links", usershandlers.ChangePersonalLinks).Methods("POST")
+	router.Handle("/v0/privateprofile", securityMiddleware(http.HandlerFunc(privateuser.GetPrivateProfileUserResponse))).Methods("GET")
+
+	// changing profile stuff - apply security middleware
+	router.Handle("/v0/changepassword", securityMiddleware(http.HandlerFunc(usershandlers.ChangePassword))).Methods("POST")
+	router.Handle("/v0/profilechange/displayname", securityMiddleware(http.HandlerFunc(usershandlers.ChangeDisplayName))).Methods("POST")
+	router.Handle("/v0/profilechange/emoji", securityMiddleware(http.HandlerFunc(usershandlers.ChangeEmoji))).Methods("POST")
+	router.Handle("/v0/profilechange/description", securityMiddleware(http.HandlerFunc(usershandlers.ChangeDescription))).Methods("POST")
+	router.Handle("/v0/profilechange/links", securityMiddleware(http.HandlerFunc(usershandlers.ChangePersonalLinks))).Methods("POST")
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
-	router.HandleFunc("/v0/resolve/{marketId}", marketshandlers.ResolveMarketHandler).Methods("POST")
-	router.HandleFunc("/v0/bet", betshandlers.PlaceBetHandler(setup.EconomicsConfig)).Methods("POST")
-	router.HandleFunc("/v0/userposition/{marketId}", usershandlers.UserMarketPositionHandler)
-	router.HandleFunc("/v0/sell", betshandlers.SellPositionHandler(setup.EconomicsConfig)).Methods("POST")
-	router.HandleFunc("/v0/create", marketshandlers.CreateMarketHandler(setup.EconomicsConfig)).Methods("POST")
+	router.Handle("/v0/resolve/{marketId}", securityMiddleware(http.HandlerFunc(marketshandlers.ResolveMarketHandler))).Methods("POST")
+	router.Handle("/v0/bet", securityMiddleware(http.HandlerFunc(betshandlers.PlaceBetHandler(setup.EconomicsConfig)))).Methods("POST")
+	router.Handle("/v0/userposition/{marketId}", securityMiddleware(http.HandlerFunc(usershandlers.UserMarketPositionHandler))).Methods("GET")
+	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(betshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
+	router.Handle("/v0/create", securityMiddleware(http.HandlerFunc(marketshandlers.CreateMarketHandler(setup.EconomicsConfig)))).Methods("POST")
 
-	// admin stuff
-	router.HandleFunc("/v0/admin/createuser", adminhandlers.AddUserHandler(setup.EconomicsConfig)).Methods("POST")
+	// admin stuff - apply security middleware
+	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")
 
 	// Apply the CORS middleware to the Gorilla Mux router
 	handler := c.Handler(router) // Use the Gorilla Mux router here
