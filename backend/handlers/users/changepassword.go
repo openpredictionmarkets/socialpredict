@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"socialpredict/middleware"
+	"socialpredict/security"
 	"socialpredict/util"
 )
 
@@ -18,6 +19,9 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Initialize security service
+	securityService := security.NewSecurityService()
+
 	db := util.GetDB()
 	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
 	if httperr != nil {
@@ -31,9 +35,26 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate input fields
+	if req.CurrentPassword == "" {
+		http.Error(w, "Current password is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.NewPassword == "" {
+		http.Error(w, "New password is required", http.StatusBadRequest)
+		return
+	}
+
 	// Check if the current password is correct
 	if !user.CheckPasswordHash(req.CurrentPassword) {
 		http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		return
+	}
+
+	// Validate new password strength
+	if err := securityService.Sanitizer.SanitizePassword(req.NewPassword); err != nil {
+		http.Error(w, "New password does not meet security requirements: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
