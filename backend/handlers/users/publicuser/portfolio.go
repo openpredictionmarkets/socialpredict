@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"socialpredict/handlers/positions"
+	positionsmath "socialpredict/handlers/math/positions"
 	"socialpredict/models"
 	"socialpredict/util"
 	"sort"
@@ -106,7 +106,7 @@ func makeUserMarketMap(userbets []models.Bet) map[uint]PortfolioItem {
 func processMarketMap(db *gorm.DB, marketMap map[uint]PortfolioItem, username string) ([]PortfolioItem, error) {
 	// Calculate market positions for each market
 	for marketID := range marketMap {
-		position, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(db, strconv.Itoa(int(marketID)), username)
+		position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(db, strconv.Itoa(int(marketID)), username)
 		if err != nil {
 			return nil, err
 		}

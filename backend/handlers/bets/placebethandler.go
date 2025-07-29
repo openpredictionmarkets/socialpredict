@@ -7,6 +7,7 @@ import (
 	betutils "socialpredict/handlers/bets/betutils"
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
 
@@ -15,6 +16,9 @@ import (
 
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Initialize security service
+		securityService := security.NewSecurityService()
+
 		db := util.GetDB()
 		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
 		if httperr != nil {
@@ -31,10 +35,56 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 
 		bet, err := PlaceBetCore(user, betRequest, db, loadEconConfig)
 		if err != nil {
+		// Validate and sanitize bet input using security service
+		betInput := security.BetInput{
+			MarketID: fmt.Sprintf("%d", betRequest.MarketID), // Convert uint to string
+			Amount:   float64(betRequest.Amount),             // Convert int64 to float64
+			Outcome:  betRequest.Outcome,
+		}
+
+		sanitizedBetInput, err := securityService.ValidateAndSanitizeBetInput(betInput)
+		if err != nil {
+			http.Error(w, "Invalid bet data: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Update the bet request with sanitized data - convert back to original types
+		// Note: MarketID should not be changed after sanitization since it's a database reference
+		betRequest.Amount = int64(sanitizedBetInput.Amount) // Convert float64 back to int64
+		betRequest.Outcome = sanitizedBetInput.Outcome
+
+		// Validate the request (check if market exists, if not closed/resolved, etc.)
+		betutils.CheckMarketStatus(db, betRequest.MarketID)
+
+		sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
+
+		// Check if the user's balance after the bet would be lower than the allowed maximum debt
+		// deduct fees along with calculation to ensure fees can be paid.
+		checkUserBalance(user, betRequest, sumOfBetFees, loadEconConfig)
+
+		// Create a new Bet object, set at current time
+		bet := models.CreateBet(user.Username, betRequest.MarketID, betRequest.Amount, betRequest.Outcome)
+
+		// Validate the final bet before putting into database
+		if err := betutils.ValidateBuy(db, &bet); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
+		user.AccountBalance -= betRequest.Amount + sumOfBetFees
+		if err := db.Save(&user).Error; err != nil {
+			http.Error(w, "Failed to update user balance", http.StatusInternalServerError)
+			return
+		}
+
+		// Save the Bet to the database
+		result := db.Create(&bet)
+		if result.Error != nil {
+			http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Return a success response
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(bet)
 	}
@@ -44,7 +94,9 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 // It assumes user authentication and JSON decoding is already done.
 func PlaceBetCore(user *models.User, betRequest models.Bet, db *gorm.DB, loadEconConfig setup.EconConfigLoader) (*models.Bet, error) {
 	// Validate the request (check if market exists, if not closed/resolved, etc.)
-	betutils.CheckMarketStatus(db, betRequest.MarketID)
+	if err := betutils.CheckMarketStatus(db, betRequest.MarketID); err != nil {
+    return nil, err
+}
 
 	sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
 

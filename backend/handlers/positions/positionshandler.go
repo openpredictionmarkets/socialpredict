@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"socialpredict/errors"
+	positionsmath "socialpredict/handlers/math/positions"
 	"socialpredict/util"
 
 	"github.com/gorilla/mux"
@@ -16,7 +17,7 @@ func MarketDBPMPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	// open up database to utilize connection pooling
 	db := util.GetDB()
 
-	marketDBPMPositions, err := CalculateMarketPositions_WPAM_DBPM(db, marketIdStr)
+	marketDBPMPositions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(db, marketIdStr)
 	if errors.HandleHTTPError(w, err, http.StatusBadRequest, "Invalid request or data processing error.") {
 		return // Stop execution if there was an error.
 	}
@@ -34,7 +35,7 @@ func MarketDBPMUserPositionsHandler(w http.ResponseWriter, r *http.Request) {
 	// open up database to utilize connection pooling
 	db := util.GetDB()
 
-	marketDBPMPositions, err := CalculateMarketPositionForUser_WPAM_DBPM(db, marketIdStr, userNameStr)
+	marketDBPMPositions, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(db, marketIdStr, userNameStr)
 	if errors.HandleHTTPError(w, err, http.StatusBadRequest, "Invalid request or data processing error.") {
 		return // Stop execution if there was an error.
 	}

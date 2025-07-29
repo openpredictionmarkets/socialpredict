@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"socialpredict/middleware"
+	"socialpredict/security"
 	"socialpredict/util"
 )
 
@@ -16,6 +17,9 @@ func ChangeDescription(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Initialize security service
+	securityService := security.NewSecurityService()
 
 	db := util.GetDB()
 	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
@@ -30,12 +34,20 @@ func ChangeDescription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if request.Description == "" {
-		http.Error(w, "Description cannot be blank", http.StatusBadRequest)
+	// Validate description length and content
+	if len(request.Description) > 2000 {
+		http.Error(w, "Description exceeds maximum length of 2000 characters", http.StatusBadRequest)
 		return
 	}
 
-	user.Description = request.Description
+	// Sanitize the description to prevent XSS
+	sanitizedDescription, err := securityService.Sanitizer.SanitizeDescription(request.Description)
+	if err != nil {
+		http.Error(w, "Invalid description: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	user.Description = sanitizedDescription
 	if err := db.Save(&user).Error; err != nil {
 		http.Error(w, "Failed to update description: "+err.Error(), http.StatusInternalServerError)
 		return

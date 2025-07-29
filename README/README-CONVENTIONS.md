@@ -2,6 +2,8 @@
 
 The following is a documentation of various coding conventions used to keep SocialPredict clean, maintainable and secure.
 
+Further conventions will be added within the codebase within README files and will be assigned uuid's. To search for convention, simply search, "Convention," in the codebase.
+
 ## Seperation of Concerns
 
 * The application is separated into a backend and a frontend so that people who specialize in different areas can easily contribute seperately.
