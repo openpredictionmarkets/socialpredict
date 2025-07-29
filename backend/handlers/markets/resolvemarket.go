@@ -127,7 +127,7 @@ func distributePayouts(market *models.Market, db *gorm.DB) error {
 		}
 
 		for _, bet := range bets {
-			if err := usersHandlers.UpdateUserBalance(bet.Username, bet.Amount, db, "refund"); err != nil {
+			if err := usersHandlers.ApplyTransactionToUser(bet.Username, bet.Amount, db, usersHandlers.TransactionRefund); err != nil {
 				return err
 			}
 		}
@@ -175,7 +175,7 @@ func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
 		}
 
 		if winningShares > 0 {
-			if err := usersHandlers.UpdateUserBalance(pos.Username, winningShares, db, "win"); err != nil {
+			if err := usersHandlers.ApplyTransactionToUser(pos.Username, winningShares, db, usersHandlers.TransactionWin); err != nil {
 				return err
 			}
 		}

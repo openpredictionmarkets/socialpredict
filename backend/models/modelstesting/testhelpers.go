@@ -59,38 +59,6 @@ func GenerateProbability(probabilities ...float64) []wpam.ProbabilityChange {
 	return changes
 }
 
-// GenerateUser creates a fake user for testing
-func GenerateUser(username string, startingBalance int64) models.User {
-	now := time.Now().UnixNano()
-	return models.User{
-		PublicUser: models.PublicUser{
-			Username:              username,
-			DisplayName:           fmt.Sprintf("%s_display", username),
-			UserType:              "regular",
-			InitialAccountBalance: startingBalance,
-			AccountBalance:        startingBalance,
-		},
-		PrivateUser: models.PrivateUser{
-			Email:    fmt.Sprintf("%s@example.com", username),
-			APIKey:   fmt.Sprintf("api-key-%d", now), // <<< Random API key!
-			Password: "password",
-		},
-	}
-}
-
-// GenerateMarket creates a minimal valid market for testing
-func GenerateMarket(id int64, creatorUsername string) models.Market {
-	return models.Market{
-		ID:                 id,
-		QuestionTitle:      "Test Market",
-		Description:        "Test Description",
-		OutcomeType:        "BINARY",
-		ResolutionDateTime: time.Now().Add(24 * time.Hour),
-		InitialProbability: 0.5,
-		CreatorUsername:    creatorUsername,
-	}
-}
-
 // GenerateEconomicConfig returns a standard fake EconomicConfig based on your real setup.yaml
 func GenerateEconomicConfig() *setup.EconomicConfig {
 	return &setup.EconomicConfig{
