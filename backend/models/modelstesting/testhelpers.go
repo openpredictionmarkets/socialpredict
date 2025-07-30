@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"time"
 )
 
@@ -56,4 +57,34 @@ func GenerateProbability(probabilities ...float64) []wpam.ProbabilityChange {
 		changes = append(changes, wpam.ProbabilityChange{Probability: p})
 	}
 	return changes
+}
+
+// GenerateEconomicConfig returns a standard fake EconomicConfig based on your real setup.yaml
+func GenerateEconomicConfig() *setup.EconomicConfig {
+	return &setup.EconomicConfig{
+		Economics: setup.Economics{
+			MarketCreation: setup.MarketCreation{
+				InitialMarketProbability:   0.5,
+				InitialMarketSubsidization: 10,
+				InitialMarketYes:           0,
+				InitialMarketNo:            0,
+			},
+			MarketIncentives: setup.MarketIncentives{
+				CreateMarketCost: 10,
+				TraderBonus:      1,
+			},
+			User: setup.User{
+				InitialAccountBalance: 0,
+				MaximumDebtAllowed:    500,
+			},
+			Betting: setup.Betting{
+				MinimumBet: 1,
+				BetFees: setup.BetFees{
+					InitialBetFee: 1,
+					BuySharesFee:  0,
+					SellSharesFee: 0,
+				},
+			},
+		},
+	}
 }
