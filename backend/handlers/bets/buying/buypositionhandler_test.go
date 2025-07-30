@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"socialpredict/models"
+	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
 )
 
@@ -98,5 +99,47 @@ func TestCheckUserBalance_CustomConfig(t *testing.T) {
 				t.Errorf("got error = %v, expected error = %v", err != nil, tt.expectsError)
 			}
 		})
+	}
+}
+
+func TestPlaceBetCore_BalanceAdjustment(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+
+	initialBalance := int64(1000)
+	user := modelstesting.GenerateUser("testuser", initialBalance)
+	market := modelstesting.GenerateMarket(1, "testuser")
+
+	db.Create(&user)
+	db.Create(&market)
+
+	betRequest := models.Bet{
+		MarketID: 1,
+		Amount:   100,
+		Outcome:  "YES",
+	}
+
+	// Call PlaceBetCore directly (no HTTP server)
+	bet, err := PlaceBetCore(&user, betRequest, db, func() *setup.EconomicConfig {
+		return modelstesting.GenerateEconomicConfig()
+	})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Reload user from DB to verify updated balance
+	var updatedUser models.User
+	db.First(&updatedUser, "username = ?", "testuser")
+
+	expectedBalance := initialBalance - betRequest.Amount - modelstesting.GenerateEconomicConfig().Economics.Betting.BetFees.InitialBetFee
+	if updatedUser.AccountBalance != expectedBalance {
+		t.Fatalf("Expected balance %d, got %d", expectedBalance, updatedUser.AccountBalance)
+	}
+
+	// Verify that the bet was created successfully
+	if bet == nil {
+		t.Fatalf("Expected bet to be created, got nil")
+	}
+	if bet.Username != "testuser" {
+		t.Errorf("Expected bet username 'testuser', got %s", bet.Username)
 	}
 }
