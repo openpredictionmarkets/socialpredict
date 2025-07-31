@@ -6,6 +6,8 @@ import (
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 )
 
 // GenerateBet is used for Generating fake bets for testing purposes
@@ -20,6 +22,29 @@ func GenerateBet(amount int64, outcome, username string, marketID uint, offset t
 	}
 }
 
+// UserClaims represents the expected structure of the JWT claims (matches middleware)
+type UserClaims struct {
+	Username string `json:"username"`
+	jwt.StandardClaims
+}
+
+// GenerateValidJWT creates a valid JWT token for testing purposes
+func GenerateValidJWT(username string) string {
+	// Use the same JWT key structure as the middleware
+	jwtKey := []byte("test-secret-key-for-testing")
+
+	claims := &UserClaims{
+		Username: username,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, _ := token.SignedString(jwtKey)
+	return tokenString
+}
+
 func GenerateMarket(id int64, creatorUsername string) models.Market {
 	return models.Market{
 		ID:                 id,
@@ -32,19 +57,23 @@ func GenerateMarket(id int64, creatorUsername string) models.Market {
 	}
 }
 
+var userCounter int64 = 0
+
 func GenerateUser(username string, startingBalance int64) models.User {
+	userCounter++
 	now := time.Now().UnixNano()
+	uniqueId := fmt.Sprintf("%d_%d", now, userCounter)
 	return models.User{
 		PublicUser: models.PublicUser{
 			Username:              username,
-			DisplayName:           fmt.Sprintf("%s_display_%d", username, now),
+			DisplayName:           fmt.Sprintf("%s_display_%s", username, uniqueId),
 			UserType:              "regular",
 			InitialAccountBalance: startingBalance,
 			AccountBalance:        startingBalance,
 		},
 		PrivateUser: models.PrivateUser{
-			Email:    fmt.Sprintf("%s_%d@example.com", username, now),
-			APIKey:   fmt.Sprintf("api-key-%d", now),
+			Email:    fmt.Sprintf("%s_%s@example.com", username, uniqueId),
+			APIKey:   fmt.Sprintf("api-key-%s", uniqueId),
 			Password: "password",
 		},
 	}

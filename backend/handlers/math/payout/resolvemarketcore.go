@@ -3,7 +3,6 @@ package payout
 import (
 	"errors"
 	"fmt"
-	"log"
 	positionsmath "socialpredict/handlers/math/positions"
 	usersHandlers "socialpredict/handlers/users"
 	"socialpredict/models"
@@ -19,8 +18,7 @@ func DistributePayoutsWithRefund(market *models.Market, db *gorm.DB) error {
 
 	switch market.ResolutionResult {
 	case "N/A":
-		log.Printf("[TODO] Refund logic not implemented yet for market ID %d", market.ID)
-		return fmt.Errorf("refunds not yet implemented for ResolutionResult=N/A")
+		return refundAllBets(market, db)
 	case "YES", "NO":
 		return calculateAndAllocateProportionalPayouts(market, db)
 	case "PROB":
@@ -46,6 +44,23 @@ func calculateAndAllocateProportionalPayouts(market *models.Market, db *gorm.DB)
 			if err := usersHandlers.ApplyTransactionToUser(pos.Username, pos.Value, db, usersHandlers.TransactionWin); err != nil {
 				return err
 			}
+		}
+	}
+
+	return nil
+}
+
+func refundAllBets(market *models.Market, db *gorm.DB) error {
+	// Retrieve all bets associated with the market
+	var bets []models.Bet
+	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
+		return err
+	}
+
+	// Refund each bet to the user
+	for _, bet := range bets {
+		if err := usersHandlers.ApplyTransactionToUser(bet.Username, bet.Amount, db, usersHandlers.TransactionRefund); err != nil {
+			return err
 		}
 	}
 
