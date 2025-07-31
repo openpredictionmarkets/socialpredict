@@ -5,10 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	dbpm "socialpredict/handlers/math/outcomes/dbpm"
-	wpam "socialpredict/handlers/math/probabilities/wpam"
-	usersHandlers "socialpredict/handlers/users"
-
 	"socialpredict/handlers/math/payout"
 
 	"socialpredict/logging"
@@ -95,91 +91,20 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 	market.ResolutionResult = resolutionData.Outcome
 	market.FinalResolutionDateTime = time.Now()
 
-	// Handle payouts (if applicable)
+	// Save the market changes first so payout calculation sees the resolved state
+	if err := db.Save(&market).Error; err != nil {
+		http.Error(w, "Error saving market resolution: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Handle payouts (if applicable) - after market is saved as resolved
 	err = payout.DistributePayoutsWithRefund(&market, db)
 	if err != nil {
 		http.Error(w, "Error distributing payouts: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Save the market changes
-	if err := db.Save(&market).Error; err != nil {
-		http.Error(w, "Error saving market resolution: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	// Send a response back
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Market resolved successfully"})
-}
-
-// distributePayouts handles the logic for calculating and distributing payouts
-func distributePayouts(market *models.Market, db *gorm.DB) error {
-	if market == nil {
-		return errors.New("market is nil")
-	}
-
-	// Handle the N/A outcome by refunding all bets
-	if market.ResolutionResult == "N/A" {
-		var bets []models.Bet
-		if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
-			return err
-		}
-
-		for _, bet := range bets {
-			if err := usersHandlers.ApplyTransactionToUser(bet.Username, bet.Amount, db, usersHandlers.TransactionRefund); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// Calculate and distribute payouts using the CPMM model
-	return calculateDBPMPayouts(market, db)
-}
-
-// calculate DBPM Payouts calculates and updates user balances based on the CPMM model.
-func calculateDBPMPayouts(market *models.Market, db *gorm.DB) error {
-	// Step 1: Retrieve all bets associated with the market
-	var bets []models.Bet
-	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
-		return err
-	}
-
-	// Step 2: Compute probabilities dynamically
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
-
-	// Sanity check: make sure we have some probability history
-	if len(probabilityChanges) == 0 {
-		return errors.New("no probability changes found for market")
-	}
-
-	// Step 3 onward: payout logic stays the same
-	coursePayouts := dbpm.CalculateCoursePayoutsDBPM(bets, probabilityChanges)
-	yesShares, noShares := dbpm.DivideUpMarketPoolSharesDBPM(bets, probabilityChanges)
-	yesNormFactor, noNormFactor := dbpm.CalculateNormalizationFactorsDBPM(yesShares, noShares, coursePayouts)
-	scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(bets, coursePayouts, yesNormFactor, noNormFactor)
-	adjustedPayouts := dbpm.AdjustPayouts(bets, scaledPayouts)
-	userPayouts := dbpm.AggregateUserPayoutsDBPM(bets, adjustedPayouts)
-	netPositions := dbpm.NetAggregateMarketPositions(userPayouts)
-
-	for _, pos := range netPositions {
-		var winningShares int64
-
-		if market.ResolutionResult == "YES" {
-			winningShares = pos.YesSharesOwned
-		} else if market.ResolutionResult == "NO" {
-			winningShares = pos.NoSharesOwned
-		} else {
-			winningShares = 0
-		}
-
-		if winningShares > 0 {
-			if err := usersHandlers.ApplyTransactionToUser(pos.Username, winningShares, db, usersHandlers.TransactionWin); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
