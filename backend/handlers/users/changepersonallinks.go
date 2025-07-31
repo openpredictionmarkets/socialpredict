@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"socialpredict/middleware"
+	"socialpredict/security"
 	"socialpredict/util"
 )
 
@@ -21,6 +22,9 @@ func ChangePersonalLinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Initialize security service
+	securityService := security.NewSecurityService()
+
 	db := util.GetDB()
 	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
 	if httperr != nil {
@@ -36,11 +40,37 @@ func ChangePersonalLinks(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Received links update: %+v", request)
 
-	// Directly map request fields to user model fields
-	user.PersonalLink1 = request.PersonalLink1
-	user.PersonalLink2 = request.PersonalLink2
-	user.PersonalLink3 = request.PersonalLink3
-	user.PersonalLink4 = request.PersonalLink4
+	// Validate and sanitize each personal link individually
+	links := [4]string{request.PersonalLink1, request.PersonalLink2, request.PersonalLink3, request.PersonalLink4}
+	var sanitizedLinks [4]string
+
+	for i, link := range links {
+		// Allow empty links
+		if link == "" {
+			sanitizedLinks[i] = ""
+			continue
+		}
+
+		// Validate link length
+		if len(link) > 200 {
+			http.Error(w, "Personal link exceeds maximum length of 200 characters", http.StatusBadRequest)
+			return
+		}
+
+		// Sanitize the link
+		sanitizedLink, err := securityService.Sanitizer.SanitizePersonalLink(link)
+		if err != nil {
+			http.Error(w, "Invalid personal link: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		sanitizedLinks[i] = sanitizedLink
+	}
+
+	// Update user with sanitized links
+	user.PersonalLink1 = sanitizedLinks[0]
+	user.PersonalLink2 = sanitizedLinks[1]
+	user.PersonalLink3 = sanitizedLinks[2]
+	user.PersonalLink4 = sanitizedLinks[3]
 
 	// Use direct update with GORM to specify which fields to update
 	if err := db.Model(&user).Select("PersonalLink1", "PersonalLink2", "PersonalLink3", "PersonalLink4").Updates(map[string]interface{}{

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"socialpredict/middleware"
+	"socialpredict/security"
 	"socialpredict/util"
 )
 
@@ -16,6 +17,9 @@ func ChangeDisplayName(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Initialize security service
+	securityService := security.NewSecurityService()
 
 	db := util.GetDB()
 	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
@@ -30,12 +34,20 @@ func ChangeDisplayName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if request.DisplayName == "" {
-		http.Error(w, "Display name cannot be blank", http.StatusBadRequest)
+	// Validate display name length and content
+	if len(request.DisplayName) > 50 || len(request.DisplayName) < 1 {
+		http.Error(w, "Display name must be between 1 and 50 characters", http.StatusBadRequest)
 		return
 	}
 
-	user.DisplayName = request.DisplayName
+	// Sanitize the display name to prevent XSS
+	sanitizedDisplayName, err := securityService.Sanitizer.SanitizeDisplayName(request.DisplayName)
+	if err != nil {
+		http.Error(w, "Invalid display name: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	user.DisplayName = sanitizedDisplayName
 	if err := db.Save(&user).Error; err != nil {
 		http.Error(w, "Failed to update display name: "+err.Error(), http.StatusInternalServerError)
 		return
