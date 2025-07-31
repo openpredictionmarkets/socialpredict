@@ -10,6 +10,9 @@ import (
 const (
 	TransactionWin    = "WIN"
 	TransactionRefund = "REFUND"
+	TransactionSale   = "SALE"
+	TransactionBuy    = "BUY"
+	TransactionFee    = "FEE"
 )
 
 // ApplyTransactionToUser credits the user's balance for a specific transaction type (WIN, REFUND, etc.)
@@ -21,8 +24,10 @@ func ApplyTransactionToUser(username string, amount int64, db *gorm.DB, transact
 	}
 
 	switch transactionType {
-	case TransactionWin, TransactionRefund:
+	case TransactionWin, TransactionRefund, TransactionSale:
 		user.AccountBalance += amount
+	case TransactionBuy, TransactionFee:
+		user.AccountBalance -= amount
 	default:
 		return fmt.Errorf("unknown transaction type: %s", transactionType)
 	}

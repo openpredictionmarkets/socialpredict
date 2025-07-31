@@ -1,0 +1,305 @@
+package security
+
+import (
+	"fmt"
+	"net/url"
+	"regexp"
+	"strings"
+	"unicode"
+
+	"github.com/microcosm-cc/bluemonday"
+)
+
+// Sanitizer holds the bluemonday policies for different content types
+type Sanitizer struct {
+	strictPolicy *bluemonday.Policy
+	basicPolicy  *bluemonday.Policy
+}
+
+// NewSanitizer creates a new sanitizer with predefined policies
+func NewSanitizer() *Sanitizer {
+	return &Sanitizer{
+		strictPolicy: bluemonday.StrictPolicy(),
+		basicPolicy:  createBasicPolicy(),
+	}
+}
+
+// createBasicPolicy creates a policy that allows basic text formatting but removes scripts
+func createBasicPolicy() *bluemonday.Policy {
+	p := bluemonday.NewPolicy()
+	// Allow basic text formatting
+	p.AllowElements("b", "i", "em", "strong")
+	// Ensure no scripts, iframes, or dangerous elements
+	p.AllowAttrs("href").OnElements("a")
+	p.RequireNoReferrerOnLinks(true)
+	return p
+}
+
+// SanitizeUsername removes any characters that are not lowercase letters or numbers
+func (s *Sanitizer) SanitizeUsername(username string) (string, error) {
+	// Remove any whitespace
+	username = strings.TrimSpace(username)
+
+	// Check if username matches expected pattern
+	if match, _ := regexp.MatchString("^[a-z0-9]+$", username); !match {
+		return "", fmt.Errorf("username must only contain lowercase letters and numbers")
+	}
+
+	// Additional length check
+	if len(username) < 3 || len(username) > 30 {
+		return "", fmt.Errorf("username must be between 3 and 30 characters")
+	}
+
+	return username, nil
+}
+
+// SanitizeDisplayName removes HTML/script content but allows basic formatting
+func (s *Sanitizer) SanitizeDisplayName(displayName string) (string, error) {
+	// Remove leading/trailing whitespace
+	displayName = strings.TrimSpace(displayName)
+
+	// Check length
+	if len(displayName) == 0 {
+		return "", fmt.Errorf("display name cannot be empty")
+	}
+	if len(displayName) > 50 {
+		return "", fmt.Errorf("display name cannot exceed 50 characters")
+	}
+
+	// Check for potentially dangerous patterns before sanitizing
+	if containsSuspiciousPatterns(displayName) {
+		return "", fmt.Errorf("display name contains potentially dangerous content")
+	}
+
+	// Sanitize HTML/script content
+	sanitized := s.strictPolicy.Sanitize(displayName)
+
+	return sanitized, nil
+}
+
+// SanitizeDescription removes dangerous HTML while allowing basic formatting
+func (s *Sanitizer) SanitizeDescription(description string) (string, error) {
+	// Remove leading/trailing whitespace
+	description = strings.TrimSpace(description)
+
+	// Check length
+	if len(description) > 2000 {
+		return "", fmt.Errorf("description cannot exceed 2000 characters")
+	}
+
+	// Check for suspicious patterns before sanitizing
+	if containsSuspiciousPatterns(description) {
+		return "", fmt.Errorf("description contains potentially dangerous content")
+	}
+
+	// Sanitize with basic policy (allows some formatting)
+	sanitized := s.basicPolicy.Sanitize(description)
+
+	return sanitized, nil
+}
+
+// SanitizeMarketTitle sanitizes market question titles
+func (s *Sanitizer) SanitizeMarketTitle(title string) (string, error) {
+	// Remove leading/trailing whitespace
+	title = strings.TrimSpace(title)
+
+	// Check length constraints
+	if len(title) == 0 {
+		return "", fmt.Errorf("market title cannot be empty")
+	}
+	if len(title) > 160 {
+		return "", fmt.Errorf("market title cannot exceed 160 characters")
+	}
+
+	// Check for suspicious patterns before sanitizing
+	if containsSuspiciousPatterns(title) {
+		return "", fmt.Errorf("market title contains potentially dangerous content")
+	}
+
+	// Sanitize HTML/script content
+	sanitized := s.strictPolicy.Sanitize(title)
+
+	return sanitized, nil
+}
+
+// SanitizePersonalLink validates and sanitizes personal links
+func (s *Sanitizer) SanitizePersonalLink(link string) (string, error) {
+	// Remove leading/trailing whitespace
+	link = strings.TrimSpace(link)
+
+	// Empty links are allowed
+	if link == "" {
+		return "", nil
+	}
+
+	// Check length
+	if len(link) > 200 {
+		return "", fmt.Errorf("personal link cannot exceed 200 characters")
+	}
+
+	// Parse URL to validate format
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL format: %v", err)
+	}
+
+	// Ensure scheme is provided and is http/https
+	if parsedURL.Scheme == "" {
+		// Add https by default
+		link = "https://" + link
+		parsedURL, err = url.Parse(link)
+		if err != nil {
+			return "", fmt.Errorf("invalid URL format after adding scheme: %v", err)
+		}
+	}
+
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return "", fmt.Errorf("only http and https URLs are allowed")
+	}
+
+	// Check for suspicious domains or patterns
+	if containsMaliciousDomain(parsedURL.Host) {
+		return "", fmt.Errorf("potentially malicious domain detected")
+	}
+
+	return parsedURL.String(), nil
+}
+
+// SanitizeEmoji validates that the emoji is from an allowed set
+func (s *Sanitizer) SanitizeEmoji(emoji string) (string, error) {
+	// Remove leading/trailing whitespace
+	emoji = strings.TrimSpace(emoji)
+
+	// Check if it's a valid emoji (basic check for unicode emoji ranges)
+	if !isValidEmoji(emoji) {
+		return "", fmt.Errorf("invalid emoji format")
+	}
+
+	// Check length (emojis should be short)
+	if len(emoji) > 20 {
+		return "", fmt.Errorf("emoji too long")
+	}
+
+	return emoji, nil
+}
+
+// SanitizePassword validates password strength
+func (s *Sanitizer) SanitizePassword(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters long")
+	}
+
+	if len(password) > 128 {
+		return fmt.Errorf("password cannot exceed 128 characters")
+	}
+
+	// Check for at least one uppercase, one lowercase, one digit
+	var hasUpper, hasLower, hasDigit bool
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsDigit(char):
+			hasDigit = true
+		}
+	}
+
+	if !hasUpper || !hasLower || !hasDigit {
+		return fmt.Errorf("password must contain at least one uppercase letter, one lowercase letter, and one digit")
+	}
+
+	return nil
+}
+
+// containsSuspiciousPatterns checks for common XSS and injection patterns
+func containsSuspiciousPatterns(input string) bool {
+	suspiciousPatterns := []string{
+		"javascript:",
+		"vbscript:",
+		"data:",
+		"<script",
+		"</script>",
+		"<iframe",
+		"<object",
+		"<embed",
+		"<link",
+		"<meta",
+		"<style",
+		"onload=",
+		"onerror=",
+		"onclick=",
+		"onmouseover=",
+		"onfocus=",
+		"onblur=",
+		"onchange=",
+		"onsubmit=",
+		"eval(",
+		"expression(",
+		"url(",
+		"@import",
+		"<!--",
+		"-->",
+	}
+
+	inputLower := strings.ToLower(input)
+	for _, pattern := range suspiciousPatterns {
+		if strings.Contains(inputLower, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// containsMaliciousDomain checks against known malicious domain patterns
+func containsMaliciousDomain(domain string) bool {
+	// This is a basic implementation - in production, you'd use a more comprehensive list
+	maliciousPatterns := []string{
+		"bit.ly", // URL shorteners can be used maliciously
+		"tinyurl.com",
+		"t.co",
+		"localhost", // Prevent internal network access
+		"127.0.0.1",
+		"0.0.0.0",
+		"::1",
+		"169.254.", // Link-local addresses
+		"10.",      // Private network ranges
+		"192.168.",
+		"172.16.",
+	}
+
+	domainLower := strings.ToLower(domain)
+	for _, pattern := range maliciousPatterns {
+		if strings.Contains(domainLower, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isValidEmoji performs basic emoji validation
+func isValidEmoji(emoji string) bool {
+	// Basic check for emoji unicode ranges
+	for _, r := range emoji {
+		// Common emoji ranges (this is simplified - real emoji validation is complex)
+		if (r >= 0x1F600 && r <= 0x1F64F) || // Emoticons
+			(r >= 0x1F300 && r <= 0x1F5FF) || // Misc Symbols
+			(r >= 0x1F680 && r <= 0x1F6FF) || // Transport
+			(r >= 0x2600 && r <= 0x26FF) || // Misc symbols
+			(r >= 0x2700 && r <= 0x27BF) || // Dingbats
+			(r >= 0xFE00 && r <= 0xFE0F) || // Variation selectors
+			(r >= 0x1F900 && r <= 0x1F9FF) || // Supplemental symbols
+			(r >= 0x1F1E6 && r <= 0x1F1FF) { // Regional indicators
+			continue
+		}
+		// Also allow basic ASCII characters for simple emojis like :)
+		if r >= 32 && r <= 126 {
+			continue
+		}
+		return false
+	}
+	return len(emoji) > 0
+}

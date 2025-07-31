@@ -6,9 +6,9 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"regexp"
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
 
@@ -23,8 +23,11 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 			return
 		}
 
+		// Initialize security service
+		securityService := security.NewSecurityService()
+
 		var req struct {
-			Username string `json:"username"`
+			Username string `json:"username" validate:"required,min=3,max=30,username"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Error decoding request body", http.StatusBadRequest)
@@ -32,12 +35,21 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 			return
 		}
 
-		if match, _ := regexp.MatchString("^[a-z0-9]+$", req.Username); !match {
-			err := fmt.Errorf("username %s must only contain lowercase letters and numbers", req.Username)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		// Validate the username using security service
+		if err := securityService.Validator.ValidateStruct(req); err != nil {
+			http.Error(w, "Invalid username: "+err.Error(), http.StatusBadRequest)
 			log.Printf("AddUserHandler: %v", err)
 			return
 		}
+
+		// Sanitize the username
+		sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
+		if err != nil {
+			http.Error(w, "Invalid username format: "+err.Error(), http.StatusBadRequest)
+			log.Printf("AddUserHandler: %v", err)
+			return
+		}
+		req.Username = sanitizedUsername
 
 		db := util.GetDB()
 

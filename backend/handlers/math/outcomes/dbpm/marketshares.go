@@ -5,7 +5,6 @@ import (
 	"math"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
@@ -51,15 +50,9 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	yesShares := int64(0)
 	noShares := int64(0)
 
-	// Check case where there is a single share, implying one bet
+	// Check case where there is only one bet
 	if marketmath.GetMarketVolume(bets) == 1 {
-		singleShareDirection := singleShareYesNoAllocator(bets, logging.DefaultLogger{})
-
-		if singleShareDirection == "YES" {
-			yesShares = 1
-		} else {
-			noShares = 1
-		}
+		yesShares, noShares = singleCreditYesNoAllocator(bets)
 	} else {
 		// Calculate YES and NO pools using floating-point arithmetic
 		yesShares = int64(math.Round(totalSharePool * currentProbability))
@@ -290,12 +283,21 @@ func NetAggregateMarketPositions(positions []DBPMMarketPosition) []DBPMMarketPos
 	return normalizedPositions
 }
 
-// singleShareYesNoAllocator determines the outcome of a single bet.
-// Logs a fatal error and exits if the input condition (len(bets) == 1) is not met.
-func singleShareYesNoAllocator(bets []models.Bet, logger logging.Logger) string {
-	if len(bets) != 1 {
-		logger.Fatalf("singleShareYesNoAllocator: expected len(bets) = 1, got %d", len(bets))
+// SingleCreditYesNoAllocator assigns the remaining credit/share to YES or NO, based on net position.
+func singleCreditYesNoAllocator(bets []models.Bet) (yesShares int64, noShares int64) {
+	var netYes, netNo int64
+	for _, bet := range bets {
+		if bet.Outcome == "YES" {
+			netYes += bet.Amount
+		} else if bet.Outcome == "NO" {
+			netNo += bet.Amount
+		}
 	}
-
-	return bets[0].Outcome
+	if netYes > netNo {
+		return 1, 0
+	} else if netNo > netYes {
+		return 0, 1
+	}
+	// If equal or ambiguous, assign to neither (fallback)
+	return 0, 0
 }

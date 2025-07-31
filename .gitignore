@@ -33,3 +33,6 @@ go.work
 **/data/postgres
 
 .first_run
+
+# Keys
+.playground_key_pointer

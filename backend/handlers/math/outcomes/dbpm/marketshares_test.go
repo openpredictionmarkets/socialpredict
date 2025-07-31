@@ -3,7 +3,6 @@ package dbpm
 import (
 	"reflect"
 	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/logging"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
@@ -739,67 +738,66 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 	}
 }
 
-func TestSingleShareYesNoAllocator(t *testing.T) {
+func TestSingleCreditYesNoAllocator(t *testing.T) {
 	tests := []struct {
-		name        string
-		bets        []models.Bet
-		expectFatal bool
-		expected    string
+		name    string
+		bets    []models.Bet
+		wantYes int64
+		wantNo  int64
 	}{
 		{
-			name:        "Single YES bet",
-			bets:        []models.Bet{modelstesting.GenerateBet(1, "YES", "one", 1, 0)},
-			expectFatal: false,
-			expected:    "YES",
+			name:    "Net YES",
+			bets:    []models.Bet{modelstesting.GenerateBet(1, "YES", "one", 1, 0)},
+			wantYes: 1,
+			wantNo:  0,
 		},
 		{
-			name:        "Single NO bet",
-			bets:        []models.Bet{modelstesting.GenerateBet(1, "NO", "one", 1, 0)},
-			expectFatal: false,
-			expected:    "NO",
+			name:    "Net NO",
+			bets:    []models.Bet{modelstesting.GenerateBet(1, "NO", "one", 1, 0)},
+			wantYes: 0,
+			wantNo:  1,
 		},
 		{
-			name: "Multiple bets",
+			name: "Net YES after mix",
+			bets: []models.Bet{
+				modelstesting.GenerateBet(2, "YES", "one", 1, 0),
+				modelstesting.GenerateBet(1, "NO", "two", 1, 1),
+			},
+			wantYes: 1,
+			wantNo:  0,
+		},
+		{
+			name: "Net NO after mix",
+			bets: []models.Bet{
+				modelstesting.GenerateBet(1, "YES", "one", 1, 0),
+				modelstesting.GenerateBet(2, "NO", "two", 1, 1),
+			},
+			wantYes: 0,
+			wantNo:  1,
+		},
+		{
+			name:    "No bets",
+			bets:    []models.Bet{},
+			wantYes: 0,
+			wantNo:  0,
+		},
+		{
+			name: "Ambiguous (net 0)",
 			bets: []models.Bet{
 				modelstesting.GenerateBet(1, "YES", "one", 1, 0),
 				modelstesting.GenerateBet(1, "NO", "two", 1, 1),
 			},
-			expectFatal: true,
-		},
-		{
-			name:        "No bets",
-			bets:        []models.Bet{},
-			expectFatal: true,
+			wantYes: 0,
+			wantNo:  0,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mockLogger := &logging.MockLogger{}
-
-			defer func() {
-				if r := recover(); r != nil {
-					if tc.expectFatal {
-						// Test passes if fatal was expected
-						t.Logf("[DEBUG] Test case %q: Expected fatal error occurred. Recovered: %v", tc.name, r)
-					} else {
-						// Test fails if panic was not expected
-						t.Errorf("Unexpected fatal error for case %q: %v", tc.name, r)
-					}
-				} else if tc.expectFatal {
-					// Test fails if no fatal occurred but was expected
-					t.Errorf("Expected fatal error for case %q, but none occurred", tc.name)
-				}
-			}()
-
-			// Call the function
-			result := singleShareYesNoAllocator(tc.bets, mockLogger)
-
-			// If no fatal error was expected, check the result
-			if !tc.expectFatal {
-				if result != tc.expected {
-					t.Errorf("Expected outcome %q, got %q", tc.expected, result)
-				}
+			gotYes, gotNo := singleCreditYesNoAllocator(tc.bets)
+			if gotYes != tc.wantYes || gotNo != tc.wantNo {
+				t.Errorf("%s: expected (YES=%d, NO=%d), got (YES=%d, NO=%d)",
+					tc.name, tc.wantYes, tc.wantNo, gotYes, gotNo)
 			}
 		})
 	}
