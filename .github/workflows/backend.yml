@@ -61,4 +61,6 @@ jobs:
       - name: Run tests
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
         working-directory: ./backend
+        env:
+          JWT_SIGNING_KEY: "test-secret-key-for-testing"
         run: go test ./...
