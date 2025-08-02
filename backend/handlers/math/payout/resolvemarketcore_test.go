@@ -1,7 +1,6 @@
 package payout
 
 import (
-	"strings"
 	"testing"
 
 	"socialpredict/models"
@@ -21,8 +20,19 @@ func TestDistributePayoutsWithRefund_NARefund(t *testing.T) {
 	db.Create(&bet)
 
 	err := DistributePayoutsWithRefund(&market, db)
-	if err == nil || !strings.Contains(err.Error(), "not yet implemented") {
-		t.Fatalf("expected refund not implemented error, got: %v", err)
+	if err != nil {
+		t.Fatalf("expected no error for N/A refund, got: %v", err)
+	}
+
+	// Verify the user received their refund
+	var updatedUser models.User
+	if err := db.First(&updatedUser, "username = ?", "refundbot").Error; err != nil {
+		t.Fatalf("failed to fetch refundbot: %v", err)
+	}
+
+	expectedBalance := int64(50) // Should get the bet amount back
+	if updatedUser.AccountBalance != expectedBalance {
+		t.Errorf("refundbot balance = %d, want %d", updatedUser.AccountBalance, expectedBalance)
 	}
 }
 
