@@ -5,9 +5,9 @@ import PositionsActivityLayout from '../layouts/activity/positions/PositionsActi
 
 const ActivityTabs = ({ marketId }) => {
     const tabsData = [
-        { label: 'Comments', content: <div>Comments Go here...</div> },
         { label: 'Positions', content: <PositionsActivityLayout marketId={marketId} /> },
         { label: 'Bets', content: <BetsActivityLayout marketId={marketId} /> },
+        { label: 'Comments', content: <div>Comments Go here...</div> },
     ];
 
     return <SiteTabs tabs={tabsData} />;
