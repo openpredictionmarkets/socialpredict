@@ -190,6 +190,9 @@ func TestValidateAndSanitizeUserInput(t *testing.T) {
 func TestValidateAndSanitizeMarketInput(t *testing.T) {
 	service := NewSecurityService()
 
+	// Use a future date for testing
+	futureDate := "2026-12-31T23:59:59Z"
+
 	tests := []struct {
 		name    string
 		input   MarketInput
@@ -200,7 +203,7 @@ func TestValidateAndSanitizeMarketInput(t *testing.T) {
 			input: MarketInput{
 				Title:       "Will it rain tomorrow?",
 				Description: "A market about weather prediction",
-				EndTime:     "2024-12-31T23:59:59Z",
+				EndTime:     futureDate,
 			},
 			wantErr: false,
 		},
@@ -209,7 +212,7 @@ func TestValidateAndSanitizeMarketInput(t *testing.T) {
 			input: MarketInput{
 				Title:       "Will it rain <script>alert('xss')</script> tomorrow?",
 				Description: "A market about weather prediction",
-				EndTime:     "2024-12-31T23:59:59Z",
+				EndTime:     futureDate,
 			},
 			wantErr: true,
 		},
@@ -218,7 +221,7 @@ func TestValidateAndSanitizeMarketInput(t *testing.T) {
 			input: MarketInput{
 				Title:       "",
 				Description: "A market about weather prediction",
-				EndTime:     "2024-12-31T23:59:59Z",
+				EndTime:     futureDate,
 			},
 			wantErr: true,
 		},
@@ -227,7 +230,7 @@ func TestValidateAndSanitizeMarketInput(t *testing.T) {
 			input: MarketInput{
 				Title:       "This is a very long title that exceeds the maximum allowed length for market titles and should cause a validation error because it's way too long and contains more than 160 characters which is the limit",
 				Description: "A market about weather prediction",
-				EndTime:     "2024-12-31T23:59:59Z",
+				EndTime:     futureDate,
 			},
 			wantErr: true,
 		},
