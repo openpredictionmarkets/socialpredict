@@ -45,7 +45,9 @@ func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWr
 // It assumes user authentication and JSON decoding is already done.
 func PlaceBetCore(user *models.User, betRequest models.Bet, db *gorm.DB, loadEconConfig setup.EconConfigLoader) (*models.Bet, error) {
 	// Validate the request (check if market exists, if not closed/resolved, etc.)
-	betutils.CheckMarketStatus(db, betRequest.MarketID)
+	if err := betutils.CheckMarketStatus(db, betRequest.MarketID); err != nil {
+		return nil, err
+	}
 
 	sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
 
