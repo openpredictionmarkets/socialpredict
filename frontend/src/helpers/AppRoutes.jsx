@@ -8,6 +8,7 @@ import Polls from '../pages/polls/Polls';
 import Notifications from '../pages/notifications/Notifications';
 import Create from '../pages/create/Create';
 import About from '../pages/about/About';
+import Stats from '../pages/stats/Stats';
 import Home from '../pages/home/Home';
 import MarketDetails from '../pages/marketDetails/MarketDetails';
 import User from '../pages/user/User';
@@ -61,6 +62,13 @@ const AppRoutes = () => {
           <Redirect to='/changepassword' />
         ) : (
           <User />
+        )}
+      </Route>
+      <Route exact path='/stats'>
+        {isLoggedIn && auth.usertype !== 'ADMIN' && mustChangePassword ? (
+          <Redirect to='/changepassword' />
+        ) : (
+          <Stats />
         )}
       </Route>
 

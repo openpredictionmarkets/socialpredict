@@ -9,7 +9,7 @@ const User = () => {
   const { username } = useParams();
 
   useEffect(() => {
-    fetch(`${API_URL}/api/v0/userinfo/${username}`)
+    fetch(`${API_URL}/v0/userinfo/${username}`)
       .then((response) => response.json())
       .then((data) => setUserData(data))
       .catch((error) => console.error('Error fetching user data:', error));

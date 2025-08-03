@@ -105,8 +105,8 @@ function MarketsByStatusTable({ status }) {
       
       try {
         const endpoint = status === 'all' 
-          ? `${API_URL}/api/v0/markets`
-          : `${API_URL}/api/v0/markets/${status}`;
+          ? `${API_URL}/v0/markets`
+          : `${API_URL}/v0/markets/${status}`;
         
         const response = await fetch(endpoint);
         if (!response.ok) throw new Error(`Failed to fetch ${status} markets`);
