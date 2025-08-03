@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
-import MobileMarketCard from '../../components/tables/MobileMarketCard';
-import LoadingSpinner from '../../components/loaders/LoadingSpinner';
+import MobileMarketCard from './MobileMarketCard';
+import LoadingSpinner from '../loaders/LoadingSpinner';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -93,20 +93,34 @@ const MarketRow = ({ marketData }) => (
   </tr>
 );
 
-function MarketsTable() {
+function MarketsByStatusTable({ status }) {
   const [marketsData, setMarketsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchMarkets = async () => {
+      setLoading(true);
+      setError('');
+      
       try {
-        const response = await fetch(`${API_URL}/v0/markets`);
-        if (!response.ok) throw new Error('Failed to fetch markets');
+        const endpoint = status === 'all' 
+          ? `${API_URL}/v0/markets`
+          : `${API_URL}/v0/markets/${status}`;
+        
+        const response = await fetch(endpoint);
+        if (!response.ok) throw new Error(`Failed to fetch ${status} markets`);
+        
         const data = await response.json();
-        setMarketsData(data.markets || []);
+        
+        // Handle different response structures
+        if (status === 'all') {
+          setMarketsData(data.markets || []);
+        } else {
+          setMarketsData(data.markets || []);
+        }
       } catch (error) {
-        console.error('Error fetching market data:', error);
+        console.error(`Error fetching ${status} market data:`, error);
         setError(error.toString());
       } finally {
         setTimeout(() => setLoading(false), 300);
@@ -114,23 +128,25 @@ function MarketsTable() {
     };
 
     fetchMarkets();
-  }, []);
+  }, [status]);
 
   if (loading)
     return (
       <div className='p-4 text-center'>
         <LoadingSpinner />
-        Loading markets...
+        Loading {status} markets...
       </div>
     );
+    
   if (error)
     return <div className='p-4 text-center text-red-500'>Error: {error}</div>;
 
   return (
-    <div className='w-full md:w-full h-[calc(100vh-40px)] sm:h-full overflow-y-auto px-4 md:px-6 lg:px-8'>
-      <h1 className='text-2xl font-semibold text-gray-300 mb-6'>Markets</h1>
+    <div className='w-full'>
       {marketsData.length === 0 ? (
-        <div className='p-4 text-center text-gray-400'>No markets found.</div>
+        <div className='p-4 text-center text-gray-400'>
+          No {status} markets found.
+        </div>
       ) : (
         <>
           <div className='md:hidden'>
@@ -156,4 +172,4 @@ function MarketsTable() {
   );
 }
 
-export default MarketsTable;
+export default MarketsByStatusTable;

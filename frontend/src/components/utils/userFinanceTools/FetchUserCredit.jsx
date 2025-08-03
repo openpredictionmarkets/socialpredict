@@ -9,7 +9,7 @@ const useUserCredit = (username) => {
     useEffect(() => {
       const fetchCredit = async () => {
         try {
-          const response = await fetch(`${API_URL}/api/v0/usercredit/${username}`);
+          const response = await fetch(`${API_URL}/v0/usercredit/${username}`);
           if (!response.ok) {
             throw new Error('Failed to fetch user credit');
           }
@@ -32,4 +32,3 @@ const useUserCredit = (username) => {
   };
 
   export default useUserCredit;
-  

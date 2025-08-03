@@ -32,6 +32,7 @@ func Start() {
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{
 			"http://localhost:8089",
+			"http://localhost",
 		},
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
@@ -57,6 +58,9 @@ func Start() {
 
 	// markets display, market information
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketshandlers.ListMarketsHandler))).Methods("GET")
+	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(marketshandlers.ListActiveMarketsHandler))).Methods("GET")
+	router.Handle("/v0/markets/closed", securityMiddleware(http.HandlerFunc(marketshandlers.ListClosedMarketsHandler))).Methods("GET")
+	router.Handle("/v0/markets/resolved", securityMiddleware(http.HandlerFunc(marketshandlers.ListResolvedMarketsHandler))).Methods("GET")
 	router.Handle("/v0/markets/{marketId}", securityMiddleware(http.HandlerFunc(marketshandlers.MarketDetailsHandler))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(http.HandlerFunc(marketshandlers.ProjectNewProbabilityHandler))).Methods("GET")
 

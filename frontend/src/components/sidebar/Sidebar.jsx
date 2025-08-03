@@ -17,6 +17,7 @@ import {
   PollsSVG,
   ProfileSVG,
   CreateSVG,
+  StatsSVG,
 } from '../../assets/components/SvgIcons';
 
 const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
@@ -84,6 +85,9 @@ const Sidebar = () => {
           <SidebarLink to='/about' icon={AboutSVG}>
             About
           </SidebarLink>
+          <SidebarLink to='/stats' icon={StatsSVG}>
+            Stats
+          </SidebarLink>
         </>
       );
     }
@@ -102,6 +106,9 @@ const Sidebar = () => {
           </SidebarLink>
           <SidebarLink to='/about' icon={AboutSVG}>
             About
+          </SidebarLink>
+          <SidebarLink to='/stats' icon={StatsSVG}>
+            Stats
           </SidebarLink>
           <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
             Logout
@@ -148,6 +155,9 @@ const Sidebar = () => {
         </SidebarLink>
         <SidebarLink to='/about' icon={AboutSVG}>
           About
+        </SidebarLink>
+        <SidebarLink to='/stats' icon={StatsSVG}>
+          Stats
         </SidebarLink>
         <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
           Logout
