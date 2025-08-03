@@ -134,6 +134,7 @@ func CalculateMarketPositionForUser_WPAM_DBPM(db *gorm.DB, marketIdStr string, u
 			return UserMarketPosition{
 				NoSharesOwned:  position.NoSharesOwned,
 				YesSharesOwned: position.YesSharesOwned,
+				Value:          position.Value,
 			}, nil
 		}
 	}

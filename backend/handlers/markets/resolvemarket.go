@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"socialpredict/handlers/math/payout"
-
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"

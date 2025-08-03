@@ -6,6 +6,8 @@ import (
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
+	buybetshandlers "socialpredict/handlers/bets/buying"
+	sellbetshandlers "socialpredict/handlers/bets/selling"
 	marketshandlers "socialpredict/handlers/markets"
 	positions "socialpredict/handlers/positions"
 	setuphandlers "socialpredict/handlers/setup"
@@ -80,9 +82,9 @@ func Start() {
 
 	// handle private user actions such as resolve a market, make a bet, create a market, change profile
 	router.Handle("/v0/resolve/{marketId}", securityMiddleware(http.HandlerFunc(marketshandlers.ResolveMarketHandler))).Methods("POST")
-	router.Handle("/v0/bet", securityMiddleware(http.HandlerFunc(betshandlers.PlaceBetHandler(setup.EconomicsConfig)))).Methods("POST")
+	router.Handle("/v0/bet", securityMiddleware(http.HandlerFunc(buybetshandlers.PlaceBetHandler(setup.EconomicsConfig)))).Methods("POST")
 	router.Handle("/v0/userposition/{marketId}", securityMiddleware(http.HandlerFunc(usershandlers.UserMarketPositionHandler))).Methods("GET")
-	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(betshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
+	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
 	router.Handle("/v0/create", securityMiddleware(http.HandlerFunc(marketshandlers.CreateMarketHandler(setup.EconomicsConfig)))).Methods("POST")
 
 	// admin stuff - apply security middleware

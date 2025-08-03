@@ -14,7 +14,10 @@ import (
 )
 
 // login and validation stuff
-var jwtKey = []byte(os.Getenv("JWT_SIGNING_KEY"))
+// getJWTKey returns the JWT signing key, checking environment variable at runtime
+func getJWTKey() []byte {
+	return []byte(os.Getenv("JWT_SIGNING_KEY"))
+}
 
 // UserClaims represents the expected structure of the JWT claims
 type UserClaims struct {
@@ -91,7 +94,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// Sign and get the complete encoded token as a string
-	tokenString, err := token.SignedString(jwtKey)
+	tokenString, err := token.SignedString(getJWTKey())
 	if err != nil {
 		http.Error(w, "Error creating token", http.StatusInternalServerError)
 		return

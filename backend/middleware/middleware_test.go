@@ -81,10 +81,10 @@ func TestExtractTokenFromHeader(t *testing.T) {
 }
 
 func TestParseToken(t *testing.T) {
-	// Set up JWT key for testing
-	originalKey := jwtKey
-	jwtKey = []byte("test-secret-key")
-	defer func() { jwtKey = originalKey }()
+	// Set up JWT key for testing via environment variable
+	originalKey := os.Getenv("JWT_SIGNING_KEY")
+	os.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	defer func() { os.Setenv("JWT_SIGNING_KEY", originalKey) }()
 
 	tests := []struct {
 		name        string
@@ -104,7 +104,7 @@ func TestParseToken(t *testing.T) {
 	}
 
 	keyFunc := func(token *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
+		return getJWTKey(), nil
 	}
 
 	for _, tt := range tests {
@@ -392,14 +392,14 @@ func createTestToken(username string, userType string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtKey)
+	return token.SignedString(getJWTKey())
 }
 
 func TestCreateTestToken(t *testing.T) {
-	// Set up JWT key for testing
-	originalKey := jwtKey
-	jwtKey = []byte("test-secret-key")
-	defer func() { jwtKey = originalKey }()
+	// Set up JWT key for testing via environment variable
+	originalKey := os.Getenv("JWT_SIGNING_KEY")
+	os.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	defer func() { os.Setenv("JWT_SIGNING_KEY", originalKey) }()
 
 	token, err := createTestToken("testuser", "USER")
 	if err != nil {
@@ -412,18 +412,19 @@ func TestCreateTestToken(t *testing.T) {
 }
 
 func TestJWTKeyExists(t *testing.T) {
-	// Test that jwtKey is available (it's loaded from environment)
+	// Test that JWT key is available from environment
 	// In a test environment, it should be non-nil
-	originalKey := jwtKey
-	defer func() { jwtKey = originalKey }()
+	originalKey := os.Getenv("JWT_SIGNING_KEY")
+	defer func() { os.Setenv("JWT_SIGNING_KEY", originalKey) }()
 
 	// Set a test key if not set
-	if jwtKey == nil || len(jwtKey) == 0 {
-		jwtKey = []byte("test-key-for-testing")
+	if os.Getenv("JWT_SIGNING_KEY") == "" {
+		os.Setenv("JWT_SIGNING_KEY", "test-key-for-testing")
 	}
 
+	jwtKey := getJWTKey()
 	if len(jwtKey) == 0 {
-		t.Error("Expected jwtKey to be non-empty")
+		t.Error("Expected JWT key to be non-empty")
 	}
 }
 
