@@ -36,6 +36,7 @@ const MarketChart = ({ data, currentProbability, title, className }) => {
       maximum: 1,
       labelFontColor: '#708090',
       suffix: '',
+      valueFormatString: '0.00',
     },
     data: [
       {
