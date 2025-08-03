@@ -25,7 +25,14 @@ func SellPositionHandler(loadEconConfig setup.EconConfigLoader) func(w http.Resp
 			return
 		}
 
-		if err := ProcessSellRequest(db, &redeemRequest, user); err != nil {
+		// Load economic configuration
+		cfg := loadEconConfig()
+		if cfg == nil {
+			http.Error(w, "failed to load economic configuration", http.StatusInternalServerError)
+			return
+		}
+
+		if err := ProcessSellRequest(db, &redeemRequest, user, cfg); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
