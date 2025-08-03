@@ -40,6 +40,114 @@ const Style = () => {
   return (
     <div className='overflow-auto'>
       <Header />
+      
+      {/* Color Palette Section */}
+      <div className='bg-primary-background p-6'>
+        <h2 className='text-2xl font-bold text-white mb-6'>SocialPredict Color Palette</h2>
+        <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8'>
+          {/* Primary Colors */}
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-primary-background rounded mb-2 border border-gray-500'></div>
+            <div className='text-white text-sm font-medium'>primary-background</div>
+            <div className='text-gray-400 text-xs'>#0e121d</div>
+          </div>
+          
+          {/* Gray Colors */}
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-custom-gray-verylight rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>custom-gray-verylight</div>
+            <div className='text-gray-400 text-xs'>#DBD4D3</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-custom-gray-light rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>custom-gray-light</div>
+            <div className='text-gray-400 text-xs'>#67697C</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-custom-gray-dark rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>custom-gray-dark</div>
+            <div className='text-gray-400 text-xs'>#303030</div>
+          </div>
+          
+          {/* Button Colors */}
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-green-btn rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>green-btn</div>
+            <div className='text-gray-400 text-xs'>#054A29</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-red-btn rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>red-btn</div>
+            <div className='text-gray-400 text-xs'>#D00000</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-gold-btn rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>gold-btn</div>
+            <div className='text-gray-400 text-xs'>#FFC107</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-neutral-btn rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>neutral-btn</div>
+            <div className='text-gray-400 text-xs'>#8A1C7C</div>
+          </div>
+          
+          {/* Special Colors */}
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-beige rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>beige</div>
+            <div className='text-gray-400 text-xs'>#F9D3A5</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-primary-pink rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>primary-pink</div>
+            <div className='text-gray-400 text-xs'>#F72585</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-info-blue rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>info-blue</div>
+            <div className='text-gray-400 text-xs'>#17a2b8</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-warning-orange rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>warning-orange</div>
+            <div className='text-gray-400 text-xs'>#ffc107</div>
+          </div>
+        </div>
+        
+        {/* Chart Colors Section */}
+        <h3 className='text-xl font-bold text-white mb-4 mt-8'>Chart Colors</h3>
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-8'>
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-info-blue rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>Default Probability</div>
+            <div className='text-gray-400 text-xs'>info-blue: #17a2b8</div>
+            <div className='text-gray-500 text-xs mt-1'>Used for single probability line</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-green-btn rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>YES Probability</div>
+            <div className='text-gray-400 text-xs'>green-btn: #054A29</div>
+            <div className='text-gray-500 text-xs mt-1'>Used when showing dual probabilities</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-red-btn rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>NO Probability</div>
+            <div className='text-gray-400 text-xs'>red-btn: #D00000</div>
+            <div className='text-gray-500 text-xs mt-1'>Used when showing dual probabilities</div>
+          </div>
+        </div>
+      </div>
+      
       <table className='min-w-full divide-y divide-gray-200 bg-primary-background'>
         <thead className='bg-gray-50'>
           <tr>
