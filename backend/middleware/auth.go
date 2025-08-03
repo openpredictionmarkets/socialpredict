@@ -42,7 +42,7 @@ func ValidateTokenAndGetUser(r *http.Request, db *gorm.DB) (*models.User, *HTTPE
 
 	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
+		return getJWTKey(), nil
 	})
 	if err != nil {
 		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
