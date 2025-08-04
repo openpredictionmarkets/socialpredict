@@ -7,11 +7,11 @@ const tabInactiveStyle = "text-white bg-custom-gray-light border-transparent";
 // Styles for the selected tab
 const tabActiveStyle = "text-white bg-primary-pink";
 
-const SiteTabs = ({ tabs, onTabChange, defaultTab }) => {
+const SiteTabs = ({ tabs, onTabChange, defaultTab, activeTab }) => {
     const [internalActiveTab, setInternalActiveTab] = useState(defaultTab || tabs[0].label);
     
-    // Use external control if onTabChange is provided, otherwise use internal state
-    const activeTab = onTabChange ? (defaultTab || tabs[0].label) : internalActiveTab;
+    // Use activeTab prop if provided, otherwise fall back to internal state
+    const currentTab = activeTab ?? internalActiveTab;
 
     useEffect(() => {
         if (defaultTab && defaultTab !== internalActiveTab) {
@@ -41,7 +41,7 @@ const SiteTabs = ({ tabs, onTabChange, defaultTab }) => {
                 {tabs.map(tab => (
                     <div
                         key={tab.label}
-                        className={`${tabBaseStyle} ${activeTab === tab.label ? tabActiveStyle : tabInactiveStyle} flex-1`}
+                        className={`${tabBaseStyle} ${currentTab === tab.label ? tabActiveStyle : tabInactiveStyle} flex-1`}
                         onClick={() => handleTabClick(tab.label)}
                     >
                         {tab.label}
@@ -50,7 +50,7 @@ const SiteTabs = ({ tabs, onTabChange, defaultTab }) => {
             </div>
             <div className="p-4">
                 {tabs.map(tab => (
-                    activeTab === tab.label && <div key={tab.label}>{tab.content}</div>
+                    currentTab === tab.label && <div key={tab.label}>{tab.content}</div>
                 ))}
             </div>
         </div>

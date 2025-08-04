@@ -81,7 +81,7 @@ function Markets() {
                     <SiteTabs 
                         tabs={tabsData} 
                         onTabChange={handleTabChange}
-                        defaultTab="Active"
+                        activeTab={activeTab}
                     />
                 </div>
             </div>
