@@ -58,6 +58,7 @@ func Start() {
 
 	// markets display, market information
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketshandlers.ListMarketsHandler))).Methods("GET")
+	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketshandlers.SearchMarketsHandler))).Methods("GET")
 	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(marketshandlers.ListActiveMarketsHandler))).Methods("GET")
 	router.Handle("/v0/markets/closed", securityMiddleware(http.HandlerFunc(marketshandlers.ListClosedMarketsHandler))).Methods("GET")
 	router.Handle("/v0/markets/resolved", securityMiddleware(http.HandlerFunc(marketshandlers.ListResolvedMarketsHandler))).Methods("GET")

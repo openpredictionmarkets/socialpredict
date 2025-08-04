@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Base styles for all tabs
 const tabBaseStyle = "px-4 py-2 text-sm font-medium text-center cursor-pointer";
@@ -7,8 +7,33 @@ const tabInactiveStyle = "text-white bg-custom-gray-light border-transparent";
 // Styles for the selected tab
 const tabActiveStyle = "text-white bg-primary-pink";
 
-const SiteTabs = ({ tabs }) => {
-    const [activeTab, setActiveTab] = useState(tabs[0].label); // Initialize with the first tab active
+const SiteTabs = ({ tabs, onTabChange, defaultTab }) => {
+    const [internalActiveTab, setInternalActiveTab] = useState(defaultTab || tabs[0].label);
+    
+    // Use external control if onTabChange is provided, otherwise use internal state
+    const activeTab = onTabChange ? (defaultTab || tabs[0].label) : internalActiveTab;
+
+    useEffect(() => {
+        if (defaultTab && defaultTab !== internalActiveTab) {
+            setInternalActiveTab(defaultTab);
+        }
+    }, [defaultTab]);
+
+    const handleTabClick = (tabLabel) => {
+        if (onTabChange) {
+            // External control - call the callback
+            onTabChange(tabLabel);
+        } else {
+            // Internal control - update internal state
+            setInternalActiveTab(tabLabel);
+        }
+
+        // Call individual tab's onSelect callback if it exists
+        const tab = tabs.find(t => t.label === tabLabel);
+        if (tab && tab.onSelect) {
+            tab.onSelect();
+        }
+    };
 
     return (
         <div>
@@ -17,7 +42,7 @@ const SiteTabs = ({ tabs }) => {
                     <div
                         key={tab.label}
                         className={`${tabBaseStyle} ${activeTab === tab.label ? tabActiveStyle : tabInactiveStyle} flex-1`}
-                        onClick={() => setActiveTab(tab.label)}
+                        onClick={() => handleTabClick(tab.label)}
                     >
                         {tab.label}
                     </div>
