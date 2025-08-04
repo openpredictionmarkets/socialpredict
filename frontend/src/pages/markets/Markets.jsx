@@ -1,24 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import MarketsByStatusTable from '../../components/tables/MarketsByStatusTable';
 import GlobalSearchBar from '../../components/search/GlobalSearchBar';
 import SearchResultsTable from '../../components/tables/SearchResultsTable';
+import { TAB_TO_STATUS } from '../../utils/statusMap';
 
 function Markets() {
     const [searchResults, setSearchResults] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
     const [activeTab, setActiveTab] = useState('Active');
-
-    // Map tab labels to status values
-    const getStatusFromTab = (tabLabel) => {
-        switch(tabLabel) {
-            case 'Active': return 'active';
-            case 'Closed': return 'closed';
-            case 'Resolved': return 'resolved';
-            case 'All': return 'all';
-            default: return 'all';
-        }
-    };
 
     const handleSearchResults = (results) => {
         setSearchResults(results);
@@ -26,9 +16,8 @@ function Markets() {
 
     const handleTabChange = (tabLabel) => {
         setActiveTab(tabLabel);
-        // Clear search when switching tabs
-        setSearchResults(null);
-        setIsSearching(false);
+        // Don't clear search when switching tabs - let GlobalSearchBar re-execute with new status
+        // The search will automatically re-execute due to currentStatus change in GlobalSearchBar
     };
 
     const tabsData = [
@@ -72,7 +61,7 @@ function Markets() {
                     {/* Global Search Bar - Always visible at top */}
                     <GlobalSearchBar 
                         onSearchResults={handleSearchResults}
-                        currentStatus={getStatusFromTab(activeTab)}
+                        currentStatus={TAB_TO_STATUS[activeTab]}
                         isSearching={isSearching}
                         setIsSearching={setIsSearching}
                     />

@@ -1,5 +1,5 @@
 import React from 'react';
-import MarketTables from './MarketTables';
+import MarketTable from './MarketTable';
 
 const SearchResultsTable = ({ searchResults }) => {
     if (!searchResults) {
@@ -38,7 +38,7 @@ const SearchResultsTable = ({ searchResults }) => {
                             Results from {searchResults.primaryStatus} markets matching "{searchResults.query}"
                         </p>
                     </div>
-                    <MarketTables markets={searchResults.primaryResults} />
+                    <MarketTable markets={searchResults.primaryResults} />
                 </div>
             )}
 
@@ -62,7 +62,7 @@ const SearchResultsTable = ({ searchResults }) => {
                             Other markets matching "{searchResults.query}"
                         </p>
                     </div>
-                    <MarketTables markets={searchResults.fallbackResults} />
+                    <MarketTable markets={searchResults.fallbackResults} />
                 </div>
             )}
 

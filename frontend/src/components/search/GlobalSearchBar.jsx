@@ -6,7 +6,7 @@ const GlobalSearchBar = ({ onSearchResults, currentStatus, isSearching, setIsSea
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Debounce search queries
+    // Debounce search queries - trigger on query OR status change
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (query.trim().length > 0) {
