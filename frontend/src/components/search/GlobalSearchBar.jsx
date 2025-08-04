@@ -26,11 +26,7 @@ const GlobalSearchBar = ({ onSearchResults, currentStatus, isSearching, setIsSea
         setIsSearching(true);
         
         try {
-            const results = await searchMarkets({
-                query: searchQuery,
-                status: currentStatus,
-                limit: 20
-            });
+            const results = await searchMarkets(searchQuery, currentStatus, 20);
             onSearchResults(results);
         } catch (error) {
             console.error('Search error:', error);

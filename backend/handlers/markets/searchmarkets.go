@@ -55,6 +55,7 @@ func SearchMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	sanitizer := security.NewSanitizer()
 	sanitizedQuery, err := sanitizer.SanitizeMarketTitle(query)
 	if err != nil {
+		log.Printf("SearchMarketsHandler: Sanitization failed for query '%s': %v", query, err)
 		http.Error(w, "Invalid search query: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -62,6 +63,8 @@ func SearchMarketsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Query too long (max 100 characters)", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("SearchMarketsHandler: Original query: '%s', Sanitized query: '%s'", query, sanitizedQuery)
 
 	// Default values
 	if status == "" {
@@ -187,16 +190,27 @@ func searchMarketsWithFilter(db *gorm.DB, searchQuery string, filterFunc MarketF
 
 	// Create the search query - search in both title and description
 	searchTerm := "%" + strings.ToLower(searchQuery) + "%"
+	log.Printf("searchMarketsWithFilter: searchTerm = '%s'", searchTerm)
+
+	// Build the query with filter
+	query := filterFunc(db).Where("LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?", searchTerm, searchTerm).
+		Order("created_at DESC").
+		Limit(limit)
+
+	// Log the SQL query for debugging
+	log.Printf("searchMarketsWithFilter: Executing search query...")
 
 	// Search in both question_title and description fields
-	result := filterFunc(db).Where("LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?", searchTerm, searchTerm).
-		Order("created_at DESC").
-		Limit(limit).
-		Find(&markets)
+	result := query.Find(&markets)
 
 	if result.Error != nil {
 		log.Printf("Error in searchMarketsWithFilter: %v", result.Error)
 		return nil, result.Error
+	}
+
+	log.Printf("searchMarketsWithFilter: Found %d markets", len(markets))
+	for i, market := range markets {
+		log.Printf("  Market %d: ID=%d, Title='%s'", i+1, market.ID, market.QuestionTitle)
 	}
 
 	return markets, nil
