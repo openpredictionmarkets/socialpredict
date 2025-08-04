@@ -294,4 +294,34 @@ By default users start with an initial account balance of 0 credits and can go u
 ```
 docker exec -it -e PGPASSWORD=${POSTGRES_PASSWORD} socialpredict-postgres-container psql -U ${POSTGRES_USER} -d socialpredict_db
 ```
+### Self hosting on NATed home server
 
+An alternative option is to self host at home on a linux server (or a VM). All installation steps are very similar to the setup described above and in the Local Setup.
+
+#### Requirements
+* Linux server with docker and docker compose (ubuntu is what we tested on) with internet access (if you want to make it available online). Make sure the server (or likely a VM) is in bridge mode (so it gets your network's IP).
+  If you choose docker desktop, that will also work as it comes with docker compose.
+  
+* Domain name (paid or free one, such asdesc.io one described below)
+
+You can get one free sub-domain from https://desec.io/ - in the domain space they operate. 
+Simply sign up for a free account, choose a subdomain and domain, and point the A record to your router's Public IP address
+To find out what your public ip address is navigate to https://ifconfig.io/ from the network and take note of IPaddress (desc.io should auto-detect).
+
+* admin access to your network's router (for port forwarding). 
+Instructions vary depending on your router make&mode. Your goal is to forward ports 80 and 443 to the local IP address of the server where you installed the sociapredict software. Port 80 can be just temporary as it will be needed to generate SSL cert (the script will fail otherwise). You can disable it once you are installed. Port 443 is for HTTPS.
+
+#### Instructions
+
+- **Clone the Repository**: Download the repository to your self hosted linux machine.
+-- `git clone https://github.com/openpredictionmarkets/socialpredict.git`
+- **Install Docker**: Install Docker on your local machine. [Here is the link to the Docker installation guide.](https://docs.docker.com/get-docker/) We are assuming the latest version of Docker as of the date of this document.
+- **Install docker compose**: Install `docker compose` on your local machine. [Here is the link to the docker compose installation guide](https://docs.docker.com/compose/install/). We are assuming the latest version of docker compose as of the date of this document. NOTE: `docker-compose` is deprecated and the command to use should be `docker compose`.
+- If you have not run this previously, within the root of the `./socialpredict` directory, create a `.env` file which will be ignored in the gitignore.
+- Within the root of the `./socialpredict` repo, run the command, `./SocialPredict install`.
+- Select (2) Production, then select to rebuild the `.env` file and rebuild the images.
+- Follow all the prompts to setup admin and passwords (for the DB and admin)
+- When this has completed, run `./SocialPredict up`...this will use `docker compose` to spin up the images into containers on your machine.
+- Make sure to complete the domain setup and port forwarding mentioned in requirements above.
+To test this, try to ping the domain name you setup. It should respond. If it doesnt, try nslookup `domain name` to ask your local DNS server (sometimes it takes few minutes to propagate)
+- Once this is fully up and running, you can then visit `domain name` and log in to use the app (with the credentials you set during install)
