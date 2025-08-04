@@ -2,11 +2,13 @@ import React from 'react';
 import SiteTabs from './SiteTabs';
 import BetsActivityLayout from '../layouts/activity/bets/BetsActivity';
 import PositionsActivityLayout from '../layouts/activity/positions/PositionsActivity';
+import LeaderboardActivity from '../layouts/activity/leaderboard/LeaderboardActivity';
 
 const ActivityTabs = ({ marketId }) => {
     const tabsData = [
         { label: 'Positions', content: <PositionsActivityLayout marketId={marketId} /> },
         { label: 'Bets', content: <BetsActivityLayout marketId={marketId} /> },
+        { label: 'Leaderboard', content: <LeaderboardActivity marketId={marketId} /> },
         { label: 'Comments', content: <div>Comments Go here...</div> },
     ];
 
