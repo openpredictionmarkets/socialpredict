@@ -73,7 +73,8 @@ func DeterminePositionType(yesShares, noShares int64) string {
 func CalculateMarketLeaderboard(db *gorm.DB, marketIdStr string) ([]UserProfitability, error) {
 	// Convert marketId string to uint
 	marketIDUint64, err := strconv.ParseUint(marketIdStr, 10, 64)
-	if errors.ErrorLogger(err, "Can't convert marketIdStr to uint64.") {
+	if err != nil {
+		errors.ErrorLogger(err, "Can't convert marketIdStr to uint64.")
 		return nil, err
 	}
 	marketIDUint := uint(marketIDUint64)
