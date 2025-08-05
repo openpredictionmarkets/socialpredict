@@ -55,7 +55,17 @@ const AuthProvider = ({ children }) => {
                 body: JSON.stringify({ username, password }),
             });
 
-            const data = await response.json();
+            // Read response as text first to handle both JSON and non-JSON responses
+            const text = await response.text();
+            let data = {};
+            
+            // Safely attempt to parse JSON
+            try {
+                data = JSON.parse(text);
+            } catch (parseError) {
+                // If JSON parsing fails, create a basic error object
+                data = { error: text || 'Unknown error occurred' };
+            }
 
             if (response.ok) {
                 localStorage.setItem('token', data.token);
@@ -71,7 +81,9 @@ const AuthProvider = ({ children }) => {
                 });
                 return true;
             } else {
-                throw new Error(data.message || 'Login failed');
+                // Create meaningful error message based on response
+                const errorMessage = data.error || data.message || `HTTP ${response.status}: ${text}`;
+                throw new Error(errorMessage);
             }
         } catch (error) {
             console.error('Login error:', error);
