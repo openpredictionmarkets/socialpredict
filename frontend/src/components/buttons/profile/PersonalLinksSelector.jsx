@@ -28,7 +28,7 @@ const PersonalLinksSelector = ({ onSave, initialLinks }) => {
         setError('');
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/v0/profilechange/links`, {
+            const response = await fetch(`${API_URL}/api/v0/profilechange/links`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

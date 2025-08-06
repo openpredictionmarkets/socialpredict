@@ -9,7 +9,7 @@ const usePortfolio = (username) => {
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
-        const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
+        const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`);
         if (!response.ok) {
           throw new Error('Failed to fetch portfolio');
         }
