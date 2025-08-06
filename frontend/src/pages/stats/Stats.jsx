@@ -9,7 +9,7 @@ const Stats = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_URL}/v0/stats`, {
+        const response = await fetch(`${API_URL}/api/v0/stats`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

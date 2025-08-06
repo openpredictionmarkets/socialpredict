@@ -15,7 +15,7 @@ export const resolveMarket = (marketId, token, selectedResolution) => {
     };
 
     // Returning fetch promise to allow handling of the response in the component
-    return fetch(`${API_URL}/v0/resolve/${marketId}`, requestOptions)
+    return fetch(`${API_URL}/api/v0/resolve/${marketId}`, requestOptions)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');

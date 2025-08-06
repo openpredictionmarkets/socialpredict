@@ -12,7 +12,7 @@ const DescriptionSelector = ({ onSave }) => {
         }
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/v0/profilechange/description`, {
+            const response = await fetch(`${API_URL}/api/v0/profilechange/description`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

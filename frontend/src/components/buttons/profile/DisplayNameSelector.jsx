@@ -12,7 +12,7 @@ const DisplayNameSelector = ({ onSave }) => {
         }
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/v0/profilechange/displayname`, {
+            const response = await fetch(`${API_URL}/api/v0/profilechange/displayname`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -11,7 +11,7 @@ const LeaderboardActivity = ({ marketId }) => {
         const fetchLeaderboard = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/v0/markets/leaderboard/${marketId}`);
+                const response = await fetch(`${API_URL}/api/v0/markets/leaderboard/${marketId}`);
                 if (response.ok) {
                     const data = await response.json();
                     setLeaderboard(data);

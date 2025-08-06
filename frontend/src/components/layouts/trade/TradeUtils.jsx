@@ -11,7 +11,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
 
     console.log('Sending bet data:', betData);
 
-    fetch(`${API_URL}/v0/bet`, {
+    fetch(`${API_URL}/api/v0/bet`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -37,7 +37,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
 
 
 export const fetchUserShares = async (marketId, token) => {
-    const response = await fetch(`${API_URL}/v0/userposition/${marketId}`, {
+    const response = await fetch(`${API_URL}/api/v0/userposition/${marketId}`, {
         headers: {
         'Authorization': `Bearer ${token}` // Include the authorization token to validate user
         }
@@ -57,7 +57,7 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
 
     console.log('Sending sale data:', saleData);
 
-    fetch(`${API_URL}/v0/sell`, {
+    fetch(`${API_URL}/api/v0/sell`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

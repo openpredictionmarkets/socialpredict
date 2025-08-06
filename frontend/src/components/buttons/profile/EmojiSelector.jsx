@@ -42,7 +42,7 @@ const EmojiSelector = ({ onSave }) => {
         }
 
         try {
-            const response = await fetch(`${API_URL}/v0/profilechange/emoji`, {
+            const response = await fetch(`${API_URL}/api/v0/profilechange/emoji`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
