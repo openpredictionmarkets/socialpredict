@@ -15,10 +15,15 @@ import (
 
 // holds the number of YES and NO shares owned by all users in a market
 type MarketPosition struct {
-	Username       string `json:"username"`
-	NoSharesOwned  int64  `json:"noSharesOwned"`
-	YesSharesOwned int64  `json:"yesSharesOwned"`
-	Value          int64  `json:"value"`
+	Username         string `json:"username"`
+	MarketID         uint   `json:"marketId"`
+	NoSharesOwned    int64  `json:"noSharesOwned"`
+	YesSharesOwned   int64  `json:"yesSharesOwned"`
+	Value            int64  `json:"value"`
+	TotalSpent       int64  `json:"totalSpent"`       // Total amount user spent in this market
+	TotalSpentInPlay int64  `json:"totalSpentInPlay"` // Amount spent in unresolved markets only
+	IsResolved       bool   `json:"isResolved"`       // From market.IsResolved
+	ResolutionResult string `json:"resolutionResult"` // From market.ResolutionResult
 }
 
 // UserMarketPosition holds the number of YES and NO shares owned by a user in a market.
@@ -105,16 +110,37 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 		return nil, err
 	}
 
-	// Step 5: Append valuation to each MarketPosition struct
+	// Step 5: Calculate user bet totals for TotalSpent and TotalSpentInPlay
+	userBetTotals := make(map[string]struct {
+		TotalSpent       int64
+		TotalSpentInPlay int64
+	})
+
+	for _, bet := range allBetsOnMarket {
+		totals := userBetTotals[bet.Username]
+		totals.TotalSpent += bet.Amount
+		if !publicResponseMarket.IsResolved {
+			totals.TotalSpentInPlay += bet.Amount
+		}
+		userBetTotals[bet.Username] = totals
+	}
+
+	// Step 6: Append valuation to each MarketPosition struct
 	// Convert to []positions.MarketPosition for external use
 	var displayPositions []MarketPosition
 	for _, p := range netPositions {
 		val := valuations[p.Username]
+		betTotals := userBetTotals[p.Username]
 		displayPositions = append(displayPositions, MarketPosition{
-			Username:       p.Username,
-			YesSharesOwned: p.YesSharesOwned,
-			NoSharesOwned:  p.NoSharesOwned,
-			Value:          val.RoundedValue,
+			Username:         p.Username,
+			MarketID:         marketIDUint,
+			YesSharesOwned:   p.YesSharesOwned,
+			NoSharesOwned:    p.NoSharesOwned,
+			Value:            val.RoundedValue,
+			TotalSpent:       betTotals.TotalSpent,
+			TotalSpentInPlay: betTotals.TotalSpentInPlay,
+			IsResolved:       publicResponseMarket.IsResolved,
+			ResolutionResult: publicResponseMarket.ResolutionResult,
 		})
 	}
 
@@ -140,4 +166,60 @@ func CalculateMarketPositionForUser_WPAM_DBPM(db *gorm.DB, marketIdStr string, u
 	}
 
 	return UserMarketPosition{}, nil
+}
+
+// CalculateAllUserMarketPositions_WPAM_DBPM fetches and summarizes positions for a given user across all markets where they have bets.
+// Optimized to only process markets where the user has positions (O(user_bets + unique_user_markets))
+func CalculateAllUserMarketPositions_WPAM_DBPM(db *gorm.DB, username string) ([]MarketPosition, error) {
+	// Step 1: Get all user bets (single query - O(user_bets))
+	var userBets []models.Bet
+	if err := db.Where("username = ?", username).Find(&userBets).Error; err != nil {
+		return nil, err
+	}
+
+	// Step 2: Build stack of unique market IDs where user has positions
+	marketIDSet := make(map[uint]bool)
+	userBetsByMarket := make(map[uint][]models.Bet)
+
+	for _, bet := range userBets {
+		marketIDSet[bet.MarketID] = true
+		userBetsByMarket[bet.MarketID] = append(userBetsByMarket[bet.MarketID], bet)
+	}
+
+	// Step 3: Get market resolution info for all relevant markets (single query)
+	marketIDs := make([]uint, 0, len(marketIDSet))
+	for id := range marketIDSet {
+		marketIDs = append(marketIDs, id)
+	}
+
+	var markets []models.Market
+	if err := db.Where("id IN ?", marketIDs).Find(&markets).Error; err != nil {
+		return nil, err
+	}
+
+	marketResolutionMap := make(map[uint]models.Market)
+	for _, market := range markets {
+		marketResolutionMap[uint(market.ID)] = market
+	}
+
+	// Step 4: Calculate positions only for markets where user has bets
+	var allPositions []MarketPosition
+	for marketID := range marketIDSet {
+		marketIDStr := strconv.Itoa(int(marketID))
+		positions, err := CalculateMarketPositions_WPAM_DBPM(db, marketIDStr)
+		if err != nil {
+			return nil, err
+		}
+
+		// Find user's position in this market
+		for _, pos := range positions {
+			if pos.Username == username {
+				// Position already has all the enhanced fields from CalculateMarketPositions_WPAM_DBPM
+				allPositions = append(allPositions, pos)
+				break
+			}
+		}
+	}
+
+	return allPositions, nil
 }
