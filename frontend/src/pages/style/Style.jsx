@@ -27,6 +27,7 @@ import MarketsTable from '../../components/tables/MarketTables';
 import MarketChart from '../../components/charts/MarketChart';
 import TestMarketData from '../../tests/TestData';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
+import { SharesBadge } from '../../components/buttons/trade/SellButtons';
 
 const Style = () => {
   const [isSelected, setIsSelected] = useState(false);
@@ -429,8 +430,45 @@ const Style = () => {
               </code>
             </td>
           </tr>
+          <tr>
+            <td className='px-6 py-4'>
+              <div className='flex flex-wrap items-center gap-4'>
+                <SharesBadge type="YES" count={8} />
+                <SharesBadge type="NO" count={12} />
+              </div>
+            </td>
+            <td className='px-6 py-4 text-sm text-gray-500'>Shares Badges (Portfolio Display)</td>
+            <td className='px-6 py-4 text-sm font-mono text-gray-500'>
+              <code>{`import { SharesBadge } from '../../components/buttons/trade/SellButtons';`}</code>
+            </td>
+          </tr>
         </tbody>
       </table>
+      
+      {/* Shares Badge Section */}
+      <div className='bg-primary-background p-6'>
+        <h3 className='text-xl font-bold text-white mb-4 mt-8'>Portfolio Shares Styling</h3>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-8'>
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='flex justify-center mb-4'>
+              <SharesBadge type="YES" count={8} />
+            </div>
+            <div className='text-white text-sm font-medium'>YES Shares Badge</div>
+            <div className='text-gray-400 text-xs'>Green (#054A29) to Beige (#F9D3A5) gradient</div>
+            <div className='text-gray-400 text-xs'>Gold border (#FFC107) with coin emoji 🪙</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='flex justify-center mb-4'>
+              <SharesBadge type="NO" count={12} />
+            </div>
+            <div className='text-white text-sm font-medium'>NO Shares Badge</div>
+            <div className='text-gray-400 text-xs'>Red (#D00000) to Beige (#F9D3A5) gradient</div>
+            <div className='text-gray-400 text-xs'>Gold border (#FFC107) with coin emoji 🪙</div>
+          </div>
+        </div>
+      </div>
+      
       <MarketsTable></MarketsTable>
       <table className='min-w-full divide-y divide-gray-200 bg-primary-background'>
         <thead className='bg-gray-50'>
