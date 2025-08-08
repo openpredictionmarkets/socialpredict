@@ -24,7 +24,7 @@ func TestGetSetupHandler(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedResponse: `{
-				"MarketCreation":{"InitialMarketProbability":0.5,"InitialMarketSubsidization":10,"InitialMarketYes":0,"InitialMarketNo":0},
+				"MarketCreation":{"InitialMarketProbability":0.5,"InitialMarketSubsidization":10,"InitialMarketYes":0,"InitialMarketNo":0,"MinimumFutureHours":1},
 				"MarketIncentives":{"CreateMarketCost":10,"TraderBonus":1},
 				"User":{"InitialAccountBalance":0,"MaximumDebtAllowed":500},
 				"Betting":{"MinimumBet":1,"MaxDustPerSale":2,"BetFees":{"InitialBetFee":1,"BuySharesFee":0,"SellSharesFee":0}}}`,

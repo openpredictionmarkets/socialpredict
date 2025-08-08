@@ -153,7 +153,7 @@ type UserInput struct {
 type MarketInput struct {
 	Title       string `validate:"required,min=1,max=160,safe_string"`
 	Description string `validate:"max=2000,safe_string"`
-	EndTime     string `validate:"required,future_date"`
+	EndTime     string `validate:"required"`
 }
 
 type BetInput struct {

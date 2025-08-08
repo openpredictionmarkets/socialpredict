@@ -16,6 +16,7 @@ type MarketCreation struct {
 	InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization"`
 	InitialMarketYes           int64   `yaml:"initialMarketYes"`
 	InitialMarketNo            int64   `yaml:"initialMarketNo"`
+	MinimumFutureHours         float64 `yaml:"minimumFutureHours"`
 }
 
 type MarketIncentives struct {
