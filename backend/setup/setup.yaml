@@ -4,6 +4,7 @@ economics:
     initialMarketSubsidization: 10
     initialMarketYes: 0
     initialMarketNo: 0
+    minimumFutureHours: 1.0
   marketincentives:
     createMarketCost: 10
     traderBonus: 1

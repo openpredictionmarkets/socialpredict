@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -26,7 +25,6 @@ func NewValidator() *Validator {
 	validate.RegisterValidation("market_outcome", validateMarketOutcome)
 	validate.RegisterValidation("positive_amount", validatePositiveAmount)
 	validate.RegisterValidation("market_id", validateMarketID)
-	validate.RegisterValidation("future_date", validateFutureDate)
 
 	return &Validator{
 		validate: validate,
@@ -79,8 +77,6 @@ func getFieldErrorMessage(fe validator.FieldError) string {
 		return "amount must be a positive number"
 	case "market_id":
 		return "invalid market ID format"
-	case "future_date":
-		return fmt.Sprintf("%s must be at least 1 hour in the future", field)
 	default:
 		return fmt.Sprintf("%s is invalid", field)
 	}
@@ -186,41 +182,6 @@ func validateMarketID(fl validator.FieldLevel) bool {
 	default:
 		return false
 	}
-}
-
-// validateFutureDate checks if the date string represents a future date
-func validateFutureDate(fl validator.FieldLevel) bool {
-	dateStr := fl.Field().String()
-	if dateStr == "" {
-		return false
-	}
-
-	// Try parsing as RFC3339 format (common for JSON datetime)
-	parsedTime, err := time.Parse(time.RFC3339, dateStr)
-	if err != nil {
-		// Try parsing as other common formats if RFC3339 fails
-		formats := []string{
-			"2006-01-02T15:04:05Z07:00",
-			"2006-01-02T15:04:05Z",
-			"2006-01-02 15:04:05",
-			"2006-01-02T15:04:05",
-		}
-
-		for _, format := range formats {
-			if parsedTime, err = time.Parse(format, dateStr); err == nil {
-				break
-			}
-		}
-
-		if err != nil {
-			return false // Invalid date format
-		}
-	}
-
-	// Check if the date is in the future (with 1 hour minimum buffer)
-	now := time.Now()
-	minimumFutureTime := now.Add(1 * time.Hour)
-	return parsedTime.After(minimumFutureTime)
 }
 
 // ValidationRules contains validation tag strings for common fields
