@@ -35,6 +35,6 @@ func GetMarketVolume(bets []models.Bet) int64 {
 // subsidzation in pool could be paid out after resolution but not sold mid-market
 func GetEndMarketVolume(bets []models.Bet) int64 {
 
-	return GetEndMarketVolume(bets) + appConfig.Economics.MarketCreation.InitialMarketSubsidization
+	return GetMarketVolume(bets) + appConfig.Economics.MarketCreation.InitialMarketSubsidization
 
 }
