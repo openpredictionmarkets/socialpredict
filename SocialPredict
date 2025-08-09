@@ -148,3 +148,13 @@ if [ "$1" = "down" ]; then
 		exit 1
 	fi
 fi
+
+# Database backup/restore
+if [ "$1" = "backup" ]; then
+	source_env
+	export CALLED_FROM_SOCIALPREDICT=yes
+	shift
+	# Pass remaining args to the backup script, e.g. --save / --list / --restore <file> / --restore-latest
+	source "$SCRIPT_DIR/scripts/backup/db_backup.sh" "$@"
+	unset CALLED_FROM_SOCIALPREDICT
+fi
