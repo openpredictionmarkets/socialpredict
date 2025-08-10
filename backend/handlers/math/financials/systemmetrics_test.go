@@ -40,15 +40,21 @@ func TestComputeSystemMetrics(t *testing.T) {
 			t.Errorf("Expected no error, got %v", err)
 		}
 
-		// With no users, all metrics should be zero
-		if metrics.MoneyCreated.UserDebtCapacity.Value != 0 {
-			t.Errorf("Expected user debt capacity 0, got %d", metrics.MoneyCreated.UserDebtCapacity.Value)
+		// With no users, all metrics should be zero - use proper assertions
+		if val, ok := metrics.MoneyCreated.UserDebtCapacity.Value.(int64); ok && val == 0 {
+			t.Logf("✓ User debt capacity is 0 as expected")
+		} else {
+			t.Errorf("Expected user debt capacity 0, got %v", metrics.MoneyCreated.UserDebtCapacity.Value)
 		}
-		if metrics.MoneyUtilized.TotalUtilized.Value != 0 {
-			t.Errorf("Expected total utilized 0, got %d", metrics.MoneyUtilized.TotalUtilized.Value)
+		if val, ok := metrics.MoneyUtilized.TotalUtilized.Value.(int64); ok && val == 0 {
+			t.Logf("✓ Total utilized is 0 as expected")
+		} else {
+			t.Errorf("Expected total utilized 0, got %v", metrics.MoneyUtilized.TotalUtilized.Value)
 		}
-		if metrics.Verification.Balanced.Value != 1 {
-			t.Errorf("Expected balanced metrics for empty database")
+		if val, ok := metrics.Verification.Balanced.Value.(bool); ok && val == true {
+			t.Logf("✓ Metrics are balanced as expected")
+		} else {
+			t.Errorf("Expected balanced metrics for empty database, got %v", metrics.Verification.Balanced.Value)
 		}
 	})
 
@@ -80,60 +86,70 @@ func TestComputeSystemMetrics(t *testing.T) {
 
 		// Expected calculations:
 		// User debt capacity: 2 users × 500 = 1000
-		// Money in wallets: |950| + |-100| = 1050
 		// Unused debt: (500-0) + (500-100) = 900
 		// Market creation fees: 1 market × 50 = 50
 		// Participation fees: 2 first-time bets × 5 = 10
-		// Active bet volume: (50+30) + 100 subsidization = 180
-		// Total utilized: 1050 + 900 + 180 + 50 + 10 + 0 = 2190
-		// Surplus: 1000 - 2190 = -1190
+		// Active bet volume: (50+30) = 80 (excludes subsidization)
+		// Total utilized: 900 + 80 + 50 + 10 + 0 = 1040
+		// Surplus: 1000 - 1040 = -40
 
-		if metrics.MoneyCreated.UserDebtCapacity.Value != 1000 {
-			t.Errorf("Expected user debt capacity 1000, got %d", metrics.MoneyCreated.UserDebtCapacity.Value)
+		if val, ok := metrics.MoneyCreated.UserDebtCapacity.Value.(int64); ok && val == 1000 {
+			t.Logf("✓ User debt capacity is 1000 as expected")
+		} else {
+			t.Errorf("Expected user debt capacity 1000, got %v", metrics.MoneyCreated.UserDebtCapacity.Value)
 		}
 
-		if metrics.MoneyCreated.NumUsers.Value != 2 {
-			t.Errorf("Expected 2 users, got %d", metrics.MoneyCreated.NumUsers.Value)
+		if val, ok := metrics.MoneyCreated.NumUsers.Value.(int64); ok && val == 2 {
+			t.Logf("✓ Number of users is 2 as expected")
+		} else {
+			t.Errorf("Expected 2 users, got %v", metrics.MoneyCreated.NumUsers.Value)
 		}
 
-		if metrics.MoneyUtilized.MoneyInWallets.Value != 1050 {
-			t.Errorf("Expected money in wallets 1050, got %d", metrics.MoneyUtilized.MoneyInWallets.Value)
+		if val, ok := metrics.MoneyUtilized.MarketCreationFees.Value.(int64); ok && val == 50 {
+			t.Logf("✓ Market creation fees are 50 as expected")
+		} else {
+			t.Errorf("Expected market creation fees 50, got %v", metrics.MoneyUtilized.MarketCreationFees.Value)
 		}
 
-		if metrics.MoneyUtilized.MarketCreationFees.Value != 50 {
-			t.Errorf("Expected market creation fees 50, got %d", metrics.MoneyUtilized.MarketCreationFees.Value)
+		if val, ok := metrics.MoneyUtilized.ParticipationFees.Value.(int64); ok && val == 10 {
+			t.Logf("✓ Participation fees are 10 as expected")
+		} else {
+			t.Errorf("Expected participation fees 10, got %v", metrics.MoneyUtilized.ParticipationFees.Value)
 		}
 
-		if metrics.MoneyUtilized.ParticipationFees.Value != 10 {
-			t.Errorf("Expected participation fees 10, got %d", metrics.MoneyUtilized.ParticipationFees.Value)
+		if val, ok := metrics.MoneyUtilized.ActiveBetVolume.Value.(int64); ok && val == 80 {
+			t.Logf("✓ Active bet volume is 80 as expected")
+		} else {
+			t.Errorf("Expected active bet volume 80, got %v", metrics.MoneyUtilized.ActiveBetVolume.Value)
 		}
 
-		if metrics.MoneyUtilized.ActiveBetVolume.Value != 180 {
-			t.Errorf("Expected active bet volume 180, got %d", metrics.MoneyUtilized.ActiveBetVolume.Value)
+		if val, ok := metrics.MoneyUtilized.UnusedDebt.Value.(int64); ok && val == 900 {
+			t.Logf("✓ Unused debt is 900 as expected")
+		} else {
+			t.Errorf("Expected unused debt 900, got %v", metrics.MoneyUtilized.UnusedDebt.Value)
 		}
 
-		if metrics.MoneyUtilized.UnusedDebt.Value != 900 {
-			t.Errorf("Expected unused debt 900, got %d", metrics.MoneyUtilized.UnusedDebt.Value)
+		if val, ok := metrics.MoneyUtilized.TotalUtilized.Value.(int64); ok && val == 1040 {
+			t.Logf("✓ Total utilized is 1040 as expected")
+		} else {
+			t.Errorf("Expected total utilized 1040, got %v", metrics.MoneyUtilized.TotalUtilized.Value)
 		}
 
-		if metrics.MoneyUtilized.TotalUtilized.Value != 2190 {
-			t.Errorf("Expected total utilized 2190, got %d", metrics.MoneyUtilized.TotalUtilized.Value)
+		if val, ok := metrics.Verification.Surplus.Value.(int64); ok && val == -40 {
+			t.Logf("✓ Surplus is -40 as expected")
+		} else {
+			t.Errorf("Expected surplus -40, got %v", metrics.Verification.Surplus.Value)
 		}
 
-		if metrics.Verification.Surplus.Value != -1190 {
-			t.Errorf("Expected surplus -1190, got %d", metrics.Verification.Surplus.Value)
-		}
-
-		if metrics.Verification.Balanced.Value != 0 {
-			t.Errorf("Expected unbalanced (0), got %d", metrics.Verification.Balanced.Value)
+		if val, ok := metrics.Verification.Balanced.Value.(bool); ok && val == false {
+			t.Logf("✓ Metrics are unbalanced as expected")
+		} else {
+			t.Errorf("Expected unbalanced (false), got %v", metrics.Verification.Balanced.Value)
 		}
 
 		// Verify formulas and explanations exist
 		if metrics.MoneyCreated.UserDebtCapacity.Formula == "" {
 			t.Error("Expected formula for user debt capacity")
-		}
-		if metrics.MoneyUtilized.MoneyInWallets.Explanation == "" {
-			t.Error("Expected explanation for money in wallets")
 		}
 	})
 

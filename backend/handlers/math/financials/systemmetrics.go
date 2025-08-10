@@ -12,9 +12,9 @@ import (
 )
 
 type MetricWithExplanation struct {
-	Value       int64  `json:"value"`
-	Formula     string `json:"formula,omitempty"`
-	Explanation string `json:"explanation"`
+	Value       interface{} `json:"value"`
+	Formula     string      `json:"formula,omitempty"`
+	Explanation string      `json:"explanation"`
 }
 
 type MoneyCreated struct {
@@ -23,7 +23,6 @@ type MoneyCreated struct {
 }
 
 type MoneyUtilized struct {
-	MoneyInWallets     MetricWithExplanation `json:"moneyInWallets"`
 	UnusedDebt         MetricWithExplanation `json:"unusedDebt"`
 	ActiveBetVolume    MetricWithExplanation `json:"activeBetVolume"`
 	MarketCreationFees MetricWithExplanation `json:"marketCreationFees"`
@@ -50,25 +49,19 @@ func ComputeSystemMetrics(db *gorm.DB, loadEcon setup.EconConfigLoader) (SystemM
 	}
 	econ := loadEcon()
 
-	// Users (count, balances calculation)
+	// Users (count, unused debt calculation)
 	var users []models.User
 	if err := db.Find(&users).Error; err != nil {
 		return SystemMetrics{}, err
 	}
 
 	var (
-		userCount      = int64(len(users))
-		moneyInWallets int64 // |positive balances| + |negative balances|
-		unusedDebt     int64 // remaining borrowing capacity
+		userCount  = int64(len(users))
+		unusedDebt int64 // remaining borrowing capacity
 	)
 
 	for i := range users {
 		balance := users[i].PublicUser.AccountBalance
-		if balance < 0 {
-			moneyInWallets += -balance // Add absolute value of negative balances
-		} else {
-			moneyInWallets += balance // Add positive balances
-		}
 
 		// Calculate unused debt capacity for this user
 		// Formula: maxDebtAllowed - max(0, -balance)
@@ -91,12 +84,12 @@ func ComputeSystemMetrics(db *gorm.DB, loadEcon setup.EconConfigLoader) (SystemM
 	// Market creation fees
 	marketCreationFees := int64(len(markets)) * econ.Economics.MarketIncentives.CreateMarketCost
 
-	// Active bet volume: sum of unresolved market volumes (including subsidization)
+	// Active bet volume: sum of unresolved market volumes (pure bet volume only, excludes subsidization)
 	var activeBetVolume int64
 	for i := range markets {
 		if !markets[i].IsResolved {
 			bets := tradingdata.GetBetsForMarket(db, uint(markets[i].ID))
-			vol := marketmath.GetMarketVolume(bets) + econ.Economics.MarketCreation.InitialMarketSubsidization
+			vol := marketmath.GetMarketVolume(bets)
 			activeBetVolume += vol
 		}
 	}
@@ -128,20 +121,12 @@ func ComputeSystemMetrics(db *gorm.DB, loadEcon setup.EconConfigLoader) (SystemM
 	// Bonuses (future feature)
 	bonusesPaid := int64(0)
 
-	// Total utilized (including unused debt capacity)
-	totalUtilized := moneyInWallets + unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid
+	// Total utilized (corrected calculation without moneyInWallets)
+	totalUtilized := unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid
 
 	// Verification
 	surplus := totalDebtCapacity - totalUtilized
 	balanced := surplus == 0
-
-	// Convert boolean to int64 for JSON consistency
-	var balancedValue int64
-	if balanced {
-		balancedValue = 1
-	} else {
-		balancedValue = 0
-	}
 
 	// Build response with embedded documentation
 	return SystemMetrics{
@@ -157,11 +142,6 @@ func ComputeSystemMetrics(db *gorm.DB, loadEcon setup.EconConfigLoader) (SystemM
 			},
 		},
 		MoneyUtilized: MoneyUtilized{
-			MoneyInWallets: MetricWithExplanation{
-				Value:       moneyInWallets,
-				Formula:     "Σ|positive_balances| + Σ|negative_balances|",
-				Explanation: "Total debt capacity drawn down by users (regardless of current profit/loss)",
-			},
 			UnusedDebt: MetricWithExplanation{
 				Value:       unusedDebt,
 				Formula:     "Σ(maxDebtPerUser - max(0, -balance))",
@@ -169,8 +149,8 @@ func ComputeSystemMetrics(db *gorm.DB, loadEcon setup.EconConfigLoader) (SystemM
 			},
 			ActiveBetVolume: MetricWithExplanation{
 				Value:       activeBetVolume,
-				Formula:     "Σ(unresolved_market_volumes + subsidization)",
-				Explanation: "Total value of bets currently active in unresolved markets",
+				Formula:     "Σ(unresolved_market_volumes)",
+				Explanation: "Total value of bets currently active in unresolved markets (excludes fees and subsidies)",
 			},
 			MarketCreationFees: MetricWithExplanation{
 				Value:       marketCreationFees,
@@ -188,13 +168,13 @@ func ComputeSystemMetrics(db *gorm.DB, loadEcon setup.EconConfigLoader) (SystemM
 			},
 			TotalUtilized: MetricWithExplanation{
 				Value:       totalUtilized,
-				Formula:     "moneyInWallets + unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid",
+				Formula:     "unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid",
 				Explanation: "Total debt capacity that has been utilized across all categories",
 			},
 		},
 		Verification: Verification{
 			Balanced: MetricWithExplanation{
-				Value:       balancedValue,
+				Value:       balanced,
 				Explanation: "Whether total created equals total utilized (perfect accounting balance)",
 			},
 			Surplus: MetricWithExplanation{
