@@ -67,6 +67,11 @@ const Stats = () => {
   const [metricsError, setMetricsError] = useState(null);
   const [showFormulas, setShowFormulas] = useState({});
 
+  // Global leaderboard state
+  const [globalLeaderboard, setGlobalLeaderboard] = useState(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState(null);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -114,6 +119,30 @@ const Stats = () => {
       setMetricsError(err.message);
     } finally {
       setMetricsLoading(false);
+    }
+  };
+
+  const fetchGlobalLeaderboard = async () => {
+    setLeaderboardLoading(true);
+    setLeaderboardError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/v0/global/leaderboard`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch global leaderboard: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setGlobalLeaderboard(data);
+    } catch (err) {
+      setLeaderboardError(err.message);
+    } finally {
+      setLeaderboardLoading(false);
     }
   };
 
@@ -363,14 +392,137 @@ const Stats = () => {
     </div>
   );
 
+  // Global Leaderboard Tab Content
+  const globalLeaderboardContent = (
+    <div className="bg-gray-800 rounded-lg p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-semibold text-white">
+          Global Leaderboard <span className="text-warning-orange text-lg">(Beta)</span>
+        </h2>
+        <SiteButton 
+          onClick={fetchGlobalLeaderboard} 
+          isSelected={false}
+          disabled={leaderboardLoading}
+          className="bg-info-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          {leaderboardLoading ? 'Calculating...' : 'Calculate Leaderboard'}
+        </SiteButton>
+      </div>
+
+      {/* Beta Disclaimer */}
+      <div className="bg-warning-orange/20 border border-warning-orange/50 rounded-lg p-4 mb-6">
+        <div className="flex items-start">
+          <span className="text-warning-orange text-xl mr-3">🏆</span>
+          <div>
+            <h4 className="text-warning-orange font-medium mb-2">Beta Feature Notice</h4>
+            <p className="text-gray-300 text-sm">
+              This global leaderboard aggregates profit calculations across all markets. Rankings are based on 
+              total profit (current position value minus total amount spent) across both resolved and active markets.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {leaderboardLoading && (
+        <div className="flex justify-center items-center py-8">
+          <LoadingSpinner />
+          <span className="ml-3 text-gray-300">Computing global leaderboard...</span>
+        </div>
+      )}
+
+      {leaderboardError && (
+        <div className="bg-red-900/50 border border-red-600 rounded-lg p-4 mb-6">
+          <p className="text-red-300">Error loading leaderboard: {leaderboardError}</p>
+        </div>
+      )}
+
+      {!globalLeaderboard && !leaderboardLoading && !leaderboardError && (
+        <div className="text-center py-8">
+          <p className="text-gray-400 mb-4">Click "Calculate Leaderboard" to view global profit rankings</p>
+          <p className="text-gray-500 text-sm">This will analyze all user positions across all markets to create a comprehensive ranking</p>
+        </div>
+      )}
+
+      {globalLeaderboard && globalLeaderboard.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-600">
+                <th className="text-left py-3 px-4 text-gray-300 font-medium">Rank</th>
+                <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
+                <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Profit</th>
+                <th className="text-left py-3 px-4 text-gray-300 font-medium">Current Value</th>
+                <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Spent</th>
+                <th className="text-left py-3 px-4 text-gray-300 font-medium">Active Markets</th>
+                <th className="text-left py-3 px-4 text-gray-300 font-medium">Resolved Markets</th>
+              </tr>
+            </thead>
+            <tbody>
+              {globalLeaderboard.map((user, index) => {
+                const getRankDisplay = (rank) => {
+                  if (rank === 1) return '🥇';
+                  if (rank === 2) return '🥈';
+                  if (rank === 3) return '🥉';
+                  return `#${rank}`;
+                };
+
+                const getProfitColor = (profit) => {
+                  if (profit > 0) return 'text-green-400';
+                  if (profit < 0) return 'text-red-400';
+                  return 'text-gray-300';
+                };
+
+                return (
+                  <tr key={user.username} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
+                    <td className="py-3 px-4 text-white font-semibold">
+                      {getRankDisplay(user.rank)}
+                    </td>
+                    <td className="py-3 px-4 text-blue-400 font-medium">
+                      {user.username}
+                    </td>
+                    <td className={`py-3 px-4 font-semibold ${getProfitColor(user.totalProfit)}`}>
+                      {user.totalProfit >= 0 ? '+' : ''}{user.totalProfit.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300">
+                      {user.totalCurrentValue.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300">
+                      {user.totalSpent.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300 text-center">
+                      {user.activeMarkets}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300 text-center">
+                      {user.resolvedMarkets}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {globalLeaderboard && globalLeaderboard.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-gray-400">No users with betting activity found.</p>
+        </div>
+      )}
+    </div>
+  );
+
   const tabs = [
     {
-      label: 'Setup Configuration',
-      content: setupConfigContent
+      label: 'Global Leaderboard (Beta)',
+      content: globalLeaderboardContent
     },
     {
       label: 'System Financial Metrics (Beta)',
       content: systemMetricsContent
+    },
+    {
+      label: 'Setup Configuration',
+      content: setupConfigContent
     }
   ];
 
@@ -383,7 +535,7 @@ const Stats = () => {
         </p>
       </div>
 
-      <SiteTabs tabs={tabs} defaultTab="Setup Configuration" />
+      <SiteTabs tabs={tabs} defaultTab="Global Leaderboard (Beta)" />
     </div>
   );
 };
