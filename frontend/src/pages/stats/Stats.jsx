@@ -276,15 +276,6 @@ const Stats = () => {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <MetricCard 
-                title="Money in Wallets"
-                value={systemMetrics.moneyUtilized.moneyInWallets.value}
-                formula={systemMetrics.moneyUtilized.moneyInWallets.formula}
-                explanation={systemMetrics.moneyUtilized.moneyInWallets.explanation}
-                onToggleFormula={() => toggleFormula('moneyInWallets')}
-                showFormula={showFormulas.moneyInWallets}
-                colorClass="text-green-400"
-              />
-              <MetricCard 
                 title="Unused Debt Capacity"
                 value={systemMetrics.moneyUtilized.unusedDebt.value}
                 formula={systemMetrics.moneyUtilized.unusedDebt.formula}
@@ -350,9 +341,9 @@ const Stats = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <MetricCard 
                 title="System Balanced"
-                value={systemMetrics.verification.balanced.value === 1 ? 'YES' : 'NO'}
+                value={systemMetrics.verification.balanced.value === true ? 'YES' : 'NO'}
                 explanation={systemMetrics.verification.balanced.explanation}
-                colorClass={systemMetrics.verification.balanced.value === 1 ? 'text-green-400' : 'text-red-400'}
+                colorClass={systemMetrics.verification.balanced.value === true ? 'text-green-400' : 'text-red-400'}
                 isStatus={true}
               />
               <MetricCard 
