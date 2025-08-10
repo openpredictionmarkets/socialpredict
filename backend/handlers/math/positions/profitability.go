@@ -161,3 +161,116 @@ func CalculateMarketLeaderboard(db *gorm.DB, marketIdStr string) ([]UserProfitab
 
 	return leaderboard, nil
 }
+
+// GlobalUserProfitability represents a user's total profitability across all markets
+type GlobalUserProfitability struct {
+	Username          string    `json:"username"`
+	TotalProfit       int64     `json:"totalProfit"`
+	TotalCurrentValue int64     `json:"totalCurrentValue"`
+	TotalSpent        int64     `json:"totalSpent"`
+	ActiveMarkets     int       `json:"activeMarkets"`   // Number of markets with positions
+	ResolvedMarkets   int       `json:"resolvedMarkets"` // Number of resolved markets participated
+	EarliestBet       time.Time `json:"earliestBet"`
+	Rank              int       `json:"rank"`
+}
+
+// CalculateGlobalLeaderboard calculates profitability rankings for all users across all markets
+func CalculateGlobalLeaderboard(db *gorm.DB) ([]GlobalUserProfitability, error) {
+	if db == nil {
+		return nil, errors.New("Failed to fetch users from database: database connection is nil")
+	}
+
+	// Get all users who have made bets
+	var users []models.User
+	if err := db.Find(&users).Error; err != nil {
+		ErrorLogger(err, "Failed to fetch users from database.")
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return []GlobalUserProfitability{}, nil
+	}
+
+	var globalLeaderboard []GlobalUserProfitability
+
+	for _, user := range users {
+		// Get all market positions for this user
+		userPositions, err := CalculateAllUserMarketPositions_WPAM_DBPM(db, user.Username)
+		if err != nil {
+			ErrorLogger(err, "Failed to calculate user positions for "+user.Username)
+			continue // Skip this user but continue with others
+		}
+
+		// Skip users with no positions
+		if len(userPositions) == 0 {
+			continue
+		}
+
+		var totalProfit int64 = 0
+		var totalCurrentValue int64 = 0
+		var totalSpent int64 = 0
+		var activeMarkets int = 0
+		var resolvedMarkets int = 0
+		var earliestBet time.Time
+		var hasEarliestBet bool = false
+
+		// Get all bets for this user to find earliest bet time
+		var userBets []models.Bet
+		if err := db.Where("username = ?", user.Username).Order("placed_at ASC").Find(&userBets).Error; err != nil {
+			ErrorLogger(err, "Failed to fetch bets for user "+user.Username)
+			continue
+		}
+
+		if len(userBets) > 0 {
+			earliestBet = userBets[0].PlacedAt
+			hasEarliestBet = true
+		}
+
+		// Aggregate profits from all markets
+		for _, position := range userPositions {
+			// Calculate profit for this market: currentValue - totalSpent
+			marketProfit := position.Value - position.TotalSpent
+
+			totalProfit += marketProfit
+			totalCurrentValue += position.Value
+			totalSpent += position.TotalSpent
+
+			// Count market types
+			if position.IsResolved {
+				resolvedMarkets++
+			} else {
+				activeMarkets++
+			}
+		}
+
+		// Only include users with some betting activity
+		if hasEarliestBet {
+			globalLeaderboard = append(globalLeaderboard, GlobalUserProfitability{
+				Username:          user.Username,
+				TotalProfit:       totalProfit,
+				TotalCurrentValue: totalCurrentValue,
+				TotalSpent:        totalSpent,
+				ActiveMarkets:     activeMarkets,
+				ResolvedMarkets:   resolvedMarkets,
+				EarliestBet:       earliestBet,
+			})
+		}
+	}
+
+	// Sort by total profit (descending), then by earliest bet time (ascending) for ties
+	sort.Slice(globalLeaderboard, func(i, j int) bool {
+		if globalLeaderboard[i].TotalProfit == globalLeaderboard[j].TotalProfit {
+			// If profits are equal, rank by who bet earlier (ascending time)
+			return globalLeaderboard[i].EarliestBet.Before(globalLeaderboard[j].EarliestBet)
+		}
+		// Otherwise rank by total profit (descending)
+		return globalLeaderboard[i].TotalProfit > globalLeaderboard[j].TotalProfit
+	})
+
+	// Assign ranks
+	for i := range globalLeaderboard {
+		globalLeaderboard[i].Rank = i + 1
+	}
+
+	return globalLeaderboard, nil
+}
