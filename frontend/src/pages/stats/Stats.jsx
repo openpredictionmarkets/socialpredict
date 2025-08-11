@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
 import SiteButton from '../../components/buttons/SiteButtons';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
@@ -477,8 +478,13 @@ const Stats = () => {
                     <td className="py-3 px-4 text-white font-semibold">
                       {getRankDisplay(user.rank)}
                     </td>
-                    <td className="py-3 px-4 text-blue-400 font-medium">
-                      {user.username}
+                    <td className="py-3 px-4">
+                      <Link 
+                        to={`/user/${user.username}`}
+                        className="text-blue-400 font-medium hover:text-blue-300 transition-colors"
+                      >
+                        {user.username}
+                      </Link>
                     </td>
                     <td className={`py-3 px-4 font-semibold ${getProfitColor(user.totalProfit)}`}>
                       {user.totalProfit >= 0 ? '+' : ''}{user.totalProfit.toLocaleString()}
