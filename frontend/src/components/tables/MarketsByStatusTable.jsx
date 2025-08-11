@@ -4,6 +4,7 @@ import { API_URL } from '../../config';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import MobileMarketCard from './MobileMarketCard';
 import LoadingSpinner from '../loaders/LoadingSpinner';
+import ExpandableLink from '../utils/ExpandableLink';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -43,14 +44,16 @@ const MarketRow = ({ marketData }) => (
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-300'>
       {marketData.lastProbability.toFixed(3)}
     </td>
-    <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300'>
-      <Link
+    <td className='px-6 py-4 text-sm font-medium text-gray-300'>
+      <ExpandableLink
+        text={marketData.market.questionTitle}
         to={`/markets/${marketData.market.id}`}
-        className='hover:text-blue-400 transition-colors duration-200 block max-w-xs overflow-hidden overflow-ellipsis'
-        title={marketData.market.questionTitle}
-      >
-        {marketData.market.questionTitle}
-      </Link>
+        maxLength={45}
+        className=""
+        linkClassName="hover:text-blue-400 transition-colors duration-200"
+        buttonClassName="text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1"
+        expandIcon="📐"
+      />
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
       {formatResolutionDate(marketData.market.resolutionDateTime)}

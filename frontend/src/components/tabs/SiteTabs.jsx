@@ -37,14 +37,18 @@ const SiteTabs = ({ tabs, onTabChange, defaultTab, activeTab }) => {
 
     return (
         <div>
-            <div className="flex border-b-2">
+            {/* Mobile-responsive tab container with overflow handling */}
+            <div className="flex border-b-2 overflow-x-auto">
                 {tabs.map(tab => (
                     <div
                         key={tab.label}
-                        className={`${tabBaseStyle} ${currentTab === tab.label ? tabActiveStyle : tabInactiveStyle} flex-1`}
+                        className={`${tabBaseStyle} ${currentTab === tab.label ? tabActiveStyle : tabInactiveStyle} flex-1 min-w-0`}
                         onClick={() => handleTabClick(tab.label)}
                     >
-                        {tab.label}
+                        {/* Mobile-responsive text with truncation */}
+                        <span className="truncate text-xs sm:text-sm block">
+                            {tab.label}
+                        </span>
                     </div>
                 ))}
             </div>
