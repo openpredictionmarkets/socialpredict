@@ -3,24 +3,36 @@ import CanvasJSReact from '@canvasjs/react-charts';
 
 const CanvasJSChart = CanvasJSReact.CanvasJSChart;
 
-const MarketChart = ({ data, currentProbability, title, className }) => {
+const MarketChart = ({ data, currentProbability, title, className, closeDateTime }) => {
   const [showInverseProbability, setShowInverseProbability] = useState(false);
 
   const generateDataPoints = (data, isInverse = false) => {
     let dataPoints = [];
+    const now = new Date();
+    const closeDate = closeDateTime ? new Date(closeDateTime) : null;
+    const isMarketClosed = closeDate && closeDate < now;
+
     if (data && Array.isArray(data)) {
-      dataPoints = data.map((item) => ({
+      // Filter out any probability changes that occurred after the close date for closed markets
+      const filteredData = isMarketClosed 
+        ? data.filter(item => new Date(item.timestamp) <= closeDate)
+        : data;
+      
+      dataPoints = filteredData.map((item) => ({
         x: new Date(item.timestamp),
         y: isInverse ? 1 - item.probability : item.probability,
       }));
     }
-    // Append the current probability with the current timestamp if available
-    if (currentProbability !== undefined && currentProbability !== null) {
+
+    // For active markets: append current probability with current timestamp
+    // For closed markets: don't extend beyond close date
+    if (currentProbability !== undefined && currentProbability !== null && !isMarketClosed) {
       dataPoints.push({
-        x: new Date(),
+        x: now,
         y: isInverse ? 1 - currentProbability : currentProbability,
       });
     }
+    
     return dataPoints;
   };
 

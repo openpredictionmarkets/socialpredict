@@ -53,6 +53,14 @@ code {
     @apply grid grid-cols-2 sm:grid-cols-7 gap-2 sm:gap-3 rounded-xl bg-slate-800 px-3 py-3; 
   }
 
+  /* Setup Configuration */
+  .sp-grid-setup-header { 
+    @apply hidden sm:grid grid-cols-3 gap-3 px-4 py-2 text-xs text-gray-400; 
+  }
+  .sp-grid-setup-row { 
+    @apply grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 rounded-xl bg-slate-800 px-3 py-3; 
+  }
+
   /* Optional smallest device tweaks (<=390px) */
   @media (max-width: 390px) {
     .sp-tight { letter-spacing: 0; }

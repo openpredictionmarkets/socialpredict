@@ -57,6 +57,7 @@ function MarketDetailsTable({
           currentProbability={currentProbability}
           title='Probability Changes'
           className='w-full'
+          closeDateTime={market.resolutionDateTime}
         />
       </div>
 

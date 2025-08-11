@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import MobileMarketCard from './MobileMarketCard';
+import ExpandableText from '../utils/ExpandableText';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -41,13 +42,21 @@ const MarketRow = ({ marketData }) => (
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-300'>
       {marketData.lastProbability.toFixed(3)}
     </td>
-    <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300'>
+    <td className='px-6 py-4 text-sm font-medium text-gray-300'>
       <Link
         to={`/markets/${marketData.market.id}`}
-        className='hover:text-blue-400 transition-colors duration-200 block max-w-xs overflow-hidden overflow-ellipsis'
+        className='hover:text-blue-400 transition-colors duration-200 block max-w-xs'
         title={marketData.market.questionTitle}
       >
-        {marketData.market.questionTitle}
+        <ExpandableText
+          text={marketData.market.questionTitle}
+          maxLength={45}
+          className=""
+          expandedClassName="mt-2 p-2 bg-gray-700 rounded border border-gray-600 relative z-10"
+          buttonClassName="text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1"
+          showFullTextInExpanded={true}
+          expandIcon="📐"
+        />
       </Link>
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>

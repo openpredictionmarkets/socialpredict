@@ -28,6 +28,8 @@ import MarketChart from '../../components/charts/MarketChart';
 import TestMarketData from '../../tests/TestData';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import { SharesBadge } from '../../components/buttons/trade/SellButtons';
+import ExpandableText from '../../components/utils/ExpandableText';
+import ExpandableLink from '../../components/utils/ExpandableLink';
 
 const Style = () => {
   const [isSelected, setIsSelected] = useState(false);
@@ -607,6 +609,39 @@ const Style = () => {
               <code>{`import SiteTabs from '../../components/tabs/SiteTabs';`}</code>
             </td>
           </tr>
+          <tr>
+            <td className='px-6 py-4'>
+              <div className='flex flex-wrap items-center gap-4'>
+                <ExpandableText
+                  text="Will artificial intelligence completely replace human-operated prediction markets?"
+                  maxLength={35}
+                  className="text-blue-400"
+                  buttonClassName="text-xs text-yellow-400 ml-1"
+                />
+              </div>
+            </td>
+            <td className='px-6 py-4 text-sm text-gray-500'>Expandable Text</td>
+            <td className='px-6 py-4 text-sm font-mono text-gray-500'>
+              <code>{`import ExpandableText from '../../components/utils/ExpandableText';`}</code>
+            </td>
+          </tr>
+          <tr>
+            <td className='px-6 py-4'>
+              <div className='flex flex-wrap items-center gap-4'>
+                <ExpandableLink
+                  text="Will artificial intelligence completely replace human-operated prediction markets by 2025?"
+                  to="/markets/example"
+                  maxLength={35}
+                  linkClassName="text-blue-400 hover:text-blue-300"
+                  buttonClassName="text-xs text-yellow-400 ml-1"
+                />
+              </div>
+            </td>
+            <td className='px-6 py-4 text-sm text-gray-500'>Expandable Link (Table Use)</td>
+            <td className='px-6 py-4 text-sm font-mono text-gray-500'>
+              <code>{`import ExpandableLink from '../../components/utils/ExpandableLink';`}</code>
+            </td>
+          </tr>
         </tbody>
       </table>
       <table className='min-w-full divide-y divide-gray-200 bg-primary-background'>
@@ -670,6 +705,96 @@ const Style = () => {
             <div className='text-white text-sm font-medium'>NO Shares Badge</div>
             <div className='text-gray-400 text-xs'>Red (#D00000) to Beige (#F9D3A5) gradient</div>
             <div className='text-gray-400 text-xs'>Gold border (#FFC107) with coin emoji 🪙</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Expandable Text Section */}
+      <div className='bg-primary-background p-6'>
+        <h3 className='text-xl font-bold text-white mb-4 mt-8'>Expandable Text Component</h3>
+        <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'>
+          <div className='bg-gray-800 p-4 rounded-lg border border-gray-600'>
+            <div className='text-white text-sm font-medium mb-2'>Short Text (No expansion needed)</div>
+            <div className='text-gray-400 text-xs mb-3'>Text shorter than maxLength displays normally</div>
+            <ExpandableText
+              text="Will AI replace human prediction markets?"
+              maxLength={50}
+              className="text-blue-400"
+            />
+          </div>
+          
+          <div className='bg-gray-800 p-4 rounded-lg border border-gray-600'>
+            <div className='text-white text-sm font-medium mb-2'>Long Text (Expandable)</div>
+            <div className='text-gray-400 text-xs mb-3'>Text longer than maxLength gets truncated with expand button</div>
+            <ExpandableText
+              text="Will artificial intelligence completely replace human-operated prediction markets and forecasting platforms by the end of 2025, considering current technological advances?"
+              maxLength={50}
+              className="text-blue-400"
+              expandedClassName="mt-2 p-3 bg-gray-700 rounded border border-gray-500"
+              buttonClassName="text-xs text-yellow-400 hover:text-yellow-300 transition-colors ml-2"
+              expandIcon="🔍"
+            />
+          </div>
+        </div>
+        
+        <div className='bg-gray-900 p-4 rounded-lg'>
+          <h4 className='text-lg font-semibold text-white mb-3'>Usage Examples</h4>
+          <div className='space-y-4 text-sm'>
+            <div>
+              <div className='text-emerald-400 mb-1'>Basic Usage:</div>
+              <code className='text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded block'>
+                {`<ExpandableText text="Long question title..." maxLength={45} />`}
+              </code>
+            </div>
+            <div>
+              <div className='text-emerald-400 mb-1'>With Custom Styling:</div>
+              <code className='text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded block whitespace-pre-wrap'>
+{`<ExpandableText
+  text="Long text here..."
+  maxLength={60}
+  className="text-blue-400"
+  expandedClassName="mt-2 p-2 bg-gray-700 rounded"
+  buttonClassName="text-xs text-yellow-400 ml-1"
+  expandIcon="📖"
+/>`}
+              </code>
+            </div>
+            <div>
+              <div className='text-emerald-400 mb-1'>Import Statement:</div>
+              <code className='text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded block'>
+                {`import ExpandableText from '../utils/ExpandableText';`}
+              </code>
+            </div>
+          </div>
+        </div>
+        
+        <div className='bg-gray-900 p-4 rounded-lg mt-4'>
+          <h4 className='text-lg font-semibold text-white mb-3'>Props</h4>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-sm'>
+            <div>
+              <div className='text-blue-400 font-mono'>text</div>
+              <div className='text-gray-400 text-xs'>Required string - The text to display</div>
+            </div>
+            <div>
+              <div className='text-blue-400 font-mono'>maxLength</div>
+              <div className='text-gray-400 text-xs'>Number (default: 50) - Characters before truncation</div>
+            </div>
+            <div>
+              <div className='text-blue-400 font-mono'>className</div>
+              <div className='text-gray-400 text-xs'>String - CSS classes for text container</div>
+            </div>
+            <div>
+              <div className='text-blue-400 font-mono'>expandedClassName</div>
+              <div className='text-gray-400 text-xs'>String - CSS classes for expanded view</div>
+            </div>
+            <div>
+              <div className='text-blue-400 font-mono'>buttonClassName</div>
+              <div className='text-gray-400 text-xs'>String - CSS classes for expand button</div>
+            </div>
+            <div>
+              <div className='text-blue-400 font-mono'>expandIcon</div>
+              <div className='text-gray-400 text-xs'>String (default: '📐') - Icon for expand button</div>
+            </div>
           </div>
         </div>
       </div>

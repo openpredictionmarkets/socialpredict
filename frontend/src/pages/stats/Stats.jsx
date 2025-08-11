@@ -190,31 +190,40 @@ const Stats = () => {
   const setupConfigContent = (
     <div className="bg-gray-800 rounded-lg p-6">
       <h2 className="text-2xl font-semibold text-white mb-6">Setup Configuration</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-600">
-              <th className="text-left py-3 px-4 text-gray-300 font-medium">Setup Variable</th>
-              <th className="text-left py-3 px-4 text-gray-300 font-medium">Value</th>
-              <th className="text-left py-3 px-4 text-gray-300 font-medium">Explanation</th>
-            </tr>
-          </thead>
-          <tbody>
-            {statsData?.setupConfiguration && Object.entries(statsData.setupConfiguration).map(([key, value]) => (
-              <tr key={key} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
-                <td className="py-3 px-4 text-blue-400 font-mono text-sm">
-                  {key}
-                </td>
-                <td className="py-3 px-4 text-white font-semibold">
-                  {typeof value === 'number' ? value.toLocaleString() : value.toString()}
-                </td>
-                <td className="py-3 px-4 text-gray-300">
-                  {setupConfigExplanations[key] || 'Configuration parameter for platform behavior'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      
+      {/* Mobile-responsive grid for setup configuration */}
+      <div className="space-y-2">
+        <div className="sp-grid-setup-header">
+          <div>Setup Variable</div>
+          <div>Value</div>
+          <div>Explanation</div>
+        </div>
+        
+        {statsData?.setupConfiguration && Object.entries(statsData.setupConfiguration).map(([key, value]) => (
+          <div key={key} className="sp-grid-setup-row hover:bg-gray-700/50 transition-colors">
+            {/* Variable Name */}
+            <div className="sp-cell-username">
+              <div className="sp-ellipsis text-xs sm:text-sm font-mono text-blue-400">
+                {key}
+              </div>
+            </div>
+
+            {/* Value */}
+            <div className="sp-cell-num text-xs sm:text-sm text-white font-semibold">
+              {typeof value === 'number' ? value.toLocaleString() : value.toString()}
+            </div>
+
+            {/* Explanation (desktop only on mobile, full width below on mobile) */}
+            <div className="hidden sm:block text-gray-300 text-xs sm:text-sm">
+              {setupConfigExplanations[key] || 'Configuration parameter for platform behavior'}
+            </div>
+            
+            {/* Mobile explanation - spans full width */}
+            <div className="col-span-2 sm:hidden sp-subline mt-1">
+              {setupConfigExplanations[key] || 'Configuration parameter for platform behavior'}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -396,7 +405,7 @@ const Stats = () => {
   // Global Leaderboard Tab Content
   const globalLeaderboardContent = (
     <div className="bg-gray-800 rounded-lg p-6">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
         <h2 className="text-2xl font-semibold text-white">
           Global Leaderboard <span className="text-warning-orange text-lg">(Beta)</span>
         </h2>
@@ -404,7 +413,7 @@ const Stats = () => {
           onClick={fetchGlobalLeaderboard} 
           isSelected={false}
           disabled={leaderboardLoading}
-          className="bg-info-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+          className="bg-info-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
         >
           {leaderboardLoading ? 'Calculating...' : 'Calculate Leaderboard'}
         </SiteButton>
