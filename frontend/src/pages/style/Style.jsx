@@ -42,6 +42,168 @@ const Style = () => {
     <div className='overflow-auto'>
       <Header />
       
+      {/* Responsive Grids (Spec) Section */}
+      <div className='bg-primary-background p-6'>
+        <h2 className='text-2xl font-bold text-white mb-6'>Responsive Grids (Spec)</h2>
+        <p className='text-gray-300 mb-8'>
+          Mobile-responsive grid patterns used throughout SocialPredict. These components adapt from mobile-first 
+          (iPhone 12 mini @ 375px) to desktop layouts using Tailwind's responsive utilities.
+        </p>
+        
+        {/* Bets Grid Demo */}
+        <div className='mb-8'>
+          <h3 className='text-xl font-semibold text-white mb-4'>Bets Grid</h3>
+          <div className='bg-gray-900 p-4 rounded-lg'>
+            <div className="sp-grid-bets-header">
+              <div>Username</div>
+              <div className="text-center">Outcome</div>
+              <div className="text-right">Amount</div>
+              <div className="text-right">After</div>
+              <div className="text-right">Placed</div>
+            </div>
+            
+            <div className="sp-grid-bets-row mt-2">
+              <div className="sp-cell-username">
+                <div className="truncate text-xs sm:text-sm font-medium">
+                  <span className="text-blue-500">alice_trader</span>
+                </div>
+              </div>
+              <div className="justify-self-start sm:justify-self-center">
+                <span className="sp-chip">YES</span>
+              </div>
+              <div className="sp-cell-num text-xs sm:text-sm text-gray-300">250</div>
+              <div className="hidden sm:block sp-cell-num text-gray-300">0.724</div>
+              <div className="col-span-3 sm:col-span-1 text-right sp-subline">
+                Jan 8, 2025, 3:45 PM
+              </div>
+            </div>
+            
+            <div className="sp-grid-bets-row mt-2">
+              <div className="sp-cell-username">
+                <div className="truncate text-xs sm:text-sm font-medium">
+                  <span className="text-blue-500">bob_predictor_longusername</span>
+                </div>
+              </div>
+              <div className="justify-self-start sm:justify-self-center">
+                <span className="sp-chip">NO</span>
+              </div>
+              <div className="sp-cell-num text-xs sm:text-sm text-gray-300">100</div>
+              <div className="hidden sm:block sp-cell-num text-gray-300">0.276</div>
+              <div className="col-span-3 sm:col-span-1 text-right sp-subline">
+                Jan 8, 2025, 2:30 PM
+              </div>
+            </div>
+          </div>
+          <div className='text-xs text-gray-400 mt-2'>
+            <strong>Mobile (≤639px):</strong> 3 columns - Username, Outcome, Amount (timestamp spans full width)<br/>
+            <strong>Desktop (≥640px):</strong> 5 columns - adds After probability & dedicated Placed column
+          </div>
+        </div>
+
+        {/* Leaderboard Grid Demo */}
+        <div className='mb-8'>
+          <h3 className='text-xl font-semibold text-white mb-4'>Leaderboard Grid</h3>
+          <div className='bg-gray-900 p-4 rounded-lg'>
+            <div className="sp-grid-leaderboard-header">
+              <div>Rank</div>
+              <div>User</div>
+              <div>Position</div>
+              <div className="text-right">Profit</div>
+              <div className="text-right">Current Value</div>
+              <div className="text-right">Total Spent</div>
+              <div>Shares</div>
+            </div>
+            
+            <div className="sp-grid-leaderboard-row mt-2">
+              <div className="flex items-center justify-start">
+                <div className="text-white font-bold text-lg mr-2">🥇</div>
+                <div className="sm:hidden sp-cell-username">
+                  <div className="truncate text-xs font-medium">
+                    <span className="text-blue-500">alice_trader</span>
+                  </div>
+                </div>
+              </div>
+              <div className="hidden sm:block sp-cell-username">
+                <div className="truncate font-medium">
+                  <span className="text-blue-500">alice_trader</span>
+                </div>
+              </div>
+              <div className="hidden sm:block">
+                <span className="px-2 py-1 rounded text-xs font-bold bg-green-600 text-white">YES</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-sm text-green-400">+1,250</div>
+                <div className="sm:hidden sp-subline">Pos YES • 15Y 3N</div>
+              </div>
+              <div className="hidden sm:block sp-cell-num text-gray-300">2,100</div>
+              <div className="hidden sm:block sp-cell-num text-gray-300">850</div>
+              <div className="hidden sm:block text-gray-300 text-xs">
+                <div>YES: 15</div>
+                <div>NO: 3</div>
+              </div>
+            </div>
+            
+            <div className="sp-grid-leaderboard-row mt-2">
+              <div className="flex items-center justify-start">
+                <div className="text-white font-bold text-lg mr-2">🥈</div>
+                <div className="sm:hidden sp-cell-username">
+                  <div className="truncate text-xs font-medium">
+                    <span className="text-blue-500">bob_predictor</span>
+                  </div>
+                </div>
+              </div>
+              <div className="hidden sm:block sp-cell-username">
+                <div className="truncate font-medium">
+                  <span className="text-blue-500">bob_predictor</span>
+                </div>
+              </div>
+              <div className="hidden sm:block">
+                <span className="px-2 py-1 rounded text-xs font-bold bg-red-600 text-white">NO</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-sm text-red-400">-75</div>
+                <div className="sm:hidden sp-subline">Pos NO • 2Y 8N</div>
+              </div>
+              <div className="hidden sm:block sp-cell-num text-gray-300">675</div>
+              <div className="hidden sm:block sp-cell-num text-gray-300">750</div>
+              <div className="hidden sm:block text-gray-300 text-xs">
+                <div>YES: 2</div>
+                <div>NO: 8</div>
+              </div>
+            </div>
+          </div>
+          <div className='text-xs text-gray-400 mt-2'>
+            <strong>Mobile (≤639px):</strong> 2 columns - Rank+Username combined, Profit+subline info<br/>
+            <strong>Desktop (≥640px):</strong> 7 columns - separate Rank, User, Position, Profit, Current Value, Total Spent, Shares
+          </div>
+        </div>
+
+        {/* CSS Classes Reference */}
+        <div className='mb-8'>
+          <h3 className='text-xl font-semibold text-white mb-4'>CSS Classes</h3>
+          <div className='bg-gray-900 p-4 rounded-lg font-mono text-xs text-gray-300'>
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+              <div>
+                <div className='text-emerald-400 mb-2'>/* Bets Grid */</div>
+                <div>.sp-grid-bets-header</div>
+                <div>.sp-grid-bets-row</div>
+                <div className='mt-4 text-emerald-400 mb-2'>/* Leaderboard Grid */</div>
+                <div>.sp-grid-leaderboard-header</div>
+                <div>.sp-grid-leaderboard-row</div>
+              </div>
+              <div>
+                <div className='text-emerald-400 mb-2'>/* Shared Utilities */</div>
+                <div>.sp-cell-username</div>
+                <div>.sp-cell-num</div>
+                <div>.sp-chip</div>
+                <div>.sp-subline</div>
+                <div>.sp-tight</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       {/* Color Palette Section */}
       <div className='bg-primary-background p-6'>
         <h2 className='text-2xl font-bold text-white mb-6'>SocialPredict Color Palette</h2>

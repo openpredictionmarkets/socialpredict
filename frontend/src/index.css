@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 body {
   @apply bg-primary-background;
   margin: 0;
@@ -11,4 +15,46 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+@layer components {
+  /* Shared cells */
+  .sp-cell-username { 
+    @apply min-w-0; 
+  }
+  .sp-cell-num { 
+    @apply text-right tabular-nums; 
+  }
+  .sp-chip { 
+    @apply px-2 py-0.5 rounded-full text-[10px] sm:text-xs bg-emerald-600/20; 
+  }
+  .sp-subline { 
+    @apply text-[10px] sm:text-xs text-slate-400; 
+  }
+  .sp-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Bets */
+  .sp-grid-bets-header { 
+    @apply hidden sm:grid grid-cols-5 gap-3 px-4 py-2 text-xs text-gray-400; 
+  }
+  .sp-grid-bets-row { 
+    @apply grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 rounded-xl bg-slate-800 px-3 py-3; 
+  }
+
+  /* Leaderboard */
+  .sp-grid-leaderboard-header { 
+    @apply hidden sm:grid grid-cols-7 gap-3 px-4 py-2 text-xs text-gray-400; 
+  }
+  .sp-grid-leaderboard-row { 
+    @apply grid grid-cols-2 sm:grid-cols-7 gap-2 sm:gap-3 rounded-xl bg-slate-800 px-3 py-3; 
+  }
+
+  /* Optional smallest device tweaks (<=390px) */
+  @media (max-width: 390px) {
+    .sp-tight { letter-spacing: 0; }
+  }
 }

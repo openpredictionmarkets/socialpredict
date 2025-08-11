@@ -90,57 +90,71 @@ const LeaderboardActivity = ({ marketId }) => {
     return (
         <div className="p-4">
             {/* Header */}
-            <div className="bg-gray-800 p-3 rounded-lg shadow">
-                <div className="grid grid-cols-7 gap-2 text-white font-bold text-sm">
-                    <div>Rank</div>
-                    <div>User</div>
-                    <div>Position</div>
-                    <div>Profit</div>
-                    <div>Current Value</div>
-                    <div>Total Spent</div>
-                    <div>Shares</div>
-                </div>
+            <div className="sp-grid-leaderboard-header">
+                <div>Rank</div>
+                <div>User</div>
+                <div>Position</div>
+                <div className="text-right">Profit</div>
+                <div className="text-right">Current Value</div>
+                <div className="text-right">Total Spent</div>
+                <div>Shares</div>
             </div>
             
             {/* Leaderboard Rows */}
             {leaderboard.map((entry, index) => (
-                <div key={entry.username} className="bg-gray-800 p-3 rounded-lg shadow mt-2 grid grid-cols-7 gap-2 items-center">
-                    {/* Rank */}
-                    <div className="text-white font-bold text-lg">
-                        {getRankDisplay(entry.rank)}
+                <div key={entry.username} className="sp-grid-leaderboard-row mt-2">
+                    {/* Rank + Username (xs) / Rank (sm+) */}
+                    <div className="flex items-center justify-start">
+                        <div className="text-white font-bold text-lg mr-2">
+                            {getRankDisplay(entry.rank)}
+                        </div>
+                        <div className="sm:hidden sp-cell-username">
+                            <div className="sp-ellipsis text-xs font-medium">
+                                <Link to={`/user/${entry.username}`} className="text-blue-500 hover:text-blue-400 transition-colors">
+                                    {entry.username}
+                                </Link>
+                            </div>
+                        </div>
                     </div>
                     
-                    {/* Username */}
-                    <div className="text-blue-500 font-bold">
-                        <Link to={`/user/${entry.username}`} className="underline hover:text-blue-700">
-                            {entry.username}
-                        </Link>
+                    {/* Username (sm+) */}
+                    <div className="hidden sm:block sp-cell-username">
+                        <div className="sp-ellipsis font-medium">
+                            <Link to={`/user/${entry.username}`} className="text-blue-500 hover:text-blue-400 transition-colors">
+                                {entry.username}
+                            </Link>
+                        </div>
                     </div>
                     
-                    {/* Position */}
-                    <div>
+                    {/* Position (sm+) */}
+                    <div className="hidden sm:block">
                         <span className={getPositionBadge(entry.position)}>
                             {entry.position}
                         </span>
                     </div>
                     
-                    {/* Profit */}
-                    <div className={`font-bold ${getProfitColor(entry.profit)}`}>
-                        {entry.profit >= 0 ? '+' : ''}{formatCurrency(entry.profit)}
+                    {/* P&L + Subline (xs) / Profit (sm+) */}
+                    <div className="text-right">
+                        <div className={`font-bold text-sm ${getProfitColor(entry.profit)}`}>
+                            {entry.profit >= 0 ? '+' : ''}{formatCurrency(entry.profit)}
+                        </div>
+                        <div className="sm:hidden sp-subline">
+                            Pos {entry.position} • {entry.yesSharesOwned}Y {entry.noSharesOwned}N
+                        </div>
                     </div>
                     
-                    {/* Current Value */}
-                    <div className="text-gray-300">
+                    {/* Current Value (sm+) */}
+                    <div className="hidden sm:block sp-cell-num text-gray-300">
                         {formatCurrency(entry.currentValue)}
                     </div>
                     
-                    {/* Total Spent */}
-                    <div className="text-gray-300">
+                    {/* Total Spent (sm+) */}
+                    <div className="hidden sm:block sp-cell-num text-gray-300">
                         {formatCurrency(entry.totalSpent)}
                     </div>
                     
-                    {/* Shares */}
-                    <div className="text-gray-300 text-xs">
+                    {/* Shares (sm+) */}
+                    <div className="hidden sm:block text-gray-300 text-xs">
                         <div>YES: {entry.yesSharesOwned}</div>
                         <div>NO: {entry.noSharesOwned}</div>
                     </div>
