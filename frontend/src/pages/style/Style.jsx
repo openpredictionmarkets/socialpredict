@@ -45,10 +45,31 @@ const Style = () => {
       {/* Responsive Grids (Spec) Section */}
       <div className='bg-primary-background p-6'>
         <h2 className='text-2xl font-bold text-white mb-6'>Responsive Grids (Spec)</h2>
-        <p className='text-gray-300 mb-8'>
+        <p className='text-gray-300 mb-4'>
           Mobile-responsive grid patterns used throughout SocialPredict. These components adapt from mobile-first 
           (iPhone 12 mini @ 375px) to desktop layouts using Tailwind's responsive utilities.
         </p>
+        
+        {/* Import Documentation */}
+        <div className='bg-gray-900 p-4 rounded-lg mb-8'>
+          <h3 className='text-lg font-semibold text-white mb-3'>Component Imports</h3>
+          <div className='space-y-3'>
+            <div>
+              <div className='text-emerald-400 text-sm font-medium mb-1'>Bets Grid Component</div>
+              <code className='text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded block'>
+                import BetsActivity from '../components/layouts/activity/bets/BetsActivity';
+              </code>
+              <div className='text-gray-400 text-xs mt-1'>Usage: {`<BetsActivity marketId={marketId} />`}</div>
+            </div>
+            <div>
+              <div className='text-emerald-400 text-sm font-medium mb-1'>Leaderboard Grid Component</div>
+              <code className='text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded block'>
+                import LeaderboardActivity from '../components/layouts/activity/leaderboard/LeaderboardActivity';
+              </code>
+              <div className='text-gray-400 text-xs mt-1'>Usage: {`<LeaderboardActivity marketId={marketId} />`}</div>
+            </div>
+          </div>
+        </div>
         
         {/* Bets Grid Demo */}
         <div className='mb-8'>
@@ -64,12 +85,12 @@ const Style = () => {
             
             <div className="sp-grid-bets-row mt-2">
               <div className="sp-cell-username">
-                <div className="truncate text-xs sm:text-sm font-medium">
+                <div className="sp-ellipsis text-xs sm:text-sm font-medium">
                   <span className="text-blue-500">alice_trader</span>
                 </div>
               </div>
               <div className="justify-self-start sm:justify-self-center">
-                <span className="sp-chip">YES</span>
+                <span className="px-2 py-1 rounded text-xs font-bold bg-green-600 text-white">YES</span>
               </div>
               <div className="sp-cell-num text-xs sm:text-sm text-gray-300">250</div>
               <div className="hidden sm:block sp-cell-num text-gray-300">0.724</div>
@@ -80,12 +101,12 @@ const Style = () => {
             
             <div className="sp-grid-bets-row mt-2">
               <div className="sp-cell-username">
-                <div className="truncate text-xs sm:text-sm font-medium">
+                <div className="sp-ellipsis text-xs sm:text-sm font-medium">
                   <span className="text-blue-500">bob_predictor_longusername</span>
                 </div>
               </div>
               <div className="justify-self-start sm:justify-self-center">
-                <span className="sp-chip">NO</span>
+                <span className="px-2 py-1 rounded text-xs font-bold bg-red-600 text-white">NO</span>
               </div>
               <div className="sp-cell-num text-xs sm:text-sm text-gray-300">100</div>
               <div className="hidden sm:block sp-cell-num text-gray-300">0.276</div>
@@ -118,13 +139,13 @@ const Style = () => {
               <div className="flex items-center justify-start">
                 <div className="text-white font-bold text-lg mr-2">🥇</div>
                 <div className="sm:hidden sp-cell-username">
-                  <div className="truncate text-xs font-medium">
+                  <div className="sp-ellipsis text-xs font-medium">
                     <span className="text-blue-500">alice_trader</span>
                   </div>
                 </div>
               </div>
               <div className="hidden sm:block sp-cell-username">
-                <div className="truncate font-medium">
+                <div className="sp-ellipsis font-medium">
                   <span className="text-blue-500">alice_trader</span>
                 </div>
               </div>
@@ -147,13 +168,13 @@ const Style = () => {
               <div className="flex items-center justify-start">
                 <div className="text-white font-bold text-lg mr-2">🥈</div>
                 <div className="sm:hidden sp-cell-username">
-                  <div className="truncate text-xs font-medium">
+                  <div className="sp-ellipsis text-xs font-medium">
                     <span className="text-blue-500">bob_predictor</span>
                   </div>
                 </div>
               </div>
               <div className="hidden sm:block sp-cell-username">
-                <div className="truncate font-medium">
+                <div className="sp-ellipsis font-medium">
                   <span className="text-blue-500">bob_predictor</span>
                 </div>
               </div>
@@ -282,6 +303,28 @@ const Style = () => {
             <div className='w-full h-16 bg-warning-orange rounded mb-2'></div>
             <div className='text-white text-sm font-medium'>warning-orange</div>
             <div className='text-gray-400 text-xs'>#ffc107</div>
+          </div>
+          
+          {/* Outcome Badge Colors */}
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-green-600 rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>green-600 (YES)</div>
+            <div className='text-gray-400 text-xs'>#059669</div>
+            <div className='text-gray-500 text-xs mt-1'>Used for YES outcome badges</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-red-600 rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>red-600 (NO)</div>
+            <div className='text-gray-400 text-xs'>#dc2626</div>
+            <div className='text-gray-500 text-xs mt-1'>Used for NO outcome badges</div>
+          </div>
+          
+          <div className='bg-primary-background p-4 rounded-lg border border-gray-600'>
+            <div className='w-full h-16 bg-red-btn rounded mb-2'></div>
+            <div className='text-white text-sm font-medium'>red-btn (Button)</div>
+            <div className='text-gray-400 text-xs'>#D00000</div>
+            <div className='text-gray-500 text-xs mt-1'>Used for buttons & charts</div>
           </div>
         </div>
         

@@ -41,7 +41,9 @@ const BetsActivityLayout = ({ marketId }) => {
 
                     {/* Outcome */}
                     <div className="justify-self-start sm:justify-self-center">
-                        <span className="sp-chip">{bet.outcome}</span>
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${bet.outcome === 'YES' ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+                            {bet.outcome}
+                        </span>
                     </div>
 
                     {/* Amount */}
