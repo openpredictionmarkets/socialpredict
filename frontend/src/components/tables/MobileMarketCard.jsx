@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
+import ExpandableText from '../utils/ExpandableText';
 
 const MobileMarketCard = ({ marketData }) => {
   const isMarketOpen =
@@ -33,9 +34,17 @@ const MobileMarketCard = ({ marketData }) => {
       </div>
       <Link
         to={`/markets/${marketData.market.id}`}
-        className='text-blue-400 hover:text-blue-300 font-medium block mb-2 truncate'
+        className='text-blue-400 hover:text-blue-300 font-medium block mb-2'
       >
-        {marketData.market.questionTitle}
+        <ExpandableText
+          text={marketData.market.questionTitle}
+          maxLength={60}
+          className=""
+          expandedClassName="mt-2 p-2 bg-gray-700 rounded border border-gray-600 relative z-10"
+          buttonClassName="text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1"
+          showFullTextInExpanded={true}
+          expandIcon="📐"
+        />
       </Link>
       <div className='grid grid-cols-3 text-sm text-gray-400'>
         <span className='truncate'>👤 {marketData.numUsers}</span>

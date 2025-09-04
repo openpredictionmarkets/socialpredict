@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import ResolutionAlert from '../resolutions/ResolutionAlert';
 import MarketChart from '../charts/MarketChart';
 import ActivityTabs from '../../components/tabs/ActivityTabs';
+import ResolveModalButton from '../modals/resolution/ResolveModal';
+import BetModalButton from '../modals/bet/BetModal';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 
 function MarketDetailsTable({
@@ -9,9 +11,14 @@ function MarketDetailsTable({
   creator,
   numUsers,
   totalVolume,
+  marketDust,
   currentProbability,
   probabilityChanges,
   marketId,
+  username,
+  isLoggedIn,
+  token,
+  refetchData,
 }) {
   const [showFullDescription, setShowFullDescription] = useState(false);
 
@@ -50,6 +57,7 @@ function MarketDetailsTable({
           currentProbability={currentProbability}
           title='Probability Changes'
           className='w-full'
+          closeDateTime={market.resolutionDateTime}
         />
       </div>
 
@@ -81,7 +89,11 @@ function MarketDetailsTable({
       <div className='grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-4'>
         {[
           { label: 'Users', value: `${numUsers}`, icon: '👤' },
-          { label: 'Volume', value: `${totalVolume.toFixed(2)}`, icon: '📊' },
+          { 
+            label: 'Volume', 
+            value: `${Math.round(totalVolume)}`,
+            icon: '📊' 
+          },
           { label: 'Comments', value: '0', icon: '💬' },
           {
             label: 'Closes',
@@ -100,7 +112,50 @@ function MarketDetailsTable({
         ))}
       </div>
 
-      <div className='mx-auto mt-8 w-full'>
+      {marketDust > 0 && (
+        <div className='grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-4'>
+          <div className='bg-gray-800 p-2 rounded-lg'>
+            <div className='text-xs text-gray-400'>Dust</div>
+            <div className='text-sm font-semibold truncate'>
+              ✨ {marketDust}
+            </div>
+          </div>
+          <div className='bg-gray-800 p-2 rounded-lg opacity-50'>
+            <div className='text-xs text-gray-400'>—</div>
+            <div className='text-sm font-semibold truncate'>—</div>
+          </div>
+          <div className='bg-gray-800 p-2 rounded-lg opacity-50'>
+            <div className='text-xs text-gray-400'>—</div>
+            <div className='text-sm font-semibold truncate'>—</div>
+          </div>
+          <div className='bg-gray-800 p-2 rounded-lg opacity-50'>
+            <div className='text-xs text-gray-400'>—</div>
+            <div className='text-sm font-semibold truncate'>—</div>
+          </div>
+        </div>
+      )}
+
+      <div className='flex items-center justify-center mb-4 space-x-4 py-4'>
+        {username === market.creatorUsername && !market.isResolved && (
+          <ResolveModalButton
+            marketId={marketId}
+            token={token}
+            disabled={!token}
+            className='text-xs px-4 py-2'
+          />
+        )}
+        {!market.isResolved && isLoggedIn && new Date(market.resolutionDateTime) > new Date() && (
+          <BetModalButton
+            marketId={marketId}
+            token={token}
+            disabled={!token}
+            onTransactionSuccess={refetchData}
+            className='text-xs px-4 py-2'
+          />
+        )}
+      </div>
+
+      <div className='mx-auto w-full'>
         <ActivityTabs marketId={marketId} />
       </div>
     </div>

@@ -21,8 +21,8 @@ type TestCase struct {
 	ExpectedF_NO          float64
 	ScaledPayouts         []int64
 	AdjustedScaledPayouts []int64
-	AggregatedPositions   []dbpm.MarketPosition
-	NetPositions          []dbpm.MarketPosition
+	AggregatedPositions   []dbpm.DBPMMarketPosition
+	NetPositions          []dbpm.DBPMMarketPosition
 }
 
 var now = time.Now() // Capture current time for consistent test data
@@ -63,10 +63,10 @@ var TestCases = []TestCase{
 		ExpectedF_NO:          5.714286,
 		ScaledPayouts:         []int64{3, 1},
 		AdjustedScaledPayouts: []int64{3, 1},
-		AggregatedPositions: []dbpm.MarketPosition{
+		AggregatedPositions: []dbpm.DBPMMarketPosition{
 			{Username: "user1", YesSharesOwned: 3, NoSharesOwned: 1},
 		},
-		NetPositions: []dbpm.MarketPosition{
+		NetPositions: []dbpm.DBPMMarketPosition{
 			{Username: "user1", YesSharesOwned: 2, NoSharesOwned: 0},
 		},
 	},
@@ -132,11 +132,11 @@ var TestCases = []TestCase{
 		ExpectedF_NO:          2,
 		ScaledPayouts:         []int64{0, 0, 1, 0, 1},
 		AdjustedScaledPayouts: []int64{0, 0, 1, 0, 0},
-		AggregatedPositions: []dbpm.MarketPosition{
+		AggregatedPositions: []dbpm.DBPMMarketPosition{
 			{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
 			{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
 		},
-		NetPositions: []dbpm.MarketPosition{
+		NetPositions: []dbpm.DBPMMarketPosition{
 			{Username: "user1", YesSharesOwned: 0, NoSharesOwned: 1},
 			{Username: "user2", YesSharesOwned: 0, NoSharesOwned: 0},
 		},

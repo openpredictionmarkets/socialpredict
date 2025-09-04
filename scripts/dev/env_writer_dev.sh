@@ -4,15 +4,23 @@
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
 # Function to create and update .env file
+# Updated to be compatible with MacOS Sonoma.
+# Uses POSTGRES_VOLUME to deal with MacOS xattrs provenence.
 init_env() {
 	# Create .env file
 	cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env"
 
-	# Update .env file
-
 	# Update APP_ENV
 	sed -i -e "s/APP_ENV=.*/APP_ENV='development'/g" "$SCRIPT_DIR/.env"
 	echo "ENV_PATH=$SCRIPT_DIR/.env" >> "$SCRIPT_DIR/.env"
+
+	# Add OS-specific POSTGRES_VOLUME
+	OS=$(uname -s)
+	if [[ "$OS" == "Darwin" ]]; then
+		echo "POSTGRES_VOLUME=pgdata:/var/lib/postgresql/data" >> "$SCRIPT_DIR/.env"
+	else
+		echo "POSTGRES_VOLUME=../data/postgres:/var/lib/postgresql/data" >> "$SCRIPT_DIR/.env"
+	fi
 }
 
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then

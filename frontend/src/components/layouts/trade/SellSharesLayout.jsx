@@ -12,7 +12,7 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     useEffect(() => {
         const fetchFeeData = async () => {
             try {
-                const response = await fetch('http://localhost/api/v0/setup');
+                const response = await fetch('/api/v0/setup');
                 const data = await response.json();
                 setFeeData(data.Betting.BetFees);
                 setIsLoading(false); // Set loading state to false after fetching
@@ -28,21 +28,34 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     useEffect(() => {
         fetchUserShares(marketId, token)
             .then(data => {
-                setShares(data);
-                // Automatically select an outcome and set initial sell amount
-                if (data.NoSharesOwned > 0 && data.YesSharesOwned === 0) {
+                // Always get an object, never an array
+                let sharesObj;
+                if (Array.isArray(data)) {
+                    sharesObj = data[0] || { noSharesOwned: 0, yesSharesOwned: 0, value: 0 };
+                } else if (typeof data === 'object' && data !== null) {
+                    sharesObj = data;
+                } else {
+                    sharesObj = { noSharesOwned: 0, yesSharesOwned: 0, value: 0 };
+                }
+                setShares(sharesObj);
+
+                // Set outcome and amount based on shares
+                if (sharesObj.noSharesOwned > 0 && sharesObj.yesSharesOwned === 0) {
                     setSelectedOutcome('NO');
-                    setSellAmount(data.NoSharesOwned);
-                } else if (data.YesSharesOwned > 0 && data.NoSharesOwned === 0) {
+                    setSellAmount(sharesObj.noSharesOwned);
+                } else if (sharesObj.yesSharesOwned > 0 && sharesObj.noSharesOwned === 0) {
                     setSelectedOutcome('YES');
-                    setSellAmount(data.YesSharesOwned);
+                    setSellAmount(sharesObj.yesSharesOwned);
                 }
             })
             .catch(error => {
                 alert(`Error fetching shares: ${error.message}`);
                 console.error('Error fetching shares:', error);
+                // Optionally, reset to default state on error
+                setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
             });
     }, [marketId, token]);
+
 
     const handleSellAmountChange = (event) => {
         const newAmount = parseInt(event.target.value, 10) || 0; // Ensure it defaults to 0 if conversion fails
@@ -84,31 +97,37 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     return (
         <div className="p-6 bg-blue-900 rounded-lg text-white">
             <h2 className="text-xl mb-4">Shares Owned</h2>
-            {shares.NoSharesOwned < 1 && shares.YesSharesOwned < 1 ? (
+            {shares.noSharesOwned < 1 && shares.yesSharesOwned < 1 ? (
                 <div className="text-center">
                     <p>No Shares Owned In This Market</p>
                 </div>
             ) : (
                 <>
                     <div className="flex justify-center space-x-4 mb-4">
-                        {shares.NoSharesOwned > 0 &&
-                            <SharesBadge type="NO" count={shares.NoSharesOwned} />}
-                        {shares.YesSharesOwned > 0 &&
-                            <SharesBadge type="YES" count={shares.YesSharesOwned} />}
+                        {shares.noSharesOwned > 0 &&
+                            <SharesBadge type="NO" count={shares.noSharesOwned} />}
+                        {shares.yesSharesOwned > 0 &&
+                            <SharesBadge type="YES" count={shares.yesSharesOwned} />}
                     </div>
+                    {(shares.noSharesOwned > 0 || shares.yesSharesOwned > 0) && (
+                        <div className="text-center text-lg mt-2">
+                            <span className="font-bold">Position Value: </span>
+                            <span className="text-green-300">{shares.value}</span>
+                        </div>
+                    )}
                     <div className="border-t border-gray-200 my-2"></div>
                     <div className="flex items-center space-x-4 mb-4">
                         <h2 className="text-xl">Sale Amount</h2>
                         <SaleInputAmount
                             value={sellAmount}
                             onChange={handleSellAmountChange}
-                            max={selectedOutcome === 'NO' ? shares.NoSharesOwned : shares.YesSharesOwned}
+                            max={selectedOutcome === 'NO' ? shares.noSharesOwned : shares.yesSharesOwned}
                         />
                     </div>
                     <div className="flex justify-center">
-                        {shares.NoSharesOwned > 0 &&
+                        {shares.noSharesOwned > 0 &&
                             <ConfirmSaleButton onClick={() => handleSaleSubmission('NO')} selectedDirection="NO">Sell NO</ConfirmSaleButton>}
-                        {shares.YesSharesOwned > 0 &&
+                        {shares.yesSharesOwned > 0 &&
                             <ConfirmSaleButton onClick={() => handleSaleSubmission('YES')} selectedDirection="YES">Sell YES</ConfirmSaleButton>}
                     </div>
                 </>
@@ -137,10 +156,10 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
                     )}
                 </div>
             )}
-
-
         </div>
     );
+
+
 };
 
 export default SellSharesLayout;

@@ -19,7 +19,7 @@ func ValidateAdminToken(r *http.Request, db *gorm.DB) error {
 	}
 
 	keyFunc := func(token *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
+		return getJWTKey(), nil
 	}
 
 	token, err := parseToken(tokenString, keyFunc)

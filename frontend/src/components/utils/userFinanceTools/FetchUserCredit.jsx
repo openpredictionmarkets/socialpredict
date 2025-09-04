@@ -32,4 +32,3 @@ const useUserCredit = (username) => {
   };
 
   export default useUserCredit;
-  

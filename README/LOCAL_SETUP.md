@@ -20,6 +20,8 @@ mkdir -p data/postgres data/certbot
 chown -R $(whoami):staff data
 ```
 
+* For newer versions of MacOS, Apple adds some `xattrs` which maintain provenance over the files, not allowing Docker to work with them directly on the disk. Hence, we have to mount our database from local on development mode. See [here](https://developer.apple.com/forums/thread/723397).
+
 #### Instructions
 
 - **Clone the Repository**: Download the repository to your local machine.
@@ -96,6 +98,31 @@ docker compose -p scripts logs | grep frontend
 docker compose -p scripts logs | grep nginx
 docker compose -p scripts logs | grep postgres
 docker compose -p scripts logs | grep certbot
+```
+
+### Backing Up Database On Local Prior to Change
+
+* There may be instances in which you want to backup your database on local prior to implementing a new feature or fix coming in from a different branch, so that a desired state can be restored if the change or fix didn't work.
+
+Here are two quick steps to backup and restore your database:
+
+#### Backup
+
+```
+docker exec socialpredict-postgres-container sh -c 'pg_dump -U user -F c socialpredict_db' > backup_before_resolution.dump 2> pgdump_error.log
+```
+
+* This will create an error log at pgdump_error.log which you can inspect in case there are any problems.
+
+#### Restore
+
+```
+# Drop and recreate DB
+docker exec -it socialpredict-postgres-container psql -U user -c "DROP DATABASE socialpredict_db;"
+docker exec -it socialpredict-postgres-container psql -U user -c "CREATE DATABASE socialpredict_db;"
+
+# Restore
+cat backup_before_resolution.dump | docker exec -i socialpredict-postgres-container pg_restore --no-owner -U user -d socialpredict_db
 ```
 
 ### Setting Up a Staging Instance On the Web

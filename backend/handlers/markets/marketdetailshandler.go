@@ -22,6 +22,7 @@ type MarketDetailHandlerResponse struct {
 	ProbabilityChanges []wpam.ProbabilityChange                  `json:"probabilityChanges"`
 	NumUsers           int                                       `json:"numUsers"`
 	TotalVolume        int64                                     `json:"totalVolume"`
+	MarketDust         int64                                     `json:"marketDust"`
 }
 
 func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
@@ -56,11 +57,14 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	// find the number of users on the market
 	numUsers := models.GetNumMarketUsers(bets)
 
-	// market volume is equivalent to the sum of all bets
-	marketVolume := marketmath.GetMarketVolume(bets)
+	// market volume represents actual liquidity remaining (including dust)
+	marketVolume := marketmath.GetMarketVolumeWithDust(bets)
 	if err != nil {
 		// Handle error
 	}
+
+	// calculate market dust from selling transactions
+	marketDust := marketmath.GetMarketDust(bets)
 
 	// get market creator
 	// Fetch the Creator's public information using utility function
@@ -73,6 +77,7 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		ProbabilityChanges: probabilityChanges,
 		NumUsers:           numUsers,
 		TotalVolume:        marketVolume,
+		MarketDust:         marketDust,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

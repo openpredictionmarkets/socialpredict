@@ -7,6 +7,21 @@ set -x # Verbose
 # Determine script's directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Ensure .env file exists before resolving path
+if [ ! -f "$SCRIPT_DIR/.env" ]; then
+  echo ".env file not found."
+
+  if [ -f "$SCRIPT_DIR/scripts/dev/env_writer_dev.sh" ]; then
+    echo "Initializing .env file using env_writer_dev.sh (first-run only)..."
+    export CALLED_FROM_SOCIALPREDICT=yes
+    SCRIPT_INTERACTIVE=true source "$SCRIPT_DIR/scripts/dev/env_writer_dev.sh"
+    unset CALLED_FROM_SOCIALPREDICT
+  else
+    echo "Cannot continue. .env file is missing and env_writer_dev.sh was not found."
+    exit 1
+  fi
+fi
+
 # Calculate the absolute path to the .env file
 ENV_PATH="$( readlink -f "$SCRIPT_DIR/.env" )"
 ENV_FILE="--env-file $ENV_PATH"
@@ -132,4 +147,14 @@ if [ "$1" = "down" ]; then
 		echo "Wrong Application Environment in .env"
 		exit 1
 	fi
+fi
+
+# Database backup/restore
+if [ "$1" = "backup" ]; then
+	source_env
+	export CALLED_FROM_SOCIALPREDICT=yes
+	shift
+	# Pass remaining args to the backup script, e.g. --save / --list / --restore <file> / --restore-latest
+	source "$SCRIPT_DIR/scripts/backup/db_backup.sh" "$@"
+	unset CALLED_FROM_SOCIALPREDICT
 fi

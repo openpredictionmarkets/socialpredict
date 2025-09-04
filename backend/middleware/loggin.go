@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"socialpredict/models"
+	"socialpredict/security"
 	"socialpredict/util"
 	"time"
 
@@ -13,7 +14,10 @@ import (
 )
 
 // login and validation stuff
-var jwtKey = []byte(os.Getenv("JWT_SIGNING_KEY"))
+// getJWTKey returns the JWT signing key, checking environment variable at runtime
+func getJWTKey() []byte {
+	return []byte(os.Getenv("JWT_SIGNING_KEY"))
+}
 
 // UserClaims represents the expected structure of the JWT claims
 type UserClaims struct {
@@ -27,10 +31,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Initialize security service
+	securityService := security.NewSecurityService()
+
 	// Parse the request body
 	type loginRequest struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
+		Username string `json:"username" validate:"required,min=3,max=30,username"`
+		Password string `json:"password" validate:"required,min=1"`
 	}
 
 	var req loginRequest
@@ -39,6 +46,20 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
+
+	// Validate and sanitize login input
+	if err := securityService.Validator.ValidateStruct(req); err != nil {
+		http.Error(w, "Invalid input: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Sanitize username (basic sanitization for login)
+	sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
+	if err != nil {
+		http.Error(w, "Invalid username format", http.StatusBadRequest)
+		return
+	}
+	req.Username = sanitizedUsername
 
 	// Use database connection
 	db := util.GetDB()
@@ -73,7 +94,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// Sign and get the complete encoded token as a string
-	tokenString, err := token.SignedString(jwtKey)
+	tokenString, err := token.SignedString(getJWTKey())
 	if err != nil {
 		http.Error(w, "Error creating token", http.StatusInternalServerError)
 		return

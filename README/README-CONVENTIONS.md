@@ -2,6 +2,8 @@
 
 The following is a documentation of various coding conventions used to keep SocialPredict clean, maintainable and secure.
 
+Further conventions will be added within the codebase within README files and will be assigned uuid's. To search for convention, simply search, "Convention," in the codebase.
+
 ## Seperation of Concerns
 
 * The application is separated into a backend and a frontend so that people who specialize in different areas can easily contribute seperately.
@@ -9,6 +11,10 @@ The following is a documentation of various coding conventions used to keep Soci
 * The frontend is built with ReactJS, similarly because as a platform it has a high adoption rate.
 
 ## Backend
+
+### Follow All Golang Conventions First
+
+* Follow Golang conventions per the standard Golang documentation and do not deviate. For any disagreements, refer to this documentation first, in order of the documentation's statements on what to refer to.
 
 ### Ab Initio
 
@@ -120,3 +126,21 @@ db := util.GetDB()
 ```
 
 * Then moving down from there, we should try to pass db into subsequent functions so that each query being done is using the same connection, rather than running `db := util.GetDB()` again and again within each subsequent function.
+
+
+### Usage of Higher Order Functions
+
+* Subject to Golang conventions, the use of higher order functions and polymorphism in general is encouraged to help with making things more testable and refactorable.
+
+#### When To Use Higher Order Functions
+
+- When you need to inject dependencies (like setup.EconConfigLoader) into an HTTP handler.
+- When you want to create reusable, customizable behavior.
+- When you want better testability (mocking dependencies easily).
+- When you want clean separation between configuration/setup and actual execution.
+
+#### When Not To Use Higher Order Functions
+
+- When there is no meaningful dependency that needs to be passed.
+- When it makes the code unnecessarily complex.
+- When simple handler functions would be more readable and sufficient.

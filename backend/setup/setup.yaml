@@ -4,6 +4,7 @@ economics:
     initialMarketSubsidization: 10
     initialMarketYes: 0
     initialMarketNo: 0
+    minimumFutureHours: 1.0
   marketincentives:
     createMarketCost: 10
     traderBonus: 1
@@ -12,6 +13,7 @@ economics:
     maximumDebtAllowed: 500
   betting:
     minimumBet: 1
+    maxDustPerSale: 2
     betFees:
       initialBetFee: 1
       buySharesFee: 0

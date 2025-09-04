@@ -10,11 +10,26 @@ import (
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
+	"time"
 )
 
 const maxQuestionTitleLength = 160
+
+// validateMarketResolutionTime validates that the market resolution time meets business logic requirements
+func validateMarketResolutionTime(resolutionTime time.Time, config *setup.EconomicConfig) error {
+	now := time.Now()
+	minimumDuration := time.Duration(config.Economics.MarketCreation.MinimumFutureHours * float64(time.Hour))
+	minimumFutureTime := now.Add(minimumDuration)
+
+	if resolutionTime.Before(minimumFutureTime) || resolutionTime.Equal(minimumFutureTime) {
+		return fmt.Errorf("market resolution time must be at least %.1f hours in the future",
+			config.Economics.MarketCreation.MinimumFutureHours)
+	}
+	return nil
+}
 
 func checkQuestionTitleLength(title string) error {
 	if len(title) > maxQuestionTitleLength || len(title) < 1 {
@@ -37,6 +52,9 @@ func CreateMarketHandler(loadEconConfig setup.EconConfigLoader) func(http.Respon
 			return
 		}
 
+		// Initialize security service
+		securityService := security.NewSecurityService()
+
 		// Use database connection, validate user based upon token
 		db := util.GetDB()
 		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
@@ -57,6 +75,24 @@ func CreateMarketHandler(loadEconConfig setup.EconConfigLoader) func(http.Respon
 			return
 		}
 
+		// Validate and sanitize market input using security service
+		marketInput := security.MarketInput{
+			Title:       newMarket.QuestionTitle,
+			Description: newMarket.Description,
+			EndTime:     newMarket.ResolutionDateTime.String(), // Convert time to string for validation
+		}
+
+		sanitizedMarketInput, err := securityService.ValidateAndSanitizeMarketInput(marketInput)
+		if err != nil {
+			http.Error(w, "Invalid market data: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Update the market with sanitized data
+		newMarket.QuestionTitle = sanitizedMarketInput.Title
+		newMarket.Description = sanitizedMarketInput.Description
+
+		// Additional legacy validations (kept for backwards compatibility)
 		if err = checkQuestionTitleLength(newMarket.QuestionTitle); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -77,6 +113,12 @@ func CreateMarketHandler(loadEconConfig setup.EconConfigLoader) func(http.Respon
 		}
 
 		appConfig := loadEconConfig()
+
+		// Business logic validation: Check market resolution time
+		if err = validateMarketResolutionTime(newMarket.ResolutionDateTime, appConfig); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
 		// Subtract any Market Creation Fees from Creator, up to maximum debt
 		marketCreateFee := appConfig.Economics.MarketIncentives.CreateMarketCost

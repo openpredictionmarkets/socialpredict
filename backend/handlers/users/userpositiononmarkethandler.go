@@ -3,7 +3,7 @@ package usershandlers
 import (
 	"encoding/json"
 	"net/http"
-	"socialpredict/handlers/positions"
+	positionsmath "socialpredict/handlers/math/positions"
 	"socialpredict/middleware"
 	"socialpredict/util"
 
@@ -22,7 +22,7 @@ func UserMarketPositionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userPosition, err := positions.CalculateMarketPositionForUser_WPAM_DBPM(db, marketId, user.Username)
+	userPosition, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(db, marketId, user.Username)
 	if err != nil {
 		http.Error(w, "Error calculating user market position: "+err.Error(), http.StatusInternalServerError)
 		return
