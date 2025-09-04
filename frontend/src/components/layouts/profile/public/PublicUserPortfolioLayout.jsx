@@ -11,7 +11,7 @@ const PublicUserPortfolioLayout = ({ username, userData }) => {
     useEffect(() => {
         const fetchPortfolio = async () => {
             console.log(`Fetching portfolio for user: ${username} from ${API_URL}/api/v0/portfolio/${username}`);
-            const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`);
+            const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
             if (response.ok) {
                 const data = await response.json();
                 console.log('Portfolio data:', data);
