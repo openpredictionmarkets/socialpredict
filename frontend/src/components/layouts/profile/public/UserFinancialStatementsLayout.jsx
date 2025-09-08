@@ -11,7 +11,7 @@ const UserFinancialStatementsLayout = ({ username }) => {
         const fetchFinancialData = async () => {
             try {
                 console.log(`Fetching financial data for user: ${username} from ${API_URL}/api/v0/users/${username}/financial`);
-                const response = await fetch(`${API_URL}/api/v0/users/${username}/financial`);
+                const response = await fetch(`${API_URL}/v0/users/${username}/financial`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log('Financial data:', data);

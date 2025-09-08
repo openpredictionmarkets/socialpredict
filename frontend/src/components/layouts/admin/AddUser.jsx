@@ -17,7 +17,7 @@ function AdminAddUser() {
         event.preventDefault();
         setError('');
         try {
-            const response = await fetch(`${API_URL}/api/v0/admin/createuser`, {
+            const response = await fetch(`${API_URL}/v0/admin/createuser`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
