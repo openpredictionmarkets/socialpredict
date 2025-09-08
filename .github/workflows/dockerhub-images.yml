@@ -1,4 +1,6 @@
 name: Docker Hub images - build & push
+permissions:
+  contents: read
 on:
   push:
     branches:
