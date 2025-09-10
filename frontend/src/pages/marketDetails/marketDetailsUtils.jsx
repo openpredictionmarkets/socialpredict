@@ -10,7 +10,7 @@ export const useFetchMarketData = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch(`${API_URL}/api/v0/markets/${marketId}`);
+                const response = await fetch(`${API_URL}/v0/markets/${marketId}`);
                 const data = await response.json();
                 setDetails(data);
             } catch (error) {

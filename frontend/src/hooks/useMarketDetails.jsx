@@ -31,7 +31,7 @@ export const useMarketDetails = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/v0/markets/${marketId}`);
+        const response = await fetch(`${API_URL}/v0/markets/${marketId}`);
         if (!response.ok) {
           throw new Error('Failed to fetch market data');
         }

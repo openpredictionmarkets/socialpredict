@@ -1,0 +1,4 @@
+window.__ENV__ = {
+  DOMAIN_URL: "${DOMAIN_URL:-http://localhost}",
+  API_URL: "${API_URL:-http://localhost:8080}"
+};
