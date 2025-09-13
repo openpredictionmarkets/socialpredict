@@ -37,6 +37,10 @@ We welcome and appreciate every contribution. Get started by reading our [guide]
 - Look at our [Issues](https://github.com/openpredictionmarkets/socialpredict/issues)
 - Have your say on [GitHub Discussions](https://github.com/orgs/openpredictionmarkets/discussions)
 
+#### Note
+
+SocialPredict is designed to be performant on 64-bit systems. If you get it up and running on a 32-bit system, or you're trying to, let us know!
+
 ### Join us in shaping the future of prediction markets by building connections and expertise within your community!
 
 ## Used By
