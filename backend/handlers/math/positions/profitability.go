@@ -13,6 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// Define a constant for the maximum value of uint for static analysis (CodeQL)
+const maxUintValue uint64 = 4294967295 // For 32-bit systems; adjust for 64-bit if needed
 // UserProfitability represents a user's profitability data for a specific market
 type UserProfitability struct {
 	Username       string    `json:"username"`
@@ -89,8 +91,8 @@ func CalculateMarketLeaderboard(db *gorm.DB, marketIdStr string) ([]UserProfitab
 		return nil, err
 	}
 
-	// Check that marketIDUint64 fits in uint (security vulnerability fix)
-	if marketIDUint64 > uint64(math.MaxUint) {
+	// Check that marketIDUint64 fits in uint using explicit constant bound (security vulnerability fix)
+	if marketIDUint64 > maxUintValue {
 		err := errors.New("marketId out of range for uint")
 		ErrorLogger(err, "marketIdStr is too large for uint.")
 		return nil, err
