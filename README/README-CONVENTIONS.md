@@ -160,9 +160,25 @@ db := util.GetDB()
 
 #### Recommended Implementation
 
-Use named constants to make the platform detection logic clear and self-documenting:
+**Option A: Direct Maximum Value Comparison (Recommended for Most Cases)**
+
+This is the simplest and most readable approach:
 
 ```go
+// 32-bit platform compatibility check (Convention CONV-32BIT-001)
+// Ensure valueUint64 fits in a uint before casting
+if valueUint64 > uint64(^uint(0)) {
+    return errors.New("value exceeds allowed range for uint platform type")
+}
+valueUint := uint(valueUint64)
+```
+
+**Option B: Named Constants with Platform Detection (For Educational/Complex Cases)**
+
+Use this when you need to understand or document the platform detection mechanism:
+
+```go
+// 32-bit platform compatibility check (Convention CONV-32BIT-001)
 // Platform detection constants for 32-bit compatibility check
 const (
     bitsInByte = 8
@@ -183,6 +199,10 @@ if isPlatform32Bit && valueUint64 > math.MaxUint32 {
 }
 valueUint := uint(valueUint64)
 ```
+
+**When to Use Each Approach:**
+- **Option A**: Use for most cases - simpler, more readable, equally effective
+- **Option B**: Use when the platform detection logic needs to be explicit for educational purposes or when working with security-critical code where the mechanism should be transparent
 
 #### What NOT To Do (Avoid Magic Numbers)
 

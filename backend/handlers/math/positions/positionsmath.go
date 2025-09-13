@@ -1,7 +1,7 @@
 package positionsmath
 
 import (
-	"socialpredict/errors"
+	"errors"
 	"socialpredict/handlers/marketpublicresponse"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/outcomes/dbpm"
@@ -9,6 +9,8 @@ import (
 	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
 	"strconv"
+
+	spErrors "socialpredict/errors"
 
 	"gorm.io/gorm"
 )
@@ -39,15 +41,20 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 
 	// marketIDUint for needed areas
 	marketIDUint64, err := strconv.ParseUint(marketIdStr, 10, 64)
-	if errors.ErrorLogger(err, "Can't convert string.") {
+	if spErrors.ErrorLogger(err, "Can't convert string.") {
 		return nil, err
 	}
 
+	// 32-bit platform compatibility check (Convention CONV-32BIT-001)
+	// Ensure marketIDUint64 fits in a uint before casting
+	if marketIDUint64 > uint64(^uint(0)) {
+		return nil, errors.New("marketIdStr value exceeds allowed range for uint platform type")
+	}
 	marketIDUint := uint(marketIDUint64)
 
 	// Assuming a function to fetch the market creation time
 	publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketIdStr)
-	if errors.ErrorLogger(err, "Can't convert marketIdStr to publicResponseMarket.") {
+	if spErrors.ErrorLogger(err, "Can't convert marketIdStr to publicResponseMarket.") {
 		return nil, err
 	}
 
