@@ -11,6 +11,7 @@ import (
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
+	"math"
 
 	"github.com/gorilla/mux"
 )
@@ -36,6 +37,11 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the parsed uint64 fits into platform uint
+	if uintSize := 32 << (^uint(0) >> 63); uintSize == 32 && marketIDUint64 > math.MaxUint32 {
+		http.Error(w, "Market ID out of range", http.StatusBadRequest)
+		return
+	}
 	marketIDUint := uint(marketIDUint64)
 
 	// open up database to utilize connection pooling
