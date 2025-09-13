@@ -43,6 +43,10 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 		return nil, err
 	}
 
+	// Ensure marketIDUint64 fits in a uint before casting
+	if marketIDUint64 > uint64(^uint(0)) {
+		return nil, errors.New("marketIdStr value exceeds allowed range for uint platform type")
+	}
 	marketIDUint := uint(marketIDUint64)
 
 	// Assuming a function to fetch the market creation time
