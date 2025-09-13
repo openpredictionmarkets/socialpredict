@@ -2,6 +2,7 @@ package marketshandlers
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"socialpredict/handlers/marketpublicresponse"
 	marketmath "socialpredict/handlers/math/market"
@@ -36,6 +37,25 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 32-bit platform compatibility check (Convention CONV-32BIT-001 in README-CONVENTIONS.md)
+	// Platform detection constants for 32-bit compatibility check
+	const (
+		bitsInByte                  = 8
+		bytesInUint32               = 4
+		rightShiftFor64BitDetection = 63
+		baseBitWidth                = 32
+	)
+
+	// Detect platform bit width using named constants
+	maxUintValue := ^uint(0)
+	platformBitWidth := baseBitWidth << (maxUintValue >> rightShiftFor64BitDetection)
+	isPlatform32Bit := platformBitWidth == baseBitWidth
+
+	// Validate that the uint64 value fits in platform uint
+	if isPlatform32Bit && marketIDUint64 > math.MaxUint32 {
+		http.Error(w, "Market ID out of range", http.StatusBadRequest)
+		return
+	}
 	marketIDUint := uint(marketIDUint64)
 
 	// open up database to utilize connection pooling
