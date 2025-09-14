@@ -38,7 +38,6 @@ func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 32-bit platform compatibility check (Convention CONV-32BIT-001 in README-CONVENTIONS.md)
-	// Check if the parsed uint64 value fits in the platform's uint type
 	// Platform detection constants for 32-bit compatibility check
 	const (
 		bitsInByte                  = 8
