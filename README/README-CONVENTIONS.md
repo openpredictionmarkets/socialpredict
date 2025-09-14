@@ -144,3 +144,87 @@ db := util.GetDB()
 - When there is no meaningful dependency that needs to be passed.
 - When it makes the code unnecessarily complex.
 - When simple handler functions would be more readable and sufficient.
+
+### 32-Bit Platform Compatibility
+
+**Convention UUID: CONV-32BIT-001**
+
+* When parsing string values to uint64 and then converting to platform-specific uint types, always validate that the value fits within the platform's uint size to prevent overflow on 32-bit systems.
+* This convention addresses security concerns identified by GitHub's CodeQL analysis and ensures cross-platform compatibility.
+
+#### The Problem
+
+* On 64-bit platforms, `uint` is 64 bits and can hold any `uint64` value safely.
+* On 32-bit platforms, `uint` is only 32 bits, so large `uint64` values will overflow when converted to `uint`.
+* Direct conversion without validation can lead to unexpected behavior and potential security issues.
+
+#### Recommended Implementation
+
+**Option A: Direct Maximum Value Comparison (Recommended for Most Cases)**
+
+This is the simplest and most readable approach:
+
+```go
+// 32-bit platform compatibility check (Convention CONV-32BIT-001)
+// Ensure valueUint64 fits in a uint before casting
+if valueUint64 > uint64(^uint(0)) {
+    return errors.New("value exceeds allowed range for uint platform type")
+}
+valueUint := uint(valueUint64)
+```
+
+**Option B: Named Constants with Platform Detection (For Educational/Complex Cases)**
+
+Use this when you need to understand or document the platform detection mechanism:
+
+```go
+// 32-bit platform compatibility check (Convention CONV-32BIT-001)
+// Platform detection constants for 32-bit compatibility check
+const (
+    bitsInByte = 8
+    bytesInUint32 = 4
+    rightShiftFor64BitDetection = 63
+    baseBitWidth = 32
+)
+
+// Detect platform bit width using named constants
+maxUintValue := ^uint(0)
+platformBitWidth := baseBitWidth << (maxUintValue >> rightShiftFor64BitDetection)
+isPlatform32Bit := platformBitWidth == baseBitWidth
+
+// Validate that the uint64 value fits in platform uint
+if isPlatform32Bit && valueUint64 > math.MaxUint32 {
+    http.Error(w, "Value out of range for platform", http.StatusBadRequest)
+    return
+}
+valueUint := uint(valueUint64)
+```
+
+**When to Use Each Approach:**
+- **Option A**: Use for most cases - simpler, more readable, equally effective
+- **Option B**: Use when the platform detection logic needs to be explicit for educational purposes or when working with security-critical code where the mechanism should be transparent
+
+#### What NOT To Do (Avoid Magic Numbers)
+
+```go
+// BAD: Uses magic numbers without explanation
+if uintSize := 32 << (^uint(0) >> 63); uintSize == 32 && valueUint64 > math.MaxUint32 {
+    // This is unclear and unmaintainable
+}
+```
+
+#### How The Platform Detection Works
+
+* `^uint(0)` creates the maximum value for the platform's uint type (all bits set to 1)
+* On 64-bit platforms: `^uint(0)` has 64 ones, so `>> 63` yields 1, making `32 << 1 = 64`
+* On 32-bit platforms: `^uint(0)` has 32 ones, so `>> 63` yields 0, making `32 << 0 = 32`
+* This allows runtime detection of whether we're on a 32-bit or 64-bit platform
+
+#### Usage Pattern
+
+Apply this pattern whenever:
+- Parsing string IDs to uint64 and then converting to uint
+- Handling user input that gets converted to platform-specific types
+- Working with numeric values that might exceed 32-bit limits
+
+To find all implementations of this convention, search for "Convention CONV-32BIT-001" in the codebase.
