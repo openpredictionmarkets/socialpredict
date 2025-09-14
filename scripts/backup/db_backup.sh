@@ -77,6 +77,12 @@ pg_dump_users_cmd() {
   echo "PGPASSWORD='${POSTGRES_PASSWORD}' pg_dump -U '${POSTGRES_USER}' -h 'localhost' -p '${POSTGRES_PORT}' -d '${POSTGRES_DATABASE}' --table=users --data-only --column-inserts"
 }
 
+pg_dump_users_reset_cmd() {
+  # pg_dump for users table with balance reset - uses a query to reset account_balance to initial_account_balance
+  local query="SELECT id, username, display_name, user_type, email, password, initial_account_balance, initial_account_balance as account_balance, personal_emoji, description, personal_link1, personal_link2, personal_link3, personal_link4, created_at, updated_at FROM users"
+  echo "PGPASSWORD='${POSTGRES_PASSWORD}' psql -U '${POSTGRES_USER}' -h 'localhost' -p '${POSTGRES_PORT}' -d '${POSTGRES_DATABASE}' -c \"COPY ($query) TO STDOUT WITH CSV HEADER;\""
+}
+
 pg_restore_cmd() {
   # pg_restore inside container; restore into same database; clean objects first
   echo "PGPASSWORD='${POSTGRES_PASSWORD}' pg_restore -U '${POSTGRES_USER}' -h 'localhost' -p '${POSTGRES_PORT}' -d '${POSTGRES_DATABASE}' --clean --if-exists"
@@ -97,18 +103,46 @@ latest_users_backup_file() {
 
 print_usage() {
   cat <<EOF
-Usage: ./SocialPredict backup [--save | --list | --latest | --restore <file> | --restore-latest | --help]
+Usage: ./SocialPredict backup [options]
 
-  --save             Create a new backup in $BACKUP_ROOT
-  --list             List available backups (newest first)
-  --latest           Print the path to the newest backup
-  --restore <file>   Restore the given .dump.gz into the running DB (with confirmation)
-  --restore-latest   Restore the newest backup (with confirmation)
-  --help             Show this help
+DATABASE BACKUP OPERATIONS:
+  --save                      Create a new full database backup
+  --list                      List available full database backups (newest first)
+  --latest                    Print the path to the newest full database backup
+  --restore <file>            Restore from specific full database backup file (with confirmation)
+  --restore-latest            Restore from the newest full database backup (with confirmation)
 
-Backups:
-  socialpredict_backup_${APP_ENV}_YYYYmmdd_HHMMSS.dump.gz
-  socialpredict_backup_${APP_ENV}_YYYYmmdd_HHMMSS.dump.gz.sha256
+USER-ONLY BACKUP OPERATIONS:
+  --save-users                Create a users-only backup (preserves current balances)
+  --save-users-reset          Create a users-only backup with balances reset to initial values (requires confirmation)
+  --list-users                List available users-only backups (newest first)
+  --latest-users              Print the path to the newest users-only backup
+  --restore-users <file>      Restore from specific users-only backup file (with confirmation)
+  --restore-users-latest      Restore from the newest users-only backup (with confirmation)
+
+OTHER:
+  --help, -h                  Show this help
+
+Backup Files Created:
+  Full Database:
+    socialpredict_backup_${APP_ENV}_YYYYmmdd_HHMMSS.dump.gz
+    socialpredict_backup_${APP_ENV}_YYYYmmdd_HHMMSS.dump.gz.sha256
+
+  Users Only (current balances):
+    socialpredict_users_${APP_ENV}_YYYYmmdd_HHMMSS.dump.gz
+    socialpredict_users_${APP_ENV}_YYYYmmdd_HHMMSS.dump.gz.sha256
+
+  Users Only (reset balances):
+    socialpredict_users_reset_${APP_ENV}_YYYYmmdd_HHMMSS.csv.gz
+    socialpredict_users_reset_${APP_ENV}_YYYYmmdd_HHMMSS.csv.gz.sha256
+
+All backups are stored in: $BACKUP_ROOT
+
+Examples:
+  ./SocialPredict backup --save-users          # Backup users with current balances
+  ./SocialPredict backup --save-users-reset    # Backup users with reset balances (requires 'RESET' confirmation)
+  ./SocialPredict backup --list-users          # List all users-only backups
+  ./SocialPredict backup --restore-users-latest # Restore newest users backup (requires 'RESTORE USERS' confirmation)
 EOF
 }
 
@@ -207,17 +241,180 @@ do_restore_latest() {
   do_restore_file "$latest"
 }
 
+do_save_users() {
+  need_container_running
+  local ts file tmpfile checksum
+  ts="$(timestamp)"
+  file="$BACKUP_ROOT/socialpredict_users_${APP_ENV}_${ts}.dump.gz"
+  tmpfile="${file}.partial"
+
+  echo "Creating users-only backup: $file"
+  echo "NOTE: This backup preserves current account balances."
+  
+  # Run pg_dump for users table only; stream to host; compress
+  if ! docker exec -i "$POSTGRES_CONTAINER_NAME" bash -c "$(pg_dump_users_cmd)" | gzip -c > "$tmpfile"; then
+    echo "ERROR: pg_dump failed."
+    rm -f "$tmpfile"
+    exit 1
+  fi
+
+  # Finalize: checksum + move
+  checksum="$(sha256_file "$tmpfile")"
+  echo "$checksum  $(basename "$file")" > "${file}.sha256"
+  mv "$tmpfile" "$file"
+
+  echo "Users backup complete:"
+  echo "  File: $file"
+  echo "  SHA256: $checksum"
+}
+
+do_save_users_reset() {
+  need_container_running
+  
+  echo "WARNING: This will create a users backup with all account balances RESET to initial values."
+  echo "Current balances will be lost in this backup."
+  echo
+  read -r -p "Are you sure you want to reset balances in this backup? (type 'RESET' to confirm): " answer
+  if [ "$answer" != "RESET" ]; then
+    echo "Aborted."
+    exit 1
+  fi
+
+  local ts file tmpfile checksum
+  ts="$(timestamp)"
+  file="$BACKUP_ROOT/socialpredict_users_reset_${APP_ENV}_${ts}.csv.gz"
+  tmpfile="${file}.partial"
+
+  echo "Creating users backup with reset balances: $file"
+  
+  # Run the CSV export with balance reset; stream to host; compress
+  if ! docker exec -i "$POSTGRES_CONTAINER_NAME" bash -c "$(pg_dump_users_reset_cmd)" | gzip -c > "$tmpfile"; then
+    echo "ERROR: CSV export failed."
+    rm -f "$tmpfile"
+    exit 1
+  fi
+
+  # Finalize: checksum + move
+  checksum="$(sha256_file "$tmpfile")"
+  echo "$checksum  $(basename "$file")" > "${file}.sha256"
+  mv "$tmpfile" "$file"
+
+  echo "Users backup with reset balances complete:"
+  echo "  File: $file"
+  echo "  SHA256: $checksum"
+}
+
+do_list_users() {
+  echo "User backups in $BACKUP_ROOT (newest first):"
+  echo
+  echo "Regular users backups (with current balances):"
+  ls -1t "$BACKUP_ROOT"/socialpredict_users_"${APP_ENV}"_*.dump.gz 2>/dev/null || echo "  (none found)"
+  echo
+  echo "Reset balance users backups:"
+  ls -1t "$BACKUP_ROOT"/socialpredict_users_reset_"${APP_ENV}"_*.csv.gz 2>/dev/null || echo "  (none found)"
+}
+
+do_latest_users() {
+  local latest
+  latest="$(latest_users_backup_file)"
+  if [ -z "$latest" ]; then
+    echo "(none)"
+  else
+    echo "$latest"
+  fi
+}
+
+confirm_users_restore() {
+  local file="$1"
+  echo "WARNING: About to RESTORE USERS into database '${POSTGRES_DATABASE}' inside container '${POSTGRES_CONTAINER_NAME}'."
+  echo "This will overwrite ALL EXISTING USER DATA including balances, profiles, etc."
+  echo
+  echo "Backup file: $file"
+  echo
+  read -r -p "Type 'RESTORE USERS' to proceed, or anything else to abort: " answer
+  if [ "$answer" != "RESTORE USERS" ]; then
+    echo "Aborted."
+    exit 1
+  fi
+}
+
+do_restore_users() {
+  local file="$1"
+  [ -f "$file" ] || { echo "ERROR: Users backup file not found: $file"; exit 1; }
+  need_container_running
+  confirm_users_restore "$file"
+
+  # Verify checksum if present
+  local sumfile="${file}.sha256"
+  if [ -f "$sumfile" ]; then
+    echo "Verifying checksum..."
+    local expected actual
+    expected="$(awk '{print $1}' "$sumfile")"
+    actual="$(sha256_file "$file")"
+    if [ "$expected" != "$actual" ]; then
+      echo "ERROR: Checksum mismatch! Expected=$expected Actual=$actual"
+      exit 1
+    fi
+    echo "Checksum OK."
+  fi
+
+  echo "Restoring users data..."
+  
+  # First, clear existing users table
+  if ! docker exec -i "$POSTGRES_CONTAINER_NAME" bash -c "$(psql_cmd) -c 'DELETE FROM users;'"; then
+    echo "ERROR: Failed to clear users table."
+    exit 1
+  fi
+
+  # Then restore users data
+  if [[ "$file" == *.csv.gz ]]; then
+    # Handle CSV format (reset balances)
+    echo "ERROR: CSV restore not yet implemented. Please use regular users backup format."
+    exit 1
+  else
+    # Handle SQL dump format
+    if ! gunzip -c "$file" | docker exec -i "$POSTGRES_CONTAINER_NAME" bash -c "$(psql_cmd)"; then
+      echo "ERROR: Users restore failed."
+      exit 1
+    fi
+  fi
+
+  echo "Users restore complete."
+}
+
+do_restore_users_latest() {
+  local latest
+  latest="$(latest_users_backup_file)"
+  if [ -z "$latest" ]; then
+    echo "ERROR: No users backups found in $BACKUP_ROOT"
+    exit 1
+  fi
+  do_restore_users "$latest"
+}
+
 # --- Main ---------------------------------------------------------------------
 ACTION="${1:-"--help"}"
 case "$ACTION" in
   --save)
     do_save
     ;;
+  --save-users)
+    do_save_users
+    ;;
+  --save-users-reset)
+    do_save_users_reset
+    ;;
   --list)
     do_list
     ;;
+  --list-users)
+    do_list_users
+    ;;
   --latest)
     do_latest
+    ;;
+  --latest-users)
+    do_latest_users
     ;;
   --restore)
     shift || true
@@ -226,6 +423,14 @@ case "$ACTION" in
     ;;
   --restore-latest)
     do_restore_latest
+    ;;
+  --restore-users)
+    shift || true
+    [ -n "${1:-}" ] || { echo "ERROR: --restore-users requires a file path"; exit 1; }
+    do_restore_users "$1"
+    ;;
+  --restore-users-latest)
+    do_restore_users_latest
     ;;
   --help|-h)
     print_usage
