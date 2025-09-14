@@ -72,13 +72,27 @@ pg_dump_cmd() {
   echo "PGPASSWORD='${POSTGRES_PASSWORD}' pg_dump -U '${POSTGRES_USER}' -h 'localhost' -p '${POSTGRES_PORT}' -d '${POSTGRES_DATABASE}' -Fc"
 }
 
+pg_dump_users_cmd() {
+  # pg_dump for users table only; data-only with inserts format for easier manipulation
+  echo "PGPASSWORD='${POSTGRES_PASSWORD}' pg_dump -U '${POSTGRES_USER}' -h 'localhost' -p '${POSTGRES_PORT}' -d '${POSTGRES_DATABASE}' --table=users --data-only --column-inserts"
+}
+
 pg_restore_cmd() {
   # pg_restore inside container; restore into same database; clean objects first
   echo "PGPASSWORD='${POSTGRES_PASSWORD}' pg_restore -U '${POSTGRES_USER}' -h 'localhost' -p '${POSTGRES_PORT}' -d '${POSTGRES_DATABASE}' --clean --if-exists"
 }
 
+psql_cmd() {
+  # psql command for direct SQL execution
+  echo "PGPASSWORD='${POSTGRES_PASSWORD}' psql -U '${POSTGRES_USER}' -h 'localhost' -p '${POSTGRES_PORT}' -d '${POSTGRES_DATABASE}'"
+}
+
 latest_backup_file() {
   ls -1t "$BACKUP_ROOT"/socialpredict_backup_"${APP_ENV}"_*.dump.gz 2>/dev/null | head -n 1 || true
+}
+
+latest_users_backup_file() {
+  ls -1t "$BACKUP_ROOT"/socialpredict_users_"${APP_ENV}"_*.dump.gz 2>/dev/null | head -n 1 || true
 }
 
 print_usage() {
