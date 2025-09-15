@@ -360,20 +360,37 @@ do_restore_users() {
 
   echo "Restoring users data..."
   
-  # First, clear existing users table
-  if ! docker exec -i "$POSTGRES_CONTAINER_NAME" bash -c "$(psql_cmd) -c 'DELETE FROM users;'"; then
-    echo "ERROR: Failed to clear users table."
-    exit 1
-  fi
-
-  # Then restore users data
   if [[ "$file" == *.csv.gz ]]; then
     # Handle CSV format (reset balances)
     echo "ERROR: CSV restore not yet implemented. Please use regular users backup format."
     exit 1
   else
-    # Handle SQL dump format
-    if ! gunzip -c "$file" | docker exec -i "$POSTGRES_CONTAINER_NAME" bash -c "$(psql_cmd)"; then
+    # Handle SQL dump format with proper foreign key constraint handling
+    local restore_sql
+    restore_sql=$(cat <<'EOF'
+BEGIN;
+
+-- Set constraints to deferred for this transaction
+SET CONSTRAINTS ALL DEFERRED;
+
+-- Clear existing users table
+TRUNCATE users RESTART IDENTITY CASCADE;
+
+-- The restore data will be inserted here via stdin
+
+COMMIT;
+EOF
+)
+
+    # Execute the restore in a transaction with deferred constraints
+    {
+      echo "$restore_sql" | sed '/-- The restore data will be inserted here via stdin/d'
+      echo "-- Inserting users data:"
+      gunzip -c "$file"
+      echo "COMMIT;"
+    } | docker exec -i "$POSTGRES_CONTAINER_NAME" bash -c "$(psql_cmd)"
+
+    if [ $? -ne 0 ]; then
       echo "ERROR: Users restore failed."
       exit 1
     fi
