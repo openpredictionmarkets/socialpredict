@@ -1,0 +1,36 @@
+// frontend/vite.config.mjs.template
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// Parse comma-separated host lists from env
+const parseHosts = (s) =>
+  (s || '')
+    .split(',')
+    .map(h => h.trim())
+    .filter(Boolean)
+
+const DEV_ALLOWED = parseHosts(process.env.VITE_DEV_ALLOWED_HOSTS)
+const PROD_ALLOWED = parseHosts(process.env.VITE_PROD_ALLOWED_HOSTS)
+
+export default defineConfig(({ mode }) => {
+  const isProd = mode === 'production'
+  const allowed = isProd ? PROD_ALLOWED : DEV_ALLOWED
+
+  return {
+    server: {
+      host: '0.0.0.0',
+      allowedHosts: allowed.length ? allowed : ['localhost', '127.0.0.1', 'frontend'],
+    },
+    preview: {
+      allowedHosts: allowed.length ? allowed : ['localhost'],
+    },
+    build: {
+      outDir: 'build',
+      commonjsOptions: { transformMixedEsModules: true },
+    },
+    plugins: [react()],
+    css: {
+      target: 'async',
+    },
+  }
+})

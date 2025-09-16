@@ -48,6 +48,15 @@ init_env() {
 
 	echo
 
+	# Add VITE_PROD_ALLOWED_HOSTS and VITE_DEV_ALLOWED_HOSTS if not present
+	if ! grep -q "^VITE_PROD_ALLOWED_HOSTS=" .env; then
+	  echo "VITE_PROD_ALLOWED_HOSTS='${domain_answer},www.${domain_answer}'" >> .env
+	fi
+
+	if ! grep -q "^VITE_DEV_ALLOWED_HOSTS=" .env; then
+	  echo "VITE_DEV_ALLOWED_HOSTS='localhost,127.0.0.1,frontend'" >> .env
+	fi
+
 	# Update email address
 	read -r -p "What email address do you wish to use for the SSL Certificate? " email_answer
 	while [ -z "$email_answer" ]

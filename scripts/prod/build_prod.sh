@@ -15,12 +15,27 @@ frontend_api_uri() {
 	envsubst < $template > $file
 }
 
+# Function to generate vite.config.mjs from template
+frontend_vite_allowed_hosts() {
+  local template="$SCRIPT_DIR/frontend/vite.config.mjs.template"
+  local file="$SCRIPT_DIR/frontend/vite.config.mjs"
+
+  # Ensure env vars are set
+  export VITE_DEV_ALLOWED_HOSTS="${VITE_DEV_ALLOWED_HOSTS:-localhost,127.0.0.1,frontend}"
+  export VITE_PROD_ALLOWED_HOSTS="${VITE_PROD_ALLOWED_HOSTS:-$DOMAIN,www.$DOMAIN}"
+
+  envsubst < "$template" > "$file"
+}
+
 # Function to build frontend image
 build_frontend() {
         echo "### Building Frontend Image ..."
 
 	# Update API_URI
 	frontend_api_uri
+
+	# Generate vite.config.mjs
+	frontend_vite_allowed_hosts
 
         # Get frontend directory
         FRONTEND_DIR="$( readlink -f "$SCRIPT_DIR/frontend" )"
