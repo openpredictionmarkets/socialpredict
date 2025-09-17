@@ -2,54 +2,56 @@
 
 This is the frontend application for SocialPredict, built with React and Vite.
 
-## Getting Started
+This gets you started with running only the frontend using Docker.
 
-### Prerequisites
+#### Prerequisites
 
-- **Node.js**: Version 21.0.0 or higher
-- **npm**: Comes with Node.js
+- **Docker**: Version 20.10 or higher
+- **Docker Compose**: Version 2.0 or higher
 
-### Installation
+#### Running with Docker
 
-1. **Install dependencies:**
+1. **Build the frontend Docker image:**
+
    ```bash
-   npm install
+   cd /path/to/socialpredict
+   cd frontend
+   docker build -t socialpredict .
    ```
 
-### Development
+2. **Run the frontend container:**
 
-2. **Start the development server:**
    ```bash
-   npm start
+   docker run -d -p 5173:5173 socialpredict
    ```
 
    This will start the Vite development server with the following features:
+
    - **Port**: Typically runs on `http://localhost:5173` (Vite's default port)
-   - **Host**: Accessible from other devices on your network (due to `--host` flag)
+   - **Host**: Accessible from other devices on your network
    - **Hot reload**: Automatic reloading when files change
    - **Fast builds**: Vite's lightning-fast development experience
 
-3. **Open your browser:**
-   Navigate to `http://localhost:5173` to view the application.
+3. **Access the application:**
+   Navigate to `http://localhost:5173` on your browser to view the application.
 
-### Available Scripts
-
-- **`npm start`** or **`vite --host`**: Start the development server
-- **`npm run build`** or **`vite build`**: Build the app for production
-- **`npm run serve`** or **`vite preview`**: Preview the production build
+4. **When ready, stop the container:**
+   ```bash
+   docker stop $(docker ps -n 1 -a -q)
+   ```
 
 ### Mobile Responsiveness
 
 The application is fully responsive and includes:
+
 - Mobile-optimized navigation with hamburger menu
 - Touch-friendly interface
 - Responsive design for all screen sizes
 
-### Technology Stack
+### Tech Stack
 
 - **React 18**: UI framework
 - **Vite**: Build tool and development server
 - **Tailwind CSS**: Styling
 - **React Router**: Client-side routing
 - **Chart.js & Recharts**: Data visualization
-
