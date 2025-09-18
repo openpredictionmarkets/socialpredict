@@ -13,7 +13,7 @@ const PortfolioTabContent = ({ username }) => {
         const fetchPositions = async () => {
             try {
                 console.log(`Fetching portfolio for: ${username} from ${API_URL}/api/v0/portfolio/${username}`);
-                const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`);
+                const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log('Portfolio data:', data);
