@@ -45,12 +45,23 @@ function ChangePasswordLayout() {
                 },
                 body: JSON.stringify({ currentPassword, newPassword })
             });
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to change password');
+                let errorMessage = 'Failed to change password';
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } else {
+                    const errorText = await response.text();
+                    errorMessage = errorText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
+
             // Set success message
             setSuccess("Password changed successfully! Logging out. Please log in with your new password.");
+
             // Logout user and redirect to login page after a short delay
             setTimeout(() => {
                 logout();
@@ -88,12 +99,13 @@ function ChangePasswordLayout() {
                     placeholder="Confirm New Password"
                     required
                 />
+                {/* fix: this is toggling between two button styles. is this intentional? should it be a flash to indicate the bottom was pressed kind of like an animation instead? */}
                 <SiteButton type="submit">
                     Save New Password
                 </SiteButton>
             </form>
             {success && <p className="text-green-500">{success}</p>}
-            {error && <p className="error">{error}</p>}
+            {error && <p className="text-red-500">{error}</p>}
         </div>
     );
 }
