@@ -18,9 +18,9 @@ func SellPositionHandler(loadEconConfig setup.EconConfigLoader) func(w http.Resp
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
-		if httperr != nil {
-			http.Error(w, httperr.Error(), httperr.StatusCode)
+		user, httpErr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+		if httpErr != nil {
+			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return
 		}
 

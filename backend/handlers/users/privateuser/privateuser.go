@@ -31,9 +31,9 @@ func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
 	db := util.GetDB()
 
 	// Validate the token and get the user
-	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
-	if httperr != nil {
-		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
+	user, httpErr := middleware.ValidateTokenAndGetUser(r, db)
+	if httpErr != nil {
+		http.Error(w, "Invalid token: "+httpErr.Error(), http.StatusUnauthorized)
 		return
 	}
 
