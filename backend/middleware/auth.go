@@ -45,20 +45,24 @@ func ValidateTokenAndGetUser(r *http.Request, db *gorm.DB) (*models.User, *HTTPE
 		return getJWTKey(), nil
 	})
 	if err != nil {
-		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
+		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Error parsing token: " + err.Error()} // fix: this will be reached if the current password is incorrect, but the "new password" field value and "confirm new password" field value are matching (includes empty values). this is probably accurate and meaningful to the user. But is it a security risk to say "the current password is incorrect"?
 	}
 
 	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
 		var user models.User
 		result := db.Where("username = ?", claims.Username).First(&user)
+
 		if result.Error != nil {
 			return nil, &HTTPError{StatusCode: http.StatusNotFound, Message: "User not found"}
 		}
+
 		if user.UserType == "ADMIN" {
 			return nil, &HTTPError{StatusCode: http.StatusForbidden, Message: "Access denied for ADMIN users"}
 		}
+
 		return &user, nil
 	}
+
 	return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
 }
 

@@ -16,9 +16,9 @@ import (
 func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
-		if httperr != nil {
-			http.Error(w, httperr.Error(), httperr.StatusCode)
+		user, httpErr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+		if httpErr != nil {
+			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return
 		}
 
