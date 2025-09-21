@@ -24,6 +24,47 @@ check_username_strength() {
     fi
 }
 
+# Render PROD allowedHosts into frontend/vite.config.mjs from the template,
+# using DOMAIN (and optional PROD_EXTRA_ALLOWED) from your deploy env file.
+render_vite_config_prod() {
+	local env_file="${1:-${ENV_PATH:-}}"
+	
+	if [[ -z "${env_file}" || ! -f "${env_file}" ]]; then
+		echo "ERROR: Supply path to deploy .env (arg #1) or set ENV_PATH to a valid file." >&2
+		return 1
+	fi
+
+	local root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+	local tpl="${root_dir}/frontend/vite.config.mjs.template"
+	local out="${root_dir}/frontend/vite.config.mjs"
+
+	# shellcheck disable=SC1090
+	. "${env_file}"
+
+	: "${DOMAIN:?DOMAIN must be set in ${env_file}}"
+	local prod_extra_allowed="${PROD_EXTRA_ALLOWED:-}"
+
+	# Build host list: apex + www + extras (comma/space separated), dedup
+	join_unique_csv() {
+		echo "$1" | tr ' ,' '\n' | sed '/^$/d' | awk '!seen[$0]++' | paste -sd',' -
+	}
+
+	local base="${DOMAIN},www.${DOMAIN}"
+	local all_csv="$(join_unique_csv "${base},${prod_extra_allowed}")"
+
+	# CSV -> "a","b","c"
+	local js_items="$(awk -v csv="$all_csv" 'BEGIN{
+		n=split(csv, a, /,/);
+		for(i=1;i<=n;i++){gsub(/^ +| +$/,"",a[i]); if(a[i]!=""){printf "\"%s\"%s", a[i], (i<n?", ":"")}}
+	}')"
+
+	mkdir -p "$(dirname "$out")"
+	sed -e "s|__PROD_ALLOWED_HOSTS__|${js_items}|g" "$tpl" > "$out"
+
+	echo "Rendered ${out}"
+	echo "PROD allowedHosts => [${js_items}]"
+}
+
 # Function to create and update .env file
 init_env() {
 	# Create .env file

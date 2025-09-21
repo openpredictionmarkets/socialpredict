@@ -15,16 +15,15 @@ frontend_api_uri() {
 	envsubst < $template > $file
 }
 
-# Function to generate vite.config.mjs from template
+# Function to generate vite.config.mjs from template using the new templating system
 frontend_vite_allowed_hosts() {
-  local template="$SCRIPT_DIR/frontend/vite.config.mjs.template"
-  local file="$SCRIPT_DIR/frontend/vite.config.mjs"
-
-  # Ensure env vars are set
-  export VITE_DEV_ALLOWED_HOSTS="${VITE_DEV_ALLOWED_HOSTS:-localhost,127.0.0.1,frontend}"
-  export VITE_PROD_ALLOWED_HOSTS="${VITE_PROD_ALLOWED_HOSTS:-$DOMAIN,www.$DOMAIN}"
-
-  envsubst < "$template" > "$file"
+	# Source the render function from env_writer_prod.sh
+	local env_writer_script="$SCRIPT_DIR/scripts/prod/env_writer_prod.sh"
+	# shellcheck disable=SC1090
+	source "$env_writer_script"
+	
+	# Call the render function with the .env file path
+	render_vite_config_prod "$SCRIPT_DIR/.env"
 }
 
 # Function to build frontend image
