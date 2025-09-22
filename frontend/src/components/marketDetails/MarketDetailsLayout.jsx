@@ -176,7 +176,7 @@ function MarketDetailsTable({
       )}
 
       {/* Spacer so content doesn't sit under the CTA */}
-      <div className="h-24 md:hidden" />
+      <div className="h-32 md:hidden" />
 
       {/* Shared Trade Modal */}
       {showBetModal && (

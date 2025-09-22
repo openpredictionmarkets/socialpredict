@@ -30,6 +30,7 @@ import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import { SharesBadge } from '../../components/buttons/trade/SellButtons';
 import ExpandableText from '../../components/utils/ExpandableText';
 import ExpandableLink from '../../components/utils/ExpandableLink';
+import TradeCTA from '../../components/TradeCTA';
 
 const Style = () => {
   const [isSelected, setIsSelected] = useState(false);
@@ -640,6 +641,20 @@ const Style = () => {
             <td className='px-6 py-4 text-sm text-gray-500'>Expandable Link (Table Use)</td>
             <td className='px-6 py-4 text-sm font-mono text-gray-500'>
               <code>{`import ExpandableLink from '../../components/utils/ExpandableLink';`}</code>
+            </td>
+          </tr>
+          <tr>
+            <td className='px-6 py-4'>
+              <div className='flex flex-wrap items-center gap-4'>
+                <TradeCTA
+                  onClick={() => setIsSelected(!isSelected)}
+                  disabled={false}
+                />
+              </div>
+            </td>
+            <td className='px-6 py-4 text-sm text-gray-500'>Mobile Trade CTA</td>
+            <td className='px-6 py-4 text-sm font-mono text-gray-500'>
+              <code>{`import TradeCTA from '../../components/TradeCTA';`}</code>
             </td>
           </tr>
         </tbody>
