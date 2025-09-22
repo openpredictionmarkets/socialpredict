@@ -4,6 +4,9 @@ import MarketChart from '../charts/MarketChart';
 import ActivityTabs from '../../components/tabs/ActivityTabs';
 import ResolveModalButton from '../modals/resolution/ResolveModal';
 import BetModalButton from '../modals/bet/BetModal';
+import TradeCTA from '../TradeCTA';
+import TradeTabs from '../../components/tabs/TradeTabs';
+import { BetButton } from '../buttons/trade/BetButtons';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 
 function MarketDetailsTable({
@@ -21,6 +24,18 @@ function MarketDetailsTable({
   refetchData,
 }) {
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showBetModal, setShowBetModal] = useState(false);
+
+  const toggleBetModal = () => setShowBetModal(prev => !prev);
+
+  const handleTransactionSuccess = () => {
+    setShowBetModal(false);  // Close modal
+    if (refetchData) {
+      refetchData();  // Trigger data refresh
+    }
+  };
+
+  const shouldShowTradeButtons = !market.isResolved && isLoggedIn && new Date(market.resolutionDateTime) > new Date();
 
   return (
     <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
@@ -144,20 +159,40 @@ function MarketDetailsTable({
             className='text-xs px-4 py-2'
           />
         )}
-        {!market.isResolved && isLoggedIn && new Date(market.resolutionDateTime) > new Date() && (
-          <BetModalButton
-            marketId={marketId}
-            token={token}
-            disabled={!token}
-            onTransactionSuccess={refetchData}
-            className='text-xs px-4 py-2'
-          />
+        {shouldShowTradeButtons && (
+          <div className="hidden md:block">
+            <BetButton onClick={toggleBetModal} className="text-xs px-4 py-2" />
+          </div>
         )}
       </div>
 
-      <div className='mx-auto w-full'>
+      <div className='mx-auto w-full mb-4'>
         <ActivityTabs marketId={marketId} />
       </div>
+
+      {/* Mobile floating CTA */}
+      {shouldShowTradeButtons && (
+        <TradeCTA onClick={toggleBetModal} disabled={!token} />
+      )}
+
+      {/* Spacer so content doesn't sit under the CTA */}
+      <div className="h-24 md:hidden" />
+
+      {/* Shared Trade Modal */}
+      {showBetModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bet-modal relative bg-blue-900 p-6 rounded-lg text-white m-6 mx-auto" style={{ width: '350px' }}>
+            <TradeTabs
+              marketId={marketId}
+              token={token}
+              onTransactionSuccess={handleTransactionSuccess}
+            />
+            <button onClick={toggleBetModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
