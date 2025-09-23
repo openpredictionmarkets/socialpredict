@@ -15,12 +15,26 @@ frontend_api_uri() {
 	envsubst < $template > $file
 }
 
+# Function to generate vite.config.mjs from template using the new templating system
+frontend_vite_allowed_hosts() {
+	# Source the render function from env_writer_prod.sh
+	local env_writer_script="$SCRIPT_DIR/scripts/prod/env_writer_prod.sh"
+	# shellcheck disable=SC1090
+	source "$env_writer_script"
+	
+	# Call the render function with the .env file path
+	render_vite_config_prod "$SCRIPT_DIR/.env"
+}
+
 # Function to build frontend image
 build_frontend() {
         echo "### Building Frontend Image ..."
 
 	# Update API_URI
 	frontend_api_uri
+
+	# Generate vite.config.mjs
+	frontend_vite_allowed_hosts
 
         # Get frontend directory
         FRONTEND_DIR="$( readlink -f "$SCRIPT_DIR/frontend" )"
