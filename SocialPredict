@@ -57,6 +57,45 @@ source_env() {
         fi
 }
 
+# Function to display help information
+print_help() {
+        cat <<EOF
+Usage: ./SocialPredict <command> [options]
+
+SocialPredict - Database-driven prediction market platform
+
+Commands:
+  install                 Interactive installation and setup
+  up                      Start all services (Docker containers)
+  down                    Stop all services (Docker containers)
+  exec <container> [cmd]  Execute commands inside containers
+  backup [options]        Database backup and restore operations
+  --help, -h              Show this help message
+
+Backup Operations:
+  backup --save           Create a new full database backup
+  backup --save-users     Create a users-only backup (preserves current balances)
+  backup --save-users-reset Create a users-only backup with balances reset (requires confirmation)
+  backup --list           List all available full database backups
+  backup --list-users     List all available users-only backups
+  backup --latest         Show path to the newest full database backup
+  backup --restore <file> Restore from specific full database backup file
+  backup --restore-latest Restore from the newest full database backup
+  backup --restore-users <file> Restore from specific users-only backup file
+  backup --help           Show detailed backup help with all options
+
+Examples:
+  ./SocialPredict install           # First-time setup
+  ./SocialPredict up                # Start the application
+  ./SocialPredict backup --save     # Create a backup
+  ./SocialPredict backup --list     # List backups
+  ./SocialPredict exec backend bash # Access backend container
+  ./SocialPredict down              # Stop the application
+
+For detailed backup options, run: ./SocialPredict backup --help
+EOF
+}
+
 if [ "$1" = "install" ]; then
 	# Echo initial message
 	echo "### Building and Deploying SocialPredict ..."
@@ -157,4 +196,19 @@ if [ "$1" = "backup" ]; then
 	# Pass remaining args to the backup script, e.g. --save / --list / --restore <file> / --restore-latest
 	source "$SCRIPT_DIR/scripts/backup/db_backup.sh" "$@"
 	unset CALLED_FROM_SOCIALPREDICT
+	exit 0
+fi
+
+# Help command or no arguments
+if [ "$1" = "--help" ] || [ "$1" = "-h" ] || [ -z "$1" ]; then
+	print_help
+	exit 0
+fi
+
+# Unknown command
+if [ -n "$1" ]; then
+	echo "Unknown command: $1"
+	echo
+	print_help
+	exit 1
 fi
