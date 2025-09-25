@@ -57,9 +57,9 @@ func CreateMarketHandler(loadEconConfig setup.EconConfigLoader) func(http.Respon
 
 		// Use database connection, validate user based upon token
 		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
-		if httperr != nil {
-			http.Error(w, httperr.Error(), httperr.StatusCode)
+		user, httpErr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+		if httpErr != nil {
+			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return
 		}
 

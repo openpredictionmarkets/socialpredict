@@ -36,3 +36,5 @@ go.work
 
 # Keys
 .playground_key_pointer
+
+.prettierignore
