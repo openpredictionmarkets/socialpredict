@@ -108,7 +108,7 @@ sleep 1;
 
 # Pull remaining images
 echo "Pulling remaining images ..."
-$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-prod.yaml" pull db webserver certbot
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-prod.yaml" pull db webserver
 echo
 
 echo "Images built."

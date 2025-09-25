@@ -4,16 +4,13 @@ services:
     container_name: ${POSTGRES_CONTAINER_NAME}
     image: postgres:16.6-alpine3.20
     environment:
-      #      ENVIRONMENT: ${APP_ENV}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DATABASE}
     volumes:
       - ../data/postgres:/var/lib/postgresql/data
-    ports:
-      - "${DB_PORT}:${POSTGRES_PORT}"
     networks:
-      - database_network
+      - internal_network
     env_file:
       - ${ENV_PATH}
 
@@ -26,16 +23,13 @@ services:
       DB_HOST: db
       DB_USER: ${POSTGRES_USER}
       DB_PASS: ${POSTGRES_PASSWORD}
-    ports:
-      - "${BACKEND_HOSTPORT}:${BACKEND_PORT}"
     volumes:
       - ../backend:/backend
       - ${ENV_PATH}:/backend/.env.dev
     command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
     tty: true
     networks:
-      - database_network
-      - frontend_network
+      - internal_network
     env_file:
       - ${ENV_PATH}
     depends_on:
@@ -48,15 +42,13 @@ services:
       ENVIRONMENT: ${APP_ENV}
       DOMAIN: "https://${DOMAIN}"
     networks:
-      - frontend_network
+      - internal_network
     env_file:
       - ${ENV_PATH}
     volumes:
       - ../frontend:/app
       - /app/node_modules
     stdin_open: true
-    ports:
-      - "${REACT_HOSTPORT}:${REACT_PORT}"
     depends_on:
       - backend
 
@@ -68,33 +60,41 @@ services:
       DOMAIN: ${DOMAIN}
       BACKEND_PORT: ${BACKEND_PORT}
       FRONTEND_PORT: ${REACT_PORT}
-    ports:
-      - 80:80
-      - 443:443
     volumes:
       - ../data/nginx/vhosts/prod:/etc/nginx/templates/
-      - ../data/certbot/conf:/etc/letsencrypt
-      - ../data/certbot/www:/var/www/certbot
     restart: always
     networks:
-      - database_network
-      - frontend_network
+      - internal_network
+      - external_network
     env_file:
       - ${ENV_PATH}
     depends_on:
       - backend
       - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.social-predict.rule=Host(`${DOMAIN}`)"
 
-  certbot:
-    container_name: "${CERTBOT_CONTAINER_NAME}"
-    image: certbot/certbot:latest
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+  traefik:
+    container_name: "${TRAEFIK_CONTAINER_NAME}"
+    image: traefik:v3.5
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - external_network
     volumes:
-      - ../data/certbot/conf:/etc/letsencrypt
-      - ../data/certbot/www:/var/www/certbot
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../data/traefik/config/traefik.yaml:/etc/traefik/traefik.yml:ro
+      - ../data/traefik/config/acme.json:/acme.json
+      - ../data/traefik/logs/:/logs/
 
 networks:
-  database_network:
-    driver: bridge
-  frontend_network:
-    driver: bridge
+  internal_network:
+    name: internal_network
+  external_network:
+    name: external_network
+    external: true
