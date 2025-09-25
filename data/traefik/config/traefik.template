@@ -22,12 +22,12 @@ providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: external_network
+    network: socialpredict_external_network
 
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: SSLEMAIL
+      email: ${EMAIL}
       storage: /acme.json
       caServer: https://acme-v02.api.letsencrypt.org/directory
       httpChallenge:

@@ -10,7 +10,7 @@ services:
     volumes:
       - ../data/postgres:/var/lib/postgresql/data
     networks:
-      - internal_network
+      - socialpredict_internal_network
     env_file:
       - ${ENV_PATH}
 
@@ -29,7 +29,7 @@ services:
     command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
     tty: true
     networks:
-      - internal_network
+      - socialpredict_internal_network
     env_file:
       - ${ENV_PATH}
     depends_on:
@@ -42,7 +42,7 @@ services:
       ENVIRONMENT: ${APP_ENV}
       DOMAIN: "https://${DOMAIN}"
     networks:
-      - internal_network
+      - socialpredict_internal_network
     env_file:
       - ${ENV_PATH}
     volumes:
@@ -64,8 +64,8 @@ services:
       - ../data/nginx/vhosts/prod:/etc/nginx/templates/
     restart: always
     networks:
-      - internal_network
-      - external_network
+      - socialpredict_internal_network
+      - socialpredict_external_network
     env_file:
       - ${ENV_PATH}
     depends_on:
@@ -85,7 +85,7 @@ services:
       - 80:80
       - 443:443
     networks:
-      - external_network
+      - socialpredict_external_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../data/traefik/config/traefik.yaml:/etc/traefik/traefik.yml:ro
@@ -93,8 +93,8 @@ services:
       - ../data/traefik/logs/:/logs/
 
 networks:
-  internal_network:
-    name: internal_network
-  external_network:
-    name: external_network
+  socialpredict_internal_network:
+    name: socialpredict_internal_network
+  socialpredict_external_network:
+    name: socialpredict_external_network
     external: true

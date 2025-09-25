@@ -108,8 +108,11 @@ sleep 1;
 
 # Pull remaining images
 echo "Pulling remaining images ..."
-$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-prod.yaml" pull db webserver
+$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-prod.yaml" pull db webserver traefik
 echo
 
 echo "Images built."
 echo
+echo "Your admin credentials are:"
+echo "Username: admin"
+echo "Password: $ADMIN_PASS"

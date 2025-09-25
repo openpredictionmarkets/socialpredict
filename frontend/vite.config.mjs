@@ -1,26 +1,28 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-export default defineConfig(() => {
+// DEV stays fixed — no templating
+const DEV_ALLOWED = ['frontend', 'localhost', '127.0.0.1']
+
+// PROD is injected at build-time by scripts/prod/env_writer_prod.sh
+// It becomes a concrete JS array literal like: ["brierfoxforecast.com", "www.brierfoxforecast.com"]
+const PROD_ALLOWED = ["social.ntoufoudis.com", "www.social.ntoufoudis.com"]
+
+export default defineConfig(({ mode }) => {
+  const isProd = mode === 'production'
+  const allowed = isProd ? PROD_ALLOWED.filter(Boolean) : DEV_ALLOWED
+
   return {
     server: {
-      allowedHosts: [
-        'frontend', // we need this to be able to access the app on localhost
-	'localhost',
-	'brierfoxforecast.com', // staging instance
-	'openprediction.xyz' // prod instance
-
-	// add your own domain here!
-
-      ]
+      host: '0.0.0.0',
+      allowedHosts: allowed,
     },
+    preview: { allowedHosts: allowed },
     build: {
       outDir: 'build',
       commonjsOptions: { transformMixedEsModules: true },
     },
     plugins: [react()],
-    css: {
-      target: 'async', // or 'defer' for older browsers
-    },
-  };
-});
+    css: { target: 'async' },
+  }
+})

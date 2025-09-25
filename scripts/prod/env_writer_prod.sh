@@ -7,7 +7,7 @@
 generate_password() {
         local length=20
         # Define the character set for the password
-        local char_set="A-Za-z0-9!@#$%^&*()-=+[]{}<>?"
+        local char_set="A-Za-z0-9"
 
         # Generate a random password
         tr -dc "$char_set" < /dev/urandom | head -c "$length"
@@ -97,6 +97,11 @@ init_env() {
 	done
 
 	# Change the Email setting:
+	template="$SCRIPT_DIR/data/traefik/config/traefik.template"
+        file="$SCRIPT_DIR/data/traefik/config/traefik.yaml"
+        export EMAIL="$email_answer"
+        envsubst < $template > $file
+
 	sed -i -e "s/SSLEMAIL/$email_answer/g" ./data/traefik/config/traefik.yaml
 	echo "Setting EMAIL to: $email_answer"
 
@@ -110,8 +115,8 @@ init_env() {
 	echo
 
 	# Update Admin Password:
-	local admin_pass=$(generate_password)
-	sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='${admin_pass//&/\\&}'/g" .env
+	ADMIN_PASS=$(generate_password)
+	sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='${ADMIN_PASS}'/g" .env
 	echo "Setting Admin Password"
 }
 
