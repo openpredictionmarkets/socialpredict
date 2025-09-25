@@ -37,7 +37,7 @@ function ChangePasswordLayout() {
         }
 
         try {
-            const response = await fetch(`${API_URL}/api/v0/changepassword`, {
+            const response = await fetch(`${API_URL}/v0/changepassword`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

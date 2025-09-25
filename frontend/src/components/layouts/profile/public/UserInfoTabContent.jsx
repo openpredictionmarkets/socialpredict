@@ -11,7 +11,7 @@ const UserInfoTabContent = ({ username, userData }) => {
         const fetchUserCredit = async () => {
             try {
                 console.log(`Fetching user credit for: ${username} from ${API_URL}/api/v0/usercredit/${username}`);
-                const response = await fetch(`${API_URL}/api/v0/usercredit/${username}`);
+                const response = await fetch(`${API_URL}/v0/usercredit/${username}`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log('User credit data:', data);

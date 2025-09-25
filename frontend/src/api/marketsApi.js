@@ -18,7 +18,7 @@ export const searchMarkets = async (query, status = 'all', limit = 20) => {
         limit: limit.toString()
     });
 
-    const response = await fetch(`${API_URL}/api/v0/markets/search?${params}`);
+    const response = await fetch(`${API_URL}/v0/markets/search?${params}`);
     
     if (!response.ok) {
         const errorText = await response.text();
@@ -57,7 +57,7 @@ export const getMarketDetails = async (marketId) => {
         throw new Error('Market ID is required');
     }
 
-    const response = await fetch(`${API_URL}/api/v0/markets/${marketId}`);
+    const response = await fetch(`${API_URL}/v0/markets/${marketId}`);
     
     if (!response.ok) {
         throw new Error(`Failed to fetch market details: ${response.status}`);
