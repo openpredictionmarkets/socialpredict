@@ -69,7 +69,7 @@ if [ "$1" = "install" ]; then
 	sleep 1;
 
 	# Ask user input for Application Environment
-	echo "### Select Application Envrionment: "
+	echo "### Select Application Environment: "
 	PS3='Please enter your choice: '
 	options=("Development" "Production" "Quit")
 	select opt in "${options[@]}"
