@@ -1,30 +1,12 @@
 server {
-	listen 80;
-	server_name ${DOMAIN};
-
-	location /.well-known/acme-challenge/ {
-		root /var/www/certbot;
-	}
-
-	location / {
-		return 301 https://$host$request_uri;
-	}
-}
-
-server {
 	gzip on;
 	gzip_min_length 1000;
 	gunzip on;
 	gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
-	listen 443 ssl;
+
+	listen 80;
 	server_name ${DOMAIN};
-
-	ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-	ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-
-	include /etc/letsencrypt/options-ssl-nginx.conf;
-	ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-
+	
 	location /api/ {
 		proxy_pass http://backend:8080/;
 	}

@@ -52,18 +52,13 @@ func SeedUsers(db *gorm.DB) {
 					Email:  "admin@example.com",
 					APIKey: "NONE",
 				},
-				MustChangePassword: false,
+				MustChangePassword: true,
 			}
 
 			adminUser.HashPassword(adminPassword)
 
 			db.Create(&adminUser)
 
-			// Database default for must_change_password is true, the following force resets to false.
-			if result := db.Model(&adminUser).Update("must_change_password", false); result.Error != nil {
-				log.Printf("Failed to update MustChangePassword: %v", result.Error)
-				return
-			}
 		}
 	}
 

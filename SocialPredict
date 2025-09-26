@@ -2,7 +2,6 @@
 
 set -e # Stop script on error
 set -a # Automatically export all variables
-set -x # Verbose
 
 # Determine script's directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -28,7 +27,7 @@ ENV_FILE="--env-file $ENV_PATH"
 
 # Function to check if a command exists
 command_exists() {
-        type "$1" &> /dev/null
+        command -v "$1" &> /dev/null 2>&1
 }
 
 # Function to check if Docker && Docker Compose are installed
