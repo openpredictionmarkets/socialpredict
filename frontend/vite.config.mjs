@@ -6,9 +6,7 @@ export default defineConfig(() => {
     server: {
       allowedHosts: [
         'frontend', // we need this to be able to access the app on localhost
-        'localhost',
-        'brierfoxforecast.com', // staging instance
-        'openprediction.xyz' // prod instance
+        'localhost'
 
         // add your own domain here!
 
