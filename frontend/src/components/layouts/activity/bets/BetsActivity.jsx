@@ -7,7 +7,7 @@ const BetsActivityLayout = ({ marketId }) => {
 
     useEffect(() => {
         const fetchBets = async () => {
-            const response = await fetch(`${API_URL}/api/v0/markets/bets/${marketId}`, {
+            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}`, {
             });
             if (response.ok) {
                 const data = await response.json();
