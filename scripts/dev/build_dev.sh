@@ -58,9 +58,9 @@ check_and_build_image() {
 echo "### Searching for Docker Images ..."
 sleep 1;
 
-# Backend and Frontend Image Names
-BACKEND_IMAGE_NAME="socialpredict-backend:latest"
-FRONTEND_IMAGE_NAME="socialpredict-frontend:latest"
+# Backend and Frontend Image Names (Defaults can be overridden by environment variables)
+BACKEND_IMAGE_NAME="${BACKEND_IMAGE_NAME:-socialpredict-backend:latest}"
+FRONTEND_IMAGE_NAME="${FRONTEND_IMAGE_NAME:-socialpredict-frontend:latest}"
 
 # Backend and Frontend Directory Paths
 BACKEND_DIR="$( readlink -f "$SCRIPT_DIR/backend" )"
