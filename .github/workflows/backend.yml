@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [ '1.23.x' ]
+        go-version: [ '1.25.x' ]
     steps:
     - uses: actions/checkout@v4
     - name: Setup Go ${{ matrix.go-version }}
@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [ '1.23.x' ]
+        go-version: [ '1.25.x' ]
     steps:
       - uses: actions/checkout@v4
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
