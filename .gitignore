@@ -36,3 +36,6 @@ go.work
 
 # Keys
 .playground_key_pointer
+
+# Local temporary files
+tmp/
