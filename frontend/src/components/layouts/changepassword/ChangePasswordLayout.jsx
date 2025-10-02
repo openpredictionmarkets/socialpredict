@@ -46,11 +46,16 @@ function ChangePasswordLayout() {
                 body: JSON.stringify({ currentPassword, newPassword })
             });
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to change password');
+                // NOTE: The backend returns error messages in plain text
+                // so we read it as text and capitalize the first character
+                // before displaying it to the user. /RR
+                const errMsg = capitalizeFirstChar(await response.text());
+                throw new Error(errMsg || 'Failed to change password');
             }
+
             // Set success message
             setSuccess("Password changed successfully! Logging out. Please log in with your new password.");
+
             // Logout user and redirect to login page after a short delay
             setTimeout(() => {
                 logout();
@@ -96,6 +101,15 @@ function ChangePasswordLayout() {
             {error && <p className="error">{error}</p>}
         </div>
     );
+}
+
+// Utility function to capitalize the first character of a string
+// TODO: Move to utils file if needed elsewhere /RR
+function capitalizeFirstChar(str) {
+  if (typeof str !== 'string' || str.length === 0) {
+    return str; // Handle empty or non-string input
+  }
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 export default ChangePasswordLayout;
