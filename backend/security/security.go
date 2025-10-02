@@ -93,7 +93,7 @@ func (s *SecurityService) ValidateAndSanitizeUserInput(input UserInput) (*Saniti
 
 	// Validate password if provided
 	if input.Password != "" {
-		if err := s.Sanitizer.SanitizePassword(input.Password); err != nil {
+		if _, err := s.Sanitizer.SanitizePassword(input.Password); err != nil {
 			return nil, err
 		}
 	}
