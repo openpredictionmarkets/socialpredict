@@ -39,3 +39,10 @@ go.work
 
 # Keys
 .playground_key_pointer
+
+# JetBrains files
+/.idea
+
+# Frontend Files that are generated from their template
+/frontend/src/config.js
+/frontend/vite.config.mjs

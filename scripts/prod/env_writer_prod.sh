@@ -3,6 +3,14 @@
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
+# Check to see if this file is being run or sources from another script
+_is_sourced() {
+  # https://unix.stackexchange.com/a/215279
+  [ "${#FUNCNAME[@]}" -ge 2 ] \
+    && [ "${FUNCNAME[0]}" = '_is_sourced' ] \
+    && [ "${FUNCNAME[1]}" = 'source' ]
+}
+
 # Function to generate a random password
 generate_password() {
         local length=20
@@ -18,7 +26,7 @@ generate_password() {
 # using DOMAIN (and optional PROD_EXTRA_ALLOWED) from your deploy env file.
 render_vite_config_prod() {
 	local env_file="${1:-${ENV_PATH:-}}"
-	
+
 	if [[ -z "${env_file}" || ! -f "${env_file}" ]]; then
 		echo "ERROR: Supply path to deploy .env (arg #1) or set ENV_PATH to a valid file." >&2
 		return 1
@@ -120,23 +128,29 @@ init_env() {
 	echo "Setting Admin Password"
 }
 
-if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
-	echo "### First time running the script ..."
-	echo "Let's initialize the application ..."
-	sleep 1
-	init_env
-	echo "Application initialized successfully."
-else
-	read -p ".env file found. Do you want to re-create it? (y/N) " DECISION
-	if [ "$DECISION" != "Y" ] && [ "$DECISION" != "y" ]; then
-		:
-	else
-		sleep 1
-		echo "Re-creating env file ..."
-		sleep 1
-		init_env
-		echo ".env file re-created successfully."
-	fi
-fi
+_main() {
+  if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
+	  echo "### First time running the script ..."
+	  echo "Let's initialize the application ..."
+  	sleep 1
+	  init_env
+  	echo "Application initialized successfully."
+  else
+	  read -p ".env file found. Do you want to re-create it? (y/N) " DECISION
+  	if [ "$DECISION" != "Y" ] && [ "$DECISION" != "y" ]; then
+	  	:
+  	else
+	  	sleep 1
+		  echo "Re-creating env file ..."
+  		sleep 1
+	  	init_env
+		  echo ".env file re-created successfully."
+	  fi
+  fi
 
-echo
+  echo
+}
+
+if ! _is_sourced; then
+  _main
+fi

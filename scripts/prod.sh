@@ -6,6 +6,7 @@
 # Check for .env file
 export CALLED_FROM_SOCIALPREDICT=yes
 source "$SCRIPT_DIR/scripts/prod/env_writer_prod.sh"
+_main
 unset CALLED_FROM_SOCIALPREDICT
 
 source_env
