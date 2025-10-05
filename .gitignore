@@ -31,8 +31,18 @@ go.work
 # Data files
 **/data/certbot
 **/data/postgres
+**/data/traefik/logs
+**/data/traefik/config/acme.json
+**/data/traefik/config/traefik.yaml
 
 .first_run
 
 # Keys
 .playground_key_pointer
+
+# JetBrains files
+/.idea
+
+# Frontend Files that are generated from their template
+/frontend/src/config.js
+/frontend/vite.config.mjs
