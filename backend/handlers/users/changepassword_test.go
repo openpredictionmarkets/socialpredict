@@ -77,7 +77,7 @@ func TestPasswordValidation(t *testing.T) {
 
 			// Test password strength validation
 			securityService := security.NewSecurityService()
-			err := securityService.Sanitizer.SanitizePassword(tt.newPass)
+			_, err := securityService.Sanitizer.SanitizePassword(tt.newPass)
 
 			if tt.expectedValid {
 				if err != nil {
@@ -151,7 +151,7 @@ func TestPasswordStrengthRequirements(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := securityService.Sanitizer.SanitizePassword(tt.password)
+			_, err := securityService.Sanitizer.SanitizePassword(tt.password)
 
 			if tt.shouldPass {
 				if err != nil {
@@ -186,7 +186,7 @@ func TestPasswordSecurityFeatures(t *testing.T) {
 			testName = testName[:10]
 		}
 		t.Run("Security_Test_"+testName, func(t *testing.T) {
-			err := securityService.Sanitizer.SanitizePassword(maliciousPass)
+			_, err := securityService.Sanitizer.SanitizePassword(maliciousPass)
 
 			// These should either be rejected for weakness or pass sanitization
 			// The key is that they shouldn't cause any security issues
@@ -235,7 +235,7 @@ func TestPasswordLengthValidation(t *testing.T) {
 				password = "A" + "a" + "1" + strings.Repeat("x", remainingLength)
 			}
 
-			err := securityService.Sanitizer.SanitizePassword(password)
+			_, err := securityService.Sanitizer.SanitizePassword(password)
 
 			if tt.shouldPass {
 				if err != nil && strings.Contains(err.Error(), "length") {
@@ -287,7 +287,7 @@ func TestPasswordComplexityPatterns(t *testing.T) {
 
 	for _, pattern := range patterns {
 		t.Run(pattern.name, func(t *testing.T) {
-			err := securityService.Sanitizer.SanitizePassword(pattern.password)
+			_, err := securityService.Sanitizer.SanitizePassword(pattern.password)
 
 			if pattern.shouldPass {
 				if err != nil {

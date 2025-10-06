@@ -184,33 +184,42 @@ func (s *Sanitizer) SanitizeEmoji(emoji string) (string, error) {
 }
 
 // SanitizePassword validates password strength
-func (s *Sanitizer) SanitizePassword(password string) error {
-	if len(password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters long")
+func (s *Sanitizer) SanitizePassword(password string) (string, error) {
+
+	// Basic length checks
+	password, err := s.CheckPasswordLength(password)
+	if err != nil {
+		return "", err
 	}
 
-	if len(password) > 128 {
-		return fmt.Errorf("password cannot exceed 128 characters")
+	password, err = s.CheckPasswordChars(password)
+	if err != nil {
+		return "", err
 	}
 
-	// Check for at least one uppercase, one lowercase, one digit
-	var hasUpper, hasLower, hasDigit bool
-	for _, char := range password {
-		switch {
-		case unicode.IsUpper(char):
-			hasUpper = true
-		case unicode.IsLower(char):
-			hasLower = true
-		case unicode.IsDigit(char):
-			hasDigit = true
-		}
+	return password, nil
+}
+
+func (s *Sanitizer) CheckPasswordLength(password string) (string, error) {
+	const minLength = 8
+	const maxLength = 128
+
+	// Check length constraints
+	len := len(password)
+	if len < minLength || len > maxLength {
+		return "", fmt.Errorf("password must be between %d and %d characters long", minLength, maxLength)
 	}
 
-	if !hasUpper || !hasLower || !hasDigit {
-		return fmt.Errorf("password must contain at least one uppercase letter, one lowercase letter, and one digit")
+	return password, nil
+}
+
+// CheckChars checks for the presence of uppercase, lowercase, and digit characters
+func (s *Sanitizer) CheckPasswordChars(password string) (string, error) {
+	if !(hasUppercase(password) && hasLowercase(password) && hasDigit(password)) {
+		return "", fmt.Errorf("password must contain at least one uppercase letter, one lowercase letter, and one digit")
 	}
 
-	return nil
+	return password, nil
 }
 
 // containsSuspiciousPatterns checks for common XSS and injection patterns
@@ -302,4 +311,31 @@ func isValidEmoji(emoji string) bool {
 		return false
 	}
 	return len(emoji) > 0
+}
+
+func hasUppercase(s string) bool {
+	for _, char := range s {
+		if unicode.IsUpper(char) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasLowercase(s string) bool {
+	for _, char := range s {
+		if unicode.IsLower(char) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasDigit(s string) bool {
+	for _, char := range s {
+		if unicode.IsDigit(char) {
+			return true
+		}
+	}
+	return false
 }
