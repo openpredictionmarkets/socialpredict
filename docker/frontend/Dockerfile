@@ -14,6 +14,6 @@ COPY frontend/public/env-config.js.template /usr/share/nginx/html/env-config.js.
 COPY docker/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/frontend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
+RUN chown -R nginx:nginx /usr/share/nginx/html
 EXPOSE 80
 ENTRYPOINT ["/entrypoint.sh"]

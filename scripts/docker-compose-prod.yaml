@@ -3,6 +3,7 @@ services:
   db:
     container_name: ${POSTGRES_CONTAINER_NAME}
     image: postgres:16.6-alpine3.20
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -17,17 +18,7 @@ services:
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
     image: "${BACKEND_IMAGE_NAME}"
-    environment:
-      ENVIRONMENT: ${APP_ENV}
-      CONTAINER_NAME: ${BACKEND_CONTAINER_NAME}
-      DB_HOST: db
-      DB_USER: ${POSTGRES_USER}
-      DB_PASS: ${POSTGRES_PASSWORD}
-    volumes:
-      - ../backend:/backend
-      - ${ENV_PATH}:/backend/.env.dev
-    command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
-    tty: true
+    restart: unless-stopped
     networks:
       - socialpredict_internal_network
     env_file:
@@ -38,23 +29,18 @@ services:
   frontend:
     container_name: "${FRONTEND_CONTAINER_NAME}"
     image: "${FRONTEND_IMAGE_NAME}"
-    environment:
-      ENVIRONMENT: ${APP_ENV}
-      DOMAIN: "https://${DOMAIN}"
+    restart: unless-stopped
     networks:
       - socialpredict_internal_network
     env_file:
       - ${ENV_PATH}
-    volumes:
-      - ../frontend:/app
-      - /app/node_modules
-    stdin_open: true
     depends_on:
       - backend
 
   webserver:
     container_name: "${NGINX_CONTAINER_NAME}"
     image: nginx:latest
+    restart: unless-stopped
     environment:
       ENVIRONMENT: ${APP_ENV}
       DOMAIN: ${DOMAIN}
@@ -62,7 +48,6 @@ services:
       FRONTEND_PORT: ${REACT_PORT}
     volumes:
       - ../data/nginx/vhosts/prod:/etc/nginx/templates/
-    restart: always
     networks:
       - socialpredict_internal_network
       - socialpredict_external_network
