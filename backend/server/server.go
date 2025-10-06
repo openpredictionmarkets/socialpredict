@@ -3,6 +3,9 @@ package server
 import (
 	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
@@ -25,20 +28,73 @@ import (
 	"github.com/rs/cors"
 )
 
+// CORS helpers configured via environment variables
+
+func getListEnv(key, def string) []string { // default empty - allows any string, splits on comma
+	val := strings.TrimSpace(os.Getenv(key))
+	if val == "" {
+		val = def
+	}
+	if val == "" {
+		return nil
+	}
+	parts := strings.Split(val, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func getBoolEnv(key string, def bool) bool { // default false - allows any string to be false except specific true values
+	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if v == "" {
+		return def
+	}
+	return v == "1" || v == "true" || v == "yes" || v == "on"
+}
+
+func getIntEnv(key string, def int) int { // default 0 - allows any string to be int, otherwise default
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	if n, err := strconv.Atoi(v); err == nil {
+		return n
+	}
+	return def
+}
+
+func buildCORSFromEnv() *cors.Cors {
+	if !getBoolEnv("CORS_ENABLED", true) {
+		return nil
+	}
+	origins := getListEnv("CORS_ALLOW_ORIGINS", "*")
+	methods := getListEnv("CORS_ALLOW_METHODS", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+	headers := getListEnv("CORS_ALLOW_HEADERS", "Content-Type,Authorization")
+	expose := getListEnv("CORS_EXPOSE_HEADERS", "")
+	allowCreds := getBoolEnv("CORS_ALLOW_CREDENTIALS", false)
+	maxAge := getIntEnv("CORS_MAX_AGE", 600)
+
+	return cors.New(cors.Options{
+		AllowedOrigins:   origins,
+		AllowedMethods:   methods,
+		AllowedHeaders:   headers,
+		ExposedHeaders:   expose,
+		AllowCredentials: allowCreds,
+		MaxAge:           maxAge,
+	})
+}
+
 func Start() {
 	// Initialize security service
 	securityService := security.NewSecurityService()
 
-	// CORS handler
-	c := cors.New(cors.Options{
-		AllowedOrigins: []string{
-			"http://localhost:8089",
-			"http://localhost",
-		},
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
-		AllowCredentials: true,
-	})
+	// CORS handler (configurable via env)
+  c := buildCORSFromEnv()
 
 	// Initialize mux router
 	router := mux.NewRouter()
@@ -100,11 +156,20 @@ func Start() {
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")
 
-	// Apply the CORS middleware to the Gorilla Mux router
-	handler := c.Handler(router) // Use the Gorilla Mux router here
+	// Apply CORS middleware if enabled
+  handler := http.Handler(router)
+  if c != nil {
+  	handler = c.Handler(handler)
+  }
 
-	log.Println("Starting server on :8080")
-	if err := http.ListenAndServe(":8080", handler); err != nil {
+  // Allow BACKEND_PORT to be configured via environment, default to 8080
+  port := os.Getenv("BACKEND_PORT")
+  if port == "" {
+  	port = "8080"
+  }
+
+	log.Printf("Starting server on :%s", port)
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatal(err)
 	}
 }
