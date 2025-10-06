@@ -83,6 +83,8 @@ init_env() {
 
 	# Change the Domain setting:
 	sed -i -e "s/DOMAIN=.*/DOMAIN='$domain_answer'/g" .env
+	sed -i -e 's/DOMAIN_URL=.*/DOMAIN_URL='\''https:\/\/'"$domain_answer"''\''/g' .env
+	sed -i -e 's/API_URL=.*/API_URL='\''https:\/\/'"$domain_answer"''\''/g' .env
 	echo "Setting DOMAIN to: $domain_answer"
 
 	echo

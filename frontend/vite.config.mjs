@@ -15,6 +15,7 @@ export default defineConfig(() => {
     build: {
       outDir: 'build',
       commonjsOptions: { transformMixedEsModules: true },
+      chunkSizeWarningLimit: 1000,
     },
     plugins: [react()],
     css: {

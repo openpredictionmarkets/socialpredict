@@ -1,15 +1,9 @@
-name: Create and publish a Docker image
+name: Create and publish Docker images
 
 on:
-  push:
-    branches:
-    - feature/ci-lighthouse-bench
-    - main
-    tags:
-    - 'v*'
-  
-concurrency:
-  group: "publish"
+  release:
+    types: [published]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -17,6 +11,7 @@ env:
 
 jobs:
   build-and-push-image:
+    name: Push Docker images to Github Container registry
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -25,18 +20,24 @@ jobs:
       id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Log in to the Container registry
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        uses: actions/checkout@v5
+
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Extract metadata (tags, labels) for Frontend
         id: frontend-meta
-        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
           tags: |
@@ -46,44 +47,52 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Frontend
-        id: frontend
-        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        id: push-frontend
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
+          platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          github-token: ${{ secrets.DOCKER_TOKEN }}
           push: true
           tags: ${{ steps.frontend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
           labels: ${{ steps.frontend-meta.outputs.labels }}
+
       - name: Generate artifact attestation Frontend
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-frontend
-          subject-digest: ${{ steps.frontend.outputs.digest }}
+          subject-digest: ${{ steps.push-frontend.outputs.digest }}
           push-to-registry: true
 
       - name: Extract metadata (tags, labels) for Backend
         id: backend-meta
-        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
       - name: Build and push Backend
-        id: backend
-        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        id: push-backend
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
+          platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          github-token: ${{ secrets.DOCKER_TOKEN }}
           push: true
           tags: ${{ steps.backend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
           labels: ${{ steps.backend-meta.outputs.labels }}
+
       - name: Generate artifact attestation Backend
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-backend
-          subject-digest: ${{ steps.backend.outputs.digest }}
+          subject-digest: ${{ steps.push-backend.outputs.digest }}
           push-to-registry: true

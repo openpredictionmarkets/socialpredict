@@ -1,0 +1,3 @@
+window.__ENV__ = {
+  DOMAIN_URL: "${DOMAIN_URL:-http://localhost}"
+};
