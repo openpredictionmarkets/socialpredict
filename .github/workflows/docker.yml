@@ -50,8 +50,8 @@ jobs:
         id: push-frontend
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
-          file: ./frontend/Dockerfile.prod
+          context: .
+          file: docker/frontend/Dockerfile
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -81,8 +81,8 @@ jobs:
         id: push-backend
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: .
+          file: docker/backend/Dockerfile
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
