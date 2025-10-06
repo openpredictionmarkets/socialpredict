@@ -12,7 +12,7 @@ if [ -f "$TEMPLATE" ]; then
   cp "$TEMPLATE" "$TARGET"
 
   sed -i "s|\${DOMAIN_URL:-http://localhost}|${DOMAIN_URL}|g" "$TARGET"
-  sed -i "s|\${API_URL:-http://localhost:8080}|${API_URL}|g" "$TARGET"
+  sed -i "s|\${API_URL:-http://localhost:8080}|${DOMAIN_URL}|g" "$TARGET"
 
   chown nginx:nginx "$TARGET"
 
