@@ -17,7 +17,7 @@ services:
 
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
-    image: "${BACKEND_IMAGE_NAME}"
+    image: ghcr.io/openpredictionmarkets/socialpredict-backend
     restart: unless-stopped
     networks:
       - socialpredict_internal_network
@@ -28,7 +28,7 @@ services:
 
   frontend:
     container_name: "${FRONTEND_CONTAINER_NAME}"
-    image: "${FRONTEND_IMAGE_NAME}"
+    image: ghcr.io/openpredictionmarkets/socialpredict-frontend
     restart: unless-stopped
     networks:
       - socialpredict_internal_network
