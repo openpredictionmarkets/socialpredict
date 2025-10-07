@@ -1,8 +1,9 @@
 import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getMarketLabels } from '../../../../utils/labelMapping';
 
-const LeaderboardActivity = ({ marketId }) => {
+const LeaderboardActivity = ({ marketId, market }) => {
     const [leaderboard, setLeaderboard] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -87,6 +88,8 @@ const LeaderboardActivity = ({ marketId }) => {
         );
     }
 
+    const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
+
     return (
         <div className="p-4">
             {/* Header */}
@@ -155,8 +158,8 @@ const LeaderboardActivity = ({ marketId }) => {
                     
                     {/* Shares (sm+) */}
                     <div className="hidden sm:block text-gray-300 text-xs">
-                        <div>YES: {entry.yesSharesOwned}</div>
-                        <div>NO: {entry.noSharesOwned}</div>
+                        <div>{labels.yes}: {entry.yesSharesOwned}</div>
+                        <div>{labels.no}: {entry.noSharesOwned}</div>
                     </div>
                 </div>
             ))}

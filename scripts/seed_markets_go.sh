@@ -2,6 +2,8 @@
 
 # seed_markets_go.sh
 # Wrapper script to run the Go market seeder with proper module setup
+# Usage: ./seed_markets_go.sh [SQL_FILE]
+# Default: example_markets.sql
 
 set -e
 
@@ -63,7 +65,7 @@ go mod tidy
 
 # Build and run the seeder
 print_status "Building and running market seeder..."
-if go run seed_markets.go; then
+if go run seed_markets.go "$@"; then
     print_status "Market seeding completed successfully!"
 else
     print_error "Market seeding failed!"

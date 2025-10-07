@@ -209,25 +209,33 @@ count_existing_markets() {
 
 # Function to populate markets
 populate_markets() {
-    print_status "Populating database with example markets..."
+    local sql_file="${1:-example_markets.sql}"
+    
+    print_status "Populating database with markets from: $sql_file"
     
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    SQL_FILE="$SCRIPT_DIR/example_markets.sql"
+    
+    # Check if file is absolute path or relative
+    if [[ "$sql_file" = /* ]]; then
+        SQL_FILE="$sql_file"
+    else
+        SQL_FILE="$SCRIPT_DIR/$sql_file"
+    fi
     
     if [ ! -f "$SQL_FILE" ]; then
         print_error "SQL file not found: $SQL_FILE"
-        print_error "Make sure example_markets.sql is in the same directory as this script."
+        print_error "Make sure the SQL file exists in the specified location."
         exit 1
     fi
     
     if exec_psql_file "$SQL_FILE"; then
-        print_status "Successfully populated database with example markets!"
+        print_status "Successfully populated database with markets from $(basename "$SQL_FILE")!"
         
         # Count markets after insertion
         NEW_MARKET_COUNT=$(exec_psql "SELECT COUNT(*) FROM markets;" | grep -o '[0-9]*' | head -1)
         print_status "Database now contains $NEW_MARKET_COUNT total markets."
     else
-        print_error "Failed to populate database with example markets."
+        print_error "Failed to populate database with markets from $(basename "$SQL_FILE")."
         print_error "Check the SQL file for syntax errors or constraint violations."
         exit 1
     fi
@@ -235,9 +243,13 @@ populate_markets() {
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [OPTIONS]"
+    echo "Usage: $0 [SQL_FILE] [OPTIONS]"
     echo ""
-    echo "Populates the SocialPredict database with example prediction markets."
+    echo "Populates the SocialPredict database with prediction markets from a SQL file."
+    echo ""
+    echo "Arguments:"
+    echo "  SQL_FILE           SQL file to load (default: example_markets.sql)"
+    echo "                     Can be absolute path or relative to scripts directory"
     echo ""
     echo "Configuration:"
     echo "  The script looks for a .env file in the project root directory."
@@ -256,7 +268,9 @@ show_usage() {
     echo "  --env-file FILE    Use specific .env file (default: ../env)"
     echo ""
     echo "Examples:"
-    echo "  $0                                    # Use .env file or defaults"
+    echo "  $0                                    # Use example_markets.sql with .env defaults"
+    echo "  $0 example_sports_markets.sql        # Use sports markets file"
+    echo "  $0 /path/to/custom_markets.sql       # Use absolute path to SQL file"
     echo "  $0 --env-file /path/to/.env          # Use specific .env file"
     echo "  DB_HOST=db.example.com $0            # Override database host"
     echo "  $0 --check-only                      # Only run checks"
@@ -264,55 +278,79 @@ show_usage() {
 
 # Main script logic
 main() {
-    case "${1:-}" in
-        -h|--help)
-            show_usage
-            exit 0
-            ;;
-        --env-file)
-            if [ -z "${2:-}" ]; then
-                print_error "--env-file requires a file path"
+    local sql_file=""
+    local env_file=""
+    local check_only=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            --env-file)
+                if [ -z "${2:-}" ]; then
+                    print_error "--env-file requires a file path"
+                    show_usage
+                    exit 1
+                fi
+                env_file="$2"
+                shift 2
+                ;;
+            --check-only)
+                check_only=true
+                shift
+                ;;
+            -*)
+                print_error "Unknown option: $1"
                 show_usage
                 exit 1
-            fi
-            load_env "$2"
-            # Re-set database variables after loading custom .env
-            DB_HOST=${DB_HOST:-"localhost"}
-            DB_PORT=${DB_PORT:-"5432"}
-            DB_USER=${POSTGRES_USER:-"user"}
-            DB_PASSWORD=${POSTGRES_PASSWORD:-"password"}
-            DB_NAME=${POSTGRES_DATABASE:-"devdb"}
-            
-            print_status "Starting market population process with custom .env file..."
-            check_database
-            check_markets_table
-            check_admin_user
-            count_existing_markets
-            populate_markets
-            print_status "Market population completed successfully!"
-            ;;
-        --check-only)
-            check_database
-            check_markets_table
-            check_admin_user
-            print_status "All checks passed! Database is ready for market population."
-            exit 0
-            ;;
-        "")
-            print_status "Starting market population process..."
-            check_database
-            check_markets_table
-            check_admin_user
-            count_existing_markets
-            populate_markets
-            print_status "Market population completed successfully!"
-            ;;
-        *)
-            print_error "Unknown option: $1"
-            show_usage
-            exit 1
-            ;;
-    esac
+                ;;
+            *)
+                if [ -z "$sql_file" ]; then
+                    sql_file="$1"
+                else
+                    print_error "Multiple SQL files specified. Only one file is allowed."
+                    show_usage
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Set default SQL file if none provided
+    if [ -z "$sql_file" ]; then
+        sql_file="example_markets.sql"
+    fi
+    
+    # Load custom .env file if specified
+    if [ -n "$env_file" ]; then
+        load_env "$env_file"
+        # Re-set database variables after loading custom .env
+        DB_HOST=${DB_HOST:-"localhost"}
+        DB_PORT=${DB_PORT:-"5432"}
+        DB_USER=${POSTGRES_USER:-"user"}
+        DB_PASSWORD=${POSTGRES_PASSWORD:-"password"}
+        DB_NAME=${POSTGRES_DATABASE:-"devdb"}
+    fi
+    
+    # Run checks
+    check_database
+    check_markets_table
+    check_admin_user
+    
+    if [ "$check_only" = true ]; then
+        print_status "All checks passed! Database is ready for market population."
+        exit 0
+    fi
+    
+    # Populate markets
+    print_status "Starting market population process with file: $sql_file"
+    count_existing_markets
+    populate_markets "$sql_file"
+    print_status "Market population completed successfully!"
 }
 
 # Run main function with all arguments

@@ -14,6 +14,8 @@ function Create() {
   const [resolutionDateTime, setResolutionDateTime] = useState(
     getEndofDayDateTime()
   );
+  const [yesLabel, setYesLabel] = useState('');
+  const [noLabel, setNoLabel] = useState('');
   const [error, setError] = useState('');
   const { username } = useAuth();
   const history = useHistory();
@@ -21,6 +23,20 @@ function Create() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+
+    // Validate custom labels
+    const trimmedYesLabel = yesLabel.trim();
+    const trimmedNoLabel = noLabel.trim();
+    
+    if (trimmedYesLabel && (trimmedYesLabel.length < 1 || trimmedYesLabel.length > 20)) {
+      setError('Yes label must be between 1 and 20 characters');
+      return;
+    }
+    
+    if (trimmedNoLabel && (trimmedNoLabel.length < 1 || trimmedNoLabel.length > 20)) {
+      setError('No label must be between 1 and 20 characters');
+      return;
+    }
 
     let isoDateTime = resolutionDateTime;
 
@@ -51,6 +67,8 @@ function Create() {
         creatorUsername: username,
         isResolved: false,
         utcOffset: new Date().getTimezoneOffset(),
+        yesLabel: trimmedYesLabel || 'YES',
+        noLabel: trimmedNoLabel || 'NO',
       };
 
       console.log('marketData:', marketData);
@@ -111,6 +129,57 @@ function Create() {
             className='h-32 resize-y'
           />
         </div>
+
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+          <div>
+            <label className='block text-sm font-medium text-gray-300 mb-1'>
+              Yes Label (Optional)
+            </label>
+            <RegularInput
+              type='text'
+              value={yesLabel}
+              onChange={(e) => setYesLabel(e.target.value)}
+              placeholder='e.g., BULL 🚀, WIN, PASS'
+              maxLength={20}
+              className='w-full'
+            />
+            <p className='text-xs text-gray-400 mt-1'>
+              Custom label for positive outcome (defaults to "YES")
+            </p>
+          </div>
+          
+          <div>
+            <label className='block text-sm font-medium text-gray-300 mb-1'>
+              No Label (Optional)
+            </label>
+            <RegularInput
+              type='text'
+              value={noLabel}
+              onChange={(e) => setNoLabel(e.target.value)}
+              placeholder='e.g., BEAR 📉, LOSE, FAIL'
+              maxLength={20}
+              className='w-full'
+            />
+            <p className='text-xs text-gray-400 mt-1'>
+              Custom label for negative outcome (defaults to "NO")
+            </p>
+          </div>
+        </div>
+
+        {(yesLabel.trim() || noLabel.trim()) && (
+          <div className='bg-gray-700 p-3 rounded-md'>
+            <p className='text-sm font-medium text-gray-300 mb-2'>Preview:</p>
+            <div className='flex space-x-2'>
+              <span className='px-3 py-1 bg-green-600 text-white text-sm rounded'>
+                {yesLabel.trim() || 'YES'}
+              </span>
+              <span className='text-gray-400'>vs</span>
+              <span className='px-3 py-1 bg-red-600 text-white text-sm rounded'>
+                {noLabel.trim() || 'NO'}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className='block text-sm font-medium text-gray-300 mb-1'>

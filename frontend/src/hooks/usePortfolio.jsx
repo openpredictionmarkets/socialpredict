@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from '../config';
+import { useAuth } from '../helpers/AuthContent';
 
 const usePortfolio = (username) => {
   const [portfolio, setPortfolio] = useState({ portfolioItems: [] });
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [portfolioError, setPortfolioError] = useState(null);
+  const { token } = useAuth();
 
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`);
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+          headers['Content-Type'] = 'application/json';
+        }
+
+        const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`, { headers });
         if (!response.ok) {
           throw new Error('Failed to fetch portfolio');
         }
@@ -23,10 +31,10 @@ const usePortfolio = (username) => {
       }
     };
 
-    if (username) {
+    if (username && token) {
       fetchPortfolio();
     }
-  }, [username]);
+  }, [username, token]);
 
   return { portfolio, portfolioLoading, portfolioError };
 };
