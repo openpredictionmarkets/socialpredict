@@ -9,6 +9,7 @@
     "@testing-library/user-event": "^13.5.0",
     "chart.js": "^4.4.0",
     "d3": "^7.8.5",
+    "emoji-picker-react": "^4.14.0",
     "jwt-decode": "^4.0.0",
     "path-to-regexp": ">=8.2.0",
     "react": "^18.2.0",

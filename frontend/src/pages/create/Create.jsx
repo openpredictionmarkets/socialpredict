@@ -5,6 +5,7 @@ import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDa
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
 import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
+import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
 import { API_URL } from '../../config';
 
@@ -109,12 +110,12 @@ function Create() {
           <label className='block text-sm font-medium text-gray-300 mb-1'>
             Question Title
           </label>
-          <RegularInput
+          <EmojiPickerInput
             type='text'
             value={questionTitle}
             onChange={(e) => setQuestionTitle(e.target.value)}
             placeholder='Enter the market question'
-            className='w-full'
+            className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
           />
         </div>
 
@@ -122,11 +123,12 @@ function Create() {
           <label className='block text-sm font-medium text-gray-300 mb-1'>
             Description
           </label>
-          <RegularInputBox
+          <EmojiPickerInput
+            type='textarea'
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder='Provide details about the market'
-            className='h-32 resize-y'
+            className='w-full h-32 resize-y bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
           />
         </div>
 
@@ -135,13 +137,13 @@ function Create() {
             <label className='block text-sm font-medium text-gray-300 mb-1'>
               Yes Label (Optional)
             </label>
-            <RegularInput
+            <EmojiPickerInput
               type='text'
               value={yesLabel}
               onChange={(e) => setYesLabel(e.target.value)}
               placeholder='e.g., BULL 🚀, WIN, PASS'
               maxLength={20}
-              className='w-full'
+              className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
             />
             <p className='text-xs text-gray-400 mt-1'>
               Custom label for positive outcome (defaults to "YES")
@@ -152,13 +154,13 @@ function Create() {
             <label className='block text-sm font-medium text-gray-300 mb-1'>
               No Label (Optional)
             </label>
-            <RegularInput
+            <EmojiPickerInput
               type='text'
               value={noLabel}
               onChange={(e) => setNoLabel(e.target.value)}
               placeholder='e.g., BEAR 📉, LOSE, FAIL'
               maxLength={20}
-              className='w-full'
+              className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
             />
             <p className='text-xs text-gray-400 mt-1'>
               Custom label for negative outcome (defaults to "NO")
