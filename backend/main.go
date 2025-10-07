@@ -14,9 +14,10 @@ func main() {
 
 	http.Handle("/secure", middleware.Authenticate(http.HandlerFunc(secureEndpoint)))
 
-	err := util.GetEnv()
-	if err != nil {
-		log.Fatalf("Failed to load environment variables: %v", err)
+  // Load .env.dev if present; non-fatal if missing
+	if err := util.GetEnv(); err != nil {
+		// util.GetEnv is tolerant, but log any unexpected errors
+		log.Printf("Warning loading environment: %v", err)
 	}
 
 	util.InitDB()
