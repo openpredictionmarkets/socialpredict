@@ -93,6 +93,7 @@ ACTION="${1:-"--help"}"
 case "$ACTION" in
   --save)                    do_save ;;
   --list)                    do_list ;;
+  --list-all)                do_list_all ;;
   --latest)                  do_latest ;;
   --restore)                 shift || true; [ -n "${1:-}" ] || { echo "ERROR: --restore requires a file path"; exit 1; }; do_restore_file "$1" ;;
   --restore-latest)          do_restore_latest ;;

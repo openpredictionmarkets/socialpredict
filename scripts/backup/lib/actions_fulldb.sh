@@ -35,6 +35,19 @@ do_list() {
   ls -1t "$BACKUP_ROOT"/socialpredict_backup_"${APP_ENV}"_*.dump.gz 2>/dev/null || echo "(none found)"
 }
 
+do_list_all() {
+  echo "Backups in $BACKUP_ROOT (newest first):"
+  echo
+  echo "Full database backups:"
+  ls -1t "$BACKUP_ROOT"/socialpredict_backup_"${APP_ENV}"_*.dump.gz 2>/dev/null || echo "  (none found)"
+  echo
+  echo "Users-only backups (current balances):"
+  ls -1t "$BACKUP_ROOT"/socialpredict_users_"${APP_ENV}"_*.csv.gz 2>/dev/null || echo "  (none found)"
+  echo
+  echo "Users-only backups (reset balances):"
+  ls -1t "$BACKUP_ROOT"/socialpredict_users_reset_"${APP_ENV}"_*.csv.gz 2>/dev/null || echo "  (none found)"
+}
+
 do_latest() {
   local latest; latest="$(latest_backup_file)"
   [ -z "$latest" ] && { echo "(none)"; return; }
@@ -93,17 +106,62 @@ do_restore_latest() {
 do_inspect() {
   local file="$1"
   [ -f "$file" ] || { echo "ERROR: Backup file not found: $file"; exit 1; }
-  local tmp; tmp="$(mktemp -t sp_dump_XXXXXX.dump)"
-  trap 'rm -f "$tmp"' EXIT
-  gunzip -c "$file" > "$tmp"
 
-  echo "== Dump inspection =="; echo "File: $file"; echo
+  need_container_running
+
+  echo "== Dump inspection =="
+  echo "File: $file"
+  echo
+
+  # 1) Decompress to a seekable temp file on host
+  local tmp_host
+  tmp_host="$(mktemp -t sp_dump_XXXXXX.dump)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$tmp_host'" RETURN
+  if ! gunzip -c "$file" > "$tmp_host"; then
+    echo "ERROR: Failed to decompress dump."
+    exit 1
+  fi
+
+  # 2) Try inside the running PG container (copy in, run, clean up)
+  local toc="" tmp_in
+  tmp_in="/tmp/$(basename "$tmp_host")"
+  if docker cp "$tmp_host" "$POSTGRES_CONTAINER_NAME:$tmp_in" >/dev/null 2>&1; then
+    if toc="$(docker exec "$POSTGRES_CONTAINER_NAME" sh -lc 'command -v pg_restore >/dev/null 2>&1 && pg_restore -l '"$tmp_in"' 2>/dev/null' )" && [ -n "$toc" ]; then
+      docker exec "$POSTGRES_CONTAINER_NAME" sh -lc 'rm -f '"$tmp_in"'' >/dev/null 2>&1 || true
+    else
+      docker exec "$POSTGRES_CONTAINER_NAME" sh -lc 'rm -f '"$tmp_in"'' >/dev/null 2>&1 || true
+      toc=""
+    fi
+  fi
+
+  # 3) Fallback: ephemeral container using the SAME image as the running PG
+  if [ -z "$toc" ]; then
+    local img
+    img="$(docker inspect "$POSTGRES_CONTAINER_NAME" --format '{{.Config.Image}}' 2>/dev/null || true)"
+    [ -n "$img" ] || img="postgres:16-alpine"
+    toc="$(docker run --rm -v "$tmp_host":/dump.dump:ro "$img" sh -lc 'pg_restore -l /dump.dump 2>/dev/null' || true)"
+    if [ -z "$toc" ]; then
+      echo "ERROR: Failed to run 'pg_restore -l' (checked running container and fallback image: $img)."
+      echo "Optionally install pg_restore on host: macOS 'brew install libpq && brew link --force libpq', Debian/Ubuntu 'apt-get install postgresql-client'."
+      exit 1
+    fi
+  fi
+
   echo "-- Owners referenced --"
-  (pg_restore -l "$tmp" | grep -Eo 'OWNER TO [^;]+' | sort -u) || echo "(none)"
+  if ! echo "$toc" | grep -Eo 'OWNER TO [^;]+' | sort -u | sed -n '1,200p'; then
+    echo "(none)"
+  fi
   echo
+
   echo "-- Privilege statements (GRANT/REVOKE) --"
-  (pg_restore -l "$tmp" | grep -E 'GRANT |REVOKE ' | sort -u | sed -n '1,200p') || echo "(none)"
+  if ! echo "$toc" | grep -E 'GRANT |REVOKE ' | sort -u | sed -n '1,200p'; then
+    echo "(none)"
+  fi
   echo
+
   echo "-- Extensions requested --"
-  (pg_restore -l "$tmp" | grep -i 'EXTENSION - ' | sed -n '1,200p') || echo "(none)"
+  if ! echo "$toc" | grep -i 'EXTENSION - ' | sed -n '1,200p'; then
+    echo "(none)"
+  fi
 }

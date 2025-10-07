@@ -25,11 +25,10 @@ SELECT
   created_at,
   updated_at
 FROM users
-ORDER BY username;
+ORDER BY username
 SQL
 }
 
-# Build COPY SELECT for users (reset balances to initial)
 users_copy_reset_sql() {
   cat <<'SQL'
 SELECT
@@ -49,7 +48,7 @@ SELECT
   created_at,
   updated_at
 FROM users
-ORDER BY username;
+ORDER BY username
 SQL
 }
 
