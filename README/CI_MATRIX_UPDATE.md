@@ -78,5 +78,13 @@ file:backend/go.mod
 ## File Changes Made
 
 1. **`.github/workflows/backend.yml`** - Updated with dynamic matrix system
-2. **`.github/go-versions`** - New configuration file for version management
+2. **`.github/go-versions`** - New configuration file for version management  
 3. **`README/CI_MATRIX_UPDATE.md`** - This documentation
+
+## Recent Fix Applied
+
+### Cache Parameter Fix
+- **Issue**: `actions/setup-go@v5` was failing with "Input does not meet YAML 1.2 'Core Schema' specification: cache"
+- **Cause**: The `cache: 'gomod'` parameter was using string format, but v5 requires boolean
+- **Fix**: Changed `cache: 'gomod'` to `cache: true` in both Go setup steps in `unit_matrix` job
+- **Result**: Workflow now properly enables dependency caching without YAML validation errors

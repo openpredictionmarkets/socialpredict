@@ -98,14 +98,14 @@ jobs:
         with:
           go-version-file: ${{ matrix.go.value }}
           check-latest: true
-          cache: 'gomod'
+          cache: true
       - name: Setup Go ${{ matrix.go.value }}
         if: ${{ !startsWith(github.head_ref, 'doc/') && matrix.go.mode == 'version' }}
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go.value }}
           check-latest: true
-          cache: 'gomod'
+          cache: true
       - name: Get Dependencies
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
         working-directory: ./backend
