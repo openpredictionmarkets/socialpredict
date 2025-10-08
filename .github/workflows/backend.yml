@@ -10,6 +10,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Prepare the Go version matrix dynamically.
+  # Source order of precedence:
+  # 1) .github/go-versions (if present)
+  # 2) Default to the module's go.mod (file:backend/go.mod)
+  prepare-matrix:
+    name: prepare-matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: build
+        name: Build Go version matrix JSON
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.github/go-versions';
+            let entries = [];
+            if (fs.existsSync(path)) {
+              const raw = fs.readFileSync(path, 'utf8')
+                .split('\n')
+                .map(l => l.trim())
+                .filter(l => l && !l.startsWith('#'));
+              for (const line of raw) {
+                if (line.startsWith('file:')) {
+                  entries.push({ mode: 'file', value: line.replace(/^file:/,'') });
+                } else {
+                  entries.push({ mode: 'version', value: line });
+                }
+              }
+            } else {
+              // Default: follow the module version from backend/go.mod
+              entries = [{ mode: 'file', value: 'backend/go.mod' }];
+            }
+            const matrix = { go: entries };
+            core.setOutput('matrix', JSON.stringify(matrix));
+
   smoke:
     runs-on: ubuntu-latest
     strategy:
@@ -17,24 +55,27 @@ jobs:
       matrix:
         go-version: [ '1.25.x' ]
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Get Dependencies
-      working-directory: ./backend
-      run: |
-        go mod download
-    - name: Run tests
-      working-directory: ./backend
-      run: |
-        go build -o ./main && ./main &
-        SERVER_PID=$!
-        sleep 10
-        kill $SERVER_PID
-  unit:
-    needs: smoke
+      - uses: actions/checkout@v4
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Get Dependencies
+        working-directory: ./backend
+        run: |
+          go mod download
+      - name: Run tests
+        working-directory: ./backend
+        run: |
+          go build -o ./main && ./main &
+          SERVER_PID=$!
+          sleep 10
+          kill $SERVER_PID
+
+  # Dynamic, ANY-version unit matrix (driven by prepare-matrix output)
+  unit_matrix:
+    name: unit (matrix)
+    needs: [smoke, prepare-matrix]
     if: |
       startsWith(github.head_ref, 'feature/')
       || startsWith(github.head_ref, 'fix/')
@@ -43,24 +84,46 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        go-version: [ '1.25.x' ]
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
-      - name: Setup Go ${{ matrix.go-version }}
-        if: ${{ !startsWith(github.head_ref, 'doc/') }}
+      # Use go-version-file when mode == file, otherwise go-version
+      - name: Setup Go (from go.mod)
+        if: ${{ !startsWith(github.head_ref, 'doc/') && matrix.go.mode == 'file' }}
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: ${{ matrix.go.value }}
+          check-latest: true
+          cache: 'gomod'
+      - name: Setup Go ${{ matrix.go.value }}
+        if: ${{ !startsWith(github.head_ref, 'doc/') && matrix.go.mode == 'version' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go.value }}
+          check-latest: true
+          cache: 'gomod'
       - name: Get Dependencies
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
         working-directory: ./backend
-        run: |
-          go get .
-      - name: Run tests
+        run: go get .
+      - name: Run unit tests (${{ matrix.go.mode == 'file' && 'go.mod' || matrix.go.value }})
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
         working-directory: ./backend
         env:
           JWT_SIGNING_KEY: "test-secret-key-for-testing"
         run: go test ./...
+
+  # Stable, aggregate check: require this going forward
+  unit:
+    name: unit
+    needs: [unit_matrix]
+    if: |
+      startsWith(github.head_ref, 'feature/')
+      || startsWith(github.head_ref, 'fix/')
+      || startsWith(github.head_ref, 'refactor/')
+      || startsWith(github.head_ref, 'doc/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish aggregate unit status
+        run: echo "All unit matrix jobs succeeded."
