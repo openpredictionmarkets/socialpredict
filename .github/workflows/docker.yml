@@ -39,7 +39,7 @@ jobs:
         id: frontend-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-front
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -56,13 +56,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true
-          tags: ${{ steps.frontend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-front:latest
+          tags: ${{ steps.frontend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
           labels: ${{ steps.frontend-meta.outputs.labels }}
 
       - name: Generate artifact attestation Frontend
         uses: actions/attest-build-provenance@v3
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-front
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-frontend
           subject-digest: ${{ steps.push-frontend.outputs.digest }}
           push-to-registry: true
 
@@ -70,7 +70,7 @@ jobs:
         id: backend-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-back
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -87,12 +87,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true
-          tags: ${{ steps.backend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-back:latest
+          tags: ${{ steps.backend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
           labels: ${{ steps.backend-meta.outputs.labels }}
 
       - name: Generate artifact attestation Backend
         uses: actions/attest-build-provenance@v3
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-back
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-backend
           subject-digest: ${{ steps.push-backend.outputs.digest }}
           push-to-registry: true
