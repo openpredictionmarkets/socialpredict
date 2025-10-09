@@ -1,0 +1,1195 @@
+openapi: 3.0.3
+info:
+  title: SocialPredict API
+  description: |
+    SocialPredict is a prediction market platform where users can create markets,
+    place bets on outcomes, and track their performance. The API provides endpoints
+    for user management, market operations, betting, and administrative functions.
+  version: 1.0.0
+  contact:
+    name: SocialPredict Team
+    url: https://github.com/raisch/socialpredict
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /v0/login endpoint
+
+  schemas:
+    # Core Models
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        displayname:
+          type: string
+        usertype:
+          type: string
+        initialAccountBalance:
+          type: integer
+          format: int64
+        accountBalance:
+          type: integer
+          format: int64
+        personalEmoji:
+          type: string
+        description:
+          type: string
+        personalink1:
+          type: string
+        personalink2:
+          type: string
+        personalink3:
+          type: string
+        personalink4:
+          type: string
+        mustChangePassword:
+          type: boolean
+
+    PublicUser:
+      type: object
+      properties:
+        username:
+          type: string
+        displayname:
+          type: string
+        usertype:
+          type: string
+        initialAccountBalance:
+          type: integer
+          format: int64
+        accountBalance:
+          type: integer
+          format: int64
+        personalEmoji:
+          type: string
+        description:
+          type: string
+        personalink1:
+          type: string
+        personalink2:
+          type: string
+        personalink3:
+          type: string
+        personalink4:
+          type: string
+
+    PrivateUser:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        apiKey:
+          type: string
+
+    Market:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        questionTitle:
+          type: string
+        description:
+          type: string
+        outcomeType:
+          type: string
+        resolutionDateTime:
+          type: string
+          format: date-time
+        finalResolutionDateTime:
+          type: string
+          format: date-time
+        utcOffset:
+          type: integer
+        isResolved:
+          type: boolean
+        resolutionResult:
+          type: string
+        initialProbability:
+          type: number
+          format: double
+        creatorUsername:
+          type: string
+
+    Bet:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        username:
+          type: string
+        marketId:
+          type: integer
+        amount:
+          type: integer
+          format: int64
+        placedAt:
+          type: string
+          format: date-time
+        outcome:
+          type: string
+
+    MarketOverview:
+      type: object
+      properties:
+        market:
+          $ref: '#/components/schemas/PublicResponseMarket'
+        creator:
+          $ref: '#/components/schemas/PublicUser'
+        lastProbability:
+          type: number
+          format: double
+        numUsers:
+          type: integer
+        totalVolume:
+          type: integer
+          format: int64
+
+    PublicResponseMarket:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        questionTitle:
+          type: string
+        description:
+          type: string
+        outcomeType:
+          type: string
+        resolutionDateTime:
+          type: string
+          format: date-time
+        finalResolutionDateTime:
+          type: string
+          format: date-time
+        utcOffset:
+          type: integer
+        isResolved:
+          type: boolean
+        resolutionResult:
+          type: string
+        initialProbability:
+          type: number
+          format: double
+        creatorUsername:
+          type: string
+
+    # Request/Response Models
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+        password:
+          type: string
+          minLength: 1
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        username:
+          type: string
+        usertype:
+          type: string
+        mustChangePassword:
+          type: boolean
+
+    HomeResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Data From the Backend!"
+
+    ListMarketsResponse:
+      type: object
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketOverview'
+
+    BetRequest:
+      type: object
+      required:
+        - marketId
+        - amount
+        - outcome
+      properties:
+        marketId:
+          type: integer
+        amount:
+          type: integer
+          format: int64
+        outcome:
+          type: string
+
+    CreateMarketRequest:
+      type: object
+      required:
+        - questionTitle
+        - description
+        - outcomeType
+        - resolutionDateTime
+      properties:
+        questionTitle:
+          type: string
+        description:
+          type: string
+        outcomeType:
+          type: string
+        resolutionDateTime:
+          type: string
+          format: date-time
+        utcOffset:
+          type: integer
+        initialProbability:
+          type: number
+          format: double
+
+    ResolveMarketRequest:
+      type: object
+      required:
+        - resolutionResult
+      properties:
+        resolutionResult:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+
+    ChangeDisplayNameRequest:
+      type: object
+      required:
+        - displayName
+      properties:
+        displayName:
+          type: string
+
+    ChangeEmojiRequest:
+      type: object
+      required:
+        - emoji
+      properties:
+        emoji:
+          type: string
+
+    ChangeDescriptionRequest:
+      type: object
+      required:
+        - description
+      properties:
+        description:
+          type: string
+
+    ChangePersonalLinksRequest:
+      type: object
+      properties:
+        personalLink1:
+          type: string
+        personalLink2:
+          type: string
+        personalLink3:
+          type: string
+        personalLink4:
+          type: string
+
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - displayName
+        - email
+        - password
+        - userType
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        userType:
+          type: string
+
+    EconomicsConfig:
+      type: object
+      properties:
+        marketcreation:
+          $ref: '#/components/schemas/MarketCreation'
+        marketincentives:
+          $ref: '#/components/schemas/MarketIncentives'
+        user:
+          $ref: '#/components/schemas/UserConfig'
+        betting:
+          $ref: '#/components/schemas/Betting'
+
+    MarketCreation:
+      type: object
+      properties:
+        initialMarketProbability:
+          type: number
+          format: double
+        initialMarketSubsidization:
+          type: integer
+          format: int64
+        initialMarketYes:
+          type: integer
+          format: int64
+        initialMarketNo:
+          type: integer
+          format: int64
+        minimumFutureHours:
+          type: number
+          format: double
+
+    MarketIncentives:
+      type: object
+      properties:
+        createMarketCost:
+          type: integer
+          format: int64
+        traderBonus:
+          type: integer
+          format: int64
+
+    UserConfig:
+      type: object
+      properties:
+        initialAccountBalance:
+          type: integer
+          format: int64
+        maximumDebtAllowed:
+          type: integer
+          format: int64
+
+    Betting:
+      type: object
+      properties:
+        minimumBet:
+          type: integer
+          format: int64
+        maxDustPerSale:
+          type: integer
+          format: int64
+        betFees:
+          $ref: '#/components/schemas/BetFees'
+
+    BetFees:
+      type: object
+      properties:
+        initialBetFee:
+          type: integer
+          format: int64
+        buySharesFee:
+          type: integer
+          format: int64
+        sellSharesFee:
+          type: integer
+          format: int64
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+paths:
+  # Public endpoints
+  /v0/home:
+    get:
+      tags:
+        - Public
+      summary: Get home page data
+      description: Returns a welcome message from the backend
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeResponse'
+
+  /v0/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Setup and Configuration
+  /v0/setup:
+    get:
+      tags:
+        - Configuration
+      summary: Get application setup configuration
+      description: Returns the economics configuration for the application
+      responses:
+        '200':
+          description: Configuration data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EconomicsConfig'
+
+  /v0/stats:
+    get:
+      tags:
+        - Statistics
+      summary: Get application statistics
+      description: Returns general statistics about the application
+      responses:
+        '200':
+          description: Statistics data
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/system/metrics:
+    get:
+      tags:
+        - Metrics
+      summary: Get system metrics
+      description: Returns system performance and health metrics
+      responses:
+        '200':
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/global/leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get global leaderboard
+      description: Returns the global user leaderboard
+      responses:
+        '200':
+          description: Global leaderboard data
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Markets
+  /v0/markets:
+    get:
+      tags:
+        - Markets
+      summary: List all markets
+      description: Returns a random list of up to 100 markets
+      responses:
+        '200':
+          description: List of markets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+
+  /v0/markets/search:
+    get:
+      tags:
+        - Markets
+      summary: Search markets
+      description: Search for markets based on query parameters
+      parameters:
+        - name: q
+          in: query
+          description: Search query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+
+  /v0/markets/active:
+    get:
+      tags:
+        - Markets
+      summary: List active markets
+      description: Returns all active (unresolved) markets
+      responses:
+        '200':
+          description: List of active markets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+
+  /v0/markets/closed:
+    get:
+      tags:
+        - Markets
+      summary: List closed markets
+      description: Returns all closed markets
+      responses:
+        '200':
+          description: List of closed markets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+
+  /v0/markets/resolved:
+    get:
+      tags:
+        - Markets
+      summary: List resolved markets
+      description: Returns all resolved markets
+      responses:
+        '200':
+          description: List of resolved markets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+
+  /v0/markets/{marketId}:
+    get:
+      tags:
+        - Markets
+      summary: Get market details
+      description: Returns detailed information about a specific market
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Market details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Market'
+        '400':
+          description: Invalid market ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/marketprojection/{marketId}/{amount}/{outcome}/:
+    get:
+      tags:
+        - Markets
+      summary: Project new probability
+      description: Calculate the new probability if a bet of specified amount and outcome were placed
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+        - name: amount
+          in: path
+          required: true
+          description: Bet amount
+          schema:
+            type: integer
+            format: int64
+        - name: outcome
+          in: path
+          required: true
+          description: Bet outcome
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Projected probability
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  newProbability:
+                    type: number
+                    format: double
+
+  # Market Bets and Positions
+  /v0/markets/bets/{marketId}:
+    get:
+      tags:
+        - Markets
+      summary: Get market bets
+      description: Returns all bets for a specific market
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Market bets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bet'
+
+  /v0/markets/positions/{marketId}:
+    get:
+      tags:
+        - Markets
+      summary: Get market positions
+      description: Returns all positions for a specific market
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Market positions
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/markets/positions/{marketId}/{username}:
+    get:
+      tags:
+        - Markets
+      summary: Get user positions in market
+      description: Returns a specific user's positions in a market
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+        - name: username
+          in: path
+          required: true
+          description: Username
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User positions in market
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/markets/leaderboard/{marketId}:
+    get:
+      tags:
+        - Markets
+      summary: Get market leaderboard
+      description: Returns the leaderboard for a specific market
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Market leaderboard
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # User Information
+  /v0/userinfo/{username}:
+    get:
+      tags:
+        - Users
+      summary: Get public user information
+      description: Returns public information about a user
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Username
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Public user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUser'
+
+  /v0/usercredit/{username}:
+    get:
+      tags:
+        - Users
+      summary: Get user credit information
+      description: Returns credit/balance information for a user
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Username
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User credit information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accountBalance:
+                    type: integer
+                    format: int64
+
+  /v0/portfolio/{username}:
+    get:
+      tags:
+        - Users
+      summary: Get user portfolio
+      description: Returns a user's investment portfolio
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Username
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User portfolio
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/users/{username}/financial:
+    get:
+      tags:
+        - Users
+      summary: Get user financial information
+      description: Returns financial information for a user
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Username
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User financial information
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Private User Endpoints
+  /v0/privateprofile:
+    get:
+      tags:
+        - User Profile
+      summary: Get private profile
+      description: Returns private profile information for the authenticated user
+      responses:
+        '200':
+          description: Private profile information
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PublicUser'
+                  - $ref: '#/components/schemas/PrivateUser'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/changepassword:
+    post:
+      tags:
+        - User Profile
+      summary: Change password
+      description: Change the authenticated user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/profilechange/displayname:
+    post:
+      tags:
+        - User Profile
+      summary: Change display name
+      description: Change the authenticated user's display name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeDisplayNameRequest'
+      responses:
+        '200':
+          description: Display name changed successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/profilechange/emoji:
+    post:
+      tags:
+        - User Profile
+      summary: Change personal emoji
+      description: Change the authenticated user's personal emoji
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmojiRequest'
+      responses:
+        '200':
+          description: Emoji changed successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/profilechange/description:
+    post:
+      tags:
+        - User Profile
+      summary: Change profile description
+      description: Change the authenticated user's profile description
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeDescriptionRequest'
+      responses:
+        '200':
+          description: Description changed successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/profilechange/links:
+    post:
+      tags:
+        - User Profile
+      summary: Change personal links
+      description: Change the authenticated user's personal links
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePersonalLinksRequest'
+      responses:
+        '200':
+          description: Links changed successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Betting and Trading
+  /v0/bet:
+    post:
+      tags:
+        - Betting
+      summary: Place a bet
+      description: Place a bet on a market outcome
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BetRequest'
+      responses:
+        '201':
+          description: Bet placed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bet'
+        '400':
+          description: Invalid bet request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/userposition/{marketId}:
+    get:
+      tags:
+        - Betting
+      summary: Get user position in market
+      description: Returns the authenticated user's position in a specific market
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: User position in market
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v0/sell:
+    post:
+      tags:
+        - Betting
+      summary: Sell position
+      description: Sell shares in a market position
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                marketId:
+                  type: integer
+                amount:
+                  type: integer
+                  format: int64
+                outcome:
+                  type: string
+      responses:
+        '200':
+          description: Position sold successfully
+        '400':
+          description: Invalid sell request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Market Management
+  /v0/create:
+    post:
+      tags:
+        - Market Management
+      summary: Create a new market
+      description: Create a new prediction market
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMarketRequest'
+      responses:
+        '201':
+          description: Market created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Market'
+        '400':
+          description: Invalid market creation request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v0/resolve/{marketId}:
+    post:
+      tags:
+        - Market Management
+      summary: Resolve a market
+      description: Resolve a market with the final outcome
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveMarketRequest'
+      responses:
+        '200':
+          description: Market resolved successfully
+        '400':
+          description: Invalid resolution request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Admin Endpoints
+  /v0/admin/createuser:
+    post:
+      tags:
+        - Administration
+      summary: Create a new user (Admin only)
+      description: Create a new user account (requires admin privileges)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid user creation request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient privileges
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: Public
+    description: Public endpoints that don't require authentication
+  - name: Authentication
+    description: User authentication endpoints
+  - name: Configuration
+    description: Application configuration and setup
+  - name: Statistics
+    description: Application statistics and analytics
+  - name: Metrics
+    description: System metrics and monitoring
+  - name: Leaderboard
+    description: User and market leaderboards
+  - name: Markets
+    description: Market information and browsing
+  - name: Users
+    description: Public user information
+  - name: User Profile
+    description: Private user profile management
+  - name: Betting
+    description: Betting and position management
+  - name: Market Management
+    description: Market creation and resolution
+  - name: Administration
+    description: Administrative functions
