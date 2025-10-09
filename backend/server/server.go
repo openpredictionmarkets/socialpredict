@@ -4,13 +4,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
 	buybetshandlers "socialpredict/handlers/bets/buying"
 	sellbetshandlers "socialpredict/handlers/bets/selling"
+	"socialpredict/handlers/cms/homepage"
+	cmshomehttp "socialpredict/handlers/cms/homepage/http"
 	marketshandlers "socialpredict/handlers/markets"
 	metricshandlers "socialpredict/handlers/metrics"
 	positions "socialpredict/handlers/positions"
@@ -23,6 +23,9 @@ import (
 	"socialpredict/middleware"
 	"socialpredict/security"
 	"socialpredict/setup"
+	"socialpredict/util"
+	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -94,7 +97,7 @@ func Start() {
 	securityService := security.NewSecurityService()
 
 	// CORS handler (configurable via env)
-  c := buildCORSFromEnv()
+	c := buildCORSFromEnv()
 
 	// Initialize mux router
 	router := mux.NewRouter()
@@ -156,17 +159,27 @@ func Start() {
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")
 
-	// Apply CORS middleware if enabled
-  handler := http.Handler(router)
-  if c != nil {
-  	handler = c.Handler(handler)
-  }
+	// homepage content routes
+	db := util.GetDB()
+	homepageRepo := homepage.NewGormRepository(db)
+	homepageRenderer := homepage.NewDefaultRenderer()
+	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
+	homepageHandler := cmshomehttp.NewHandler(homepageSvc)
 
-  // Allow BACKEND_PORT to be configured via environment, default to 8080
-  port := os.Getenv("BACKEND_PORT")
-  if port == "" {
-  	port = "8080"
-  }
+	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
+	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
+
+	// Apply CORS middleware if enabled
+	handler := http.Handler(router)
+	if c != nil {
+		handler = c.Handler(handler)
+	}
+
+	// Allow BACKEND_PORT to be configured via environment, default to 8080
+	port := os.Getenv("BACKEND_PORT")
+	if port == "" {
+		port = "8080"
+	}
 
 	log.Printf("Starting server on :%s", port)
 	if err := http.ListenAndServe(":"+port, handler); err != nil {

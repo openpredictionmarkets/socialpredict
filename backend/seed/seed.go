@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"
@@ -87,4 +88,34 @@ func EnsureDBReady(db *gorm.DB, maxAttempts int) error {
 	}
 
 	return fmt.Errorf("database is not ready after %d attempts: %v", maxAttempts, err)
+}
+
+func SeedHomepage(db *gorm.DB, repoRoot string) error {
+	var count int64
+	if err := db.Model(&models.HomepageContent{}).
+		Where("slug = ?", "home").Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	// default seed path lives next to frontend
+	mdPath := filepath.Join(repoRoot, "frontend", "src", "content", "home.md")
+	data, err := os.ReadFile(mdPath)
+	if err != nil {
+		// If file missing, seed with a trivial default
+		data = []byte("# Welcome to BrierFoxForecast\n\nThis is the seeded home page.")
+	}
+
+	item := models.HomepageContent{
+		Slug:     "home",
+		Title:    "Home",
+		Format:   "markdown",
+		Markdown: string(data),
+		HTML:     "", // rendered later by service
+		Version:  1,
+	}
+
+	return db.Create(&item).Error
 }
