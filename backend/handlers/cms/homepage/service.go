@@ -7,6 +7,7 @@ import (
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 type Renderer interface {
@@ -20,9 +21,38 @@ type DefaultRenderer struct {
 }
 
 func NewDefaultRenderer() *DefaultRenderer {
+	// Create a permissive policy for rich HTML content with Tailwind classes
+	policy := bluemonday.NewPolicy()
+
+	// Allow all common HTML structural elements
+	policy.AllowElements(
+		"div", "section", "p", "span",
+		"h1", "h2", "h3", "h4", "h5", "h6",
+		"ul", "ol", "li",
+		"a", "img",
+		"strong", "em", "b", "i",
+		"br", "hr",
+	)
+
+	// Allow class attribute on all elements (for Tailwind CSS)
+	policy.AllowAttrs("class", "id").Globally()
+
+	// Allow specific attributes for links
+	policy.AllowAttrs("href", "target", "rel", "title").OnElements("a")
+
+	// Allow specific attributes for images
+	policy.AllowAttrs("src", "alt", "width", "height", "title").OnElements("img")
+
+	// Allow URL schemes for links and images
+	policy.AllowURLSchemes("http", "https", "mailto")
+
 	return &DefaultRenderer{
-		md: goldmark.New(),
-		pm: bluemonday.UGCPolicy(),
+		md: goldmark.New(
+			goldmark.WithRendererOptions(
+				html.WithUnsafe(),
+			),
+		),
+		pm: policy,
 	}
 }
 

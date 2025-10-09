@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"
+
+	"socialpredict/handlers/cms/homepage"
 
 	"gorm.io/gorm"
 )
@@ -100,20 +101,30 @@ func SeedHomepage(db *gorm.DB, repoRoot string) error {
 		return nil
 	}
 
-	// default seed path lives next to frontend
-	mdPath := filepath.Join(repoRoot, "frontend", "src", "content", "home.md")
-	data, err := os.ReadFile(mdPath)
-	if err != nil {
-		// If file missing, seed with a trivial default
+	// Use embedded content to avoid filesystem path issues
+	var data []byte
+	if len(defaultHomeMD) > 0 {
+		data = defaultHomeMD
+	} else {
+		// Fallback only if embedding failed
 		data = []byte("# Welcome to BrierFoxForecast\n\nThis is the seeded home page.")
 	}
+
+	// Create renderer for sanitization
+	renderer := homepage.NewDefaultRenderer()
+
+	// Since the content is pure HTML, treat it as HTML format
+	htmlContent := string(data)
+
+	// Sanitize the HTML directly (no markdown conversion needed)
+	sanitizedHTML := renderer.SanitizeHTML(htmlContent)
 
 	item := models.HomepageContent{
 		Slug:     "home",
 		Title:    "Home",
-		Format:   "markdown",
-		Markdown: string(data),
-		HTML:     "", // rendered later by service
+		Format:   "html", // Changed to html since content is pure HTML
+		Markdown: "",     // Empty since we're using HTML format
+		HTML:     sanitizedHTML,
 		Version:  1,
 	}
 
