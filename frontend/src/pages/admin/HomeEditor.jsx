@@ -3,8 +3,6 @@ import React, { useEffect, useState } from 'react';
 function HomeEditor() {
   const [content, setContent] = useState({
     title: '',
-    format: 'markdown',
-    markdown: '',
     html: '',
     version: 0
   });
@@ -19,13 +17,11 @@ function HomeEditor() {
 
   const fetchContent = async () => {
     try {
-      const response = await fetch('/v0/content/home');
+      const response = await fetch('/api/v0/content/home');
       if (response.ok) {
         const data = await response.json();
         setContent({
           title: data.title || '',
-          format: data.format || 'markdown',
-          markdown: data.markdown || '',
           html: data.html || '',
           version: data.version || 0
         });
@@ -45,8 +41,8 @@ function HomeEditor() {
     setError('');
 
     try {
-      const token = localStorage.getItem('authToken'); // Adjust based on your auth implementation
-      const response = await fetch('/v0/admin/content/home', {
+      const token = localStorage.getItem('token'); // Use correct token key from localStorage
+      const response = await fetch('/api/v0/admin/content/home', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -54,9 +50,8 @@ function HomeEditor() {
         },
         body: JSON.stringify({
           title: content.title,
-          format: content.format,
-          markdown: content.markdown,
-          html: content.format === 'html' ? content.html : '',
+          format: 'html',
+          html: content.html,
           version: content.version
         })
       });
@@ -129,37 +124,17 @@ function HomeEditor() {
             />
           </div>
 
-          {/* Format Selection */}
-          <div>
-            <label className="block text-white font-semibold mb-2">
-              Format
-            </label>
-            <select
-              value={content.format}
-              onChange={(e) => handleInputChange('format', e.target.value)}
-              className="p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="markdown">Markdown</option>
-              <option value="html">HTML</option>
-            </select>
-          </div>
-
           {/* Content Editor */}
           <div>
             <label className="block text-white font-semibold mb-2">
-              {content.format === 'markdown' ? 'Markdown Content' : 'HTML Content'}
+              HTML Content
             </label>
             <textarea
-              value={content.format === 'markdown' ? content.markdown : content.html}
-              onChange={(e) => 
-                handleInputChange(
-                  content.format === 'markdown' ? 'markdown' : 'html',
-                  e.target.value
-                )
-              }
+              value={content.html}
+              onChange={(e) => handleInputChange('html', e.target.value)}
               rows={20}
               className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none font-mono text-sm"
-              placeholder={content.format === 'markdown' ? 'Enter markdown content...' : 'Enter HTML content...'}
+              placeholder="Enter HTML content..."
             />
           </div>
 
