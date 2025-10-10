@@ -34,17 +34,27 @@ func NewDefaultRenderer() *DefaultRenderer {
 		"br", "hr",
 	)
 
-	// Allow class attribute on all elements (for Tailwind CSS)
+	// Allow class and id attributes on all elements (for Tailwind CSS)
 	policy.AllowAttrs("class", "id").Globally()
+
+	// Allow accessibility attributes globally
+	policy.AllowAttrs(
+		"aria-labelledby", "aria-describedby", "aria-label", "aria-hidden",
+		"role", "tabindex", "aria-expanded", "aria-controls",
+	).Globally()
 
 	// Allow specific attributes for links
 	policy.AllowAttrs("href", "target", "rel", "title").OnElements("a")
 
-	// Allow specific attributes for images
-	policy.AllowAttrs("src", "alt", "width", "height", "title").OnElements("img")
+	// Allow specific attributes for images (including performance attributes)
+	policy.AllowAttrs(
+		"src", "alt", "width", "height", "title",
+		"loading", "decoding", // Performance attributes
+	).OnElements("img")
 
-	// Allow URL schemes for links and images
+	// Allow URL schemes for links and images (including relative paths)
 	policy.AllowURLSchemes("http", "https", "mailto")
+	policy.AllowRelativeURLs(true) // Allow relative URLs like "/HomePageLogo.png"
 
 	return &DefaultRenderer{
 		md: goldmark.New(
