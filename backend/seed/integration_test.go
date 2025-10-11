@@ -46,8 +46,8 @@ func TestSeedHomepage_Integration_WithActualFile(t *testing.T) {
 	if content.Title != "Home" {
 		t.Errorf("Expected title 'Home', got '%s'", content.Title)
 	}
-	if content.Format != "markdown" {
-		t.Errorf("Expected format 'markdown', got '%s'", content.Format)
+	if content.Format != "html" {
+		t.Errorf("Expected format 'html', got '%s'", content.Format)
 	}
 
 	// Verify HTML was rendered and contains rich content
@@ -55,21 +55,12 @@ func TestSeedHomepage_Integration_WithActualFile(t *testing.T) {
 		t.Fatal("HTML field should not be empty after seeding")
 	}
 
-	// Verify the markdown content contains the expected rich content
-	if !strings.Contains(content.Markdown, "Enhanced Homepage Content") {
-		t.Errorf("Expected markdown to contain title, got: %s", content.Markdown)
-	}
-	if !strings.Contains(content.Markdown, "BrierFoxForecast (BFF)") {
-		t.Errorf("Expected markdown to contain BFF title, got: %s", content.Markdown)
-	}
-	if !strings.Contains(content.Markdown, "class=") {
-		t.Errorf("Expected markdown to contain CSS classes, got: %s", content.Markdown)
+	// Note: Markdown field should be empty since we're using HTML format
+	if content.Markdown != "" {
+		t.Errorf("Expected empty markdown content for HTML format, got: %s", content.Markdown)
 	}
 
 	// Verify HTML contains rendered content with preserved classes
-	if !strings.Contains(content.HTML, "Enhanced Homepage Content") {
-		t.Errorf("Expected HTML to contain title, got: %s", content.HTML)
-	}
 	if !strings.Contains(content.HTML, "BrierFoxForecast (BFF)") {
 		t.Errorf("Expected HTML to contain BFF title, got: %s", content.HTML)
 	}
@@ -78,6 +69,9 @@ func TestSeedHomepage_Integration_WithActualFile(t *testing.T) {
 	}
 	if !strings.Contains(content.HTML, `/HomePageLogo.png`) {
 		t.Errorf("Expected HTML to contain logo reference, got: %s", content.HTML)
+	}
+	if !strings.Contains(content.HTML, `aria-labelledby=`) {
+		t.Errorf("Expected HTML to contain accessibility attributes, got: %s", content.HTML)
 	}
 
 	// Test the service can retrieve the content properly
