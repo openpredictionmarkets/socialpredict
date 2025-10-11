@@ -25,4 +25,10 @@ func MigrateDB(db *gorm.DB) {
 	if err != nil {
 		log.Fatalf("Error migrating Bet model: %v", err)
 	}
+
+	// Then, migrate the HomepageContent model
+	err = db.AutoMigrate(&models.HomepageContent{})
+	if err != nil {
+		log.Fatalf("Error migrating HomepageContent model: %v", err)
+	}
 }

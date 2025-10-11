@@ -54,7 +54,10 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 		db := util.GetDB()
 
 		// validate that the user performing this function is indeed admin
-		middleware.ValidateAdminToken(r, db)
+		if err := middleware.ValidateAdminToken(r, db); err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 
 		appConfig := loadEconConfig()
 		user := models.User{
