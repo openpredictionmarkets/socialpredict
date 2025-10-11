@@ -21,6 +21,8 @@ type PublicResponseMarket struct {
 	InitialProbability      float64   `json:"initialProbability"`
 	CreatorUsername         string    `json:"creatorUsername"`
 	CreatedAt               time.Time `json:"createdAt"`
+	YesLabel                string    `json:"yesLabel"`
+	NoLabel                 string    `json:"noLabel"`
 }
 
 // GetPublicResponseMarketByID retrieves a market by its ID using an existing database connection,
@@ -52,6 +54,8 @@ func GetPublicResponseMarketByID(db *gorm.DB, marketId string) (PublicResponseMa
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
 		CreatedAt:               market.CreatedAt,
+		YesLabel:                market.YesLabel,
+		NoLabel:                 market.NoLabel,
 	}
 
 	return responseMarket, nil

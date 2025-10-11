@@ -24,7 +24,7 @@ const NoPortfolio = () => (
 
 const Profile = () => {
   const { username } = useAuth();
-  const { userData, userLoading, userError } = useUserData(username);
+  const { userData, userLoading, userError } = useUserData(username, true); // Use private profile
   const { portfolio, portfolioLoading, portfolioError } =
     usePortfolio(username);
 

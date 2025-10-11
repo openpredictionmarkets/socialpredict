@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../../buttons/trade/BetButtons';
 import MarketProjectionLayout from '../marketprojection/MarketProjectionLayout';
-import { submitBet } from './TradeUtils'
+import { submitBet } from './TradeUtils';
+import { useMarketLabels } from '../../../hooks/useMarketLabels';
 
 
-const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
+const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
     const [betAmount, setBetAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
     const [feeData, setFeeData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    
+    // Get custom labels for this market
+    const { yesLabel, noLabel } = useMarketLabels(market);
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -56,15 +60,21 @@ const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
         <div className="p-6 bg-blue-900 rounded-lg text-white">
             <h2 className="text-xl mb-4">Purchase Shares</h2>
             <div className="flex justify-center space-x-4 mb-4">
-                <BetNoButton onClick={() => setSelectedOutcome('NO')} />
-                <BetYesButton onClick={() => setSelectedOutcome('YES')} />
+                <BetNoButton 
+                    onClick={() => setSelectedOutcome('NO')} 
+                    label={noLabel}
+                />
+                <BetYesButton 
+                    onClick={() => setSelectedOutcome('YES')} 
+                    label={yesLabel}
+                />
             </div>
             <div className="border-t border-gray-200 my-2"></div>
             <div className="flex items-center space-x-4 mb-4">
                 <h2 className="text-xl">Amount</h2>
                 <BetInputAmount value={betAmount} onChange={handleBetAmountChange} />
             </div>
-            <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} />
+            <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} yesLabel={yesLabel} noLabel={noLabel} />
             <div>
             <div className="border-t border-gray-200 my-2"></div>
 

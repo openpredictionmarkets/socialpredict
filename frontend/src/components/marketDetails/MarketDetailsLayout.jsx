@@ -25,6 +25,7 @@ function MarketDetailsTable({
 }) {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showBetModal, setShowBetModal] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const toggleBetModal = () => setShowBetModal(prev => !prev);
 
@@ -33,6 +34,7 @@ function MarketDetailsTable({
     if (refetchData) {
       refetchData();  // Trigger data refresh
     }
+    setRefreshTrigger(prev => prev + 1); // Trigger positions refresh
   };
 
   const shouldShowTradeButtons = !market.isResolved && isLoggedIn && new Date(market.resolutionDateTime) > new Date();
@@ -42,6 +44,7 @@ function MarketDetailsTable({
       <ResolutionAlert
         isResolved={market.isResolved}
         resolutionResult={market.resolutionResult}
+        market={market}
       />
 
       <div className='mb-4'>
@@ -167,7 +170,7 @@ function MarketDetailsTable({
       </div>
 
       <div className='mx-auto w-full mb-4'>
-        <ActivityTabs marketId={marketId} />
+        <ActivityTabs marketId={marketId} market={market} refreshTrigger={refreshTrigger} />
       </div>
 
       {/* Mobile floating CTA */}
@@ -184,6 +187,7 @@ function MarketDetailsTable({
           <div className="bet-modal relative bg-blue-900 p-6 rounded-lg text-white m-6 mx-auto" style={{ width: '350px' }}>
             <TradeTabs
               marketId={marketId}
+              market={market}
               token={token}
               onTransactionSuccess={handleTransactionSuccess}
             />
