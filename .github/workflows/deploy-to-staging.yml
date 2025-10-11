@@ -1,0 +1,14 @@
+name: Deploy To Staging
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  deploy:
+    name: Deploy SocialPredict to Staging
+    if: github.event.pull_request.merged == true
+    uses:
+      openpredictionmarkets/ansible_playbooks/.github/workflows/deploy_staging.yml@main
