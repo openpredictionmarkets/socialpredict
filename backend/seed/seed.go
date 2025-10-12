@@ -8,6 +8,8 @@ import (
 	"socialpredict/setup"
 	"time"
 
+	"socialpredict/handlers/cms/homepage"
+
 	"gorm.io/gorm"
 )
 
@@ -87,4 +89,44 @@ func EnsureDBReady(db *gorm.DB, maxAttempts int) error {
 	}
 
 	return fmt.Errorf("database is not ready after %d attempts: %v", maxAttempts, err)
+}
+
+func SeedHomepage(db *gorm.DB, repoRoot string) error {
+	var count int64
+	if err := db.Model(&models.HomepageContent{}).
+		Where("slug = ?", "home").Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	// Use embedded content to avoid filesystem path issues
+	var data []byte
+	if len(defaultHomeMD) > 0 {
+		data = defaultHomeMD
+	} else {
+		// Fallback only if embedding failed
+		data = []byte("# Welcome to BrierFoxForecast\n\nThis is the seeded home page.")
+	}
+
+	// Create renderer for sanitization
+	renderer := homepage.NewDefaultRenderer()
+
+	// Since the content is pure HTML, treat it as HTML format
+	htmlContent := string(data)
+
+	// Sanitize the HTML directly (no markdown conversion needed)
+	sanitizedHTML := renderer.SanitizeHTML(htmlContent)
+
+	item := models.HomepageContent{
+		Slug:     "home",
+		Title:    "Home",
+		Format:   "html", // Changed to html since content is pure HTML
+		Markdown: "",     // Empty since we're using HTML format
+		HTML:     sanitizedHTML,
+		Version:  1,
+	}
+
+	return db.Create(&item).Error
 }
