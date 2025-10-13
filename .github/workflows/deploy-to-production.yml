@@ -1,0 +1,20 @@
+name: Deploy To Production
+
+on:
+  workflow_run:
+    workflows: ["Create and publish Docker images"]
+    types: [completed]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Deploy SocialPredict to Production
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.ANSIBLE_PLAYBOOK_PRODUCTION }}
+          repository: openpredictionmarkets/ansible_playbooks
+          event-type: deploy-to-production
