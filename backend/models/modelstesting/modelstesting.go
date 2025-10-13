@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"socialpredict/migration"
+	// Import migrations to ensure init() functions run during tests
+	_ "socialpredict/migration/migrations"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
