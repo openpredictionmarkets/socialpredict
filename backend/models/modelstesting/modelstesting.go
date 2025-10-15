@@ -22,3 +22,13 @@ func NewFakeDB(t *testing.T) *gorm.DB {
 	migration.MigrateDB(db)
 	return db
 }
+
+// Returns a Completely New DB and does not migrate. Used for testing migrations.
+func NewTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	return db
+}
