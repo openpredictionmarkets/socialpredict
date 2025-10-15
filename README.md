@@ -1,3 +1,7 @@
+[![Deploy To Production](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml/badge.svg)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml)
+
+[![Deploy To Staging](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml/badge.svg)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml)
+
 # About SocialPredict
 ## Free Forecasting for Everyone, Everywhere
 
