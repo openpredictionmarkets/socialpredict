@@ -44,8 +44,6 @@ services:
     environment:
       ENVIRONMENT: ${APP_ENV}
       DOMAIN: ${DOMAIN}
-      BACKEND_PORT: ${BACKEND_PORT}
-      FRONTEND_PORT: ${REACT_PORT}
     volumes:
       - ../data/nginx/vhosts/prod:/etc/nginx/templates/
     networks:
