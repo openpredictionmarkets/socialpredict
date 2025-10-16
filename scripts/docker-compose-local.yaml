@@ -12,8 +12,6 @@ services:
       - ${POSTGRES_VOLUME}:/var/lib/postgresql/data
     networks:
       - socialpredict_network
-    env_file:
-      - ../.env
 
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"

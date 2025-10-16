@@ -13,7 +13,7 @@ const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
     useEffect(() => {
         const fetchFeeData = async () => {
             try {
-                const response = await fetch('/api/v0/setup');
+                const response = await fetch('/v0/setup');
                 const data = await response.json();
                 setFeeData(data.Betting.BetFees);
                 setIsLoading(false); // Set loading state to false after fetching
@@ -90,8 +90,8 @@ const BuySharesLayout = ({ marketId, token, onTransactionSuccess }) => {
                 </div>
             )}
 
-            
-            <div className="border-t border-gray-200 my-2"></div>           
+
+            <div className="border-t border-gray-200 my-2"></div>
             <MarketProjectionLayout
                 marketId={marketId}
                 amount={betAmount}

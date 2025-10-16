@@ -10,8 +10,8 @@ const UserInfoTabContent = ({ username, userData }) => {
     useEffect(() => {
         const fetchUserCredit = async () => {
             try {
-                console.log(`Fetching user credit for: ${username} from ${API_URL}/api/v0/usercredit/${username}`);
-                const response = await fetch(`${API_URL}/api/v0/usercredit/${username}`);
+                console.log(`Fetching user credit for: ${username} from ${API_URL}/v0/usercredit/${username}`);
+                const response = await fetch(`${API_URL}/v0/usercredit/${username}`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log('User credit data:', data);
@@ -34,7 +34,7 @@ const UserInfoTabContent = ({ username, userData }) => {
 
     const renderPersonalLinks = () => {
         if (!userData) return null;
-        
+
         const linkKeys = ['personalink1', 'personalink2', 'personalink3', 'personalink4'];
         return linkKeys.map(key => {
             const link = userData[key];

@@ -127,9 +127,7 @@ fi
 if [ "$1" = "up" ]; then
 	source_env
 	if [ "${APP_ENV}" = "development" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" up -d
-		unset CALLED_FROM_SOCIALPREDICT
+	  docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-dev.yaml" up -d
 	elif [ "${APP_ENV}" = "localhost" ]; then
 	  docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-local.yaml" up -d
 	elif [ "${APP_ENV}" = "production" ]; then
@@ -146,9 +144,7 @@ fi
 if [ "$1" = "down" ]; then
 	source_env
 	if [ "${APP_ENV}" = "development" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" down
-		unset CALLED_FROM_SOCIALPREDICT
+		docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-dev.yaml" down -v
 	elif [ "${APP_ENV}" = "localhost" ]; then
     docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-local.yaml" down -v
 	elif [ "${APP_ENV}" = "production" ]; then
