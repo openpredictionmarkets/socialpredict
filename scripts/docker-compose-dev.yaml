@@ -16,7 +16,7 @@ services:
 
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
-    image: "${BACKEND_IMAGE_NAME}"
+    image: ghcr.io/openpredictionmarkets/socialpredict-backend
     environment:
       ENVIRONMENT: ${APP_ENV}
       CONTAINER_NAME: ${BACKEND_CONTAINER_NAME}
@@ -40,7 +40,7 @@ services:
 
   frontend:
     container_name: "${FRONTEND_CONTAINER_NAME}"
-    image: "${FRONTEND_IMAGE_NAME}"
+    image: ghcr.io/openpredictionmarkets/socialpredict-frontend
     environment:
       ENVIRONMENT: ${APP_ENV}
     networks:
