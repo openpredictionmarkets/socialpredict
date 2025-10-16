@@ -48,12 +48,12 @@ docker_check() {
 
 # Function to Source the .env file
 source_env() {
-        if [ -f "$ENV_PATH" ]; then
-                source "$ENV_PATH"
-        else
-                echo "Error: .env file not found."
-                exit 1
-        fi
+  if [ -f "${SCRIPT_DIR}/.env" ]; then
+    source "${SCRIPT_DIR}/.env"
+  else
+    echo "Error: .env file not found."
+    exit 1
+  fi
 }
 
 if [ "$1" = "install" ]; then
@@ -112,49 +112,30 @@ fi
 
 # Run Docker Exec
 if [ "$1" = "exec" ]; then
-	source_env
-	export CALLED_FROM_SOCIALPREDICT=yes
-	if [ -z "$3" ]; then
-		source ./scripts/exec.sh "$2"
-	else
-		source ./scripts/exec.sh "$2" "$3"
-	fi
-
+  source_env
+  export CALLED_FROM_SOCIALPREDICT=yes
+  if [ -z "$3" ]; then
+  	source "$SCRIPT_DIR/scripts/docker-commands.sh" exec "$2"
+  	else
+  	source "$SCRIPT_DIR/scripts/docker-commands.sh" exec "$2" "$3"
+  fi
 	unset CALLED_FROM_SOCIALPREDICT
 fi
 
 # Run docker compose up
 if [ "$1" = "up" ]; then
-	source_env
-	if [ "${APP_ENV}" = "development" ]; then
-	  docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-dev.yaml" up -d
-	elif [ "${APP_ENV}" = "localhost" ]; then
-	  docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-local.yaml" up -d
-	elif [ "${APP_ENV}" = "production" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" up -d
-		unset CALLED_FROM_SOCIALPREDICT
-	else
-		echo "Wrong Application Environment in .env"
-		exit 1
-	fi
+  source_env
+  export CALLED_FROM_SOCIALPREDICT=yes
+  source "$SCRIPT_DIR/scripts/docker-commands.sh" up
+  unset CALLED_FROM_SOCIALPREDICT
 fi
 
 # Run docker compose down
 if [ "$1" = "down" ]; then
-	source_env
-	if [ "${APP_ENV}" = "development" ]; then
-		docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-dev.yaml" down -v
-	elif [ "${APP_ENV}" = "localhost" ]; then
-    docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-local.yaml" down -v
-	elif [ "${APP_ENV}" = "production" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" down
-		unset CALLED_FROM_SOCIALPREDICT
-	else
-		echo "Wrong Application Environment in .env"
-		exit 1
-	fi
+  source_env
+  export CALLED_FROM_SOCIALPREDICT=yes
+    source "$SCRIPT_DIR/scripts/docker-commands.sh" down
+    unset CALLED_FROM_SOCIALPREDICT
 fi
 
 # Database backup/restore
