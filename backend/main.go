@@ -14,7 +14,7 @@ func main() {
 
 	http.Handle("/secure", middleware.Authenticate(http.HandlerFunc(secureEndpoint)))
 
-  // Load .env.dev if present; non-fatal if missing
+	// Load .env.dev if present; non-fatal if missing
 	if err := util.GetEnv(); err != nil {
 		// util.GetEnv is tolerant, but log any unexpected errors
 		log.Printf("Warning loading environment: %v", err)
@@ -31,6 +31,11 @@ func main() {
 	migration.MigrateDB(db)
 
 	seed.SeedUsers(db)
+
+	// Seed homepage content - pass current working directory as repo root
+	if err := seed.SeedHomepage(db, "."); err != nil {
+		log.Printf("Warning: Failed to seed homepage content: %v", err)
+	}
 
 	server.Start()
 }
