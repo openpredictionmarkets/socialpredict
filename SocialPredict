@@ -39,7 +39,7 @@ docker_check() {
                 echo "Error: Found docker-compose V1. Please update to V2."
                 echo "https://docs.docker.com/compose/migrate/"
                 exit 1
-    
+
         else
                 echo "Error: Docker Compose is not installed."
                 exit 1
@@ -71,7 +71,7 @@ if [ "$1" = "install" ]; then
 	# Ask user input for Application Environment
 	echo "### Select Application Environment: "
 	PS3='Please enter your choice: '
-	options=("Development" "Production" "Quit")
+	options=("Development" "Localhost" "Production" "Quit")
 	select opt in "${options[@]}"
 	do
 		case $opt in
@@ -84,6 +84,15 @@ if [ "$1" = "install" ]; then
 				unset CALLED_FROM_SOCIALPREDICT
 				break
 				;;
+		  "Localhost")
+		    echo
+		    echo "Building for Localhost"
+		    echo
+		    export CALLED_FROM_SOCIALPREDICT=yes
+		    source "$SCRIPT_DIR/scripts/localhost.sh"
+		    unset CALLED_FROM_SOCIALPREDICT
+		    break
+		    ;;
 			"Production")
 				echo
 				echo "Building for Production"
@@ -121,6 +130,8 @@ if [ "$1" = "up" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
 		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" up -d
 		unset CALLED_FROM_SOCIALPREDICT
+	elif [ "${APP_ENV}" = "localhost" ]; then
+	  docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-local.yaml" up -d
 	elif [ "${APP_ENV}" = "production" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
 		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" up -d
@@ -138,6 +149,8 @@ if [ "$1" = "down" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
 		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" down
 		unset CALLED_FROM_SOCIALPREDICT
+	elif [ "${APP_ENV}" = "localhost" ]; then
+    docker compose --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-local.yaml" down -v
 	elif [ "${APP_ENV}" = "production" ]; then
 		export CALLED_FROM_SOCIALPREDICT=yes
 		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" down
