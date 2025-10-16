@@ -6,6 +6,33 @@ set -a # Automatically export all variables
 # Determine script's directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# -------------------------- Help (no .env required) ---------------------------
+print_help() {
+  cat <<EOF
+Usage: ./SocialPredict <command> [options]
+
+SocialPredict - Database-driven prediction market platform
+
+Commands:
+  install                      Interactive installation and setup
+  up                           Start all services (Docker containers)
+  down                         Stop all services (Docker containers)
+  exec <container> [cmd]       Execute commands inside containers
+  backup [options]             Database backup and restore operations
+  --help, -h                   Show this help message
+
+For detailed backup options, run:
+  ./SocialPredict backup --help
+EOF
+}
+
+# Show help if explicitly requested or if no command provided — before .env work
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ] || [ -z "${1:-}" ]; then
+  print_help
+  exit 0
+fi
+# ----------------------------------------------------------------------------- 
+
 # Ensure .env file exists before resolving path
 if [ ! -f "$SCRIPT_DIR/.env" ]; then
   echo ".env file not found."
@@ -156,4 +183,11 @@ if [ "$1" = "backup" ]; then
 	# Pass remaining args to the backup script, e.g. --save / --list / --restore <file> / --restore-latest
 	source "$SCRIPT_DIR/scripts/backup/db_backup.sh" "$@"
 	unset CALLED_FROM_SOCIALPREDICT
+	exit 0
 fi
+
+# Unknown command
+echo "Unknown command: $1"
+echo
+print_help
+exit 1
