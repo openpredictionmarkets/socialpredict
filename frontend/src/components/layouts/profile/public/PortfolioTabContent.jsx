@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { API_URL } from '../../../../config';
 import { SharesBadge } from '../../../buttons/trade/SellButtons';
 import LoadingSpinner from '../../../loaders/LoadingSpinner';
+import { mapInternalToDisplay } from '../../../../utils/labelMapping';
 
 const PortfolioTabContent = ({ username }) => {
     const [positions, setPositions] = useState([]);
@@ -67,15 +68,18 @@ const PortfolioTabContent = ({ username }) => {
     }
 
     // Create a smaller version of SharesBadge for table use
-    const CompactSharesBadge = ({ type, count }) => {
+    const CompactSharesBadge = ({ type, count, market = null }) => {
         if (count === 0) return null;
         
         const bgColor = type === "YES" ? "bg-green-600" : "bg-red-600";
         const textColor = "text-white";
         
+        // Use custom label if market is provided, otherwise use internal type
+        const displayLabel = market ? mapInternalToDisplay(type, market) : type;
+        
         return (
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor}`}>
-                {count} {type}
+                {count} {displayLabel}
             </span>
         );
     };

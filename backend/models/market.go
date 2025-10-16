@@ -18,6 +18,8 @@ type Market struct {
 	IsResolved              bool      `json:"isResolved"`
 	ResolutionResult        string    `json:"resolutionResult"`
 	InitialProbability      float64   `json:"initialProbability" gorm:"not null"`
+	YesLabel                string    `json:"yesLabel" gorm:"default:YES"`
+	NoLabel                 string    `json:"noLabel" gorm:"default:NO"`
 	CreatorUsername         string    `json:"creatorUsername" gorm:"not null"`
 	Creator                 User      `gorm:"foreignKey:CreatorUsername;references:Username"`
 }
