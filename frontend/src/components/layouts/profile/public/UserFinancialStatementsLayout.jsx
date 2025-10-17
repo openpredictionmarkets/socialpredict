@@ -10,8 +10,8 @@ const UserFinancialStatementsLayout = ({ username }) => {
     useEffect(() => {
         const fetchFinancialData = async () => {
             try {
-                console.log(`Fetching financial data for user: ${username} from ${API_URL}/api/v0/users/${username}/financial`);
-                const response = await fetch(`${API_URL}/api/v0/users/${username}/financial`);
+                console.log(`Fetching financial data for user: ${username} from ${API_URL}/v0/users/${username}/financial`);
+                const response = await fetch(`${API_URL}/v0/users/${username}/financial`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log('Financial data:', data);
@@ -228,7 +228,7 @@ const UserFinancialStatementsLayout = ({ username }) => {
         },
         {
             name: 'Position Efficiency',
-            value: financialData.totalSpentInPlay > 0 ? 
+            value: financialData.totalSpentInPlay > 0 ?
                 Math.round((financialData.amountInPlayActive / financialData.totalSpentInPlay) * 100) : 0,
             description: 'Current position value vs amount spent (%)',
             formula: '(amountInPlayActive / totalSpentInPlay) × 100'
@@ -239,27 +239,27 @@ const UserFinancialStatementsLayout = ({ username }) => {
         <div className="bg-primary-background shadow-md rounded-lg">
             <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-6">Financial Statements</h3>
-                
-                <FinancialSection 
-                    title="Balance Sheet - Financial Position" 
+
+                <FinancialSection
+                    title="Balance Sheet - Financial Position"
                     items={balanceSheetItems}
                     bgColor="bg-info-blue"
                 />
-                
-                <FinancialSection 
-                    title="Income Statement - Profitability" 
+
+                <FinancialSection
+                    title="Income Statement - Profitability"
                     items={incomeStatementItems}
                     bgColor="bg-green-btn"
                 />
-                
-                <FinancialSection 
-                    title="Cash Flow Statement - Investment Activity" 
+
+                <FinancialSection
+                    title="Cash Flow Statement - Investment Activity"
                     items={cashFlowItems}
                     bgColor="bg-warning-orange"
                 />
-                
-                <FinancialSection 
-                    title="Market Position Summary - Trading Performance" 
+
+                <FinancialSection
+                    title="Market Position Summary - Trading Performance"
                     items={marketPositionItems}
                     bgColor="bg-primary-pink"
                 />

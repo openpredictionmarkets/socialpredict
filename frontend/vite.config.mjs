@@ -7,9 +7,6 @@ export default defineConfig(() => {
       allowedHosts: [
         'frontend', // we need this to be able to access the app on localhost
         'localhost'
-
-        // add your own domain here!
-
       ]
     },
     build: {

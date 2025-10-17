@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import {API_URL} from "../../config";
 
 function HomeEditor() {
   const [content, setContent] = useState({
@@ -17,7 +18,7 @@ function HomeEditor() {
 
   const fetchContent = async () => {
     try {
-      const response = await fetch('/api/v0/content/home');
+      const response = await fetch(`${API_URL}/v0/content/home`);
       if (response.ok) {
         const data = await response.json();
         setContent({
@@ -42,7 +43,7 @@ function HomeEditor() {
 
     try {
       const token = localStorage.getItem('token'); // Use correct token key from localStorage
-      const response = await fetch('/api/v0/admin/content/home', {
+      const response = await fetch(`${API_URL}/v0/admin/content/home`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +157,7 @@ function HomeEditor() {
           {content.html && (
             <div>
               <h3 className="text-white font-semibold mb-2">Preview:</h3>
-              <div 
+              <div
                 className="bg-gray-900 p-4 rounded border prose prose-invert max-w-none"
                 dangerouslySetInnerHTML={{ __html: content.html }}
               />

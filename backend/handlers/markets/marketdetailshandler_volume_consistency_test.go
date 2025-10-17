@@ -38,7 +38,7 @@ func TestMarketDetailsHandler_VolumeConsistencyFix(t *testing.T) {
 	db.Create(&sellBet)
 
 	// Create the request
-	req := httptest.NewRequest("GET", "/api/v0/markets/"+strconv.Itoa(int(testMarket.ID)), nil)
+	req := httptest.NewRequest("GET", "/v0/markets/"+strconv.Itoa(int(testMarket.ID)), nil)
 	req = mux.SetURLVars(req, map[string]string{"marketId": strconv.Itoa(int(testMarket.ID))})
 
 	// Create a response recorder
@@ -119,7 +119,7 @@ func TestMarketDetailsHandler_NoInconsistencyWithOnlyBuys(t *testing.T) {
 	db.Create(&bet2)
 
 	// Create the request
-	req := httptest.NewRequest("GET", "/api/v0/markets/"+strconv.Itoa(int(testMarket.ID)), nil)
+	req := httptest.NewRequest("GET", "/v0/markets/"+strconv.Itoa(int(testMarket.ID)), nil)
 	req = mux.SetURLVars(req, map[string]string{"marketId": strconv.Itoa(int(testMarket.ID))})
 
 	// Create a response recorder

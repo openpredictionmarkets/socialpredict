@@ -16,7 +16,7 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
         setError(null);
 
         try {
-            const response = await fetch(`${API_URL}/api/v0/marketprojection/${marketId}/${amount}/${direction}/`);
+            const response = await fetch(`${API_URL}/v0/marketprojection/${marketId}/${amount}/${direction}/`);
             if (!response.ok) {
                 throw new Error(`Error fetching data: ${response.statusText}`);
             }
@@ -43,7 +43,7 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
     return (
         <div className="market-projection-layout">
             <div className="projection-details">
-                <button 
+                <button
                     className="btn btn-primary mb-4"
                     onClick={fetchProjectionData}
                     disabled={!amount || !direction || loading}

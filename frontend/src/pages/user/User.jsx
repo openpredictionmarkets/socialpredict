@@ -14,7 +14,7 @@ const User = () => {
   const history = useHistory();
 
   useEffect(() => {
-    fetch(`${API_URL}/api/v0/userinfo/${username}`)
+    fetch(`${API_URL}/v0/userinfo/${username}`)
       .then((response) => response.json())
       .then((data) => setUserData(data))
       .catch((error) => console.error('Error fetching user data:', error));
@@ -57,7 +57,7 @@ const User = () => {
                 @{userData.username}
               </div>
             </div>
-            
+
             {/* Edit Profile Button - Only show if user is viewing their own profile */}
             {isLoggedIn && loggedInUsername === username && (
               <button
@@ -72,9 +72,9 @@ const User = () => {
             )}
           </div>
         </div>
-        
-        <SiteTabs 
-          tabs={userProfileTabs} 
+
+        <SiteTabs
+          tabs={userProfileTabs}
           defaultTab="User Info"
         />
       </div>

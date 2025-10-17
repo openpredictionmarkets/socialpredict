@@ -105,17 +105,17 @@ function MarketsByStatusTable({ status }) {
     const fetchMarkets = async () => {
       setLoading(true);
       setError('');
-      
+
       try {
-        const endpoint = status === 'all' 
-          ? `${API_URL}/api/v0/markets`
-          : `${API_URL}/api/v0/markets/${status}`;
-        
+        const endpoint = status === 'all'
+          ? `${API_URL}/v0/markets`
+          : `${API_URL}/v0/markets/${status}`;
+
         const response = await fetch(endpoint);
         if (!response.ok) throw new Error(`Failed to fetch ${status} markets`);
-        
+
         const data = await response.json();
-        
+
         // Handle different response structures
         if (status === 'all') {
           setMarketsData(data.markets || []);
@@ -140,7 +140,7 @@ function MarketsByStatusTable({ status }) {
         Loading {status} markets...
       </div>
     );
-    
+
   if (error)
     return <div className='p-4 text-center text-red-500'>Error: {error}</div>;
 
