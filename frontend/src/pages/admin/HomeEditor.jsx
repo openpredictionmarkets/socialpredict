@@ -43,7 +43,7 @@ function HomeEditor() {
 
     try {
       const token = localStorage.getItem('token'); // Use correct token key from localStorage
-      const response = await fetch(`${API_URL}/v0/content/home`, {
+      const response = await fetch(`${API_URL}/v0/admin/content/home`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
