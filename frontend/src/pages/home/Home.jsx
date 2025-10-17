@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import {API_URL} from "../../config";
 
 function Home() {
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/v0/content/home')
+    fetch(`${API_URL}/v0/content/home`)
       .then(response => response.json())
       .then(data => {
         setContent({
@@ -44,7 +45,7 @@ function Home() {
   return (
     <div className='min-h-[calc(100vh-6rem)] bg-primary-background text-custom-gray-verylight flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8'>
       <div className='max-w-4xl mx-auto w-full'>
-        <div 
+        <div
           className='homepage-content'
           dangerouslySetInnerHTML={{ __html: content.html }}
         />

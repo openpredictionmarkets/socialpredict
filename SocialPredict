@@ -39,7 +39,7 @@ docker_check() {
                 echo "Error: Found docker-compose V1. Please update to V2."
                 echo "https://docs.docker.com/compose/migrate/"
                 exit 1
-    
+
         else
                 echo "Error: Docker Compose is not installed."
                 exit 1
@@ -48,12 +48,12 @@ docker_check() {
 
 # Function to Source the .env file
 source_env() {
-        if [ -f "$ENV_PATH" ]; then
-                source "$ENV_PATH"
-        else
-                echo "Error: .env file not found."
-                exit 1
-        fi
+  if [ -f "${SCRIPT_DIR}/.env" ]; then
+    source "${SCRIPT_DIR}/.env"
+  else
+    echo "Error: .env file not found."
+    exit 1
+  fi
 }
 
 if [ "$1" = "install" ]; then
@@ -71,7 +71,7 @@ if [ "$1" = "install" ]; then
 	# Ask user input for Application Environment
 	echo "### Select Application Environment: "
 	PS3='Please enter your choice: '
-	options=("Development" "Production" "Quit")
+	options=("Development" "Localhost" "Production" "Quit")
 	select opt in "${options[@]}"
 	do
 		case $opt in
@@ -84,6 +84,15 @@ if [ "$1" = "install" ]; then
 				unset CALLED_FROM_SOCIALPREDICT
 				break
 				;;
+		  "Localhost")
+		    echo
+		    echo "Building for Localhost"
+		    echo
+		    export CALLED_FROM_SOCIALPREDICT=yes
+		    source "$SCRIPT_DIR/scripts/localhost.sh"
+		    unset CALLED_FROM_SOCIALPREDICT
+		    break
+		    ;;
 			"Production")
 				echo
 				echo "Building for Production"
@@ -103,49 +112,30 @@ fi
 
 # Run Docker Exec
 if [ "$1" = "exec" ]; then
-	source_env
-	export CALLED_FROM_SOCIALPREDICT=yes
-	if [ -z "$3" ]; then
-		source ./scripts/exec.sh "$2"
-	else
-		source ./scripts/exec.sh "$2" "$3"
-	fi
-
+  source_env
+  export CALLED_FROM_SOCIALPREDICT=yes
+  if [ -z "$3" ]; then
+  	source "$SCRIPT_DIR/scripts/docker-commands.sh" exec "$2"
+  	else
+  	source "$SCRIPT_DIR/scripts/docker-commands.sh" exec "$2" "$3"
+  fi
 	unset CALLED_FROM_SOCIALPREDICT
 fi
 
 # Run docker compose up
 if [ "$1" = "up" ]; then
-	source_env
-	if [ "${APP_ENV}" = "development" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" up -d
-		unset CALLED_FROM_SOCIALPREDICT
-	elif [ "${APP_ENV}" = "production" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" up -d
-		unset CALLED_FROM_SOCIALPREDICT
-	else
-		echo "Wrong Application Environment in .env"
-		exit 1
-	fi
+  source_env
+  export CALLED_FROM_SOCIALPREDICT=yes
+  source "$SCRIPT_DIR/scripts/docker-commands.sh" up
+  unset CALLED_FROM_SOCIALPREDICT
 fi
 
 # Run docker compose down
 if [ "$1" = "down" ]; then
-	source_env
-	if [ "${APP_ENV}" = "development" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/dev/compose_dev.sh" down
-		unset CALLED_FROM_SOCIALPREDICT
-	elif [ "${APP_ENV}" = "production" ]; then
-		export CALLED_FROM_SOCIALPREDICT=yes
-		source "$SCRIPT_DIR/scripts/prod/compose_prod.sh" down
-		unset CALLED_FROM_SOCIALPREDICT
-	else
-		echo "Wrong Application Environment in .env"
-		exit 1
-	fi
+  source_env
+  export CALLED_FROM_SOCIALPREDICT=yes
+    source "$SCRIPT_DIR/scripts/docker-commands.sh" down
+    unset CALLED_FROM_SOCIALPREDICT
 fi
 
 # Database backup/restore
