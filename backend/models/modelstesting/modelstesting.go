@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"socialpredict/migration"
+	// Import migrations to ensure init() functions run during tests
+	_ "socialpredict/migration/migrations"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -17,7 +19,9 @@ func NewFakeDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to the database: %v", err)
 	}
-	migration.MigrateDB(db)
+	if err := migration.MigrateDB(db); err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
+	}
 	return db
 }
 

@@ -2,9 +2,11 @@ package migration
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"sort"
 	"time"
+
+	"socialpredict/logger"
 
 	"gorm.io/gorm"
 )
@@ -26,11 +28,15 @@ func ClearRegistry() {
 	registry = make(map[string]step)
 }
 
-func Register(id string, up func(*gorm.DB) error) {
+func Register(id string, up func(*gorm.DB) error) error {
 	if _, exists := registry[id]; exists {
-		panic("duplicate migration id: " + id)
+		err := errors.New("duplicate migration id: " + id)
+		logger.LogError("migration", "Register", err)
+		return err
 	}
 	registry[id] = step{ID: id, Up: up}
+	logger.LogInfo("migration", "Register", fmt.Sprintf("registered migration %s", id))
+	return nil
 }
 
 func ensureTable(db *gorm.DB) error {
@@ -82,9 +88,15 @@ func Run(db *gorm.DB) error {
 	return nil
 }
 
-func MigrateDB(db *gorm.DB) {
+func MigrateDB(db *gorm.DB) error {
+	logger.LogInfo("migration", "MigrateDB", "starting database migrations")
+
 	err := Run(db)
 	if err != nil {
-		log.Fatalf("Error running migrations: %v", err)
+		logger.LogError("migration", "MigrateDB", err)
+		return fmt.Errorf("error running migrations: %w", err)
 	}
+
+	logger.LogInfo("migration", "MigrateDB", "database migrations completed successfully")
+	return nil
 }

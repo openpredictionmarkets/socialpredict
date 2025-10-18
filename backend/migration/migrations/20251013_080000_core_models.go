@@ -1,6 +1,9 @@
 package migrations
 
 import (
+	"log"
+
+	"socialpredict/logger"
 	"socialpredict/migration"
 	"socialpredict/models"
 
@@ -8,7 +11,7 @@ import (
 )
 
 func init() {
-	migration.Register("20251013080000", func(db *gorm.DB) error {
+	err := migration.Register("20251013080000", func(db *gorm.DB) error {
 		// Migrate the User models first
 		if err := db.AutoMigrate(&models.User{}); err != nil {
 			return err
@@ -31,4 +34,10 @@ func init() {
 
 		return nil
 	})
+
+	// In init() functions, registration failure is a critical startup error
+	if err != nil {
+		logger.LogError("migrations", "init", err)
+		log.Fatalf("Failed to register migration 20251013080000: %v", err)
+	}
 }

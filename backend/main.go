@@ -28,7 +28,9 @@ func main() {
 		log.Fatalf("Database readiness check failed: %v", err)
 	}
 
-	migration.MigrateDB(db)
+	if err := migration.MigrateDB(db); err != nil {
+		log.Fatalf("Database migration failed: %v", err)
+	}
 
 	seed.SeedUsers(db)
 

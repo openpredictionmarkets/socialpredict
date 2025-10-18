@@ -10,18 +10,24 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestRegister_DuplicatePanics(t *testing.T) {
+func TestRegister_DuplicateReturnsError(t *testing.T) {
 	migration.ClearRegistry()
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic on duplicate migration id, got none")
-		}
-	}()
+	err := migration.Register("20250101000000", func(db *gorm.DB) error { return nil })
+	if err != nil {
+		t.Fatalf("first registration should succeed, got error: %v", err)
+	}
 
-	migration.Register("20250101000000", func(db *gorm.DB) error { return nil })
-	// Second registration with the same ID should panic.
-	migration.Register("20250101000000", func(db *gorm.DB) error { return nil })
+	// Second registration with the same ID should return error.
+	err = migration.Register("20250101000000", func(db *gorm.DB) error { return nil })
+	if err == nil {
+		t.Fatalf("expected error on duplicate migration id, got none")
+	}
+
+	expectedMsg := "duplicate migration id: 20250101000000"
+	if err.Error() != expectedMsg {
+		t.Fatalf("expected error message %q, got %q", expectedMsg, err.Error())
+	}
 }
 
 func TestRun_AppliesInOrder_And_Persists(t *testing.T) {
@@ -31,19 +37,25 @@ func TestRun_AppliesInOrder_And_Persists(t *testing.T) {
 	var calls []string
 
 	// Register intentionally out of order; Run must apply in ascending lexicographic order.
-	migration.Register("20250103000000", func(db *gorm.DB) error {
+	if err := migration.Register("20250103000000", func(db *gorm.DB) error {
 		calls = append(calls, "20250103000000")
 		// Touch DB to ensure Up() runs a real operation
 		return db.AutoMigrate(&migration.SchemaMigration{})
-	})
-	migration.Register("20250101000000", func(db *gorm.DB) error {
+	}); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if err := migration.Register("20250101000000", func(db *gorm.DB) error {
 		calls = append(calls, "20250101000000")
 		return nil
-	})
-	migration.Register("20250102000000", func(db *gorm.DB) error {
+	}); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if err := migration.Register("20250102000000", func(db *gorm.DB) error {
 		calls = append(calls, "20250102000000")
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	if err := migration.Run(db); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -81,10 +93,12 @@ func TestRun_IsIdempotent(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
 	var calls []string
-	migration.Register("20250101000000", func(db *gorm.DB) error {
+	if err := migration.Register("20250101000000", func(db *gorm.DB) error {
 		calls = append(calls, "20250101000000")
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	// First run applies once.
 	if err := migration.Run(db); err != nil {
@@ -115,7 +129,9 @@ func TestRun_ErrOnNilUp(t *testing.T) {
 	migration.ClearRegistry()
 	db := modelstesting.NewFakeDB(t)
 
-	migration.Register("20250102000000", nil)
+	if err := migration.Register("20250102000000", nil); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	if err := migration.Run(db); err == nil {
 		t.Fatalf("expected error for nil Up(), got nil")
@@ -126,7 +142,9 @@ func TestRun_PersistsAppliedAt(t *testing.T) {
 	migration.ClearRegistry()
 	db := modelstesting.NewFakeDB(t)
 
-	migration.Register("20250104000000", func(db *gorm.DB) error { return nil })
+	if err := migration.Register("20250104000000", func(db *gorm.DB) error { return nil }); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
 
 	if err := migration.Run(db); err != nil {
 		t.Fatalf("Run: %v", err)
