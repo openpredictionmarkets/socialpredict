@@ -21,6 +21,11 @@ type step struct {
 
 var registry = make(map[string]step)
 
+// for testing
+func ClearRegistry() {
+	registry = make(map[string]step)
+}
+
 func Register(id string, up func(*gorm.DB) error) {
 	if _, exists := registry[id]; exists {
 		panic("duplicate migration id: " + id)
