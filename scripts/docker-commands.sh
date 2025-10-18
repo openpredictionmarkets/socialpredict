@@ -43,7 +43,7 @@ echo "Using compose file: ${COMPOSE_MAIN}"
 # optional override (e.g., Apple Silicon platform pinning)
 COMPOSE_FILES=(-f "${COMPOSE_MAIN}")
 if [ -f "${__SP_ROOT_DIR}/docker-compose.override.yml" ]; then
-  COMPOSE_FILES+=(-f "${__SP_ROOT_DIR}/docker-compose.override.yml"})
+  COMPOSE_FILES+=(-f "${__SP_ROOT_DIR}/docker-compose.override.yml")
 fi
 
 # absolute .env
