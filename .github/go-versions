@@ -1,9 +1,0 @@
-# One entry per line. Two formats supported:
-#   file:<path-to-go.mod>  -> reads the language version from that go.mod
-#   <semver/range>         -> exact or x-wildcard like 1.26.x
-#
-# Default (if this file is missing): file:backend/go.mod
-
-file:backend/go.mod
-#1.26.x
-#1.25.x
