@@ -44,6 +44,13 @@ const User = () => {
     }
   ];
 
+  // Adding validation logic for checking if a user exists
+
+  const isUserFound = userData && userData.username && userData.id !== 0;
+   if (userData && !isUserFound) {
+     return <UserNotFound username={username} />;
+   }
+
   return (
     <div className="min-h-screen bg-primary-background">
       <div className="container mx-auto px-4 py-6">
