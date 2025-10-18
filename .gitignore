@@ -52,3 +52,6 @@ tmp/
 /frontend/public/env-config.js
 
 /backend/.air.toml
+
+# Apple Silicon Docker Compose Override
+docker-compose.override.yml
