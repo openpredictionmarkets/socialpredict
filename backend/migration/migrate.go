@@ -1,69 +1,56 @@
 package migration
 
 import (
-	"errors"
 	"fmt"
+	"log"
 	"sort"
-	"time"
-
-	"socialpredict/logger"
 
 	"gorm.io/gorm"
+
+	// core models for fallback
+	"socialpredict/models"
 )
 
+// Registry of migrations; you already have tests that exercise this.
+var registry = map[string]func(*gorm.DB) error{}
+
 type SchemaMigration struct {
-	ID        string `gorm:"primaryKey;size:32"` // e.g., "20251013080000"
-	AppliedAt time.Time
-}
-
-type step struct {
-	ID string
-	Up func(db *gorm.DB) error
-}
-
-var registry = make(map[string]step)
-
-// for testing
-func ClearRegistry() {
-	registry = make(map[string]step)
+	ID        string `gorm:"primaryKey;size:32"`
+	AppliedAt int64  `gorm:"autoCreateTime"`
 }
 
 func Register(id string, up func(*gorm.DB) error) error {
 	if _, exists := registry[id]; exists {
-		err := errors.New("duplicate migration id: " + id)
-		logger.LogError("migration", "Register", err)
-		return err
+		return fmt.Errorf("duplicate migration id: %s", id)
 	}
-	registry[id] = step{ID: id, Up: up}
-	logger.LogInfo("migration", "Register", fmt.Sprintf("registered migration %s", id))
+	registry[id] = up
 	return nil
 }
 
-func ensureTable(db *gorm.DB) error {
-	return db.AutoMigrate(&SchemaMigration{})
+func ClearRegistry() { // used by tests
+	for k := range registry {
+		delete(registry, k)
+	}
 }
 
-func appliedSet(db *gorm.DB) (map[string]struct{}, error) {
-	if err := ensureTable(db); err != nil {
-		return nil, err
-	}
-	var rows []SchemaMigration
-	if err := db.Order("id asc").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	m := make(map[string]struct{}, len(rows))
-	for _, r := range rows {
-		m[r.ID] = struct{}{}
-	}
-	return m, nil
-}
-
+// Run applies registered migrations in ID order and records them.
 func Run(db *gorm.DB) error {
-	applied, err := appliedSet(db)
-	if err != nil {
-		return err
+	// Ensure the tracking table exists
+	if err := db.AutoMigrate(&SchemaMigration{}); err != nil {
+		return fmt.Errorf("auto-migrate SchemaMigration: %w", err)
 	}
 
+	// Load already-applied
+	applied := map[string]bool{}
+	var rows []SchemaMigration
+	if err := db.Find(&rows).Error; err != nil {
+		return fmt.Errorf("load SchemaMigration: %w", err)
+	}
+	for _, r := range rows {
+		applied[r.ID] = true
+	}
+
+	// Sort ids and apply new ones
 	ids := make([]string, 0, len(registry))
 	for id := range registry {
 		ids = append(ids, id)
@@ -71,32 +58,45 @@ func Run(db *gorm.DB) error {
 	sort.Strings(ids)
 
 	for _, id := range ids {
-		if _, ok := applied[id]; ok {
+		if applied[id] {
 			continue
 		}
-		step := registry[id]
-		if step.Up == nil {
-			return errors.New("migration has no Up(): " + id)
+		if err := registry[id](db); err != nil {
+			return fmt.Errorf("migration %s failed: %w", id, err)
 		}
-		if err := step.Up(db); err != nil {
-			return err
+		if err := db.Create(&SchemaMigration{ID: id}).Error; err != nil {
+			return fmt.Errorf("record SchemaMigration %s: %w", id, err)
 		}
-		if err := db.Create(&SchemaMigration{ID: id, AppliedAt: time.Now()}).Error; err != nil {
-			return err
-		}
+		log.Printf("migration - applied %s", id)
 	}
 	return nil
 }
 
+// MigrateDB is the public entry; it never crashes the app.
+// If there are zero registered migrations, we WARN and fallback to AutoMigrate core tables.
 func MigrateDB(db *gorm.DB) error {
-	logger.LogInfo("migration", "MigrateDB", "starting database migrations")
+	log.Printf("migration - MigrateDB: starting database migrations")
 
-	err := Run(db)
-	if err != nil {
-		logger.LogError("migration", "MigrateDB", err)
-		return fmt.Errorf("error running migrations: %w", err)
+	if len(registry) == 0 {
+		log.Printf("migration - WARN: no registered migrations found; falling back to AutoMigrate for baseline schema")
+		// Baseline schema so the app can run:
+		// Keep this list tight (public, stable domain models only).
+		if err := db.AutoMigrate(
+			&models.User{},
+			&models.Market{},
+			&models.Bet{},
+			&models.HomepageContent{},
+		); err != nil {
+			return fmt.Errorf("fallback AutoMigrate failed: %w", err)
+		}
+		log.Printf("migration - fallback AutoMigrate completed")
+		return nil
 	}
 
-	logger.LogInfo("migration", "MigrateDB", "database migrations completed successfully")
+	if err := Run(db); err != nil {
+		return err
+	}
+
+	log.Printf("migration - MigrateDB: database migrations completed")
 	return nil
 }
