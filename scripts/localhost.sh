@@ -1,5 +1,26 @@
 #!/bin/bash
 
+# --- Platform Compatibility, Linux vs. Apple Silicon ---
+
+source "$(dirname "$0")/lib/arch.sh"
+echo "== localhost platform: ${FORCE_PLATFORM:-default} =="
+
+# If we are forcing a platform, prefer an override compose that pins it explicitly.
+OVERRIDE_FILE="docker-compose.override.yml"
+cat > "${OVERRIDE_FILE}" <<EOF
+services:
+  backend:
+    platform: ${FORCE_PLATFORM:-linux/amd64}
+  frontend:
+    platform: ${FORCE_PLATFORM:-linux/amd64}
+  postgres:
+    platform: ${FORCE_PLATFORM:-linux/amd64}
+EOF
+
+echo "Wrote ${OVERRIDE_FILE} to pin platform = ${FORCE_PLATFORM:-linux/amd64}"
+
+# --- Main SocialPredict Functionality ---
+
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 

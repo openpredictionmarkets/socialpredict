@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# --- Platform Compatibility, Linux vs. Apple Silicon ---
+
+source "$(dirname "$0")/lib/arch.sh"
+
+COMPOSE_FILES=(-f scripts/docker-compose-${APP_ENV}.yaml)
+if [ -f "docker-compose.override.yml" ]; then
+  COMPOSE_FILES+=(-f docker-compose.override.yml)
+fi
+
+# --- Main SocialPredict Functionality ---
+
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
