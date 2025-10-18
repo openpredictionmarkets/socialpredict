@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -15,8 +16,8 @@ import (
 var registry = map[string]func(*gorm.DB) error{}
 
 type SchemaMigration struct {
-	ID        string `gorm:"primaryKey;size:32"`
-	AppliedAt int64  `gorm:"autoCreateTime"`
+	ID        string    `gorm:"primaryKey;size:32"`
+	AppliedAt time.Time `gorm:"autoCreateTime"`
 }
 
 func Register(id string, up func(*gorm.DB) error) error {
@@ -35,7 +36,7 @@ func ClearRegistry() { // used by tests
 
 // Run applies registered migrations in ID order and records them.
 func Run(db *gorm.DB) error {
-	// Ensure the tracking table exists
+	// Ensure tracking table exists
 	if err := db.AutoMigrate(&SchemaMigration{}); err != nil {
 		return fmt.Errorf("auto-migrate SchemaMigration: %w", err)
 	}
@@ -50,7 +51,7 @@ func Run(db *gorm.DB) error {
 		applied[r.ID] = true
 	}
 
-	// Sort ids and apply new ones
+	// Sort and apply
 	ids := make([]string, 0, len(registry))
 	for id := range registry {
 		ids = append(ids, id)
@@ -61,13 +62,18 @@ func Run(db *gorm.DB) error {
 		if applied[id] {
 			continue
 		}
-		if err := registry[id](db); err != nil {
+		up := registry[id]
+		if up == nil {
+			// <-- Fix: return a proper error instead of panic
+			return fmt.Errorf("migration %s has nil Up()", id)
+		}
+		if err := up(db); err != nil {
 			return fmt.Errorf("migration %s failed: %w", id, err)
 		}
-		if err := db.Create(&SchemaMigration{ID: id}).Error; err != nil {
+		if err := db.Create(&SchemaMigration{ID: id, AppliedAt: time.Now()}).Error; err != nil {
 			return fmt.Errorf("record SchemaMigration %s: %w", id, err)
 		}
-		log.Printf("migration - applied %s", id)
+		// optional: log.Printf("migration - applied %s", id)
 	}
 	return nil
 }
