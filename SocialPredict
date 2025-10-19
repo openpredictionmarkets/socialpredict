@@ -3,8 +3,17 @@
 set -e # Stop script on error
 set -a # Automatically export all variables
 
+
 # Determine script's directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# --- Platform Compatibility, Linux vs. Apple Silicon ---
+# before calling any scripts/* entry points that use docker
+if [ -f "$SCRIPT_DIR/scripts/lib/arch.sh" ]; then
+  source "$SCRIPT_DIR/scripts/lib/arch.sh"
+fi
+
+# --- Main SocialPredict Functionality ---
 
 # Ensure .env file exists before resolving path
 if [ ! -f "$SCRIPT_DIR/.env" ]; then
