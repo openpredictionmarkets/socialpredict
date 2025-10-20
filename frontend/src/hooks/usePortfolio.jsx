@@ -11,7 +11,6 @@ const usePortfolio = (username) => {
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
-<<<<<<< HEAD
         const headers = {};
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -19,9 +18,6 @@ const usePortfolio = (username) => {
         }
 
         const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`, { headers });
-=======
-        const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
->>>>>>> main
         if (!response.ok) {
           throw new Error('Failed to fetch portfolio');
         }

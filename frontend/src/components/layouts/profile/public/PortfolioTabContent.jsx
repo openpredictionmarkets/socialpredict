@@ -73,14 +73,9 @@ const PortfolioTabContent = ({ username }) => {
 
         const bgColor = type === "YES" ? "bg-green-600" : "bg-red-600";
         const textColor = "text-white";
-<<<<<<< HEAD
         
         // Use custom label if market is provided, otherwise use internal type
         const displayLabel = market ? mapInternalToDisplay(type, market) : type;
-        
-=======
-
->>>>>>> main
         return (
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor}`}>
                 {count} {displayLabel}

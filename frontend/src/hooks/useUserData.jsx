@@ -11,7 +11,6 @@ const useUserData = (username, usePrivateProfile = false) => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-<<<<<<< HEAD
         let url, headers = {};
         
         if (usePrivateProfile) {
@@ -33,9 +32,6 @@ const useUserData = (username, usePrivateProfile = false) => {
         }
 
         const response = await fetch(url, { headers });
-=======
-        const response = await fetch(`${API_URL}/v0/userinfo/${username}`);
->>>>>>> main
         if (!response.ok) {
           throw new Error('Failed to fetch user data');
         }

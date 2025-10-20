@@ -76,6 +76,8 @@ function MarketDetailsTable({
           title='Probability Changes'
           className='w-full'
           closeDateTime={market.resolutionDateTime}
+          yesLabel={market.yesLabel}
+          noLabel={market.noLabel}
         />
       </div>
 
