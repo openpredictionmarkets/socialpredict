@@ -12,7 +12,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
         const fetchLeaderboard = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/api/v0/markets/leaderboard/${marketId}`);
+                const response = await fetch(`${API_URL}/v0/markets/leaderboard/${marketId}`);
                 if (response.ok) {
                     const data = await response.json();
                     setLeaderboard(data);
@@ -27,7 +27,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
                 setLoading(false);
             }
         };
-        
+
         if (marketId) {
             fetchLeaderboard();
         }
@@ -102,7 +102,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
                 <div className="text-right">Total Spent</div>
                 <div>Shares</div>
             </div>
-            
+
             {/* Leaderboard Rows */}
             {leaderboard.map((entry, index) => (
                 <div key={entry.username} className="sp-grid-leaderboard-row mt-2">
@@ -119,7 +119,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
                             </div>
                         </div>
                     </div>
-                    
+
                     {/* Username (sm+) */}
                     <div className="hidden sm:block sp-cell-username">
                         <div className="sp-ellipsis font-medium">
@@ -128,14 +128,14 @@ const LeaderboardActivity = ({ marketId, market }) => {
                             </Link>
                         </div>
                     </div>
-                    
+
                     {/* Position (sm+) */}
                     <div className="hidden sm:block">
                         <span className={getPositionBadge(entry.position)}>
                             {entry.position}
                         </span>
                     </div>
-                    
+
                     {/* P&L + Subline (xs) / Profit (sm+) */}
                     <div className="text-right">
                         <div className={`font-bold text-sm ${getProfitColor(entry.profit)}`}>
@@ -145,17 +145,17 @@ const LeaderboardActivity = ({ marketId, market }) => {
                             Pos {entry.position} • {entry.yesSharesOwned}Y {entry.noSharesOwned}N
                         </div>
                     </div>
-                    
+
                     {/* Current Value (sm+) */}
                     <div className="hidden sm:block sp-cell-num text-gray-300">
                         {formatCurrency(entry.currentValue)}
                     </div>
-                    
+
                     {/* Total Spent (sm+) */}
                     <div className="hidden sm:block sp-cell-num text-gray-300">
                         {formatCurrency(entry.totalSpent)}
                     </div>
-                    
+
                     {/* Shares (sm+) */}
                     <div className="hidden sm:block text-gray-300 text-xs">
                         <div>{labels.yes}: {entry.yesSharesOwned}</div>

@@ -94,7 +94,7 @@ function MarketsTable() {
   useEffect(() => {
     const fetchMarkets = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/v0/markets`);
+        const response = await fetch(`${API_URL}/v0/markets`);
         if (!response.ok) throw new Error('Failed to fetch markets');
         const data = await response.json();
         setMarketsData(data.markets || []);

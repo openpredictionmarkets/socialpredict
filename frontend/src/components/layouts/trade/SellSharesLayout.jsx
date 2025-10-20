@@ -16,7 +16,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     useEffect(() => {
         const fetchFeeData = async () => {
             try {
-                const response = await fetch('/api/v0/setup');
+                const response = await fetch('/v0/setup');
                 const data = await response.json();
                 setFeeData(data.Betting.BetFees);
                 setIsLoading(false); // Set loading state to false after fetching

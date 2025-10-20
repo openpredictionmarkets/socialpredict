@@ -1,18 +1,17 @@
 services:
   db:
-    image: postgres:16.6-alpine3.20
     container_name: ${POSTGRES_CONTAINER_NAME}
+    image: postgres:16.6-alpine
     environment:
-      ENVIRONMENT: ${APP_ENV}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DATABASE}
     volumes:
-      - ${POSTGRES_VOLUME}
-    ports:
-      - "${DB_PORT}:${POSTGRES_PORT}"
+      - ${POSTGRES_VOLUME}:/var/lib/postgres/data
     networks:
-      - database_network
+      - socialpredict_dev_network
+    ports:
+      - "${DB_PORT}:5432"
 
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
@@ -26,15 +25,11 @@ services:
     env_file:
       - ../.env
     ports:
-      - "${BACKEND_HOSTPORT}:${BACKEND_PORT}"
+      - "${BACKEND_PORT}:8080"
     volumes:
-      - ../backend:/backend
-      - ../.env:/backend/.env.dev
-    command: reflex -r '\.go$' -s -- sh -c './supervisor.sh'
-    tty: true
+      - ../backend:/src
     networks:
-      - database_network
-      - frontend_network
+      - socialpredict_dev_network
     depends_on:
       - db
 
@@ -44,43 +39,20 @@ services:
     environment:
       ENVIRONMENT: ${APP_ENV}
     networks:
-      - frontend_network
+      - socialpredict_dev_network
     env_file:
       - ../.env
     volumes:
       - ../frontend:/app
-      - /app/node_modules
-    stdin_open: true
+      - socialpredict_dev_node_modules:/app/node_modules
     ports:
-      - "${REACT_HOSTPORT}:${REACT_PORT}"
+      - "${FRONTEND_PORT}:5173"
     depends_on:
       - backend
-
-  webserver:
-    container_name: "${NGINX_CONTAINER_NAME}"
-    image: nginx:latest
-    environment:
-      ENVIRONMENT: ${APP_ENV}
-      BACKEND_PORT: ${BACKEND_PORT}
-      FRONTEND_PORT: ${REACT_PORT}
-    ports:
-      - 80:80
-      - 443:443
-    volumes:
-      - ../data/nginx/vhosts/dev:/etc/nginx/templates/
-    restart: always
-    networks:
-      - database_network
-      - frontend_network
-    depends_on:
-      - backend
-      - frontend
 
 networks:
-  database_network:
-    driver: bridge
-  frontend_network:
-    driver: bridge
+  socialpredict_dev_network:
+    name: socialpredict_dev_network
 
 volumes:
   pgdata:

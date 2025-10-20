@@ -9,7 +9,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
 
     console.log('Sending bet data:', betData);
 
-    fetch(`${API_URL}/api/v0/bet`, {
+    fetch(`${API_URL}/v0/bet`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

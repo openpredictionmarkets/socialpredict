@@ -49,3 +49,9 @@ tmp/
 # Frontend Files that are generated from their template
 /frontend/src/config.js
 /frontend/vite.config.mjs
+/frontend/public/env-config.js
+
+/backend/.air.toml
+
+# Apple Silicon Docker Compose Override
+docker-compose.override.yml

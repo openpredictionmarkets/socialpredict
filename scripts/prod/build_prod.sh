@@ -5,7 +5,7 @@
 
 # Pull images
 echo "Pulling images ..."
-$COMPOSE $ENV_FILE --file "$SCRIPT_DIR/scripts/docker-compose-prod.yaml" pull
+$COMPOSE --env-file "$SCRIPT_DIR"/.env --file "$SCRIPT_DIR/scripts/docker-compose-prod.yaml" pull
 echo
 
 echo "Images pulled."

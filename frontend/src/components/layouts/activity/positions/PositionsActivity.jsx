@@ -8,7 +8,7 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
 
   useEffect(() => {
     const fetchPositions = async () => {
-      const response = await fetch(`${API_URL}/api/v0/markets/positions/${marketId}`);
+      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}`);
       if (response.ok) {
         const rawData = await response.json();
         console.log("API Data:", rawData);

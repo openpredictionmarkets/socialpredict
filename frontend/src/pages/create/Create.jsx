@@ -75,7 +75,7 @@ function Create() {
       console.log('marketData:', marketData);
       console.log(JSON.stringify(marketData));
 
-      const response = await fetch(`${API_URL}/api/v0/create`, {
+      const response = await fetch(`${API_URL}/v0/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
