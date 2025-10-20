@@ -12,9 +12,28 @@ import (
 	"socialpredict/models"
 	"socialpredict/util"
 	"strconv"
-
-	"gorm.io/gorm"
 )
+
+// MarketService interface defines methods for market operations
+// This will be injected from the domain layer
+type MarketService interface {
+	ListMarkets() ([]models.Market, error)
+}
+
+// DefaultMarketService implements MarketService using existing functionality
+// This is a temporary bridge to avoid breaking changes
+type DefaultMarketService struct{}
+
+func (s *DefaultMarketService) ListMarkets() ([]models.Market, error) {
+	db := util.GetDB()
+	var markets []models.Market
+	result := db.Order("RANDOM()").Limit(100).Find(&markets)
+	if result.Error != nil {
+		log.Printf("Error fetching markets: %v", result.Error)
+		return nil, result.Error
+	}
+	return markets, nil
+}
 
 // ListMarketsResponse defines the structure for the list markets response
 type ListMarketsResponse struct {
@@ -29,6 +48,14 @@ type MarketOverview struct {
 	TotalVolume     int64                                     `json:"totalVolume"`
 }
 
+// listMarketsService holds the service instance
+var listMarketsService MarketService = &DefaultMarketService{}
+
+// SetListMarketsService allows injecting a custom service (for testing or new architecture)
+func SetListMarketsService(service MarketService) {
+	listMarketsService = service
+}
+
 // ListMarketsHandler handles the HTTP request for listing markets.
 func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("ListMarketsHandler: Request received")
@@ -37,14 +64,15 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := util.GetDB()
-	markets, err := ListMarkets(db)
+	markets, err := listMarketsService.ListMarkets()
 	if err != nil {
 		http.Error(w, "Error fetching markets", http.StatusInternalServerError)
 		return
 	}
 
 	var marketOverviews []MarketOverview
+	db := util.GetDB() // Still needed for complex calculations - will be refactored later
+
 	for _, market := range markets {
 		bets := tradingdata.GetBetsForMarket(db, uint(market.ID))
 		probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
@@ -80,16 +108,4 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-// ListMarkets fetches a random list of all markets from the database.
-func ListMarkets(db *gorm.DB) ([]models.Market, error) {
-	var markets []models.Market
-	result := db.Order("RANDOM()").Limit(100).Find(&markets) // Set a reasonable limit
-	if result.Error != nil {
-		log.Printf("Error fetching markets: %v", result.Error)
-		return nil, result.Error
-	}
-
-	return markets, nil
 }

@@ -1,0 +1,184 @@
+package users
+
+import (
+	"context"
+	"errors"
+
+	dusers "socialpredict/internal/domain/users"
+	"socialpredict/models"
+
+	"gorm.io/gorm"
+)
+
+// GormRepository implements the users domain repository interface using GORM
+type GormRepository struct {
+	db *gorm.DB
+}
+
+// NewGormRepository creates a new GORM-based users repository
+func NewGormRepository(db *gorm.DB) *GormRepository {
+	return &GormRepository{db: db}
+}
+
+// GetByUsername retrieves a user by username
+func (r *GormRepository) GetByUsername(ctx context.Context, username string) (*dusers.User, error) {
+	var dbUser models.User
+
+	err := r.db.WithContext(ctx).Where("username = ?", username).First(&dbUser).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, dusers.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return r.modelToDomain(&dbUser), nil
+}
+
+// UpdateBalance updates a user's account balance
+func (r *GormRepository) UpdateBalance(ctx context.Context, username string, newBalance int64) error {
+	result := r.db.WithContext(ctx).Model(&models.User{}).
+		Where("username = ?", username).
+		Update("account_balance", newBalance)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return dusers.ErrUserNotFound
+	}
+
+	return nil
+}
+
+// Create creates a new user in the database
+func (r *GormRepository) Create(ctx context.Context, user *dusers.User) error {
+	dbUser := r.domainToModel(user)
+
+	result := r.db.WithContext(ctx).Create(&dbUser)
+	if result.Error != nil {
+		// Check for unique constraint violations
+		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+			return dusers.ErrUserAlreadyExists
+		}
+		return result.Error
+	}
+
+	// Update the domain model with the generated ID
+	user.ID = dbUser.ID
+	return nil
+}
+
+// Update updates a user in the database
+func (r *GormRepository) Update(ctx context.Context, user *dusers.User) error {
+	dbUser := r.domainToModel(user)
+
+	result := r.db.WithContext(ctx).Save(&dbUser)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return dusers.ErrUserNotFound
+	}
+
+	return nil
+}
+
+// Delete removes a user from the database
+func (r *GormRepository) Delete(ctx context.Context, username string) error {
+	result := r.db.WithContext(ctx).Where("username = ?", username).Delete(&models.User{})
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return dusers.ErrUserNotFound
+	}
+
+	return nil
+}
+
+// List retrieves users with the given filters
+func (r *GormRepository) List(ctx context.Context, filters dusers.ListFilters) ([]*dusers.User, error) {
+	query := r.db.WithContext(ctx).Model(&models.User{})
+
+	if filters.UserType != "" {
+		query = query.Where("user_type = ?", filters.UserType)
+	}
+
+	if filters.Limit > 0 {
+		query = query.Limit(filters.Limit)
+	}
+
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+
+	query = query.Order("created_at DESC")
+
+	var dbUsers []models.User
+	if err := query.Find(&dbUsers).Error; err != nil {
+		return nil, err
+	}
+
+	users := make([]*dusers.User, len(dbUsers))
+	for i, dbUser := range dbUsers {
+		users[i] = r.modelToDomain(&dbUser)
+	}
+
+	return users, nil
+}
+
+// domainToModel converts a domain user to a GORM model
+func (r *GormRepository) domainToModel(user *dusers.User) models.User {
+	return models.User{
+		Model: gorm.Model{
+			ID:        uint(user.ID),
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		},
+		PublicUser: models.PublicUser{
+			Username:              user.Username,
+			DisplayName:           user.DisplayName,
+			UserType:              user.UserType,
+			InitialAccountBalance: user.InitialAccountBalance,
+			AccountBalance:        user.AccountBalance,
+			PersonalEmoji:         user.PersonalEmoji,
+			Description:           user.Description,
+			PersonalLink1:         user.PersonalLink1,
+			PersonalLink2:         user.PersonalLink2,
+			PersonalLink3:         user.PersonalLink3,
+			PersonalLink4:         user.PersonalLink4,
+		},
+		PrivateUser: models.PrivateUser{
+			Email:  user.Email,
+			APIKey: user.APIKey,
+		},
+		MustChangePassword: user.MustChangePassword,
+	}
+}
+
+// modelToDomain converts a GORM model to a domain user
+func (r *GormRepository) modelToDomain(dbUser *models.User) *dusers.User {
+	return &dusers.User{
+		ID:                    int64(dbUser.ID),
+		Username:              dbUser.Username,
+		DisplayName:           dbUser.DisplayName,
+		Email:                 dbUser.Email,
+		UserType:              dbUser.UserType,
+		InitialAccountBalance: dbUser.InitialAccountBalance,
+		AccountBalance:        dbUser.AccountBalance,
+		PersonalEmoji:         dbUser.PersonalEmoji,
+		Description:           dbUser.Description,
+		PersonalLink1:         dbUser.PersonalLink1,
+		PersonalLink2:         dbUser.PersonalLink2,
+		PersonalLink3:         dbUser.PersonalLink3,
+		PersonalLink4:         dbUser.PersonalLink4,
+		APIKey:                dbUser.APIKey,
+		MustChangePassword:    dbUser.MustChangePassword,
+		CreatedAt:             dbUser.CreatedAt,
+		UpdatedAt:             dbUser.UpdatedAt,
+	}
+}
