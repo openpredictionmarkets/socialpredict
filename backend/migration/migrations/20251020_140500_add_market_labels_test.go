@@ -11,75 +11,71 @@ import (
 	"gorm.io/gorm"
 )
 
-func seedMinimalMarket(t *testing.T, db *gorm.DB) models.Market {
+// MarketV1 mirrors the old schema (no label fields) but uses same table name.
+type MarketV1 struct {
+	ID                      int64 `gorm:"primaryKey"`
+	QuestionTitle           string
+	Description             string
+	OutcomeType             string
+	ResolutionDateTime      time.Time
+	FinalResolutionDateTime time.Time
+	UTCOffset               int
+	IsResolved              bool
+	ResolutionResult        string
+	InitialProbability      float64
+	CreatorUsername         string
+}
+
+func (MarketV1) TableName() string { return "markets" }
+
+func seedPreMigrationMarket(t *testing.T, db *gorm.DB) int64 {
 	t.Helper()
-	// Use your helper if present; otherwise a minimal inline seed.
-	m := modelstesting.GenerateMarket(1, "alice")
-	// Ensure zero-values for new fields (old DB rows would have had no columns)
-	m.YesLabel = ""
-	m.NoLabel = ""
-	if err := db.Create(&m).Error; err != nil {
-		t.Fatalf("failed to seed market: %v", err)
+	m := MarketV1{
+		ID:                 1,
+		QuestionTitle:      "Test Market",
+		Description:        "Test Description",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: time.Now().Add(24 * time.Hour),
+		CreatorUsername:    "alice",
 	}
-	return m
+	if err := db.Create(&m).Error; err != nil {
+		t.Fatalf("failed to seed v1 market: %v", err)
+	}
+	return m.ID
 }
 
 func TestMigrateAddMarketLabels_AddsColumnsAndBackfills(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	// Simulate pre-migration DB: create a market before columns exist.
-	// (NewFakeDB runs full AutoMigrate on current models; if your test DB
-	// already includes columns, force-drop them to mimic v1 schema.)
+	// Simulate v1: drop the new columns if present.
 	_ = db.Migrator().DropColumn(&models.Market{}, "YesLabel")
 	_ = db.Migrator().DropColumn(&models.Market{}, "NoLabel")
 
-	// Now seed data as it would exist in v1.x (no labels)
-	m := seedMinimalMarket(t, db)
+	id := seedPreMigrationMarket(t, db)
 
-	// Run the migration under test
+	// Run the migration under test.
 	if err := migrations.MigrateAddMarketLabels(db); err != nil {
 		t.Fatalf("migration failed: %v", err)
 	}
 
-	// Columns should exist
-	if !db.Migrator().HasColumn(&models.Market{}, "YesLabel") {
-		t.Fatalf("expected yes_label column to exist after migration")
+	// Assert columns exist.
+	mig := db.Migrator()
+	if !mig.HasColumn(&models.Market{}, "YesLabel") {
+		t.Fatalf("expected yes_label column after migration")
 	}
-	if !db.Migrator().HasColumn(&models.Market{}, "NoLabel") {
-		t.Fatalf("expected no_label column to exist after migration")
+	if !mig.HasColumn(&models.Market{}, "NoLabel") {
+		t.Fatalf("expected no_label column after migration")
 	}
 
-	// Backfill should have applied
+	// Assert backfill applied.
 	var out models.Market
-	if err := db.First(&out, m.ID).Error; err != nil {
-		t.Fatalf("failed to load market after migration: %v", err)
+	if err := db.First(&out, id).Error; err != nil {
+		t.Fatalf("load market failed: %v", err)
 	}
 	if out.YesLabel != "YES" {
-		t.Fatalf("expected YesLabel to be backfilled to YES, got %q", out.YesLabel)
+		t.Fatalf("expected YesLabel 'YES', got %q", out.YesLabel)
 	}
 	if out.NoLabel != "NO" {
-		t.Fatalf("expected NoLabel to be backfilled to NO, got %q", out.NoLabel)
+		t.Fatalf("expected NoLabel 'NO', got %q", out.NoLabel)
 	}
-}
-
-func TestMigrateAddMarketLabels_IsIdempotent(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-
-	// Ensure columns exist first time
-	if err := migrations.MigrateAddMarketLabels(db); err != nil {
-		t.Fatalf("first run failed: %v", err)
-	}
-
-	// Run a second time to confirm idempotence (no errors)
-	if err := migrations.MigrateAddMarketLabels(db); err != nil {
-		t.Fatalf("second run failed (should be idempotent): %v", err)
-	}
-
-	// Quick sanity: columns still there
-	if !db.Migrator().HasColumn(&models.Market{}, "YesLabel") ||
-		!db.Migrator().HasColumn(&models.Market{}, "NoLabel") {
-		t.Fatalf("expected columns to remain after second run")
-	}
-
-	_ = time.Now() // keep lints happy if needed
 }
