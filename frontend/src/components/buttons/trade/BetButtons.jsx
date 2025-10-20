@@ -24,24 +24,24 @@ const BetButton = ({ onClick }) => {
     );
 };
 
-const BetNoButton = ({ onClick }) => {
+const BetNoButton = ({ onClick, label = "NO" }) => {
     return (
         <button
         className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-btn`}
             onClick={onClick}
         >
-            NO
+            {label}
         </button>
     );
 };
 
-const BetYesButton = ({ onClick }) => {
+const BetYesButton = ({ onClick, label = "YES" }) => {
     return (
         <button
         className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-btn`}
             onClick={onClick}
         >
-            YES
+            {label}
         </button>
     );
 };
@@ -55,7 +55,7 @@ const BetInputAmount = ({ value, onChange }) => {
     );
 };
 
-const ConfirmBetButton = ({ onClick, selectedDirection }) => {
+const ConfirmBetButton = ({ onClick, selectedDirection, yesLabel = "YES", noLabel = "NO" }) => {
     const getButtonStyle = () => {
         switch (selectedDirection) {
             case 'NO':
@@ -70,9 +70,9 @@ const ConfirmBetButton = ({ onClick, selectedDirection }) => {
     const buttonText = () => {
         switch (selectedDirection) {
             case 'NO':
-                return "CONFIRM PURCHASE NO";
+                return `CONFIRM PURCHASE OF: ${noLabel}`;
             case 'YES':
-                return "CONFIRM PURCHASE YES";
+                return `CONFIRM PURCHASE OF: ${yesLabel}`;
             default:
                 return "CONFIRM PURCHASE";
         }

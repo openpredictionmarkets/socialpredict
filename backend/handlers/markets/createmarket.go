@@ -13,6 +13,7 @@ import (
 	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
+	"strings"
 	"time"
 )
 
@@ -42,6 +43,26 @@ func checkQuestionDescriptionLength(description string) error {
 	if len(description) > 2000 {
 		return errors.New("question description exceeds 2000 characters")
 	}
+	return nil
+}
+
+func validateCustomLabels(yesLabel, noLabel string) error {
+	// Validate yes label
+	if yesLabel != "" {
+		yesLabel = strings.TrimSpace(yesLabel)
+		if len(yesLabel) < 1 || len(yesLabel) > 20 {
+			return errors.New("yes label must be between 1 and 20 characters")
+		}
+	}
+	
+	// Validate no label
+	if noLabel != "" {
+		noLabel = strings.TrimSpace(noLabel)
+		if len(noLabel) < 1 || len(noLabel) > 20 {
+			return errors.New("no label must be between 1 and 20 characters")
+		}
+	}
+	
 	return nil
 }
 
@@ -101,6 +122,20 @@ func CreateMarketHandler(loadEconConfig setup.EconConfigLoader) func(http.Respon
 		if err = checkQuestionDescriptionLength(newMarket.Description); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+
+		// Validate custom labels
+		if err = validateCustomLabels(newMarket.YesLabel, newMarket.NoLabel); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Set default labels if not provided
+		if strings.TrimSpace(newMarket.YesLabel) == "" {
+			newMarket.YesLabel = "YES"
+		}
+		if strings.TrimSpace(newMarket.NoLabel) == "" {
+			newMarket.NoLabel = "NO"
 		}
 
 		if err = util.CheckUserIsReal(db, newMarket.CreatorUsername); err != nil {
