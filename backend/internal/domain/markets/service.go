@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	maxQuestionTitleLength = 160
-	maxDescriptionLength   = 2000
-	maxLabelLength         = 20
-	minLabelLength         = 1
+	MaxQuestionTitleLength = 160
+	MaxDescriptionLength   = 2000
+	MaxLabelLength         = 20
+	MinLabelLength         = 1
 )
 
 // Clock provides time functionality for testability
@@ -111,7 +111,7 @@ func (s *Service) CreateMarket(ctx context.Context, req MarketCreateRequest, cre
 	}
 
 	// Validate market resolution time
-	if err := s.validateMarketResolutionTime(req.ResolutionDateTime); err != nil {
+	if err := s.ValidateMarketResolutionTime(req.ResolutionDateTime); err != nil {
 		return nil, err
 	}
 
@@ -265,7 +265,7 @@ func (s *Service) ListResolvedMarkets(ctx context.Context, limit int) ([]*Market
 
 // validateQuestionTitle validates the market question title
 func (s *Service) validateQuestionTitle(title string) error {
-	if len(title) > maxQuestionTitleLength || len(title) < 1 {
+	if len(title) > MaxQuestionTitleLength || len(title) < 1 {
 		return ErrInvalidQuestionLength
 	}
 	return nil
@@ -273,7 +273,7 @@ func (s *Service) validateQuestionTitle(title string) error {
 
 // validateDescription validates the market description
 func (s *Service) validateDescription(description string) error {
-	if len(description) > maxDescriptionLength {
+	if len(description) > MaxDescriptionLength {
 		return ErrInvalidDescriptionLength
 	}
 	return nil
@@ -284,7 +284,7 @@ func (s *Service) validateCustomLabels(yesLabel, noLabel string) error {
 	// Validate yes label
 	if yesLabel != "" {
 		yesLabel = strings.TrimSpace(yesLabel)
-		if len(yesLabel) < minLabelLength || len(yesLabel) > maxLabelLength {
+		if len(yesLabel) < MinLabelLength || len(yesLabel) > MaxLabelLength {
 			return ErrInvalidLabel
 		}
 	}
@@ -292,7 +292,7 @@ func (s *Service) validateCustomLabels(yesLabel, noLabel string) error {
 	// Validate no label
 	if noLabel != "" {
 		noLabel = strings.TrimSpace(noLabel)
-		if len(noLabel) < minLabelLength || len(noLabel) > maxLabelLength {
+		if len(noLabel) < MinLabelLength || len(noLabel) > MaxLabelLength {
 			return ErrInvalidLabel
 		}
 	}
@@ -300,21 +300,9 @@ func (s *Service) validateCustomLabels(yesLabel, noLabel string) error {
 	return nil
 }
 
-// ValidateMarketResolutionTime validates that the market resolution time meets business logic requirements
-func (s *Service) ValidateMarketResolutionTime(resolutionTime time.Time) error {
-	now := s.clock.Now()
-	minimumDuration := time.Duration(s.config.MinimumFutureHours * float64(time.Hour))
-	minimumFutureTime := now.Add(minimumDuration)
-
-	if resolutionTime.Before(minimumFutureTime) || resolutionTime.Equal(minimumFutureTime) {
-		return fmt.Errorf("market resolution time must be at least %.1f hours in the future", s.config.MinimumFutureHours)
-	}
-	return nil
-}
-
 // ValidateQuestionTitle validates the market question title
 func (s *Service) ValidateQuestionTitle(title string) error {
-	if len(title) > maxQuestionTitleLength || len(title) < 1 {
+	if len(title) > MaxQuestionTitleLength || len(title) < 1 {
 		return ErrInvalidQuestionLength
 	}
 	return nil
@@ -322,7 +310,7 @@ func (s *Service) ValidateQuestionTitle(title string) error {
 
 // ValidateDescription validates the market description
 func (s *Service) ValidateDescription(description string) error {
-	if len(description) > maxDescriptionLength {
+	if len(description) > MaxDescriptionLength {
 		return ErrInvalidDescriptionLength
 	}
 	return nil
@@ -333,7 +321,7 @@ func (s *Service) ValidateLabels(yesLabel, noLabel string) error {
 	// Validate yes label
 	if yesLabel != "" {
 		yesLabel = strings.TrimSpace(yesLabel)
-		if len(yesLabel) < minLabelLength || len(yesLabel) > maxLabelLength {
+		if len(yesLabel) < MinLabelLength || len(yesLabel) > MaxLabelLength {
 			return ErrInvalidLabel
 		}
 	}
@@ -341,7 +329,7 @@ func (s *Service) ValidateLabels(yesLabel, noLabel string) error {
 	// Validate no label
 	if noLabel != "" {
 		noLabel = strings.TrimSpace(noLabel)
-		if len(noLabel) < minLabelLength || len(noLabel) > maxLabelLength {
+		if len(noLabel) < MinLabelLength || len(noLabel) > MaxLabelLength {
 			return ErrInvalidLabel
 		}
 	}
@@ -350,7 +338,7 @@ func (s *Service) ValidateLabels(yesLabel, noLabel string) error {
 }
 
 // validateMarketResolutionTime validates that the market resolution time meets business logic requirements (private)
-func (s *Service) validateMarketResolutionTime(resolutionTime time.Time) error {
+func (s *Service) ValidateMarketResolutionTime(resolutionTime time.Time) error {
 	now := s.clock.Now()
 	minimumDuration := time.Duration(s.config.MinimumFutureHours * float64(time.Hour))
 	minimumFutureTime := now.Add(minimumDuration)
