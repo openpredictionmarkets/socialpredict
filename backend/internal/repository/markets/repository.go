@@ -110,6 +110,46 @@ func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters)
 	return markets, nil
 }
 
+// ListByStatus retrieves markets filtered by status with pagination
+func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
+	query := r.db.WithContext(ctx).Model(&models.Market{})
+
+	// Apply status filter
+	now := time.Now()
+	switch status {
+	case "active":
+		query = query.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+	case "closed":
+		query = query.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+	case "resolved":
+		query = query.Where("is_resolved = ?", true)
+	case "all":
+		// No status filter
+	}
+
+	// Apply pagination
+	if p.Limit > 0 {
+		query = query.Limit(p.Limit)
+	}
+	if p.Offset > 0 {
+		query = query.Offset(p.Offset)
+	}
+
+	query = query.Order("created_at DESC")
+
+	var dbMarkets []models.Market
+	if err := query.Find(&dbMarkets).Error; err != nil {
+		return nil, err
+	}
+
+	markets := make([]*dmarkets.Market, len(dbMarkets))
+	for i, dbMarket := range dbMarkets {
+		markets[i] = r.modelToDomain(&dbMarket)
+	}
+
+	return markets, nil
+}
+
 // Search searches for markets by query string
 func (r *GormRepository) Search(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
 	dbQuery := r.db.WithContext(ctx).Model(&models.Market{})

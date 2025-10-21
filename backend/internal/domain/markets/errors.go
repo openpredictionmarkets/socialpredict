@@ -12,4 +12,5 @@ var (
 	ErrUserNotFound             = errors.New("creator user not found")
 	ErrInsufficientBalance      = errors.New("insufficient balance")
 	ErrUnauthorized             = errors.New("unauthorized")
+	ErrInvalidInput             = errors.New("invalid input")
 )

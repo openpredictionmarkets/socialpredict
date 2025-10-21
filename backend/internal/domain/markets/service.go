@@ -25,6 +25,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id int64) (*Market, error)
 	UpdateLabels(ctx context.Context, id int64, yesLabel, noLabel string) error
 	List(ctx context.Context, filters ListFilters) ([]*Market, error)
+	ListByStatus(ctx context.Context, status string, p Page) ([]*Market, error)
 	Search(ctx context.Context, query string, filters SearchFilters) ([]*Market, error)
 	Delete(ctx context.Context, id int64) error
 	ResolveMarket(ctx context.Context, id int64, resolution string) error
@@ -57,6 +58,17 @@ type SearchFilters struct {
 	Status string
 	Limit  int
 	Offset int
+}
+
+// ServiceInterface defines the interface for market service operations
+type ServiceInterface interface {
+	CreateMarket(ctx context.Context, req MarketCreateRequest, creatorUsername string) (*Market, error)
+	SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error
+	GetMarket(ctx context.Context, id int64) (*Market, error)
+	ListMarkets(ctx context.Context, filters ListFilters) ([]*Market, error)
+	SearchMarkets(ctx context.Context, query string, filters SearchFilters) ([]*Market, error)
+	ResolveMarket(ctx context.Context, marketID int64, resolution string) error
+	ListByStatus(ctx context.Context, status string, p Page) ([]*Market, error)
 }
 
 // Service implements the core market business logic
@@ -261,6 +273,36 @@ func (s *Service) ListResolvedMarkets(ctx context.Context, limit int) ([]*Market
 		Limit:  limit,
 	}
 	return s.repo.List(ctx, filters)
+}
+
+// Page represents pagination parameters
+type Page struct {
+	Limit  int
+	Offset int
+}
+
+// ListByStatus returns markets filtered by status with pagination
+func (s *Service) ListByStatus(ctx context.Context, status string, p Page) ([]*Market, error) {
+	// Validate status
+	switch status {
+	case "active", "closed", "resolved", "all":
+		// Valid status
+	default:
+		return nil, ErrInvalidInput
+	}
+
+	// Validate pagination
+	if p.Limit <= 0 {
+		p.Limit = 100
+	}
+	if p.Limit > 1000 {
+		p.Limit = 1000
+	}
+	if p.Offset < 0 {
+		p.Offset = 0
+	}
+
+	return s.repo.ListByStatus(ctx, status, p)
 }
 
 // validateQuestionTitle validates the market question title

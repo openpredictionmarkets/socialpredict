@@ -1,15 +1,63 @@
 package marketshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"socialpredict/handlers/markets/dto"
+	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/util"
 	"testing"
 	"time"
 )
+
+// MockService implements dmarkets.Service for testing
+type MockService struct{}
+
+func (m *MockService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockService) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
+	return nil
+}
+
+func (m *MockService) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockService) ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockService) ResolveMarket(ctx context.Context, marketID int64, resolution string) error {
+	return nil
+}
+
+func (m *MockService) ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
+	// Mock implementation that returns test data based on status
+	market := &dmarkets.Market{
+		ID:                 1,
+		QuestionTitle:      status + " Market",
+		Description:        "Test " + status + " market",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: time.Now().Add(24 * time.Hour),
+		CreatorUsername:    "testuser",
+		YesLabel:           "YES",
+		NoLabel:            "NO",
+		Status:             status,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+	return []*dmarkets.Market{market}, nil
+}
 
 func TestActiveMarketsFilter(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
@@ -232,8 +280,8 @@ func TestListMarketsByStatus(t *testing.T) {
 	if len(markets) != 1 {
 		t.Errorf("Expected 1 market, got %d", len(markets))
 	}
-	if markets[0].QuestionTitle != "Active Market" {
-		t.Errorf("Expected 'Active Market', got %s", markets[0].QuestionTitle)
+	if markets[0].Market.(dto.MarketResponse).QuestionTitle != "Active Market" {
+		t.Errorf("Expected 'Active Market', got %s", markets[0].Market.(dto.MarketResponse).QuestionTitle)
 	}
 }
 
@@ -282,8 +330,9 @@ func TestListActiveMarketsHandler(t *testing.T) {
 	// Create response recorder
 	rr := httptest.NewRecorder()
 
-	// Call handler
-	handler := http.HandlerFunc(ListActiveMarketsHandler)
+	// Call handler with mock service
+	mockService := &MockService{}
+	handler := ListActiveMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	// Check response status
@@ -342,7 +391,8 @@ func TestListClosedMarketsHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// Call handler
-	handler := http.HandlerFunc(ListClosedMarketsHandler)
+	mockService := &MockService{}
+	handler := ListClosedMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	// Check response status
@@ -403,7 +453,8 @@ func TestListResolvedMarketsHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// Call handler
-	handler := http.HandlerFunc(ListResolvedMarketsHandler)
+	mockService := &MockService{}
+	handler := ListResolvedMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	// Check response status
@@ -438,7 +489,8 @@ func TestHandlerMethodNotAllowed(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(ListActiveMarketsHandler)
+	mockService := &MockService{}
+	handler := ListActiveMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusMethodNotAllowed {

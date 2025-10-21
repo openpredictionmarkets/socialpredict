@@ -20,6 +20,7 @@ import (
 	usercredit "socialpredict/handlers/users/credit"
 	privateuser "socialpredict/handlers/users/privateuser"
 	"socialpredict/handlers/users/publicuser"
+	"socialpredict/internal/app"
 	"socialpredict/middleware"
 	"socialpredict/security"
 	"socialpredict/setup"
@@ -109,6 +110,11 @@ func Start() {
 		_, _ = w.Write([]byte("ok"))
 	}).Methods("GET")
 
+	// Initialize domain services
+	db := util.GetDB()
+	container := app.BuildApplication(db, setup.EconomicsConfig())
+	marketsService := container.GetMarketsService()
+
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
 
@@ -128,9 +134,9 @@ func Start() {
 	// markets display, market information
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketshandlers.ListMarketsHandler))).Methods("GET")
 	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketshandlers.SearchMarketsHandler))).Methods("GET")
-	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(marketshandlers.ListActiveMarketsHandler))).Methods("GET")
-	router.Handle("/v0/markets/closed", securityMiddleware(http.HandlerFunc(marketshandlers.ListClosedMarketsHandler))).Methods("GET")
-	router.Handle("/v0/markets/resolved", securityMiddleware(http.HandlerFunc(marketshandlers.ListResolvedMarketsHandler))).Methods("GET")
+	router.Handle("/v0/markets/active", securityMiddleware(marketshandlers.ListActiveMarketsHandler(marketsService))).Methods("GET")
+	router.Handle("/v0/markets/closed", securityMiddleware(marketshandlers.ListClosedMarketsHandler(marketsService))).Methods("GET")
+	router.Handle("/v0/markets/resolved", securityMiddleware(marketshandlers.ListResolvedMarketsHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/markets/{marketId}", securityMiddleware(http.HandlerFunc(marketshandlers.MarketDetailsHandler))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(http.HandlerFunc(marketshandlers.ProjectNewProbabilityHandler))).Methods("GET")
 
@@ -167,7 +173,6 @@ func Start() {
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")
 
 	// homepage content routes
-	db := util.GetDB()
 	homepageRepo := homepage.NewGormRepository(db)
 	homepageRenderer := homepage.NewDefaultRenderer()
 	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
