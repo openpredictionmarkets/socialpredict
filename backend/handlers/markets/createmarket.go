@@ -54,7 +54,7 @@ func validateCustomLabels(yesLabel, noLabel string) error {
 			return errors.New("yes label must be between 1 and 20 characters")
 		}
 	}
-	
+
 	// Validate no label
 	if noLabel != "" {
 		noLabel = strings.TrimSpace(noLabel)
@@ -62,7 +62,7 @@ func validateCustomLabels(yesLabel, noLabel string) error {
 			return errors.New("no label must be between 1 and 20 characters")
 		}
 	}
-	
+
 	return nil
 }
 

@@ -19,7 +19,7 @@ type Market struct {
 	UpdatedAt          time.Time
 }
 
-// MarketCreateRequest represents the data needed to create a new market
+// MarketCreateRequest represents the request to create a new market
 type MarketCreateRequest struct {
 	QuestionTitle      string
 	Description        string
