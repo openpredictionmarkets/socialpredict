@@ -25,6 +25,20 @@ type ListMarketsResponse struct {
 	Total   int               `json:"total"`
 }
 
+// CreateMarketResponse represents the HTTP response after creating a market
+type CreateMarketResponse struct {
+	ID                 int64     `json:"id"`
+	QuestionTitle      string    `json:"questionTitle"`
+	Description        string    `json:"description"`
+	OutcomeType        string    `json:"outcomeType"`
+	ResolutionDateTime time.Time `json:"resolutionDateTime"`
+	CreatorUsername    string    `json:"creatorUsername"`
+	YesLabel           string    `json:"yesLabel"`
+	NoLabel            string    `json:"noLabel"`
+	Status             string    `json:"status"`
+	CreatedAt          time.Time `json:"createdAt"`
+}
+
 // ErrorResponse represents an error response
 type ErrorResponse struct {
 	Error   string `json:"error"`
