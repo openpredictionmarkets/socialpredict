@@ -236,6 +236,33 @@ func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution 
 	return s.repo.ResolveMarket(ctx, marketID, resolution)
 }
 
+// ListActiveMarkets returns markets that are not resolved and active
+func (s *Service) ListActiveMarkets(ctx context.Context, limit int) ([]*Market, error) {
+	filters := ListFilters{
+		Status: "active",
+		Limit:  limit,
+	}
+	return s.repo.List(ctx, filters)
+}
+
+// ListClosedMarkets returns markets that are closed but not resolved
+func (s *Service) ListClosedMarkets(ctx context.Context, limit int) ([]*Market, error) {
+	filters := ListFilters{
+		Status: "closed",
+		Limit:  limit,
+	}
+	return s.repo.List(ctx, filters)
+}
+
+// ListResolvedMarkets returns markets that have been resolved
+func (s *Service) ListResolvedMarkets(ctx context.Context, limit int) ([]*Market, error) {
+	filters := ListFilters{
+		Status: "resolved",
+		Limit:  limit,
+	}
+	return s.repo.List(ctx, filters)
+}
+
 // validateQuestionTitle validates the market question title
 func (s *Service) validateQuestionTitle(title string) error {
 	if len(title) > maxQuestionTitleLength || len(title) < 1 {
@@ -273,7 +300,56 @@ func (s *Service) validateCustomLabels(yesLabel, noLabel string) error {
 	return nil
 }
 
-// validateMarketResolutionTime validates that the market resolution time meets business logic requirements
+// ValidateMarketResolutionTime validates that the market resolution time meets business logic requirements
+func (s *Service) ValidateMarketResolutionTime(resolutionTime time.Time) error {
+	now := s.clock.Now()
+	minimumDuration := time.Duration(s.config.MinimumFutureHours * float64(time.Hour))
+	minimumFutureTime := now.Add(minimumDuration)
+
+	if resolutionTime.Before(minimumFutureTime) || resolutionTime.Equal(minimumFutureTime) {
+		return fmt.Errorf("market resolution time must be at least %.1f hours in the future", s.config.MinimumFutureHours)
+	}
+	return nil
+}
+
+// ValidateQuestionTitle validates the market question title
+func (s *Service) ValidateQuestionTitle(title string) error {
+	if len(title) > maxQuestionTitleLength || len(title) < 1 {
+		return ErrInvalidQuestionLength
+	}
+	return nil
+}
+
+// ValidateDescription validates the market description
+func (s *Service) ValidateDescription(description string) error {
+	if len(description) > maxDescriptionLength {
+		return ErrInvalidDescriptionLength
+	}
+	return nil
+}
+
+// ValidateLabels validates the custom yes/no labels
+func (s *Service) ValidateLabels(yesLabel, noLabel string) error {
+	// Validate yes label
+	if yesLabel != "" {
+		yesLabel = strings.TrimSpace(yesLabel)
+		if len(yesLabel) < minLabelLength || len(yesLabel) > maxLabelLength {
+			return ErrInvalidLabel
+		}
+	}
+
+	// Validate no label
+	if noLabel != "" {
+		noLabel = strings.TrimSpace(noLabel)
+		if len(noLabel) < minLabelLength || len(noLabel) > maxLabelLength {
+			return ErrInvalidLabel
+		}
+	}
+
+	return nil
+}
+
+// validateMarketResolutionTime validates that the market resolution time meets business logic requirements (private)
 func (s *Service) validateMarketResolutionTime(resolutionTime time.Time) error {
 	now := s.clock.Now()
 	minimumDuration := time.Duration(s.config.MinimumFutureHours * float64(time.Hour))
