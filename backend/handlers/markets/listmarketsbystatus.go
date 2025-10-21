@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"socialpredict/handlers/marketpublicresponse"
+	"socialpredict/handlers/markets/dto"
 	marketmath "socialpredict/handlers/math/market"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
@@ -19,9 +20,9 @@ import (
 
 // ListMarketsStatusResponse defines the structure for filtered market responses
 type ListMarketsStatusResponse struct {
-	Markets []MarketOverview `json:"markets"`
-	Status  string           `json:"status"`
-	Count   int              `json:"count"`
+	Markets []dto.MarketOverview `json:"markets"`
+	Status  string               `json:"status"`
+	Count   int                  `json:"count"`
 }
 
 // MarketFilterFunc defines the filtering logic for markets
@@ -44,7 +45,7 @@ func ListMarketsByStatusHandler(filterFunc MarketFilterFunc, statusName string) 
 			return
 		}
 
-		var marketOverviews []MarketOverview
+		var marketOverviews []dto.MarketOverview
 		for _, market := range markets {
 			bets := tradingdata.GetBetsForMarket(db, uint(market.ID))
 			probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
@@ -63,7 +64,7 @@ func ListMarketsByStatusHandler(filterFunc MarketFilterFunc, statusName string) 
 				return
 			}
 
-			marketOverview := MarketOverview{
+			marketOverview := dto.MarketOverview{
 				Market:          publicResponseMarket,
 				Creator:         creatorInfo,
 				LastProbability: lastProbability,

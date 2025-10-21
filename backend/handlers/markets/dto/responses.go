@@ -19,12 +19,6 @@ type MarketResponse struct {
 	UpdatedAt          time.Time `json:"updatedAt"`
 }
 
-// ListMarketsResponse represents the HTTP response for listing markets
-type ListMarketsResponse struct {
-	Markets []*MarketResponse `json:"markets"`
-	Total   int               `json:"total"`
-}
-
 // CreateMarketResponse represents the HTTP response after creating a market
 type CreateMarketResponse struct {
 	ID                 int64     `json:"id"`
@@ -37,6 +31,36 @@ type CreateMarketResponse struct {
 	NoLabel            string    `json:"noLabel"`
 	Status             string    `json:"status"`
 	CreatedAt          time.Time `json:"createdAt"`
+}
+
+// MarketOverviewResponse represents enriched market data for list display
+type MarketOverviewResponse struct {
+	Market          *MarketResponse `json:"market"`
+	Creator         interface{}     `json:"creator"` // User info - will be properly typed later
+	LastProbability float64         `json:"lastProbability"`
+	NumUsers        int             `json:"numUsers"`
+	TotalVolume     int64           `json:"totalVolume"`
+}
+
+// SimpleListMarketsResponse represents the HTTP response for simple market listing
+type SimpleListMarketsResponse struct {
+	Markets []*MarketResponse `json:"markets"`
+	Total   int               `json:"total"`
+}
+
+// ListMarketsResponse represents the HTTP response for listing markets with enriched data
+type ListMarketsResponse struct {
+	Markets []*MarketOverviewResponse `json:"markets"`
+}
+
+// MarketOverview represents backward compatibility type for market overview data
+type MarketOverview struct {
+	Market          interface{} `json:"market"`
+	Creator         interface{} `json:"creator"`
+	LastProbability float64     `json:"lastProbability"`
+	NumUsers        int         `json:"numUsers"`
+	TotalVolume     int64       `json:"totalVolume"`
+	MarketDust      int64       `json:"marketDust"`
 }
 
 // ErrorResponse represents an error response

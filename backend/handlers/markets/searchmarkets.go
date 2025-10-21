@@ -18,6 +18,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// MarketOverview represents backward compatibility type for market overview data
+type MarketOverview struct {
+	Market          marketpublicresponse.PublicResponseMarket `json:"market"`
+	Creator         interface{}                               `json:"creator"`
+	LastProbability float64                                   `json:"lastProbability"`
+	NumUsers        int                                       `json:"numUsers"`
+	TotalVolume     int64                                     `json:"totalVolume"`
+}
+
 // SearchMarketsResponse defines the structure for search results
 type SearchMarketsResponse struct {
 	PrimaryResults  []MarketOverview `json:"primaryResults"`

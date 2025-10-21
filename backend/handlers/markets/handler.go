@@ -201,7 +201,7 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 		responses[i] = h.marketToResponse(market)
 	}
 
-	response := dto.ListMarketsResponse{
+	response := dto.SimpleListMarketsResponse{
 		Markets: responses,
 		Total:   len(responses),
 	}
@@ -260,7 +260,7 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 		responses[i] = h.marketToResponse(market)
 	}
 
-	response := dto.ListMarketsResponse{
+	response := dto.SimpleListMarketsResponse{
 		Markets: responses,
 		Total:   len(responses),
 	}
