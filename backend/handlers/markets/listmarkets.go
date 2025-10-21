@@ -70,7 +70,7 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var marketOverviews []MarketOverview
+	var marketOverviews []MarketOverview = make([]MarketOverview, 0)
 	db := util.GetDB() // Still needed for complex calculations - will be refactored later
 
 	for _, market := range markets {

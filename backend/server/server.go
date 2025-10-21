@@ -102,6 +102,13 @@ func Start() {
 	// Initialize mux router
 	router := mux.NewRouter()
 
+	// Health endpoint
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}).Methods("GET")
+
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
 
