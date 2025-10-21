@@ -1,6 +1,7 @@
 import React from 'react';
+import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 
-const ResolutionAlert = ({ isResolved, resolutionResult }) => {
+const ResolutionAlert = ({ isResolved, resolutionResult, market }) => {
   if (!isResolved) return null;
 
   const isYes = resolutionResult.toUpperCase() === 'YES';
@@ -8,7 +9,7 @@ const ResolutionAlert = ({ isResolved, resolutionResult }) => {
   const borderColor = isYes ? 'border-blue-500/50' : 'border-red-500/50';
   const textColor = isYes ? 'text-blue-200' : 'text-red-200';
   const iconColor = isYes ? 'text-blue-400' : 'text-red-400';
-  const strongColor = isYes ? 'text-blue-300' : 'text-red-300';
+  const strongColor = isYes ? 'text-green-300' : 'text-red-300';
 
   return (
     <div
@@ -32,7 +33,9 @@ const ResolutionAlert = ({ isResolved, resolutionResult }) => {
           <p className='text-sm font-medium'>Market Resolved</p>
           <p className='text-sm'>
             This market has been resolved as{' '}
-            <strong className={strongColor}>{resolutionResult}</strong>
+            <strong className={strongColor}>
+              {market ? getResolvedText(resolutionResult, market).replace('Resolved ', '') : resolutionResult}
+            </strong>
           </p>
         </div>
       </div>

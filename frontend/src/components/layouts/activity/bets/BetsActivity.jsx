@@ -2,7 +2,7 @@ import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 
-const BetsActivityLayout = ({ marketId }) => {
+const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
     const [bets, setBets] = useState([]);
 
     useEffect(() => {
@@ -17,7 +17,7 @@ const BetsActivityLayout = ({ marketId }) => {
             }
         };
         fetchBets();
-    }, [marketId]);
+    }, [marketId, refreshTrigger]);
 
     return (
         <div className="p-4">

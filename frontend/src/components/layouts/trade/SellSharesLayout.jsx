@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons';
-import { fetchUserShares, submitSale } from './TradeUtils'
+import { fetchUserShares, submitSale } from './TradeUtils';
+import { useMarketLabels } from '../../../hooks/useMarketLabels';
 
-const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
+const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
     const [shares, setShares] = useState({ NoSharesOwned: 0, YesSharesOwned: 0 });
     const [sellAmount, setSellAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
     const [feeData, setFeeData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    
+    // Get custom labels for this market
+    const { yesLabel, noLabel } = useMarketLabels(market);
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -105,9 +109,9 @@ const SellSharesLayout = ({ marketId, token, onTransactionSuccess }) => {
                 <>
                     <div className="flex justify-center space-x-4 mb-4">
                         {shares.noSharesOwned > 0 &&
-                            <SharesBadge type="NO" count={shares.noSharesOwned} />}
+                            <SharesBadge type="NO" count={shares.noSharesOwned} label={noLabel} />}
                         {shares.yesSharesOwned > 0 &&
-                            <SharesBadge type="YES" count={shares.yesSharesOwned} />}
+                            <SharesBadge type="YES" count={shares.yesSharesOwned} label={yesLabel} />}
                     </div>
                     {(shares.noSharesOwned > 0 || shares.yesSharesOwned > 0) && (
                         <div className="text-center text-lg mt-2">
