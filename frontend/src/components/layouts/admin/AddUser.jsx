@@ -17,10 +17,12 @@ function AdminAddUser() {
         event.preventDefault();
         setError('');
         try {
-            const response = await fetch(`${API_URL}/api/v0/admin/createuser`, {
+          const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/v0/admin/createuser`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({ username })
             });

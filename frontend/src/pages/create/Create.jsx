@@ -5,6 +5,7 @@ import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDa
 import DatetimeSelector from '../../components/datetimeSelector/DatetimeSelector';
 import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
+import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
 import { API_URL } from '../../config';
 
@@ -14,6 +15,8 @@ function Create() {
   const [resolutionDateTime, setResolutionDateTime] = useState(
     getEndofDayDateTime()
   );
+  const [yesLabel, setYesLabel] = useState('');
+  const [noLabel, setNoLabel] = useState('');
   const [error, setError] = useState('');
   const { username } = useAuth();
   const history = useHistory();
@@ -21,6 +24,20 @@ function Create() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+
+    // Validate custom labels
+    const trimmedYesLabel = yesLabel.trim();
+    const trimmedNoLabel = noLabel.trim();
+    
+    if (trimmedYesLabel && (trimmedYesLabel.length < 1 || trimmedYesLabel.length > 20)) {
+      setError('Yes label must be between 1 and 20 characters');
+      return;
+    }
+    
+    if (trimmedNoLabel && (trimmedNoLabel.length < 1 || trimmedNoLabel.length > 20)) {
+      setError('No label must be between 1 and 20 characters');
+      return;
+    }
 
     let isoDateTime = resolutionDateTime;
 
@@ -51,12 +68,14 @@ function Create() {
         creatorUsername: username,
         isResolved: false,
         utcOffset: new Date().getTimezoneOffset(),
+        yesLabel: trimmedYesLabel || 'YES',
+        noLabel: trimmedNoLabel || 'NO',
       };
 
       console.log('marketData:', marketData);
       console.log(JSON.stringify(marketData));
 
-      const response = await fetch(`${API_URL}/api/v0/create`, {
+      const response = await fetch(`${API_URL}/v0/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,12 +110,12 @@ function Create() {
           <label className='block text-sm font-medium text-gray-300 mb-1'>
             Question Title
           </label>
-          <RegularInput
+          <EmojiPickerInput
             type='text'
             value={questionTitle}
             onChange={(e) => setQuestionTitle(e.target.value)}
             placeholder='Enter the market question'
-            className='w-full'
+            className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
           />
         </div>
 
@@ -104,13 +123,65 @@ function Create() {
           <label className='block text-sm font-medium text-gray-300 mb-1'>
             Description
           </label>
-          <RegularInputBox
+          <EmojiPickerInput
+            type='textarea'
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder='Provide details about the market'
-            className='h-32 resize-y'
+            className='w-full h-32 resize-y bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
           />
         </div>
+
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+          <div>
+            <label className='block text-sm font-medium text-gray-300 mb-1'>
+              Yes Label (Optional)
+            </label>
+            <EmojiPickerInput
+              type='text'
+              value={yesLabel}
+              onChange={(e) => setYesLabel(e.target.value)}
+              placeholder='e.g., BULL 🚀, WIN, PASS'
+              maxLength={20}
+              className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+            />
+            <p className='text-xs text-gray-400 mt-1'>
+              Custom label for positive outcome (defaults to "YES")
+            </p>
+          </div>
+          
+          <div>
+            <label className='block text-sm font-medium text-gray-300 mb-1'>
+              No Label (Optional)
+            </label>
+            <EmojiPickerInput
+              type='text'
+              value={noLabel}
+              onChange={(e) => setNoLabel(e.target.value)}
+              placeholder='e.g., BEAR 📉, LOSE, FAIL'
+              maxLength={20}
+              className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+            />
+            <p className='text-xs text-gray-400 mt-1'>
+              Custom label for negative outcome (defaults to "NO")
+            </p>
+          </div>
+        </div>
+
+        {(yesLabel.trim() || noLabel.trim()) && (
+          <div className='bg-gray-700 p-3 rounded-md'>
+            <p className='text-sm font-medium text-gray-300 mb-2'>Preview:</p>
+            <div className='flex space-x-2'>
+              <span className='px-3 py-1 bg-green-600 text-white text-sm rounded'>
+                {yesLabel.trim() || 'YES'}
+              </span>
+              <span className='text-gray-400'>vs</span>
+              <span className='px-3 py-1 bg-red-600 text-white text-sm rounded'>
+                {noLabel.trim() || 'NO'}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className='block text-sm font-medium text-gray-300 mb-1'>

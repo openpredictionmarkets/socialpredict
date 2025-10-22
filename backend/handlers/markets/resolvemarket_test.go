@@ -54,7 +54,7 @@ func TestResolveMarketHandler_NARefund(t *testing.T) {
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
-	req := httptest.NewRequest("POST", "/api/v0/market/1/resolve", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest("POST", "/v0/market/1/resolve", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -63,7 +63,7 @@ func TestResolveMarketHandler_NARefund(t *testing.T) {
 
 	// Set up router with URL vars
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
 	router.ServeHTTP(w, req)
 
 	// Check response
@@ -121,7 +121,7 @@ func TestResolveMarketHandler_YESWin(t *testing.T) {
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
-	req := httptest.NewRequest("POST", "/api/v0/market/2/resolve", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest("POST", "/v0/market/2/resolve", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -130,7 +130,7 @@ func TestResolveMarketHandler_YESWin(t *testing.T) {
 
 	// Set up router with URL vars
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
 	router.ServeHTTP(w, req)
 
 	// Check response
@@ -196,7 +196,7 @@ func TestResolveMarketHandler_NOWin(t *testing.T) {
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
-	req := httptest.NewRequest("POST", "/api/v0/market/3/resolve", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest("POST", "/v0/market/3/resolve", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -205,7 +205,7 @@ func TestResolveMarketHandler_NOWin(t *testing.T) {
 
 	// Set up router with URL vars
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
 	router.ServeHTTP(w, req)
 
 	// Check response
@@ -263,7 +263,7 @@ func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
-	req := httptest.NewRequest("POST", "/api/v0/market/4/resolve", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest("POST", "/v0/market/4/resolve", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -272,7 +272,7 @@ func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
 
 	// Set up router with URL vars
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
 	router.ServeHTTP(w, req)
 
 	// Check response - should be unauthorized
@@ -310,7 +310,7 @@ func TestResolveMarketHandler_InvalidOutcome(t *testing.T) {
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
-	req := httptest.NewRequest("POST", "/api/v0/market/5/resolve", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest("POST", "/v0/market/5/resolve", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -319,7 +319,7 @@ func TestResolveMarketHandler_InvalidOutcome(t *testing.T) {
 
 	// Set up router with URL vars
 	router := mux.NewRouter()
-	router.HandleFunc("/api/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
 	router.ServeHTTP(w, req)
 
 	// Check response - should be bad request

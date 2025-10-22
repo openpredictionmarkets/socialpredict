@@ -3,7 +3,7 @@ import { buttonBaseStyle } from '../BaseButton';
 import { NumberInput } from '../../inputs/InputBar';
 
 
-const SharesBadgeSimple = ({ type, count }) => {
+const SharesBadgeSimple = ({ type, count, label }) => {
 
     const backgrounds = {
         YES: 'linear-gradient(to right, #054A29, #FFC107)', // green to yellow gradient
@@ -12,17 +12,20 @@ const SharesBadgeSimple = ({ type, count }) => {
         // NO: `linear-gradient(to right, theme('colors.red-btn'), theme('colors.gold-btn')`,
     };
 
+    // Use custom label if provided, otherwise fall back to type
+    const displayLabel = label || type;
+
     return (
         <div
             className="cursor-default text-white px-4 py-2 rounded-full shadow-md"
             style={{ background: backgrounds[type] }}
         >
-            {type}: {count} 🪙
+            {displayLabel}: {count} 🪙
         </div>
     );
 };
 
-const SharesBadge = ({ type, count }) => {
+const SharesBadge = ({ type, count, label }) => {
     const colors = {
         YES: '#054A29',
         NO: '#D00000',
@@ -36,6 +39,9 @@ const SharesBadge = ({ type, count }) => {
         borderColor: `${colors.GOLD}`,
     };
 
+    // Use custom label if provided, otherwise fall back to type
+    const displayLabel = label || type;
+
     return (
         <div
             className="cursor-default px-4 py-2 font-bold text-lg"
@@ -46,7 +52,7 @@ const SharesBadge = ({ type, count }) => {
                 position: 'relative',
             }}
         >
-            {type}: {count} 🪙
+            {displayLabel}: {count} 🪙
         </div>
     );
 };

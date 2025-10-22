@@ -6,16 +6,16 @@ import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import SiteTabs from '../../components/tabs/SiteTabs';
 
 // MetricCard Component
-const MetricCard = ({ 
-  title, 
-  value, 
-  formula, 
-  explanation, 
-  onToggleFormula, 
-  showFormula, 
-  colorClass = "text-white", 
-  isTotal = false, 
-  isStatus = false 
+const MetricCard = ({
+  title,
+  value,
+  formula,
+  explanation,
+  onToggleFormula,
+  showFormula,
+  colorClass = "text-white",
+  isTotal = false,
+  isStatus = false
 }) => {
   const formatValue = (val) => {
     if (isStatus) return val;
@@ -39,15 +39,15 @@ const MetricCard = ({
           </button>
         )}
       </div>
-      
+
       <p className={`${colorClass} ${isTotal ? 'text-3xl' : 'text-2xl'} font-bold mb-2`}>
         {formatValue(value)}
       </p>
-      
+
       {explanation && (
         <p className="text-gray-400 text-xs mb-2">{explanation}</p>
       )}
-      
+
       {formula && showFormula && (
         <div className="mt-3 p-3 bg-gray-800 rounded border border-gray-700">
           <p className="text-gray-300 text-xs font-mono">{formula}</p>
@@ -61,7 +61,7 @@ const Stats = () => {
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // System metrics state
   const [systemMetrics, setSystemMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -76,7 +76,7 @@ const Stats = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/v0/stats`, {
+        const response = await fetch(`${API_URL}/v0/stats`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ const Stats = () => {
     setMetricsLoading(true);
     setMetricsError(null);
     try {
-      const response = await fetch(`${API_URL}/api/v0/system/metrics`, {
+      const response = await fetch(`${API_URL}/v0/system/metrics`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -127,7 +127,7 @@ const Stats = () => {
     setLeaderboardLoading(true);
     setLeaderboardError(null);
     try {
-      const response = await fetch(`${API_URL}/api/v0/global/leaderboard`, {
+      const response = await fetch(`${API_URL}/v0/global/leaderboard`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -190,7 +190,7 @@ const Stats = () => {
   const setupConfigContent = (
     <div className="bg-gray-800 rounded-lg p-6">
       <h2 className="text-2xl font-semibold text-white mb-6">Setup Configuration</h2>
-      
+
       {/* Mobile-responsive grid for setup configuration */}
       <div className="space-y-2">
         <div className="sp-grid-setup-header">
@@ -198,7 +198,7 @@ const Stats = () => {
           <div>Value</div>
           <div>Explanation</div>
         </div>
-        
+
         {statsData?.setupConfiguration && Object.entries(statsData.setupConfiguration).map(([key, value]) => (
           <div key={key} className="sp-grid-setup-row hover:bg-gray-700/50 transition-colors">
             {/* Variable Name */}
@@ -217,7 +217,7 @@ const Stats = () => {
             <div className="hidden sm:block text-gray-300 text-xs sm:text-sm">
               {setupConfigExplanations[key] || 'Configuration parameter for platform behavior'}
             </div>
-            
+
             {/* Mobile explanation - spans full width */}
             <div className="col-span-2 sm:hidden sp-subline mt-1">
               {setupConfigExplanations[key] || 'Configuration parameter for platform behavior'}
@@ -235,8 +235,8 @@ const Stats = () => {
         <h2 className="text-2xl font-semibold text-white">
           System Financial Metrics <span className="text-warning-orange text-lg">(Beta)</span>
         </h2>
-        <SiteButton 
-          onClick={fetchSystemMetrics} 
+        <SiteButton
+          onClick={fetchSystemMetrics}
           isSelected={false}
           disabled={metricsLoading}
           className="bg-info-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
@@ -252,8 +252,8 @@ const Stats = () => {
           <div>
             <h4 className="text-warning-orange font-medium mb-2">Beta Feature Notice</h4>
             <p className="text-gray-300 text-sm">
-              These financial metrics are currently in beta. Balance calculations may not perfectly align 
-              as we continue to refine the accounting logic. We are actively working to improve accuracy 
+              These financial metrics are currently in beta. Balance calculations may not perfectly align
+              as we continue to refine the accounting logic. We are actively working to improve accuracy
               and ensure complete balance reconciliation in future versions.
             </p>
           </div>
@@ -289,7 +289,7 @@ const Stats = () => {
               <span className="ml-2 text-sm text-gray-400">(Total System Capacity)</span>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <MetricCard 
+              <MetricCard
                 title="User Debt Capacity"
                 value={systemMetrics.moneyCreated.userDebtCapacity.value}
                 formula={systemMetrics.moneyCreated.userDebtCapacity.formula}
@@ -298,7 +298,7 @@ const Stats = () => {
                 showFormula={showFormulas.userDebtCapacity}
                 colorClass="text-blue-400"
               />
-              <MetricCard 
+              <MetricCard
                 title="Number of Users"
                 value={systemMetrics.moneyCreated.numUsers.value}
                 explanation={systemMetrics.moneyCreated.numUsers.explanation}
@@ -314,7 +314,7 @@ const Stats = () => {
               <span className="ml-2 text-sm text-gray-400">(Where the money went)</span>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <MetricCard 
+              <MetricCard
                 title="Unused Debt Capacity"
                 value={systemMetrics.moneyUtilized.unusedDebt.value}
                 formula={systemMetrics.moneyUtilized.unusedDebt.formula}
@@ -323,7 +323,7 @@ const Stats = () => {
                 showFormula={showFormulas.unusedDebt}
                 colorClass="text-yellow-400"
               />
-              <MetricCard 
+              <MetricCard
                 title="Active Bet Volume"
                 value={systemMetrics.moneyUtilized.activeBetVolume.value}
                 formula={systemMetrics.moneyUtilized.activeBetVolume.formula}
@@ -332,7 +332,7 @@ const Stats = () => {
                 showFormula={showFormulas.activeBetVolume}
                 colorClass="text-purple-400"
               />
-              <MetricCard 
+              <MetricCard
                 title="Market Creation Fees"
                 value={systemMetrics.moneyUtilized.marketCreationFees.value}
                 formula={systemMetrics.moneyUtilized.marketCreationFees.formula}
@@ -341,7 +341,7 @@ const Stats = () => {
                 showFormula={showFormulas.marketCreationFees}
                 colorClass="text-orange-400"
               />
-              <MetricCard 
+              <MetricCard
                 title="Participation Fees"
                 value={systemMetrics.moneyUtilized.participationFees.value}
                 formula={systemMetrics.moneyUtilized.participationFees.formula}
@@ -350,7 +350,7 @@ const Stats = () => {
                 showFormula={showFormulas.participationFees}
                 colorClass="text-cyan-400"
               />
-              <MetricCard 
+              <MetricCard
                 title="Bonuses Paid"
                 value={systemMetrics.moneyUtilized.bonusesPaid.value}
                 explanation={systemMetrics.moneyUtilized.bonusesPaid.explanation}
@@ -358,7 +358,7 @@ const Stats = () => {
               />
             </div>
             <div className="mt-4 pt-4 border-t border-gray-600">
-              <MetricCard 
+              <MetricCard
                 title="Total Utilized"
                 value={systemMetrics.moneyUtilized.totalUtilized.value}
                 formula={systemMetrics.moneyUtilized.totalUtilized.formula}
@@ -378,21 +378,21 @@ const Stats = () => {
               <span className="ml-2 text-sm text-gray-400">(Balance Check)</span>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <MetricCard 
+              <MetricCard
                 title="System Balanced"
                 value={systemMetrics.verification.balanced.value === true ? 'YES' : 'NO'}
                 explanation={systemMetrics.verification.balanced.explanation}
                 colorClass={systemMetrics.verification.balanced.value === true ? 'text-green-400' : 'text-red-400'}
                 isStatus={true}
               />
-              <MetricCard 
+              <MetricCard
                 title="Surplus/Deficit"
                 value={systemMetrics.verification.surplus.value}
                 formula={systemMetrics.verification.surplus.formula}
                 explanation={systemMetrics.verification.surplus.explanation}
                 onToggleFormula={() => toggleFormula('surplus')}
                 showFormula={showFormulas.surplus}
-                colorClass={systemMetrics.verification.surplus.value === 0 ? 'text-green-400' : 
+                colorClass={systemMetrics.verification.surplus.value === 0 ? 'text-green-400' :
                            systemMetrics.verification.surplus.value > 0 ? 'text-yellow-400' : 'text-red-400'}
               />
             </div>
@@ -409,8 +409,8 @@ const Stats = () => {
         <h2 className="text-2xl font-semibold text-white">
           Global Leaderboard <span className="text-warning-orange text-lg">(Beta)</span>
         </h2>
-        <SiteButton 
-          onClick={fetchGlobalLeaderboard} 
+        <SiteButton
+          onClick={fetchGlobalLeaderboard}
           isSelected={false}
           disabled={leaderboardLoading}
           className="bg-info-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
@@ -426,7 +426,7 @@ const Stats = () => {
           <div>
             <h4 className="text-warning-orange font-medium mb-2">Beta Feature Notice</h4>
             <p className="text-gray-300 text-sm">
-              This global leaderboard aggregates profit calculations across all markets. Rankings are based on 
+              This global leaderboard aggregates profit calculations across all markets. Rankings are based on
               total profit (current position value minus total amount spent) across both resolved and active markets.
             </p>
           </div>
@@ -488,7 +488,7 @@ const Stats = () => {
                       {getRankDisplay(user.rank)}
                     </td>
                     <td className="py-3 px-4">
-                      <Link 
+                      <Link
                         to={`/user/${user.username}`}
                         className="text-blue-400 font-medium hover:text-blue-300 transition-colors"
                       >

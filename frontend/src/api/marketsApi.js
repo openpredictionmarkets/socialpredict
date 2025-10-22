@@ -18,8 +18,8 @@ export const searchMarkets = async (query, status = 'all', limit = 20) => {
         limit: limit.toString()
     });
 
-    const response = await fetch(`${API_URL}/api/v0/markets/search?${params}`);
-    
+    const response = await fetch(`${API_URL}/v0/markets/search?${params}`);
+
     if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Search failed: ${response.status} ${errorText}`);
@@ -34,16 +34,16 @@ export const searchMarkets = async (query, status = 'all', limit = 20) => {
  * @returns {Promise<Object>} Markets data
  */
 export const getMarketsByStatus = async (status = 'all') => {
-    const endpoint = status === 'all' 
-        ? `${API_URL}/api/v0/markets`
-        : `${API_URL}/api/v0/markets/${status}`;
-    
+    const endpoint = status === 'all'
+        ? `${API_URL}/v0/markets`
+        : `${API_URL}/v0/markets/${status}`;
+
     const response = await fetch(endpoint);
-    
+
     if (!response.ok) {
         throw new Error(`Failed to fetch ${status} markets: ${response.status}`);
     }
-    
+
     return await response.json();
 };
 
@@ -57,11 +57,11 @@ export const getMarketDetails = async (marketId) => {
         throw new Error('Market ID is required');
     }
 
-    const response = await fetch(`${API_URL}/api/v0/markets/${marketId}`);
-    
+    const response = await fetch(`${API_URL}/v0/markets/${marketId}`);
+
     if (!response.ok) {
         throw new Error(`Failed to fetch market details: ${response.status}`);
     }
-    
+
     return await response.json();
 };

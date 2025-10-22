@@ -4,6 +4,7 @@ import { API_URL } from '../../config';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import MobileMarketCard from '../../components/tables/MobileMarketCard';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
+import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -75,16 +76,8 @@ const MarketRow = ({ marketData }) => (
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>0</td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
       {marketData.market.isResolved ? (
-        <span
-          className={
-            marketData.market.resolutionResult === 'YES'
-              ? 'text-green-400'
-              : 'text-red-400'
-          }
-        >
-          {marketData.market.resolutionResult === 'YES'
-            ? 'Resolved YES'
-            : 'Resolved NO'}
+        <span className={getResultCssClass(marketData.market.resolutionResult)}>
+          {getResolvedText(marketData.market.resolutionResult, marketData.market)}
         </span>
       ) : (
         'Pending'
@@ -101,7 +94,7 @@ function MarketsTable() {
   useEffect(() => {
     const fetchMarkets = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/v0/markets`);
+        const response = await fetch(`${API_URL}/v0/markets`);
         if (!response.ok) throw new Error('Failed to fetch markets');
         const data = await response.json();
         setMarketsData(data.markets || []);

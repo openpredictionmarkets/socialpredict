@@ -13,7 +13,7 @@ services:
     networks:
       - socialpredict_internal_network
     env_file:
-      - ${ENV_PATH}
+      - ../.env
 
   backend:
     container_name: "${BACKEND_CONTAINER_NAME}"
@@ -22,7 +22,7 @@ services:
     networks:
       - socialpredict_internal_network
     env_file:
-      - ${ENV_PATH}
+      - ../.env
     depends_on:
       - db
 
@@ -33,7 +33,7 @@ services:
     networks:
       - socialpredict_internal_network
     env_file:
-      - ${ENV_PATH}
+      - ../.env
     depends_on:
       - backend
 
@@ -44,15 +44,13 @@ services:
     environment:
       ENVIRONMENT: ${APP_ENV}
       DOMAIN: ${DOMAIN}
-      BACKEND_PORT: ${BACKEND_PORT}
-      FRONTEND_PORT: ${REACT_PORT}
     volumes:
       - ../data/nginx/vhosts/prod:/etc/nginx/templates/
     networks:
       - socialpredict_internal_network
       - socialpredict_external_network
     env_file:
-      - ${ENV_PATH}
+      - ../.env
     depends_on:
       - backend
       - frontend

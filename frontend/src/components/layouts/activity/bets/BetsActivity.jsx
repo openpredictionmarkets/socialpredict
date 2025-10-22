@@ -2,12 +2,12 @@ import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 
-const BetsActivityLayout = ({ marketId }) => {
+const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
     const [bets, setBets] = useState([]);
 
     useEffect(() => {
         const fetchBets = async () => {
-            const response = await fetch(`${API_URL}/api/v0/markets/bets/${marketId}`, {
+            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}`, {
             });
             if (response.ok) {
                 const data = await response.json();
@@ -17,7 +17,7 @@ const BetsActivityLayout = ({ marketId }) => {
             }
         };
         fetchBets();
-    }, [marketId]);
+    }, [marketId, refreshTrigger]);
 
     return (
         <div className="p-4">

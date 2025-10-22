@@ -1,13 +1,14 @@
 import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getMarketLabels } from '../../../../utils/labelMapping';
 
-const PositionsActivityLayout = ({ marketId }) => {
+const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
   const [positions, setPositions] = useState([]);
 
   useEffect(() => {
     const fetchPositions = async () => {
-      const response = await fetch(`${API_URL}/api/v0/markets/positions/${marketId}`);
+      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}`);
       if (response.ok) {
         const rawData = await response.json();
         console.log("API Data:", rawData);
@@ -23,13 +24,15 @@ const PositionsActivityLayout = ({ marketId }) => {
       }
     };
     fetchPositions();
-  }, [marketId]);
+  }, [marketId, refreshTrigger]);
+
+  const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
 
   return (
     <div className="flex flex-row gap-4 p-4">
       {/* NO Shares */}
       <div className="flex-1">
-        <h2 className="text-center font-bold text-red-500 mb-2">NO Shares</h2>
+        <h2 className="text-center font-bold mb-2">Shares for: <span className="text-red-500">{labels.no}</span></h2>
         <div className="flex flex-col gap-2">
           {positions.filter(pos => pos.noSharesOwned > 0).map((pos, index) => (
             <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">
@@ -48,7 +51,7 @@ const PositionsActivityLayout = ({ marketId }) => {
 
       {/* YES Shares */}
       <div className="flex-1">
-        <h2 className="text-center font-bold text-green-500 mb-2">YES Shares</h2>
+        <h2 className="text-center font-bold mb-2">Shares for: <span className="text-green-500">{labels.yes}</span></h2>
         <div className="flex flex-col gap-2">
           {positions.filter(pos => pos.yesSharesOwned > 0).map((pos, index) => (
             <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">

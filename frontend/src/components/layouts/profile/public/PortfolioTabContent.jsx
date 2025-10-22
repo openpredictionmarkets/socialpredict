@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { API_URL } from '../../../../config';
 import { SharesBadge } from '../../../buttons/trade/SellButtons';
 import LoadingSpinner from '../../../loaders/LoadingSpinner';
+import { mapInternalToDisplay } from '../../../../utils/labelMapping';
 
 const PortfolioTabContent = ({ username }) => {
     const [positions, setPositions] = useState([]);
@@ -12,8 +13,8 @@ const PortfolioTabContent = ({ username }) => {
     useEffect(() => {
         const fetchPositions = async () => {
             try {
-                console.log(`Fetching portfolio for: ${username} from ${API_URL}/api/v0/portfolio/${username}`);
-                const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`);
+                console.log(`Fetching portfolio for: ${username} from ${API_URL}/v0/portfolio/${username}`);
+                const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
                 if (response.ok) {
                     const data = await response.json();
                     console.log('Portfolio data:', data);
@@ -67,15 +68,17 @@ const PortfolioTabContent = ({ username }) => {
     }
 
     // Create a smaller version of SharesBadge for table use
-    const CompactSharesBadge = ({ type, count }) => {
+    const CompactSharesBadge = ({ type, count, market = null }) => {
         if (count === 0) return null;
-        
+
         const bgColor = type === "YES" ? "bg-green-600" : "bg-red-600";
         const textColor = "text-white";
         
+        // Use custom label if market is provided, otherwise use internal type
+        const displayLabel = market ? mapInternalToDisplay(type, market) : type;
         return (
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor}`}>
-                {count} {type}
+                {count} {displayLabel}
             </span>
         );
     };
@@ -109,7 +112,7 @@ const PortfolioTabContent = ({ username }) => {
                             {positions.map((position, index) => (
                                 <tr key={position.marketId || index} className="hover:bg-custom-gray-dark transition-colors">
                                     <td className="px-6 py-4">
-                                        <Link 
+                                        <Link
                                             to={`/markets/${position.marketId}`}
                                             className="text-sm font-medium text-custom-gray-verylight hover:text-gold-btn transition-colors duration-200"
                                         >

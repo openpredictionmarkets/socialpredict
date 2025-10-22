@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import ExpandableText from '../utils/ExpandableText';
+import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 
 const MobileMarketCard = ({ marketData }) => {
   const isMarketOpen =
@@ -54,16 +55,12 @@ const MobileMarketCard = ({ marketData }) => {
         <span
           className={`text-right ${
             marketData.market.isResolved
-              ? marketData.market.resolutionResult === 'YES'
-                ? 'text-green-400'
-                : 'text-red-400'
+              ? getResultCssClass(marketData.market.resolutionResult)
               : 'text-gray-400'
           }`}
         >
           {marketData.market.isResolved
-            ? marketData.market.resolutionResult === 'YES'
-              ? 'Resolved YES'
-              : 'Resolved NO'
+            ? getResolvedText(marketData.market.resolutionResult, marketData.market)
             : 'Pending'}
         </span>
       </div>
