@@ -30,8 +30,17 @@ func (m *MockResolveService) GetMarket(ctx context.Context, id int64) (*dmarkets
 func (m *MockResolveService) ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
 	return nil, nil
 }
-func (m *MockResolveService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
-	return nil, nil
+func (m *MockResolveService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
+	return &dmarkets.SearchResults{
+		PrimaryResults:  []*dmarkets.Market{},
+		FallbackResults: []*dmarkets.Market{},
+		Query:           query,
+		PrimaryStatus:   filters.Status,
+		PrimaryCount:    0,
+		FallbackCount:   0,
+		TotalCount:      0,
+		FallbackUsed:    false,
+	}, nil
 }
 func (m *MockResolveService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
 	// Mock implementation that checks authorization and valid outcomes
@@ -53,6 +62,18 @@ func (m *MockResolveService) ProjectProbability(ctx context.Context, req dmarket
 	return nil, nil
 }
 func (m *MockResolveService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	return nil, nil
+}
+
+func (m *MockResolveService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {
+	return []*dmarkets.BetDisplayInfo{}, nil
+}
+
+func (m *MockResolveService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *MockResolveService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
 	return nil, nil
 }
 

@@ -68,6 +68,13 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	// Convert domain overviews to response DTOs
 	var responseOverviews []*dto.MarketOverviewResponse
 	for _, overview := range overviews {
+		// For now, create a basic creator response from the available data
+		creator := &dto.CreatorResponse{
+			Username:      overview.Market.CreatorUsername,
+			PersonalEmoji: "👤", // Default emoji - TODO: Get from user service
+			DisplayName:   overview.Market.CreatorUsername,
+		}
+
 		responseOverview := &dto.MarketOverviewResponse{
 			Market: &dto.MarketResponse{
 				ID:                 overview.Market.ID,
@@ -82,7 +89,7 @@ func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
 				CreatedAt:          overview.Market.CreatedAt,
 				UpdatedAt:          overview.Market.UpdatedAt,
 			},
-			Creator:         overview.Creator,
+			Creator:         creator,
 			LastProbability: overview.LastProbability,
 			NumUsers:        overview.NumUsers,
 			TotalVolume:     overview.TotalVolume,
@@ -161,6 +168,13 @@ func ListMarketsHandlerFactory(svc dmarkets.Service) http.HandlerFunc {
 		// Convert domain overviews to response DTOs
 		var responseOverviews []*dto.MarketOverviewResponse
 		for _, overview := range overviews {
+			// For now, create a basic creator response from the available data
+			creator := &dto.CreatorResponse{
+				Username:      overview.Market.CreatorUsername,
+				PersonalEmoji: "👤", // Default emoji - TODO: Get from user service
+				DisplayName:   overview.Market.CreatorUsername,
+			}
+
 			responseOverview := &dto.MarketOverviewResponse{
 				Market: &dto.MarketResponse{
 					ID:                 overview.Market.ID,
@@ -175,7 +189,7 @@ func ListMarketsHandlerFactory(svc dmarkets.Service) http.HandlerFunc {
 					CreatedAt:          overview.Market.CreatedAt,
 					UpdatedAt:          overview.Market.UpdatedAt,
 				},
-				Creator:         overview.Creator,
+				Creator:         creator,
 				LastProbability: overview.LastProbability,
 				NumUsers:        overview.NumUsers,
 				TotalVolume:     overview.TotalVolume,

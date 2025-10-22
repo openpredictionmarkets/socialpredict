@@ -33,8 +33,17 @@ func (m *MockService) ListMarkets(ctx context.Context, filters dmarkets.ListFilt
 	return nil, nil
 }
 
-func (m *MockService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
-	return nil, nil
+func (m *MockService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
+	return &dmarkets.SearchResults{
+		PrimaryResults:  []*dmarkets.Market{},
+		FallbackResults: []*dmarkets.Market{},
+		Query:           query,
+		PrimaryStatus:   filters.Status,
+		PrimaryCount:    0,
+		FallbackCount:   0,
+		TotalCount:      0,
+		FallbackUsed:    false,
+	}, nil
 }
 
 func (m *MockService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
@@ -108,6 +117,18 @@ func (m *MockService) GetMarketDetails(ctx context.Context, marketID int64) (*dm
 		TotalVolume: totalVolume,
 		MarketDust:  marketDust,
 	}, nil
+}
+
+func (m *MockService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {
+	return []*dmarkets.BetDisplayInfo{}, nil
+}
+
+func (m *MockService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *MockService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
+	return nil, nil
 }
 
 func TestActiveMarketsFilter(t *testing.T) {

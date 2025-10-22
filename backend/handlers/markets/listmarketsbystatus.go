@@ -11,9 +11,34 @@ import (
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models"
+	"socialpredict/util"
 
 	"gorm.io/gorm"
 )
+
+// getCreatorInfo fetches creator details from database
+func getCreatorInfo(username string) *dto.CreatorResponse {
+	var user models.User
+	db := util.GetDB()
+
+	// Query user by username
+	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
+		// If user not found, return default creator info
+		log.Printf("Creator user not found for username %s: %v", username, err)
+		return &dto.CreatorResponse{
+			Username:      username,
+			PersonalEmoji: "👤", // Default emoji
+			DisplayName:   username,
+		}
+	}
+
+	// Return actual user data
+	return &dto.CreatorResponse{
+		Username:      user.Username,
+		PersonalEmoji: user.PersonalEmoji,
+		DisplayName:   user.DisplayName,
+	}
+}
 
 // ListMarketsStatusResponse defines the structure for filtered market responses
 type ListMarketsStatusResponse struct {
@@ -91,14 +116,17 @@ func ListMarketsByStatusHandler(svc dmarkets.ServiceInterface, statusName string
 				UpdatedAt:          market.UpdatedAt,
 			}
 
+			// Get actual creator info from database
+			creator := getCreatorInfo(market.CreatorUsername)
+
 			// Create market overview with basic data
 			// TODO: Complex calculations (bets, probabilities, volumes) should be moved to domain service
 			marketOverview := dto.MarketOverview{
 				Market:          marketResponse,
-				Creator:         nil, // TODO: Get from user service
-				LastProbability: 0.5, // TODO: Calculate in domain service
-				NumUsers:        0,   // TODO: Calculate in domain service
-				TotalVolume:     0,   // TODO: Calculate in domain service
+				Creator:         creator, // Proper creator object instead of nil
+				LastProbability: 0.5,     // TODO: Calculate in domain service
+				NumUsers:        0,       // TODO: Calculate in domain service
+				TotalVolume:     0,       // TODO: Calculate in domain service
 			}
 			marketOverviews = append(marketOverviews, marketOverview)
 		}

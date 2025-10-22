@@ -20,7 +20,7 @@ type Service interface {
 	SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error
 	GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error)
 	ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
-	SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error)
+	SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error)
 	ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error
 	ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
 	GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
@@ -252,15 +252,18 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call service
-	markets, err := h.service.SearchMarkets(r.Context(), params.Query, filters)
+	searchResults, err := h.service.SearchMarkets(r.Context(), params.Query, filters)
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
 
+	// Combine primary and fallback results
+	allMarkets := append(searchResults.PrimaryResults, searchResults.FallbackResults...)
+
 	// Convert to response DTOs
-	responses := make([]*dto.MarketResponse, len(markets))
-	for i, market := range markets {
+	responses := make([]*dto.MarketResponse, len(allMarkets))
+	for i, market := range allMarkets {
 		responses[i] = h.marketToResponse(market)
 	}
 

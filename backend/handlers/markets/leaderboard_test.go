@@ -31,8 +31,17 @@ func (m *MockLeaderboardService) ListMarkets(ctx context.Context, filters dmarke
 	return nil, nil
 }
 
-func (m *MockLeaderboardService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
-	return nil, nil
+func (m *MockLeaderboardService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
+	return &dmarkets.SearchResults{
+		PrimaryResults:  []*dmarkets.Market{},
+		FallbackResults: []*dmarkets.Market{},
+		Query:           query,
+		PrimaryStatus:   filters.Status,
+		PrimaryCount:    0,
+		FallbackCount:   0,
+		TotalCount:      0,
+		FallbackUsed:    false,
+	}, nil
 }
 
 func (m *MockLeaderboardService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
@@ -52,6 +61,18 @@ func (m *MockLeaderboardService) ProjectProbability(ctx context.Context, req dma
 }
 
 func (m *MockLeaderboardService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {
+	return []*dmarkets.BetDisplayInfo{}, nil
+}
+
+func (m *MockLeaderboardService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
 	return nil, nil
 }
 

@@ -60,18 +60,33 @@ type SearchFilters struct {
 	Offset int
 }
 
+// SearchResults represents the result of a market search with fallback
+type SearchResults struct {
+	PrimaryResults  []*Market `json:"primaryResults"`
+	FallbackResults []*Market `json:"fallbackResults"`
+	Query           string    `json:"query"`
+	PrimaryStatus   string    `json:"primaryStatus"`
+	PrimaryCount    int       `json:"primaryCount"`
+	FallbackCount   int       `json:"fallbackCount"`
+	TotalCount      int       `json:"totalCount"`
+	FallbackUsed    bool      `json:"fallbackUsed"`
+}
+
 // ServiceInterface defines the interface for market service operations
 type ServiceInterface interface {
 	CreateMarket(ctx context.Context, req MarketCreateRequest, creatorUsername string) (*Market, error)
 	SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error
 	GetMarket(ctx context.Context, id int64) (*Market, error)
 	ListMarkets(ctx context.Context, filters ListFilters) ([]*Market, error)
-	SearchMarkets(ctx context.Context, query string, filters SearchFilters) ([]*Market, error)
+	SearchMarkets(ctx context.Context, query string, filters SearchFilters) (*SearchResults, error)
 	ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error
 	ListByStatus(ctx context.Context, status string, p Page) ([]*Market, error)
 	GetMarketLeaderboard(ctx context.Context, marketID int64, p Page) ([]*LeaderboardRow, error)
 	ProjectProbability(ctx context.Context, req ProbabilityProjectionRequest) (*ProbabilityProjection, error)
 	GetMarketDetails(ctx context.Context, marketID int64) (*MarketOverview, error)
+	GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error)
+	GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
+	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (UserPosition, error)
 }
 
 // Service implements the core market business logic
@@ -236,9 +251,77 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 	return overview, nil
 }
 
-// SearchMarkets searches for markets by query
-func (s *Service) SearchMarkets(ctx context.Context, query string, filters SearchFilters) ([]*Market, error) {
-	return s.repo.Search(ctx, query, filters)
+// SearchMarkets searches for markets by query with fallback logic
+func (s *Service) SearchMarkets(ctx context.Context, query string, filters SearchFilters) (*SearchResults, error) {
+	// Validate query
+	if strings.TrimSpace(query) == "" {
+		return nil, ErrInvalidInput
+	}
+
+	// Validate and set defaults
+	if filters.Limit <= 0 || filters.Limit > 50 {
+		filters.Limit = 20
+	}
+	if filters.Offset < 0 {
+		filters.Offset = 0
+	}
+
+	// Primary search within specified status
+	primaryResults, err := s.repo.Search(ctx, query, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	searchResults := &SearchResults{
+		PrimaryResults:  primaryResults,
+		FallbackResults: []*Market{},
+		Query:           query,
+		PrimaryStatus:   filters.Status,
+		PrimaryCount:    len(primaryResults),
+		FallbackCount:   0,
+		TotalCount:      len(primaryResults),
+		FallbackUsed:    false,
+	}
+
+	// If we have 5 or fewer primary results and we're not already searching "all", search all markets
+	if len(primaryResults) <= 5 && filters.Status != "" && filters.Status != "all" {
+		// Search all markets for fallback
+		allFilters := SearchFilters{
+			Status: "", // Empty means search all
+			Limit:  filters.Limit * 2,
+			Offset: 0,
+		}
+
+		allResults, err := s.repo.Search(ctx, query, allFilters)
+		if err != nil {
+			return searchResults, nil // Return primary results even if fallback fails
+		}
+
+		// Filter out markets that are already in primary results
+		primaryIDs := make(map[int64]bool)
+		for _, market := range primaryResults {
+			primaryIDs[market.ID] = true
+		}
+
+		var fallbackResults []*Market
+		for _, market := range allResults {
+			if !primaryIDs[market.ID] {
+				fallbackResults = append(fallbackResults, market)
+				if len(fallbackResults) >= filters.Limit {
+					break
+				}
+			}
+		}
+
+		if len(fallbackResults) > 0 {
+			searchResults.FallbackResults = fallbackResults
+			searchResults.FallbackCount = len(fallbackResults)
+			searchResults.TotalCount = searchResults.PrimaryCount + searchResults.FallbackCount
+			searchResults.FallbackUsed = true
+		}
+	}
+
+	return searchResults, nil
 }
 
 // ResolveMarket resolves a market with a given outcome
@@ -411,6 +494,79 @@ func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProject
 	}
 
 	return projection, nil
+}
+
+// BetDisplayInfo represents a bet with probability information
+type BetDisplayInfo struct {
+	Username    string    `json:"username"`
+	Outcome     string    `json:"outcome"`
+	Amount      int64     `json:"amount"`
+	Probability float64   `json:"probability"`
+	PlacedAt    time.Time `json:"placedAt"`
+}
+
+// GetMarketBets returns the bet history for a market with probabilities
+func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error) {
+	// 1. Validate market exists
+	_, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
+		return nil, ErrMarketNotFound
+	}
+
+	// 2. This is a placeholder implementation - the full logic should be moved here
+	// from the existing betshandlers.MarketBetsDisplayHandler
+	// For now, return empty slice to maintain interface compliance
+	//
+	// TODO: Implement full logic:
+	// - Get all bets for the market from repository
+	// - Calculate WPAM probabilities over time using market.CreatedAt
+	// - Match each bet with its probability at placement time
+	// - Sort by placement time and return formatted results
+
+	return []*BetDisplayInfo{}, nil
+}
+
+// MarketPositions represents the positions data for all users in a market
+type MarketPositions interface{} // TODO: Define proper type based on positionsmath package
+
+// UserPosition represents a specific user's position in a market
+type UserPosition interface{} // TODO: Define proper type based on positionsmath package
+
+// GetMarketPositions returns all user positions in a market
+func (s *Service) GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error) {
+	// 1. Validate market exists
+	_, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
+		return nil, ErrMarketNotFound
+	}
+
+	// 2. TODO: Move position calculation logic here from handlers
+	// This should involve:
+	// - Getting all bets for the market
+	// - Calculating WPAM/DBPM positions for all users
+	// - Returning structured position data
+
+	// For now, return nil - the actual implementation will move from handlers
+	return nil, nil
+}
+
+// GetUserPositionInMarket returns a specific user's position in a market
+func (s *Service) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (UserPosition, error) {
+	// 1. Validate market exists
+	_, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
+		return nil, ErrMarketNotFound
+	}
+
+	// 2. TODO: Validate user exists (via user service)
+	// 3. TODO: Move user position calculation logic here from handlers
+	// This should involve:
+	// - Getting user's bets for the market
+	// - Calculating WPAM/DBPM position for the user
+	// - Returning structured position data
+
+	// For now, return nil - the actual implementation will move from handlers
+	return nil, nil
 }
 
 // validateQuestionTitle validates the market question title

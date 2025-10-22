@@ -33,13 +33,20 @@ type CreateMarketResponse struct {
 	CreatedAt          time.Time `json:"createdAt"`
 }
 
+// CreatorResponse represents the creator information for frontend display
+type CreatorResponse struct {
+	Username      string `json:"username"`
+	PersonalEmoji string `json:"personalEmoji"`
+	DisplayName   string `json:"displayname,omitempty"`
+}
+
 // MarketOverviewResponse represents enriched market data for list display
 type MarketOverviewResponse struct {
-	Market          *MarketResponse `json:"market"`
-	Creator         interface{}     `json:"creator"` // User info - will be properly typed later
-	LastProbability float64         `json:"lastProbability"`
-	NumUsers        int             `json:"numUsers"`
-	TotalVolume     int64           `json:"totalVolume"`
+	Market          *MarketResponse  `json:"market"`
+	Creator         *CreatorResponse `json:"creator"` // Properly typed creator info
+	LastProbability float64          `json:"lastProbability"`
+	NumUsers        int              `json:"numUsers"`
+	TotalVolume     int64            `json:"totalVolume"`
 }
 
 // SimpleListMarketsResponse represents the HTTP response for simple market listing

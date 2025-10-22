@@ -9,6 +9,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	"socialpredict/handlers/users/publicuser"
+	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models"
 	"socialpredict/security"
 	"socialpredict/util"
@@ -39,7 +40,147 @@ type SearchMarketsResponse struct {
 	FallbackUsed    bool             `json:"fallbackUsed"`
 }
 
-// SearchMarketsHandler handles HTTP requests for searching markets
+// SearchMarketsHandlerWithService creates a service-injected search handler
+func SearchMarketsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("SearchMarketsHandlerWithService: Request received")
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Get and validate query parameters
+		query := r.URL.Query().Get("query")
+		status := r.URL.Query().Get("status")
+		limitStr := r.URL.Query().Get("limit")
+
+		// Validate and sanitize input
+		if query == "" {
+			http.Error(w, "Query parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Sanitize the search query
+		sanitizer := security.NewSanitizer()
+		sanitizedQuery, err := sanitizer.SanitizeMarketTitle(query)
+		if err != nil {
+			log.Printf("SearchMarketsHandlerWithService: Sanitization failed for query '%s': %v", query, err)
+			http.Error(w, "Invalid search query: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if len(sanitizedQuery) > 100 {
+			http.Error(w, "Query too long (max 100 characters)", http.StatusBadRequest)
+			return
+		}
+
+		log.Printf("SearchMarketsHandlerWithService: Original query: '%s', Sanitized query: '%s'", query, sanitizedQuery)
+
+		// Default values
+		if status == "" {
+			status = "all"
+		}
+		limit := 20
+		if limitStr != "" {
+			if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 50 {
+				limit = parsedLimit
+			}
+		}
+
+		// Build domain search filters
+		filters := dmarkets.SearchFilters{
+			Status: status,
+			Limit:  limit,
+			Offset: 0,
+		}
+
+		// Call domain service
+		searchResults, err := svc.SearchMarkets(r.Context(), sanitizedQuery, filters)
+		if err != nil {
+			// Map domain errors to HTTP status codes
+			switch err {
+			case dmarkets.ErrInvalidInput:
+				http.Error(w, "Invalid search parameters", http.StatusBadRequest)
+			default:
+				log.Printf("Error searching markets: %v", err)
+				http.Error(w, "Error searching markets", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Convert to response format - use the existing SearchMarketsResponse structure
+		// but populate from domain service results
+		primaryOverviews := make([]MarketOverview, 0, len(searchResults.PrimaryResults))
+		fallbackOverviews := make([]MarketOverview, 0, len(searchResults.FallbackResults))
+
+		// Convert primary results
+		for _, market := range searchResults.PrimaryResults {
+			// TODO: This is simplified - in full implementation, we'd get creator info,
+			// probability calculations, etc. from the domain service
+			publicResponseMarket := marketpublicresponse.PublicResponseMarket{
+				ID:                 market.ID,
+				QuestionTitle:      market.QuestionTitle,
+				Description:        market.Description,
+				OutcomeType:        market.OutcomeType,
+				ResolutionDateTime: market.ResolutionDateTime,
+				CreatorUsername:    market.CreatorUsername,
+				YesLabel:           market.YesLabel,
+				NoLabel:            market.NoLabel,
+			}
+
+			marketOverview := MarketOverview{
+				Market:          publicResponseMarket,
+				Creator:         nil, // TODO: Get from user service
+				LastProbability: 0.5, // TODO: Calculate from domain service
+				NumUsers:        0,   // TODO: Calculate from domain service
+				TotalVolume:     0,   // TODO: Calculate from domain service
+			}
+			primaryOverviews = append(primaryOverviews, marketOverview)
+		}
+
+		// Convert fallback results
+		for _, market := range searchResults.FallbackResults {
+			publicResponseMarket := marketpublicresponse.PublicResponseMarket{
+				ID:                 market.ID,
+				QuestionTitle:      market.QuestionTitle,
+				Description:        market.Description,
+				OutcomeType:        market.OutcomeType,
+				ResolutionDateTime: market.ResolutionDateTime,
+				CreatorUsername:    market.CreatorUsername,
+				YesLabel:           market.YesLabel,
+				NoLabel:            market.NoLabel,
+			}
+
+			marketOverview := MarketOverview{
+				Market:          publicResponseMarket,
+				Creator:         nil, // TODO: Get from user service
+				LastProbability: 0.5, // TODO: Calculate from domain service
+				NumUsers:        0,   // TODO: Calculate from domain service
+				TotalVolume:     0,   // TODO: Calculate from domain service
+			}
+			fallbackOverviews = append(fallbackOverviews, marketOverview)
+		}
+
+		// Build response
+		response := &SearchMarketsResponse{
+			PrimaryResults:  primaryOverviews,
+			FallbackResults: fallbackOverviews,
+			Query:           searchResults.Query,
+			PrimaryStatus:   searchResults.PrimaryStatus,
+			PrimaryCount:    searchResults.PrimaryCount,
+			FallbackCount:   searchResults.FallbackCount,
+			TotalCount:      searchResults.TotalCount,
+			FallbackUsed:    searchResults.FallbackUsed,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Error encoding search response: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+// SearchMarketsHandler handles HTTP requests for searching markets (legacy version)
 func SearchMarketsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("SearchMarketsHandler: Request received")
 	if r.Method != http.MethodGet {
