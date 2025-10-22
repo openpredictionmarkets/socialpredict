@@ -130,9 +130,9 @@ func TestResolveMarketHandler_NARefund(t *testing.T) {
 	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	// Check response - updated for specification compliance (NoContent instead of OK)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Expected status 204, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
 	// Note: The actual resolution logic (updating DB, processing refunds) would be tested separately
@@ -184,9 +184,9 @@ func TestResolveMarketHandler_YESWin(t *testing.T) {
 	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	// Check response - updated for specification compliance (NoContent instead of OK)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Expected status 204, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
 	// Note: The actual payout logic would be tested in the domain service layer
@@ -238,9 +238,9 @@ func TestResolveMarketHandler_NOWin(t *testing.T) {
 	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	// Check response - updated for specification compliance (NoContent instead of OK)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Expected status 204, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
 	// Note: The actual payout logic would be tested in the domain service layer
@@ -283,9 +283,9 @@ func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
 	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response - should be unauthorized
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("Expected status 401, got %d", w.Code)
+	// Check response - updated for specification compliance (403 Forbidden instead of 401)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("Expected status 403, got %d", w.Code)
 	}
 }
 

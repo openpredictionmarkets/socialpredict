@@ -6,12 +6,14 @@ import (
 	"os"
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
+	betshandlers "socialpredict/handlers/bets"
 	buybetshandlers "socialpredict/handlers/bets/buying"
 	sellbetshandlers "socialpredict/handlers/bets/selling"
 	"socialpredict/handlers/cms/homepage"
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
 	marketshandlers "socialpredict/handlers/markets"
 	metricshandlers "socialpredict/handlers/metrics"
+	positionshandlers "socialpredict/handlers/positions"
 	setuphandlers "socialpredict/handlers/setup"
 	statshandlers "socialpredict/handlers/stats"
 	usershandlers "socialpredict/handlers/users"
@@ -113,6 +115,9 @@ func Start() {
 	container := app.BuildApplication(db, setup.EconomicsConfig())
 	marketsService := container.GetMarketsService()
 
+	// Create Handler instances
+	marketsHandler := marketshandlers.NewHandler(marketsService)
+
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
 
@@ -129,20 +134,26 @@ func Start() {
 	router.Handle("/v0/system/metrics", securityMiddleware(http.HandlerFunc(metricshandlers.GetSystemMetricsHandler))).Methods("GET")
 	router.Handle("/v0/global/leaderboard", securityMiddleware(http.HandlerFunc(metricshandlers.GetGlobalLeaderboardHandler))).Methods("GET")
 
-	// markets display, market information
-	router.Handle("/v0/markets", securityMiddleware(marketshandlers.ListMarketsHandlerFactory(*marketsService))).Methods("GET")
-	router.Handle("/v0/markets/search", securityMiddleware(marketshandlers.SearchMarketsHandlerWithService(marketsService))).Methods("GET")
+	// Markets routes - using new Handler instance
+	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
+	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
+	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
+	router.Handle("/v0/markets/status/{status}", securityMiddleware(http.HandlerFunc(marketsHandler.ListByStatus))).Methods("GET")
+	router.Handle("/v0/markets/{id}", securityMiddleware(http.HandlerFunc(marketsHandler.GetDetails))).Methods("GET")
+	router.Handle("/v0/markets/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarket))).Methods("POST")
+	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
+	router.Handle("/v0/markets/{id}/projection", securityMiddleware(http.HandlerFunc(marketsHandler.ProjectProbability))).Methods("GET")
+
+	// Legacy routes for backward compatibility
 	router.Handle("/v0/markets/active", securityMiddleware(marketshandlers.ListActiveMarketsHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/markets/closed", securityMiddleware(marketshandlers.ListClosedMarketsHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/markets/resolved", securityMiddleware(marketshandlers.ListResolvedMarketsHandler(marketsService))).Methods("GET")
-	router.Handle("/v0/markets/{marketId}", securityMiddleware(marketshandlers.MarketDetailsHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 
-	// handle market positions, get trades - using service injection
-	router.Handle("/v0/markets/bets/{marketId}", securityMiddleware(marketshandlers.MarketBetsHandlerWithService(marketsService))).Methods("GET")
-	router.Handle("/v0/markets/positions/{marketId}", securityMiddleware(marketshandlers.MarketPositionsHandlerWithService(marketsService))).Methods("GET")
-	router.Handle("/v0/markets/positions/{marketId}/{username}", securityMiddleware(marketshandlers.MarketUserPositionHandlerWithService(marketsService))).Methods("GET")
-	router.Handle("/v0/markets/leaderboard/{marketId}", securityMiddleware(marketshandlers.MarketLeaderboardHandler(marketsService))).Methods("GET")
+	// handle market positions, get trades - using service injection from new locations
+	router.Handle("/v0/markets/bets/{marketId}", securityMiddleware(betshandlers.MarketBetsHandlerWithService(marketsService))).Methods("GET")
+	router.Handle("/v0/markets/positions/{marketId}", securityMiddleware(positionshandlers.MarketPositionsHandlerWithService(marketsService))).Methods("GET")
+	router.Handle("/v0/markets/positions/{marketId}/{username}", securityMiddleware(positionshandlers.MarketUserPositionHandlerWithService(marketsService))).Methods("GET")
 
 	// handle public user stuff
 	router.Handle("/v0/userinfo/{username}", securityMiddleware(http.HandlerFunc(publicuser.GetPublicUserResponse))).Methods("GET")
@@ -160,12 +171,10 @@ func Start() {
 	router.Handle("/v0/profilechange/description", securityMiddleware(http.HandlerFunc(usershandlers.ChangeDescription))).Methods("POST")
 	router.Handle("/v0/profilechange/links", securityMiddleware(http.HandlerFunc(usershandlers.ChangePersonalLinks))).Methods("POST")
 
-	// handle private user actions such as resolve a market, make a bet, create a market, change profile
-	router.Handle("/v0/resolve/{marketId}", securityMiddleware(marketshandlers.ResolveMarketHandler(marketsService))).Methods("POST")
+	// handle private user actions such as make a bet, sell positions, get user position
 	router.Handle("/v0/bet", securityMiddleware(http.HandlerFunc(buybetshandlers.PlaceBetHandler(setup.EconomicsConfig)))).Methods("POST")
 	router.Handle("/v0/userposition/{marketId}", securityMiddleware(http.HandlerFunc(usershandlers.UserMarketPositionHandler))).Methods("GET")
 	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
-	router.Handle("/v0/create", securityMiddleware(marketshandlers.CreateMarketHandlerWithService(marketsService, setup.EconomicsConfig()))).Methods("POST")
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")

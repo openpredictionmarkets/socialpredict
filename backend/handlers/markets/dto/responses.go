@@ -126,3 +126,15 @@ type MarketDetailHandlerResponse struct {
 	TotalVolume        int64       `json:"totalVolume"`
 	MarketDust         int64       `json:"marketDust"`
 }
+
+// SearchResponse represents the HTTP response for market search with fallback logic
+type SearchResponse struct {
+	PrimaryResults  []MarketResponse `json:"primaryResults"`
+	FallbackResults []MarketResponse `json:"fallbackResults"`
+	Query           string           `json:"query"`
+	PrimaryStatus   string           `json:"primaryStatus"`
+	PrimaryCount    int              `json:"primaryCount"`
+	FallbackCount   int              `json:"fallbackCount"`
+	TotalCount      int              `json:"totalCount"`
+	FallbackUsed    bool             `json:"fallbackUsed"`
+}

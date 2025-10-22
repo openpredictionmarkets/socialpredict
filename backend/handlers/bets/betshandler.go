@@ -1,4 +1,4 @@
-package marketshandlers
+package betshandlers
 
 import (
 	"encoding/json"

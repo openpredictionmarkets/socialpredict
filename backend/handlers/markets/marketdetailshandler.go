@@ -2,41 +2,14 @@ package marketshandlers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
-	"socialpredict/models"
-	"socialpredict/util"
 
 	"github.com/gorilla/mux"
 )
-
-// getCreatorInfoForDetails fetches creator details from database for market details
-func getCreatorInfoForDetails(username string) *dto.CreatorResponse {
-	var user models.User
-	db := util.GetDB()
-
-	// Query user by username
-	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		// If user not found, return default creator info
-		log.Printf("Creator user not found for username %s: %v", username, err)
-		return &dto.CreatorResponse{
-			Username:      username,
-			PersonalEmoji: "👤", // Default emoji
-			DisplayName:   username,
-		}
-	}
-
-	// Return actual user data
-	return &dto.CreatorResponse{
-		Username:      user.Username,
-		PersonalEmoji: user.PersonalEmoji,
-		DisplayName:   user.DisplayName,
-	}
-}
 
 // MarketDetailsHandler handles requests for detailed market information
 func MarketDetailsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
@@ -66,15 +39,12 @@ func MarketDetailsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		// 4. Get actual creator info from database
-		creatorUsername := details.Market.CreatorUsername
-		creator := getCreatorInfoForDetails(creatorUsername)
-
-		// 5. Convert domain model to response DTO
+		// 4. Convert domain model to response DTO
+		// The domain service should provide all necessary data including creator info
 		response := dto.MarketDetailsResponse{
 			MarketID:           marketId,
 			Market:             details.Market,
-			Creator:            creator, // Proper creator object instead of nil/interface{}
+			Creator:            details.Creator, // Creator info should come from domain service
 			ProbabilityChanges: details.ProbabilityChanges,
 			NumUsers:           details.NumUsers,
 			TotalVolume:        details.TotalVolume,

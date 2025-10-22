@@ -323,6 +323,226 @@ func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ListByStatus handles GET /markets/status/{status}
+func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse status from URL
+	vars := mux.Vars(r)
+	status := vars["status"]
+	if status == "" {
+		http.Error(w, "Status is required", http.StatusBadRequest)
+		return
+	}
+
+	// Parse pagination parameters
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	page := dmarkets.Page{
+		Limit:  limit,
+		Offset: offset,
+	}
+
+	// Call service
+	markets, err := h.service.ListByStatus(r.Context(), status, page)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Convert to response DTOs
+	responses := make([]*dto.MarketResponse, len(markets))
+	for i, market := range markets {
+		responses[i] = h.marketToResponse(market)
+	}
+
+	response := dto.SimpleListMarketsResponse{
+		Markets: responses,
+		Total:   len(responses),
+	}
+
+	// Send response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetDetails handles GET /markets/{id} with full market details
+func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse market ID from URL
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if idStr == "" {
+		http.Error(w, "Market ID is required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		return
+	}
+
+	// Call service
+	details, err := h.service.GetMarketDetails(r.Context(), id)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Send response (MarketOverview already has JSON tags)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(details)
+}
+
+// MarketLeaderboard handles GET /markets/{id}/leaderboard
+func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse market ID from URL
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if idStr == "" {
+		http.Error(w, "Market ID is required", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse pagination parameters
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	page := dmarkets.Page{
+		Limit:  limit,
+		Offset: offset,
+	}
+
+	// Call service
+	leaderboard, err := h.service.GetMarketLeaderboard(r.Context(), id, page)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Convert to response DTOs
+	var leaderRows []dto.LeaderboardRow
+	for _, row := range leaderboard {
+		leaderRows = append(leaderRows, dto.LeaderboardRow{
+			Username: row.Username,
+			Profit:   row.Profit,
+			Volume:   row.Volume,
+			Rank:     row.Rank,
+		})
+	}
+
+	// Ensure empty array instead of null
+	if leaderRows == nil {
+		leaderRows = make([]dto.LeaderboardRow, 0)
+	}
+
+	response := dto.LeaderboardResponse{
+		MarketID:    id,
+		Leaderboard: leaderRows,
+		Total:       len(leaderRows),
+	}
+
+	// Send response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// ProjectProbability handles GET /markets/{id}/projection
+func (h *Handler) ProjectProbability(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse market ID from URL
+	vars := mux.Vars(r)
+	marketIdStr := vars["marketId"]
+	amountStr := vars["amount"]
+	outcome := vars["outcome"]
+
+	// Parse marketId
+	marketId, err := strconv.ParseInt(marketIdStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse amount
+	amount, err := strconv.ParseInt(amountStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid amount value", http.StatusBadRequest)
+		return
+	}
+
+	// Build domain request
+	projectionReq := dmarkets.ProbabilityProjectionRequest{
+		MarketID: marketId,
+		Amount:   amount,
+		Outcome:  outcome,
+	}
+
+	// Call service
+	projection, err := h.service.ProjectProbability(r.Context(), projectionReq)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	// Return response DTO
+	response := dto.ProbabilityProjectionResponse{
+		MarketID:             marketId,
+		CurrentProbability:   projection.CurrentProbability,
+		ProjectedProbability: projection.ProjectedProbability,
+		Amount:               amount,
+		Outcome:              outcome,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // marketToResponse converts a domain market to a response DTO
 func (h *Handler) marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
 	return &dto.MarketResponse{
