@@ -1,13 +1,59 @@
 package marketshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	dmarkets "socialpredict/internal/domain/markets"
+
 	"github.com/gorilla/mux"
 )
+
+// MockLeaderboardService implements the ServiceInterface for testing
+type MockLeaderboardService struct{}
+
+func (m *MockLeaderboardService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
+	return nil
+}
+
+func (m *MockLeaderboardService) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
+	return nil
+}
+
+func (m *MockLeaderboardService) ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+	return []*dmarkets.LeaderboardRow{}, nil
+}
+
+func (m *MockLeaderboardService) ProjectProbability(ctx context.Context, req dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error) {
+	return nil, nil
+}
+
+func (m *MockLeaderboardService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	return nil, nil
+}
 
 func TestMarketLeaderboardHandler_InvalidMarketId(t *testing.T) {
 	// Create a request with an invalid market ID
@@ -19,9 +65,10 @@ func TestMarketLeaderboardHandler_InvalidMarketId(t *testing.T) {
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 
-	// Create router and add the route
+	// Create router and add the route with mock service
+	mockService := &MockLeaderboardService{}
 	router := mux.NewRouter()
-	router.HandleFunc("/v0/markets/leaderboard/{marketId}", MarketLeaderboardHandler)
+	router.HandleFunc("/v0/markets/leaderboard/{marketId}", MarketLeaderboardHandler(mockService))
 
 	// Serve the request
 	router.ServeHTTP(rr, req)

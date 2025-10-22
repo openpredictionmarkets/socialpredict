@@ -21,7 +21,11 @@ type Service interface {
 	GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error)
 	ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
 	SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error)
-	ResolveMarket(ctx context.Context, marketID int64, resolution string) error
+	ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error
+	ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
+	GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
+	ProjectProbability(ctx context.Context, req dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error)
+	GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error)
 }
 
 // Handler handles HTTP requests for markets
@@ -291,6 +295,14 @@ func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user for authorization
+	db := util.GetDB()
+	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+	if httperr != nil {
+		http.Error(w, httperr.Error(), httperr.StatusCode)
+		return
+	}
+
 	// Parse request body
 	var req dto.ResolveMarketRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -299,7 +311,7 @@ func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call service
-	if err := h.service.ResolveMarket(r.Context(), id, req.Resolution); err != nil {
+	if err := h.service.ResolveMarket(r.Context(), id, req.Resolution, user.Username); err != nil {
 		h.handleError(w, err)
 		return
 	}

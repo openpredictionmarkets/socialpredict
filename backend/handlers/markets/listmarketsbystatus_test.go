@@ -37,7 +37,7 @@ func (m *MockService) SearchMarkets(ctx context.Context, query string, filters d
 	return nil, nil
 }
 
-func (m *MockService) ResolveMarket(ctx context.Context, marketID int64, resolution string) error {
+func (m *MockService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
 	return nil
 }
 
@@ -57,6 +57,57 @@ func (m *MockService) ListByStatus(ctx context.Context, status string, p dmarket
 		UpdatedAt:          time.Now(),
 	}
 	return []*dmarkets.Market{market}, nil
+}
+
+func (m *MockService) GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+	// Mock implementation returns empty leaderboard
+	return []*dmarkets.LeaderboardRow{}, nil
+}
+
+func (m *MockService) ProjectProbability(ctx context.Context, req dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error) {
+	// Mock implementation returns placeholder projection
+	return &dmarkets.ProbabilityProjection{
+		CurrentProbability:   0.5,
+		ProjectedProbability: 0.6,
+	}, nil
+}
+
+func (m *MockService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	// Mock implementation returns placeholder market overview
+	market := &dmarkets.Market{
+		ID:                 marketID,
+		QuestionTitle:      "Test Market",
+		Description:        "Test market description",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: time.Now().Add(24 * time.Hour),
+		CreatorUsername:    "testuser",
+		YesLabel:           "YES",
+		NoLabel:            "NO",
+		Status:             "active",
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+
+	// Return different data based on marketID for testing
+	var marketDust int64 = 0
+	var totalVolume int64 = 0
+	var numUsers int = 0
+
+	if marketID == 1 {
+		// Market with bets - return non-zero values
+		marketDust = 50
+		totalVolume = 1000
+		numUsers = 3
+	}
+	// For other markets (like ID 2), return zeros as expected by tests
+
+	return &dmarkets.MarketOverview{
+		Market:      market,
+		Creator:     "testuser",
+		NumUsers:    numUsers,
+		TotalVolume: totalVolume,
+		MarketDust:  marketDust,
+	}, nil
 }
 
 func TestActiveMarketsFilter(t *testing.T) {

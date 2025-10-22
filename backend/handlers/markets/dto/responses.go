@@ -69,3 +69,53 @@ type ErrorResponse struct {
 	Code    string `json:"code,omitempty"`
 	Details string `json:"details,omitempty"`
 }
+
+// ResolveMarketResponse represents the HTTP response after resolving a market
+type ResolveMarketResponse struct {
+	Message string `json:"message"`
+}
+
+// LeaderboardRow represents a single row in the market leaderboard
+type LeaderboardRow struct {
+	Username string  `json:"username"`
+	Profit   float64 `json:"profit"`
+	Volume   int64   `json:"volume"`
+	Rank     int     `json:"rank"`
+}
+
+// LeaderboardResponse represents the HTTP response for market leaderboard
+type LeaderboardResponse struct {
+	MarketID    int64            `json:"marketId"`
+	Leaderboard []LeaderboardRow `json:"leaderboard"`
+	Total       int              `json:"total"`
+}
+
+// ProbabilityProjectionResponse represents the HTTP response for probability projection
+type ProbabilityProjectionResponse struct {
+	MarketID             int64   `json:"marketId"`
+	CurrentProbability   float64 `json:"currentProbability"`
+	ProjectedProbability float64 `json:"projectedProbability"`
+	Amount               int64   `json:"amount"`
+	Outcome              string  `json:"outcome"`
+}
+
+// MarketDetailsResponse represents the HTTP response for market details
+type MarketDetailsResponse struct {
+	MarketID           int64       `json:"marketId"`
+	Market             interface{} `json:"market"`             // Will be properly typed later
+	Creator            interface{} `json:"creator"`            // Will be properly typed later
+	ProbabilityChanges interface{} `json:"probabilityChanges"` // Will be properly typed later
+	NumUsers           int         `json:"numUsers"`
+	TotalVolume        int64       `json:"totalVolume"`
+	MarketDust         int64       `json:"marketDust"`
+}
+
+// MarketDetailHandlerResponse - backward compatibility type for tests
+type MarketDetailHandlerResponse struct {
+	Market             interface{} `json:"market"`
+	Creator            interface{} `json:"creator"`
+	ProbabilityChanges interface{} `json:"probabilityChanges"`
+	NumUsers           int         `json:"numUsers"`
+	TotalVolume        int64       `json:"totalVolume"`
+	MarketDust         int64       `json:"marketDust"`
+}
