@@ -85,3 +85,76 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateMarketPositions_IncludesZeroPositionUsers(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	_, _ = modelstesting.UseStandardTestEconomics(t)
+
+	creator := modelstesting.GenerateUser("creator", 0)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("failed to create creator: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(42, creator.Username)
+	market.IsResolved = true
+	market.ResolutionResult = "YES"
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("failed to create market: %v", err)
+	}
+
+	participants := []struct {
+		username string
+	}{
+		{"patrick"},
+		{"jimmy"},
+		{"jyron"},
+		{"testuser03"},
+	}
+	for _, p := range participants {
+		user := modelstesting.GenerateUser(p.username, 0)
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("failed to create user %s: %v", p.username, err)
+		}
+	}
+
+	bets := []struct {
+		amount   int64
+		outcome  string
+		username string
+		offset   time.Duration
+	}{
+		{amount: 50, outcome: "NO", username: "patrick", offset: 0},
+		{amount: 51, outcome: "NO", username: "jimmy", offset: time.Second},
+		{amount: 51, outcome: "NO", username: "jimmy", offset: 2 * time.Second},
+		{amount: 10, outcome: "YES", username: "jyron", offset: 3 * time.Second},
+		{amount: 30, outcome: "YES", username: "testuser03", offset: 4 * time.Second},
+	}
+
+	for _, b := range bets {
+		bet := modelstesting.GenerateBet(b.amount, b.outcome, b.username, uint(market.ID), b.offset)
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("failed to create bet %+v: %v", b, err)
+		}
+	}
+
+	positions, err := CalculateMarketPositions_WPAM_DBPM(db, strconv.Itoa(int(market.ID)))
+	if err != nil {
+		t.Fatalf("unexpected error calculating positions: %v", err)
+	}
+
+	var lockedUser *MarketPosition
+	for i := range positions {
+		if positions[i].Username == "testuser03" {
+			lockedUser = &positions[i]
+			break
+		}
+	}
+
+	if lockedUser == nil {
+		t.Fatalf("expected zero-position user to be present in positions")
+	}
+
+	if lockedUser.YesSharesOwned != 0 || lockedUser.NoSharesOwned != 0 || lockedUser.Value != 0 {
+		t.Fatalf("expected zero shares/value for locked user, got %+v", lockedUser)
+	}
+}

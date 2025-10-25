@@ -134,7 +134,10 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 
 	// Step 6: Append valuation to each MarketPosition struct
 	// Convert to []positions.MarketPosition for external use
-	var displayPositions []MarketPosition
+	var (
+		displayPositions []MarketPosition
+		seenUsers        = make(map[string]bool)
+	)
 	for _, p := range netPositions {
 		val := valuations[p.Username]
 		betTotals := userBetTotals[p.Username]
@@ -146,6 +149,25 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 			Value:            val.RoundedValue,
 			TotalSpent:       betTotals.TotalSpent,
 			TotalSpentInPlay: betTotals.TotalSpentInPlay,
+			IsResolved:       publicResponseMarket.IsResolved,
+			ResolutionResult: publicResponseMarket.ResolutionResult,
+		})
+		seenUsers[p.Username] = true
+	}
+
+	// Ensure every bettor appears in the output even if their net position is zero.
+	for username, totals := range userBetTotals {
+		if seenUsers[username] {
+			continue
+		}
+		displayPositions = append(displayPositions, MarketPosition{
+			Username:         username,
+			MarketID:         marketIDUint,
+			YesSharesOwned:   0,
+			NoSharesOwned:    0,
+			Value:            0,
+			TotalSpent:       totals.TotalSpent,
+			TotalSpentInPlay: totals.TotalSpentInPlay,
 			IsResolved:       publicResponseMarket.IsResolved,
 			ResolutionResult: publicResponseMarket.ResolutionResult,
 		})
