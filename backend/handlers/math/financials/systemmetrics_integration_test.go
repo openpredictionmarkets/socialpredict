@@ -1,29 +1,19 @@
-package financials
+package financials_test
 
 import (
-	"fmt"
 	"testing"
 
 	buybetshandlers "socialpredict/handlers/bets/buying"
+	financials "socialpredict/handlers/math/financials"
+	"socialpredict/handlers/math/payout"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 )
 
 func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	// Align global economics configuration with deterministic test values
-	econConfig := setup.EconomicsConfig()
-	originalEconomics := econConfig.Economics
-	defer func() {
-		econConfig.Economics = originalEconomics
-	}()
-	econConfig.Economics = modelstesting.GenerateEconomicConfig().Economics
-
-	loadEcon := func() *setup.EconomicConfig {
-		return econConfig
-	}
+	econConfig, loadEcon := modelstesting.UseStandardTestEconomics(t)
 
 	// Prepare users
 	users := []models.User{
@@ -72,14 +62,13 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	}
 
 	// Sequence of bets that leaves the final entrant without a position
-	placeBet("alice", 5, "YES")
-	placeBet("bob", 10, "YES")
-	placeBet("carol", 3, "YES")
-	placeBet("alice", 10, "NO")
+	placeBet("alice", 10, "YES")
+	placeBet("bob", 10, "NO")
+	placeBet("alice", 10, "YES")
 	placeBet("bob", 10, "NO")
 	placeBet("carol", 30, "YES")
 
-	metrics, err := ComputeSystemMetrics(db, loadEcon)
+	metrics, err := financials.ComputeSystemMetrics(db, loadEcon)
 	if err != nil {
 		t.Fatalf("compute metrics failed: %v", err)
 	}
@@ -110,19 +99,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		expectedActiveVolume += b.Amount
 	}
 
-	seen := make(map[string]bool)
-	var expectedParticipationFees int64
-	initialFee := econConfig.Economics.Betting.BetFees.InitialBetFee
-	for _, b := range bets {
-		if b.Amount <= 0 {
-			continue
-		}
-		key := fmt.Sprintf("%d:%s", b.MarketID, b.Username)
-		if !seen[key] {
-			seen[key] = true
-			expectedParticipationFees += initialFee
-		}
-	}
+	expectedParticipationFees := modelstesting.CalculateParticipationFees(econConfig, bets)
 	expectedCreationFees := creationFee // single market
 	totalUtilized := expectedUnusedDebt + expectedActiveVolume + expectedCreationFees + expectedParticipationFees
 	totalCapacity := maxDebt * int64(len(dbUsers))
@@ -157,5 +134,99 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 
 	if balanced, ok := metrics.Verification.Balanced.Value.(bool); !ok || !balanced {
 		t.Fatalf("expected metrics to be balanced, got %v", metrics.Verification.Balanced.Value)
+	}
+}
+
+func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+
+	econConfig, loadEcon := modelstesting.UseStandardTestEconomics(t)
+
+	users := []models.User{
+		modelstesting.GenerateUser("patrick", 0),
+		modelstesting.GenerateUser("jimmy", 0),
+		modelstesting.GenerateUser("jyron", 0),
+		modelstesting.GenerateUser("testuser03", 0),
+	}
+
+	for i := range users {
+		if err := db.Create(&users[i]).Error; err != nil {
+			t.Fatalf("failed to create user %s: %v", users[i].Username, err)
+		}
+	}
+
+	market := modelstesting.GenerateMarket(8002, users[0].Username)
+	market.IsResolved = false
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("failed to create market: %v", err)
+	}
+
+	creationFee := econConfig.Economics.MarketIncentives.CreateMarketCost
+	if err := modelstesting.AdjustUserBalance(db, users[0].Username, -creationFee); err != nil {
+		t.Fatalf("failed to apply creation fee: %v", err)
+	}
+
+	placeBet := func(username string, amount int64, outcome string) {
+		var u models.User
+		if err := db.Where("username = ?", username).First(&u).Error; err != nil {
+			t.Fatalf("failed to load user %s: %v", username, err)
+		}
+		betReq := models.Bet{
+			MarketID: uint(market.ID),
+			Amount:   amount,
+			Outcome:  outcome,
+		}
+		if _, err := buybetshandlers.PlaceBetCore(&u, betReq, db, loadEcon); err != nil {
+			t.Fatalf("place bet failed for %s: %v", username, err)
+		}
+	}
+
+	// Sequence mimicking reported scenario: multiple NO wagers, then smaller YES, final large YES bet
+	placeBet("patrick", 50, "NO")
+	placeBet("jimmy", 51, "NO")
+	placeBet("jimmy", 51, "NO")
+	placeBet("jyron", 10, "YES")
+	placeBet("testuser03", 30, "YES") // final entrant expected to be locked
+
+	sumBalancesBeforeResolution, err := modelstesting.SumAllUserBalances(db)
+	if err != nil {
+		t.Fatalf("failed to compute sum balances: %v", err)
+	}
+	if sumBalancesBeforeResolution >= 0 {
+		t.Fatalf("expected users to carry net debt before resolution, got %d", sumBalancesBeforeResolution)
+	}
+
+	market.IsResolved = true
+	market.ResolutionResult = "YES"
+	if err := db.Save(&market).Error; err != nil {
+		t.Fatalf("failed to mark market resolved: %v", err)
+	}
+
+	if err := payout.DistributePayoutsWithRefund(&market, db); err != nil {
+		t.Fatalf("payout distribution failed: %v", err)
+	}
+
+	sumBalancesAfterResolution, err := modelstesting.SumAllUserBalances(db)
+	if err != nil {
+		t.Fatalf("failed to compute sum balances after resolution: %v", err)
+	}
+
+	var bets []models.Bet
+	if err := db.Where("market_id = ?", market.ID).Order("placed_at ASC").Find(&bets).Error; err != nil {
+		t.Fatalf("failed to load bets: %v", err)
+	}
+
+	expectedParticipationFees := modelstesting.CalculateParticipationFees(econConfig, bets)
+	expectedSum := -(creationFee + expectedParticipationFees)
+
+	userBalances, err := modelstesting.LoadUserBalances(db)
+	if err != nil {
+		t.Fatalf("failed to load user balances: %v", err)
+	}
+	t.Logf("final user balances: %+v", userBalances)
+	t.Logf("sumBalancesAfterResolution=%d expectedSum=%d", sumBalancesAfterResolution, expectedSum)
+
+	if sumBalancesAfterResolution != expectedSum {
+		t.Fatalf("expected total user balances %d after resolution (fees only), got %d", expectedSum, sumBalancesAfterResolution)
 	}
 }
