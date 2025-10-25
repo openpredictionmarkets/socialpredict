@@ -6,6 +6,7 @@ import (
 	buybetshandlers "socialpredict/handlers/bets/buying"
 	financials "socialpredict/handlers/math/financials"
 	"socialpredict/handlers/math/payout"
+	positionsmath "socialpredict/handlers/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
@@ -228,5 +229,23 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 
 	if sumBalancesAfterResolution != expectedSum {
 		t.Fatalf("expected total user balances %d after resolution (fees only), got %d", expectedSum, sumBalancesAfterResolution)
+	}
+
+	positions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(db, "8002")
+	if err != nil {
+		t.Fatalf("failed to load market positions: %v", err)
+	}
+
+	found := false
+	for _, pos := range positions {
+		if pos.Username == "testuser03" {
+			found = true
+			if pos.YesSharesOwned != 0 || pos.NoSharesOwned != 0 || pos.Value != 0 {
+				t.Fatalf("expected zero position for testuser03, got %+v", pos)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected testuser03 to appear in positions output")
 	}
 }
