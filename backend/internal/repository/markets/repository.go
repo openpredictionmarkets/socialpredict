@@ -3,6 +3,7 @@ package markets
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
@@ -154,14 +155,19 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 func (r *GormRepository) Search(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
 	dbQuery := r.db.WithContext(ctx).Model(&models.Market{})
 
-	// Search in question title and description
-	searchPattern := "%" + query + "%"
-	dbQuery = dbQuery.Where("question_title ILIKE ? OR description ILIKE ?", searchPattern, searchPattern)
+	// Search in question title and description (case insensitive, SQLite compatible)
+	searchTerm := strings.ToLower(query)
+	searchPattern := "%" + searchTerm + "%"
+	dbQuery = dbQuery.Where("(LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?)", searchPattern, searchPattern)
 
-	if filters.Status != "" {
-		if filters.Status == "active" {
-			dbQuery = dbQuery.Where("is_resolved = ?", false)
-		} else if filters.Status == "resolved" {
+	if filters.Status != "" && filters.Status != "all" {
+		now := time.Now()
+		switch filters.Status {
+		case "active":
+			dbQuery = dbQuery.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+		case "closed":
+			dbQuery = dbQuery.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+		case "resolved":
 			dbQuery = dbQuery.Where("is_resolved = ?", true)
 		}
 	}
