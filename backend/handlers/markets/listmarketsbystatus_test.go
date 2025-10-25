@@ -1,15 +1,135 @@
 package marketshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"socialpredict/handlers/markets/dto"
+	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/util"
 	"testing"
 	"time"
 )
+
+// MockService implements dmarkets.Service for testing
+type MockService struct{}
+
+func (m *MockService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockService) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
+	return nil
+}
+
+func (m *MockService) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockService) ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *MockService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
+	return &dmarkets.SearchResults{
+		PrimaryResults:  []*dmarkets.Market{},
+		FallbackResults: []*dmarkets.Market{},
+		Query:           query,
+		PrimaryStatus:   filters.Status,
+		PrimaryCount:    0,
+		FallbackCount:   0,
+		TotalCount:      0,
+		FallbackUsed:    false,
+	}, nil
+}
+
+func (m *MockService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
+	return nil
+}
+
+func (m *MockService) ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
+	// Mock implementation that returns test data based on status
+	market := &dmarkets.Market{
+		ID:                 1,
+		QuestionTitle:      status + " Market",
+		Description:        "Test " + status + " market",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: time.Now().Add(24 * time.Hour),
+		CreatorUsername:    "testuser",
+		YesLabel:           "YES",
+		NoLabel:            "NO",
+		Status:             status,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+	return []*dmarkets.Market{market}, nil
+}
+
+func (m *MockService) GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+	// Mock implementation returns empty leaderboard
+	return []*dmarkets.LeaderboardRow{}, nil
+}
+
+func (m *MockService) ProjectProbability(ctx context.Context, req dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error) {
+	// Mock implementation returns placeholder projection
+	return &dmarkets.ProbabilityProjection{
+		CurrentProbability:   0.5,
+		ProjectedProbability: 0.6,
+	}, nil
+}
+
+func (m *MockService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	// Mock implementation returns placeholder market overview
+	market := &dmarkets.Market{
+		ID:                 marketID,
+		QuestionTitle:      "Test Market",
+		Description:        "Test market description",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: time.Now().Add(24 * time.Hour),
+		CreatorUsername:    "testuser",
+		YesLabel:           "YES",
+		NoLabel:            "NO",
+		Status:             "active",
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+
+	// Return different data based on marketID for testing
+	var marketDust int64 = 0
+	var totalVolume int64 = 0
+	var numUsers int = 0
+
+	if marketID == 1 {
+		// Market with bets - return non-zero values
+		marketDust = 50
+		totalVolume = 1000
+		numUsers = 3
+	}
+	// For other markets (like ID 2), return zeros as expected by tests
+
+	return &dmarkets.MarketOverview{
+		Market:      market,
+		Creator:     "testuser",
+		NumUsers:    numUsers,
+		TotalVolume: totalVolume,
+		MarketDust:  marketDust,
+	}, nil
+}
+
+func (m *MockService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {
+	return []*dmarkets.BetDisplayInfo{}, nil
+}
+
+func (m *MockService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *MockService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
+	return nil, nil
+}
 
 func TestActiveMarketsFilter(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
@@ -232,8 +352,8 @@ func TestListMarketsByStatus(t *testing.T) {
 	if len(markets) != 1 {
 		t.Errorf("Expected 1 market, got %d", len(markets))
 	}
-	if markets[0].QuestionTitle != "Active Market" {
-		t.Errorf("Expected 'Active Market', got %s", markets[0].QuestionTitle)
+	if markets[0].Market.(dto.MarketResponse).QuestionTitle != "Active Market" {
+		t.Errorf("Expected 'Active Market', got %s", markets[0].Market.(dto.MarketResponse).QuestionTitle)
 	}
 }
 
@@ -282,8 +402,9 @@ func TestListActiveMarketsHandler(t *testing.T) {
 	// Create response recorder
 	rr := httptest.NewRecorder()
 
-	// Call handler
-	handler := http.HandlerFunc(ListActiveMarketsHandler)
+	// Call handler with mock service
+	mockService := &MockService{}
+	handler := ListActiveMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	// Check response status
@@ -342,7 +463,8 @@ func TestListClosedMarketsHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// Call handler
-	handler := http.HandlerFunc(ListClosedMarketsHandler)
+	mockService := &MockService{}
+	handler := ListClosedMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	// Check response status
@@ -403,7 +525,8 @@ func TestListResolvedMarketsHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// Call handler
-	handler := http.HandlerFunc(ListResolvedMarketsHandler)
+	mockService := &MockService{}
+	handler := ListResolvedMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	// Check response status
@@ -438,7 +561,8 @@ func TestHandlerMethodNotAllowed(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(ListActiveMarketsHandler)
+	mockService := &MockService{}
+	handler := ListActiveMarketsHandler(mockService)
 	handler.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusMethodNotAllowed {
