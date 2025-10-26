@@ -42,7 +42,7 @@ const MarketRow = ({ marketData }) => (
       </Link>
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-300'>
-      {marketData.lastProbability.toFixed(3)}
+      {marketData.lastProbability.toFixed(2)}
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300'>
       <Link
