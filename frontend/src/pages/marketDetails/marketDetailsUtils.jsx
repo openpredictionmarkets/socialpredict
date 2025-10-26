@@ -35,7 +35,7 @@ export const calculateCurrentProbability = (details) => {
         ? details.probabilityChanges[details.probabilityChanges.length - 1].probability
         : details.market.initialProbability;
 
-    return parseFloat(currentProbability.toFixed(3));
+    return parseFloat(currentProbability.toFixed(2));
 };
 
 
