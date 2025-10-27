@@ -29,6 +29,7 @@ type Repository interface {
 	Search(ctx context.Context, query string, filters SearchFilters) ([]*Market, error)
 	Delete(ctx context.Context, id int64) error
 	ResolveMarket(ctx context.Context, id int64, resolution string) error
+	GetUserPosition(ctx context.Context, marketID int64, username string) (*UserPosition, error)
 }
 
 // UserService defines the interface for user-related operations
@@ -86,7 +87,7 @@ type ServiceInterface interface {
 	GetMarketDetails(ctx context.Context, marketID int64) (*MarketOverview, error)
 	GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error)
 	GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
-	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (UserPosition, error)
+	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*UserPosition, error)
 }
 
 // Service implements the core market business logic
@@ -526,12 +527,6 @@ func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisp
 	return []*BetDisplayInfo{}, nil
 }
 
-// MarketPositions represents the positions data for all users in a market
-type MarketPositions interface{} // TODO: Define proper type based on positionsmath package
-
-// UserPosition represents a specific user's position in a market
-type UserPosition interface{} // TODO: Define proper type based on positionsmath package
-
 // GetMarketPositions returns all user positions in a market
 func (s *Service) GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error) {
 	// 1. Validate market exists
@@ -551,22 +546,22 @@ func (s *Service) GetMarketPositions(ctx context.Context, marketID int64) (Marke
 }
 
 // GetUserPositionInMarket returns a specific user's position in a market
-func (s *Service) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (UserPosition, error) {
+func (s *Service) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*UserPosition, error) {
 	// 1. Validate market exists
 	_, err := s.repo.GetByID(ctx, marketID)
 	if err != nil {
 		return nil, ErrMarketNotFound
 	}
 
-	// 2. TODO: Validate user exists (via user service)
-	// 3. TODO: Move user position calculation logic here from handlers
-	// This should involve:
-	// - Getting user's bets for the market
-	// - Calculating WPAM/DBPM position for the user
-	// - Returning structured position data
+	if strings.TrimSpace(username) == "" {
+		return nil, ErrInvalidInput
+	}
 
-	// For now, return nil - the actual implementation will move from handlers
-	return nil, nil
+	position, err := s.repo.GetUserPosition(ctx, marketID, username)
+	if err != nil {
+		return nil, err
+	}
+	return position, nil
 }
 
 // validateQuestionTitle validates the market question title

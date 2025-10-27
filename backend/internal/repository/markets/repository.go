@@ -3,9 +3,11 @@ package markets
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
+	positionsmath "socialpredict/handlers/math/positions"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models"
 
@@ -193,6 +195,23 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 	}
 
 	return markets, nil
+}
+
+// GetUserPosition retrieves the aggregated position for a specific user in a market.
+func (r *GormRepository) GetUserPosition(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
+	marketIDStr := strconv.FormatInt(marketID, 10)
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr, username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dmarkets.UserPosition{
+		Username:       username,
+		MarketID:       marketID,
+		YesSharesOwned: position.YesSharesOwned,
+		NoSharesOwned:  position.NoSharesOwned,
+		Value:          position.Value,
+	}, nil
 }
 
 // Delete removes a market from the database

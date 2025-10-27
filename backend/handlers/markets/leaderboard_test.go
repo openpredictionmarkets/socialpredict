@@ -72,7 +72,7 @@ func (m *MockLeaderboardService) GetMarketPositions(ctx context.Context, marketI
 	return nil, nil
 }
 
-func (m *MockLeaderboardService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
+func (m *MockLeaderboardService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return nil, nil
 }
 

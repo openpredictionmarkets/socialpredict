@@ -1,12 +1,15 @@
 package payout
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	positionsmath "socialpredict/handlers/math/positions"
-	usersHandlers "socialpredict/handlers/users"
-	"socialpredict/models"
 	"strconv"
+
+	positionsmath "socialpredict/handlers/math/positions"
+	dusers "socialpredict/internal/domain/users"
+	rusers "socialpredict/internal/repository/users"
+	"socialpredict/models"
 
 	"gorm.io/gorm"
 )
@@ -16,11 +19,13 @@ func DistributePayoutsWithRefund(market *models.Market, db *gorm.DB) error {
 		return errors.New("market is nil")
 	}
 
+	usersService := dusers.NewService(rusers.NewGormRepository(db))
+
 	switch market.ResolutionResult {
 	case "N/A":
-		return refundAllBets(market, db)
+		return refundAllBets(context.Background(), market, db, usersService)
 	case "YES", "NO":
-		return calculateAndAllocateProportionalPayouts(market, db)
+		return calculateAndAllocateProportionalPayouts(context.Background(), market, db, usersService)
 	case "PROB":
 		return fmt.Errorf("probabilistic resolution is not yet supported")
 	default:
@@ -28,7 +33,7 @@ func DistributePayoutsWithRefund(market *models.Market, db *gorm.DB) error {
 	}
 }
 
-func calculateAndAllocateProportionalPayouts(market *models.Market, db *gorm.DB) error {
+func calculateAndAllocateProportionalPayouts(ctx context.Context, market *models.Market, db *gorm.DB, usersService dusers.ServiceInterface) error {
 	// Step 1: Convert market ID formats
 	marketIDStr := strconv.FormatInt(market.ID, 10)
 
@@ -41,7 +46,7 @@ func calculateAndAllocateProportionalPayouts(market *models.Market, db *gorm.DB)
 	// Step 3: Pay out each user their resolved valuation
 	for _, pos := range displayPositions {
 		if pos.Value > 0 {
-			if err := usersHandlers.ApplyTransactionToUser(pos.Username, pos.Value, db, usersHandlers.TransactionWin); err != nil {
+			if err := usersService.ApplyTransaction(ctx, pos.Username, pos.Value, dusers.TransactionWin); err != nil {
 				return err
 			}
 		}
@@ -50,7 +55,7 @@ func calculateAndAllocateProportionalPayouts(market *models.Market, db *gorm.DB)
 	return nil
 }
 
-func refundAllBets(market *models.Market, db *gorm.DB) error {
+func refundAllBets(ctx context.Context, market *models.Market, db *gorm.DB, usersService dusers.ServiceInterface) error {
 	// Retrieve all bets associated with the market
 	var bets []models.Bet
 	if err := db.Where("market_id = ?", market.ID).Find(&bets).Error; err != nil {
@@ -59,7 +64,7 @@ func refundAllBets(market *models.Market, db *gorm.DB) error {
 
 	// Refund each bet to the user
 	for _, bet := range bets {
-		if err := usersHandlers.ApplyTransactionToUser(bet.Username, bet.Amount, db, usersHandlers.TransactionRefund); err != nil {
+		if err := usersService.ApplyTransaction(ctx, bet.Username, bet.Amount, dusers.TransactionRefund); err != nil {
 			return err
 		}
 	}

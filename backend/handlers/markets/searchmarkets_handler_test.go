@@ -69,7 +69,7 @@ func (m *searchServiceMock) GetMarketPositions(ctx context.Context, marketID int
 	return nil, nil
 }
 
-func (m *searchServiceMock) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
+func (m *searchServiceMock) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return nil, nil
 }
 

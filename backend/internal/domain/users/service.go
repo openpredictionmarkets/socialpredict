@@ -4,6 +4,13 @@ import (
 	"context"
 )
 
+// ServiceInterface defines the behavior required by HTTP handlers and other consumers.
+type ServiceInterface interface {
+	GetPublicUser(ctx context.Context, username string) (*PublicUser, error)
+	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
+	GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error)
+}
+
 // Repository defines the interface for user data access
 type Repository interface {
 	GetByUsername(ctx context.Context, username string) (*User, error)
@@ -161,4 +168,39 @@ func (s *Service) DeleteUser(ctx context.Context, username string) error {
 	}
 
 	return s.repo.Delete(ctx, username)
+}
+
+var _ ServiceInterface = (*Service)(nil)
+
+// ApplyTransaction adjusts the user's account balance based on the supplied transaction type.
+func (s *Service) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	newBalance := user.AccountBalance
+	switch transactionType {
+	case TransactionWin, TransactionRefund, TransactionSale:
+		newBalance += amount
+	case TransactionBuy, TransactionFee:
+		newBalance -= amount
+	default:
+		return ErrInvalidTransactionType
+	}
+
+	return s.repo.UpdateBalance(ctx, username, newBalance)
+}
+
+// GetUserCredit returns the available credit for a user based on their balance and the maximum debt limit.
+func (s *Service) GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error) {
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		if err == ErrUserNotFound {
+			return maximumDebtAllowed, nil
+		}
+		return 0, err
+	}
+
+	return maximumDebtAllowed + user.AccountBalance, nil
 }

@@ -119,6 +119,6 @@ func (m *MockService) GetMarketPositions(ctx context.Context, marketID int64) (d
 	return nil, nil
 }
 
-func (m *MockService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
+func (m *MockService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return nil, nil
 }

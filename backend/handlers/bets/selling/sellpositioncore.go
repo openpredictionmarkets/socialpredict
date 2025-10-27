@@ -1,15 +1,18 @@
 package sellbetshandlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	betutils "socialpredict/handlers/bets/betutils"
-	positionsmath "socialpredict/handlers/math/positions"
-	usershandlers "socialpredict/handlers/users"
-	"socialpredict/models"
-	"socialpredict/setup"
 	"strconv"
 	"time"
+
+	betutils "socialpredict/handlers/bets/betutils"
+	positionsmath "socialpredict/handlers/math/positions"
+	dusers "socialpredict/internal/domain/users"
+	rusers "socialpredict/internal/repository/users"
+	"socialpredict/models"
+	"socialpredict/setup"
 
 	"gorm.io/gorm"
 )
@@ -35,6 +38,8 @@ func ProcessSellRequest(db *gorm.DB, redeemRequest *models.Bet, user *models.Use
 	if err := betutils.CheckMarketStatus(db, redeemRequest.MarketID); err != nil {
 		return err
 	}
+
+	usersService := dusers.NewService(rusers.NewGormRepository(db))
 
 	marketIDStr := strconv.FormatUint(uint64(redeemRequest.MarketID), 10)
 
@@ -70,7 +75,7 @@ func ProcessSellRequest(db *gorm.DB, redeemRequest *models.Bet, user *models.Use
 		return err
 	}
 
-	if err := usershandlers.ApplyTransactionToUser(user.Username, actualSaleValue, db, usershandlers.TransactionSale); err != nil {
+	if err := usersService.ApplyTransaction(context.Background(), user.Username, actualSaleValue, dusers.TransactionSale); err != nil {
 		return err
 	}
 

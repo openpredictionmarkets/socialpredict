@@ -1,8 +1,11 @@
 package payout
 
 import (
+	"context"
 	"testing"
 
+	dusers "socialpredict/internal/domain/users"
+	rusers "socialpredict/internal/repository/users"
 	"socialpredict/models"
 	modelstesting "socialpredict/models/modelstesting"
 )
@@ -62,7 +65,8 @@ func TestCalculateAndAllocateProportionalPayouts_NoWinningShares(t *testing.T) {
 	bet := modelstesting.GenerateBet(100, "NO", "loserbot", uint(market.ID), 0)
 	db.Create(&bet)
 
-	err := calculateAndAllocateProportionalPayouts(&market, db)
+	usersService := dusers.NewService(rusers.NewGormRepository(db))
+	err := calculateAndAllocateProportionalPayouts(context.Background(), &market, db, usersService)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -91,7 +95,8 @@ func TestCalculateAndAllocateProportionalPayouts_SuccessfulPayout(t *testing.T) 
 	bet := modelstesting.GenerateBet(100, "YES", "winnerbot", uint(market.ID), 0)
 	db.Create(&bet)
 
-	err := calculateAndAllocateProportionalPayouts(&market, db)
+	usersService := dusers.NewService(rusers.NewGormRepository(db))
+	err := calculateAndAllocateProportionalPayouts(context.Background(), &market, db, usersService)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}

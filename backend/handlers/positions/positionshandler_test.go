@@ -22,6 +22,20 @@ type mockPositionsService struct {
 	err       error
 }
 
+func toDomainPositions(input []positionsmath.MarketPosition) dmarkets.MarketPositions {
+	out := make(dmarkets.MarketPositions, 0, len(input))
+	for _, p := range input {
+		out = append(out, &dmarkets.UserPosition{
+			Username:       p.Username,
+			MarketID:       int64(p.MarketID),
+			YesSharesOwned: p.YesSharesOwned,
+			NoSharesOwned:  p.NoSharesOwned,
+			Value:          p.Value,
+		})
+	}
+	return out
+}
+
 func (m *mockPositionsService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
 	return nil, nil
 }
@@ -70,7 +84,7 @@ func (m *mockPositionsService) GetMarketPositions(ctx context.Context, marketID 
 	return m.positions, m.err
 }
 
-func (m *mockPositionsService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (dmarkets.UserPosition, error) {
+func (m *mockPositionsService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return nil, nil
 }
 
@@ -124,7 +138,7 @@ func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.
 		t.Fatalf("calculate positions: %v", err)
 	}
 
-	mockSvc := &mockPositionsService{positions: positionSnapshot}
+	mockSvc := &mockPositionsService{positions: toDomainPositions(positionSnapshot)}
 	handler := MarketPositionsHandlerWithService(mockSvc)
 
 	req := httptest.NewRequest("GET", "/v0/markets/positions/"+marketIDStr, nil)

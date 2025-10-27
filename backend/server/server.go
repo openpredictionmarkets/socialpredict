@@ -19,7 +19,7 @@ import (
 	usershandlers "socialpredict/handlers/users"
 	usercredit "socialpredict/handlers/users/credit"
 	privateuser "socialpredict/handlers/users/privateuser"
-	"socialpredict/handlers/users/publicuser"
+	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
 	"socialpredict/middleware"
 	"socialpredict/security"
@@ -112,8 +112,10 @@ func Start() {
 
 	// Initialize domain services
 	db := util.GetDB()
-	container := app.BuildApplication(db, setup.EconomicsConfig())
+	econConfig := setup.EconomicsConfig()
+	container := app.BuildApplication(db, econConfig)
 	marketsService := container.GetMarketsService()
+	usersService := container.GetUsersService()
 
 	// Create Handler instances
 	marketsHandler := marketshandlers.NewHandler(marketsService)
@@ -156,8 +158,8 @@ func Start() {
 	router.Handle("/v0/markets/positions/{marketId}/{username}", securityMiddleware(positionshandlers.MarketUserPositionHandlerWithService(marketsService))).Methods("GET")
 
 	// handle public user stuff
-	router.Handle("/v0/userinfo/{username}", securityMiddleware(http.HandlerFunc(publicuser.GetPublicUserResponse))).Methods("GET")
-	router.Handle("/v0/usercredit/{username}", securityMiddleware(http.HandlerFunc(usercredit.GetUserCreditHandler))).Methods("GET")
+	router.Handle("/v0/userinfo/{username}", securityMiddleware(usershandlers.GetPublicUserHandler(usersService))).Methods("GET")
+	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, econConfig.Economics.User.MaximumDebtAllowed))).Methods("GET")
 	router.Handle("/v0/portfolio/{username}", securityMiddleware(http.HandlerFunc(publicuser.GetPortfolio))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(http.HandlerFunc(usershandlers.GetUserFinancialHandler))).Methods("GET")
 
@@ -173,7 +175,7 @@ func Start() {
 
 	// handle private user actions such as make a bet, sell positions, get user position
 	router.Handle("/v0/bet", securityMiddleware(http.HandlerFunc(buybetshandlers.PlaceBetHandler(setup.EconomicsConfig)))).Methods("POST")
-	router.Handle("/v0/userposition/{marketId}", securityMiddleware(http.HandlerFunc(usershandlers.UserMarketPositionHandler))).Methods("GET")
+	router.Handle("/v0/userposition/{marketId}", securityMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService))).Methods("GET")
 	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
 
 	// admin stuff - apply security middleware

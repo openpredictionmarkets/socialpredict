@@ -9,18 +9,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/gorilla/mux"
+
 	positionsmath "socialpredict/handlers/math/positions"
+	"socialpredict/internal/app"
 	"socialpredict/middleware"
 	"socialpredict/models/modelstesting"
 	"socialpredict/util"
-
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/gorilla/mux"
 )
 
 func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
+	config := modelstesting.GenerateEconomicConfig()
+	container := app.BuildApplication(db, config)
 
 	origDB := util.DB
 	util.DB = db
@@ -93,7 +96,8 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 	})
 	rec := httptest.NewRecorder()
 
-	UserMarketPositionHandler(rec, req)
+	handler := UserMarketPositionHandlerWithService(container.GetMarketsService())
+	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
@@ -111,6 +115,9 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 
 func TestUserMarketPositionHandlerUnauthorizedWithoutToken(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
+	_, _ = modelstesting.UseStandardTestEconomics(t)
+	config := modelstesting.GenerateEconomicConfig()
+	container := app.BuildApplication(db, config)
 	origDB := util.DB
 	util.DB = db
 	t.Cleanup(func() { util.DB = origDB })
@@ -119,7 +126,8 @@ func TestUserMarketPositionHandlerUnauthorizedWithoutToken(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"marketId": "1"})
 	rec := httptest.NewRecorder()
 
-	UserMarketPositionHandler(rec, req)
+	handler := UserMarketPositionHandlerWithService(container.GetMarketsService())
+	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", rec.Code)

@@ -1,59 +1,93 @@
 package usercredit
 
 import (
-	"fmt"
-	"socialpredict/models"
-	"socialpredict/models/modelstesting"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gorilla/mux"
+
+	"socialpredict/handlers/users/dto"
+	dusers "socialpredict/internal/domain/users"
 )
 
-func TestCalculateUserCredit(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
+type creditServiceMock struct {
+	credit          int64
+	err             error
+	lastUsername    string
+	lastMaximumDebt int64
+}
 
-	testCases := []struct {
-		username       string
-		displayName    string
-		accountBalance int64
-		maximumDebt    int64
-		expectedCredit int64
-	}{
-		{"user1", "Test User 1", -100, 500, 400},
-		{"user2", "Test User 2", 0, 500, 500},
-		{"user3", "Test User 3", 100, 500, 600},
-		{"user4", "Test User 4", -100, 5000, 4900},
-		{"user5", "Test User 5", 0, 5000, 5000},
-		{"user6", "Test User 6", 100, 5000, 5100},
+func (m *creditServiceMock) GetPublicUser(context.Context, string) (*dusers.PublicUser, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) ApplyTransaction(context.Context, string, int64, string) error {
+	return nil
+}
+
+func (m *creditServiceMock) GetUserCredit(_ context.Context, username string, maximumDebt int64) (int64, error) {
+	m.lastUsername = username
+	m.lastMaximumDebt = maximumDebt
+	if m.err != nil {
+		return 0, m.err
+	}
+	return m.credit, nil
+}
+
+func TestGetUserCreditHandlerSuccess(t *testing.T) {
+	mock := &creditServiceMock{credit: 750}
+	handler := GetUserCreditHandler(mock, 500)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/usercredit/alice", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "alice"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	for _, tc := range testCases {
-		user := models.User{
-			PublicUser: models.PublicUser{
-				Username:       tc.username,
-				DisplayName:    tc.displayName,
-				UserType:       "REGULAR",
-				AccountBalance: tc.accountBalance,
-			},
-			PrivateUser: models.PrivateUser{
-				Email:    tc.username + "@example.com",
-				Password: "password123",
-				APIKey:   "apikey-" + tc.username,
-			},
-		}
-
-		if err := db.Create(&user).Error; err != nil {
-			t.Fatalf("Failed to save user %s to database: %v", tc.username, err)
-		}
+	var body dto.UserCreditResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
 	}
 
-	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("Username=%s_AccountBalance=%d_MaximumDebt=%d", tc.username, tc.accountBalance, tc.maximumDebt), func(t *testing.T) {
-			credit := calculateUserCredit(db, tc.username, tc.maximumDebt)
-			if credit != tc.expectedCredit {
-				t.Errorf(
-					"calculateUserCredit(db, username=%s, maximumDebt=%d) = %d; want %d",
-					tc.username, tc.maximumDebt, credit, tc.expectedCredit,
-				)
-			}
-		})
+	if body.Credit != 750 {
+		t.Fatalf("expected credit 750, got %d", body.Credit)
+	}
+	if mock.lastUsername != "alice" || mock.lastMaximumDebt != 500 {
+		t.Fatalf("unexpected parameters passed to service: username=%s maxDebt=%d", mock.lastUsername, mock.lastMaximumDebt)
+	}
+}
+
+func TestGetUserCreditHandlerMethodNotAllowed(t *testing.T) {
+	handler := GetUserCreditHandler(&creditServiceMock{}, 500)
+
+	req := httptest.NewRequest(http.MethodPost, "/v0/usercredit/alice", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status 405, got %d", rec.Code)
+	}
+}
+
+func TestGetUserCreditHandlerInternalError(t *testing.T) {
+	handler := GetUserCreditHandler(&creditServiceMock{err: errors.New("boom")}, 500)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/usercredit/alice", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "alice"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rec.Code)
 	}
 }
