@@ -31,6 +31,10 @@ func (m *publicUserServiceMock) GetUserCredit(context.Context, string, int64) (i
 	return 0, nil
 }
 
+func (m *publicUserServiceMock) GetUserPortfolio(context.Context, string) (*dusers.Portfolio, error) {
+	return nil, nil
+}
+
 func TestGetPublicUserHandlerReturnsPublicUser(t *testing.T) {
 	mockUser := &dusers.PublicUser{
 		Username:              "alice",

@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"sort"
 )
 
 // ServiceInterface defines the behavior required by HTTP handlers and other consumers.
@@ -9,6 +10,7 @@ type ServiceInterface interface {
 	GetPublicUser(ctx context.Context, username string) (*PublicUser, error)
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
 	GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error)
+	GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error)
 }
 
 // Repository defines the interface for user data access
@@ -19,6 +21,9 @@ type Repository interface {
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, username string) error
 	List(ctx context.Context, filters ListFilters) ([]*User, error)
+	ListUserBets(ctx context.Context, username string) ([]*UserBet, error)
+	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
+	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
 }
 
 // ListFilters represents filters for listing users
@@ -170,8 +175,6 @@ func (s *Service) DeleteUser(ctx context.Context, username string) error {
 	return s.repo.Delete(ctx, username)
 }
 
-var _ ServiceInterface = (*Service)(nil)
-
 // ApplyTransaction adjusts the user's account balance based on the supplied transaction type.
 func (s *Service) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
 	user, err := s.repo.GetByUsername(ctx, username)
@@ -204,3 +207,58 @@ func (s *Service) GetUserCredit(ctx context.Context, username string, maximumDeb
 
 	return maximumDebtAllowed + user.AccountBalance, nil
 }
+
+// GetUserPortfolio returns the user's portfolio across markets.
+func (s *Service) GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error) {
+	bets, err := s.repo.ListUserBets(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	marketMap := make(map[uint]*PortfolioItem)
+	for _, bet := range bets {
+		item, exists := marketMap[bet.MarketID]
+		if !exists {
+			item = &PortfolioItem{
+				MarketID:      bet.MarketID,
+				LastBetPlaced: bet.PlacedAt,
+			}
+			marketMap[bet.MarketID] = item
+		}
+		if bet.PlacedAt.After(item.LastBetPlaced) {
+			item.LastBetPlaced = bet.PlacedAt
+		}
+	}
+
+	var items []PortfolioItem
+	var totalShares int64
+	for marketID, item := range marketMap {
+		position, err := s.repo.GetUserPositionInMarket(ctx, int64(marketID), username)
+		if err != nil {
+			return nil, err
+		}
+
+		title, err := s.repo.GetMarketQuestion(ctx, marketID)
+		if err != nil {
+			return nil, err
+		}
+
+		item.YesSharesOwned = position.YesSharesOwned
+		item.NoSharesOwned = position.NoSharesOwned
+		item.QuestionTitle = title
+		totalShares += position.YesSharesOwned + position.NoSharesOwned
+
+		items = append(items, *item)
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].LastBetPlaced.After(items[j].LastBetPlaced)
+	})
+
+	return &Portfolio{
+		Items:            items,
+		TotalSharesOwned: totalShares,
+	}, nil
+}
+
+var _ ServiceInterface = (*Service)(nil)

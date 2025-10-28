@@ -38,6 +38,10 @@ func (m *creditServiceMock) GetUserCredit(_ context.Context, username string, ma
 	return m.credit, nil
 }
 
+func (m *creditServiceMock) GetUserPortfolio(context.Context, string) (*dusers.Portfolio, error) {
+	return nil, nil
+}
+
 func TestGetUserCreditHandlerSuccess(t *testing.T) {
 	mock := &creditServiceMock{credit: 750}
 	handler := GetUserCreditHandler(mock, 500)

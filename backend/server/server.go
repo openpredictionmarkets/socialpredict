@@ -160,7 +160,7 @@ func Start() {
 	// handle public user stuff
 	router.Handle("/v0/userinfo/{username}", securityMiddleware(usershandlers.GetPublicUserHandler(usersService))).Methods("GET")
 	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, econConfig.Economics.User.MaximumDebtAllowed))).Methods("GET")
-	router.Handle("/v0/portfolio/{username}", securityMiddleware(http.HandlerFunc(publicuser.GetPortfolio))).Methods("GET")
+	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(http.HandlerFunc(usershandlers.GetUserFinancialHandler))).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize

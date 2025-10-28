@@ -60,3 +60,30 @@ type UserUpdateRequest struct {
 	PersonalLink3 string
 	PersonalLink4 string
 }
+
+// UserBet represents a bet placed by a user.
+type UserBet struct {
+	MarketID uint
+	PlacedAt time.Time
+}
+
+// MarketUserPosition represents a user's position within a market.
+type MarketUserPosition struct {
+	YesSharesOwned int64
+	NoSharesOwned  int64
+}
+
+// PortfolioItem captures aggregate information for a market within a user's portfolio.
+type PortfolioItem struct {
+	MarketID       uint
+	QuestionTitle  string
+	YesSharesOwned int64
+	NoSharesOwned  int64
+	LastBetPlaced  time.Time
+}
+
+// Portfolio represents the user's overall market positions.
+type Portfolio struct {
+	Items            []PortfolioItem
+	TotalSharesOwned int64
+}

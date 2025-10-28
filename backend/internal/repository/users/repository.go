@@ -3,7 +3,9 @@ package users
 import (
 	"context"
 	"errors"
+	"strconv"
 
+	positionsmath "socialpredict/handlers/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
 
@@ -129,6 +131,49 @@ func (r *GormRepository) List(ctx context.Context, filters dusers.ListFilters) (
 	}
 
 	return users, nil
+}
+
+// ListUserBets retrieves all bets placed by the specified user ordered by placement time descending.
+func (r *GormRepository) ListUserBets(ctx context.Context, username string) ([]*dusers.UserBet, error) {
+	var bets []models.Bet
+	if err := r.db.WithContext(ctx).
+		Where("username = ?", username).
+		Order("placed_at DESC").
+		Find(&bets).Error; err != nil {
+		return nil, err
+	}
+
+	result := make([]*dusers.UserBet, len(bets))
+	for i, bet := range bets {
+		result[i] = &dusers.UserBet{
+			MarketID: bet.MarketID,
+			PlacedAt: bet.PlacedAt,
+		}
+	}
+	return result, nil
+}
+
+// GetMarketQuestion retrieves the question title for the specified market.
+func (r *GormRepository) GetMarketQuestion(ctx context.Context, marketID uint) (string, error) {
+	var market models.Market
+	if err := r.db.WithContext(ctx).Select("question_title").Where("id = ?", marketID).First(&market).Error; err != nil {
+		return "", err
+	}
+	return market.QuestionTitle, nil
+}
+
+// GetUserPositionInMarket calculates the user's position within the specified market.
+func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dusers.MarketUserPosition, error) {
+	marketIDStr := strconv.FormatInt(marketID, 10)
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr, username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dusers.MarketUserPosition{
+		YesSharesOwned: position.YesSharesOwned,
+		NoSharesOwned:  position.NoSharesOwned,
+	}, nil
 }
 
 // domainToModel converts a domain user to a GORM model

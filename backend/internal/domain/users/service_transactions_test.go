@@ -90,3 +90,59 @@ func TestServiceGetUserCredit(t *testing.T) {
 		t.Fatalf("credit for missing user = %d, want 500", credit)
 	}
 }
+
+func TestServiceGetUserPortfolio(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	_, _ = modelstesting.UseStandardTestEconomics(t)
+	repo := rusers.NewGormRepository(db)
+	service := users.NewService(repo)
+
+	user := modelstesting.GenerateUser("portfolio_user", 0)
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	creator := modelstesting.GenerateUser("creator", 0)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("create creator: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(5001, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+
+	bet := modelstesting.GenerateBet(100, "YES", user.Username, uint(market.ID), 0)
+	if err := db.Create(&bet).Error; err != nil {
+		t.Fatalf("create bet: %v", err)
+	}
+
+	ctx := context.Background()
+	portfolio, err := service.GetUserPortfolio(ctx, user.Username)
+	if err != nil {
+		t.Fatalf("GetUserPortfolio returned error: %v", err)
+	}
+
+	if portfolio == nil || len(portfolio.Items) != 1 {
+		t.Fatalf("expected 1 portfolio item, got %+v", portfolio)
+	}
+
+	item := portfolio.Items[0]
+	if item.MarketID != uint(market.ID) {
+		t.Fatalf("expected market id %d, got %d", market.ID, item.MarketID)
+	}
+	if item.QuestionTitle != market.QuestionTitle {
+		t.Fatalf("expected question title %q, got %q", market.QuestionTitle, item.QuestionTitle)
+	}
+	if portfolio.TotalSharesOwned == 0 {
+		t.Fatalf("expected non-zero total shares, got %d", portfolio.TotalSharesOwned)
+	}
+
+	portfolio, err = service.GetUserPortfolio(ctx, "unknown")
+	if err != nil {
+		t.Fatalf("expected no error for user without bets, got %v", err)
+	}
+	if len(portfolio.Items) != 0 || portfolio.TotalSharesOwned != 0 {
+		t.Fatalf("expected empty portfolio, got %+v", portfolio)
+	}
+}
