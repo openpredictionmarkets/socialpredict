@@ -2,7 +2,12 @@ package users
 
 import (
 	"context"
+	"fmt"
 	"sort"
+
+	"socialpredict/setup"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ServiceInterface defines the behavior required by HTTP handlers and other consumers.
@@ -11,6 +16,13 @@ type ServiceInterface interface {
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
 	GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error)
 	GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error)
+	GetUserFinancials(ctx context.Context, username string) (map[string]int64, error)
+	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
+	UpdateDescription(ctx context.Context, username, description string) (*User, error)
+	UpdateDisplayName(ctx context.Context, username, displayName string) (*User, error)
+	UpdateEmoji(ctx context.Context, username, emoji string) (*User, error)
+	UpdatePersonalLinks(ctx context.Context, username string, links PersonalLinks) (*User, error)
+	ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error
 }
 
 // Repository defines the interface for user data access
@@ -24,6 +36,10 @@ type Repository interface {
 	ListUserBets(ctx context.Context, username string) ([]*UserBet, error)
 	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
+	ComputeUserFinancials(ctx context.Context, username string, accountBalance int64, econ *setup.EconomicConfig) (map[string]int64, error)
+	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
+	GetCredentials(ctx context.Context, username string) (*Credentials, error)
+	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
 }
 
 // ListFilters represents filters for listing users
@@ -33,14 +49,29 @@ type ListFilters struct {
 	Offset   int
 }
 
+// Sanitizer defines the behavior needed to sanitize user profile inputs.
+type Sanitizer interface {
+	SanitizeDescription(string) (string, error)
+	SanitizeDisplayName(string) (string, error)
+	SanitizeEmoji(string) (string, error)
+	SanitizePersonalLink(string) (string, error)
+	SanitizePassword(string) (string, error)
+}
+
 // Service implements the core user business logic
 type Service struct {
-	repo Repository
+	repo      Repository
+	config    *setup.EconomicConfig
+	sanitizer Sanitizer
 }
 
 // NewService creates a new users service
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository, config *setup.EconomicConfig, sanitizer Sanitizer) *Service {
+	return &Service{
+		repo:      repo,
+		config:    config,
+		sanitizer: sanitizer,
+	}
 }
 
 // ValidateUserExists checks if a user exists
@@ -259,6 +290,208 @@ func (s *Service) GetUserPortfolio(ctx context.Context, username string) (*Portf
 		Items:            items,
 		TotalSharesOwned: totalShares,
 	}, nil
+}
+
+// ListUserMarkets returns markets the specified user has participated in.
+func (s *Service) ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error) {
+	if userID <= 0 {
+		return nil, ErrInvalidUserData
+	}
+	return s.repo.ListUserMarkets(ctx, userID)
+}
+
+// GetUserFinancials returns the user's comprehensive financial snapshot.
+func (s *Service) GetUserFinancials(ctx context.Context, username string) (map[string]int64, error) {
+	if s.config == nil {
+		return nil, ErrInvalidUserData
+	}
+
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	return s.repo.ComputeUserFinancials(ctx, username, user.AccountBalance, s.config)
+}
+
+// UpdateDescription sanitizes and updates a user's description.
+func (s *Service) UpdateDescription(ctx context.Context, username, description string) (*User, error) {
+	if len(description) > 2000 {
+		return nil, fmt.Errorf("description exceeds maximum length of 2000 characters")
+	}
+
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.sanitizer == nil {
+		return nil, ErrInvalidUserData
+	}
+
+	sanitized, err := s.sanitizer.SanitizeDescription(description)
+	if err != nil {
+		return nil, fmt.Errorf("invalid description: %w", err)
+	}
+
+	user.Description = sanitized
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// UpdateDisplayName sanitizes and updates a user's display name.
+func (s *Service) UpdateDisplayName(ctx context.Context, username, displayName string) (*User, error) {
+	if len(displayName) < 1 || len(displayName) > 50 {
+		return nil, fmt.Errorf("display name must be between 1 and 50 characters")
+	}
+
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.sanitizer == nil {
+		return nil, ErrInvalidUserData
+	}
+
+	sanitized, err := s.sanitizer.SanitizeDisplayName(displayName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid display name: %w", err)
+	}
+
+	user.DisplayName = sanitized
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// UpdateEmoji sanitizes and updates a user's personal emoji.
+func (s *Service) UpdateEmoji(ctx context.Context, username, emoji string) (*User, error) {
+	if emoji == "" {
+		return nil, fmt.Errorf("emoji cannot be blank")
+	}
+	if len(emoji) > 20 {
+		return nil, fmt.Errorf("emoji exceeds maximum length of 20 characters")
+	}
+
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.sanitizer == nil {
+		return nil, ErrInvalidUserData
+	}
+
+	sanitized, err := s.sanitizer.SanitizeEmoji(emoji)
+	if err != nil {
+		return nil, fmt.Errorf("invalid emoji: %w", err)
+	}
+
+	user.PersonalEmoji = sanitized
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// UpdatePersonalLinks sanitizes and updates a user's personal links.
+func (s *Service) UpdatePersonalLinks(ctx context.Context, username string, links PersonalLinks) (*User, error) {
+	if s.sanitizer == nil {
+		return nil, ErrInvalidUserData
+	}
+
+	values := []string{
+		links.PersonalLink1,
+		links.PersonalLink2,
+		links.PersonalLink3,
+		links.PersonalLink4,
+	}
+
+	for _, link := range values {
+		if len(link) > 200 {
+			return nil, fmt.Errorf("personal link exceeds maximum length of 200 characters")
+		}
+	}
+
+	sanitized := make([]string, len(values))
+	for i, link := range values {
+		if link == "" {
+			sanitized[i] = ""
+			continue
+		}
+		clean, err := s.sanitizer.SanitizePersonalLink(link)
+		if err != nil {
+			return nil, fmt.Errorf("invalid personal link: %w", err)
+		}
+		sanitized[i] = clean
+	}
+
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	user.PersonalLink1 = sanitized[0]
+	user.PersonalLink2 = sanitized[1]
+	user.PersonalLink3 = sanitized[2]
+	user.PersonalLink4 = sanitized[3]
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+const passwordHashCost = 14
+
+// PasswordHashCost exposes the bcrypt cost used for hashing user passwords.
+func PasswordHashCost() int {
+	return passwordHashCost
+}
+
+// ChangePassword validates credentials and persists a new hashed password.
+func (s *Service) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
+	if username == "" {
+		return ErrInvalidUserData
+	}
+	if currentPassword == "" {
+		return fmt.Errorf("current password is required")
+	}
+	if newPassword == "" {
+		return fmt.Errorf("new password is required")
+	}
+	if s.sanitizer == nil {
+		return ErrInvalidUserData
+	}
+
+	creds, err := s.repo.GetCredentials(ctx, username)
+	if err != nil {
+		return err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	sanitized, err := s.sanitizer.SanitizePassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("new password does not meet security requirements: %w", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(sanitized)); err == nil {
+		return fmt.Errorf("new password must differ from the current password")
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(sanitized), passwordHashCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	return s.repo.UpdatePassword(ctx, username, string(hashed), false)
 }
 
 var _ ServiceInterface = (*Service)(nil)

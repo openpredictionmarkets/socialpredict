@@ -35,6 +35,34 @@ func (m *publicUserServiceMock) GetUserPortfolio(context.Context, string) (*duse
 	return nil, nil
 }
 
+func (m *publicUserServiceMock) GetUserFinancials(context.Context, string) (map[string]int64, error) {
+	return nil, nil
+}
+
+func (m *publicUserServiceMock) ListUserMarkets(context.Context, int64) ([]*dusers.UserMarket, error) {
+	return nil, nil
+}
+
+func (m *publicUserServiceMock) UpdateDescription(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *publicUserServiceMock) UpdateDisplayName(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *publicUserServiceMock) UpdateEmoji(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *publicUserServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *publicUserServiceMock) ChangePassword(context.Context, string, string, string) error {
+	return nil
+}
+
 func TestGetPublicUserHandlerReturnsPublicUser(t *testing.T) {
 	mockUser := &dusers.PublicUser{
 		Username:              "alice",

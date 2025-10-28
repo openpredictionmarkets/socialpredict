@@ -5,9 +5,11 @@ import (
 	"errors"
 	"strconv"
 
+	"socialpredict/handlers/math/financials"
 	positionsmath "socialpredict/handlers/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
+	"socialpredict/setup"
 
 	"gorm.io/gorm"
 )
@@ -174,6 +176,88 @@ func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID i
 		YesSharesOwned: position.YesSharesOwned,
 		NoSharesOwned:  position.NoSharesOwned,
 	}, nil
+}
+
+// ComputeUserFinancials builds a financial snapshot for a user.
+func (r *GormRepository) ComputeUserFinancials(ctx context.Context, username string, accountBalance int64, econ *setup.EconomicConfig) (map[string]int64, error) {
+	return financials.ComputeUserFinancials(r.db.WithContext(ctx), username, accountBalance, econ)
+}
+
+// ListUserMarkets returns markets the user has participated in ordered by last bet time.
+func (r *GormRepository) ListUserMarkets(ctx context.Context, userID int64) ([]*dusers.UserMarket, error) {
+	var dbMarkets []models.Market
+
+	query := r.db.WithContext(ctx).Table("markets").
+		Joins("join bets on bets.market_id = markets.id").
+		Where("bets.user_id = ?", userID).
+		Order("bets.created_at DESC").
+		Distinct("markets.*").
+		Find(&dbMarkets)
+
+	if query.Error != nil {
+		return nil, query.Error
+	}
+
+	markets := make([]*dusers.UserMarket, len(dbMarkets))
+	for i, m := range dbMarkets {
+		markets[i] = &dusers.UserMarket{
+			ID:                      m.ID,
+			QuestionTitle:           m.QuestionTitle,
+			Description:             m.Description,
+			OutcomeType:             m.OutcomeType,
+			ResolutionDateTime:      m.ResolutionDateTime,
+			FinalResolutionDateTime: m.FinalResolutionDateTime,
+			UTCOffset:               m.UTCOffset,
+			IsResolved:              m.IsResolved,
+			ResolutionResult:        m.ResolutionResult,
+			InitialProbability:      m.InitialProbability,
+			YesLabel:                m.YesLabel,
+			NoLabel:                 m.NoLabel,
+			CreatorUsername:         m.CreatorUsername,
+			CreatedAt:               m.CreatedAt,
+			UpdatedAt:               m.UpdatedAt,
+		}
+	}
+
+	return markets, nil
+}
+
+// GetCredentials returns the hashed password and password-change flag for the specified user.
+func (r *GormRepository) GetCredentials(ctx context.Context, username string) (*dusers.Credentials, error) {
+	var user models.User
+	if err := r.db.WithContext(ctx).
+		Select("password", "must_change_password").
+		Where("username = ?", username).
+		Take(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, dusers.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return &dusers.Credentials{
+		PasswordHash:       user.Password,
+		MustChangePassword: user.MustChangePassword,
+	}, nil
+}
+
+// UpdatePassword persists a new password hash and updates the must-change flag.
+func (r *GormRepository) UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error {
+	result := r.db.WithContext(ctx).Model(&models.User{}).
+		Where("username = ?", username).
+		Updates(map[string]any{
+			"password":             hashedPassword,
+			"must_change_password": mustChange,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return dusers.ErrUserNotFound
+	}
+	return nil
 }
 
 // domainToModel converts a domain user to a GORM model

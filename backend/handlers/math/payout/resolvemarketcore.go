@@ -19,7 +19,7 @@ func DistributePayoutsWithRefund(market *models.Market, db *gorm.DB) error {
 		return errors.New("market is nil")
 	}
 
-	usersService := dusers.NewService(rusers.NewGormRepository(db))
+	usersService := dusers.NewService(rusers.NewGormRepository(db), nil, nil)
 
 	switch market.ResolutionResult {
 	case "N/A":

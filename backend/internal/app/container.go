@@ -17,6 +17,7 @@ import (
 
 	// Handlers
 	hmarkets "socialpredict/handlers/markets"
+	"socialpredict/security"
 )
 
 // Clock interface for testability
@@ -66,8 +67,9 @@ func (c *Container) InitializeRepositories() {
 
 // InitializeServices sets up all domain services with their dependencies
 func (c *Container) InitializeServices() {
-	// Users service depends only on users repository
-	c.usersService = dusers.NewService(&c.usersRepo)
+	// Users service depends on users repository and configuration
+	securityService := security.NewSecurityService()
+	c.usersService = dusers.NewService(&c.usersRepo, c.config, securityService.Sanitizer)
 
 	// Markets service depends on markets repository and users service
 	marketsConfig := dmarkets.Config{

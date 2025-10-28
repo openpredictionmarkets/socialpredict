@@ -42,6 +42,34 @@ func (m *creditServiceMock) GetUserPortfolio(context.Context, string) (*dusers.P
 	return nil, nil
 }
 
+func (m *creditServiceMock) GetUserFinancials(context.Context, string) (map[string]int64, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) ListUserMarkets(context.Context, int64) ([]*dusers.UserMarket, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) UpdateDescription(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) UpdateDisplayName(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) UpdateEmoji(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) ChangePassword(context.Context, string, string, string) error {
+	return nil
+}
+
 func TestGetUserCreditHandlerSuccess(t *testing.T) {
 	mock := &creditServiceMock{credit: 750}
 	handler := GetUserCreditHandler(mock, 500)

@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"socialpredict/internal/app"
 	"socialpredict/models/modelstesting"
 	"socialpredict/util"
 )
@@ -30,7 +31,11 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 
-	GetPrivateProfileUserResponse(rec, req)
+	config := modelstesting.GenerateEconomicConfig()
+	container := app.BuildApplication(db, config)
+
+	handler := GetPrivateProfileHandler(container.GetUsersService())
+	handler.ServeHTTP(rec, req)
 
 	if rec.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
@@ -62,7 +67,11 @@ func TestGetPrivateProfileUserResponse_Unauthorized(t *testing.T) {
 	req := httptest.NewRequest("GET", "/v0/privateprofile", nil)
 	rec := httptest.NewRecorder()
 
-	GetPrivateProfileUserResponse(rec, req)
+	config := modelstesting.GenerateEconomicConfig()
+	container := app.BuildApplication(db, config)
+
+	handler := GetPrivateProfileHandler(container.GetUsersService())
+	handler.ServeHTTP(rec, req)
 
 	if rec.Code != 401 {
 		t.Fatalf("expected status 401, got %d", rec.Code)

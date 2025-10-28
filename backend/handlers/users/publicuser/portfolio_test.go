@@ -39,6 +39,34 @@ func (m *portfolioServiceMock) GetUserPortfolio(context.Context, string) (*duser
 	return m.portfolio, nil
 }
 
+func (m *portfolioServiceMock) GetUserFinancials(context.Context, string) (map[string]int64, error) {
+	return nil, nil
+}
+
+func (m *portfolioServiceMock) ListUserMarkets(context.Context, int64) ([]*dusers.UserMarket, error) {
+	return nil, nil
+}
+
+func (m *portfolioServiceMock) UpdateDescription(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *portfolioServiceMock) UpdateDisplayName(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *portfolioServiceMock) UpdateEmoji(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *portfolioServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *portfolioServiceMock) ChangePassword(context.Context, string, string, string) error {
+	return nil
+}
+
 func TestGetPortfolioHandlerSuccess(t *testing.T) {
 	portfolio := &dusers.Portfolio{
 		Items: []dusers.PortfolioItem{

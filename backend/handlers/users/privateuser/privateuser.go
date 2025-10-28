@@ -3,10 +3,12 @@ package privateuser
 import (
 	"encoding/json"
 	"net/http"
-	"socialpredict/handlers/users/publicuser"
+
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/util"
+
+	dusers "socialpredict/internal/domain/users"
 )
 
 type CombinedUserResponse struct {
@@ -26,39 +28,44 @@ type CombinedUserResponse struct {
 	PersonalLink4         string `json:"personalink4,omitempty"`
 }
 
-func GetPrivateProfileUserResponse(w http.ResponseWriter, r *http.Request) {
-	// Use database connection
-	db := util.GetDB()
+func GetPrivateProfileHandler(svc dusers.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		db := util.GetDB()
 
-	// Validate the token and get the user
-	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
-	if httperr != nil {
-		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
-		return
+		user, httperr := middleware.ValidateTokenAndGetUser(r, db)
+		if httperr != nil {
+			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		publicInfo, err := svc.GetPublicUser(r.Context(), user.Username)
+		if err != nil {
+			if err == dusers.ErrUserNotFound {
+				http.Error(w, "user not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "failed to fetch user", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		response := CombinedUserResponse{
+			PrivateUser:           user.PrivateUser,
+			Username:              publicInfo.Username,
+			DisplayName:           publicInfo.DisplayName,
+			UserType:              publicInfo.UserType,
+			InitialAccountBalance: publicInfo.InitialAccountBalance,
+			AccountBalance:        publicInfo.AccountBalance,
+			PersonalEmoji:         publicInfo.PersonalEmoji,
+			Description:           publicInfo.Description,
+			PersonalLink1:         publicInfo.PersonalLink1,
+			PersonalLink2:         publicInfo.PersonalLink2,
+			PersonalLink3:         publicInfo.PersonalLink3,
+			PersonalLink4:         publicInfo.PersonalLink4,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
-
-	// The username is extracted from the token
-	username := user.Username
-
-	publicInfo := publicuser.GetPublicUserInfo(db, username)
-
-	response := CombinedUserResponse{
-		// Private fields
-		PrivateUser: user.PrivateUser,
-		// Public fields
-		Username:              publicInfo.Username,
-		DisplayName:           publicInfo.DisplayName,
-		UserType:              publicInfo.UserType,
-		InitialAccountBalance: publicInfo.InitialAccountBalance,
-		AccountBalance:        publicInfo.AccountBalance,
-		PersonalEmoji:         publicInfo.PersonalEmoji,
-		Description:           publicInfo.Description,
-		PersonalLink1:         publicInfo.PersonalLink1,
-		PersonalLink2:         publicInfo.PersonalLink2,
-		PersonalLink3:         publicInfo.PersonalLink3,
-		PersonalLink4:         publicInfo.PersonalLink4,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }

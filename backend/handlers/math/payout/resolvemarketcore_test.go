@@ -65,7 +65,7 @@ func TestCalculateAndAllocateProportionalPayouts_NoWinningShares(t *testing.T) {
 	bet := modelstesting.GenerateBet(100, "NO", "loserbot", uint(market.ID), 0)
 	db.Create(&bet)
 
-	usersService := dusers.NewService(rusers.NewGormRepository(db))
+	usersService := dusers.NewService(rusers.NewGormRepository(db), nil, nil)
 	err := calculateAndAllocateProportionalPayouts(context.Background(), &market, db, usersService)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -95,7 +95,7 @@ func TestCalculateAndAllocateProportionalPayouts_SuccessfulPayout(t *testing.T) 
 	bet := modelstesting.GenerateBet(100, "YES", "winnerbot", uint(market.ID), 0)
 	db.Create(&bet)
 
-	usersService := dusers.NewService(rusers.NewGormRepository(db))
+	usersService := dusers.NewService(rusers.NewGormRepository(db), nil, nil)
 	err := calculateAndAllocateProportionalPayouts(context.Background(), &market, db, usersService)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)

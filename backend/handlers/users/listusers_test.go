@@ -1,12 +1,16 @@
 package usershandlers
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
+	dusers "socialpredict/internal/domain/users"
+	rusers "socialpredict/internal/repository/users"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
+	"socialpredict/security"
 )
 
 func TestListUserMarketsReturnsDistinctMarketsOrderedByRecentBet(t *testing.T) {
@@ -70,7 +74,9 @@ func TestListUserMarketsReturnsDistinctMarketsOrderedByRecentBet(t *testing.T) {
 		}
 	}
 
-	results, err := ListUserMarkets(db, user.ID)
+	service := dusers.NewService(rusers.NewGormRepository(db), modelstesting.GenerateEconomicConfig(), security.NewSecurityService().Sanitizer)
+
+	results, err := ListUserMarkets(context.Background(), service, user.ID)
 	if err != nil {
 		t.Fatalf("ListUserMarkets returned error: %v", err)
 	}
@@ -106,7 +112,9 @@ func TestListUserMarketsReturnsErrorFromQuery(t *testing.T) {
 		t.Fatalf("drop bets table: %v", err)
 	}
 
-	if _, err := ListUserMarkets(db, 123); err == nil {
+	service := dusers.NewService(rusers.NewGormRepository(db), modelstesting.GenerateEconomicConfig(), security.NewSecurityService().Sanitizer)
+
+	if _, err := ListUserMarkets(context.Background(), service, 123); err == nil {
 		t.Fatalf("expected error when querying without bets table, got nil")
 	}
 }

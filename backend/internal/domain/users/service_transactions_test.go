@@ -7,12 +7,14 @@ import (
 	users "socialpredict/internal/domain/users"
 	rusers "socialpredict/internal/repository/users"
 	"socialpredict/models/modelstesting"
+	"socialpredict/security"
 )
 
 func TestServiceApplyTransaction(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := rusers.NewGormRepository(db)
-	service := users.NewService(repo)
+	config := modelstesting.GenerateEconomicConfig()
+	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("tx_user", 0)
 	user.AccountBalance = 100
@@ -64,7 +66,8 @@ func TestServiceApplyTransaction(t *testing.T) {
 func TestServiceGetUserCredit(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := rusers.NewGormRepository(db)
-	service := users.NewService(repo)
+	config := modelstesting.GenerateEconomicConfig()
+	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("credit_user", 0)
 	user.AccountBalance = 200
@@ -95,7 +98,8 @@ func TestServiceGetUserPortfolio(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 	repo := rusers.NewGormRepository(db)
-	service := users.NewService(repo)
+	config := modelstesting.GenerateEconomicConfig()
+	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("portfolio_user", 0)
 	if err := db.Create(&user).Error; err != nil {
@@ -144,5 +148,52 @@ func TestServiceGetUserPortfolio(t *testing.T) {
 	}
 	if len(portfolio.Items) != 0 || portfolio.TotalSharesOwned != 0 {
 		t.Fatalf("expected empty portfolio, got %+v", portfolio)
+	}
+}
+
+func TestServiceGetUserFinancials(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	_, _ = modelstesting.UseStandardTestEconomics(t)
+	repo := rusers.NewGormRepository(db)
+	config := modelstesting.GenerateEconomicConfig()
+	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
+
+	user := modelstesting.GenerateUser("financial_user", 0)
+	user.AccountBalance = 300
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	creator := modelstesting.GenerateUser("creator_financial", 0)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("create creator: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(6101, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+
+	bet := modelstesting.GenerateBet(80, "YES", user.Username, uint(market.ID), 0)
+	if err := db.Create(&bet).Error; err != nil {
+		t.Fatalf("create bet: %v", err)
+	}
+
+	ctx := context.Background()
+	snapshot, err := service.GetUserFinancials(ctx, user.Username)
+	if err != nil {
+		t.Fatalf("GetUserFinancials returned error: %v", err)
+	}
+
+	if snapshot == nil || len(snapshot) == 0 {
+		t.Fatalf("expected financial snapshot, got %v", snapshot)
+	}
+	if _, ok := snapshot["accountBalance"]; !ok {
+		t.Fatalf("expected accountBalance in snapshot, got %v", snapshot)
+	}
+
+	// Ensure missing user still returns error (since the service expects existing users)
+	if _, err := service.GetUserFinancials(ctx, "unknown"); err == nil {
+		t.Fatal("expected error for unknown user")
 	}
 }

@@ -87,3 +87,36 @@ type Portfolio struct {
 	Items            []PortfolioItem
 	TotalSharesOwned int64
 }
+
+// UserMarket represents a market a user has participated in.
+type UserMarket struct {
+	ID                      int64
+	QuestionTitle           string
+	Description             string
+	OutcomeType             string
+	ResolutionDateTime      time.Time
+	FinalResolutionDateTime time.Time
+	UTCOffset               int
+	IsResolved              bool
+	ResolutionResult        string
+	InitialProbability      float64
+	YesLabel                string
+	NoLabel                 string
+	CreatorUsername         string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+}
+
+// PersonalLinks captures the set of personal links associated with a user profile.
+type PersonalLinks struct {
+	PersonalLink1 string
+	PersonalLink2 string
+	PersonalLink3 string
+	PersonalLink4 string
+}
+
+// Credentials represents the sensitive authentication fields associated with a user.
+type Credentials struct {
+	PasswordHash       string
+	MustChangePassword bool
+}

@@ -39,7 +39,7 @@ func ProcessSellRequest(db *gorm.DB, redeemRequest *models.Bet, user *models.Use
 		return err
 	}
 
-	usersService := dusers.NewService(rusers.NewGormRepository(db))
+	usersService := dusers.NewService(rusers.NewGormRepository(db), nil, nil)
 
 	marketIDStr := strconv.FormatUint(uint64(redeemRequest.MarketID), 10)
 
