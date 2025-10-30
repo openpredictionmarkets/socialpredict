@@ -295,3 +295,25 @@ func TestServiceChangePassword(t *testing.T) {
 		}
 	})
 }
+
+func TestServiceGetPrivateProfile(t *testing.T) {
+	username, service, repo, ctx := newServiceWithUser(t)
+
+	profile, err := service.GetPrivateProfile(ctx, username)
+	if err != nil {
+		t.Fatalf("GetPrivateProfile returned error: %v", err)
+	}
+
+	if profile.Username != username {
+		t.Fatalf("expected username %q, got %q", username, profile.Username)
+	}
+	if profile.Email == "" {
+		t.Fatalf("expected email to be populated")
+	}
+
+	// simulate missing user
+	repo.user = nil
+	if _, err := service.GetPrivateProfile(ctx, username); err == nil {
+		t.Fatal("expected error for missing user")
+	}
+}

@@ -26,6 +26,10 @@ func (m *financialServiceMock) ApplyTransaction(context.Context, string, int64, 
 	return nil
 }
 
+func (m *financialServiceMock) GetUser(context.Context, string) (*dusers.User, error) {
+	return nil, nil
+}
+
 func (m *financialServiceMock) GetUserCredit(context.Context, string, int64) (int64, error) {
 	return 0, nil
 }
@@ -58,6 +62,10 @@ func (m *financialServiceMock) UpdateEmoji(context.Context, string, string) (*du
 }
 
 func (m *financialServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) GetPrivateProfile(context.Context, string) (*dusers.PrivateProfile, error) {
 	return nil, nil
 }
 

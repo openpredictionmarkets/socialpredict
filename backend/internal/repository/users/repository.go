@@ -5,11 +5,9 @@ import (
 	"errors"
 	"strconv"
 
-	"socialpredict/handlers/math/financials"
-	positionsmath "socialpredict/handlers/math/positions"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
-	"socialpredict/setup"
 
 	"gorm.io/gorm"
 )
@@ -176,11 +174,6 @@ func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID i
 		YesSharesOwned: position.YesSharesOwned,
 		NoSharesOwned:  position.NoSharesOwned,
 	}, nil
-}
-
-// ComputeUserFinancials builds a financial snapshot for a user.
-func (r *GormRepository) ComputeUserFinancials(ctx context.Context, username string, accountBalance int64, econ *setup.EconomicConfig) (map[string]int64, error) {
-	return financials.ComputeUserFinancials(r.db.WithContext(ctx), username, accountBalance, econ)
 }
 
 // ListUserMarkets returns markets the user has participated in ordered by last bet time.

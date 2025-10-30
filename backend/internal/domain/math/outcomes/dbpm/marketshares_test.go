@@ -2,7 +2,7 @@ package dbpm
 
 import (
 	"reflect"
-	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"

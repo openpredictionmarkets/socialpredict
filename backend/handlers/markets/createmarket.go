@@ -66,7 +66,7 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// Validate user and get username
 	db := util.GetDB()
-	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
 	if httperr != nil {
 		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
@@ -158,7 +158,7 @@ func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, econConfig *s
 
 		// Validate user and get username
 		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
 		if httperr != nil {
 			http.Error(w, httperr.Error(), httperr.StatusCode)
 			return

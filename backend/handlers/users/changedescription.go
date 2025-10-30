@@ -7,7 +7,6 @@ import (
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/middleware"
-	"socialpredict/util"
 )
 
 // ChangeDescriptionHandler returns an HTTP handler that delegates description updates to the users service.
@@ -18,8 +17,7 @@ func ChangeDescriptionHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		db := util.GetDB()
-		user, httperr := middleware.ValidateTokenAndGetUser(r, db)
+		user, httperr := middleware.ValidateTokenAndGetUser(r, svc)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), httperr.StatusCode)
 			return
@@ -37,11 +35,9 @@ func ChangeDescriptionHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		user.Description = updated.Description
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(user); err != nil {
+		if err := json.NewEncoder(w).Encode(toPrivateUserResponse(updated)); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}

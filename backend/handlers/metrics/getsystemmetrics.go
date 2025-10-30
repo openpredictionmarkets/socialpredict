@@ -3,23 +3,22 @@ package metricshandlers
 import (
 	"encoding/json"
 	"net/http"
-	"socialpredict/handlers/math/financials"
-	"socialpredict/setup"
-	"socialpredict/util"
+
+	analytics "socialpredict/internal/domain/analytics"
 )
 
-func GetSystemMetricsHandler(w http.ResponseWriter, r *http.Request) {
-	db := util.GetDB()
-	load := setup.EconomicsConfig // matches EconConfigLoader (func() *EconomicConfig)
+// GetSystemMetricsHandler returns an HTTP handler that emits system metrics via the analytics service.
+func GetSystemMetricsHandler(svc *analytics.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		metrics, err := svc.ComputeSystemMetrics(r.Context())
+		if err != nil {
+			http.Error(w, "failed to compute metrics: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-	res, err := financials.ComputeSystemMetrics(db, load)
-	if err != nil {
-		http.Error(w, "failed to compute metrics: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(res); err != nil {
-		http.Error(w, "Failed to encode metrics response: "+err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(metrics); err != nil {
+			http.Error(w, "Failed to encode metrics response: "+err.Error(), http.StatusInternalServerError)
+		}
 	}
 }

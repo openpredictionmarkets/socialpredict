@@ -8,7 +8,7 @@ import (
 	"time"
 
 	betutils "socialpredict/handlers/bets/betutils"
-	positionsmath "socialpredict/handlers/math/positions"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	rusers "socialpredict/internal/repository/users"
 	"socialpredict/models"

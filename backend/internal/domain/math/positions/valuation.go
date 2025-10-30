@@ -3,8 +3,7 @@ package positionsmath
 import (
 	"fmt"
 	"math"
-
-	"gorm.io/gorm"
+	"time"
 )
 
 type UserValuationResult struct {
@@ -13,13 +12,12 @@ type UserValuationResult struct {
 }
 
 func CalculateRoundedUserValuationsFromUserMarketPositions(
-	db *gorm.DB,
-	marketID uint,
 	userPositions map[string]UserMarketPosition,
 	currentProbability float64,
 	totalVolume int64,
 	isResolved bool,
 	resolutionResult string,
+	earliestBets map[string]time.Time,
 ) (map[string]UserValuationResult, error) {
 	result := make(map[string]UserValuationResult)
 	var finalProb float64
@@ -55,10 +53,7 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 		}
 	}
 
-	adjusted, err := AdjustUserValuationsToMarketVolume(db, marketID, result, totalVolume)
-	if err != nil {
-		return nil, err
-	}
+	adjusted := AdjustUserValuationsToMarketVolume(result, earliestBets, totalVolume)
 	return adjusted, nil
 }
 

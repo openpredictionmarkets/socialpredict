@@ -1,7 +1,7 @@
 package sellbetshandlers
 
 import (
-	positionsmath "socialpredict/handlers/math/positions"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models/modelstesting"
 	"testing"
 )

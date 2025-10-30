@@ -3,8 +3,6 @@ package positionsmath
 import (
 	"sort"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // UserHolder is for sorting only—combines valuation and earliest bet.
@@ -31,21 +29,14 @@ func (s ByValBetTimeUsername) Less(i, j int) bool {
 // AdjustUserValuationsToMarketVolume ensures user values match total market volume,
 // distributing rounding delta deterministically. Only users with >0 value are adjusted.
 func AdjustUserValuationsToMarketVolume(
-	db *gorm.DB,
-	marketID uint,
 	userValuations map[string]UserValuationResult,
+	earliestBets map[string]time.Time,
 	targetMarketVolume int64,
-) (map[string]UserValuationResult, error) {
+) map[string]UserValuationResult {
 	// Filter out users with zero valuation
 	filtered := filterWinningValuations(userValuations)
 	if len(filtered) == 0 {
-		return userValuations, nil
-	}
-
-	// Fetch earliest bets for ordering
-	earliestBets, err := GetAllUserEarliestBetsForMarket(db, marketID)
-	if err != nil {
-		return nil, err
+		return userValuations
 	}
 
 	// Create sortable holder list
@@ -54,7 +45,7 @@ func AdjustUserValuationsToMarketVolume(
 	// Apply delta correction
 	adjusted := adjustValuations(filtered, holders, sum, targetMarketVolume)
 
-	return adjusted, nil
+	return adjusted
 }
 
 // filterWinningValuations drops users with zero rounded value
@@ -79,10 +70,11 @@ func buildUserHolders(
 	)
 	for username, val := range userVals {
 		sum += val.RoundedValue
+		earliestTime := earliest[username]
 		holders = append(holders, UserHolder{
 			Username:     username,
 			RoundedValue: val.RoundedValue,
-			EarliestBet:  earliest[username],
+			EarliestBet:  earliestTime,
 		})
 	}
 	sort.Sort(ByValBetTimeUsername(holders))

@@ -28,6 +28,10 @@ func (noopUserService) DeductBalance(ctx context.Context, username string, amoun
 	return nil
 }
 
+func (noopUserService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+	return nil
+}
+
 type fixedClock struct {
 	now time.Time
 }

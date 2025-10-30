@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	// Domain services
+	analytics "socialpredict/internal/domain/analytics"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 
@@ -39,12 +40,14 @@ type Container struct {
 	clock  Clock
 
 	// Repositories
-	marketsRepo rmarkets.GormRepository
-	usersRepo   rusers.GormRepository
+	marketsRepo   rmarkets.GormRepository
+	usersRepo     rusers.GormRepository
+	analyticsRepo analytics.GormRepository
 
 	// Domain services
-	marketsService *dmarkets.Service
-	usersService   *dusers.Service
+	analyticsService *analytics.Service
+	marketsService   *dmarkets.Service
+	usersService     *dusers.Service
 
 	// Handlers
 	marketsHandler *hmarkets.Handler
@@ -63,13 +66,16 @@ func NewContainer(db *gorm.DB, config *setup.EconomicConfig) *Container {
 func (c *Container) InitializeRepositories() {
 	c.marketsRepo = *rmarkets.NewGormRepository(c.db)
 	c.usersRepo = *rusers.NewGormRepository(c.db)
+	c.analyticsRepo = *analytics.NewGormRepository(c.db)
 }
 
 // InitializeServices sets up all domain services with their dependencies
 func (c *Container) InitializeServices() {
 	// Users service depends on users repository and configuration
 	securityService := security.NewSecurityService()
-	c.usersService = dusers.NewService(&c.usersRepo, c.config, securityService.Sanitizer)
+	configLoader := func() *setup.EconomicConfig { return c.config }
+	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader)
+	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
 
 	// Markets service depends on markets repository and users service
 	marketsConfig := dmarkets.Config{
@@ -101,6 +107,11 @@ func (c *Container) GetMarketsHandler() *hmarkets.Handler {
 // GetUsersService returns the users domain service
 func (c *Container) GetUsersService() *dusers.Service {
 	return c.usersService
+}
+
+// GetAnalyticsService returns the analytics domain service
+func (c *Container) GetAnalyticsService() *analytics.Service {
+	return c.analyticsService
 }
 
 // GetMarketsService returns the markets domain service

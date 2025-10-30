@@ -28,6 +28,10 @@ func (m *portfolioServiceMock) ApplyTransaction(context.Context, string, int64, 
 	return nil
 }
 
+func (m *portfolioServiceMock) GetUser(context.Context, string) (*dusers.User, error) {
+	return nil, nil
+}
+
 func (m *portfolioServiceMock) GetUserCredit(context.Context, string, int64) (int64, error) {
 	return 0, nil
 }
@@ -60,6 +64,10 @@ func (m *portfolioServiceMock) UpdateEmoji(context.Context, string, string) (*du
 }
 
 func (m *portfolioServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *portfolioServiceMock) GetPrivateProfile(context.Context, string) (*dusers.PrivateProfile, error) {
 	return nil, nil
 }
 

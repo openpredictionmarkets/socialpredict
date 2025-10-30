@@ -29,6 +29,10 @@ func (m *creditServiceMock) ApplyTransaction(context.Context, string, int64, str
 	return nil
 }
 
+func (m *creditServiceMock) GetUser(context.Context, string) (*dusers.User, error) {
+	return nil, nil
+}
+
 func (m *creditServiceMock) GetUserCredit(_ context.Context, username string, maximumDebt int64) (int64, error) {
 	m.lastUsername = username
 	m.lastMaximumDebt = maximumDebt
@@ -63,6 +67,10 @@ func (m *creditServiceMock) UpdateEmoji(context.Context, string, string) (*duser
 }
 
 func (m *creditServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *creditServiceMock) GetPrivateProfile(context.Context, string) (*dusers.PrivateProfile, error) {
 	return nil, nil
 }
 

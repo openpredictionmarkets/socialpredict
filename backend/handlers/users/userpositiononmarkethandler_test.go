@@ -12,11 +12,10 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 
-	positionsmath "socialpredict/handlers/math/positions"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/internal/app"
 	"socialpredict/middleware"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
 )
 
 func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
@@ -25,21 +24,7 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 	config := modelstesting.GenerateEconomicConfig()
 	container := app.BuildApplication(db, config)
 
-	origDB := util.DB
-	util.DB = db
-	t.Cleanup(func() { util.DB = origDB })
-
-	origKey := os.Getenv("JWT_SIGNING_KEY")
-	if err := os.Setenv("JWT_SIGNING_KEY", "test-secret-key"); err != nil {
-		t.Fatalf("set env: %v", err)
-	}
-	t.Cleanup(func() {
-		if origKey == "" {
-			os.Unsetenv("JWT_SIGNING_KEY")
-		} else {
-			os.Setenv("JWT_SIGNING_KEY", origKey)
-		}
-	})
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
 	creator := modelstesting.GenerateUser("creator", 0)
 	if err := db.Create(&creator).Error; err != nil {
@@ -96,7 +81,7 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 	})
 	rec := httptest.NewRecorder()
 
-	handler := UserMarketPositionHandlerWithService(container.GetMarketsService())
+	handler := UserMarketPositionHandlerWithService(container.GetMarketsService(), container.GetUsersService())
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -118,15 +103,12 @@ func TestUserMarketPositionHandlerUnauthorizedWithoutToken(t *testing.T) {
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 	config := modelstesting.GenerateEconomicConfig()
 	container := app.BuildApplication(db, config)
-	origDB := util.DB
-	util.DB = db
-	t.Cleanup(func() { util.DB = origDB })
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/user/markets/1", nil)
 	req = mux.SetURLVars(req, map[string]string{"marketId": "1"})
 	rec := httptest.NewRecorder()
 
-	handler := UserMarketPositionHandlerWithService(container.GetMarketsService())
+	handler := UserMarketPositionHandlerWithService(container.GetMarketsService(), container.GetUsersService())
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {

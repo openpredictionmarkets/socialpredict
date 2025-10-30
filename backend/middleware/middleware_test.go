@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
+
+	dusers "socialpredict/internal/domain/users"
+	rusers "socialpredict/internal/repository/users"
+	"socialpredict/security"
 
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -144,7 +147,7 @@ func TestCheckMustChangePasswordFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			user := &models.User{
+			user := &dusers.User{
 				MustChangePassword: tt.mustChangePassword,
 			}
 
@@ -259,11 +262,12 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 
 func TestValidateTokenAndGetUser_MissingHeader(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateTokenAndGetUser(req, db)
+	user, httpErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
@@ -278,11 +282,12 @@ func TestValidateTokenAndGetUser_MissingHeader(t *testing.T) {
 
 func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 
-	user, httpErr := ValidateTokenAndGetUser(req, db)
+	user, httpErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
@@ -297,11 +302,12 @@ func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 
 func TestValidateAdminToken_MissingHeader(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	err := ValidateAdminToken(req, db)
+	err := ValidateAdminToken(req, svc)
 
 	if err == nil {
 		t.Error("Expected error but got none")
@@ -310,11 +316,12 @@ func TestValidateAdminToken_MissingHeader(t *testing.T) {
 
 func TestValidateAdminToken_InvalidToken(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 
-	err := ValidateAdminToken(req, db)
+	err := ValidateAdminToken(req, svc)
 
 	if err == nil {
 		t.Error("Expected error but got none")
@@ -369,7 +376,7 @@ func TestValidateUserAndEnforcePasswordChangeGetUser_MissingToken(t *testing.T) 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, db)
+	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUserFromDB(req, db)
 
 	if user != nil {
 		t.Error("Expected nil user")

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	positionsmath "socialpredict/handlers/math/positions"
 	dmarkets "socialpredict/internal/domain/markets"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 
 	"gorm.io/gorm"
@@ -250,19 +250,64 @@ func (r *GormRepository) ResolveMarket(ctx context.Context, id int64, resolution
 	return nil
 }
 
+// ListBetsForMarket returns all bets for the specified market ordered by placement time.
+func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
+	var bets []models.Bet
+	if err := r.db.WithContext(ctx).
+		Where("market_id = ?", marketID).
+		Order("placed_at ASC").
+		Find(&bets).Error; err != nil {
+		return nil, err
+	}
+
+	result := make([]*dmarkets.Bet, len(bets))
+	for i := range bets {
+		result[i] = &dmarkets.Bet{
+			ID:        bets[i].ID,
+			Username:  bets[i].Username,
+			MarketID:  bets[i].MarketID,
+			Amount:    bets[i].Amount,
+			Outcome:   bets[i].Outcome,
+			PlacedAt:  bets[i].PlacedAt,
+			CreatedAt: bets[i].CreatedAt,
+		}
+	}
+	return result, nil
+}
+
+// CalculatePayoutPositions computes the resolved valuations for a market's participants.
+func (r *GormRepository) CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*dmarkets.PayoutPosition, error) {
+	marketIDStr := strconv.FormatInt(marketID, 10)
+	positions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*dmarkets.PayoutPosition, 0, len(positions))
+	for _, pos := range positions {
+		result = append(result, &dmarkets.PayoutPosition{
+			Username: pos.Username,
+			Value:    pos.Value,
+		})
+	}
+	return result, nil
+}
+
 // domainToModel converts a domain market to a GORM model
 func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 	return models.Market{
-		ID:                 market.ID,
-		QuestionTitle:      market.QuestionTitle,
-		Description:        market.Description,
-		OutcomeType:        market.OutcomeType,
-		ResolutionDateTime: market.ResolutionDateTime,
-		CreatorUsername:    market.CreatorUsername,
-		YesLabel:           market.YesLabel,
-		NoLabel:            market.NoLabel,
-		IsResolved:         market.Status == "resolved",
-		InitialProbability: 0.5, // Default initial probability
+		ID:                      market.ID,
+		QuestionTitle:           market.QuestionTitle,
+		Description:             market.Description,
+		OutcomeType:             market.OutcomeType,
+		ResolutionDateTime:      market.ResolutionDateTime,
+		FinalResolutionDateTime: market.FinalResolutionDateTime,
+		ResolutionResult:        market.ResolutionResult,
+		CreatorUsername:         market.CreatorUsername,
+		YesLabel:                market.YesLabel,
+		NoLabel:                 market.NoLabel,
+		IsResolved:              market.Status == "resolved",
+		InitialProbability:      0.5, // Default initial probability
 	}
 }
 
@@ -274,16 +319,18 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 	}
 
 	return &dmarkets.Market{
-		ID:                 dbMarket.ID,
-		QuestionTitle:      dbMarket.QuestionTitle,
-		Description:        dbMarket.Description,
-		OutcomeType:        dbMarket.OutcomeType,
-		ResolutionDateTime: dbMarket.ResolutionDateTime,
-		CreatorUsername:    dbMarket.CreatorUsername,
-		YesLabel:           dbMarket.YesLabel,
-		NoLabel:            dbMarket.NoLabel,
-		Status:             status,
-		CreatedAt:          dbMarket.CreatedAt,
-		UpdatedAt:          dbMarket.UpdatedAt,
+		ID:                      dbMarket.ID,
+		QuestionTitle:           dbMarket.QuestionTitle,
+		Description:             dbMarket.Description,
+		OutcomeType:             dbMarket.OutcomeType,
+		ResolutionDateTime:      dbMarket.ResolutionDateTime,
+		FinalResolutionDateTime: dbMarket.FinalResolutionDateTime,
+		ResolutionResult:        dbMarket.ResolutionResult,
+		CreatorUsername:         dbMarket.CreatorUsername,
+		YesLabel:                dbMarket.YesLabel,
+		NoLabel:                 dbMarket.NoLabel,
+		Status:                  status,
+		CreatedAt:               dbMarket.CreatedAt,
+		UpdatedAt:               dbMarket.UpdatedAt,
 	}
 }

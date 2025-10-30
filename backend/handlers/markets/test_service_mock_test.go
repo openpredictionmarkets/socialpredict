@@ -102,13 +102,15 @@ func (m *MockService) GetMarketDetails(ctx context.Context, marketID int64) (*dm
 		numUsers = 3
 	}
 
-	return &dmarkets.MarketOverview{
-		Market:      market,
-		Creator:     "testuser",
-		NumUsers:    numUsers,
-		TotalVolume: totalVolume,
-		MarketDust:  marketDust,
-	}, nil
+return &dmarkets.MarketOverview{
+    Market:             market,
+    Creator:            &dmarkets.CreatorSummary{Username: "testuser"},
+    ProbabilityChanges: []dmarkets.ProbabilityPoint{},
+    LastProbability:    0,
+    NumUsers:           numUsers,
+    TotalVolume:        totalVolume,
+    MarketDust:         marketDust,
+}, nil
 }
 
 func (m *MockService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {

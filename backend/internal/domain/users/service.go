@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"socialpredict/setup"
+	analytics "socialpredict/internal/domain/analytics"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -13,6 +13,8 @@ import (
 // ServiceInterface defines the behavior required by HTTP handlers and other consumers.
 type ServiceInterface interface {
 	GetPublicUser(ctx context.Context, username string) (*PublicUser, error)
+	GetUser(ctx context.Context, username string) (*User, error)
+	GetPrivateProfile(ctx context.Context, username string) (*PrivateProfile, error)
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
 	GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error)
 	GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error)
@@ -36,7 +38,6 @@ type Repository interface {
 	ListUserBets(ctx context.Context, username string) ([]*UserBet, error)
 	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
-	ComputeUserFinancials(ctx context.Context, username string, accountBalance int64, econ *setup.EconomicConfig) (map[string]int64, error)
 	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
 	GetCredentials(ctx context.Context, username string) (*Credentials, error)
 	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
@@ -58,18 +59,23 @@ type Sanitizer interface {
 	SanitizePassword(string) (string, error)
 }
 
+// AnalyticsService exposes the computations required from the analytics domain.
+type AnalyticsService interface {
+	ComputeUserFinancials(ctx context.Context, req analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error)
+}
+
 // Service implements the core user business logic
 type Service struct {
-	repo      Repository
-	config    *setup.EconomicConfig
-	sanitizer Sanitizer
+	repo       Repository
+	analytics  AnalyticsService
+	sanitizer  Sanitizer
 }
 
 // NewService creates a new users service
-func NewService(repo Repository, config *setup.EconomicConfig, sanitizer Sanitizer) *Service {
+func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
 	return &Service{
 		repo:      repo,
-		config:    config,
+		analytics: analyticsSvc,
 		sanitizer: sanitizer,
 	}
 }
@@ -302,7 +308,7 @@ func (s *Service) ListUserMarkets(ctx context.Context, userID int64) ([]*UserMar
 
 // GetUserFinancials returns the user's comprehensive financial snapshot.
 func (s *Service) GetUserFinancials(ctx context.Context, username string) (map[string]int64, error) {
-	if s.config == nil {
+	if s.analytics == nil {
 		return nil, ErrInvalidUserData
 	}
 
@@ -311,7 +317,18 @@ func (s *Service) GetUserFinancials(ctx context.Context, username string) (map[s
 		return nil, ErrUserNotFound
 	}
 
-	return s.repo.ComputeUserFinancials(ctx, username, user.AccountBalance, s.config)
+	snapshot, err := s.analytics.ComputeUserFinancials(ctx, analytics.FinancialSnapshotRequest{
+		Username:       username,
+		AccountBalance: user.AccountBalance,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if snapshot == nil {
+		return map[string]int64{}, nil
+	}
+
+	return financialSnapshotToMap(snapshot), nil
 }
 
 // UpdateDescription sanitizes and updates a user's description.
@@ -444,6 +461,59 @@ func (s *Service) UpdatePersonalLinks(ctx context.Context, username string, link
 		return nil, err
 	}
 	return user, nil
+}
+
+func financialSnapshotToMap(snapshot *analytics.FinancialSnapshot) map[string]int64 {
+	return map[string]int64{
+		"accountBalance":     snapshot.AccountBalance,
+		"maximumDebtAllowed": snapshot.MaximumDebtAllowed,
+		"amountInPlay":       snapshot.AmountInPlay,
+		"amountBorrowed":     snapshot.AmountBorrowed,
+		"retainedEarnings":   snapshot.RetainedEarnings,
+		"equity":             snapshot.Equity,
+		"tradingProfits":     snapshot.TradingProfits,
+		"workProfits":        snapshot.WorkProfits,
+		"totalProfits":       snapshot.TotalProfits,
+		"amountInPlayActive": snapshot.AmountInPlayActive,
+		"totalSpent":         snapshot.TotalSpent,
+		"totalSpentInPlay":   snapshot.TotalSpentInPlay,
+		"realizedProfits":    snapshot.RealizedProfits,
+		"potentialProfits":   snapshot.PotentialProfits,
+		"realizedValue":      snapshot.RealizedValue,
+		"potentialValue":     snapshot.PotentialValue,
+	}
+}
+
+// GetPrivateProfile returns the combined private and public user information for the specified username.
+func (s *Service) GetPrivateProfile(ctx context.Context, username string) (*PrivateProfile, error) {
+	if username == "" {
+		return nil, ErrInvalidUserData
+	}
+
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PrivateProfile{
+		ID:                    user.ID,
+		Username:              user.Username,
+		DisplayName:           user.DisplayName,
+		UserType:              user.UserType,
+		InitialAccountBalance: user.InitialAccountBalance,
+		AccountBalance:        user.AccountBalance,
+		PersonalEmoji:         user.PersonalEmoji,
+		Description:           user.Description,
+		PersonalLink1:         user.PersonalLink1,
+		PersonalLink2:         user.PersonalLink2,
+		PersonalLink3:         user.PersonalLink3,
+		PersonalLink4:         user.PersonalLink4,
+		Email:                 user.Email,
+		APIKey:                user.APIKey,
+		MustChangePassword:    user.MustChangePassword,
+		CreatedAt:             user.CreatedAt,
+		UpdatedAt:             user.UpdatedAt,
+	}, nil
 }
 
 const passwordHashCost = 14

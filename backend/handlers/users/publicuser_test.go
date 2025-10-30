@@ -27,6 +27,10 @@ func (m *publicUserServiceMock) ApplyTransaction(context.Context, string, int64,
 	return nil
 }
 
+func (m *publicUserServiceMock) GetUser(context.Context, string) (*dusers.User, error) {
+	return nil, nil
+}
+
 func (m *publicUserServiceMock) GetUserCredit(context.Context, string, int64) (int64, error) {
 	return 0, nil
 }
@@ -56,6 +60,10 @@ func (m *publicUserServiceMock) UpdateEmoji(context.Context, string, string) (*d
 }
 
 func (m *publicUserServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *publicUserServiceMock) GetPrivateProfile(context.Context, string) (*dusers.PrivateProfile, error) {
 	return nil, nil
 }
 

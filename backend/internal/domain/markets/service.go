@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	marketmath "socialpredict/internal/domain/math/market"
+	"socialpredict/internal/domain/math/probabilities/wpam"
+	users "socialpredict/internal/domain/users"
+	"socialpredict/models"
 )
 
 const (
@@ -30,6 +35,19 @@ type Repository interface {
 	Delete(ctx context.Context, id int64) error
 	ResolveMarket(ctx context.Context, id int64, resolution string) error
 	GetUserPosition(ctx context.Context, marketID int64, username string) (*UserPosition, error)
+	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
+	CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*PayoutPosition, error)
+}
+
+// CreatorSummary captures lightweight information about a market creator.
+type CreatorSummary struct {
+	Username string
+}
+
+// ProbabilityPoint records a market probability at a specific moment.
+type ProbabilityPoint struct {
+	Probability float64
+	Timestamp   time.Time
 }
 
 // UserService defines the interface for user-related operations
@@ -37,6 +55,7 @@ type UserService interface {
 	ValidateUserExists(ctx context.Context, username string) error
 	ValidateUserBalance(ctx context.Context, username string, requiredAmount float64, maxDebt float64) error
 	DeductBalance(ctx context.Context, username string, amount float64) error
+	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
 }
 
 // Config holds configuration for the markets service
@@ -203,8 +222,8 @@ func (s *Service) GetMarket(ctx context.Context, id int64) (*Market, error) {
 // MarketOverview represents enriched market data with calculations
 type MarketOverview struct {
 	Market             *Market
-	Creator            interface{} // Will be replaced with proper user type
-	ProbabilityChanges interface{} // Will be replaced with proper probability change type
+	Creator            *CreatorSummary
+	ProbabilityChanges []ProbabilityPoint
 	LastProbability    float64
 	NumUsers           int
 	TotalVolume        int64
@@ -238,18 +257,81 @@ func (s *Service) GetMarketOverviews(ctx context.Context, filters ListFilters) (
 
 // GetMarketDetails returns detailed market information with calculations
 func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*MarketOverview, error) {
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
+	}
+
 	market, err := s.repo.GetByID(ctx, marketID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Complex calculation logic will be moved here from marketdetailshandler.go
-	overview := &MarketOverview{
-		Market: market,
-		// Calculations will be added here
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
+		return nil, err
 	}
 
-	return overview, nil
+	modelBets := convertToModelBets(bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets)
+	probabilityPoints := make([]ProbabilityPoint, len(probabilityChanges))
+	for i, change := range probabilityChanges {
+		probabilityPoints[i] = ProbabilityPoint{
+			Probability: change.Probability,
+			Timestamp:   change.Timestamp,
+		}
+	}
+
+	lastProbability := 0.0
+	if len(probabilityPoints) > 0 {
+		lastProbability = probabilityPoints[len(probabilityPoints)-1].Probability
+	}
+
+	totalVolumeWithDust := marketmath.GetMarketVolumeWithDust(modelBets)
+	marketDust := marketmath.GetMarketDust(modelBets)
+	numUsers := countUniqueUsers(modelBets)
+
+	return &MarketOverview{
+		Market:             market,
+		Creator:            &CreatorSummary{Username: market.CreatorUsername},
+		ProbabilityChanges: probabilityPoints,
+		LastProbability:    lastProbability,
+		NumUsers:           numUsers,
+		TotalVolume:        totalVolumeWithDust,
+		MarketDust:         marketDust,
+	}, nil
+}
+
+func convertToModelBets(bets []*Bet) []models.Bet {
+	if len(bets) == 0 {
+		return []models.Bet{}
+	}
+	out := make([]models.Bet, len(bets))
+	for i, bet := range bets {
+		out[i] = models.Bet{
+			Username: bet.Username,
+			MarketID: bet.MarketID,
+			Amount:   bet.Amount,
+			PlacedAt: bet.PlacedAt,
+			Outcome:  bet.Outcome,
+		}
+	}
+	return out
+}
+
+func countUniqueUsers(bets []models.Bet) int {
+	if len(bets) == 0 {
+		return 0
+	}
+	seen := make(map[string]struct{})
+	for _, bet := range bets {
+		if bet.Username == "" {
+			continue
+		}
+		if _, ok := seen[bet.Username]; !ok {
+			seen[bet.Username] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 // SearchMarkets searches for markets by query with fallback logic
@@ -327,29 +409,55 @@ func (s *Service) SearchMarkets(ctx context.Context, query string, filters Searc
 
 // ResolveMarket resolves a market with a given outcome
 func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
-	// 1. Validate resolution outcome
-	if resolution != "YES" && resolution != "NO" && resolution != "N/A" {
+	outcome := strings.ToUpper(strings.TrimSpace(resolution))
+	if outcome != "YES" && outcome != "NO" && outcome != "N/A" {
 		return ErrInvalidInput
 	}
 
-	// 2. Get market and validate
 	market, err := s.repo.GetByID(ctx, marketID)
 	if err != nil {
 		return ErrMarketNotFound
 	}
 
-	// 3. Check if user is authorized (creator)
 	if market.CreatorUsername != username {
 		return ErrUnauthorized
 	}
 
-	// 4. Check if market is already resolved
 	if market.Status == "resolved" {
 		return ErrInvalidState
 	}
 
-	// 5. Resolve market via repository
-	return s.repo.ResolveMarket(ctx, marketID, resolution)
+	if err := s.repo.ResolveMarket(ctx, marketID, outcome); err != nil {
+		return err
+	}
+
+	switch outcome {
+	case "N/A":
+		bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+		if err != nil {
+			return err
+		}
+		for _, bet := range bets {
+			if err := s.userService.ApplyTransaction(ctx, bet.Username, bet.Amount, users.TransactionRefund); err != nil {
+				return err
+			}
+		}
+	default: // YES or NO
+		positions, err := s.repo.CalculatePayoutPositions(ctx, marketID)
+		if err != nil {
+			return err
+		}
+		for _, pos := range positions {
+			if pos.Value <= 0 {
+				continue
+			}
+			if err := s.userService.ApplyTransaction(ctx, pos.Username, pos.Value, users.TransactionWin); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // ListActiveMarkets returns markets that are not resolved and active

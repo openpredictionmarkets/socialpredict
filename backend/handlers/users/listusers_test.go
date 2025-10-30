@@ -74,7 +74,7 @@ func TestListUserMarketsReturnsDistinctMarketsOrderedByRecentBet(t *testing.T) {
 		}
 	}
 
-	service := dusers.NewService(rusers.NewGormRepository(db), modelstesting.GenerateEconomicConfig(), security.NewSecurityService().Sanitizer)
+	service := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
 
 	results, err := ListUserMarkets(context.Background(), service, user.ID)
 	if err != nil {
@@ -112,7 +112,7 @@ func TestListUserMarketsReturnsErrorFromQuery(t *testing.T) {
 		t.Fatalf("drop bets table: %v", err)
 	}
 
-	service := dusers.NewService(rusers.NewGormRepository(db), modelstesting.GenerateEconomicConfig(), security.NewSecurityService().Sanitizer)
+	service := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
 
 	if _, err := ListUserMarkets(context.Background(), service, 123); err == nil {
 		t.Fatalf("expected error when querying without bets table, got nil")

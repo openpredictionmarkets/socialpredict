@@ -8,7 +8,6 @@ import (
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/logger"
 	"socialpredict/middleware"
-	"socialpredict/util"
 )
 
 // ChangePasswordHandler returns an HTTP handler that delegates password changes to the users service.
@@ -21,8 +20,7 @@ func ChangePasswordHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 
 		logger.LogInfo("ChangePassword", "ChangePassword", "ChangePassword handler called")
 
-		db := util.GetDB()
-		user, httperr := middleware.ValidateTokenAndGetUser(r, db)
+		user, httperr := middleware.ValidateTokenAndGetUser(r, svc)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), httperr.StatusCode)
 			logger.LogError("ChangePassword", "ValidateTokenAndGetUser", httperr)

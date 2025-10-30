@@ -3,8 +3,9 @@ package betshandlers
 import (
 	"encoding/json"
 	"net/http"
+
 	betutils "socialpredict/handlers/bets/betutils"
-	positionsmath "socialpredict/handlers/math/positions"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/middleware"
 	"socialpredict/models"
 	"socialpredict/setup"
@@ -18,7 +19,7 @@ func SellPositionHandler(loadEconConfig setup.EconConfigLoader) func(w http.Resp
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
 		if httperr != nil {
 			http.Error(w, httperr.Error(), httperr.StatusCode)
 			return

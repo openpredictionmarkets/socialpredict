@@ -1,33 +1,9 @@
 package positionsmath
 
 import (
-	"socialpredict/models/modelstesting"
 	"testing"
-
-	"gorm.io/gorm"
+	"time"
 )
-
-// Optional: Helper to create bets for test, mimics user position logic.
-func addTestBets(t *testing.T, db *gorm.DB, marketID uint, userPos []struct {
-	Username       string
-	YesSharesOwned int64
-	NoSharesOwned  int64
-}) {
-	for _, pos := range userPos {
-		if pos.YesSharesOwned > 0 {
-			bet := modelstesting.GenerateBet(
-				pos.YesSharesOwned, "YES", pos.Username, marketID, 0,
-			)
-			db.Create(&bet)
-		}
-		if pos.NoSharesOwned > 0 {
-			bet := modelstesting.GenerateBet(
-				pos.NoSharesOwned, "NO", pos.Username, marketID, 0,
-			)
-			db.Create(&bet)
-		}
-	}
-}
 
 // private helper function just for this specific use case
 func makeUserPositions(data []struct {
@@ -143,34 +119,29 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			db := modelstesting.NewFakeDB(t)
-			market := modelstesting.GenerateMarket(1, "creator")
-			db.Create(&market)
-			addTestBets(t, db, uint(market.ID), tc.UserPositions)
 			positions := makeUserPositions(tc.UserPositions)
+			earliest := make(map[string]time.Time)
+			base := time.Now()
+			for i, pos := range tc.UserPositions {
+				earliest[pos.Username] = base.Add(time.Duration(i) * time.Minute)
+			}
 
 			actual, err := CalculateRoundedUserValuationsFromUserMarketPositions(
-				db, uint(market.ID), positions, tc.Probability, tc.TotalVolume, tc.IsResolved, tc.ResolutionResult,
+				positions,
+				tc.Probability,
+				tc.TotalVolume,
+				tc.IsResolved,
+				tc.ResolutionResult,
+				earliest,
 			)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			// Log for debug
-			for user, val := range actual {
-				t.Logf("user=%s: value=%d", user, val.RoundedValue)
-			}
-
-			if tc.Expected != nil {
-				for user, want := range tc.Expected {
-					got := actual[user].RoundedValue
-					if got != want {
-						t.Errorf("user %s: expected value %d, got %d", user, want, got)
-					}
-				}
-			} else {
-				for user, val := range actual {
-					t.Logf("%s: %d", user, val.RoundedValue)
+			for user, want := range tc.Expected {
+				got := actual[user].RoundedValue
+				if got != want {
+					t.Errorf("user %s: expected value %d, got %d", user, want, got)
 				}
 			}
 		})

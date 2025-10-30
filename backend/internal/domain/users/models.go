@@ -120,3 +120,24 @@ type Credentials struct {
 	PasswordHash       string
 	MustChangePassword bool
 }
+
+// PrivateProfile combines public and private user information for authenticated views.
+type PrivateProfile struct {
+	ID                    int64
+	Username              string
+	DisplayName           string
+	UserType              string
+	InitialAccountBalance int64
+	AccountBalance        int64
+	PersonalEmoji         string
+	Description           string
+	PersonalLink1         string
+	PersonalLink2         string
+	PersonalLink3         string
+	PersonalLink4         string
+	Email                 string
+	APIKey                string
+	MustChangePassword    bool
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
 )
 
@@ -33,4 +34,28 @@ func isValidationError(message string) bool {
 		strings.Contains(lower, "must") ||
 		strings.Contains(lower, "cannot") ||
 		strings.Contains(lower, "required")
+}
+
+func toPrivateUserResponse(user *dusers.User) dto.PrivateUserResponse {
+	if user == nil {
+		return dto.PrivateUserResponse{}
+	}
+
+	return dto.PrivateUserResponse{
+		ID:                    user.ID,
+		Username:              user.Username,
+		DisplayName:           user.DisplayName,
+		UserType:              user.UserType,
+		InitialAccountBalance: user.InitialAccountBalance,
+		AccountBalance:        user.AccountBalance,
+		PersonalEmoji:         user.PersonalEmoji,
+		Description:           user.Description,
+		PersonalLink1:         user.PersonalLink1,
+		PersonalLink2:         user.PersonalLink2,
+		PersonalLink3:         user.PersonalLink3,
+		PersonalLink4:         user.PersonalLink4,
+		Email:                 user.Email,
+		APIKey:                user.APIKey,
+		MustChangePassword:    user.MustChangePassword,
+	}
 }

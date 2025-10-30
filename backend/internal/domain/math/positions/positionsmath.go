@@ -3,12 +3,13 @@ package positionsmath
 import (
 	"errors"
 	"socialpredict/handlers/marketpublicresponse"
-	marketmath "socialpredict/handlers/math/market"
-	"socialpredict/handlers/math/outcomes/dbpm"
-	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
+	marketmath "socialpredict/internal/domain/math/market"
+	"socialpredict/internal/domain/math/outcomes/dbpm"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"strconv"
+	"time"
 
 	spErrors "socialpredict/errors"
 
@@ -103,21 +104,23 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 	// Step 3: Get total volume
 	totalVolume := marketmath.GetMarketVolume(allBetsOnMarket)
 
-	// Step 4: Calculate valuations
+	// Step 4: Determine earliest bet per user
+	earliestBets := computeEarliestBets(allBetsOnMarket)
+
+	// Step 5: Calculate valuations
 	valuations, err := CalculateRoundedUserValuationsFromUserMarketPositions(
-		db,
-		marketIDUint,
 		userPositionMap,
 		currentProbability,
 		totalVolume,
 		publicResponseMarket.IsResolved,
 		publicResponseMarket.ResolutionResult,
+		earliestBets,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 5: Calculate user bet totals for TotalSpent and TotalSpentInPlay
+	// Step 6: Calculate user bet totals
 	userBetTotals := make(map[string]struct {
 		TotalSpent       int64
 		TotalSpentInPlay int64
@@ -132,7 +135,7 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 		userBetTotals[bet.Username] = totals
 	}
 
-	// Step 6: Append valuation to each MarketPosition struct
+	// Step 7: Append valuation to each MarketPosition struct
 	// Convert to []positions.MarketPosition for external use
 	var (
 		displayPositions []MarketPosition
@@ -160,12 +163,13 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 		if seenUsers[username] {
 			continue
 		}
+
 		displayPositions = append(displayPositions, MarketPosition{
 			Username:         username,
 			MarketID:         marketIDUint,
 			YesSharesOwned:   0,
 			NoSharesOwned:    0,
-			Value:            0,
+			Value:            valuations[username].RoundedValue,
 			TotalSpent:       totals.TotalSpent,
 			TotalSpentInPlay: totals.TotalSpentInPlay,
 			IsResolved:       publicResponseMarket.IsResolved,
@@ -175,6 +179,16 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 
 	return displayPositions, nil
 
+}
+
+func computeEarliestBets(bets []models.Bet) map[string]time.Time {
+	earliest := make(map[string]time.Time)
+	for _, bet := range bets {
+		if existing, ok := earliest[bet.Username]; !ok || bet.PlacedAt.Before(existing) {
+			earliest[bet.Username] = bet.PlacedAt
+		}
+	}
+	return earliest
 }
 
 // CalculateMarketPositionForUser_WPAM_DBPM fetches and summarizes the position for a given user in a specific market.

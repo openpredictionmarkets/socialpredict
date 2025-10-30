@@ -3,8 +3,8 @@ package dbpm
 import (
 	"log"
 	"math"
-	marketmath "socialpredict/handlers/math/market"
-	"socialpredict/handlers/math/probabilities/wpam"
+	marketmath "socialpredict/internal/domain/math/market"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/setup"
 )

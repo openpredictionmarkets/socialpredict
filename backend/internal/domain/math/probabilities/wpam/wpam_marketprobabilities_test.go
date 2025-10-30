@@ -1,8 +1,8 @@
 package wpam_test
 
 import (
-	"socialpredict/handlers/math/outcomes/dbpm"
-	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/internal/domain/math/outcomes/dbpm"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"testing"
 	"time"

@@ -4,17 +4,24 @@ import (
 	"context"
 	"testing"
 
+	analytics "socialpredict/internal/domain/analytics"
 	users "socialpredict/internal/domain/users"
 	rusers "socialpredict/internal/repository/users"
 	"socialpredict/models/modelstesting"
 	"socialpredict/security"
+	"socialpredict/setup"
 )
+
+type fakeAnalyticsService struct{}
+
+func (fakeAnalyticsService) ComputeUserFinancials(ctx context.Context, req analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error) {
+	return &analytics.FinancialSnapshot{}, nil
+}
 
 func TestServiceApplyTransaction(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := rusers.NewGormRepository(db)
-	config := modelstesting.GenerateEconomicConfig()
-	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
+	service := users.NewService(repo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("tx_user", 0)
 	user.AccountBalance = 100
@@ -66,8 +73,7 @@ func TestServiceApplyTransaction(t *testing.T) {
 func TestServiceGetUserCredit(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := rusers.NewGormRepository(db)
-	config := modelstesting.GenerateEconomicConfig()
-	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
+	service := users.NewService(repo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("credit_user", 0)
 	user.AccountBalance = 200
@@ -98,8 +104,7 @@ func TestServiceGetUserPortfolio(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 	repo := rusers.NewGormRepository(db)
-	config := modelstesting.GenerateEconomicConfig()
-	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
+	service := users.NewService(repo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("portfolio_user", 0)
 	if err := db.Create(&user).Error; err != nil {
@@ -156,7 +161,9 @@ func TestServiceGetUserFinancials(t *testing.T) {
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 	repo := rusers.NewGormRepository(db)
 	config := modelstesting.GenerateEconomicConfig()
-	service := users.NewService(repo, config, security.NewSecurityService().Sanitizer)
+	loader := func() *setup.EconomicConfig { return config }
+	analyticsSvc := analytics.NewService(analytics.NewGormRepository(db), loader)
+	service := users.NewService(repo, analyticsSvc, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("financial_user", 0)
 	user.AccountBalance = 300

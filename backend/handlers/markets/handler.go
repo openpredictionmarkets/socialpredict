@@ -47,7 +47,7 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 
 	// Validate user authentication
 	db := util.GetDB()
-	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
 	if httperr != nil {
 		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
@@ -300,7 +300,7 @@ func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 
 	// Get user for authorization
 	db := util.GetDB()
-	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
 	if httperr != nil {
 		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return

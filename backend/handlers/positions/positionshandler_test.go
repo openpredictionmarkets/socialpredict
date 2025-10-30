@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	positionsmath "socialpredict/handlers/math/positions"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
