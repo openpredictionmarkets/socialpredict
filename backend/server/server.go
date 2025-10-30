@@ -147,10 +147,25 @@ func Start() {
 	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
 	router.Handle("/v0/markets/{id}/projection", securityMiddleware(http.HandlerFunc(marketsHandler.ProjectProbability))).Methods("GET")
 
-	// Legacy routes for backward compatibility
-	router.Handle("/v0/markets/active", securityMiddleware(marketshandlers.ListActiveMarketsHandler(marketsService))).Methods("GET")
-	router.Handle("/v0/markets/closed", securityMiddleware(marketshandlers.ListClosedMarketsHandler(marketsService))).Methods("GET")
-	router.Handle("/v0/markets/resolved", securityMiddleware(marketshandlers.ListResolvedMarketsHandler(marketsService))).Methods("GET")
+	// Legacy routes for backward compatibility — rewrite to new handler with status query
+	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Set("status", "active")
+		r.URL.RawQuery = q.Encode()
+		marketsHandler.ListMarkets(w, r)
+	}))).Methods("GET")
+	router.Handle("/v0/markets/closed", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Set("status", "closed")
+		r.URL.RawQuery = q.Encode()
+		marketsHandler.ListMarkets(w, r)
+	}))).Methods("GET")
+	router.Handle("/v0/markets/resolved", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Set("status", "resolved")
+		r.URL.RawQuery = q.Encode()
+		marketsHandler.ListMarkets(w, r)
+	}))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 
 	// handle market positions, get trades - using service injection from new locations

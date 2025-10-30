@@ -9,7 +9,8 @@ import (
 
 // MockService provides a reusable test double for markets service interactions.
 type MockService struct {
-	ListByStatusFn func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
+	ListByStatusFn      func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
+	MarketLeaderboardFn func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
 }
 
 func (m *MockService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
@@ -65,6 +66,9 @@ func (m *MockService) ListByStatus(ctx context.Context, status string, p dmarket
 }
 
 func (m *MockService) GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+	if m.MarketLeaderboardFn != nil {
+		return m.MarketLeaderboardFn(ctx, marketID, p)
+	}
 	return []*dmarkets.LeaderboardRow{}, nil
 }
 
@@ -102,15 +106,15 @@ func (m *MockService) GetMarketDetails(ctx context.Context, marketID int64) (*dm
 		numUsers = 3
 	}
 
-return &dmarkets.MarketOverview{
-    Market:             market,
-    Creator:            &dmarkets.CreatorSummary{Username: "testuser"},
-    ProbabilityChanges: []dmarkets.ProbabilityPoint{},
-    LastProbability:    0,
-    NumUsers:           numUsers,
-    TotalVolume:        totalVolume,
-    MarketDust:         marketDust,
-}, nil
+	return &dmarkets.MarketOverview{
+		Market:             market,
+		Creator:            &dmarkets.CreatorSummary{Username: "testuser"},
+		ProbabilityChanges: []dmarkets.ProbabilityPoint{},
+		LastProbability:    0,
+		NumUsers:           numUsers,
+		TotalVolume:        totalVolume,
+		MarketDust:         marketDust,
+	}, nil
 }
 
 func (m *MockService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {

@@ -2,13 +2,18 @@ package marketshandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/logging"
+	"socialpredict/middleware"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 )
 
@@ -33,24 +38,13 @@ func ResolveMarketHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		// 3. Pull username/actor from auth context (what we already use)
-		// TODO: Replace with proper auth service injection
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "Authorization header required", http.StatusUnauthorized)
+		username, err := extractUsernameFromRequest(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		// Extract username from token - in production this would be service-injected
-		// For testing compatibility, we'll use the same logic as before
-		username := "creator" // Default for testing
-
-		// For testing: maintain backward compatibility with test expectations
-		if marketId == 4 {
-			username = "other" // This will trigger ErrUnauthorized in mock service
-		}
-
-		// 4. Call domain service: err := h.service.ResolveMarket(r.Context(), id, req.Result, actor)
+		// 4. Call domain service to resolve market
 		err = svc.ResolveMarket(r.Context(), marketId, req.Resolution, username)
 		if err != nil {
 			// 5. Map errors (not found → 404, invalid → 400/409, forbidden → 403)
@@ -73,4 +67,26 @@ func ResolveMarketHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 		// 6. w.WriteHeader(http.StatusNoContent) - per specification
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func extractUsernameFromRequest(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("authorization header required")
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	token, err := jwt.ParseWithClaims(tokenString, &middleware.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("JWT_SIGNING_KEY")), nil
+	})
+	if err != nil || !token.Valid {
+		return "", errors.New("invalid token")
+	}
+
+	claims, ok := token.Claims.(*middleware.UserClaims)
+	if !ok || claims.Username == "" {
+		return "", errors.New("invalid token claims")
+	}
+
+	return claims.Username, nil
 }
