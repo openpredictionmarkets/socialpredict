@@ -6,15 +6,17 @@ import (
 	"net/http"
 	"socialpredict/handlers/cms/homepage"
 	"socialpredict/middleware"
-	"socialpredict/util"
+
+	dusers "socialpredict/internal/domain/users"
 )
 
 type Handler struct {
-	svc *homepage.Service
+	svc      *homepage.Service
+	usersSvc dusers.ServiceInterface
 }
 
-func NewHandler(svc *homepage.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *homepage.Service, usersSvc dusers.ServiceInterface) *Handler {
+	return &Handler{svc: svc, usersSvc: usersSvc}
 }
 
 func (h *Handler) PublicGet(w http.ResponseWriter, r *http.Request) {
@@ -45,14 +47,13 @@ type updateReq struct {
 
 func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	// Validate admin access
-	db := util.GetDB()
-	if err := middleware.ValidateAdminToken(r, db); err != nil {
+	if err := middleware.ValidateAdminToken(r, h.usersSvc); err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Get username from context/token
-	user, httpErr := middleware.ValidateTokenAndGetUser(r, db)
+	user, httpErr := middleware.ValidateTokenAndGetUser(r, h.usersSvc)
 	if httpErr != nil {
 		http.Error(w, httpErr.Message, httpErr.StatusCode)
 		return
@@ -86,11 +87,10 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// RequireAdmin middleware wrapper that can be used in routes
-func RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
+// RequireAdmin middleware wrapper that can be used in routes when users service injection is available.
+func RequireAdmin(usersSvc dusers.ServiceInterface, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		db := util.GetDB()
-		if err := middleware.ValidateAdminToken(r, db); err != nil {
+		if err := middleware.ValidateAdminToken(r, usersSvc); err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

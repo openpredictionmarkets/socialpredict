@@ -12,11 +12,13 @@ import (
 	"socialpredict/setup"
 	"socialpredict/util"
 
+	dusers "socialpredict/internal/domain/users"
+
 	"github.com/brianvoe/gofakeit"
 	"gorm.io/gorm"
 )
 
-func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
+func AddUserHandler(loadEconConfig setup.EconConfigLoader, usersSvc dusers.ServiceInterface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
@@ -54,7 +56,7 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWri
 		db := util.GetDB()
 
 		// validate that the user performing this function is indeed admin
-		if err := middleware.ValidateAdminToken(r, db); err != nil {
+		if err := middleware.ValidateAdminToken(r, usersSvc); err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

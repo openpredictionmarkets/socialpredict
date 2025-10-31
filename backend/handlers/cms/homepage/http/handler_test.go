@@ -10,16 +10,14 @@ import (
 	"socialpredict/handlers/cms/homepage"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
+
+	dusers "socialpredict/internal/domain/users"
+	rusers "socialpredict/internal/repository/users"
+	"socialpredict/security"
 )
 
 func TestPublicGet_ReturnsHomepageContent(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	origDB := util.DB
-	util.DB = db
-	t.Cleanup(func() {
-		util.DB = origDB
-	})
 
 	item := models.HomepageContent{
 		Slug:     "home",
@@ -36,7 +34,8 @@ func TestPublicGet_ReturnsHomepageContent(t *testing.T) {
 	repo := homepage.NewGormRepository(db)
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
-	handler := NewHandler(svc)
+	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	handler := NewHandler(svc, usersSvc)
 
 	req := httptest.NewRequest("GET", "/v0/content/home", nil)
 	rec := httptest.NewRecorder()
@@ -59,11 +58,6 @@ func TestPublicGet_ReturnsHomepageContent(t *testing.T) {
 
 func TestAdminUpdate_Success(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	origDB := util.DB
-	util.DB = db
-	t.Cleanup(func() {
-		util.DB = origDB
-	})
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	admin := modelstesting.GenerateUser("admin_user", 0)
@@ -87,7 +81,8 @@ func TestAdminUpdate_Success(t *testing.T) {
 	repo := homepage.NewGormRepository(db)
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
-	handler := NewHandler(svc)
+	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	handler := NewHandler(svc, usersSvc)
 
 	payload := updateReq{
 		Title:   "New title",
@@ -131,17 +126,13 @@ func TestAdminUpdate_Success(t *testing.T) {
 
 func TestAdminUpdate_Unauthorized(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	origDB := util.DB
-	util.DB = db
-	t.Cleanup(func() {
-		util.DB = origDB
-	})
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	repo := homepage.NewGormRepository(db)
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
-	handler := NewHandler(svc)
+	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	handler := NewHandler(svc, usersSvc)
 
 	req := httptest.NewRequest("PUT", "/v0/admin/content/home", bytes.NewReader([]byte(`{}`)))
 	rec := httptest.NewRecorder()

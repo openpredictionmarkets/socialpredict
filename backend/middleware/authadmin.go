@@ -4,15 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"socialpredict/models"
+
+	dusers "socialpredict/internal/domain/users"
 
 	"github.com/golang-jwt/jwt/v4"
-	"gorm.io/gorm"
 )
 
 // ValidateAdminToken checks if the authenticated user is an admin
 // It returns error if not an admin or if any validation fails
-func ValidateAdminToken(r *http.Request, db *gorm.DB) error {
+func ValidateAdminToken(r *http.Request, svc dusers.ServiceInterface) error {
 	tokenString, err := extractTokenFromHeader(r)
 	if err != nil {
 		return err
@@ -28,10 +28,12 @@ func ValidateAdminToken(r *http.Request, db *gorm.DB) error {
 	}
 
 	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-		var user models.User
-		result := db.Where("username = ?", claims.Username).First(&user)
-		if result.Error != nil {
-			return fmt.Errorf("user not found")
+		user, err := svc.GetUser(r.Context(), claims.Username)
+		if err != nil {
+			if err == dusers.ErrUserNotFound {
+				return fmt.Errorf("user not found")
+			}
+			return fmt.Errorf("failed to load user")
 		}
 		if user.UserType != "ADMIN" {
 			return fmt.Errorf("access denied for non-ADMIN users")

@@ -1,0 +1,319 @@
+openapi: 3.0.3
+info:
+  title: SocialPredict API
+  description: API for SocialPredict prediction markets platform
+  version: 1.0.0
+  contact:
+    name: SocialPredict Team
+    email: support@socialpredict.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.socialpredict.com/v0
+    description: Production server
+  - url: https://staging-api.socialpredict.com/v0
+    description: Staging server
+  - url: http://localhost:8080/v0
+    description: Development server
+
+paths:
+  /markets:
+    get:
+      summary: List markets
+      description: Retrieve a list of prediction markets with optional filtering
+      operationId: listMarkets
+      tags:
+        - Markets
+      parameters:
+        - name: status
+          in: query
+          description: Filter by market status
+          schema:
+            type: string
+            enum: [active, resolved]
+        - name: created_by
+          in: query
+          description: Filter by creator username
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Number of results to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of markets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Create market
+      description: Create a new prediction market
+      operationId: createMarket
+      tags:
+        - Markets
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMarketRequest'
+      responses:
+        '201':
+          description: Market created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /markets/{id}:
+    get:
+      summary: Get market
+      description: Retrieve details of a specific market
+      operationId: getMarket
+      tags:
+        - Markets
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Market ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Market details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResponse'
+        '404':
+          description: Market not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /markets/search:
+    get:
+      summary: Search markets
+      description: Search for markets by query string
+      operationId: searchMarkets
+      tags:
+        - Markets
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by market status
+          schema:
+            type: string
+            enum: [active, resolved]
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Number of results to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    MarketResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique market identifier
+        questionTitle:
+          type: string
+          description: Market question title
+        description:
+          type: string
+          description: Market description
+        outcomeType:
+          type: string
+          description: Type of outcome (binary, multiple choice, etc.)
+        resolutionDateTime:
+          type: string
+          format: date-time
+          description: When the market will be resolved
+        creatorUsername:
+          type: string
+          description: Username of market creator
+        yesLabel:
+          type: string
+          description: Label for positive outcome
+        noLabel:
+          type: string
+          description: Label for negative outcome
+        status:
+          type: string
+          enum: [active, resolved]
+          description: Market status
+        createdAt:
+          type: string
+          format: date-time
+          description: When the market was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the market was last updated
+
+    CreateMarketRequest:
+      type: object
+      required:
+        - questionTitle
+        - outcomeType
+        - resolutionDateTime
+      properties:
+        questionTitle:
+          type: string
+          maxLength: 160
+          description: Market question title
+        description:
+          type: string
+          maxLength: 2000
+          description: Market description
+        outcomeType:
+          type: string
+          description: Type of outcome
+        resolutionDateTime:
+          type: string
+          format: date-time
+          description: When the market will be resolved
+        yesLabel:
+          type: string
+          maxLength: 20
+          description: Custom label for positive outcome
+        noLabel:
+          type: string
+          maxLength: 20
+          description: Custom label for negative outcome
+
+    ListMarketsResponse:
+      type: object
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResponse'
+        total:
+          type: integer
+          description: Total number of markets returned
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: string
+          description: Additional error details
+
+tags:
+  - name: Markets
+    description: Market management operations
+  - name: Users
+    description: User management operations
+  - name: Bets
+    description: Betting operations
+  - name: Admin
+    description: Administrative operations

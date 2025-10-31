@@ -3,7 +3,7 @@ package metricshandlers
 import (
 	"encoding/json"
 	"net/http"
-	positionsmath "socialpredict/handlers/math/positions"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/util"
 )
 
