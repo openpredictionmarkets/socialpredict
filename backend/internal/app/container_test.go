@@ -30,6 +30,11 @@ func TestBuildApplicationWiresMarketsDependencies(t *testing.T) {
 		t.Fatalf("expected users service to be initialized")
 	}
 
+	betsService := container.GetBetsService()
+	if betsService == nil {
+		t.Fatalf("expected bets service to be initialized")
+	}
+
 	marketsHandler := container.GetMarketsHandler()
 	if marketsHandler == nil {
 		t.Fatalf("expected markets handler to be initialized")

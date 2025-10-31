@@ -9,10 +9,12 @@ import (
 
 	// Domain services
 	analytics "socialpredict/internal/domain/analytics"
+	dbets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 
 	// Repositories
+	rbets "socialpredict/internal/repository/bets"
 	rmarkets "socialpredict/internal/repository/markets"
 	rusers "socialpredict/internal/repository/users"
 
@@ -43,11 +45,13 @@ type Container struct {
 	marketsRepo   rmarkets.GormRepository
 	usersRepo     rusers.GormRepository
 	analyticsRepo analytics.GormRepository
+	betsRepo      rbets.GormRepository
 
 	// Domain services
 	analyticsService *analytics.Service
 	marketsService   *dmarkets.Service
 	usersService     *dusers.Service
+	betsService      *dbets.Service
 
 	// Handlers
 	marketsHandler *hmarkets.Handler
@@ -67,6 +71,7 @@ func (c *Container) InitializeRepositories() {
 	c.marketsRepo = *rmarkets.NewGormRepository(c.db)
 	c.usersRepo = *rusers.NewGormRepository(c.db)
 	c.analyticsRepo = *analytics.NewGormRepository(c.db)
+	c.betsRepo = *rbets.NewGormRepository(c.db)
 }
 
 // InitializeServices sets up all domain services with their dependencies
@@ -85,6 +90,8 @@ func (c *Container) InitializeServices() {
 	}
 
 	c.marketsService = dmarkets.NewService(&c.marketsRepo, c.usersService, c.clock, marketsConfig)
+
+	c.betsService = dbets.NewService(&c.betsRepo, c.marketsService, c.usersService, c.config, c.clock)
 }
 
 // InitializeHandlers sets up all HTTP handlers with their service dependencies
@@ -117,6 +124,11 @@ func (c *Container) GetAnalyticsService() *analytics.Service {
 // GetMarketsService returns the markets domain service
 func (c *Container) GetMarketsService() *dmarkets.Service {
 	return c.marketsService
+}
+
+// GetBetsService returns the bets domain service
+func (c *Container) GetBetsService() *dbets.Service {
+	return c.betsService
 }
 
 // BuildApplication creates a fully wired application container

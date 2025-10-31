@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	buybetshandlers "socialpredict/handlers/bets/buying"
 	"socialpredict/internal/app"
 	"socialpredict/internal/domain/analytics"
+	dbets "socialpredict/internal/domain/bets"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -38,13 +38,16 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		t.Fatalf("apply creation fee: %v", err)
 	}
 
+	container := app.BuildApplication(db, econConfig)
+	betsService := container.GetBetsService()
+
 	placeBet := func(username string, amount int64, outcome string) {
-		var u models.User
-		if err := db.Where("username = ?", username).First(&u).Error; err != nil {
-			t.Fatalf("load user %s: %v", username, err)
-		}
-		betReq := models.Bet{MarketID: uint(market.ID), Amount: amount, Outcome: outcome}
-		if _, err := buybetshandlers.PlaceBetCore(&u, betReq, db, loadEcon); err != nil {
+		if _, err := betsService.Place(context.Background(), dbets.PlaceRequest{
+			Username: username,
+			MarketID: uint(market.ID),
+			Amount:   amount,
+			Outcome:  outcome,
+		}); err != nil {
 			t.Fatalf("place bet for %s: %v", username, err)
 		}
 	}
@@ -141,13 +144,15 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 		t.Fatalf("apply creation fee: %v", err)
 	}
 
+	container := app.BuildApplication(db, econConfig)
+	betsService := container.GetBetsService()
 	placeBet := func(username string, amount int64, outcome string) {
-		var u models.User
-		if err := db.Where("username = ?", username).First(&u).Error; err != nil {
-			t.Fatalf("load user %s: %v", username, err)
-		}
-		betReq := models.Bet{MarketID: uint(market.ID), Amount: amount, Outcome: outcome}
-		if _, err := buybetshandlers.PlaceBetCore(&u, betReq, db, loadEcon); err != nil {
+		if _, err := betsService.Place(context.Background(), dbets.PlaceRequest{
+			Username: username,
+			MarketID: uint(market.ID),
+			Amount:   amount,
+			Outcome:  outcome,
+		}); err != nil {
 			t.Fatalf("place bet for %s: %v", username, err)
 		}
 	}
@@ -158,7 +163,6 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 	placeBet("jyron", 10, "YES")
 	placeBet("testuser03", 30, "YES")
 
-	container := app.BuildApplication(db, econConfig)
 	if err := container.GetMarketsService().ResolveMarket(context.Background(), int64(market.ID), "YES", market.CreatorUsername); err != nil {
 		t.Fatalf("ResolveMarket: %v", err)
 	}

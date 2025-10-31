@@ -3,6 +3,7 @@ package markets
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -616,23 +617,61 @@ type BetDisplayInfo struct {
 
 // GetMarketBets returns the bet history for a market with probabilities
 func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error) {
-	// 1. Validate market exists
-	_, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return nil, ErrMarketNotFound
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
 	}
 
-	// 2. This is a placeholder implementation - the full logic should be moved here
-	// from the existing betshandlers.MarketBetsDisplayHandler
-	// For now, return empty slice to maintain interface compliance
-	//
-	// TODO: Implement full logic:
-	// - Get all bets for the market from repository
-	// - Calculate WPAM probabilities over time using market.CreatedAt
-	// - Match each bet with its probability at placement time
-	// - Sort by placement time and return formatted results
+	market, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
 
-	return []*BetDisplayInfo{}, nil
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	if len(bets) == 0 {
+		return []*BetDisplayInfo{}, nil
+	}
+
+	modelBets := convertToModelBets(bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets)
+	if len(probabilityChanges) == 0 {
+		probabilityChanges = []wpam.ProbabilityChange{{
+			Probability: 0,
+			Timestamp:   market.CreatedAt,
+		}}
+	}
+
+	sort.Slice(probabilityChanges, func(i, j int) bool {
+		return probabilityChanges[i].Timestamp.Before(probabilityChanges[j].Timestamp)
+	})
+
+	// Ensure bets are processed in chronological order
+	sort.Slice(modelBets, func(i, j int) bool {
+		return modelBets[i].PlacedAt.Before(modelBets[j].PlacedAt)
+	})
+
+	results := make([]*BetDisplayInfo, 0, len(modelBets))
+	for _, bet := range modelBets {
+		matchedProbability := probabilityChanges[0].Probability
+		for _, change := range probabilityChanges {
+			if change.Timestamp.After(bet.PlacedAt) {
+				break
+			}
+			matchedProbability = change.Probability
+		}
+
+		results = append(results, &BetDisplayInfo{
+			Username:    bet.Username,
+			Outcome:     bet.Outcome,
+			Amount:      bet.Amount,
+			Probability: matchedProbability,
+			PlacedAt:    bet.PlacedAt,
+		})
+	}
+
+	return results, nil
 }
 
 // GetMarketPositions returns all user positions in a market

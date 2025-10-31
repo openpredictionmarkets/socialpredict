@@ -190,9 +190,9 @@ func Start() {
 	router.Handle("/v0/profilechange/links", securityMiddleware(usershandlers.ChangePersonalLinksHandler(usersService))).Methods("POST")
 
 	// handle private user actions such as make a bet, sell positions, get user position
-	router.Handle("/v0/bet", securityMiddleware(http.HandlerFunc(buybetshandlers.PlaceBetHandler(setup.EconomicsConfig)))).Methods("POST")
+	router.Handle("/v0/bet", securityMiddleware(buybetshandlers.PlaceBetHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 	router.Handle("/v0/userposition/{marketId}", securityMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
-	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
+	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig, usersService)))).Methods("POST")

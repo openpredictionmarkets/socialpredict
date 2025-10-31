@@ -1,4 +1,4 @@
-package buybetshandlers
+package sellbetshandlers
 
 import (
 	"bytes"
@@ -16,39 +16,33 @@ import (
 	"socialpredict/models/modelstesting"
 )
 
-type fakeBetsService struct {
-	req  bets.PlaceRequest
-	resp *bets.PlacedBet
+type fakeSellService struct {
+	req  bets.SellRequest
+	resp *bets.SellResult
 	err  error
 }
 
-func (f *fakeBetsService) Place(ctx context.Context, req bets.PlaceRequest) (*bets.PlacedBet, error) {
+func (f *fakeSellService) Place(ctx context.Context, req bets.PlaceRequest) (*bets.PlacedBet, error) {
+	return nil, nil
+}
+func (f *fakeSellService) Sell(ctx context.Context, req bets.SellRequest) (*bets.SellResult, error) {
 	f.req = req
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.resp, nil
+	return f.resp, f.err
 }
 
-func (f *fakeBetsService) Sell(ctx context.Context, req bets.SellRequest) (*bets.SellResult, error) {
-	return nil, nil
-}
+type fakeUsersService struct{ user *dusers.User }
 
-type fakeUsersService struct {
-	user *dusers.User
-}
-
-func (f *fakeUsersService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
-	return nil, nil
-}
 func (f *fakeUsersService) GetUser(ctx context.Context, username string) (*dusers.User, error) {
 	return f.user, nil
 }
-func (f *fakeUsersService) GetPrivateProfile(ctx context.Context, username string) (*dusers.PrivateProfile, error) {
-	return nil, nil
-}
 func (f *fakeUsersService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
 	return nil
+}
+func (f *fakeUsersService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
+	return nil, nil
+}
+func (f *fakeUsersService) GetPrivateProfile(ctx context.Context, username string) (*dusers.PrivateProfile, error) {
+	return nil, nil
 }
 func (f *fakeUsersService) GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error) {
 	return 0, nil
@@ -110,87 +104,91 @@ func (f *fakeUsersService) UpdatePassword(ctx context.Context, username string, 
 	return nil
 }
 
-func TestPlaceBetHandler_Success(t *testing.T) {
+func TestSellPositionHandler_Success(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
-	betsSvc := &fakeBetsService{resp: &bets.PlacedBet{Username: "alice", MarketID: 5, Amount: 120, Outcome: "YES", PlacedAt: time.Now()}}
-	userSvc := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	svc := &fakeSellService{resp: &bets.SellResult{
+		Username:      "alice",
+		MarketID:      7,
+		SharesSold:    3,
+		SaleValue:     60,
+		Dust:          5,
+		Outcome:       "YES",
+		TransactionAt: time.Now(),
+	}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
 
-	payload := dto.PlaceBetRequest{MarketID: 5, Amount: 120, Outcome: "YES"}
-	body, _ := json.Marshal(payload)
-
-	req := httptest.NewRequest(http.MethodPost, "/v0/bet", bytes.NewReader(body))
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 7, Amount: 65, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
 	req.Header.Set("Content-Type", "application/json")
 
 	rr := httptest.NewRecorder()
-	handler := PlaceBetHandler(betsSvc, userSvc)
+	handler := SellPositionHandler(svc, users)
 	handler.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d", rr.Code)
 	}
-
-	if betsSvc.req.Username != "alice" || betsSvc.req.MarketID != 5 {
-		t.Fatalf("unexpected service request: %+v", betsSvc.req)
+	if svc.req.Username != "alice" || svc.req.MarketID != 7 || svc.req.Amount != 65 {
+		t.Fatalf("unexpected request payload: %+v", svc.req)
 	}
 
-	var resp dto.PlaceBetResponse
+	var resp dto.SellBetResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if resp.Username != "alice" || resp.Amount != 120 || resp.MarketID != 5 {
-		t.Fatalf("unexpected response body: %+v", resp)
+	if resp.SharesSold != 3 || resp.SaleValue != 60 || resp.Dust != 5 {
+		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
 
-func TestPlaceBetHandler_ErrorMapping(t *testing.T) {
+func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
-	userSvc := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
 
 	cases := []struct {
-		name       string
-		err        error
-		wantStatus int
+		name string
+		err  error
+		want int
 	}{
-		{"invalid outcome", bets.ErrInvalidOutcome, http.StatusBadRequest},
-		{"insufficient", bets.ErrInsufficientBalance, http.StatusUnprocessableEntity},
+		{"bad outcome", bets.ErrInvalidOutcome, http.StatusBadRequest},
 		{"market closed", bets.ErrMarketClosed, http.StatusConflict},
-		{"not found", dmarkets.ErrMarketNotFound, http.StatusNotFound},
+		{"no position", bets.ErrNoPosition, http.StatusUnprocessableEntity},
+		{"dust cap", bets.ErrDustCapExceeded{Cap: 2, Requested: 3}, http.StatusUnprocessableEntity},
+		{"market not found", dmarkets.ErrMarketNotFound, http.StatusNotFound},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			betsSvc := &fakeBetsService{err: tc.err}
-			payload := dto.PlaceBetRequest{MarketID: 1, Amount: 10, Outcome: "YES"}
-			body, _ := json.Marshal(payload)
-
-			req := httptest.NewRequest(http.MethodPost, "/v0/bet", bytes.NewReader(body))
+			svc := &fakeSellService{err: tc.err}
+			body, _ := json.Marshal(dto.SellBetRequest{MarketID: 1, Amount: 10, Outcome: "YES"})
+			req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
 			req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
 			req.Header.Set("Content-Type", "application/json")
 
 			rr := httptest.NewRecorder()
-			handler := PlaceBetHandler(betsSvc, userSvc)
+			handler := SellPositionHandler(svc, users)
 			handler.ServeHTTP(rr, req)
 
-			if rr.Code != tc.wantStatus {
-				t.Fatalf("expected status %d, got %d", tc.wantStatus, rr.Code)
+			if rr.Code != tc.want {
+				t.Fatalf("expected status %d, got %d", tc.want, rr.Code)
 			}
 		})
 	}
 }
 
-func TestPlaceBetHandler_InvalidJSON(t *testing.T) {
-	betsSvc := &fakeBetsService{}
-	userSvc := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+func TestSellPositionHandler_InvalidJSON(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
 
-	req := httptest.NewRequest(http.MethodPost, "/v0/bet", bytes.NewBufferString("{invalid"))
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewBufferString("{"))
 	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
 	req.Header.Set("Content-Type", "application/json")
 
 	rr := httptest.NewRecorder()
-	handler := PlaceBetHandler(betsSvc, userSvc)
+	handler := SellPositionHandler(svc, users)
 	handler.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
