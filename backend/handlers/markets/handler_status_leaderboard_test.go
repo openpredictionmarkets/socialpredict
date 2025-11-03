@@ -39,7 +39,7 @@ func TestListByStatusHandler_Smoke(t *testing.T) {
 		}}, nil
 	}
 
-	handler := NewHandler(svc)
+	handler := NewHandler(svc, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/status/active?limit=50", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
@@ -83,7 +83,7 @@ func TestMarketLeaderboardHandler_Smoke(t *testing.T) {
 		}}, nil
 	}
 
-	handler := NewHandler(svc)
+	handler := NewHandler(svc, nil)
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/77/leaderboard?limit=25", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()

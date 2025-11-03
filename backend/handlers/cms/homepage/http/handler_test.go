@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"socialpredict/handlers/cms/homepage"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 
@@ -35,7 +36,8 @@ func TestPublicGet_ReturnsHomepageContent(t *testing.T) {
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
 	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	handler := NewHandler(svc, usersSvc)
+	auth := authsvc.NewAuthService(usersSvc)
+	handler := NewHandler(svc, auth)
 
 	req := httptest.NewRequest("GET", "/v0/content/home", nil)
 	rec := httptest.NewRecorder()
@@ -82,7 +84,8 @@ func TestAdminUpdate_Success(t *testing.T) {
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
 	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	handler := NewHandler(svc, usersSvc)
+	auth := authsvc.NewAuthService(usersSvc)
+	handler := NewHandler(svc, auth)
 
 	payload := updateReq{
 		Title:   "New title",
@@ -132,7 +135,8 @@ func TestAdminUpdate_Unauthorized(t *testing.T) {
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
 	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	handler := NewHandler(svc, usersSvc)
+	auth := authsvc.NewAuthService(usersSvc)
+	handler := NewHandler(svc, auth)
 
 	req := httptest.NewRequest("PUT", "/v0/admin/content/home", bytes.NewReader([]byte(`{}`)))
 	rec := httptest.NewRecorder()

@@ -206,12 +206,41 @@ func (r *GormRepository) GetUserPosition(ctx context.Context, marketID int64, us
 	}
 
 	return &dmarkets.UserPosition{
-		Username:       username,
-		MarketID:       marketID,
-		YesSharesOwned: position.YesSharesOwned,
-		NoSharesOwned:  position.NoSharesOwned,
-		Value:          position.Value,
+		Username:         username,
+		MarketID:         marketID,
+		YesSharesOwned:   position.YesSharesOwned,
+		NoSharesOwned:    position.NoSharesOwned,
+		Value:            position.Value,
+		TotalSpent:       position.TotalSpent,
+		TotalSpentInPlay: position.TotalSpentInPlay,
+		IsResolved:       position.IsResolved,
+		ResolutionResult: position.ResolutionResult,
 	}, nil
+}
+
+// ListMarketPositions retrieves aggregated positions for all users in a market.
+func (r *GormRepository) ListMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	marketIDStr := strconv.FormatInt(marketID, 10)
+	positions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(dmarkets.MarketPositions, 0, len(positions))
+	for _, pos := range positions {
+		out = append(out, &dmarkets.UserPosition{
+			Username:         pos.Username,
+			MarketID:         int64(pos.MarketID),
+			YesSharesOwned:   pos.YesSharesOwned,
+			NoSharesOwned:    pos.NoSharesOwned,
+			Value:            pos.Value,
+			TotalSpent:       pos.TotalSpent,
+			TotalSpentInPlay: pos.TotalSpentInPlay,
+			IsResolved:       pos.IsResolved,
+			ResolutionResult: pos.ResolutionResult,
+		})
+	}
+	return out, nil
 }
 
 // Delete removes a market from the database

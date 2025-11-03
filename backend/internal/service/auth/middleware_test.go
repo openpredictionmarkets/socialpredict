@@ -1,4 +1,4 @@
-package middleware
+package auth
 
 import (
 	"bytes"
@@ -303,11 +303,12 @@ func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 func TestValidateAdminToken_MissingHeader(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	auth := NewAuthService(svc)
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	err := ValidateAdminToken(req, svc)
+	err := ValidateAdminToken(req, auth)
 
 	if err == nil {
 		t.Error("Expected error but got none")
@@ -317,11 +318,13 @@ func TestValidateAdminToken_MissingHeader(t *testing.T) {
 func TestValidateAdminToken_InvalidToken(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	auth := NewAuthService(svc)
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 
-	err := ValidateAdminToken(req, svc)
+	err := ValidateAdminToken(req, auth)
 
 	if err == nil {
 		t.Error("Expected error but got none")
@@ -372,11 +375,12 @@ func TestAuthenticate_MiddlewareStructure(t *testing.T) {
 
 func TestValidateUserAndEnforcePasswordChangeGetUser_MissingToken(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUserFromDB(req, db)
+	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")

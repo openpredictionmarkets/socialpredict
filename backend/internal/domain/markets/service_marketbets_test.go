@@ -11,10 +11,11 @@ import (
 )
 
 type betsRepo struct {
-	market   *markets.Market
-	bets     []*markets.Bet
-	listErr  error
-	marketID int64
+	market    *markets.Market
+	bets      []*markets.Bet
+	positions markets.MarketPositions
+	listErr   error
+	marketID  int64
 }
 
 func (r *betsRepo) Create(context.Context, *markets.Market) error { panic("unexpected call") }
@@ -42,6 +43,10 @@ func (r *betsRepo) GetByID(ctx context.Context, id int64) (*markets.Market, erro
 func (r *betsRepo) ResolveMarket(context.Context, int64, string) error { panic("unexpected call") }
 func (r *betsRepo) GetUserPosition(context.Context, int64, string) (*markets.UserPosition, error) {
 	panic("unexpected call")
+}
+
+func (r *betsRepo) ListMarketPositions(context.Context, int64) (markets.MarketPositions, error) {
+	return r.positions, nil
 }
 
 func (r *betsRepo) ListBetsForMarket(ctx context.Context, marketID int64) ([]*markets.Bet, error) {
@@ -161,6 +166,64 @@ func TestGetMarketBets_ValidatesInputAndMarket(t *testing.T) {
 	}
 
 	if _, err := service.GetMarketBets(context.Background(), 99); err != markets.ErrMarketNotFound {
+		t.Fatalf("expected ErrMarketNotFound, got %v", err)
+	}
+}
+
+func TestGetMarketPositions_ReturnsRepositoryData(t *testing.T) {
+	repo := &betsRepo{
+		market: &markets.Market{ID: 101},
+		positions: markets.MarketPositions{
+			{
+				Username:         "alice",
+				MarketID:         101,
+				YesSharesOwned:   5,
+				NoSharesOwned:    0,
+				Value:            120,
+				TotalSpent:       200,
+				TotalSpentInPlay: 0,
+				IsResolved:       true,
+				ResolutionResult: "YES",
+			},
+			{
+				Username:         "bob",
+				MarketID:         101,
+				YesSharesOwned:   0,
+				NoSharesOwned:    3,
+				Value:            0,
+				TotalSpent:       75,
+				TotalSpentInPlay: 0,
+				IsResolved:       true,
+				ResolutionResult: "YES",
+			},
+		},
+	}
+	svc := markets.NewService(repo, nopUserService{}, betsClock{now: time.Now()}, markets.Config{})
+
+	out, err := svc.GetMarketPositions(context.Background(), 101)
+	if err != nil {
+		t.Fatalf("GetMarketPositions returned error: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("expected 2 positions, got %d", len(out))
+	}
+	if out[0].Username != "alice" || out[0].TotalSpent != 200 || !out[0].IsResolved {
+		t.Fatalf("unexpected first position: %+v", out[0])
+	}
+	if out[1].Username != "bob" || out[1].NoSharesOwned != 3 {
+		t.Fatalf("unexpected second position: %+v", out[1])
+	}
+}
+
+func TestGetMarketPositions_ValidatesInputAndMarket(t *testing.T) {
+	repo := &betsRepo{}
+	svc := markets.NewService(repo, nopUserService{}, betsClock{now: time.Now()}, markets.Config{})
+
+	if _, err := svc.GetMarketPositions(context.Background(), 0); err != markets.ErrInvalidInput {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+
+	if _, err := svc.GetMarketPositions(context.Background(), 99); err != markets.ErrMarketNotFound {
 		t.Fatalf("expected ErrMarketNotFound, got %v", err)
 	}
 }

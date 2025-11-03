@@ -33,11 +33,15 @@ type MarketCreateRequest struct {
 
 // UserPosition represents a user's holdings within a market.
 type UserPosition struct {
-	Username       string
-	MarketID       int64
-	YesSharesOwned int64
-	NoSharesOwned  int64
-	Value          int64
+	Username         string
+	MarketID         int64
+	YesSharesOwned   int64
+	NoSharesOwned    int64
+	Value            int64
+	TotalSpent       int64
+	TotalSpentInPlay int64
+	IsResolved       bool
+	ResolutionResult string
 }
 
 // MarketPositions aggregates user positions for a market.

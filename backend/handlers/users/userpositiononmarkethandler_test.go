@@ -12,9 +12,9 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 
-	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/internal/app"
-	"socialpredict/middleware"
+	positionsmath "socialpredict/internal/domain/math/positions"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/models/modelstesting"
 )
 
@@ -63,7 +63,7 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 		}
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &middleware.UserClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &authsvc.UserClaims{
 		Username: user.Username,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Hour).Unix(),

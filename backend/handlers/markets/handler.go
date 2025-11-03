@@ -8,8 +8,7 @@ import (
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
-	"socialpredict/middleware"
-	"socialpredict/util"
+	authsvc "socialpredict/internal/service/auth"
 
 	"github.com/gorilla/mux"
 )
@@ -31,11 +30,15 @@ type Service interface {
 // Handler handles HTTP requests for markets
 type Handler struct {
 	service Service
+	auth    authsvc.Authenticator
 }
 
 // NewHandler creates a new markets handler
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service, auth authsvc.Authenticator) *Handler {
+	return &Handler{
+		service: service,
+		auth:    auth,
+	}
 }
 
 // CreateMarket handles POST /markets
@@ -45,9 +48,13 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate user authentication
-	db := util.GetDB()
-	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
+	if h.auth == nil {
+		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	// Validate user authentication via auth service
+	user, httperr := h.auth.CurrentUser(r)
 	if httperr != nil {
 		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
@@ -298,9 +305,13 @@ func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.auth == nil {
+		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		return
+	}
+
 	// Get user for authorization
-	db := util.GetDB()
-	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
+	user, httperr := h.auth.CurrentUser(r)
 	if httperr != nil {
 		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return

@@ -3,7 +3,6 @@ package positionsmath
 import (
 	"errors"
 	"socialpredict/handlers/marketpublicresponse"
-	"socialpredict/handlers/tradingdata"
 	marketmath "socialpredict/internal/domain/math/market"
 	"socialpredict/internal/domain/math/outcomes/dbpm"
 	"socialpredict/internal/domain/math/probabilities/wpam"
@@ -31,9 +30,13 @@ type MarketPosition struct {
 
 // UserMarketPosition holds the number of YES and NO shares owned by a user in a market.
 type UserMarketPosition struct {
-	NoSharesOwned  int64 `json:"noSharesOwned"`
-	YesSharesOwned int64 `json:"yesSharesOwned"`
-	Value          int64 `json:"value"`
+	NoSharesOwned    int64  `json:"noSharesOwned"`
+	YesSharesOwned   int64  `json:"yesSharesOwned"`
+	Value            int64  `json:"value"`
+	TotalSpent       int64  `json:"totalSpent"`
+	TotalSpentInPlay int64  `json:"totalSpentInPlay"`
+	IsResolved       bool   `json:"isResolved"`
+	ResolutionResult string `json:"resolutionResult"`
 }
 
 // FetchMarketPositions fetches and summarizes positions for a given market.
@@ -60,8 +63,10 @@ func CalculateMarketPositions_WPAM_DBPM(db *gorm.DB, marketIdStr string) ([]Mark
 	}
 
 	// Fetch bets for the market
-	var allBetsOnMarket []models.Bet
-	allBetsOnMarket = tradingdata.GetBetsForMarket(db, marketIDUint)
+	allBetsOnMarket, err := fetchBetsForMarket(db, marketIDUint)
+	if err != nil {
+		return nil, err
+	}
 
 	// Get a timeline of probability changes for the market
 	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, allBetsOnMarket)
@@ -201,9 +206,13 @@ func CalculateMarketPositionForUser_WPAM_DBPM(db *gorm.DB, marketIdStr string, u
 	for _, position := range marketPositions {
 		if position.Username == username {
 			return UserMarketPosition{
-				NoSharesOwned:  position.NoSharesOwned,
-				YesSharesOwned: position.YesSharesOwned,
-				Value:          position.Value,
+				NoSharesOwned:    position.NoSharesOwned,
+				YesSharesOwned:   position.YesSharesOwned,
+				Value:            position.Value,
+				TotalSpent:       position.TotalSpent,
+				TotalSpentInPlay: position.TotalSpentInPlay,
+				IsResolved:       position.IsResolved,
+				ResolutionResult: position.ResolutionResult,
 			}, nil
 		}
 	}
@@ -265,4 +274,16 @@ func CalculateAllUserMarketPositions_WPAM_DBPM(db *gorm.DB, username string) ([]
 	}
 
 	return allPositions, nil
+}
+
+func fetchBetsForMarket(db *gorm.DB, marketID uint) ([]models.Bet, error) {
+	var bets []models.Bet
+	err := db.
+		Where("market_id = ?", marketID).
+		Order("placed_at ASC").
+		Find(&bets).Error
+	if err != nil {
+		return nil, err
+	}
+	return bets, nil
 }

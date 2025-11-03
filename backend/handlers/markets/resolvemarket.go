@@ -10,8 +10,8 @@ import (
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/logging"
-	"socialpredict/middleware"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
@@ -76,14 +76,14 @@ func extractUsernameFromRequest(r *http.Request) (string, error) {
 	}
 
 	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-	token, err := jwt.ParseWithClaims(tokenString, &middleware.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &authsvc.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("JWT_SIGNING_KEY")), nil
 	})
 	if err != nil || !token.Valid {
 		return "", errors.New("invalid token")
 	}
 
-	claims, ok := token.Claims.(*middleware.UserClaims)
+	claims, ok := token.Claims.(*authsvc.UserClaims)
 	if !ok || claims.Username == "" {
 		return "", errors.New("invalid token claims")
 	}

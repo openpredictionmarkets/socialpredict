@@ -36,6 +36,7 @@ type Repository interface {
 	Delete(ctx context.Context, id int64) error
 	ResolveMarket(ctx context.Context, id int64, resolution string) error
 	GetUserPosition(ctx context.Context, marketID int64, username string) (*UserPosition, error)
+	ListMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
 	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
 	CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*PayoutPosition, error)
 }
@@ -676,20 +677,23 @@ func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisp
 
 // GetMarketPositions returns all user positions in a market
 func (s *Service) GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error) {
-	// 1. Validate market exists
-	_, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return nil, ErrMarketNotFound
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
 	}
 
-	// 2. TODO: Move position calculation logic here from handlers
-	// This should involve:
-	// - Getting all bets for the market
-	// - Calculating WPAM/DBPM positions for all users
-	// - Returning structured position data
+	// Ensure market exists
+	if _, err := s.repo.GetByID(ctx, marketID); err != nil {
+		return nil, err
+	}
 
-	// For now, return nil - the actual implementation will move from handlers
-	return nil, nil
+	positions, err := s.repo.ListMarketPositions(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	if positions == nil {
+		return MarketPositions{}, nil
+	}
+	return positions, nil
 }
 
 // GetUserPositionInMarket returns a specific user's position in a market

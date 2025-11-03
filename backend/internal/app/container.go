@@ -20,6 +20,7 @@ import (
 
 	// Handlers
 	hmarkets "socialpredict/handlers/markets"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/security"
 )
 
@@ -52,6 +53,7 @@ type Container struct {
 	marketsService   *dmarkets.Service
 	usersService     *dusers.Service
 	betsService      *dbets.Service
+	authService      *authsvc.AuthService
 
 	// Handlers
 	marketsHandler *hmarkets.Handler
@@ -81,6 +83,7 @@ func (c *Container) InitializeServices() {
 	configLoader := func() *setup.EconomicConfig { return c.config }
 	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader)
 	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
+	c.authService = authsvc.NewAuthService(c.usersService)
 
 	// Markets service depends on markets repository and users service
 	marketsConfig := dmarkets.Config{
@@ -96,7 +99,7 @@ func (c *Container) InitializeServices() {
 
 // InitializeHandlers sets up all HTTP handlers with their service dependencies
 func (c *Container) InitializeHandlers() {
-	c.marketsHandler = hmarkets.NewHandler(c.marketsService)
+	c.marketsHandler = hmarkets.NewHandler(c.marketsService, c.authService)
 }
 
 // Initialize sets up the entire dependency graph
@@ -129,6 +132,11 @@ func (c *Container) GetMarketsService() *dmarkets.Service {
 // GetBetsService returns the bets domain service
 func (c *Container) GetBetsService() *dbets.Service {
 	return c.betsService
+}
+
+// GetAuthService returns the authentication façade
+func (c *Container) GetAuthService() *authsvc.AuthService {
+	return c.authService
 }
 
 // BuildApplication creates a fully wired application container

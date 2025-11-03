@@ -52,6 +52,10 @@ func (r *resolveRepo) GetUserPosition(context.Context, int64, string) (*markets.
 	panic("unexpected call")
 }
 
+func (r *resolveRepo) ListMarketPositions(context.Context, int64) (markets.MarketPositions, error) {
+	panic("unexpected call")
+}
+
 func (r *resolveRepo) ListBetsForMarket(context.Context, int64) ([]*markets.Bet, error) {
 	return r.bets, nil
 }

@@ -3,7 +3,6 @@ package positionsmath
 import (
 	"errors"
 	"log"
-	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
 	"sort"
 	"strconv"
@@ -107,7 +106,11 @@ func CalculateMarketLeaderboard(db *gorm.DB, marketIdStr string) ([]UserProfitab
 	}
 
 	// Get all bets for the market to calculate spend
-	allBetsOnMarket := tradingdata.GetBetsForMarket(db, marketIDUint)
+	allBetsOnMarket, err := fetchBetsForMarket(db, marketIDUint)
+	if err != nil {
+		ErrorLogger(err, "Failed to load bets for market.")
+		return nil, err
+	}
 	if len(allBetsOnMarket) == 0 {
 		return []UserProfitability{}, nil
 	}

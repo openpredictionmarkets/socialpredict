@@ -9,7 +9,7 @@ import (
 
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 )
 
 // UserMarketPositionHandlerWithService returns an HTTP handler that resolves the authenticated
@@ -21,7 +21,7 @@ func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, u
 			return
 		}
 
-		user, httperr := middleware.ValidateTokenAndGetUser(r, usersSvc)
+		user, httperr := authsvc.ValidateTokenAndGetUser(r, usersSvc)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 			return

@@ -1,4 +1,4 @@
-package middleware
+package auth
 
 import (
 	"encoding/json"

@@ -6,19 +6,17 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/models"
 	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
 
-	dusers "socialpredict/internal/domain/users"
-
 	"github.com/brianvoe/gofakeit"
 	"gorm.io/gorm"
 )
 
-func AddUserHandler(loadEconConfig setup.EconConfigLoader, usersSvc dusers.ServiceInterface) func(http.ResponseWriter, *http.Request) {
+func AddUserHandler(loadEconConfig setup.EconConfigLoader, auth authsvc.Authenticator) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
@@ -55,9 +53,12 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader, usersSvc dusers.Servi
 
 		db := util.GetDB()
 
-		// validate that the user performing this function is indeed admin
-		if err := middleware.ValidateAdminToken(r, usersSvc); err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		if auth == nil {
+			http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+			return
+		}
+		if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
+			http.Error(w, httpErr.Message, httpErr.StatusCode)
 			return
 		}
 

@@ -6,12 +6,12 @@ import (
 
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 )
 
 func GetPrivateProfileHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, httperr := middleware.ValidateTokenAndGetUser(r, svc)
+		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 			return

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	positionsmath "socialpredict/internal/domain/math/positions"
 	dmarkets "socialpredict/internal/domain/markets"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 
@@ -26,11 +26,15 @@ func toDomainPositions(input []positionsmath.MarketPosition) dmarkets.MarketPosi
 	out := make(dmarkets.MarketPositions, 0, len(input))
 	for _, p := range input {
 		out = append(out, &dmarkets.UserPosition{
-			Username:       p.Username,
-			MarketID:       int64(p.MarketID),
-			YesSharesOwned: p.YesSharesOwned,
-			NoSharesOwned:  p.NoSharesOwned,
-			Value:          p.Value,
+			Username:         p.Username,
+			MarketID:         int64(p.MarketID),
+			YesSharesOwned:   p.YesSharesOwned,
+			NoSharesOwned:    p.NoSharesOwned,
+			Value:            p.Value,
+			TotalSpent:       p.TotalSpent,
+			TotalSpentInPlay: p.TotalSpentInPlay,
+			IsResolved:       p.IsResolved,
+			ResolutionResult: p.ResolutionResult,
 		})
 	}
 	return out

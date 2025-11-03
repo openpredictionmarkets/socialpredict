@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/security"
 	"socialpredict/setup"
-	"socialpredict/util"
 	"time"
 
 	"socialpredict/handlers/markets/dto"
@@ -51,11 +50,15 @@ func ValidateMarketResolutionTime(resolutionTime time.Time, config *setup.Econom
 }
 
 type CreateMarketService struct {
-	svc dmarkets.Service
+	svc  dmarkets.Service
+	auth authsvc.Authenticator
 }
 
-func NewCreateMarketService(svc dmarkets.Service) *CreateMarketService {
-	return &CreateMarketService{svc: svc}
+func NewCreateMarketService(svc dmarkets.Service, auth authsvc.Authenticator) *CreateMarketService {
+	return &CreateMarketService{
+		svc:  svc,
+		auth: auth,
+	}
 }
 
 func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
@@ -65,8 +68,12 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate user and get username
-	db := util.GetDB()
-	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
+	if h.auth == nil {
+		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	user, httperr := h.auth.CurrentUser(r)
 	if httperr != nil {
 		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return
@@ -149,7 +156,7 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateMarketHandlerWithService creates a handler with service injection
-func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, econConfig *setup.EconomicConfig) http.HandlerFunc {
+func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.Authenticator, econConfig *setup.EconomicConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
@@ -157,8 +164,11 @@ func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, econConfig *s
 		}
 
 		// Validate user and get username
-		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUserFromDB(r, db)
+		if auth == nil {
+			http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+			return
+		}
+		user, httperr := auth.CurrentUser(r)
 		if httperr != nil {
 			http.Error(w, httperr.Error(), httperr.StatusCode)
 			return

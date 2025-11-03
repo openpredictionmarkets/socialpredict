@@ -8,7 +8,7 @@ import (
 	dbets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 )
 
 // PlaceBetHandler returns an HTTP handler that delegates bet placement to the bets domain service.
@@ -19,7 +19,7 @@ func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInte
 			return
 		}
 
-		user, httpErr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
 		if httpErr != nil {
 			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return

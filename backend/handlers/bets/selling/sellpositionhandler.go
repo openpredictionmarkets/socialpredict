@@ -9,7 +9,7 @@ import (
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 )
 
 // SellPositionHandler returns an HTTP handler that delegates sales to the bets service.
@@ -20,7 +20,7 @@ func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceI
 			return
 		}
 
-		user, httpErr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
 		if httpErr != nil {
 			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return

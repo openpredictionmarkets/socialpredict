@@ -21,7 +21,7 @@ import (
 	privateuser "socialpredict/handlers/users/privateuser"
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/security"
 	"socialpredict/setup"
 	"socialpredict/util"
@@ -117,9 +117,10 @@ func Start() {
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
 	analyticsService := container.GetAnalyticsService()
+	authService := container.GetAuthService()
 
 	// Create Handler instances
-	marketsHandler := marketshandlers.NewHandler(marketsService)
+	marketsHandler := marketshandlers.NewHandler(marketsService, authService)
 
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
@@ -129,7 +130,7 @@ func Start() {
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
-	router.Handle("/v0/login", loginSecurityMiddleware(http.HandlerFunc(middleware.LoginHandler))).Methods("POST")
+	router.Handle("/v0/login", loginSecurityMiddleware(http.HandlerFunc(authsvc.LoginHandler))).Methods("POST")
 
 	// application setup and stats information
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)))).Methods("GET")
@@ -195,13 +196,13 @@ func Start() {
 	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 
 	// admin stuff - apply security middleware
-	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig, usersService)))).Methods("POST")
+	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig, authService)))).Methods("POST")
 
 	// homepage content routes
 	homepageRepo := homepage.NewGormRepository(db)
 	homepageRenderer := homepage.NewDefaultRenderer()
 	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
-	homepageHandler := cmshomehttp.NewHandler(homepageSvc, usersService)
+	homepageHandler := cmshomehttp.NewHandler(homepageSvc, authService)
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
