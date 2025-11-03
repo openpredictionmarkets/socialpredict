@@ -577,34 +577,56 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 // ProjectProbability projects what the probability would be after a hypothetical bet
 func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProjectionRequest) (*ProbabilityProjection, error) {
 	// 1. Validate market exists
-	_, err := s.repo.GetByID(ctx, req.MarketID)
+	if req.MarketID <= 0 || strings.TrimSpace(req.Outcome) == "" || req.Amount <= 0 {
+		return nil, ErrInvalidInput
+	}
+
+	outcome := strings.ToUpper(strings.TrimSpace(req.Outcome))
+	if outcome != "YES" && outcome != "NO" {
+		return nil, ErrInvalidInput
+	}
+
+	market, err := s.repo.GetByID(ctx, req.MarketID)
 	if err != nil {
-		return nil, ErrMarketNotFound
+		return nil, err
 	}
 
-	// 2. Validate input
-	if req.Amount <= 0 {
-		return nil, ErrInvalidInput
-	}
-	if req.Outcome != "YES" && req.Outcome != "NO" {
-		return nil, ErrInvalidInput
+	if strings.EqualFold(market.Status, "resolved") {
+		return nil, ErrInvalidState
 	}
 
-	// 3. TODO: Move probability calculation logic here from handlers
-	// This should involve:
-	// - Getting current bets for the market
-	// - Getting market creation time
-	// - Calculating current probability using WPAM algorithm
-	// - Projecting new probability with the hypothetical bet
-	// - Returning both current and projected probabilities
-
-	// For now, return placeholder values
-	projection := &ProbabilityProjection{
-		CurrentProbability:   0.5, // TODO: Calculate actual current probability
-		ProjectedProbability: 0.6, // TODO: Calculate projected probability
+	now := s.clock.Now()
+	if now.After(market.ResolutionDateTime) {
+		return nil, ErrInvalidState
 	}
 
-	return projection, nil
+	bets, err := s.repo.ListBetsForMarket(ctx, req.MarketID)
+	if err != nil {
+		return nil, err
+	}
+
+	modelBets := convertToModelBets(bets)
+	probabilityTrack := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets)
+
+	currentProbability := 0.5
+	if len(probabilityTrack) > 0 {
+		currentProbability = probabilityTrack[len(probabilityTrack)-1].Probability
+	}
+
+	newBet := models.Bet{
+		Username: "preview",
+		MarketID: uint(req.MarketID),
+		Amount:   req.Amount,
+		Outcome:  outcome,
+		PlacedAt: now,
+	}
+
+	projection := wpam.ProjectNewProbabilityWPAM(market.CreatedAt, modelBets, newBet)
+
+	return &ProbabilityProjection{
+		CurrentProbability:   currentProbability,
+		ProjectedProbability: projection.Probability,
+	}, nil
 }
 
 // BetDisplayInfo represents a bet with probability information
