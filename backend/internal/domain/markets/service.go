@@ -3,6 +3,7 @@ package markets
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -588,7 +589,7 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 // ProjectProbability projects what the probability would be after a hypothetical bet
 func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProjectionRequest) (*ProbabilityProjection, error) {
 	// 1. Validate market exists
-	if req.MarketID <= 0 || strings.TrimSpace(req.Outcome) == "" || req.Amount <= 0 {
+	if req.MarketID <= 0 || req.MarketID > int64(math.MaxUint32) || strings.TrimSpace(req.Outcome) == "" || req.Amount <= 0 {
 		return nil, ErrInvalidInput
 	}
 
