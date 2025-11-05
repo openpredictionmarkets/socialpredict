@@ -81,6 +81,10 @@ func (m *MockResolveService) CalculateMarketVolume(ctx context.Context, marketID
 	return 0, nil
 }
 
+func (m *MockResolveService) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
+	return &dmarkets.PublicMarket{ID: marketID}, nil
+}
+
 // TestMain sets up the test environment
 func TestMain(m *testing.M) {
 	// Set up test environment

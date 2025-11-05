@@ -39,6 +39,7 @@ type Repository interface {
 	ListMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
 	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
 	CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*PayoutPosition, error)
+	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)
 }
 
 // CreatorSummary captures lightweight information about a market creator.
@@ -110,6 +111,7 @@ type ServiceInterface interface {
 	GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*UserPosition, error)
 	CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error)
+	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)
 }
 
 // Service implements the core market business logic
@@ -220,6 +222,14 @@ func (s *Service) SetCustomLabels(ctx context.Context, marketID int64, yesLabel,
 // GetMarket retrieves a market by ID
 func (s *Service) GetMarket(ctx context.Context, id int64) (*Market, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+// GetPublicMarket returns a public representation of a market.
+func (s *Service) GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error) {
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.repo.GetPublicMarket(ctx, marketID)
 }
 
 // MarketOverview represents enriched market data with calculations

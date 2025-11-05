@@ -65,6 +65,10 @@ func (m *searchServiceMock) GetMarketBets(ctx context.Context, marketID int64) (
 	return nil, nil
 }
 
+func (m *searchServiceMock) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
+	return &dmarkets.PublicMarket{ID: marketID}, nil
+}
+
 func (m *searchServiceMock) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
 	return nil, nil
 }

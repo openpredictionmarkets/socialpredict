@@ -51,6 +51,10 @@ func (r *projectionRepo) CalculatePayoutPositions(context.Context, int64) ([]*ma
 	panic("unexpected call")
 }
 
+func (r *projectionRepo) GetPublicMarket(context.Context, int64) (*markets.PublicMarket, error) {
+	panic("unexpected call")
+}
+
 type projectionClock struct{ now time.Time }
 
 func (c projectionClock) Now() time.Time { return c.now }

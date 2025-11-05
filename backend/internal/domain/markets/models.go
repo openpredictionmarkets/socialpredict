@@ -19,6 +19,8 @@ type Market struct {
 	Status                  string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
+	InitialProbability      float64
+	UTCOffset               int
 }
 
 // MarketCreateRequest represents the request to create a new market
@@ -62,4 +64,22 @@ type Bet struct {
 type PayoutPosition struct {
 	Username string
 	Value    int64
+}
+
+// PublicMarket represents the public view of a market.
+type PublicMarket struct {
+	ID                      int64
+	QuestionTitle           string
+	Description             string
+	OutcomeType             string
+	ResolutionDateTime      time.Time
+	FinalResolutionDateTime time.Time
+	UTCOffset               int
+	IsResolved              bool
+	ResolutionResult        string
+	InitialProbability      float64
+	CreatorUsername         string
+	CreatedAt               time.Time
+	YesLabel                string
+	NoLabel                 string
 }

@@ -52,6 +52,34 @@ func (r *GormRepository) GetByID(ctx context.Context, id int64) (*dmarkets.Marke
 	return r.modelToDomain(&dbMarket), nil
 }
 
+// GetPublicMarket retrieves a market with public-facing attributes.
+func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
+	var market models.Market
+	if err := r.db.WithContext(ctx).First(&market, marketID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, dmarkets.ErrMarketNotFound
+		}
+		return nil, err
+	}
+
+	return &dmarkets.PublicMarket{
+		ID:                      market.ID,
+		QuestionTitle:           market.QuestionTitle,
+		Description:             market.Description,
+		OutcomeType:             market.OutcomeType,
+		ResolutionDateTime:      market.ResolutionDateTime,
+		FinalResolutionDateTime: market.FinalResolutionDateTime,
+		UTCOffset:               market.UTCOffset,
+		IsResolved:              market.IsResolved,
+		ResolutionResult:        market.ResolutionResult,
+		InitialProbability:      market.InitialProbability,
+		CreatorUsername:         market.CreatorUsername,
+		CreatedAt:               market.CreatedAt,
+		YesLabel:                market.YesLabel,
+		NoLabel:                 market.NoLabel,
+	}, nil
+}
+
 // UpdateLabels updates the yes and no labels for a market
 func (r *GormRepository) UpdateLabels(ctx context.Context, id int64, yesLabel, noLabel string) error {
 	result := r.db.WithContext(ctx).Model(&models.Market{}).
@@ -373,8 +401,9 @@ func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 		CreatorUsername:         market.CreatorUsername,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
+		UTCOffset:               market.UTCOffset,
 		IsResolved:              market.Status == "resolved",
-		InitialProbability:      0.5, // Default initial probability
+		InitialProbability:      market.InitialProbability,
 	}
 }
 
@@ -399,5 +428,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		Status:                  status,
 		CreatedAt:               dbMarket.CreatedAt,
 		UpdatedAt:               dbMarket.UpdatedAt,
+		InitialProbability:      dbMarket.InitialProbability,
+		UTCOffset:               dbMarket.UTCOffset,
 	}
 }

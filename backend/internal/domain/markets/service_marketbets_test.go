@@ -60,6 +60,10 @@ func (r *betsRepo) CalculatePayoutPositions(context.Context, int64) ([]*markets.
 	panic("unexpected call")
 }
 
+func (r *betsRepo) GetPublicMarket(context.Context, int64) (*markets.PublicMarket, error) {
+	panic("unexpected call")
+}
+
 type nopUserService struct{}
 
 func (nopUserService) ValidateUserExists(context.Context, string) error { return nil }

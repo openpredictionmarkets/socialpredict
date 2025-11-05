@@ -96,6 +96,10 @@ func (m *mockPositionsService) CalculateMarketVolume(ctx context.Context, market
 	return 0, nil
 }
 
+func (m *mockPositionsService) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
+	return &dmarkets.PublicMarket{ID: marketID}, nil
+}
+
 func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)

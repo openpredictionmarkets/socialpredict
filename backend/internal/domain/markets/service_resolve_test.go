@@ -64,6 +64,10 @@ func (r *resolveRepo) CalculatePayoutPositions(context.Context, int64) ([]*marke
 	return r.positions, nil
 }
 
+func (r *resolveRepo) GetPublicMarket(context.Context, int64) (*markets.PublicMarket, error) {
+	return nil, nil
+}
+
 type resolveUserService struct {
 	applied []struct {
 		username string
