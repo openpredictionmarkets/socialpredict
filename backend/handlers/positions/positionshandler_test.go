@@ -92,6 +92,10 @@ func (m *mockPositionsService) GetUserPositionInMarket(ctx context.Context, mark
 	return nil, nil
 }
 
+func (m *mockPositionsService) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
+	return 0, nil
+}
+
 func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
@@ -137,7 +141,24 @@ func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.
 	}
 
 	marketIDStr := strconv.FormatInt(market.ID, 10)
-	positionSnapshot, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(db, marketIDStr)
+	var marketModel models.Market
+	if err := db.First(&marketModel, market.ID).Error; err != nil {
+		t.Fatalf("reload market: %v", err)
+	}
+
+	var betsRecords []models.Bet
+	if err := db.Where("market_id = ?", market.ID).Order("placed_at ASC").Find(&betsRecords).Error; err != nil {
+		t.Fatalf("load bets: %v", err)
+	}
+
+	snapshot := positionsmath.MarketSnapshot{
+		ID:               int64(marketModel.ID),
+		CreatedAt:        marketModel.CreatedAt,
+		IsResolved:       marketModel.IsResolved,
+		ResolutionResult: marketModel.ResolutionResult,
+	}
+
+	positionSnapshot, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, betsRecords)
 	if err != nil {
 		t.Fatalf("calculate positions: %v", err)
 	}

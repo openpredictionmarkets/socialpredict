@@ -3,7 +3,6 @@ package users
 import (
 	"context"
 	"errors"
-	"strconv"
 
 	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
@@ -164,8 +163,27 @@ func (r *GormRepository) GetMarketQuestion(ctx context.Context, marketID uint) (
 
 // GetUserPositionInMarket calculates the user's position within the specified market.
 func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dusers.MarketUserPosition, error) {
-	marketIDStr := strconv.FormatInt(marketID, 10)
-	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr, username)
+	var market models.Market
+	if err := r.db.WithContext(ctx).First(&market, marketID).Error; err != nil {
+		return nil, err
+	}
+
+	var bets []models.Bet
+	if err := r.db.WithContext(ctx).
+		Where("market_id = ?", marketID).
+		Order("placed_at ASC").
+		Find(&bets).Error; err != nil {
+		return nil, err
+	}
+
+	snapshot := positionsmath.MarketSnapshot{
+		ID:               int64(market.ID),
+		CreatedAt:        market.CreatedAt,
+		IsResolved:       market.IsResolved,
+		ResolutionResult: market.ResolutionResult,
+	}
+
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, bets, username)
 	if err != nil {
 		return nil, err
 	}

@@ -77,6 +77,10 @@ func (m *MockResolveService) GetUserPositionInMarket(ctx context.Context, market
 	return nil, nil
 }
 
+func (m *MockResolveService) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
+	return 0, nil
+}
+
 // TestMain sets up the test environment
 func TestMain(m *testing.M) {
 	// Set up test environment

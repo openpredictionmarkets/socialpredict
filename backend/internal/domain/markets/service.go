@@ -109,6 +109,7 @@ type ServiceInterface interface {
 	GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error)
 	GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*UserPosition, error)
+	CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error)
 }
 
 // Service implements the core market business logic
@@ -627,6 +628,25 @@ func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProject
 		CurrentProbability:   currentProbability,
 		ProjectedProbability: projection.Probability,
 	}, nil
+}
+
+// CalculateMarketVolume returns the total traded volume for a market.
+func (s *Service) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
+	if marketID <= 0 {
+		return 0, ErrInvalidInput
+	}
+
+	if _, err := s.repo.GetByID(ctx, marketID); err != nil {
+		return 0, err
+	}
+
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
+		return 0, err
+	}
+
+	modelBets := convertToModelBets(bets)
+	return marketmath.GetMarketVolume(modelBets), nil
 }
 
 // BetDisplayInfo represents a bet with probability information

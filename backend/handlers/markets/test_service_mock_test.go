@@ -128,3 +128,7 @@ func (m *MockService) GetMarketPositions(ctx context.Context, marketID int64) (d
 func (m *MockService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return nil, nil
 }
+
+func (m *MockService) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
+	return 0, nil
+}

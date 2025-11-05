@@ -3,6 +3,8 @@ package analytics
 import (
 	"context"
 	"errors"
+	"sort"
+	"time"
 
 	marketmath "socialpredict/internal/domain/math/market"
 	positionsmath "socialpredict/internal/domain/math/positions"
@@ -221,4 +223,129 @@ func (s *Service) ComputeSystemMetrics(ctx context.Context) (*SystemMetrics, err
 	}
 
 	return metrics, nil
+}
+
+// GlobalUserProfitability summarises a user's profitability across all markets.
+type GlobalUserProfitability struct {
+	Username          string    `json:"username"`
+	TotalProfit       int64     `json:"totalProfit"`
+	TotalCurrentValue int64     `json:"totalCurrentValue"`
+	TotalSpent        int64     `json:"totalSpent"`
+	ActiveMarkets     int       `json:"activeMarkets"`
+	ResolvedMarkets   int       `json:"resolvedMarkets"`
+	EarliestBet       time.Time `json:"earliestBet"`
+	Rank              int       `json:"rank"`
+}
+
+// ComputeGlobalLeaderboard ranks users by profitability across all markets.
+func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserProfitability, error) {
+	users, err := s.repo.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(users) == 0 {
+		return []GlobalUserProfitability{}, nil
+	}
+
+	markets, err := s.repo.ListMarkets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(markets) == 0 {
+		return []GlobalUserProfitability{}, nil
+	}
+
+	type aggregate struct {
+		totalProfit       int64
+		totalCurrentValue int64
+		totalSpent        int64
+		activeMarkets     int
+		resolvedMarkets   int
+		earliestBet       time.Time
+		earliestSet       bool
+	}
+
+	aggregates := make(map[string]*aggregate)
+	betsByMarket := make(map[int64][]models.Bet, len(markets))
+
+	for _, market := range markets {
+		bets, err := s.repo.ListBetsForMarket(ctx, uint(market.ID))
+		if err != nil {
+			return nil, err
+		}
+
+		snapshot := positionsmath.MarketSnapshot{
+			ID:               int64(market.ID),
+			CreatedAt:        market.CreatedAt,
+			IsResolved:       market.IsResolved,
+			ResolutionResult: market.ResolutionResult,
+		}
+
+		marketPositions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
+		if err != nil {
+			return nil, err
+		}
+
+		betsByMarket[int64(market.ID)] = bets
+
+		for _, pos := range marketPositions {
+			agg := aggregates[pos.Username]
+			if agg == nil {
+				agg = &aggregate{}
+				aggregates[pos.Username] = agg
+			}
+
+			profit := pos.Value - pos.TotalSpent
+			agg.totalProfit += profit
+			agg.totalCurrentValue += pos.Value
+			agg.totalSpent += pos.TotalSpent
+			if pos.IsResolved {
+				agg.resolvedMarkets++
+			} else {
+				agg.activeMarkets++
+			}
+		}
+	}
+
+	for _, bets := range betsByMarket {
+		for _, bet := range bets {
+			agg := aggregates[bet.Username]
+			if agg == nil {
+				continue
+			}
+			if !agg.earliestSet || bet.PlacedAt.Before(agg.earliestBet) {
+				agg.earliestBet = bet.PlacedAt
+				agg.earliestSet = true
+			}
+		}
+	}
+
+	leaderboard := make([]GlobalUserProfitability, 0, len(aggregates))
+	for username, agg := range aggregates {
+		if !agg.earliestSet {
+			continue
+		}
+		leaderboard = append(leaderboard, GlobalUserProfitability{
+			Username:          username,
+			TotalProfit:       agg.totalProfit,
+			TotalCurrentValue: agg.totalCurrentValue,
+			TotalSpent:        agg.totalSpent,
+			ActiveMarkets:     agg.activeMarkets,
+			ResolvedMarkets:   agg.resolvedMarkets,
+			EarliestBet:       agg.earliestBet,
+		})
+	}
+
+	sort.Slice(leaderboard, func(i, j int) bool {
+		if leaderboard[i].TotalProfit == leaderboard[j].TotalProfit {
+			return leaderboard[i].EarliestBet.Before(leaderboard[j].EarliestBet)
+		}
+		return leaderboard[i].TotalProfit > leaderboard[j].TotalProfit
+	})
+
+	for i := range leaderboard {
+		leaderboard[i].Rank = i + 1
+	}
+
+	return leaderboard, nil
 }

@@ -73,6 +73,10 @@ func (m *searchServiceMock) GetUserPositionInMarket(ctx context.Context, marketI
 	return nil, nil
 }
 
+func (m *searchServiceMock) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
+	return 0, nil
+}
+
 func TestSearchMarketsHandlerSuccess(t *testing.T) {
 	mockResult := &dmarkets.SearchResults{
 		PrimaryResults: []*dmarkets.Market{

@@ -91,11 +91,12 @@ func TestDeterminePositionType(t *testing.T) {
 	}
 }
 
-// Integration test would require database setup, so we'll keep it simple for now
-// In a real implementation, you'd want to test CalculateMarketLeaderboard with test data
 func TestCalculateMarketLeaderboard_EmptyBets(t *testing.T) {
-	// This test would require more setup with database mocking
-	// For now, we can test the core logic components above
-	// In practice, you'd mock the database and test the full function
-	t.Skip("Integration test requires database setup - core logic tested above")
+	leaderboard, err := CalculateMarketLeaderboard(MarketSnapshot{ID: 1, CreatedAt: time.Now()}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(leaderboard) != 0 {
+		t.Fatalf("expected empty leaderboard, got %d entries", len(leaderboard))
+	}
 }

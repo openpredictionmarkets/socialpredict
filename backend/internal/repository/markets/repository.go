@@ -3,7 +3,6 @@ package markets
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 
@@ -199,8 +198,12 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 
 // GetUserPosition retrieves the aggregated position for a specific user in a market.
 func (r *GormRepository) GetUserPosition(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
-	marketIDStr := strconv.FormatInt(marketID, 10)
-	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr, username)
+	snapshot, bets, err := r.loadMarketData(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, bets, username)
 	if err != nil {
 		return nil, err
 	}
@@ -220,8 +223,12 @@ func (r *GormRepository) GetUserPosition(ctx context.Context, marketID int64, us
 
 // ListMarketPositions retrieves aggregated positions for all users in a market.
 func (r *GormRepository) ListMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
-	marketIDStr := strconv.FormatInt(marketID, 10)
-	positions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr)
+	snapshot, bets, err := r.loadMarketData(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+
+	positions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
 	if err != nil {
 		return nil, err
 	}
@@ -306,8 +313,12 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) 
 
 // CalculatePayoutPositions computes the resolved valuations for a market's participants.
 func (r *GormRepository) CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*dmarkets.PayoutPosition, error) {
-	marketIDStr := strconv.FormatInt(marketID, 10)
-	positions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(r.db.WithContext(ctx), marketIDStr)
+	snapshot, bets, err := r.loadMarketData(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+
+	positions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
 	if err != nil {
 		return nil, err
 	}
@@ -320,6 +331,33 @@ func (r *GormRepository) CalculatePayoutPositions(ctx context.Context, marketID 
 		})
 	}
 	return result, nil
+}
+
+func (r *GormRepository) loadMarketData(ctx context.Context, marketID int64) (positionsmath.MarketSnapshot, []models.Bet, error) {
+	var market models.Market
+	if err := r.db.WithContext(ctx).First(&market, marketID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return positionsmath.MarketSnapshot{}, nil, dmarkets.ErrMarketNotFound
+		}
+		return positionsmath.MarketSnapshot{}, nil, err
+	}
+
+	var bets []models.Bet
+	if err := r.db.WithContext(ctx).
+		Where("market_id = ?", marketID).
+		Order("placed_at ASC").
+		Find(&bets).Error; err != nil {
+		return positionsmath.MarketSnapshot{}, nil, err
+	}
+
+	snapshot := positionsmath.MarketSnapshot{
+		ID:               int64(market.ID),
+		CreatedAt:        market.CreatedAt,
+		IsResolved:       market.IsResolved,
+		ResolutionResult: market.ResolutionResult,
+	}
+
+	return snapshot, bets, nil
 }
 
 // domainToModel converts a domain market to a GORM model

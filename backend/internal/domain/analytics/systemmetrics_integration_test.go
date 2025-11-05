@@ -7,7 +7,6 @@ import (
 	"socialpredict/internal/app"
 	"socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
-	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
@@ -167,7 +166,8 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 		t.Fatalf("ResolveMarket: %v", err)
 	}
 
-	metricsSvc := analytics.NewService(analytics.NewGormRepository(db), loadEcon)
+	repo := analytics.NewGormRepository(db)
+	metricsSvc := analytics.NewService(repo, loadEcon)
 	metrics, err := metricsSvc.ComputeSystemMetrics(context.Background())
 	if err != nil {
 		t.Fatalf("metrics after resolve: %v", err)
@@ -179,7 +179,7 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 
 	// Ensure no user holds simultaneous positive YES and NO shares post-resolution
 	for _, user := range users {
-		positions, err := positionsmath.CalculateAllUserMarketPositions_WPAM_DBPM(db, user.Username)
+		positions, err := repo.UserMarketPositions(context.Background(), user.Username)
 		if err != nil {
 			t.Fatalf("calculate positions: %v", err)
 		}

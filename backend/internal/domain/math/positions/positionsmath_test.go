@@ -1,8 +1,8 @@
 package positionsmath
 
 import (
+	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -50,16 +50,21 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-			db := modelstesting.NewFakeDB(t)
-			creator := "testcreator"
-			market := modelstesting.GenerateMarket(1, creator)
-			db.Create(&market)
+			market := modelstesting.GenerateMarket(1, "testcreator")
+			market.CreatedAt = time.Now()
+
+			var bets []models.Bet
 			for _, betConf := range tc.BetConfigs {
 				bet := modelstesting.GenerateBet(betConf.Amount, betConf.Outcome, betConf.Username, uint(market.ID), betConf.Offset)
-				db.Create(&bet)
+				bets = append(bets, bet)
 			}
-			marketIDStr := strconv.Itoa(int(market.ID))
-			actualPositions, err := CalculateMarketPositions_WPAM_DBPM(db, marketIDStr)
+
+			snapshot := MarketSnapshot{
+				ID:        market.ID,
+				CreatedAt: market.CreatedAt,
+			}
+
+			actualPositions, err := CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -87,35 +92,10 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 }
 
 func TestCalculateMarketPositions_IncludesZeroPositionUsers(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-	_, _ = modelstesting.UseStandardTestEconomics(t)
-
-	creator := modelstesting.GenerateUser("creator", 0)
-	if err := db.Create(&creator).Error; err != nil {
-		t.Fatalf("failed to create creator: %v", err)
-	}
-
-	market := modelstesting.GenerateMarket(42, creator.Username)
+	market := modelstesting.GenerateMarket(42, "creator")
 	market.IsResolved = true
 	market.ResolutionResult = "YES"
-	if err := db.Create(&market).Error; err != nil {
-		t.Fatalf("failed to create market: %v", err)
-	}
-
-	participants := []struct {
-		username string
-	}{
-		{"patrick"},
-		{"jimmy"},
-		{"jyron"},
-		{"testuser03"},
-	}
-	for _, p := range participants {
-		user := modelstesting.GenerateUser(p.username, 0)
-		if err := db.Create(&user).Error; err != nil {
-			t.Fatalf("failed to create user %s: %v", p.username, err)
-		}
-	}
+	market.CreatedAt = time.Now()
 
 	bets := []struct {
 		amount   int64
@@ -130,14 +110,20 @@ func TestCalculateMarketPositions_IncludesZeroPositionUsers(t *testing.T) {
 		{amount: 30, outcome: "YES", username: "testuser03", offset: 4 * time.Second},
 	}
 
+	var betRecords []models.Bet
 	for _, b := range bets {
 		bet := modelstesting.GenerateBet(b.amount, b.outcome, b.username, uint(market.ID), b.offset)
-		if err := db.Create(&bet).Error; err != nil {
-			t.Fatalf("failed to create bet %+v: %v", b, err)
-		}
+		betRecords = append(betRecords, bet)
 	}
 
-	positions, err := CalculateMarketPositions_WPAM_DBPM(db, strconv.Itoa(int(market.ID)))
+	snapshot := MarketSnapshot{
+		ID:               market.ID,
+		CreatedAt:        market.CreatedAt,
+		IsResolved:       market.IsResolved,
+		ResolutionResult: market.ResolutionResult,
+	}
+
+	positions, err := CalculateMarketPositions_WPAM_DBPM(snapshot, betRecords)
 	if err != nil {
 		t.Fatalf("unexpected error calculating positions: %v", err)
 	}

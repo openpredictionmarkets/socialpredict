@@ -64,5 +64,80 @@ func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]models.Bet, err
 }
 
 func (r *GormRepository) UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error) {
-	return positionsmath.CalculateAllUserMarketPositions_WPAM_DBPM(r.WithContext(ctx), username)
+	db := r.WithContext(ctx)
+
+	var userBets []models.Bet
+	if err := db.Where("username = ?", username).
+		Order("market_id ASC, placed_at ASC, id ASC").
+		Find(&userBets).Error; err != nil {
+		return nil, err
+	}
+
+	if len(userBets) == 0 {
+		return []positionsmath.MarketPosition{}, nil
+	}
+
+	marketIDSet := make(map[int64]struct{})
+	for _, bet := range userBets {
+		marketIDSet[int64(bet.MarketID)] = struct{}{}
+	}
+
+	marketIDs := make([]uint, 0, len(marketIDSet))
+	for id := range marketIDSet {
+		marketIDs = append(marketIDs, uint(id))
+	}
+
+	var markets []models.Market
+	if err := db.Where("id IN ?", marketIDs).Find(&markets).Error; err != nil {
+		return nil, err
+	}
+
+	marketSnapshots := make(map[int64]positionsmath.MarketSnapshot, len(markets))
+	for _, market := range markets {
+		marketSnapshots[int64(market.ID)] = positionsmath.MarketSnapshot{
+			ID:               int64(market.ID),
+			CreatedAt:        market.CreatedAt,
+			IsResolved:       market.IsResolved,
+			ResolutionResult: market.ResolutionResult,
+		}
+	}
+
+	var allBets []models.Bet
+	if err := db.Where("market_id IN ?", marketIDs).
+		Order("market_id ASC, placed_at ASC, id ASC").
+		Find(&allBets).Error; err != nil {
+		return nil, err
+	}
+
+	betsByMarket := make(map[int64][]models.Bet)
+	for _, bet := range allBets {
+		betsByMarket[int64(bet.MarketID)] = append(betsByMarket[int64(bet.MarketID)], bet)
+	}
+
+	var positions []positionsmath.MarketPosition
+	for _, marketID := range marketIDs {
+		snapshot, ok := marketSnapshots[int64(marketID)]
+		if !ok {
+			continue
+		}
+
+		bets := betsByMarket[int64(marketID)]
+		if len(bets) == 0 {
+			continue
+		}
+
+		calculated, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, pos := range calculated {
+			if pos.Username == username {
+				positions = append(positions, pos)
+				break
+			}
+		}
+	}
+
+	return positions, nil
 }
