@@ -497,7 +497,7 @@ paths:
   /v0/markets/{id}:
     get:
       summary: Get market details
-      description: Fetches a single market by its identifier.
+      description: Fetches a single market by its identifier with probability and volume stats.
       tags: [Markets]
       security:
         - bearerAuth: []
@@ -515,7 +515,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MarketResponse'
+                $ref: '#/components/schemas/MarketDetailsResponse'
         '401':
           description: Authentication failed.
           content:
@@ -708,6 +708,110 @@ components:
         updatedAt:
           type: string
           format: date-time
+    MarketDetailsResponse:
+      type: object
+      properties:
+        Market:
+          $ref: '#/components/schemas/MarketDetail'
+        Creator:
+          $ref: '#/components/schemas/MarketCreatorSummary'
+        ProbabilityChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProbabilityChange'
+        LastProbability:
+          type: number
+          format: float
+        NumUsers:
+          type: integer
+        TotalVolume:
+          type: integer
+          format: int64
+        MarketDust:
+          type: integer
+          format: int64
+      required:
+        - Market
+        - Creator
+        - ProbabilityChanges
+        - LastProbability
+        - NumUsers
+        - TotalVolume
+        - MarketDust
+    MarketDetail:
+      type: object
+      properties:
+        ID:
+          type: integer
+          format: int64
+        QuestionTitle:
+          type: string
+        Description:
+          type: string
+        OutcomeType:
+          type: string
+        ResolutionDateTime:
+          type: string
+          format: date-time
+        FinalResolutionDateTime:
+          type: string
+          format: date-time
+        ResolutionResult:
+          type: string
+        CreatorUsername:
+          type: string
+        YesLabel:
+          type: string
+        NoLabel:
+          type: string
+        Status:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        InitialProbability:
+          type: number
+          format: float
+        UTCOffset:
+          type: integer
+      required:
+        - ID
+        - QuestionTitle
+        - Description
+        - OutcomeType
+        - ResolutionDateTime
+        - FinalResolutionDateTime
+        - ResolutionResult
+        - CreatorUsername
+        - YesLabel
+        - NoLabel
+        - Status
+        - CreatedAt
+        - UpdatedAt
+        - InitialProbability
+        - UTCOffset
+    MarketCreatorSummary:
+      type: object
+      properties:
+        Username:
+          type: string
+      required:
+        - Username
+    ProbabilityChange:
+      type: object
+      properties:
+        Probability:
+          type: number
+          format: float
+        Timestamp:
+          type: string
+          format: date-time
+      required:
+        - Probability
+        - Timestamp
     SimpleListMarketsResponse:
       type: object
       properties:
