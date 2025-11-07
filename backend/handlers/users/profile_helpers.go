@@ -1,6 +1,7 @@
 package usershandlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -12,18 +13,27 @@ import (
 func writeProfileError(w http.ResponseWriter, err error, field string) {
 	switch {
 	case errors.Is(err, dusers.ErrUserNotFound):
-		http.Error(w, "User not found", http.StatusNotFound)
+		writeProfileJSONError(w, http.StatusNotFound, "User not found")
 	case errors.Is(err, dusers.ErrInvalidUserData):
-		http.Error(w, "Invalid user data", http.StatusBadRequest)
+		writeProfileJSONError(w, http.StatusBadRequest, "Invalid user data")
 	case errors.Is(err, dusers.ErrInvalidCredentials):
-		http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		writeProfileJSONError(w, http.StatusUnauthorized, "Current password is incorrect")
 	default:
 		message := err.Error()
 		if isValidationError(message) {
-			http.Error(w, message, http.StatusBadRequest)
+			writeProfileJSONError(w, http.StatusBadRequest, message)
 			return
 		}
-		http.Error(w, "Failed to update "+field+": "+message, http.StatusInternalServerError)
+		writeProfileJSONError(w, http.StatusInternalServerError, "Failed to update "+field+": "+message)
+	}
+}
+
+func writeProfileJSONError(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	if err := json.NewEncoder(w).Encode(dto.ErrorResponse{Error: message}); err != nil {
+		http.Error(w, message, statusCode)
 	}
 }
 

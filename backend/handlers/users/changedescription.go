@@ -13,19 +13,19 @@ import (
 func ChangeDescriptionHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			writeProfileJSONError(w, http.StatusMethodNotAllowed, "Method is not supported.")
 			return
 		}
 
 		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
 		if httperr != nil {
-			http.Error(w, "Invalid token: "+httperr.Error(), httperr.StatusCode)
+			writeProfileJSONError(w, httperr.StatusCode, "Invalid token: "+httperr.Error())
 			return
 		}
 
 		var request dto.ChangeDescriptionRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			writeProfileJSONError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
 			return
 		}
 

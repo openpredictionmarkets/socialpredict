@@ -1,0 +1,875 @@
+openapi: 3.0.3
+info:
+  title: SocialPredict API
+  version: 0.1.0
+  description: >
+    HTTP contract for the SocialPredict monolith. Paths are grouped by service so
+    they can be lifted into standalone microservice specs later. This seed focuses
+    on the Markets service.
+servers:
+  - url: https://api.socialpredict.local
+    description: Placeholder development server
+tags:
+  - name: Markets
+    description: Market creation, listing, and resolution workflows.
+  - name: Users
+    description: Public and private user profile management.
+paths:
+  /v0/markets:
+    get:
+      summary: List markets
+      description: Returns recently created markets with optional filtering.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by market status (e.g. active, closed, resolved).
+          required: false
+          schema:
+            type: string
+        - name: created_by
+          in: query
+          description: Only include markets created by the given username.
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of markets to return (defaults to service limit).
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of items to skip before collecting results.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleListMarketsResponse'
+        '400':
+          description: Invalid query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create a market
+      description: Creates a new prediction market for the authenticated user.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMarketRequest'
+      responses:
+        '201':
+          description: Market created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResponse'
+        '400':
+          description: Validation failed while creating the market.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/privateprofile:
+    get:
+      summary: Get private profile
+      description: Returns the authenticated user’s private profile data.
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Private profile returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/profilechange/description:
+    post:
+      summary: Update profile description
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeDescriptionRequest'
+      responses:
+        '200':
+          description: Description updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
+          description: Invalid request body or validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/profilechange/displayname:
+    post:
+      summary: Update display name
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeDisplayNameRequest'
+      responses:
+        '200':
+          description: Display name updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
+          description: Invalid request body or validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/profilechange/emoji:
+    post:
+      summary: Update personal emoji
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmojiRequest'
+      responses:
+        '200':
+          description: Personal emoji updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
+          description: Invalid request body or validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/profilechange/links:
+    post:
+      summary: Update personal links
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePersonalLinksRequest'
+      responses:
+        '200':
+          description: Personal links updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
+          description: Invalid request body or validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/changepassword:
+    post:
+      summary: Change account password
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Password changed successfully
+        '400':
+          description: Invalid request body or password requirements not met.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/userinfo/{username}:
+    get:
+      summary: Get public user info
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          description: Username of the profile to fetch.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Public profile returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUserResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/usercredit/{username}:
+    get:
+      summary: Get user credit
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+          description: Username to evaluate for credit availability.
+      responses:
+        '200':
+          description: Credit calculated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserCreditResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/portfolio/{username}:
+    get:
+      summary: Get user portfolio
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+          description: Username whose portfolio should be returned.
+      responses:
+        '200':
+          description: Portfolio returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/users/{username}/financial:
+    get:
+      summary: Get user financial snapshot
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+          description: Username whose financial snapshot is requested.
+      responses:
+        '200':
+          description: Financial snapshot returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserFinancialResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/{id}:
+    get:
+      summary: Get market details
+      description: Fetches a single market by its identifier.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Market returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/{id}/resolve:
+    post:
+      summary: Resolve a market
+      description: Sets the final outcome for a market once it has concluded.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveMarketRequest'
+      responses:
+        '200':
+          description: Market resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveMarketResponse'
+        '400':
+          description: Provided outcome is invalid for the market state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market already resolved or cannot be resolved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ChangeDescriptionRequest:
+      type: object
+      required:
+        - description
+      properties:
+        description:
+          type: string
+          maxLength: 2000
+    ChangeDisplayNameRequest:
+      type: object
+      required:
+        - displayName
+      properties:
+        displayName:
+          type: string
+          maxLength: 50
+    ChangeEmojiRequest:
+      type: object
+      required:
+        - emoji
+      properties:
+        emoji:
+          type: string
+          maxLength: 20
+    ChangePersonalLinksRequest:
+      type: object
+      properties:
+        personalLink1:
+          type: string
+          format: uri
+        personalLink2:
+          type: string
+          format: uri
+        personalLink3:
+          type: string
+          format: uri
+        personalLink4:
+          type: string
+          format: uri
+    ChangePasswordRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+    CreateMarketRequest:
+      type: object
+      required:
+        - questionTitle
+        - outcomeType
+        - resolutionDateTime
+      properties:
+        questionTitle:
+          type: string
+          maxLength: 160
+          description: Title of the market question shown to users.
+        description:
+          type: string
+          maxLength: 2000
+          description: Optional long-form description for additional context.
+        outcomeType:
+          type: string
+          description: Outcome type code supported by the service.
+          example: binary
+        resolutionDateTime:
+          type: string
+          format: date-time
+          description: When the market should be resolved at the latest.
+        yesLabel:
+          type: string
+          maxLength: 20
+          description: Optional custom label for the "yes" outcome.
+        noLabel:
+          type: string
+          maxLength: 20
+          description: Optional custom label for the "no" outcome.
+    MarketResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        questionTitle:
+          type: string
+        description:
+          type: string
+        outcomeType:
+          type: string
+        resolutionDateTime:
+          type: string
+          format: date-time
+        creatorUsername:
+          type: string
+        yesLabel:
+          type: string
+        noLabel:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SimpleListMarketsResponse:
+      type: object
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResponse'
+        total:
+          type: integer
+          description: Number of markets returned in this page.
+      required:
+        - markets
+        - total
+    ResolveMarketRequest:
+      type: object
+      required:
+        - resolution
+      properties:
+        resolution:
+          type: string
+          enum: [yes, no]
+          description: Final outcome for the market.
+    ResolveMarketResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          nullable: true
+        details:
+          type: string
+          nullable: true
+      required:
+        - error
+    PortfolioItem:
+      type: object
+      properties:
+        marketId:
+          type: integer
+          format: int64
+        questionTitle:
+          type: string
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        lastBetPlaced:
+          type: string
+          format: date-time
+    PortfolioResponse:
+      type: object
+      properties:
+        portfolioItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioItem'
+        totalSharesOwned:
+          type: integer
+          format: int64
+      required:
+        - portfolioItems
+        - totalSharesOwned
+    PrivateUserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        displayname:
+          type: string
+        usertype:
+          type: string
+        initialAccountBalance:
+          type: integer
+          format: int64
+        accountBalance:
+          type: integer
+          format: int64
+        personalEmoji:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        personalink1:
+          type: string
+          nullable: true
+        personalink2:
+          type: string
+          nullable: true
+        personalink3:
+          type: string
+          nullable: true
+        personalink4:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+        apiKey:
+          type: string
+          nullable: true
+        mustChangePassword:
+          type: boolean
+    PublicUserResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        displayname:
+          type: string
+        usertype:
+          type: string
+        initialAccountBalance:
+          type: integer
+          format: int64
+        accountBalance:
+          type: integer
+          format: int64
+        personalEmoji:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        personalink1:
+          type: string
+          nullable: true
+        personalink2:
+          type: string
+          nullable: true
+        personalink3:
+          type: string
+          nullable: true
+        personalink4:
+          type: string
+          nullable: true
+    UserCreditResponse:
+      type: object
+      properties:
+        credit:
+          type: integer
+          format: int64
+      required:
+        - credit
+    UserFinancialResponse:
+      type: object
+      properties:
+        financial:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64

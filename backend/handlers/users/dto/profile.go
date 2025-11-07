@@ -47,3 +47,8 @@ type PrivateUserResponse struct {
 	APIKey                string `json:"apiKey,omitempty"`
 	MustChangePassword    bool   `json:"mustChangePassword"`
 }
+
+// ErrorResponse represents an error payload returned by profile endpoints.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}

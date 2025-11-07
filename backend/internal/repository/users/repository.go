@@ -274,6 +274,7 @@ func (r *GormRepository) UpdatePassword(ctx context.Context, username string, ha
 // domainToModel converts a domain user to a GORM model
 func (r *GormRepository) domainToModel(user *dusers.User) models.User {
 	return models.User{
+		ID: int64(user.ID),
 		Model: gorm.Model{
 			ID:        uint(user.ID),
 			CreatedAt: user.CreatedAt,
