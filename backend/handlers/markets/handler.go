@@ -19,12 +19,12 @@ type Service interface {
 	SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error
 	GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error)
 	ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error)
 	SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error)
 	ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error
 	ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
 	GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
 	ProjectProbability(ctx context.Context, req dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error)
-	GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error)
 }
 
 // Handler handles HTTP requests for markets
@@ -85,7 +85,7 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to response DTO
-	response := h.marketToResponse(market)
+	response := marketToResponse(market)
 
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
@@ -160,7 +160,7 @@ func (h *Handler) GetMarket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to response DTO
-	response := h.marketToResponse(market)
+	response := marketToResponse(market)
 
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
@@ -176,7 +176,12 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 
 	// Parse query parameters
 	var params dto.ListMarketsQueryParams
-	params.Status = r.URL.Query().Get("status")
+	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	params.Status = status
 	params.CreatedBy = r.URL.Query().Get("created_by")
 
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
@@ -200,26 +205,30 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call service
-	markets, err := h.service.ListMarkets(r.Context(), filters)
+	var markets []*dmarkets.Market
+	if params.Status != "" {
+		page := dmarkets.Page{Limit: params.Limit, Offset: params.Offset}
+		markets, err = h.service.ListByStatus(r.Context(), params.Status, page)
+	} else {
+		markets, err = h.service.ListMarkets(r.Context(), filters)
+	}
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
 
-	// Convert to response DTOs
-	responses := make([]*dto.MarketResponse, len(markets))
-	for i, market := range markets {
-		responses[i] = h.marketToResponse(market)
-	}
-
-	response := dto.SimpleListMarketsResponse{
-		Markets: responses,
-		Total:   len(responses),
+	overviews, err := buildMarketOverviewResponses(r.Context(), h.service, markets)
+	if err != nil {
+		h.handleError(w, err)
+		return
 	}
 
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+		Markets: overviews,
+		Total:   len(overviews),
+	})
 }
 
 // SearchMarkets handles GET /markets/search
@@ -232,7 +241,12 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	var params dto.SearchMarketsQueryParams
 	params.Query = r.URL.Query().Get("q")
-	params.Status = r.URL.Query().Get("status")
+	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	params.Status = status
 
 	if params.Query == "" {
 		http.Error(w, "Query parameter 'q' is required", http.StatusBadRequest)
@@ -271,7 +285,7 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 	// Convert to response DTOs
 	responses := make([]*dto.MarketResponse, len(allMarkets))
 	for i, market := range allMarkets {
-		responses[i] = h.marketToResponse(market)
+		responses[i] = marketToResponse(market)
 	}
 
 	response := dto.SimpleListMarketsResponse{
@@ -343,8 +357,12 @@ func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Parse status from URL
 	vars := mux.Vars(r)
-	status := vars["status"]
-	if status == "" {
+	statusValue, err := normalizeStatusParam(vars["status"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if vars["status"] == "" {
 		http.Error(w, "Status is required", http.StatusBadRequest)
 		return
 	}
@@ -369,27 +387,35 @@ func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
 		Offset: offset,
 	}
 
-	// Call service
-	markets, err := h.service.ListByStatus(r.Context(), status, page)
+	var markets []*dmarkets.Market
+	if statusValue == "" {
+		filters := dmarkets.ListFilters{
+			Status: "",
+			Limit:  limit,
+			Offset: offset,
+		}
+		markets, err = h.service.ListMarkets(r.Context(), filters)
+	} else {
+		markets, err = h.service.ListByStatus(r.Context(), statusValue, page)
+	}
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
 
 	// Convert to response DTOs
-	responses := make([]*dto.MarketResponse, len(markets))
-	for i, market := range markets {
-		responses[i] = h.marketToResponse(market)
-	}
-
-	response := dto.SimpleListMarketsResponse{
-		Markets: responses,
-		Total:   len(responses),
+	overviews, err := buildMarketOverviewResponses(r.Context(), h.service, markets)
+	if err != nil {
+		h.handleError(w, err)
+		return
 	}
 
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+		Markets: overviews,
+		Total:   len(overviews),
+	})
 }
 
 // GetDetails handles GET /markets/{id} with full market details
@@ -552,23 +578,6 @@ func (h *Handler) ProjectProbability(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-}
-
-// marketToResponse converts a domain market to a response DTO
-func (h *Handler) marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
-	return &dto.MarketResponse{
-		ID:                 market.ID,
-		QuestionTitle:      market.QuestionTitle,
-		Description:        market.Description,
-		OutcomeType:        market.OutcomeType,
-		ResolutionDateTime: market.ResolutionDateTime,
-		CreatorUsername:    market.CreatorUsername,
-		YesLabel:           market.YesLabel,
-		NoLabel:            market.NoLabel,
-		Status:             market.Status,
-		CreatedAt:          market.CreatedAt,
-		UpdatedAt:          market.UpdatedAt,
-	}
 }
 
 // handleError maps domain errors to HTTP responses

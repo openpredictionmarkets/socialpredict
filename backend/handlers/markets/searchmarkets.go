@@ -26,7 +26,11 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			// Also check 'query' parameter for backward compatibility
 			query = r.URL.Query().Get("query")
 		}
-		status := r.URL.Query().Get("status")
+		status, statusErr := normalizeStatusParam(r.URL.Query().Get("status"))
+		if statusErr != nil {
+			http.Error(w, statusErr.Error(), http.StatusBadRequest)
+			return
+		}
 		limitStr := r.URL.Query().Get("limit")
 		offsetStr := r.URL.Query().Get("offset")
 

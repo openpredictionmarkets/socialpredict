@@ -13,7 +13,11 @@ import (
 func GetMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// 1. Parse query parameters for filtering
-		status := r.URL.Query().Get("status")
+		status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		limitStr := r.URL.Query().Get("limit")
 		offsetStr := r.URL.Query().Get("offset")
 
@@ -52,34 +56,17 @@ func GetMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		// 5. Convert to DTOs
-		var marketResponses []*dto.MarketResponse
-		for _, market := range markets {
-			marketResponses = append(marketResponses, &dto.MarketResponse{
-				ID:                 market.ID,
-				QuestionTitle:      market.QuestionTitle,
-				Description:        market.Description,
-				OutcomeType:        market.OutcomeType,
-				ResolutionDateTime: market.ResolutionDateTime,
-				CreatorUsername:    market.CreatorUsername,
-				YesLabel:           market.YesLabel,
-				NoLabel:            market.NoLabel,
-				Status:             market.Status,
-				CreatedAt:          market.CreatedAt,
-				UpdatedAt:          market.UpdatedAt,
-			})
-		}
-
-		// 6. Ensure empty array instead of null
-		if marketResponses == nil {
-			marketResponses = make([]*dto.MarketResponse, 0)
+		overviews, err := buildMarketOverviewResponses(r.Context(), svc, markets)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
 		}
 
 		// 7. Return response
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(dto.SimpleListMarketsResponse{
-			Markets: marketResponses,
-			Total:   len(marketResponses),
+		json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+			Markets: overviews,
+			Total:   len(overviews),
 		})
 	}
 }

@@ -47,6 +47,7 @@ type MarketOverviewResponse struct {
 	LastProbability float64          `json:"lastProbability"`
 	NumUsers        int              `json:"numUsers"`
 	TotalVolume     int64            `json:"totalVolume"`
+	MarketDust      int64            `json:"marketDust"`
 }
 
 // SimpleListMarketsResponse represents the HTTP response for simple market listing
@@ -58,6 +59,7 @@ type SimpleListMarketsResponse struct {
 // ListMarketsResponse represents the HTTP response for listing markets with enriched data
 type ListMarketsResponse struct {
 	Markets []*MarketOverviewResponse `json:"markets"`
+	Total   int                       `json:"total"`
 }
 
 // MarketOverview represents backward compatibility type for market overview data

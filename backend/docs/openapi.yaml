@@ -29,6 +29,8 @@ paths:
           required: false
           schema:
             type: string
+            enum: [active, closed, resolved, all]
+            description: Case-insensitive status filter. `all` or empty returns every market.
         - name: created_by
           in: query
           description: Only include markets created by the given username.
@@ -56,7 +58,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SimpleListMarketsResponse'
+                $ref: '#/components/schemas/ListMarketsResponse'
         '400':
           description: Invalid query parameters.
           content:
@@ -708,6 +710,53 @@ components:
         updatedAt:
           type: string
           format: date-time
+    CreatorResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        personalEmoji:
+          type: string
+          nullable: true
+        displayname:
+          type: string
+          nullable: true
+    MarketOverviewResponse:
+      type: object
+      properties:
+        market:
+          $ref: '#/components/schemas/MarketResponse'
+        creator:
+          $ref: '#/components/schemas/CreatorResponse'
+        lastProbability:
+          type: number
+          format: float
+        numUsers:
+          type: integer
+        totalVolume:
+          type: integer
+          format: int64
+        marketDust:
+          type: integer
+          format: int64
+      required:
+        - market
+        - lastProbability
+        - numUsers
+        - totalVolume
+        - marketDust
+    ListMarketsResponse:
+      type: object
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketOverviewResponse'
+        total:
+          type: integer
+      required:
+        - markets
+        - total
     MarketDetailsResponse:
       type: object
       properties:

@@ -11,7 +11,7 @@ import (
 )
 
 // ListMarketsHandlerFactory creates an HTTP handler for listing markets with service injection
-func ListMarketsHandlerFactory(svc dmarkets.Service) http.HandlerFunc {
+func ListMarketsHandlerFactory(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("ListMarketsHandler: Request received")
 		if r.Method != http.MethodGet {
@@ -20,7 +20,11 @@ func ListMarketsHandlerFactory(svc dmarkets.Service) http.HandlerFunc {
 		}
 
 		// Parse query parameters
-		status := r.URL.Query().Get("status")
+		status, statusErr := normalizeStatusParam(r.URL.Query().Get("status"))
+		if statusErr != nil {
+			http.Error(w, statusErr.Error(), http.StatusBadRequest)
+			return
+		}
 		limitStr := r.URL.Query().Get("limit")
 		offsetStr := r.URL.Query().Get("offset")
 
@@ -48,9 +52,10 @@ func ListMarketsHandlerFactory(svc dmarkets.Service) http.HandlerFunc {
 		}
 
 		// If status is provided, delegate to ListByStatus; otherwise use List
-		var markets []*dmarkets.Market
-		var err error
-
+		var (
+			markets []*dmarkets.Market
+			err     error
+		)
 		if status != "" {
 			// Use ListByStatus for status-specific queries
 			page := dmarkets.Page{Limit: limit, Offset: offset}
@@ -72,39 +77,19 @@ func ListMarketsHandlerFactory(svc dmarkets.Service) http.HandlerFunc {
 			return
 		}
 
-		// Convert domain markets to response DTOs
-		var marketResponses []*dto.MarketResponse
-		for _, market := range markets {
-			marketResponse := &dto.MarketResponse{
-				ID:                 market.ID,
-				QuestionTitle:      market.QuestionTitle,
-				Description:        market.Description,
-				OutcomeType:        market.OutcomeType,
-				ResolutionDateTime: market.ResolutionDateTime,
-				CreatorUsername:    market.CreatorUsername,
-				YesLabel:           market.YesLabel,
-				NoLabel:            market.NoLabel,
-				Status:             market.Status,
-				CreatedAt:          market.CreatedAt,
-				UpdatedAt:          market.UpdatedAt,
-			}
-			marketResponses = append(marketResponses, marketResponse)
-		}
-
-		// Normalize empty list → [] (ensure empty array instead of null)
-		if marketResponses == nil {
-			marketResponses = make([]*dto.MarketResponse, 0)
-		}
-
-		// Encode dto.ListResponse
-		response := dto.SimpleListMarketsResponse{
-			Markets: marketResponses,
-			Total:   len(marketResponses),
+		overviews, err := buildMarketOverviewResponses(r.Context(), svc, markets)
+		if err != nil {
+			log.Printf("Error building market overviews: %v", err)
+			http.Error(w, "Error fetching markets", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(response); err != nil {
+		if err := json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+			Markets: overviews,
+			Total:   len(overviews),
+		}); err != nil {
 			log.Printf("Error encoding response: %v", err)
 			http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		}
