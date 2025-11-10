@@ -32,8 +32,8 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
                 }
                 const data = await response.json();
                 setFeeData(data.Betting.BetFees);
-            } catch (error) {
-                console.error('Error fetching fee data:', error);
+            } catch {
+                setFeeData(null);
             } finally {
                 setIsLoading(false);
             }

@@ -21,20 +21,10 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
                 throw new Error(`Error fetching data: ${response.statusText}`);
             }
 
-            // Log the raw text of the response
-            const responseText = await response.text();
-            console.log('Response text:', responseText);
-
-            // Try parsing the response as JSON
-            const data = JSON.parse(responseText);
-
-            // Log the parsed JSON data
-            console.log('Parsed JSON data:', data);
-
+            const data = await response.json();
             setProjectionData(data);
         } catch (err) {
             setError(err.message);
-            console.error('Error fetching market projection:', err);
         } finally {
             setLoading(false);
         }

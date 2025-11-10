@@ -13,15 +13,21 @@ const ResolveModalButton = ({ marketId, token }) => {
     const handleSelectYes = () => setSelectedResolution('YES');
 
     const handleConfirm = () => {
-        console.log("selectedResolution: ", selectedResolution)
+        if (!selectedResolution) {
+            alert('Please select an outcome to resolve the market.');
+            return;
+        }
+
         resolveMarket(marketId, token, selectedResolution)
-            .then(data => {
-                console.log("Resolution successful:", data);
+            .then(() => {
+                alert('Market resolved successfully.');
             })
             .catch(error => {
-                console.error("Failed to resolve market:", error);
+                alert(`Failed to resolve market: ${error.message}`);
+            })
+            .finally(() => {
+                setShowResolveModal(false);
             });
-        setShowResolveModal(false);
     };
 
     return (

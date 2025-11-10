@@ -72,9 +72,6 @@ function Create() {
         noLabel: trimmedNoLabel || 'NO',
       };
 
-      console.log('marketData:', marketData);
-      console.log(JSON.stringify(marketData));
-
       const response = await fetch(`${API_URL}/v0/markets`, {
         method: 'POST',
         headers: {
@@ -86,7 +83,6 @@ function Create() {
 
       if (response.ok) {
         const responseData = await response.json();
-        console.log('Market creation successful:', responseData);
         history.push(`/markets/${responseData.id}`);
       } else {
         const errorText = await response.text();
@@ -189,10 +185,7 @@ function Create() {
           </label>
           <DatetimeSelector
             value={resolutionDateTime}
-            onChange={(e) => {
-              console.log('New date-time:', e.target.value);
-              setResolutionDateTime(e.target.value);
-            }}
+            onChange={(e) => setResolutionDateTime(e.target.value)}
             className='w-full'
           />
         </div>

@@ -25,8 +25,6 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         return;
     }
 
-    console.log('Sending bet data:', betData);
-
     fetch(`${API_URL}/v0/bet`, {
         method: 'POST',
         headers: {
@@ -51,12 +49,8 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         }
         return response.json();
     })
-    .then(data => {
-        console.log('Success:', data);
-        onSuccess(data);
-    })
+    .then(onSuccess)
     .catch(error => {
-        console.error('Error:', error);
         onError(error);
     });
 };
@@ -97,8 +91,6 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
         return;
     }
 
-    console.log('Sending sale data:', saleData);
-
     fetch(`${API_URL}/v0/sell`, {
         method: 'POST',
         headers: {
@@ -123,12 +115,8 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
         }
         return response.json();
     })
-    .then(data => {
-        console.log('Success:', data);
-        onSuccess(data);
-    })
+    .then(onSuccess)
     .catch(error => {
-        console.error('Error:', error);
         onError(error);
     });
 };

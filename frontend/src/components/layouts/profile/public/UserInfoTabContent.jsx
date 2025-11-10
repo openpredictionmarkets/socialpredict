@@ -10,17 +10,14 @@ const UserInfoTabContent = ({ username, userData }) => {
     useEffect(() => {
         const fetchUserCredit = async () => {
             try {
-                console.log(`Fetching user credit for: ${username} from ${API_URL}/v0/usercredit/${username}`);
                 const response = await fetch(`${API_URL}/v0/usercredit/${username}`);
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('User credit data:', data);
                     setUserCredit(data);
                 } else {
                     throw new Error(`Error fetching user credit: ${response.statusText}`);
                 }
             } catch (err) {
-                console.error('Error fetching user credit:', err);
                 setError(err.message);
             } finally {
                 setLoading(false);

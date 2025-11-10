@@ -22,12 +22,7 @@ const EmojiSelector = ({ onSave }) => {
         setFilteredEmojis(emojis.filter(emoji => regex.test(emoji.name)).slice(0, numberOfEmojisShown));
     }, [searchTerm]);
 
-    useEffect(() => {
-        console.log('Selected emoji updated:', selectedEmoji);
-    }, [selectedEmoji]);
-
     const handleEmojiClick = (emoji) => {
-        console.log('Emoji clicked:', emoji);
         setSelectedEmoji(emoji);
     };
 
@@ -51,14 +46,11 @@ const EmojiSelector = ({ onSave }) => {
                 body: JSON.stringify({ emoji: selectedEmoji.symbol }), // Send only the symbol
             });
 
-            console.log('Response status:', response.status); // Log response status
             if (!response.ok) {
                 throw new Error('Failed to change emoji');
             }
-            const responseData = await response.json();
-            console.log('Response data:', responseData); // Log response data
 
-            console.log('Emoji changed successfully');
+            await response.json();
             if (onSave) onSave(selectedEmoji.symbol);
         } catch (error) {
             console.error('Error changing emoji:', error);

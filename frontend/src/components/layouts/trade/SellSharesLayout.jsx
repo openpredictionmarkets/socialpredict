@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons';
 import { fetchUserShares, submitSale } from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
+import { API_URL } from '../../../config';
 
 const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
     const [shares, setShares] = useState({ NoSharesOwned: 0, YesSharesOwned: 0 });
@@ -15,19 +16,31 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
     useEffect(() => {
         const fetchFeeData = async () => {
+            if (!token) {
+                setIsLoading(false);
+                return;
+            }
+
             try {
-                const response = await fetch('/v0/setup');
+                const response = await fetch(`${API_URL}/v0/setup`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to load setup: ${response.status}`);
+                }
                 const data = await response.json();
                 setFeeData(data.Betting.BetFees);
-                setIsLoading(false); // Set loading state to false after fetching
-            } catch (error) {
-                console.error('Error fetching fee data:', error);
+            } catch {
+                setFeeData(null);
+            } finally {
                 setIsLoading(false);
             }
         };
 
         fetchFeeData();
-    }, []);
+    }, [token]);
 
     useEffect(() => {
         fetchUserShares(marketId, token)
@@ -54,7 +67,6 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             })
             .catch(error => {
                 alert(`Error fetching shares: ${error.message}`);
-                console.error('Error fetching shares:', error);
                 // Optionally, reset to default state on error
                 setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
             });
@@ -88,11 +100,9 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
         submitSale(saleData, token, (data) => {
                 alert(`Sale successful! Sale ID: ${data.id}`);
-                console.log('Sale response:', data);
                 onTransactionSuccess();
             }, (error) => {
                 alert(`Sale failed: ${error.message}`);
-                console.error('Sale error:', error);
             }
         );
     };

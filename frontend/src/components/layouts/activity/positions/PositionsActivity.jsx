@@ -11,16 +11,12 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
       const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}`);
       if (response.ok) {
         const rawData = await response.json();
-        console.log("API Data:", rawData);
 
         const filteredSorted = rawData
           .filter(user => user.noSharesOwned > 0 || user.yesSharesOwned > 0)
           .sort((a, b) => (b.noSharesOwned + b.yesSharesOwned) - (a.noSharesOwned + a.yesSharesOwned));
 
-        console.log("Filtered and Sorted Data:", filteredSorted);
         setPositions(filteredSorted);
-      } else {
-        console.error('Error fetching positions:', response.statusText);
       }
     };
     fetchPositions();

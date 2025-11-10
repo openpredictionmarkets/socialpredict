@@ -23,11 +23,9 @@ export const resolveMarket = (marketId, token, selectedResolution) => {
             return response.json();
         })
         .then(data => {
-            console.log('Market resolved successfully:', data);
             return data;
         })
         .catch(error => {
-            console.error('Error resolving market:', error);
             throw error;
         });
 };
