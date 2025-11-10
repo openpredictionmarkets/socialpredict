@@ -22,6 +22,7 @@ const normalizeProbabilityChange = (change) => {
 
   return {
     probability: toNumber(change.probability ?? change.Probability),
+    timestamp: change.timestamp ?? change.Timestamp ?? change.createdAt ?? change.CreatedAt ?? null,
     createdAt: change.createdAt ?? change.CreatedAt ?? null,
     updatedAt: change.updatedAt ?? change.UpdatedAt ?? null,
     txId: change.txId ?? change.TxId,

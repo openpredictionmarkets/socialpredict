@@ -15,6 +15,8 @@ type MarketResponse struct {
 	YesLabel           string    `json:"yesLabel"`
 	NoLabel            string    `json:"noLabel"`
 	Status             string    `json:"status"`
+	IsResolved         bool      `json:"isResolved"`
+	ResolutionResult   string    `json:"resolutionResult"`
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
 }

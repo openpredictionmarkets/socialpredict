@@ -1,25 +1,31 @@
 import React, { useEffect, useState } from 'react';
 
-const DatetimeSelector = ({ value, onChange }) => {
-    const [internalValue, setInternalValue] = useState(value);
+const formatNow = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    const formattedMonth = month < 10 ? `0${month}` : `${month}`;
+    const formattedDay = day < 10 ? `0${day}` : `${day}`;
+    return `${year}-${formattedMonth}-${formattedDay}T23:59`;
+};
 
-    // Set internalValue when component mounts
+const DatetimeSelector = ({ value, onChange }) => {
+    const [internalValue, setInternalValue] = useState(() => value ?? formatNow());
+
     useEffect(() => {
-        if (!value) { // Only set default if no value is provided
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth() + 1;
-            const day = now.getDate();
-            const formattedMonth = month < 10 ? `0${month}` : `${month}`;
-            const formattedDay = day < 10 ? `0${day}` : `${day}`;
-            const defaultDateTime = `${year}-${formattedMonth}-${formattedDay}T23:59`;
-            setInternalValue(defaultDateTime);
+        if (value === undefined || value === null || value === '') {
+            setInternalValue((prev) => (prev ? prev : formatNow()));
+        } else {
+            setInternalValue(value);
         }
     }, [value]);
 
     const handleChange = (event) => {
         setInternalValue(event.target.value);
-        onChange(event); // Propagate changes to parent
+        if (onChange) {
+            onChange(event);
+        }
     };
 
     return (

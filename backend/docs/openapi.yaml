@@ -103,6 +103,62 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v0/sell:
+    post:
+      summary: Sell shares
+      description: Sells an amount of YES/NO shares for the authenticated user and deposits the proceeds.
+      tags: [Bets]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellRequest'
+      responses:
+        '201':
+          description: Sale processed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellResponse'
+        '400':
+          description: Invalid sale request or insufficient position.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market closed or resolved; sale not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Sale violates a business rule (e.g., dust cap exceeded).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Authentication failed.
           content:
@@ -998,6 +1054,10 @@ components:
           type: string
         status:
           type: string
+        isResolved:
+          type: boolean
+        resolutionResult:
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -1087,6 +1147,29 @@ components:
       required:
         - probability
         - timestamp
+    MarketBetHistoryItem:
+      type: object
+      properties:
+        username:
+          type: string
+        outcome:
+          type: string
+          enum: [YES, NO]
+        amount:
+          type: integer
+          format: int64
+        probability:
+          type: number
+          format: float
+        placedAt:
+          type: string
+          format: date-time
+      required:
+        - username
+        - outcome
+        - amount
+        - probability
+        - placedAt
     ListMarketsResponse:
       type: object
       properties:
@@ -1215,6 +1298,54 @@ components:
         - totalSpentInPlay
         - isResolved
         - resolutionResult
+    SellRequest:
+      type: object
+      properties:
+        marketId:
+          type: integer
+          format: int64
+        amount:
+          type: integer
+          format: int64
+          description: Credits worth of shares to sell.
+        outcome:
+          type: string
+          enum: [YES, NO]
+      required:
+        - marketId
+        - amount
+        - outcome
+    SellResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        marketId:
+          type: integer
+          format: int64
+        sharesSold:
+          type: integer
+          format: int64
+        saleValue:
+          type: integer
+          format: int64
+        dust:
+          type: integer
+          format: int64
+        outcome:
+          type: string
+          enum: [YES, NO]
+        transactionAt:
+          type: string
+          format: date-time
+      required:
+        - username
+        - marketId
+        - sharesSold
+        - saleValue
+        - dust
+        - outcome
+        - transactionAt
     SimpleListMarketsResponse:
       type: object
       properties:
@@ -1540,3 +1671,52 @@ components:
         - amount
         - outcome
         - placedAt
+  /v0/markets/bets/{marketId}:
+    get:
+      summary: List bets for a market
+      description: Returns the bet history for a specific market, including the probability at the time each bet was placed.
+      tags: [Markets, Bets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Bets returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MarketBetHistoryItem'
+        '400':
+          description: Invalid market ID supplied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

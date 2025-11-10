@@ -58,6 +58,8 @@ func marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
 		YesLabel:           market.YesLabel,
 		NoLabel:            market.NoLabel,
 		Status:             market.Status,
+		IsResolved:         strings.EqualFold(market.Status, "resolved"),
+		ResolutionResult:   market.ResolutionResult,
 		CreatedAt:          market.CreatedAt,
 		UpdatedAt:          market.UpdatedAt,
 	}
