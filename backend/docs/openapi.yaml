@@ -287,6 +287,225 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /v0/markets/{id}/resolve:
+    post:
+      summary: Resolve a market
+      description: Sets the final outcome for a market once it has concluded.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveMarketRequest'
+      responses:
+        '200':
+          description: Market resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveMarketResponse'
+        '400':
+          description: Provided outcome is invalid for the market state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market already resolved or cannot be resolved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/{id}/leaderboard:
+    get:
+      summary: Get market leaderboard
+      description: Ranks participants in a single market by realized profit and traded volume.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          required: false
+          description: Maximum rows to return (defaults to 100).
+          schema:
+            type: integer
+            minimum: 1
+        - name: offset
+          in: query
+          required: false
+          description: Number of rows to skip before collecting results.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Leaderboard returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketLeaderboardResponse'
+        '400':
+          description: Invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/positions/{marketId}:
+    get:
+      summary: List user positions for a market
+      description: Returns all users holding YES or NO shares for the specified market.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Positions returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MarketPosition'
+        '400':
+          description: Invalid market ID supplied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/positions/{marketId}/{username}:
+    get:
+      summary: Get a user's position in a market
+      description: Returns the holdings for a specific user in the given market.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: username
+          in: path
+          required: true
+          description: Username to query.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Position returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketPosition'
+        '400':
+          description: Invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market or user not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v0/privateprofile:
     get:
       summary: Get private profile
@@ -669,64 +888,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
-    post:
-      summary: Resolve a market
-      description: Sets the final outcome for a market once it has concluded.
-      tags: [Markets]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Numeric identifier of the market.
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ResolveMarketRequest'
-      responses:
-        '200':
-          description: Market resolved successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ResolveMarketResponse'
-        '400':
-          description: Provided outcome is invalid for the market state.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Market not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Market already resolved or cannot be resolved.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -963,6 +1124,97 @@ components:
         - numUsers
         - totalVolume
         - marketDust
+    MarketLeaderboardRow:
+      type: object
+      properties:
+        username:
+          type: string
+        profit:
+          type: integer
+          format: int64
+        currentValue:
+          type: integer
+          format: int64
+        totalSpent:
+          type: integer
+          format: int64
+        position:
+          type: string
+          enum: [YES, NO, NEUTRAL, NONE]
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        rank:
+          type: integer
+      required:
+        - username
+        - profit
+        - currentValue
+        - totalSpent
+        - position
+        - yesSharesOwned
+        - noSharesOwned
+        - rank
+    MarketLeaderboardResponse:
+      type: object
+      properties:
+        marketId:
+          type: integer
+          format: int64
+        leaderboard:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketLeaderboardRow'
+        total:
+          type: integer
+      required:
+        - marketId
+        - leaderboard
+        - total
+    MarketPosition:
+      type: object
+      description: A user's net holdings within a specific market.
+      properties:
+        username:
+          type: string
+        marketId:
+          type: integer
+          format: int64
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        value:
+          type: integer
+          format: int64
+          description: Net value of the position.
+        totalSpent:
+          type: integer
+          format: int64
+          description: Lifetime spend on this market.
+        totalSpentInPlay:
+          type: integer
+          format: int64
+          description: Amount currently tied up in open orders.
+        isResolved:
+          type: boolean
+        resolutionResult:
+          type: string
+      required:
+        - username
+        - marketId
+        - yesSharesOwned
+        - noSharesOwned
+        - value
+        - totalSpent
+        - totalSpentInPlay
+        - isResolved
+        - resolutionResult
     SimpleListMarketsResponse:
       type: object
       properties:

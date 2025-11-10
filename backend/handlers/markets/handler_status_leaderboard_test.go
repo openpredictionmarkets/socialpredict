@@ -76,10 +76,14 @@ func TestMarketLeaderboardHandler_Smoke(t *testing.T) {
 			t.Fatalf("expected limit 25, got %d", p.Limit)
 		}
 		return []*dmarkets.LeaderboardRow{{
-			Username: "alice",
-			Profit:   12.5,
-			Volume:   300,
-			Rank:     1,
+			Username:       "alice",
+			Profit:         12,
+			CurrentValue:   100,
+			TotalSpent:     88,
+			Position:       "YES",
+			YesSharesOwned: 5,
+			NoSharesOwned:  0,
+			Rank:           1,
 		}}, nil
 	}
 

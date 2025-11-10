@@ -110,10 +110,14 @@ type ResolveMarketResponse struct {
 
 // LeaderboardRow represents a single row in the market leaderboard
 type LeaderboardRow struct {
-	Username string  `json:"username"`
-	Profit   float64 `json:"profit"`
-	Volume   int64   `json:"volume"`
-	Rank     int     `json:"rank"`
+	Username       string `json:"username"`
+	Profit         int64  `json:"profit"`
+	CurrentValue   int64  `json:"currentValue"`
+	TotalSpent     int64  `json:"totalSpent"`
+	Position       string `json:"position"`
+	YesSharesOwned int64  `json:"yesSharesOwned"`
+	NoSharesOwned  int64  `json:"noSharesOwned"`
+	Rank           int    `json:"rank"`
 }
 
 // LeaderboardResponse represents the HTTP response for market leaderboard

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	marketmath "socialpredict/internal/domain/math/market"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	users "socialpredict/internal/domain/users"
 	"socialpredict/models"
@@ -527,10 +528,14 @@ type Page struct {
 
 // LeaderboardRow represents a single row in the market leaderboard
 type LeaderboardRow struct {
-	Username string
-	Profit   float64
-	Volume   int64
-	Rank     int
+	Username       string
+	Profit         int64
+	CurrentValue   int64
+	TotalSpent     int64
+	Position       string
+	YesSharesOwned int64
+	NoSharesOwned  int64
+	Rank           int
 }
 
 // ProbabilityProjectionRequest represents a request for probability projection
@@ -572,8 +577,12 @@ func (s *Service) ListByStatus(ctx context.Context, status string, p Page) ([]*M
 
 // GetMarketLeaderboard returns the leaderboard for a specific market
 func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Page) ([]*LeaderboardRow, error) {
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
+	}
+
 	// 1. Validate market exists
-	_, err := s.repo.GetByID(ctx, marketID)
+	market, err := s.repo.GetByID(ctx, marketID)
 	if err != nil {
 		return nil, ErrMarketNotFound
 	}
@@ -589,17 +598,58 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 		p.Offset = 0
 	}
 
-	// 3. Call repository to get leaderboard data
-	// This will be implemented in repository layer
-	// For now, return empty slice - calculations will be moved here from handlers
-	var leaderboard []*LeaderboardRow
+	// 3. Fetch bets for the market
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
 
-	// TODO: Move leaderboard calculation logic from positionsmath.CalculateMarketLeaderboard here
-	// This should involve:
-	// - Getting all bets for the market
-	// - Calculating profit/loss for each user
-	// - Ranking users by profitability
-	// - Applying pagination
+	if len(bets) == 0 {
+		return []*LeaderboardRow{}, nil
+	}
+
+	modelBets := convertToModelBets(bets)
+
+	snapshot := positionsmath.MarketSnapshot{
+		ID:               market.ID,
+		CreatedAt:        market.CreatedAt,
+		IsResolved:       strings.EqualFold(market.Status, "resolved"),
+		ResolutionResult: market.ResolutionResult,
+	}
+
+	profitability, err := positionsmath.CalculateMarketLeaderboard(snapshot, modelBets)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(profitability) == 0 {
+		return []*LeaderboardRow{}, nil
+	}
+
+	// Apply pagination manually since profitability list is already sorted
+	start := p.Offset
+	if start > len(profitability) {
+		start = len(profitability)
+	}
+	end := start + p.Limit
+	if end > len(profitability) {
+		end = len(profitability)
+	}
+	paged := profitability[start:end]
+
+	leaderboard := make([]*LeaderboardRow, len(paged))
+	for i, row := range paged {
+		leaderboard[i] = &LeaderboardRow{
+			Username:       row.Username,
+			Profit:         row.Profit,
+			CurrentValue:   row.CurrentValue,
+			TotalSpent:     row.TotalSpent,
+			Position:       row.Position,
+			YesSharesOwned: row.YesSharesOwned,
+			NoSharesOwned:  row.NoSharesOwned,
+			Rank:           row.Rank,
+		}
+	}
 
 	return leaderboard, nil
 }

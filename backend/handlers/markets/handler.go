@@ -511,10 +511,14 @@ func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
 	var leaderRows []dto.LeaderboardRow
 	for _, row := range leaderboard {
 		leaderRows = append(leaderRows, dto.LeaderboardRow{
-			Username: row.Username,
-			Profit:   row.Profit,
-			Volume:   row.Volume,
-			Rank:     row.Rank,
+			Username:       row.Username,
+			Profit:         row.Profit,
+			CurrentValue:   row.CurrentValue,
+			TotalSpent:     row.TotalSpent,
+			Position:       row.Position,
+			YesSharesOwned: row.YesSharesOwned,
+			NoSharesOwned:  row.NoSharesOwned,
+			Rank:           row.Rank,
 		})
 	}
 
