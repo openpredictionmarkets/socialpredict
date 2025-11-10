@@ -159,18 +159,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Market not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
   /v0/admin/createuser:
     post:
       summary: Create a new user
@@ -552,6 +540,55 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Market or user not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/bets/{marketId}:
+    get:
+      summary: List bets for a market
+      description: Returns the bet history for a specific market, including the probability at the time each bet was placed.
+      tags: [Markets, Bets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Bets returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MarketBetHistoryItem'
+        '400':
+          description: Invalid market ID supplied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
           content:
             application/json:
               schema:
@@ -1671,52 +1708,3 @@ components:
         - amount
         - outcome
         - placedAt
-  /v0/markets/bets/{marketId}:
-    get:
-      summary: List bets for a market
-      description: Returns the bet history for a specific market, including the probability at the time each bet was placed.
-      tags: [Markets, Bets]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: marketId
-          in: path
-          required: true
-          description: Numeric identifier of the market.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
-      responses:
-        '200':
-          description: Bets returned successfully.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MarketBetHistoryItem'
-        '400':
-          description: Invalid market ID supplied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Market not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
