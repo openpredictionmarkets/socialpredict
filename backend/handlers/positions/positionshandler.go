@@ -50,9 +50,18 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 			return
 		}
 
+		// Map to DTO responses
+		responses := make([]userPositionResponse, 0, len(positions))
+		for _, pos := range positions {
+			if pos == nil {
+				continue
+			}
+			responses = append(responses, newUserPositionResponse(pos))
+		}
+
 		// Respond with the positions information
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(positions); err != nil {
+		if err := json.NewEncoder(w).Encode(responses); err != nil {
 			log.Printf("Error encoding positions response: %v", err)
 			http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		}
@@ -108,7 +117,7 @@ func MarketUserPositionHandlerWithService(svc dmarkets.ServiceInterface) http.Ha
 
 		// Respond with the user position information
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(position); err != nil {
+		if err := json.NewEncoder(w).Encode(newUserPositionResponse(position)); err != nil {
 			log.Printf("Error encoding user position response: %v", err)
 			http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		}
