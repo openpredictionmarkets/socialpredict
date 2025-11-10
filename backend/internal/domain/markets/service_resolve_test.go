@@ -77,10 +77,10 @@ type resolveUserService struct {
 }
 
 func (resolveUserService) ValidateUserExists(context.Context, string) error { return nil }
-func (resolveUserService) ValidateUserBalance(context.Context, string, float64, float64) error {
+func (resolveUserService) ValidateUserBalance(context.Context, string, int64, int64) error {
 	return nil
 }
-func (resolveUserService) DeductBalance(context.Context, string, float64) error { return nil }
+func (resolveUserService) DeductBalance(context.Context, string, int64) error { return nil }
 func (s *resolveUserService) ApplyTransaction(ctx context.Context, username string, amount int64, tx string) error {
 	s.applied = append(s.applied, struct {
 		username string
@@ -88,6 +88,10 @@ func (s *resolveUserService) ApplyTransaction(ctx context.Context, username stri
 		txType   string
 	}{username: username, amount: amount, txType: tx})
 	return nil
+}
+
+func (resolveUserService) GetPublicUser(context.Context, string) (*users.PublicUser, error) {
+	return nil, nil
 }
 
 type nopClock struct{}

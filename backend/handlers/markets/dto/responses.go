@@ -50,6 +50,30 @@ type MarketOverviewResponse struct {
 	MarketDust      int64            `json:"marketDust"`
 }
 
+// PublicMarketResponse represents the legacy public market payload.
+type PublicMarketResponse struct {
+	ID                      int64     `json:"id"`
+	QuestionTitle           string    `json:"questionTitle"`
+	Description             string    `json:"description"`
+	OutcomeType             string    `json:"outcomeType"`
+	ResolutionDateTime      time.Time `json:"resolutionDateTime"`
+	FinalResolutionDateTime time.Time `json:"finalResolutionDateTime"`
+	UTCOffset               int       `json:"utcOffset"`
+	IsResolved              bool      `json:"isResolved"`
+	ResolutionResult        string    `json:"resolutionResult"`
+	InitialProbability      float64   `json:"initialProbability"`
+	CreatorUsername         string    `json:"creatorUsername"`
+	CreatedAt               time.Time `json:"createdAt"`
+	YesLabel                string    `json:"yesLabel"`
+	NoLabel                 string    `json:"noLabel"`
+}
+
+// ProbabilityChangeResponse represents WPAM probability history.
+type ProbabilityChangeResponse struct {
+	Probability float64   `json:"probability"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
 // SimpleListMarketsResponse represents the HTTP response for simple market listing
 type SimpleListMarketsResponse struct {
 	Markets []*MarketResponse `json:"markets"`
@@ -110,13 +134,12 @@ type ProbabilityProjectionResponse struct {
 
 // MarketDetailsResponse represents the HTTP response for market details
 type MarketDetailsResponse struct {
-	MarketID           int64       `json:"marketId"`
-	Market             interface{} `json:"market"`             // Will be properly typed later
-	Creator            interface{} `json:"creator"`            // Will be properly typed later
-	ProbabilityChanges interface{} `json:"probabilityChanges"` // Will be properly typed later
-	NumUsers           int         `json:"numUsers"`
-	TotalVolume        int64       `json:"totalVolume"`
-	MarketDust         int64       `json:"marketDust"`
+	Market             PublicMarketResponse        `json:"market"`
+	Creator            *CreatorResponse            `json:"creator"`
+	ProbabilityChanges []ProbabilityChangeResponse `json:"probabilityChanges"`
+	NumUsers           int                         `json:"numUsers"`
+	TotalVolume        int64                       `json:"totalVolume"`
+	MarketDust         int64                       `json:"marketDust"`
 }
 
 // MarketDetailHandlerResponse - backward compatibility type for tests

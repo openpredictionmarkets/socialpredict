@@ -66,9 +66,9 @@ type AnalyticsService interface {
 
 // Service implements the core user business logic
 type Service struct {
-	repo       Repository
-	analytics  AnalyticsService
-	sanitizer  Sanitizer
+	repo      Repository
+	analytics AnalyticsService
+	sanitizer Sanitizer
 }
 
 // NewService creates a new users service
@@ -90,18 +90,14 @@ func (s *Service) ValidateUserExists(ctx context.Context, username string) error
 }
 
 // ValidateUserBalance validates if a user has sufficient balance for an operation
-func (s *Service) ValidateUserBalance(ctx context.Context, username string, requiredAmount float64, maxDebt float64) error {
+func (s *Service) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
 	user, err := s.repo.GetByUsername(ctx, username)
 	if err != nil {
 		return ErrUserNotFound
 	}
 
-	// Convert float64 amounts to int64 (assuming cents)
-	requiredCents := int64(requiredAmount * 100)
-	maxDebtCents := int64(maxDebt * 100)
-
 	// Check if user would exceed maximum debt
-	if user.AccountBalance-requiredCents < -maxDebtCents {
+	if user.AccountBalance-requiredAmount < -maxDebt {
 		return ErrInsufficientBalance
 	}
 
@@ -109,16 +105,13 @@ func (s *Service) ValidateUserBalance(ctx context.Context, username string, requ
 }
 
 // DeductBalance deducts an amount from a user's balance
-func (s *Service) DeductBalance(ctx context.Context, username string, amount float64) error {
+func (s *Service) DeductBalance(ctx context.Context, username string, amount int64) error {
 	user, err := s.repo.GetByUsername(ctx, username)
 	if err != nil {
 		return ErrUserNotFound
 	}
 
-	// Convert float64 amount to int64 (assuming cents)
-	amountCents := int64(amount * 100)
-
-	newBalance := user.AccountBalance - amountCents
+	newBalance := user.AccountBalance - amount
 	return s.repo.UpdateBalance(ctx, username, newBalance)
 }
 

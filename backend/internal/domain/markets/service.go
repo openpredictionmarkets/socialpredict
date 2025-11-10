@@ -45,7 +45,9 @@ type Repository interface {
 
 // CreatorSummary captures lightweight information about a market creator.
 type CreatorSummary struct {
-	Username string
+	Username      string
+	DisplayName   string
+	PersonalEmoji string
 }
 
 // ProbabilityPoint records a market probability at a specific moment.
@@ -57,16 +59,17 @@ type ProbabilityPoint struct {
 // UserService defines the interface for user-related operations
 type UserService interface {
 	ValidateUserExists(ctx context.Context, username string) error
-	ValidateUserBalance(ctx context.Context, username string, requiredAmount float64, maxDebt float64) error
-	DeductBalance(ctx context.Context, username string, amount float64) error
+	ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error
+	DeductBalance(ctx context.Context, username string, amount int64) error
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
+	GetPublicUser(ctx context.Context, username string) (*users.PublicUser, error)
 }
 
 // Config holds configuration for the markets service
 type Config struct {
 	MinimumFutureHours float64
-	CreateMarketCost   float64
-	MaximumDebtAllowed float64
+	CreateMarketCost   int64
+	MaximumDebtAllowed int64
 }
 
 // ListFilters represents filters for listing markets
@@ -259,7 +262,8 @@ func (s *Service) GetMarketOverviews(ctx context.Context, filters ListFilters) (
 	var overviews []*MarketOverview
 	for _, market := range markets {
 		overview := &MarketOverview{
-			Market: market,
+			Market:  market,
+			Creator: s.buildCreatorSummary(ctx, market.CreatorUsername),
 			// Complex calculations will be added here
 			// This is placeholder for now - calculations should be moved from handlers
 		}
@@ -306,13 +310,27 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 
 	return &MarketOverview{
 		Market:             market,
-		Creator:            &CreatorSummary{Username: market.CreatorUsername},
+		Creator:            s.buildCreatorSummary(ctx, market.CreatorUsername),
 		ProbabilityChanges: probabilityPoints,
 		LastProbability:    lastProbability,
 		NumUsers:           numUsers,
 		TotalVolume:        totalVolumeWithDust,
 		MarketDust:         marketDust,
 	}, nil
+}
+
+func (s *Service) buildCreatorSummary(ctx context.Context, username string) *CreatorSummary {
+	summary := &CreatorSummary{Username: username}
+	if s.userService == nil {
+		return summary
+	}
+	user, err := s.userService.GetPublicUser(ctx, username)
+	if err != nil || user == nil {
+		return summary
+	}
+	summary.DisplayName = user.DisplayName
+	summary.PersonalEmoji = user.PersonalEmoji
+	return summary
 }
 
 func convertToModelBets(bets []*Bet) []models.Bet {

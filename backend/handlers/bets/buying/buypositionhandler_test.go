@@ -78,10 +78,10 @@ func (f *fakeUsersService) ChangePassword(ctx context.Context, username, current
 	return nil
 }
 func (f *fakeUsersService) ValidateUserExists(ctx context.Context, username string) error { return nil }
-func (f *fakeUsersService) ValidateUserBalance(ctx context.Context, username string, requiredAmount float64, maxDebt float64) error {
+func (f *fakeUsersService) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
 	return nil
 }
-func (f *fakeUsersService) DeductBalance(ctx context.Context, username string, amount float64) error {
+func (f *fakeUsersService) DeductBalance(ctx context.Context, username string, amount int64) error {
 	return nil
 }
 func (f *fakeUsersService) CreateUser(ctx context.Context, req dusers.UserCreateRequest) (*dusers.User, error) {

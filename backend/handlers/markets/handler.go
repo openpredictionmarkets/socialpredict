@@ -446,9 +446,17 @@ func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send response (MarketOverview already has JSON tags)
+	response := dto.MarketDetailsResponse{
+		Market:             publicMarketResponseFromDomain(details.Market),
+		Creator:            creatorResponseFromSummary(details.Creator),
+		ProbabilityChanges: probabilityChangesToResponse(details.ProbabilityChanges),
+		NumUsers:           details.NumUsers,
+		TotalVolume:        details.TotalVolume,
+		MarketDust:         details.MarketDust,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(details)
+	json.NewEncoder(w).Encode(response)
 }
 
 // MarketLeaderboard handles GET /markets/{id}/leaderboard

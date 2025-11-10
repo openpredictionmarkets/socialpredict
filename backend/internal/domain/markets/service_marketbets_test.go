@@ -7,6 +7,7 @@ import (
 
 	markets "socialpredict/internal/domain/markets"
 	"socialpredict/internal/domain/math/probabilities/wpam"
+	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
 )
 
@@ -67,11 +68,14 @@ func (r *betsRepo) GetPublicMarket(context.Context, int64) (*markets.PublicMarke
 type nopUserService struct{}
 
 func (nopUserService) ValidateUserExists(context.Context, string) error { return nil }
-func (nopUserService) ValidateUserBalance(context.Context, string, float64, float64) error {
+func (nopUserService) ValidateUserBalance(context.Context, string, int64, int64) error {
 	return nil
 }
-func (nopUserService) DeductBalance(context.Context, string, float64) error          { return nil }
+func (nopUserService) DeductBalance(context.Context, string, int64) error            { return nil }
 func (nopUserService) ApplyTransaction(context.Context, string, int64, string) error { return nil }
+func (nopUserService) GetPublicUser(context.Context, string) (*dusers.PublicUser, error) {
+	return nil, nil
+}
 
 type betsClock struct{ now time.Time }
 

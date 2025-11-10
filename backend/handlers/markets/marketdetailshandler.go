@@ -42,10 +42,9 @@ func MarketDetailsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 		// 4. Convert domain model to response DTO
 		// The domain service should provide all necessary data including creator info
 		response := dto.MarketDetailsResponse{
-			MarketID:           marketId,
-			Market:             details.Market,
-			Creator:            details.Creator, // Creator info should come from domain service
-			ProbabilityChanges: details.ProbabilityChanges,
+			Market:             publicMarketResponseFromDomain(details.Market),
+			Creator:            creatorResponseFromSummary(details.Creator),
+			ProbabilityChanges: probabilityChangesToResponse(details.ProbabilityChanges),
 			NumUsers:           details.NumUsers,
 			TotalVolume:        details.TotalVolume,
 			MarketDust:         details.MarketDust,

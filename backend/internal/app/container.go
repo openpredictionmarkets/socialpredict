@@ -88,8 +88,8 @@ func (c *Container) InitializeServices() {
 	// Markets service depends on markets repository and users service
 	marketsConfig := dmarkets.Config{
 		MinimumFutureHours: c.config.Economics.MarketCreation.MinimumFutureHours,
-		CreateMarketCost:   float64(c.config.Economics.MarketIncentives.CreateMarketCost),
-		MaximumDebtAllowed: float64(c.config.Economics.User.MaximumDebtAllowed),
+		CreateMarketCost:   c.config.Economics.MarketIncentives.CreateMarketCost,
+		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
 	}
 
 	c.marketsService = dmarkets.NewService(&c.marketsRepo, c.usersService, c.clock, marketsConfig)

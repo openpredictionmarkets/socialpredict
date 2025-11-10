@@ -7,6 +7,7 @@ import (
 	"time"
 
 	markets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
 	rmarkets "socialpredict/internal/repository/markets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -20,16 +21,20 @@ func (noopUserService) ValidateUserExists(ctx context.Context, username string) 
 	return nil
 }
 
-func (noopUserService) ValidateUserBalance(ctx context.Context, username string, requiredAmount float64, maxDebt float64) error {
+func (noopUserService) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
 	return nil
 }
 
-func (noopUserService) DeductBalance(ctx context.Context, username string, amount float64) error {
+func (noopUserService) DeductBalance(ctx context.Context, username string, amount int64) error {
 	return nil
 }
 
 func (noopUserService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
 	return nil
+}
+
+func (noopUserService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
+	return nil, nil
 }
 
 type fixedClock struct {
