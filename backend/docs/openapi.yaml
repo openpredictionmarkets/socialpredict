@@ -16,6 +16,10 @@ tags:
     description: Public and private user profile management.
   - name: Auth
     description: Authentication and session management.
+  - name: Bets
+    description: Placing and selling bets.
+  - name: Config
+    description: Application economics configuration.
 paths:
   /v0/login:
     post:
@@ -43,6 +47,70 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/setup:
+    get:
+      summary: Get economics configuration
+      description: Returns the current economic configuration (market fees, user balances, bet fees).
+      tags: [Config]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Economics configuration returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EconomicsConfig'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to load configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/bet:
+    post:
+      summary: Place a bet
+      description: Places a YES/NO bet on a market for the authenticated user.
+      tags: [Bets]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BetRequest'
+      responses:
+        '200':
+          description: Bet placed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetResponse'
+        '400':
+          description: Invalid bet payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
           content:
             application/json:
               schema:
@@ -1060,6 +1128,76 @@ components:
           additionalProperties:
             type: integer
             format: int64
+    MarketCreationConfig:
+      type: object
+      properties:
+        InitialMarketProbability:
+          type: number
+          format: float
+        InitialMarketSubsidization:
+          type: integer
+          format: int64
+        InitialMarketYes:
+          type: integer
+          format: int64
+        InitialMarketNo:
+          type: integer
+          format: int64
+        MinimumFutureHours:
+          type: number
+          format: float
+    MarketIncentivesConfig:
+      type: object
+      properties:
+        CreateMarketCost:
+          type: integer
+          format: int64
+        TraderBonus:
+          type: integer
+          format: int64
+    BetFeesConfig:
+      type: object
+      properties:
+        InitialBetFee:
+          type: integer
+          format: int64
+        BuySharesFee:
+          type: integer
+          format: int64
+        SellSharesFee:
+          type: integer
+          format: int64
+    BettingConfig:
+      type: object
+      properties:
+        MinimumBet:
+          type: integer
+          format: int64
+        MaxDustPerSale:
+          type: integer
+          format: int64
+        BetFees:
+          $ref: '#/components/schemas/BetFeesConfig'
+    UserEconomicsConfig:
+      type: object
+      properties:
+        InitialAccountBalance:
+          type: integer
+          format: int64
+        MaximumDebtAllowed:
+          type: integer
+          format: int64
+    EconomicsConfig:
+      type: object
+      properties:
+        MarketCreation:
+          $ref: '#/components/schemas/MarketCreationConfig'
+        MarketIncentives:
+          $ref: '#/components/schemas/MarketIncentivesConfig'
+        User:
+          $ref: '#/components/schemas/UserEconomicsConfig'
+        Betting:
+          $ref: '#/components/schemas/BettingConfig'
     LoginRequest:
       type: object
       required:
@@ -1113,3 +1251,40 @@ components:
         - username
         - password
         - usertype
+    BetRequest:
+      type: object
+      required:
+        - marketId
+        - amount
+        - outcome
+      properties:
+        marketId:
+          type: integer
+          format: int64
+        amount:
+          type: integer
+          minimum: 1
+        outcome:
+          type: string
+          enum: [YES, NO]
+    BetResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        marketId:
+          type: integer
+          format: int64
+        amount:
+          type: integer
+        outcome:
+          type: string
+        placedAt:
+          type: string
+          format: date-time
+      required:
+        - username
+        - marketId
+        - amount
+        - outcome
+        - placedAt
