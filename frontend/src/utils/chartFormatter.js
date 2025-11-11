@@ -51,7 +51,13 @@ export const loadChartFormatter = async () => {
 
     if (response.ok) {
       const data = await response.json();
-      requestedSigFigs = Number(data?.charts?.sigFigs ?? DEFAULT_SIG_FIGS);
+
+      const rawSigFigs = data?.charts?.sigFigs;
+
+      requestedSigFigs = Number.isFinite(Number(rawSigFigs))
+        ? Number(rawSigFigs)
+        : DEFAULT_SIG_FIGS;
+      
     }
   } catch (error) {
     console.error('Failed to load chart formatter config', error);
