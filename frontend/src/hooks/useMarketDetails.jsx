@@ -11,7 +11,7 @@ const calculateCurrentProbability = (details) => {
           .probability
       : details.market.initialProbability;
 
-  return parseFloat(currentProbability.toFixed(3));
+  return parseFloat(currentProbability.toFixed(2));
 };
 
 export const useMarketDetails = () => {

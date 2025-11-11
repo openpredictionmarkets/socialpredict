@@ -50,7 +50,7 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
                     <div className="sp-cell-num text-xs sm:text-sm text-gray-300">{bet.amount}</div>
 
                     {/* After (sm+) */}
-                    <div className="hidden sm:block sp-cell-num text-gray-300">{bet.probability.toFixed(3)}</div>
+                    <div className="hidden sm:block sp-cell-num text-gray-300">{bet.probability.toFixed(2)}</div>
 
                     {/* Placed (stack full width on xs) */}
                     <div className="col-span-3 sm:col-span-1 text-right sp-subline">

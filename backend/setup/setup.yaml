@@ -18,3 +18,7 @@ economics:
       initialBetFee: 1
       buySharesFee: 0
       sellSharesFee: 0
+
+frontend:
+  charts:
+    sigFigs: 4
