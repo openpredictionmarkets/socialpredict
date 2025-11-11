@@ -247,6 +247,212 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v0/stats:
+    get:
+      summary: Get platform stats
+      description: Returns aggregate financial stats and the current economics configuration.
+      tags: [Metrics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Stats returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to compute stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/system/metrics:
+    get:
+      summary: Get system metrics
+      description: Computes money creation/utilization metrics for auditing the economy.
+      tags: [Metrics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Metrics returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemMetrics'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to compute metrics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/active:
+    get:
+      summary: List active markets
+      description: Returns markets that are open for trading and not resolved.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          required: false
+          description: Maximum number of markets to return.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          required: false
+          description: Number of items to skip before collecting results.
+      responses:
+        '200':
+          description: Active markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/closed:
+    get:
+      summary: List closed markets
+      description: Returns markets whose resolution date has passed but which are not yet resolved.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          required: false
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          required: false
+      responses:
+        '200':
+          description: Closed markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/resolved:
+    get:
+      summary: List resolved markets
+      description: Returns markets whose outcome has been finalized.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          required: false
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          required: false
+      responses:
+        '200':
+          description: Resolved markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/create:
+    post:
+      summary: Create a market (legacy route)
+      description: Creates a new market; equivalent to POST /v0/markets.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMarketRequest'
+      responses:
+        '201':
+          description: Market created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResponse'
+        '400':
+          description: Validation failed while creating the market.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Unexpected server error.
           content:
@@ -923,6 +1129,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v0/userposition/{marketId}:
+    get:
+      summary: Get authenticated user's position in a market
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: marketId
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Market identifier.
+      responses:
+        '200':
+          description: Position returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPosition'
+        '400':
+          description: Invalid market ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v0/usercredit/{username}:
     get:
       summary: Get user credit
@@ -1039,6 +1290,54 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/content/home:
+    get:
+      summary: Get public homepage content
+      tags: [Content]
+      responses:
+        '200':
+          description: Homepage content returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeContent'
+        '404':
+          description: Homepage content not found.
+          content:
+            text/plain:
+              schema:
+                type: string
+  /v0/admin/content/home:
+    put:
+      summary: Update homepage content
+      tags: [Content]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomeContentUpdateRequest'
+      responses:
+        '200':
+          description: Homepage content updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeContent'
+        '400':
+          description: Invalid request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed or admin privileges missing.
           content:
             application/json:
               schema:
@@ -1429,6 +1728,254 @@ components:
         - totalSpentInPlay
         - isResolved
         - resolutionResult
+    UserPosition:
+      type: object
+      properties:
+        username:
+          type: string
+        marketId:
+          type: integer
+          format: int64
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        value:
+          type: integer
+          format: int64
+        totalSpent:
+          type: integer
+          format: int64
+        totalSpentInPlay:
+          type: integer
+          format: int64
+        isResolved:
+          type: boolean
+        resolutionResult:
+          type: string
+      required:
+        - username
+        - marketId
+        - yesSharesOwned
+        - noSharesOwned
+        - value
+        - totalSpent
+        - totalSpentInPlay
+        - isResolved
+    StatsResponse:
+      type: object
+      properties:
+        financialStats:
+          $ref: '#/components/schemas/FinancialStats'
+        setupConfiguration:
+          $ref: '#/components/schemas/SetupConfiguration'
+      required:
+        - financialStats
+        - setupConfiguration
+    FinancialStats:
+      type: object
+      properties:
+        totalMoney:
+          type: integer
+          format: int64
+        totalDebtExtended:
+          type: integer
+          format: int64
+        totalDebtUtilized:
+          type: integer
+          format: int64
+        totalFeesCollected:
+          type: integer
+          format: int64
+        totalBonusesPaid:
+          type: integer
+          format: int64
+        outstandingPayouts:
+          type: integer
+          format: int64
+        totalMoneyInCirculation:
+          type: integer
+          format: int64
+      required:
+        - totalMoney
+        - totalDebtExtended
+        - totalDebtUtilized
+        - totalFeesCollected
+        - totalBonusesPaid
+        - outstandingPayouts
+        - totalMoneyInCirculation
+    SetupConfiguration:
+      type: object
+      properties:
+        initialMarketProbability:
+          type: number
+          format: float
+        initialMarketSubsidization:
+          type: integer
+          format: int64
+        initialMarketYes:
+          type: integer
+          format: int64
+        initialMarketNo:
+          type: integer
+          format: int64
+        createMarketCost:
+          type: integer
+          format: int64
+        traderBonus:
+          type: integer
+          format: int64
+        initialAccountBalance:
+          type: integer
+          format: int64
+        maximumDebtAllowed:
+          type: integer
+          format: int64
+        minimumBet:
+          type: integer
+          format: int64
+        maxDustPerSale:
+          type: integer
+          format: int64
+        initialBetFee:
+          type: integer
+          format: int64
+        buySharesFee:
+          type: integer
+          format: int64
+        sellSharesFee:
+          type: integer
+          format: int64
+      required:
+        - initialMarketProbability
+        - initialMarketSubsidization
+        - initialMarketYes
+        - initialMarketNo
+        - createMarketCost
+        - traderBonus
+        - initialAccountBalance
+        - maximumDebtAllowed
+        - minimumBet
+        - maxDustPerSale
+        - initialBetFee
+        - buySharesFee
+        - sellSharesFee
+    SystemMetrics:
+      type: object
+      properties:
+        moneyCreated:
+          $ref: '#/components/schemas/MoneyCreated'
+        moneyUtilized:
+          $ref: '#/components/schemas/MoneyUtilized'
+        verification:
+          $ref: '#/components/schemas/Verification'
+      required:
+        - moneyCreated
+        - moneyUtilized
+        - verification
+    MoneyCreated:
+      type: object
+      properties:
+        userDebtCapacity:
+          $ref: '#/components/schemas/MetricWithExplanation'
+        numUsers:
+          $ref: '#/components/schemas/MetricWithExplanation'
+      required:
+        - userDebtCapacity
+        - numUsers
+    MoneyUtilized:
+      type: object
+      properties:
+        unusedDebt:
+          $ref: '#/components/schemas/MetricWithExplanation'
+        activeBetVolume:
+          $ref: '#/components/schemas/MetricWithExplanation'
+        marketCreationFees:
+          $ref: '#/components/schemas/MetricWithExplanation'
+        participationFees:
+          $ref: '#/components/schemas/MetricWithExplanation'
+        bonusesPaid:
+          $ref: '#/components/schemas/MetricWithExplanation'
+        totalUtilized:
+          $ref: '#/components/schemas/MetricWithExplanation'
+      required:
+        - unusedDebt
+        - activeBetVolume
+        - marketCreationFees
+        - participationFees
+        - bonusesPaid
+        - totalUtilized
+    Verification:
+      type: object
+      properties:
+        balanced:
+          $ref: '#/components/schemas/MetricWithExplanation'
+        surplus:
+          $ref: '#/components/schemas/MetricWithExplanation'
+      required:
+        - balanced
+        - surplus
+    MetricWithExplanation:
+      type: object
+      properties:
+        value:
+          oneOf:
+            - type: number
+            - type: string
+        formula:
+          type: string
+          nullable: true
+        explanation:
+          type: string
+      required:
+        - value
+        - explanation
+    HomeContent:
+      type: object
+      properties:
+        title:
+          type: string
+        format:
+          type: string
+          description: Rendering format (markdown or html).
+        html:
+          type: string
+          nullable: true
+        markdown:
+          type: string
+          nullable: true
+        version:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - title
+        - format
+        - version
+    HomeContentUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        format:
+          type: string
+        markdown:
+          type: string
+          nullable: true
+        html:
+          type: string
+          nullable: true
+        version:
+          type: integer
+          format: int64
+      required:
+        - title
+        - format
+        - version
     SellRequest:
       type: object
       properties:
