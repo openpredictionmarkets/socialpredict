@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -20,11 +21,10 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		// Read q, limit, offset from query
-		query := r.URL.Query().Get("q")
+		// Read query (allow both query and q), limit, offset
+		query := r.URL.Query().Get("query")
 		if query == "" {
-			// Also check 'query' parameter for backward compatibility
-			query = r.URL.Query().Get("query")
+			query = r.URL.Query().Get("q")
 		}
 		status, statusErr := normalizeStatusParam(r.URL.Query().Get("status"))
 		if statusErr != nil {
@@ -36,7 +36,7 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 
 		// Validate and sanitize input
 		if query == "" {
-			http.Error(w, "Query parameter 'q' is required", http.StatusBadRequest)
+			http.Error(w, "Query parameter 'query' is required", http.StatusBadRequest)
 			return
 		}
 
@@ -105,6 +105,8 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 				YesLabel:           market.YesLabel,
 				NoLabel:            market.NoLabel,
 				Status:             market.Status,
+				IsResolved:         strings.EqualFold(market.Status, "resolved"),
+				ResolutionResult:   market.ResolutionResult,
 				CreatedAt:          market.CreatedAt,
 				UpdatedAt:          market.UpdatedAt,
 			}
@@ -123,6 +125,8 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 				YesLabel:           market.YesLabel,
 				NoLabel:            market.NoLabel,
 				Status:             market.Status,
+				IsResolved:         strings.EqualFold(market.Status, "resolved"),
+				ResolutionResult:   market.ResolutionResult,
 				CreatedAt:          market.CreatedAt,
 				UpdatedAt:          market.UpdatedAt,
 			}

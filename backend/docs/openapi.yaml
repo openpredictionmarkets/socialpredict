@@ -253,6 +253,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/search:
+    get:
+      summary: Search markets
+      description: Searches markets by question title with optional status filtering. Results include a primary list (matching status, if specified) and optional fallback results.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search query (partial match on question title).
+          schema:
+            type: string
+            maxLength: 100
+        - name: status
+          in: query
+          required: false
+          description: Filter by market status. Defaults to all markets.
+          schema:
+            type: string
+            enum: [active, closed, resolved, all, '']
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of primary results to return (default 20, max 50).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+        - name: offset
+          in: query
+          required: false
+          description: Number of primary results to skip before collecting.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Search completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid query or status parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: Create a market
       description: Creates a new prediction market for the authenticated user.
@@ -1244,6 +1306,38 @@ components:
         - numUsers
         - totalVolume
         - marketDust
+    SearchResponse:
+      type: object
+      properties:
+        primaryResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResponse'
+        fallbackResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResponse'
+        query:
+          type: string
+        primaryStatus:
+          type: string
+          nullable: true
+        primaryCount:
+          type: integer
+        fallbackCount:
+          type: integer
+        totalCount:
+          type: integer
+        fallbackUsed:
+          type: boolean
+      required:
+        - primaryResults
+        - fallbackResults
+        - query
+        - primaryCount
+        - fallbackCount
+        - totalCount
+        - fallbackUsed
     MarketLeaderboardRow:
       type: object
       properties:

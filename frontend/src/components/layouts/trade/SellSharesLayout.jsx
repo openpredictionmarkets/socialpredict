@@ -10,6 +10,8 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     const [selectedOutcome, setSelectedOutcome] = useState(null);
     const [feeData, setFeeData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [sharesLoading, setSharesLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
@@ -43,6 +45,14 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     }, [token]);
 
     useEffect(() => {
+        if (!token) {
+            setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
+            setSelectedOutcome(null);
+            setSellAmount(1);
+            return;
+        }
+
+        setSharesLoading(true);
         fetchUserShares(marketId, token)
             .then(data => {
                 const normalized = normalizeShares(data);
@@ -66,7 +76,8 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
                 setSelectedOutcome(null);
                 setSellAmount(1);
-            });
+            })
+            .finally(() => setSharesLoading(false));
     }, [marketId, token]);
 
 
@@ -101,17 +112,25 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             amount: sellAmount,
         };
 
-        submitSale(saleData, token, (data) => {
+        setIsSubmitting(true);
+        submitSale(
+            saleData,
+            token,
+            (data) => {
                 alert(`Sale successful! Sold ${data.sharesSold} for ${data.saleValue}.`);
                 setSelectedOutcome(null);
                 setSellAmount(1);
+                setIsSubmitting(false);
                 onTransactionSuccess();
-            }, (error) => {
+            },
+            (error) => {
                 alert(`Sale failed: ${error.message}`);
+                setIsSubmitting(false);
             }
         );
     };
 
+    const isActionDisabled = sharesLoading || isSubmitting;
 
     return (
         <div className="p-6 bg-blue-900 rounded-lg text-white">
@@ -141,6 +160,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                             value={sellAmount}
                             onChange={handleSellAmountChange}
                             max={selectedOutcome === 'NO' ? shares.noSharesOwned : shares.yesSharesOwned}
+                            disabled={isActionDisabled}
                         />
                     </div>
                     <div className="flex justify-center">
@@ -151,6 +171,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                                     handleSaleSubmission('NO');
                                 }}
                                 selectedDirection="NO"
+                                disabled={isActionDisabled}
                             >
                                 Sell NO
                             </ConfirmSaleButton>}
@@ -161,6 +182,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                                     handleSaleSubmission('YES');
                                 }}
                                 selectedDirection="YES"
+                                disabled={isActionDisabled}
                             >
                                 Sell YES
                             </ConfirmSaleButton>}
