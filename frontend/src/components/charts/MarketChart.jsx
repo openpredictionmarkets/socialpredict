@@ -1,10 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import CanvasJSReact from '@canvasjs/react-charts';
+import { SocialPredictChartFormatter } from '../../utils/chartFormatter';
 
 const CanvasJSChart = CanvasJSReact.CanvasJSChart;
 
 const MarketChart = ({ data, currentProbability, title, className, closeDateTime, yesLabel, noLabel }) => {
   const [showInverseProbability, setShowInverseProbability] = useState(false);
+  const [chartFormatter, setChartFormatter] = useState(() => SocialPredictChartFormatter.getFormatter());
+
+  useEffect(() => {
+    let isMounted = true;
+    SocialPredictChartFormatter.ensure().then((formatter) => {
+      if (isMounted) {
+        setChartFormatter(formatter);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const formatValue = chartFormatter.format;
 
   const generateDataPoints = (data, isInverse = false) => {
     let dataPoints = [];
@@ -74,7 +90,22 @@ const MarketChart = ({ data, currentProbability, title, className, closeDateTime
       maximum: 1,
       labelFontColor: '#708090',
       suffix: '',
-      valueFormatString: '0.00',
+      labelFormatter: ({ value }) => formatValue(value),
+    },
+    toolTip: {
+      shared: false,
+      contentFormatter: (event) => {
+        const entry = event?.entries?.[0];
+        if (!entry) {
+          return '';
+        }
+        const value = entry.dataPoint?.y;
+        if (value === undefined || value === null) {
+          return '';
+        }
+        const labelPrefix = entry.dataSeries?.name ? `${entry.dataSeries.name}: ` : '';
+        return `${labelPrefix}${formatValue(value)}`;
+      },
     },
     data: generateChartData(),
   };
