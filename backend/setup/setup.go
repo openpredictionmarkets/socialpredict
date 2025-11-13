@@ -48,11 +48,26 @@ type Economics struct {
 	Betting          Betting          `yaml:"betting"`
 }
 
+type FrontendCharts struct {
+	SigFigs int `yaml:"sigFigs"`
+}
+
+type Frontend struct {
+	Charts FrontendCharts `yaml:"charts"`
+}
+
 type EconomicConfig struct {
 	Economics Economics `yaml:"economics"`
+	Frontend  Frontend  `yaml:"frontend"`
 }
 
 var economicConfig *EconomicConfig
+
+const (
+	minChartSigFigs     = 2
+	maxChartSigFigs     = 9
+	defaultChartSigFigs = 4
+)
 
 // load once as a singleton pattern
 var once sync.Once
@@ -87,4 +102,24 @@ func mustLoadEconomicsConfig() {
 
 func init() {
 	mustLoadEconomicsConfig()
+}
+
+// ChartSigFigs returns a clamped significant figures value for chart formatting.
+func ChartSigFigs() int {
+	if economicConfig == nil {
+		mustLoadEconomicsConfig()
+	}
+
+	sigFigs := economicConfig.Frontend.Charts.SigFigs
+	if sigFigs == 0 {
+		sigFigs = defaultChartSigFigs
+	}
+
+	if sigFigs < minChartSigFigs {
+		return minChartSigFigs
+	}
+	if sigFigs > maxChartSigFigs {
+		return maxChartSigFigs
+	}
+	return sigFigs
 }

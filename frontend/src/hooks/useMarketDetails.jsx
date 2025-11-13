@@ -121,14 +121,14 @@ const calculateCurrentProbability = (details) => {
   if (changes.length > 0) {
     const last = changes[changes.length - 1];
     const probability = toNumber(last.probability, details.lastProbability);
-    return parseFloat(probability.toFixed(3));
+    return parseFloat(probability.toFixed(2));
   }
 
   const baseProbability = toNumber(
     details.lastProbability ?? details.market?.initialProbability,
   );
 
-  return parseFloat(baseProbability.toFixed(3));
+  return parseFloat(baseProbability.toFixed(2));
 };
 
 export const useMarketDetails = () => {

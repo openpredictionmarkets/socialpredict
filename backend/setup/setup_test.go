@@ -28,3 +28,30 @@ func TestLoadEconomicsConfigSingleton(t *testing.T) {
 		t.Fatalf("EconomicsConfig should return the singleton instance")
 	}
 }
+
+func TestChartSigFigsClamping(t *testing.T) {
+	cfg, err := LoadEconomicsConfig()
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	original := cfg.Frontend.Charts.SigFigs
+	t.Cleanup(func() {
+		cfg.Frontend.Charts.SigFigs = original
+	})
+
+	cfg.Frontend.Charts.SigFigs = 1
+	if got := ChartSigFigs(); got != minChartSigFigs {
+		t.Fatalf("expected minChartSigFigs (%d), got %d", minChartSigFigs, got)
+	}
+
+	cfg.Frontend.Charts.SigFigs = 99
+	if got := ChartSigFigs(); got != maxChartSigFigs {
+		t.Fatalf("expected maxChartSigFigs (%d), got %d", maxChartSigFigs, got)
+	}
+
+	cfg.Frontend.Charts.SigFigs = 6
+	if got := ChartSigFigs(); got != 6 {
+		t.Fatalf("expected unclamped value 6, got %d", got)
+	}
+}

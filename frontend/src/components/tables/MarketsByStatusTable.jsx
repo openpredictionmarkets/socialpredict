@@ -86,7 +86,7 @@ const MarketRow = ({ marketData }) => {
   const creatorEmoji = creator.personalEmoji ?? DEFAULT_CREATOR_EMOJI;
   const probability = toNumber(marketData?.lastProbability);
   const probabilityDisplay = Number.isFinite(probability)
-    ? probability.toFixed(3)
+    ? probability.toFixed(2)
     : '—';
   const numUsers = toNumber(marketData?.numUsers);
   const totalVolume = toNumber(marketData?.totalVolume);
