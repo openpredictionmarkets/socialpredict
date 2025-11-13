@@ -2,7 +2,7 @@ import { API_URL } from '../../../config';
 
 export const resolveMarket = (marketId, token, selectedResolution) => {
     const resolutionData = {
-        outcome: selectedResolution,
+        resolution: selectedResolution,
     };
 
     const requestOptions = {
@@ -15,10 +15,13 @@ export const resolveMarket = (marketId, token, selectedResolution) => {
     };
 
     // Returning fetch promise to allow handling of the response in the component
-    return fetch(`${API_URL}/v0/resolve/${marketId}`, requestOptions)
+    return fetch(`${API_URL}/v0/markets/${marketId}/resolve`, requestOptions)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
+            }
+            if (response.status === 204) {
+                return {};
             }
             return response.json();
         })

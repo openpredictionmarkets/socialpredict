@@ -167,6 +167,7 @@ func Start() {
 		r.URL.RawQuery = q.Encode()
 		marketsHandler.ListMarkets(w, r)
 	}))).Methods("GET")
+	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 
 	// handle market positions, get trades - using service injection from new locations

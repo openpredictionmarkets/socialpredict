@@ -1,5 +1,6 @@
 import { API_URL } from '../../../config';
 import React, { useState } from 'react';
+import { SiteButtonSmall } from '../../buttons/SiteButtons';
 
 const MarketProjectionLayout = ({ marketId, amount, direction }) => {
     const [projectionData, setProjectionData] = useState(null);
@@ -7,11 +8,6 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
     const [error, setError] = useState(null);
 
     const fetchProjectionData = async () => {
-        if (!amount || !direction) {
-            setError('Amount and direction are required to fetch the market projection.');
-            return;
-        }
-
         setLoading(true);
         setError(null);
 
@@ -30,22 +26,26 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
         }
     };
 
+    const canProject = Boolean(amount) && Boolean(direction);
+
     return (
         <div className="market-projection-layout">
             <div className="projection-details">
-                <button
-                    className="btn btn-primary mb-4"
+                {!canProject && (
+                    <p className="text-sm text-gray-300 mb-2">
+                        Select amount and outcome to see the projected probability after this trade.
+                    </p>
+                )}
+                <SiteButtonSmall
+                    className="mb-4"
                     onClick={fetchProjectionData}
-                    disabled={!amount || !direction || loading}
+                    disabled={!canProject || loading}
                 >
                     {loading ? 'Updating...' : 'Update Projection'}
-                </button>
+                </SiteButtonSmall>
                 {error && <div className="error-message">Error: {error}</div>}
-                {projectionData && (
-                    <p>New Market Probability: {projectionData.projectedprobability.toFixed(4)}</p>
-                )}
-                {!projectionData && !error && !loading && (
-                    <p>Click "Update Projection" to see the new market probability after this trade.</p>
+                {projectionData && typeof projectionData.projectedProbability === 'number' && (
+                    <p>New Market Probability: {projectionData.projectedProbability.toFixed(4)}</p>
                 )}
             </div>
         </div>

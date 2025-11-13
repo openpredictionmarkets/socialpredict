@@ -45,6 +45,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v0/home:
+    get:
+      summary: Health check
+      description: Returns a simple message to verify backend availability.
+      tags: [Config]
+      responses:
+        '200':
+          description: Backend responded successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
         '401':
           description: Invalid credentials.
           content:
@@ -421,34 +436,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /v0/create:
-    post:
-      summary: Create a market (legacy route)
-      description: Creates a new market; equivalent to POST /v0/markets.
+  /v0/marketprojection/{marketId}/{amount}/{outcome}:
+    get:
+      summary: Project market probability
+      description: Projects what the market probability would become after a hypothetical bet of `amount` on `outcome`.
       tags: [Markets]
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateMarketRequest'
+      parameters:
+        - name: marketId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: amount
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: outcome
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [YES, NO]
       responses:
-        '201':
-          description: Market created successfully.
+        '200':
+          description: Projection computed successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MarketResponse'
+                $ref: '#/components/schemas/ProbabilityProjectionResponse'
         '400':
-          description: Validation failed while creating the market.
+          description: Invalid parameters.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market resolved or closed; projection not allowed.
           content:
             application/json:
               schema:
@@ -1976,6 +2016,30 @@ components:
         - title
         - format
         - version
+    ProbabilityProjectionResponse:
+      type: object
+      properties:
+        marketId:
+          type: integer
+          format: int64
+        currentProbability:
+          type: number
+          format: float
+        projectedProbability:
+          type: number
+          format: float
+        amount:
+          type: integer
+          format: int64
+        outcome:
+          type: string
+          enum: [YES, NO]
+      required:
+        - marketId
+        - currentProbability
+        - projectedProbability
+        - amount
+        - outcome
     SellRequest:
       type: object
       properties:
