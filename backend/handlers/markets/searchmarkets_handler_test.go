@@ -17,6 +17,7 @@ type searchServiceMock struct {
 	err             error
 	capturedQuery   string
 	capturedFilters dmarkets.SearchFilters
+	overviews       map[int64]*dmarkets.MarketOverview
 }
 
 func (m *searchServiceMock) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
@@ -58,7 +59,16 @@ func (m *searchServiceMock) ProjectProbability(ctx context.Context, req dmarkets
 }
 
 func (m *searchServiceMock) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
-	return nil, nil
+	if m.overviews != nil {
+		if overview, ok := m.overviews[marketID]; ok {
+			return overview, nil
+		}
+		return nil, errors.New("overview not found")
+	}
+	return &dmarkets.MarketOverview{
+		Market:  &dmarkets.Market{ID: marketID},
+		Creator: &dmarkets.CreatorSummary{Username: "tester"},
+	}, nil
 }
 
 func (m *searchServiceMock) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {
@@ -92,7 +102,17 @@ func TestSearchMarketsHandlerSuccess(t *testing.T) {
 		TotalCount:    1,
 	}
 
-	mockSvc := &searchServiceMock{result: mockResult}
+	mockSvc := &searchServiceMock{
+		result: mockResult,
+		overviews: map[int64]*dmarkets.MarketOverview{
+			1: {
+				Market: &dmarkets.Market{ID: 1, QuestionTitle: "Test Market"},
+				Creator: &dmarkets.CreatorSummary{
+					Username: "tester",
+				},
+			},
+		},
+	}
 	handler := SearchMarketsHandler(mockSvc)
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=bitcoin&status=active&limit=5&offset=2", nil)
@@ -119,6 +139,10 @@ func TestSearchMarketsHandlerSuccess(t *testing.T) {
 
 	if resp.TotalCount != 1 || resp.PrimaryCount != 1 {
 		t.Fatalf("expected counts to be 1, got total=%d primary=%d", resp.TotalCount, resp.PrimaryCount)
+	}
+
+	if len(resp.PrimaryResults) != 1 || resp.PrimaryResults[0].Market.ID != 1 {
+		t.Fatalf("expected primary results to include market overview, got %+v", resp.PrimaryResults)
 	}
 }
 

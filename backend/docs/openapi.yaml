@@ -1651,11 +1651,11 @@ components:
         primaryResults:
           type: array
           items:
-            $ref: '#/components/schemas/MarketResponse'
+            $ref: '#/components/schemas/MarketOverviewResponse'
         fallbackResults:
           type: array
           items:
-            $ref: '#/components/schemas/MarketResponse'
+            $ref: '#/components/schemas/MarketOverviewResponse'
         query:
           type: string
         primaryStatus:

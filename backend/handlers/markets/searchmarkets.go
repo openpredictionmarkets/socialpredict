@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -89,62 +88,22 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		// Map domain → []dto.Market; ensure non-nil slice
-		var primaryMarkets []dto.MarketResponse
-		var fallbackMarkets []dto.MarketResponse
-
-		// Convert primary results
-		for _, market := range searchResults.PrimaryResults {
-			marketDTO := dto.MarketResponse{
-				ID:                 market.ID,
-				QuestionTitle:      market.QuestionTitle,
-				Description:        market.Description,
-				OutcomeType:        market.OutcomeType,
-				ResolutionDateTime: market.ResolutionDateTime,
-				CreatorUsername:    market.CreatorUsername,
-				YesLabel:           market.YesLabel,
-				NoLabel:            market.NoLabel,
-				Status:             market.Status,
-				IsResolved:         strings.EqualFold(market.Status, "resolved"),
-				ResolutionResult:   market.ResolutionResult,
-				CreatedAt:          market.CreatedAt,
-				UpdatedAt:          market.UpdatedAt,
-			}
-			primaryMarkets = append(primaryMarkets, marketDTO)
+		primaryOverviews, err := buildMarketOverviewResponses(r.Context(), svc, searchResults.PrimaryResults)
+		if err != nil {
+			http.Error(w, "Error building primary results", http.StatusInternalServerError)
+			return
 		}
 
-		// Convert fallback results
-		for _, market := range searchResults.FallbackResults {
-			marketDTO := dto.MarketResponse{
-				ID:                 market.ID,
-				QuestionTitle:      market.QuestionTitle,
-				Description:        market.Description,
-				OutcomeType:        market.OutcomeType,
-				ResolutionDateTime: market.ResolutionDateTime,
-				CreatorUsername:    market.CreatorUsername,
-				YesLabel:           market.YesLabel,
-				NoLabel:            market.NoLabel,
-				Status:             market.Status,
-				IsResolved:         strings.EqualFold(market.Status, "resolved"),
-				ResolutionResult:   market.ResolutionResult,
-				CreatedAt:          market.CreatedAt,
-				UpdatedAt:          market.UpdatedAt,
-			}
-			fallbackMarkets = append(fallbackMarkets, marketDTO)
-		}
-
-		// Ensure non-nil slice
-		if primaryMarkets == nil {
-			primaryMarkets = make([]dto.MarketResponse, 0)
-		}
-		if fallbackMarkets == nil {
-			fallbackMarkets = make([]dto.MarketResponse, 0)
+		fallbackOverviews, err := buildMarketOverviewResponses(r.Context(), svc, searchResults.FallbackResults)
+		if err != nil {
+			http.Error(w, "Error building fallback results", http.StatusInternalServerError)
+			return
 		}
 
 		// Build search response using domain service results
 		response := dto.SearchResponse{
-			PrimaryResults:  primaryMarkets,
-			FallbackResults: fallbackMarkets,
+			PrimaryResults:  primaryOverviews,
+			FallbackResults: fallbackOverviews,
 			Query:           searchResults.Query,
 			PrimaryStatus:   searchResults.PrimaryStatus,
 			PrimaryCount:    searchResults.PrimaryCount,

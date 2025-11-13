@@ -240,7 +240,10 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 
 	// Parse query parameters
 	var params dto.SearchMarketsQueryParams
-	params.Query = r.URL.Query().Get("q")
+	params.Query = r.URL.Query().Get("query")
+	if params.Query == "" {
+		params.Query = r.URL.Query().Get("q")
+	}
 	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -249,7 +252,7 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 	params.Status = status
 
 	if params.Query == "" {
-		http.Error(w, "Query parameter 'q' is required", http.StatusBadRequest)
+		http.Error(w, "Query parameter 'query' is required", http.StatusBadRequest)
 		return
 	}
 
@@ -279,18 +282,27 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Combine primary and fallback results
-	allMarkets := append(searchResults.PrimaryResults, searchResults.FallbackResults...)
-
-	// Convert to response DTOs
-	responses := make([]*dto.MarketResponse, len(allMarkets))
-	for i, market := range allMarkets {
-		responses[i] = marketToResponse(market)
+	primaryOverviews, err := buildMarketOverviewResponses(r.Context(), h.service, searchResults.PrimaryResults)
+	if err != nil {
+		h.handleError(w, err)
+		return
 	}
 
-	response := dto.SimpleListMarketsResponse{
-		Markets: responses,
-		Total:   len(responses),
+	fallbackOverviews, err := buildMarketOverviewResponses(r.Context(), h.service, searchResults.FallbackResults)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+
+	response := dto.SearchResponse{
+		PrimaryResults:  primaryOverviews,
+		FallbackResults: fallbackOverviews,
+		Query:           searchResults.Query,
+		PrimaryStatus:   searchResults.PrimaryStatus,
+		PrimaryCount:    searchResults.PrimaryCount,
+		FallbackCount:   searchResults.FallbackCount,
+		TotalCount:      searchResults.TotalCount,
+		FallbackUsed:    searchResults.FallbackUsed,
 	}
 
 	// Send response
