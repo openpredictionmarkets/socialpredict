@@ -8,7 +8,7 @@
 
 SocialPredict lets **anyone** – individuals, classrooms, companies, and even governments – tap into the power of prediction markets.
 
-![improvement_market_price_graph](https://github.com/user-attachments/assets/13f616f9-af04-47fc-a839-b24f82a419a8)
+![showing_functionality](https://github.com/user-attachments/assets/5999faad-20e2-4d1b-984f-f1c6158c3074)
 
 ---
 
