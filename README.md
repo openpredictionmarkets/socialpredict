@@ -31,6 +31,8 @@ flowchart LR
     class Y2025,Y2026,Y2027,Y2030 roadmap
 ```
 
+---
+
 ## Staging
 
 Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.com/) to see what our software looks like in action. May be down if we are testing something.
