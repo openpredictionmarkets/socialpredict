@@ -2,62 +2,45 @@
 
 [![Deploy To Staging](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml/badge.svg)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml)
 
-# About SocialPredict
-## Free Forecasting for Everyone, Everywhere
+# SocialPredict
 
-We empower people and organizations to harness the **wisdom of crowds** and **make better decisions** with free, open-source forecasting software.
+## The open prediction market engine for everyone
+
+SocialPredict lets **anyone** – individuals, classrooms, companies, and even governments – tap into the power of prediction markets.
+
+- ✅ **Easy to deploy** – one project, one environment, a clean path from demo to production.  
+- ✅ **Robust by design** – battle-tested economics, clear math, and a growing feature set.  
+- ✅ **Truly open** – completely free, **MIT-licensed**, and built to be extended.
+
+Our mission is simple:
+
+> **To be the best open-source prediction market by far,  
+> and to democratize the math behind forecasting.**
+
+Prediction markets should not live in privatized, siloed, mystified platforms.  
+SocialPredict is our push to bring them into the open: understandable, self-hostable, and usable by anyone who wants to ask better questions and get better answers.
 
 ![improvement_market_price_graph](https://github.com/user-attachments/assets/13f616f9-af04-47fc-a839-b24f82a419a8)
 
-No questions are too small (or too big) for our prediction market software. Set up your own instance and start forecasting anything from your next big event to next year's hottest tech breakthroughs.
+No question is too small (or too big). You can forecast:
 
-## Staging
+- Will a project ship on time?
+- How many customers will join a new product beta?
+- What policy choice will perform better over the next year?
 
-Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.com/) to see what our software looks like in action. May be down if we are testing something.
+Spin up your own instance and you have a **living, breathing forecasting surface** for your team, class, or community.
 
-## Getting Started
+---
 
-### Setting up a Local Instance
+## Roadmap at a Glance
 
-- [Info on Local Setup](/README/LOCAL_SETUP.md)
-- [Info on How Economics Can Be Customized](/README/README-CONFIG.md)
+We’re building SocialPredict as the **best free prediction-market infrastructure** you can run yourself — today and ten years from now.
 
-### Deploying to the Web
+```mermaid
+flowchart LR
+    Y2025["2025 — Service Architecture<br/>• Simple single-node deployment<br/>• Robust production-ready core"]
+    Y2026["2026 — Microservices Architecture<br/>• Modular math engine<br/>• MCP-compatible integrations<br/>• Richer market & UX features"]
+    Y2027["2027 — Cloud-Ready Platform<br/>• Kubernetes deployment options<br/>• Further hardening & observability<br/>• Refined, accessible interface"]
+    Y2030["2028–2030 — Advanced Analytics & HPC<br/>• High-performance simulations<br/>• Deep analytics for research & policy<br/>• Tools for universities, companies & governments"]
 
-- [How to Set Up Your Own Website](/README/STAGE_SETUP.md)
-
-### How Do Prediction Markets Work?
-
-Here's a quick primer about how (and why) [prediction markets work](/README/MATH/README-MATH.md). Want more info? We maintain a list of resources where you can see research on [prediction markets in action](https://github.com/openpredictionmarkets/resources).
-
-## Contributing
-
-We welcome and appreciate every contribution. Get started by reading our [guide](https://github.com/openpredictionmarkets/socialpredict/blob/main/CONTRIBUTING.md) and make sure to follow our [Code of Conduct](https://github.com/openpredictionmarkets/socialpredict/blob/main/CODE_OF_CONDUCT.md).
-
-### Where to Next?
-
-- Brush up on our [Development Conventions](/README/README-CONVENTIONS.md)
-- Check out our [ongoing Projects](https://github.com/openpredictionmarkets/socialpredict/projects?query=is%3Aopen)
-- Look at our [Issues](https://github.com/openpredictionmarkets/socialpredict/issues)
-- Have your say on [GitHub Discussions](https://github.com/orgs/openpredictionmarkets/discussions)
-
-#### Note
-
-SocialPredict is designed to be performant on 64-bit systems. If you get it up and running on a 32-bit system, or you're trying to, let us know!
-
-### Join us in shaping the future of prediction markets by building connections and expertise within your community!
-
-## Used By
-
-<img src="https://github.com/openpredictionmarkets/socialpredict/raw/main/README/IMG/logotype_kenyon-purple_rgb.png" alt = "Kenyon College Logo" width=40% height=40%>
-
-* Kenyon College (Political Science course PSCI 303, Campaigns & Elections; syllabus [here](https://www.zacharymcgee.net/syllabi/PSCI_303_public.pdf))
-                        
-## Stargazers over time
-[![Stargazers over time](https://starchart.cc/openpredictionmarkets/socialpredict.svg?variant=adaptive)](https://starchart.cc/openpredictionmarkets/socialpredict)
-
-## Licensing
-
-SocialPredict is available under the [MIT License](https://github.com/openpredictionmarkets/socialpredict/blob/main/LICENSE).
-
-                    
+    Y2025 --> Y2026 --> Y2027 --> Y2030
