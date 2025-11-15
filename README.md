@@ -16,13 +16,14 @@ We’re building SocialPredict as the **best free prediction-market infrastructu
 
 ```mermaid
 flowchart LR
-    classDef roadmap fill=#f3f4ff,stroke=#4c51bf,stroke-width=2px,rx=8,ry=8
+    classDef roadmap fill:#eef2ff,stroke:#4c51bf,stroke-width:2px;
 
-    Y2025["🧩 Service Architecture<br/>2025"]
-    Y2026["🧱 Microservices & Math<br/>2026"]
-    Y2027["☁️ Cloud & UX<br/>2027"]
-    Y2030["🚀 HPC & Analytics<br/>2028–2030"]
+    Y2025["🧩 Service Architecture\n2025"]
+    Y2026["🧱 Microservices & Math\n2026"]
+    Y2027["☁️ Cloud & UX\n2027"]
+    Y2030["🚀 HPC & Analytics\n2028–2030"]
 
     Y2025 --> Y2026 --> Y2027 --> Y2030
 
     class Y2025,Y2026,Y2027,Y2030 roadmap
+
