@@ -18,7 +18,7 @@ We’re building SocialPredict as the **best free prediction-market infrastructu
 
 ```mermaid
 flowchart LR
-    %% Stronger contrast + explicit text color
+
     classDef roadmap fill:#dbeafe,stroke:#1d4ed8,color:#111827,stroke-width:2px;
 
     Y2025["🧩 Service Architecture<br/>2025"]
@@ -29,6 +29,7 @@ flowchart LR
     Y2025 --> Y2026 --> Y2027 --> Y2030
 
     class Y2025,Y2026,Y2027,Y2030 roadmap
+```
 
 ## Staging
 
