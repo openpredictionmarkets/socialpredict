@@ -10,6 +10,8 @@ SocialPredict lets **anyone** – individuals, classrooms, companies, and even g
 
 ![showing_functionality](https://github.com/user-attachments/assets/5999faad-20e2-4d1b-984f-f1c6158c3074)
 
+![showing_functionality](https://github.com/user-attachments/assets/63f95293-17cc-4483-8ab1-2ee1dd7efdd5)
+
 ---
 
 ## Roadmap at a Glance
