@@ -10,7 +10,7 @@ SocialPredict lets **anyone** – individuals, classrooms, companies, and even g
 
 ![showing_functionality](https://github.com/user-attachments/assets/5999faad-20e2-4d1b-984f-f1c6158c3074)
 
-![showing_functionality](https://github.com/user-attachments/assets/63f95293-17cc-4483-8ab1-2ee1dd7efdd5)
+![socialpredict_demo_3x](https://github.com/user-attachments/assets/438bb424-670b-4cd3-a69f-5581c4d9fcbf)
 
 <img src="https://github.com/user-attachments/assets/63f95293-17cc-4483-8ab1-2ee1dd7efdd5"
      alt="showing functionality"
