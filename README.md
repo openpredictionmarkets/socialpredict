@@ -12,6 +12,23 @@ SocialPredict lets **anyone** – individuals, classrooms, companies, and even g
 
 ---
 
+### Join us in shaping the future of prediction markets by building connections and expertise within your community!
+
+## Used By
+
+<img src="https://github.com/openpredictionmarkets/socialpredict/raw/main/README/IMG/logotype_kenyon-purple_rgb.png" alt = "Kenyon College Logo" width=40% height=40%>
+
+* Kenyon College (Political Science course PSCI 303, Campaigns & Elections; syllabus [here](https://www.zacharymcgee.net/syllabi/PSCI_303_public.pdf))
+                        
+## Stargazers over time
+[![Stargazers over time](https://starchart.cc/openpredictionmarkets/socialpredict.svg?variant=adaptive)](https://starchart.cc/openpredictionmarkets/socialpredict)
+
+## Licensing
+
+SocialPredict is available under the [MIT License](https://github.com/openpredictionmarkets/socialpredict/blob/main/LICENSE).
+
+---
+
 ## Roadmap at a Glance
 
 We’re building SocialPredict as the **best free prediction-market infrastructure** you can run yourself — today and into the future.
@@ -63,21 +80,3 @@ We welcome and appreciate every contribution. Get started by reading our [guide]
 - Look at our [Issues](https://github.com/openpredictionmarkets/socialpredict/issues)
 - Have your say on [GitHub Discussions](https://github.com/orgs/openpredictionmarkets/discussions)
 
-#### Note
-
-SocialPredict is designed to be performant on 64-bit systems. If you get it up and running on a 32-bit system, or you're trying to, let us know!
-
-### Join us in shaping the future of prediction markets by building connections and expertise within your community!
-
-## Used By
-
-<img src="https://github.com/openpredictionmarkets/socialpredict/raw/main/README/IMG/logotype_kenyon-purple_rgb.png" alt = "Kenyon College Logo" width=40% height=40%>
-
-* Kenyon College (Political Science course PSCI 303, Campaigns & Elections; syllabus [here](https://www.zacharymcgee.net/syllabi/PSCI_303_public.pdf))
-                        
-## Stargazers over time
-[![Stargazers over time](https://starchart.cc/openpredictionmarkets/socialpredict.svg?variant=adaptive)](https://starchart.cc/openpredictionmarkets/socialpredict)
-
-## Licensing
-
-SocialPredict is available under the [MIT License](https://github.com/openpredictionmarkets/socialpredict/blob/main/LICENSE).
