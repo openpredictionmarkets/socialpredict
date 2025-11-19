@@ -7,8 +7,6 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         return;
     }
 
-    console.log('Sending bet data:', betData);
-
     fetch(`${API_URL}/v0/bet`, {
         method: 'POST',
         headers: {
@@ -27,11 +25,9 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         return response.json();
     })
     .then(data => {
-        console.log('Success:', data);
         onSuccess(data);  // Handle success outside this utility function
     })
     .catch(error => {
-        console.error('Error:', error);
         alert(error.message);  // Use error.message to display the custom error message
         onError(error);  // Handle error outside this utility function
     });

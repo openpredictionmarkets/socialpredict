@@ -1,92 +1,126 @@
 package metricshandlers
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"socialpredict/models/modelstesting"
-	"socialpredict/util"
+	analytics "socialpredict/internal/domain/analytics"
+	positionsmath "socialpredict/internal/domain/math/positions"
+	"socialpredict/models"
 )
 
+type leaderboardRepo struct {
+	users    []models.User
+	markets  []models.Market
+	betsByID map[uint][]models.Bet
+}
+
+func (r *leaderboardRepo) ListUsers(ctx context.Context) ([]models.User, error) {
+	return append([]models.User(nil), r.users...), nil
+}
+
+func (r *leaderboardRepo) ListMarkets(ctx context.Context) ([]models.Market, error) {
+	return append([]models.Market(nil), r.markets...), nil
+}
+
+func (r *leaderboardRepo) ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error) {
+	return append([]models.Bet(nil), r.betsByID[marketID]...), nil
+}
+
+func (r *leaderboardRepo) ListBetsOrdered(context.Context) ([]models.Bet, error) {
+	return []models.Bet{}, nil
+}
+
+func (r *leaderboardRepo) UserMarketPositions(context.Context, string) ([]positionsmath.MarketPosition, error) {
+	return []positionsmath.MarketPosition{}, nil
+}
+
 func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-	orig := util.DB
-	util.DB = db
-	t.Cleanup(func() {
-		util.DB = orig
-	})
-
-	_, _ = modelstesting.UseStandardTestEconomics(t)
-
-	users := []string{"creator", "patrick", "jimmy", "jyron"}
-	for _, username := range users {
-		user := modelstesting.GenerateUser(username, 0)
-		if err := db.Create(&user).Error; err != nil {
-			t.Fatalf("create user %s: %v", username, err)
-		}
+	now := time.Now()
+	repo := &leaderboardRepo{
+		users: []models.User{
+			{PublicUser: models.PublicUser{Username: "alice"}},
+			{PublicUser: models.PublicUser{Username: "bob"}},
+		},
+		markets: []models.Market{
+			{
+				ID:                1,
+				CreatorUsername:   "alice",
+				IsResolved:        true,
+				ResolutionResult:  "YES",
+				ResolutionDateTime: now.Add(24 * time.Hour),
+			},
+		},
+		betsByID: map[uint][]models.Bet{
+			1: {
+				{Username: "alice", Outcome: "YES", Amount: 100, MarketID: 1, PlacedAt: now.Add(-2 * time.Hour)},
+				{Username: "bob", Outcome: "NO", Amount: 50, MarketID: 1, PlacedAt: now.Add(-1 * time.Hour)},
+			},
+		},
 	}
 
-	market := modelstesting.GenerateMarket(12001, "creator")
-	market.IsResolved = true
-	market.ResolutionResult = "YES"
-	if err := db.Create(&market).Error; err != nil {
-		t.Fatalf("create market: %v", err)
-	}
+	svc := analytics.NewService(repo, nil)
+	handler := GetGlobalLeaderboardHandler(svc)
 
-	bets := []struct {
-		amount   int64
-		outcome  string
-		username string
-		offset   time.Duration
-	}{
-		{50, "NO", "patrick", 0},
-		{51, "NO", "jimmy", time.Second},
-		{11, "YES", "jyron", 2 * time.Second},
-	}
-
-	for _, b := range bets {
-		bet := modelstesting.GenerateBet(b.amount, b.outcome, b.username, uint(market.ID), b.offset)
-		if err := db.Create(&bet).Error; err != nil {
-			t.Fatalf("create bet: %v", err)
-		}
-	}
-
-	req := httptest.NewRequest("GET", "/v0/global/leaderboard", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard", nil)
 	rec := httptest.NewRecorder()
 
-	GetGlobalLeaderboardHandler(rec, req)
+	handler.ServeHTTP(rec, req)
 
-	if rec.Code != 200 {
+	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var payload []map[string]interface{}
+	var payload []analytics.GlobalUserProfitability
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
 	if len(payload) == 0 {
-		t.Fatalf("expected at least one leaderboard entry")
-	}
-
-	if _, ok := payload[0]["username"]; !ok {
-		t.Fatalf("expected username field in leaderboard entry: %+v", payload[0])
+		t.Fatalf("expected non-empty leaderboard")
 	}
 }
 
-func TestGetGlobalLeaderboardHandler_Error(t *testing.T) {
-	orig := util.DB
-	util.DB = nil
-	defer func() { util.DB = orig }()
+type failingRepo struct{}
 
-	req := httptest.NewRequest("GET", "/v0/global/leaderboard", nil)
+func (f failingRepo) ListUsers(context.Context) ([]models.User, error) {
+	return nil, assertError("boom")
+}
+
+func (f failingRepo) ListMarkets(context.Context) ([]models.Market, error) {
+	return nil, nil
+}
+
+func (f failingRepo) ListBetsForMarket(context.Context, uint) ([]models.Bet, error) {
+	return nil, nil
+}
+
+func (f failingRepo) ListBetsOrdered(context.Context) ([]models.Bet, error) {
+	return nil, nil
+}
+
+func (f failingRepo) UserMarketPositions(context.Context, string) ([]positionsmath.MarketPosition, error) {
+	return nil, nil
+}
+
+type assertError string
+
+func (e assertError) Error() string { return string(e) }
+
+func TestGetGlobalLeaderboardHandler_Error(t *testing.T) {
+	svc := analytics.NewService(failingRepo{}, nil)
+	handler := GetGlobalLeaderboardHandler(svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard", nil)
 	rec := httptest.NewRecorder()
 
-	GetGlobalLeaderboardHandler(rec, req)
+	handler.ServeHTTP(rec, req)
 
-	if rec.Code != 500 {
+	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rec.Code)
 	}
 }
