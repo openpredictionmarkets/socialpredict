@@ -8,6 +8,12 @@
 
 SocialPredict lets **anyone** – individuals, classrooms, companies, and even governments – tap into the power of prediction markets.
 
+### Setting Up SocialPredict Website with HTTPS on a Virtual Private Computer
+
+![socialpredict_setup_demo](https://github.com/user-attachments/assets/1062a3b2-46d0-4a40-a648-39e71f0e7cec)
+
+### SocialPredict Logging In and Creating Market
+
 ![socialpredict_demo_3x](https://github.com/user-attachments/assets/438bb424-670b-4cd3-a69f-5581c4d9fcbf)
 
 ---
@@ -79,4 +85,3 @@ We welcome and appreciate every contribution. Get started by reading our [guide]
 - Check out our [ongoing Projects](https://github.com/openpredictionmarkets/socialpredict/projects?query=is%3Aopen)
 - Look at our [Issues](https://github.com/openpredictionmarkets/socialpredict/issues)
 - Have your say on [GitHub Discussions](https://github.com/orgs/openpredictionmarkets/discussions)
-
