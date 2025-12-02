@@ -255,18 +255,40 @@ func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserPro
 		return []GlobalUserProfitability{}, nil
 	}
 
-	type aggregate struct {
-		totalProfit       int64
-		totalCurrentValue int64
-		totalSpent        int64
-		activeMarkets     int
-		resolvedMarkets   int
-		earliestBet       time.Time
-		earliestSet       bool
+	marketData, err := s.loadLeaderboardMarketData(ctx, markets)
+	if err != nil {
+		return nil, err
+	}
+	if len(marketData) == 0 {
+		return []GlobalUserProfitability{}, nil
 	}
 
-	aggregates := make(map[string]*aggregate)
-	betsByMarket := make(map[int64][]models.Bet, len(markets))
+	aggregates := aggregateLeaderboardUserStats(marketData)
+	if len(aggregates) == 0 {
+		return []GlobalUserProfitability{}, nil
+	}
+
+	earliestBets := findEarliestBetsPerUser(marketData, aggregates)
+	leaderboard := assembleLeaderboardEntries(aggregates, earliestBets)
+	return rankLeaderboardEntries(leaderboard), nil
+}
+
+type leaderboardMarketData struct {
+	snapshot  positionsmath.MarketSnapshot
+	positions []positionsmath.MarketPosition
+	bets      []models.Bet
+}
+
+type leaderboardAggregate struct {
+	totalProfit       int64
+	totalCurrentValue int64
+	totalSpent        int64
+	activeMarkets     int
+	resolvedMarkets   int
+}
+
+func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []models.Market) ([]leaderboardMarketData, error) {
+	data := make([]leaderboardMarketData, 0, len(markets))
 
 	for _, market := range markets {
 		bets, err := s.repo.ListBetsForMarket(ctx, uint(market.ID))
@@ -286,12 +308,24 @@ func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserPro
 			return nil, err
 		}
 
-		betsByMarket[int64(market.ID)] = bets
+		data = append(data, leaderboardMarketData{
+			snapshot:  snapshot,
+			positions: marketPositions,
+			bets:      bets,
+		})
+	}
 
-		for _, pos := range marketPositions {
+	return data, nil
+}
+
+func aggregateLeaderboardUserStats(markets []leaderboardMarketData) map[string]*leaderboardAggregate {
+	aggregates := make(map[string]*leaderboardAggregate)
+
+	for _, market := range markets {
+		for _, pos := range market.positions {
 			agg := aggregates[pos.Username]
 			if agg == nil {
-				agg = &aggregate{}
+				agg = &leaderboardAggregate{}
 				aggregates[pos.Username] = agg
 			}
 
@@ -307,22 +341,32 @@ func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserPro
 		}
 	}
 
-	for _, bets := range betsByMarket {
-		for _, bet := range bets {
-			agg := aggregates[bet.Username]
-			if agg == nil {
+	return aggregates
+}
+
+func findEarliestBetsPerUser(markets []leaderboardMarketData, aggregates map[string]*leaderboardAggregate) map[string]time.Time {
+	earliest := make(map[string]time.Time)
+
+	for _, market := range markets {
+		for _, bet := range market.bets {
+			if aggregates[bet.Username] == nil {
 				continue
 			}
-			if !agg.earliestSet || bet.PlacedAt.Before(agg.earliestBet) {
-				agg.earliestBet = bet.PlacedAt
-				agg.earliestSet = true
+			if ts, ok := earliest[bet.Username]; !ok || bet.PlacedAt.Before(ts) {
+				earliest[bet.Username] = bet.PlacedAt
 			}
 		}
 	}
 
+	return earliest
+}
+
+func assembleLeaderboardEntries(aggregates map[string]*leaderboardAggregate, earliest map[string]time.Time) []GlobalUserProfitability {
 	leaderboard := make([]GlobalUserProfitability, 0, len(aggregates))
+
 	for username, agg := range aggregates {
-		if !agg.earliestSet {
+		firstBet, ok := earliest[username]
+		if !ok {
 			continue
 		}
 		leaderboard = append(leaderboard, GlobalUserProfitability{
@@ -332,20 +376,24 @@ func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserPro
 			TotalSpent:        agg.totalSpent,
 			ActiveMarkets:     agg.activeMarkets,
 			ResolvedMarkets:   agg.resolvedMarkets,
-			EarliestBet:       agg.earliestBet,
+			EarliestBet:       firstBet,
 		})
 	}
 
-	sort.Slice(leaderboard, func(i, j int) bool {
-		if leaderboard[i].TotalProfit == leaderboard[j].TotalProfit {
-			return leaderboard[i].EarliestBet.Before(leaderboard[j].EarliestBet)
+	return leaderboard
+}
+
+func rankLeaderboardEntries(entries []GlobalUserProfitability) []GlobalUserProfitability {
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].TotalProfit == entries[j].TotalProfit {
+			return entries[i].EarliestBet.Before(entries[j].EarliestBet)
 		}
-		return leaderboard[i].TotalProfit > leaderboard[j].TotalProfit
+		return entries[i].TotalProfit > entries[j].TotalProfit
 	})
 
-	for i := range leaderboard {
-		leaderboard[i].Rank = i + 1
+	for i := range entries {
+		entries[i].Rank = i + 1
 	}
 
-	return leaderboard, nil
+	return entries
 }
