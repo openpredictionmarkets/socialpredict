@@ -178,7 +178,7 @@ type debtStats struct {
 	totalDebtCapacity int64
 }
 
-func (s *Service) computeDebtStats(ctx context.Context, econ setup.EconConfig) (*debtStats, error) {
+func (s *Service) computeDebtStats(ctx context.Context, econ *setup.EconomicConfig) (*debtStats, error) {
 	users, err := s.repo.ListUsers(ctx)
 	if err != nil {
 		return nil, err
@@ -209,7 +209,7 @@ type marketVolumeStats struct {
 	activeBetVolume    int64
 }
 
-func (s *Service) computeMarketVolumes(ctx context.Context, econ setup.EconConfig) (*marketVolumeStats, error) {
+func (s *Service) computeMarketVolumes(ctx context.Context, econ *setup.EconomicConfig) (*marketVolumeStats, error) {
 	markets, err := s.repo.ListMarkets(ctx)
 	if err != nil {
 		return nil, err
@@ -234,7 +234,7 @@ func (s *Service) computeMarketVolumes(ctx context.Context, econ setup.EconConfi
 	return stats, nil
 }
 
-func (s *Service) computeParticipationFees(ctx context.Context, econ setup.EconConfig) (int64, error) {
+func (s *Service) computeParticipationFees(ctx context.Context, econ *setup.EconomicConfig) (int64, error) {
 	betsOrdered, err := s.repo.ListBetsOrdered(ctx)
 	if err != nil {
 		return 0, err
