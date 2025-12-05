@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/migration"
 	_ "socialpredict/migration/migrations" // <-- side-effect import: registers migrations via init()
 	"socialpredict/seed"
@@ -14,7 +14,7 @@ import (
 
 func main() {
 	// Secure endpoint example
-	http.Handle("/secure", middleware.Authenticate(http.HandlerFunc(secureEndpoint)))
+	http.Handle("/secure", authsvc.Authenticate(http.HandlerFunc(secureEndpoint)))
 
 	// Load env (.env, .env.dev)
 	if err := util.GetEnv(); err != nil {
