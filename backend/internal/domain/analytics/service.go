@@ -92,105 +92,51 @@ func (s *Service) ComputeSystemMetrics(ctx context.Context) (*SystemMetrics, err
 	}
 	econ := s.econLoader()
 
-	users, err := s.repo.ListUsers(ctx)
+	debtStats, err := s.computeDebtStats(ctx, econ)
 	if err != nil {
 		return nil, err
 	}
 
-	var (
-		userCount       = int64(len(users))
-		unusedDebt      int64
-		realizedProfits int64
-	)
-
-	for _, user := range users {
-		balance := user.AccountBalance
-		if balance > 0 {
-			realizedProfits += balance
-		}
-		usedDebt := int64(0)
-		if balance < 0 {
-			usedDebt = -balance
-		}
-		unusedDebt += econ.Economics.User.MaximumDebtAllowed - usedDebt
-	}
-
-	totalDebtCapacity := econ.Economics.User.MaximumDebtAllowed * userCount
-
-	markets, err := s.repo.ListMarkets(ctx)
+	volumeStats, err := s.computeMarketVolumes(ctx, econ)
 	if err != nil {
 		return nil, err
 	}
 
-	marketCreationFees := int64(len(markets)) * econ.Economics.MarketIncentives.CreateMarketCost
-
-	var activeBetVolume int64
-	for _, market := range markets {
-		if market.IsResolved {
-			continue
-		}
-
-		bets, err := s.repo.ListBetsForMarket(ctx, uint(market.ID))
-		if err != nil {
-			return nil, err
-		}
-		activeBetVolume += marketmath.GetMarketVolume(bets)
-	}
-
-	betsOrdered, err := s.repo.ListBetsOrdered(ctx)
+	participationFees, err := s.computeParticipationFees(ctx, econ)
 	if err != nil {
 		return nil, err
 	}
 
-	type userMarket struct {
-		marketID uint
-		username string
-	}
-
-	seen := make(map[userMarket]bool)
-	var participationFees int64
-
-	for _, b := range betsOrdered {
-		if b.Amount <= 0 {
-			continue
-		}
-		key := userMarket{marketID: b.MarketID, username: b.Username}
-		if !seen[key] {
-			participationFees += econ.Economics.Betting.BetFees.InitialBetFee
-			seen[key] = true
-		}
-	}
-
-	bonusesPaid := realizedProfits
-	totalUtilized := unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid
-	surplus := totalDebtCapacity - totalUtilized
+	bonusesPaid := debtStats.realizedProfits
+	totalUtilized := debtStats.unusedDebt + volumeStats.activeBetVolume + volumeStats.marketCreationFees + participationFees + bonusesPaid
+	surplus := debtStats.totalDebtCapacity - totalUtilized
 	balanced := surplus == 0
 
 	metrics := &SystemMetrics{
 		MoneyCreated: MoneyCreated{
 			UserDebtCapacity: MetricWithExplanation{
-				Value:       totalDebtCapacity,
+				Value:       debtStats.totalDebtCapacity,
 				Formula:     "numUsers × maxDebtPerUser",
 				Explanation: "Total credit capacity made available to all users",
 			},
 			NumUsers: MetricWithExplanation{
-				Value:       userCount,
+				Value:       debtStats.userCount,
 				Explanation: "Total number of registered users",
 			},
 		},
 		MoneyUtilized: MoneyUtilized{
 			UnusedDebt: MetricWithExplanation{
-				Value:       unusedDebt,
+				Value:       debtStats.unusedDebt,
 				Formula:     "Σ(maxDebtPerUser - max(0, -balance))",
 				Explanation: "Remaining borrowing capacity available to users",
 			},
 			ActiveBetVolume: MetricWithExplanation{
-				Value:       activeBetVolume,
+				Value:       volumeStats.activeBetVolume,
 				Formula:     "Σ(unresolved_market_volumes)",
 				Explanation: "Total value of bets currently active in unresolved markets (excludes fees and subsidies)",
 			},
 			MarketCreationFees: MetricWithExplanation{
-				Value:       marketCreationFees,
+				Value:       volumeStats.marketCreationFees,
 				Formula:     "number_of_markets × creation_fee_per_market",
 				Explanation: "Fees collected from users creating new markets",
 			},
@@ -223,6 +169,97 @@ func (s *Service) ComputeSystemMetrics(ctx context.Context) (*SystemMetrics, err
 	}
 
 	return metrics, nil
+}
+
+type debtStats struct {
+	userCount         int64
+	unusedDebt        int64
+	realizedProfits   int64
+	totalDebtCapacity int64
+}
+
+func (s *Service) computeDebtStats(ctx context.Context, econ setup.EconConfig) (*debtStats, error) {
+	users, err := s.repo.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &debtStats{
+		userCount: int64(len(users)),
+	}
+
+	for _, user := range users {
+		balance := user.AccountBalance
+		if balance > 0 {
+			stats.realizedProfits += balance
+		}
+		usedDebt := int64(0)
+		if balance < 0 {
+			usedDebt = -balance
+		}
+		stats.unusedDebt += econ.Economics.User.MaximumDebtAllowed - usedDebt
+	}
+
+	stats.totalDebtCapacity = econ.Economics.User.MaximumDebtAllowed * stats.userCount
+	return stats, nil
+}
+
+type marketVolumeStats struct {
+	marketCreationFees int64
+	activeBetVolume    int64
+}
+
+func (s *Service) computeMarketVolumes(ctx context.Context, econ setup.EconConfig) (*marketVolumeStats, error) {
+	markets, err := s.repo.ListMarkets(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &marketVolumeStats{
+		marketCreationFees: int64(len(markets)) * econ.Economics.MarketIncentives.CreateMarketCost,
+	}
+
+	for _, market := range markets {
+		if market.IsResolved {
+			continue
+		}
+
+		bets, err := s.repo.ListBetsForMarket(ctx, uint(market.ID))
+		if err != nil {
+			return nil, err
+		}
+		stats.activeBetVolume += marketmath.GetMarketVolume(bets)
+	}
+
+	return stats, nil
+}
+
+func (s *Service) computeParticipationFees(ctx context.Context, econ setup.EconConfig) (int64, error) {
+	betsOrdered, err := s.repo.ListBetsOrdered(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	type userMarket struct {
+		marketID uint
+		username string
+	}
+
+	seen := make(map[userMarket]bool)
+	var participationFees int64
+
+	for _, b := range betsOrdered {
+		if b.Amount <= 0 {
+			continue
+		}
+		key := userMarket{marketID: b.MarketID, username: b.Username}
+		if !seen[key] {
+			participationFees += econ.Economics.Betting.BetFees.InitialBetFee
+			seen[key] = true
+		}
+	}
+
+	return participationFees, nil
 }
 
 // GlobalUserProfitability summarises a user's profitability across all markets.
