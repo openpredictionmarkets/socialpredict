@@ -51,7 +51,9 @@ tmp/
 /frontend/vite.config.mjs
 /frontend/public/env-config.js
 
-/backend/.air.toml
+# Backend SDK
+/backend/sdk
+/backend/sdk/**/*
 
 # Apple Silicon Docker Compose Override
 docker-compose.override.yml
