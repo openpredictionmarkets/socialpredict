@@ -1,0 +1,9 @@
+services:
+  demo:
+    build: .
+    container_name: frontend-ng-demo
+    ports:
+      - "7222:7222"
+    environment:
+      - PORT=7222
+    restart: unless-stopped
