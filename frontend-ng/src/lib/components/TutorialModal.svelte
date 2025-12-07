@@ -58,7 +58,11 @@ let { open = false, steps = [], onClose, onComplete } = $props();
 	const description = $derived(current?.description);
 	const priceYes = $derived(toCents(priceLmsr(baseYes + yesBuy, baseNo + noBuy)));
 	const priceNo = $derived(100 - priceYes);
-	const displayedMarket = $derived({ ...mockMarket, yes: priceYes, no: priceNo });
+	const displayedMarket = $derived(
+		resolved
+			? { ...mockMarket, yes: 100, no: 0 }
+			: { ...mockMarket, yes: priceYes, no: priceNo }
+	);
 	const costYes = $derived(tradeCost(yesBuy, 0));
 	const costNo = $derived(tradeCost(0, noBuy));
 	const activeSide = $derived(yesBuy > 0 ? 'yes' : noBuy > 0 ? 'no' : null);
@@ -159,7 +163,7 @@ let { open = false, steps = [], onClose, onComplete } = $props();
 				<div class="layout">
 					<div class="instructions">
 						<div class="eyebrow">Step {index + 1} of {total}</div>
-						<h3>{@html current?.title}</h3>
+						<h3 class="demo-title">{@html current?.title}</h3>
 						{#if typeof description === 'string'}
 							<p>{@html description}</p>
 						{/if}
@@ -247,17 +251,20 @@ let { open = false, steps = [], onClose, onComplete } = $props();
 									<button class="primary" type="button" onclick={resolveMarket} disabled={resolved}>
 										{resolved ? 'Market is Resolved' : 'Resolve Market to YES'}
 									</button>
-									<button class="ghost" type="button" onclick={resetResolution} disabled={!resolved}>
+									<button
+										class="ghost"
+										type="button"
+										onclick={resetResolution}
+										disabled={!resolved}
+									>
 										Reset resolution
 									</button>
 								</div>
 								<div class="resolve-meta">
 									<div>You own: {yesBuy} YES / {noBuy} NO</div>
-									<div class="cost">
-										Cost at current {activeSide === 'no' ? 'NO' : 'YES'} price: ${shareCost.toFixed(
-											2
-										)}
-									</div>
+									{#if resolved}
+										<div class="cost">What you paid for your shares: ${shareCost.toFixed(2)}</div>
+									{/if}
 									<div class={`payout ${payoutPositive ? 'up' : 'down'}`}>
 										{#if resolved}
 											Your Payout: ${payoutYes.toFixed(2)}
@@ -300,9 +307,8 @@ let { open = false, steps = [], onClose, onComplete } = $props();
 								forecasters, join threads, and start predicting live markets.
 							</p>
 						</div>
-						<div class="cta-row">
-							<button class="primary" type="button">Start Predicting</button>
-							<button class="ghost" type="button">Create Account</button>
+						<div class="cta-row single">
+							<button class="primary" type="button">Create Account</button>
 						</div>
 					</div>
 				</div>
@@ -373,6 +379,7 @@ let { open = false, steps = [], onClose, onComplete } = $props();
 		gap: 0.35rem;
 	}
 
+
 	.eyebrow {
 		display: inline-flex;
 		align-items: center;
@@ -392,6 +399,12 @@ let { open = false, steps = [], onClose, onComplete } = $props();
 		margin: 0.1rem 0 0;
 		color: #f7f6ff;
 	}
+
+  .demo-title {
+    margin: 0.1rem 0 0;
+    color: #f7f6ff;
+    font-weight: 900;
+  }
 
 	p {
 		margin: 0;
@@ -528,6 +541,10 @@ let { open = false, steps = [], onClose, onComplete } = $props();
 	.cta-row {
 		display: flex;
 		gap: 0.75rem;
+	}
+
+	.cta-row.single {
+		justify-content: flex-start;
 	}
 
 	.card-shell {
