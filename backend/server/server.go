@@ -93,7 +93,7 @@ func buildCORSFromEnv() *cors.Cors {
 	})
 }
 
-func Start() {
+func Start(openAPISpec []byte) {
 	// Initialize security service
 	securityService := security.NewSecurityService()
 
@@ -108,6 +108,12 @@ func Start() {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
+	}).Methods("GET")
+
+	// OpenAPI spec endpoint
+	router.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		_, _ = w.Write(openAPISpec)
 	}).Methods("GET")
 
 	// Initialize domain services

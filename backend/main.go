@@ -38,7 +38,7 @@ func main() {
 		log.Printf("seed homepage: warning: %v", err)
 	}
 
-	server.Start()
+	server.Start(openAPISpec)
 }
 
 func secureEndpoint(w http.ResponseWriter, r *http.Request) {
