@@ -144,6 +144,10 @@ func Start() {
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
 	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
 	router.Handle("/v0/markets/status/{status}", securityMiddleware(http.HandlerFunc(marketsHandler.ListByStatus))).Methods("GET")
+	router.Handle("/v0/markets/status", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rWithStatus := mux.SetURLVars(r, map[string]string{"status": "all"})
+		marketsHandler.ListByStatus(w, rWithStatus)
+	}))).Methods("GET")
 	router.Handle("/v0/markets/{id}", securityMiddleware(http.HandlerFunc(marketsHandler.GetDetails))).Methods("GET")
 	router.Handle("/v0/markets/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarket))).Methods("POST")
 	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
