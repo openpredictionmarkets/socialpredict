@@ -21,6 +21,19 @@ tags:
   - name: Config
     description: Application economics configuration.
 paths:
+  /health:
+    get:
+      summary: Backend health check
+      description: Lightweight liveness probe endpoint.
+      tags: [Config]
+      responses:
+        '200':
+          description: Backend is healthy.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
   /v0/login:
     post:
       summary: Authenticate user credentials
@@ -80,6 +93,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EconomicsConfig'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to load configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/setup/frontend:
+    get:
+      summary: Get frontend configuration
+      description: Returns minimal configuration values needed by the frontend (e.g., chart significant figures).
+      tags: [Config]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Frontend configuration returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrontendConfig'
         '401':
           description: Authentication failed.
           content:
@@ -262,6 +301,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/status:
+    get:
+      summary: List markets across all statuses
+      description: >
+        Convenience endpoint equivalent to `/v0/markets?status=all`. Returns markets regardless of their status.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of markets to return (defaults to service limit).
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of items to skip before collecting results.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '400':
+          description: Invalid query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v0/stats:
     get:
       summary: Get platform stats
@@ -310,6 +392,34 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Failed to compute metrics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/global/leaderboard:
+    get:
+      summary: Get global leaderboard
+      description: Returns a leaderboard ranking users by overall profitability across all markets.
+      tags: [Metrics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Global leaderboard returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GlobalLeaderboardEntry'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to compute leaderboard.
           content:
             application/json:
               schema:
@@ -746,6 +856,59 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v0/markets/{id}/projection:
+    get:
+      summary: Project market probability by ID
+      description: >
+        Computes the projected probability for a market after a hypothetical bet, using the market identifier.
+      tags: [Markets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Projection computed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbabilityProjectionResponse'
+        '400':
+          description: Invalid parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market resolved or closed; projection not allowed.
           content:
             application/json:
               schema:
@@ -2323,6 +2486,52 @@ components:
           $ref: '#/components/schemas/UserEconomicsConfig'
         Betting:
           $ref: '#/components/schemas/BettingConfig'
+    GlobalLeaderboardEntry:
+      type: object
+      properties:
+        username:
+          type: string
+        totalProfit:
+          type: integer
+          format: int64
+        totalCurrentValue:
+          type: integer
+          format: int64
+        totalSpent:
+          type: integer
+          format: int64
+        activeMarkets:
+          type: integer
+        resolvedMarkets:
+          type: integer
+        earliestBet:
+          type: string
+          format: date-time
+        rank:
+          type: integer
+      required:
+        - username
+        - totalProfit
+        - totalCurrentValue
+        - totalSpent
+        - activeMarkets
+        - resolvedMarkets
+    FrontendConfig:
+      type: object
+      properties:
+        charts:
+          $ref: '#/components/schemas/FrontendChartsConfig'
+      required:
+        - charts
+    FrontendChartsConfig:
+      type: object
+      properties:
+        sigFigs:
+          type: integer
+          format: int32
+          description: Number of significant figures to use when rendering chart probabilities.
+      required:
+        - sigFigs
     LoginRequest:
       type: object
       required:
