@@ -131,20 +131,6 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS) {
 	swaggerHandler := http.FileServer(http.FS(uiFS))
 	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler))
 
-	// swaggerHandler := http.FileServer(http.FS(swaggerUIFS))
-	// router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler))
-
-	// router.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
-	// 	data, err := swaggerUIFS.ReadFile("swagger-ui/index.html")
-	// 	if err != nil {
-	// 		http.Error(w, "failed to load Swagger UI index", http.StatusInternalServerError)
-	// 		return
-	// 	}
-
-	// 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// 	_, _ = w.Write(data)
-	// }).Methods("GET")
-
 	// Initialize domain services
 	db := util.GetDB()
 	econConfig := setup.EconomicsConfig()
