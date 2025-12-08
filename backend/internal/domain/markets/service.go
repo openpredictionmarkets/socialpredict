@@ -2,7 +2,6 @@ package markets
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -910,14 +909,15 @@ func (s *Service) ValidateLabels(yesLabel, noLabel string) error {
 	return nil
 }
 
-// validateMarketResolutionTime validates that the market resolution time meets business logic requirements (private)
+// ValidateMarketResolutionTime validates that the market resolution time meets business logic requirements.
 func (s *Service) ValidateMarketResolutionTime(resolutionTime time.Time) error {
 	now := s.clock.Now()
 	minimumDuration := time.Duration(s.config.MinimumFutureHours * float64(time.Hour))
 	minimumFutureTime := now.Add(minimumDuration)
 
 	if resolutionTime.Before(minimumFutureTime) || resolutionTime.Equal(minimumFutureTime) {
-		return fmt.Errorf("market resolution time must be at least %.1f hours in the future", s.config.MinimumFutureHours)
+		// Use sentinel error so HTTP handlers can map this to a 400 response
+		return ErrInvalidResolutionTime
 	}
 	return nil
 }
