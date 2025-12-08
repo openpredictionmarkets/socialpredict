@@ -12,23 +12,25 @@ This directory contains the API documentation for the SocialPredict prediction m
 
 ## Using the API Documentation
 
-### Viewing with Swagger UI
+### Built-in Swagger UI and Spec
 
-You can view the interactive API documentation using Swagger UI:
+When running the backend locally (on port 8080 by default), the server exposes:
 
-#### Option 1: Online Swagger Editor
-1. Go to [editor.swagger.io](https://editor.swagger.io/)
-2. Copy the contents of `openapi.yaml`
-3. Paste into the editor to view the interactive documentation
+- `GET /swagger/` – Embedded Swagger UI, preconfigured to load the current OpenAPI spec.
+- `GET /openapi.yaml` – The bundled OpenAPI 3.0.3 specification served directly from the binary.
+- `GET /health` – Plain-text health check that returns `ok` when the backend is up.
 
-#### Option 2: Local Swagger UI with Docker
+For example:
+
 ```bash
-# From the backend/README/BACKEND/API directory
-docker run -p 8081:8080 -e SWAGGER_JSON=/openapi.yaml -v $(pwd)/openapi.yaml:/openapi.yaml swaggerapi/swagger-ui
+curl http://localhost:8080/health
+curl http://localhost:8080/openapi.yaml
 ```
-Then visit http://localhost:8081
 
-#### Option 3: Redoc (Alternative viewer)
+Open `http://localhost:8080/swagger` in a browser to interact with the backend routes.
+
+### Building Docs using Redoc
+
 ```bash
 # Install redoc-cli globally
 npm install -g redoc-cli
@@ -39,7 +41,8 @@ redoc-cli build openapi.yaml --output api-docs.html
 # Serve the documentation
 redoc-cli serve openapi.yaml --port 8082
 ```
-Then visit http://localhost:8082
+
+Then visit <http://localhost:8082>
 
 ### API Base URLs
 
@@ -110,12 +113,13 @@ All API endpoints return consistent error responses:
 ```json
 {
   "error": "Human readable error message",
-  "code": "ERROR_CODE", 
+  "code": "ERROR_CODE",
   "details": "Additional context if available"
 }
 ```
 
 Common HTTP status codes:
+
 - `200` - Success
 - `201` - Created
 - `400` - Bad Request
@@ -129,9 +133,11 @@ Common HTTP status codes:
 
 1. Modify `openapi.yaml` as needed
 2. Validate the OpenAPI spec:
+
    ```bash
    npx @apidevtools/swagger-parser validate openapi.yaml
    ```
+
 3. Update this documentation if needed
 4. Test the changes with Swagger UI
 
@@ -143,7 +149,7 @@ You can generate client SDKs and server stubs from the OpenAPI specification:
 # Generate Go client
 openapi-generator generate -i openapi.yaml -g go -o ./go-client
 
-# Generate TypeScript client  
+# Generate TypeScript client
 openapi-generator generate -i openapi.yaml -g typescript-axios -o ./ts-client
 
 # Generate Python client
@@ -153,5 +159,6 @@ openapi-generator generate -i openapi.yaml -g python -o ./python-client
 ## Support
 
 For API support or questions:
+
 - Create an issue in the project repository
-- Contact: support@socialpredict.com
+- Contact: <support@socialpredict.com>

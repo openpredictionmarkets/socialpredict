@@ -1,6 +1,8 @@
 package server
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -93,7 +95,7 @@ func buildCORSFromEnv() *cors.Cors {
 	})
 }
 
-func Start(openAPISpec []byte) {
+func Start(openAPISpec []byte, swaggerUIFS embed.FS) {
 	// Initialize security service
 	securityService := security.NewSecurityService()
 
@@ -115,6 +117,33 @@ func Start(openAPISpec []byte) {
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		_, _ = w.Write(openAPISpec)
 	}).Methods("GET")
+
+	// Swagger UI endpoints
+	// Redirect /swagger -> /swagger/
+	router.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/swagger/", http.StatusMovedPermanently)
+	})
+	// File server rooted at swagger-ui/
+	uiFS, err := fs.Sub(swaggerUIFS, "swagger-ui")
+	if err != nil {
+		log.Fatalf("failed to set up swagger-ui FS: %v", err)
+	}
+	swaggerHandler := http.FileServer(http.FS(uiFS))
+	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler))
+
+	// swaggerHandler := http.FileServer(http.FS(swaggerUIFS))
+	// router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler))
+
+	// router.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
+	// 	data, err := swaggerUIFS.ReadFile("swagger-ui/index.html")
+	// 	if err != nil {
+	// 		http.Error(w, "failed to load Swagger UI index", http.StatusInternalServerError)
+	// 		return
+	// 	}
+
+	// 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// 	_, _ = w.Write(data)
+	// }).Methods("GET")
 
 	// Initialize domain services
 	db := util.GetDB()
