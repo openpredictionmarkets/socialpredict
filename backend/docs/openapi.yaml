@@ -3,69 +3,88 @@ info:
   title: SocialPredict API
   version: 0.1.0
   description: >
-    HTTP contract for the SocialPredict backend service. Paths are grouped by service so
-    they can be lifted into standalone microservice specs later.
+    HTTP contract for the SocialPredict backend service. This spec is generated
+    from the Go handlers and DTOs under backend/server and backend/handlers.
 servers:
   - url: http://localhost:8080
     description: Local dev server
-  - url: https://api.socialpredict.local
-    description: Placeholder for production server
 tags:
-  - name: Markets
-    description: Market creation, listing, and resolution workflows.
-  - name: Users
-    description: Public and private user profile management.
   - name: Auth
     description: Authentication and session management.
+  - name: Config
+    description: Health and configuration endpoints.
+  - name: Markets
+    description: Market creation, listing, search, and resolution.
   - name: Bets
     description: Placing and selling bets.
-  - name: Config
-    description: Application economics configuration.
+  - name: Users
+    description: Public and private user profile and financial data.
+  - name: Metrics
+    description: Platform-wide metrics and leaderboards.
+  - name: Content
+    description: CMS-powered homepage content.
+
 paths:
   /health:
     get:
-      summary: Backend health check
-      description: Lightweight liveness probe endpoint.
       tags: [Config]
+      summary: Backend health check
+      description: Simple liveness probe that returns "ok" when the backend is running.
       responses:
-        "200":
+        '200':
           description: Backend is healthy.
           content:
             text/plain:
               schema:
                 type: string
                 example: ok
+
   /v0/login:
     post:
-      summary: Authenticate user credentials
-      description: Validates username/password and returns a JWT for subsequent requests.
       tags: [Auth]
+      summary: Authenticate user
+      description: >
+        Validates username and password and returns a JWT bearer token for subsequent
+        authenticated requests.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              $ref: '#/components/schemas/LoginRequest'
       responses:
-        "200":
+        '200':
           description: Login successful.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponse"
-        "400":
-          description: Invalid request payload.
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid JSON payload or validation failure.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid username or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Database access or token creation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/home:
     get:
-      summary: Health check
-      description: Returns a simple message to verify backend availability.
       tags: [Config]
+      summary: Backend home
+      description: Returns a simple JSON message to verify backend availability.
       responses:
-        "200":
+        '200':
           description: Backend responded successfully.
           content:
             application/json:
@@ -74,693 +93,364 @@ paths:
                 properties:
                   message:
                     type: string
-        "401":
-          description: Invalid credentials.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+
   /v0/setup:
     get:
-      summary: Get economics configuration
-      description: Returns the current economic configuration (market fees, user balances, bet fees).
       tags: [Config]
+      summary: Get economics configuration
+      description: Returns the current economic configuration used by the backend.
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Economics configuration returned.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EconomicsConfig"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/Economics'
+        '500':
+          description: Failed to load or encode configuration.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Failed to load configuration.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/setup/frontend:
     get:
-      summary: Get frontend configuration
-      description: Returns minimal configuration values needed by the frontend (e.g., chart significant figures).
       tags: [Config]
+      summary: Get frontend configuration
+      description: Returns minimal configuration values needed by the frontend, such as chart precision.
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Frontend configuration returned.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FrontendConfig"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/FrontendConfig'
+        '500':
+          description: Failed to load or encode configuration.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Failed to load configuration.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/bet:
-    post:
-      summary: Place a bet
-      description: Places a YES/NO bet on a market for the authenticated user.
-      tags: [Bets]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BetRequest"
-      responses:
-        "200":
-          description: Bet placed successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BetResponse"
-        "400":
-          description: Invalid bet payload.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/sell:
-    post:
-      summary: Sell shares
-      description: Sells an amount of YES/NO shares for the authenticated user and deposits the proceeds.
-      tags: [Bets]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SellRequest"
-      responses:
-        "201":
-          description: Sale processed successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SellResponse"
-        "400":
-          description: Invalid sale request or insufficient position.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Market not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Market closed or resolved; sale not allowed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "422":
-          description: Sale violates a business rule (e.g., dust cap exceeded).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/admin/createuser:
-    post:
-      summary: Create a new user
-      description: Admin-only endpoint that creates a REGULAR user with an autogenerated temporary password.
-      tags: [Auth]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AdminCreateUserRequest"
-      responses:
-        "200":
-          description: User created successfully with a temporary password.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminCreateUserResponse"
-        "400":
-          description: Invalid username or the username/display name/email/API key already exists.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Admin authentication required.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/markets:
     get:
-      summary: List markets
-      description: Returns recently created markets with optional filtering.
       tags: [Markets]
+      summary: List markets
+      description: >
+        Returns markets with optional filtering by status and creator. When status is
+        provided, results are backed by a status-specific query.
       security:
         - bearerAuth: []
       parameters:
-        - name: status
-          in: query
-          description: Filter by market status (e.g. active, closed, resolved).
+        - in: query
+          name: status
           required: false
+          description: >
+            Filter by market status. Accepted values are active, closed, resolved, and all
+            (or omitted for all markets).
           schema:
             type: string
             enum: [active, closed, resolved, all]
-            description: Case-insensitive status filter. `all` or empty returns every market.
-        - name: created_by
-          in: query
-          description: Only include markets created by the given username.
+        - in: query
+          name: created_by
           required: false
+          description: Only include markets created by the given username.
           schema:
             type: string
-        - name: limit
-          in: query
-          description: Maximum number of markets to return (defaults to service limit).
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-        - name: offset
-          in: query
-          description: Number of items to skip before collecting results.
-          required: false
-          schema:
-            type: integer
-            minimum: 0
-      responses:
-        "200":
-          description: Markets returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListMarketsResponse"
-        "400":
-          description: Invalid query parameters.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/markets/status:
-    get:
-      summary: List markets across all statuses
-      description: >
-        Convenience endpoint equivalent to `/v0/markets?status=all`. Returns markets regardless of their status.
-      tags: [Markets]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: limit
-          in: query
-          description: Maximum number of markets to return (defaults to service limit).
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-        - name: offset
-          in: query
-          description: Number of items to skip before collecting results.
-          required: false
-          schema:
-            type: integer
-            minimum: 0
-      responses:
-        "200":
-          description: Markets returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListMarketsResponse"
-        "400":
-          description: Invalid query parameters.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/stats:
-    get:
-      summary: Get platform stats
-      description: Returns aggregate financial stats and the current economics configuration.
-      tags: [Metrics]
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Stats returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StatsResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Failed to compute stats.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/system/metrics:
-    get:
-      summary: Get system metrics
-      description: Computes money creation/utilization metrics for auditing the economy.
-      tags: [Metrics]
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Metrics returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SystemMetrics"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Failed to compute metrics.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/global/leaderboard:
-    get:
-      summary: Get global leaderboard
-      description: Returns a leaderboard ranking users by overall profitability across all markets.
-      tags: [Metrics]
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Global leaderboard returned successfully.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/GlobalLeaderboardEntry"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Failed to compute leaderboard.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/markets/active:
-    get:
-      summary: List active markets
-      description: Returns markets that are open for trading and not resolved.
-      tags: [Markets]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
+        - in: query
+          name: limit
           required: false
           description: Maximum number of markets to return.
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            minimum: 0
-          required: false
-          description: Number of items to skip before collecting results.
-      responses:
-        "200":
-          description: Active markets returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListMarketsResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/markets/closed:
-    get:
-      summary: List closed markets
-      description: Returns markets whose resolution date has passed but which are not yet resolved.
-      tags: [Markets]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: limit
-          in: query
           schema:
             type: integer
             minimum: 1
             maximum: 100
+        - in: query
+          name: offset
           required: false
-        - name: offset
-          in: query
+          description: Number of markets to skip before collecting results.
           schema:
             type: integer
             minimum: 0
-          required: false
       responses:
-        "200":
-          description: Closed markets returned successfully.
+        '200':
+          description: Markets returned successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListMarketsResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '400':
+          description: Invalid status or pagination parameters.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while listing markets.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/markets/resolved:
-    get:
-      summary: List resolved markets
-      description: Returns markets whose outcome has been finalized.
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
       tags: [Markets]
+      summary: Create a market
+      description: Creates a new prediction market for the authenticated user.
       security:
         - bearerAuth: []
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-          required: false
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            minimum: 0
-          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMarketRequest'
       responses:
-        "200":
-          description: Resolved markets returned successfully.
+        '201':
+          description: Market created successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListMarketsResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/MarketResponse'
+        '400':
+          description: Validation failed while creating the market.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed or user not authorized.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/marketprojection/{marketId}/{amount}/{outcome}:
-    get:
-      summary: Project market probability
-      description: Projects what the market probability would become after a hypothetical bet of `amount` on `outcome`.
-      tags: [Markets]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: marketId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - name: amount
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-        - name: outcome
-          in: path
-          required: true
-          schema:
-            type: string
-            enum: [YES, NO]
-      responses:
-        "200":
-          description: Projection computed successfully.
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Password change required before creating markets.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProbabilityProjectionResponse"
-        "400":
-          description: Invalid parameters.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error during market creation.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Market not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Market resolved or closed; projection not allowed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/markets/search:
     get:
-      summary: Search markets
-      description: Searches markets by question title with optional status filtering. Results include a primary list (matching status, if specified) and optional fallback results.
       tags: [Markets]
+      summary: Search markets
+      description: >
+        Searches markets by question title with optional status filtering. Supports both
+        "query" and legacy "q" parameters.
       security:
         - bearerAuth: []
       parameters:
-        - name: query
-          in: query
-          required: true
-          description: Search query (partial match on question title).
+        - in: query
+          name: query
+          required: false
+          description: Search query (preferred parameter name).
           schema:
             type: string
-            maxLength: 100
-        - name: status
-          in: query
+        - in: query
+          name: q
           required: false
-          description: Filter by market status. Defaults to all markets.
+          description: Legacy search query parameter (used if "query" is not provided).
           schema:
             type: string
-            enum: [active, closed, resolved, all, ""]
-        - name: limit
-          in: query
+        - in: query
+          name: status
           required: false
-          description: Maximum number of primary results to return (default 20, max 50).
+          description: Filter by market status; same accepted values as /v0/markets.
+          schema:
+            type: string
+            enum: [active, closed, resolved, all]
+        - in: query
+          name: limit
+          required: false
+          description: Maximum number of primary results to return.
           schema:
             type: integer
             minimum: 1
-            maximum: 50
-        - name: offset
-          in: query
+        - in: query
+          name: offset
           required: false
           description: Number of primary results to skip before collecting.
           schema:
             type: integer
             minimum: 0
       responses:
-        "200":
+        '200':
           description: Search completed successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SearchResponse"
-        "400":
-          description: Invalid query or status parameter.
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Missing query parameter or invalid status.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error during search.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    post:
-      summary: Create a market
-      description: Creates a new prediction market for the authenticated user.
-      tags: [Markets]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateMarketRequest"
-      responses:
-        "201":
-          description: Market created successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MarketResponse"
-        "400":
-          description: Validation failed while creating the market.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/markets/{id}:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/markets/status:
     get:
-      summary: Get market details
-      description: Fetches a single market by its identifier with probability and volume stats.
       tags: [Markets]
+      summary: List markets across all statuses
+      description: Convenience endpoint equivalent to `/v0/markets?status=all`.
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
+        - in: query
+          name: limit
+          required: false
+          description: Maximum number of markets to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          description: Number of markets to skip before collecting results.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '400':
+          description: Invalid pagination parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while listing markets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/markets/status/{status}:
+    get:
+      tags: [Markets]
+      summary: List markets by status
+      description: Returns markets filtered by a specific lifecycle status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: status
+          required: true
+          description: >
+            Market status to filter by. Accepted values are active, closed, resolved, and all.
+          schema:
+            type: string
+            enum: [active, closed, resolved, all]
+        - in: query
+          name: limit
+          required: false
+          description: Maximum number of markets to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          description: Number of markets to skip before collecting results.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '400':
+          description: Invalid or unsupported status value.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while listing markets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/markets/{id}:
+    get:
+      tags: [Markets]
+      summary: Get market details
+      description: >
+        Fetches a single market by its identifier, including probability history and
+        aggregate statistics.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
           required: true
           description: Numeric identifier of the market.
           schema:
             type: integer
             format: int64
       responses:
-        "200":
+        '200':
           description: Market returned successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MarketDetailsResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/MarketDetailsResponse'
+        '400':
+          description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching market details.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/markets/{id}/resolve:
     post:
+      tags: [Markets]
       summary: Resolve a market
       description: Sets the final outcome for a market once it has concluded.
-      tags: [Markets]
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
-          description: Numeric identifier of the market.
+          description: Numeric identifier of the market to resolve.
           schema:
             type: integer
             format: int64
@@ -769,344 +459,482 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ResolveMarketRequest"
+              $ref: '#/components/schemas/ResolveMarketRequest'
       responses:
-        "200":
-          description: Market resolved successfully.
+        '204':
+          description: Market resolved successfully; no content is returned.
+        '400':
+          description: Invalid market ID, resolution value, or market state.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ResolveMarketResponse"
-        "400":
-          description: Provided outcome is invalid for the market state.
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed or user not authorized to resolve the market.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Password change required before resolving markets.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Market not found.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market or user not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Market already resolved or cannot be resolved.
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market already resolved or cannot be resolved in its current state.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error during resolution.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/markets/{id}/leaderboard:
     get:
-      summary: Get market leaderboard
-      description: Ranks participants in a single market by realized profit and traded volume.
       tags: [Markets]
+      summary: Get market leaderboard
+      description: Ranks participants in a single market by profit and traded volume.
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           description: Numeric identifier of the market.
           schema:
             type: integer
             format: int64
-        - name: limit
-          in: query
+        - in: query
+          name: limit
           required: false
-          description: Maximum rows to return (defaults to 100).
+          description: Maximum number of rows to return.
           schema:
             type: integer
             minimum: 1
-        - name: offset
-          in: query
+        - in: query
+          name: offset
           required: false
           description: Number of rows to skip before collecting results.
           schema:
             type: integer
             minimum: 0
       responses:
-        "200":
+        '200':
           description: Leaderboard returned successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MarketLeaderboardResponse"
-        "400":
-          description: Invalid request parameters.
+                $ref: '#/components/schemas/MarketLeaderboardResponse'
+        '400':
+          description: Invalid market ID or pagination parameters.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while computing leaderboard.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/markets/{id}/projection:
     get:
-      summary: Project market probability by ID
-      description: >
-        Computes the projected probability for a market after a hypothetical bet, using the market identifier.
       tags: [Markets]
+      summary: Project market probability
+      description: >
+        Computes the projected probability for a market after a hypothetical bet,
+        using the market identifier and bet parameters.
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           description: Numeric identifier of the market.
           schema:
             type: integer
             format: int64
       responses:
-        "200":
+        '200':
           description: Projection computed successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProbabilityProjectionResponse"
-        "400":
-          description: Invalid parameters.
+                $ref: '#/components/schemas/ProbabilityProjectionResponse'
+        '400':
+          description: Invalid market ID or bet parameters.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Market resolved or closed; projection not allowed.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while computing projection.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/markets/positions/{marketId}:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/marketprojection/{marketId}/{amount}/{outcome}:
     get:
-      summary: List user positions for a market
-      description: Returns all users holding YES or NO shares for the specified market.
       tags: [Markets]
+      summary: Legacy market projection endpoint
+      description: >
+        Legacy route for computing a probability projection using path parameters
+        instead of query parameters.
       security:
         - bearerAuth: []
       parameters:
-        - name: marketId
-          in: path
+        - in: path
+          name: marketId
           required: true
-          description: Numeric identifier of the market.
           schema:
             type: integer
             format: int64
-            minimum: 1
-      responses:
-        "200":
-          description: Positions returned successfully.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/MarketPosition"
-        "400":
-          description: Invalid market ID supplied.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Market not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/markets/positions/{marketId}/{username}:
-    get:
-      summary: Get a user's position in a market
-      description: Returns the holdings for a specific user in the given market.
-      tags: [Markets]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: marketId
-          in: path
+        - in: path
+          name: amount
           required: true
-          description: Numeric identifier of the market.
           schema:
             type: integer
-            format: int64
-            minimum: 1
-        - name: username
-          in: path
+        - in: path
+          name: outcome
           required: true
-          description: Username to query.
           schema:
             type: string
+            enum: [YES, NO]
       responses:
-        "200":
-          description: Position returned successfully.
+        '200':
+          description: Projection computed successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MarketPosition"
-        "400":
-          description: Invalid request parameters.
+                $ref: '#/components/schemas/ProbabilityProjectionResponse'
+        '400':
+          description: Invalid market ID, amount, or outcome.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Market or user not found.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while computing projection.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/markets/bets/{marketId}:
     get:
+      tags: [Bets, Markets]
       summary: List bets for a market
-      description: Returns the bet history for a specific market, including the probability at the time each bet was placed.
-      tags: [Markets, Bets]
+      description: Returns the bet history for a specific market.
       security:
         - bearerAuth: []
       parameters:
-        - name: marketId
-          in: path
+        - in: path
+          name: marketId
           required: true
           description: Numeric identifier of the market.
           schema:
             type: integer
             format: int64
-            minimum: 1
       responses:
-        "200":
+        '200':
           description: Bets returned successfully.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/MarketBetHistoryItem"
-        "400":
-          description: Invalid market ID supplied.
+                  $ref: '#/components/schemas/MarketBet'
+        '400':
+          description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching bets.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/markets/positions/{marketId}:
+    get:
+      tags: [Markets, Users]
+      summary: List user positions for a market
+      description: Returns all user positions (YES/NO shares) in a specific market.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: marketId
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Positions returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MarketPosition'
+        '400':
+          description: Invalid market ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching positions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/markets/positions/{marketId}/{username}:
+    get:
+      tags: [Markets, Users]
+      summary: Get a user's position in a market
+      description: Returns the holdings for a specific user in the given market.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: marketId
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+        - in: path
+          name: username
+          required: true
+          description: Username to query.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Position returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketPosition'
+        '400':
+          description: Invalid market ID or username.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market or user not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching position.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/bet:
+    post:
+      tags: [Bets]
+      summary: Place a bet
+      description: Places a YES/NO bet on a market for the authenticated user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceBetRequest'
+      responses:
+        '201':
+          description: Bet placed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceBetResponse'
+        '400':
+          description: Invalid outcome, amount, or request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed or password change required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market is closed and does not accept new bets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Insufficient balance to place the bet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while placing bet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/sell:
+    post:
+      tags: [Bets]
+      summary: Sell shares
+      description: Sells an amount of YES/NO shares for the authenticated user and deposits the proceeds.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellBetRequest'
+      responses:
+        '201':
+          description: Sale processed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellBetResponse'
+        '400':
+          description: Invalid sale request or amount/outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed or password change required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Market closed; sale not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: No position, insufficient shares, or dust cap exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while processing sale.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/privateprofile:
     get:
+      tags: [Users]
       summary: Get private profile
       description: Returns the authenticated user’s private profile data.
-      tags: [Users]
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Private profile returned successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PrivateUserResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '401':
+          description: Invalid or missing token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching profile.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/profilechange/description:
     post:
-      summary: Update profile description
       tags: [Users]
+      summary: Update profile description
       security:
         - bearerAuth: []
       requestBody:
@@ -1114,36 +942,43 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangeDescriptionRequest"
+              $ref: '#/components/schemas/ChangeDescriptionRequest'
       responses:
-        "200":
+        '200':
           description: Description updated successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PrivateUserResponse"
-        "400":
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while updating description.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/profilechange/displayname:
     post:
-      summary: Update display name
       tags: [Users]
+      summary: Update display name
       security:
         - bearerAuth: []
       requestBody:
@@ -1151,36 +986,43 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangeDisplayNameRequest"
+              $ref: '#/components/schemas/ChangeDisplayNameRequest'
       responses:
-        "200":
+        '200':
           description: Display name updated successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PrivateUserResponse"
-        "400":
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while updating display name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/profilechange/emoji:
     post:
-      summary: Update personal emoji
       tags: [Users]
+      summary: Update personal emoji
       security:
         - bearerAuth: []
       requestBody:
@@ -1188,36 +1030,43 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangeEmojiRequest"
+              $ref: '#/components/schemas/ChangeEmojiRequest'
       responses:
-        "200":
+        '200':
           description: Personal emoji updated successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PrivateUserResponse"
-        "400":
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while updating emoji.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/profilechange/links:
     post:
-      summary: Update personal links
       tags: [Users]
+      summary: Update personal links
       security:
         - bearerAuth: []
       requestBody:
@@ -1225,36 +1074,43 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangePersonalLinksRequest"
+              $ref: '#/components/schemas/ChangePersonalLinksRequest'
       responses:
-        "200":
+        '200':
           description: Personal links updated successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PrivateUserResponse"
-        "400":
+                $ref: '#/components/schemas/PrivateUserResponse'
+        '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while updating personal links.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/changepassword:
     post:
-      summary: Change account password
       tags: [Users]
+      summary: Change account password
       security:
         - bearerAuth: []
       requestBody:
@@ -1262,37 +1118,44 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangePasswordRequest"
+              $ref: '#/components/schemas/ChangePasswordRequest'
       responses:
-        "200":
+        '200':
           description: Password changed successfully.
           content:
             text/plain:
               schema:
                 type: string
                 example: Password changed successfully
-        "400":
+        '400':
           description: Invalid request body or password requirements not met.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or missing token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while changing password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/userinfo/{username}:
     get:
-      summary: Get public user info
       tags: [Users]
+      summary: Get public user info
       security:
         - bearerAuth: []
       parameters:
@@ -1303,222 +1166,117 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: Public profile returned successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PublicUserResponse"
-        "400":
+                $ref: '#/components/schemas/PublicUserResponse'
+        '400':
           description: Username missing or invalid.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching public user.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/userposition/{marketId}:
     get:
+      tags: [Users, Markets]
       summary: Get authenticated user's position in a market
-      tags: [Users]
       security:
         - bearerAuth: []
       parameters:
         - in: path
           name: marketId
           required: true
+          description: Market identifier.
           schema:
             type: integer
             format: int64
-          description: Market identifier.
       responses:
-        "200":
+        '200':
           description: Position returned successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserPosition"
-        "400":
+                $ref: '#/components/schemas/UserPosition'
+        '400':
           description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Market not found.
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Market or user not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching user position.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v0/usercredit/{username}:
     get:
-      summary: Get user credit
       tags: [Users]
+      summary: Get user credit
+      description: Returns the user's available credit limit, treating missing users as max debt.
       security:
         - bearerAuth: []
       parameters:
         - in: path
           name: username
           required: true
+          description: Username to evaluate for credit availability.
           schema:
             type: string
-          description: Username to evaluate for credit availability.
       responses:
-        "200":
+        '200':
           description: Credit calculated successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserCreditResponse"
-        "400":
+                $ref: '#/components/schemas/UserCreditResponse'
+        '400':
           description: Username missing or invalid.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to calculate user credit.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/portfolio/{username}:
-    get:
-      summary: Get user portfolio
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/admin/createuser:
+    post:
       tags: [Users]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: username
-          required: true
-          schema:
-            type: string
-          description: Username whose portfolio should be returned.
-      responses:
-        "200":
-          description: Portfolio returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PortfolioResponse"
-        "400":
-          description: Username missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/users/{username}/financial:
-    get:
-      summary: Get user financial snapshot
-      tags: [Users]
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: username
-          required: true
-          schema:
-            type: string
-          description: Username whose financial snapshot is requested.
-      responses:
-        "200":
-          description: Financial snapshot returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserFinancialResponse"
-        "400":
-          description: Username missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: User not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Unexpected server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /v0/content/home:
-    get:
-      summary: Get public homepage content
-      tags: [Content]
-      responses:
-        "200":
-          description: Homepage content returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HomeContent"
-        "404":
-          description: Homepage content not found.
-          content:
-            text/plain:
-              schema:
-                type: string
-  /v0/admin/content/home:
-    put:
-      summary: Update homepage content
-      tags: [Content]
+      summary: Create a new user (admin)
+      description: >
+        Admin-only endpoint that creates a new REGULAR user with a generated password.
       security:
         - bearerAuth: []
       requestBody:
@@ -1526,113 +1284,306 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/HomeContentUpdateRequest"
+              $ref: '#/components/schemas/AdminCreateUserRequest'
       responses:
-        "200":
-          description: Homepage content updated.
+        '200':
+          description: User created successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HomeContent"
-        "400":
-          description: Invalid request body.
+                $ref: '#/components/schemas/AdminCreateUserResponse'
+        '400':
+          description: Invalid username or username/display name/email/API key already in use.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication failed or admin privileges missing.
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed or token invalid.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to create user or hash password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/portfolio/{username}:
+    get:
+      tags: [Users]
+      summary: Get user portfolio
+      description: Returns the markets and share counts for a user's portfolio.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          description: Username whose portfolio should be returned.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Portfolio returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while fetching portfolio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/users/{username}/financial:
+    get:
+      tags: [Users]
+      summary: Get user financial snapshot
+      description: Returns a map of financial metrics (e.g., balances and exposures) by key.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          description: Username whose financial snapshot is requested.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Financial snapshot returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserFinancialResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to generate financial snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/stats:
+    get:
+      tags: [Metrics]
+      summary: Get platform stats
+      description: Returns aggregate stats and the current economics configuration.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Stats returned successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+        '500':
+          description: Failed to compute stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/system/metrics:
+    get:
+      tags: [Metrics]
+      summary: Get system metrics
+      description: Computes money creation/utilization metrics for auditing the economy.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Metrics returned successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+        '500':
+          description: Failed to compute metrics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/global/leaderboard:
+    get:
+      tags: [Metrics]
+      summary: Get global leaderboard
+      description: Returns a leaderboard ranking users by profitability across all markets.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Global leaderboard returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GlobalLeaderboardEntry'
+        '500':
+          description: Failed to compute global leaderboard.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v0/content/home:
+    get:
+      tags: [Content]
+      summary: Get public homepage content
+      description: Retrieves CMS-configured homepage content.
+      responses:
+        '200':
+          description: Homepage content returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeContent'
+        '404':
+          description: Homepage content not found.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /v0/admin/content/home:
+    put:
+      tags: [Content]
+      summary: Update homepage content
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomeContentUpdateRequest'
+      responses:
+        '200':
+          description: Homepage content updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeContent'
+        '400':
+          description: Invalid request body or update failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error while updating content.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
   schemas:
-    ChangeDescriptionRequest:
-      type: object
-      required:
-        - description
-      properties:
-        description:
-          type: string
-          maxLength: 2000
-    ChangeDisplayNameRequest:
-      type: object
-      required:
-        - displayName
-      properties:
-        displayName:
-          type: string
-          maxLength: 50
-    ChangeEmojiRequest:
-      type: object
-      required:
-        - emoji
-      properties:
-        emoji:
-          type: string
-          maxLength: 20
-    ChangePersonalLinksRequest:
+    ErrorResponse:
       type: object
       properties:
-        personalLink1:
+        error:
           type: string
-          format: uri
-        personalLink2:
-          type: string
-          format: uri
-        personalLink3:
-          type: string
-          format: uri
-        personalLink4:
-          type: string
-          format: uri
-    ChangePasswordRequest:
+      required: [error]
+
+    LoginRequest:
       type: object
-      required:
-        - currentPassword
-        - newPassword
+      required: [username, password]
       properties:
-        currentPassword:
+        username:
           type: string
-        newPassword:
+        password:
           type: string
+
+    LoginResponse:
+      type: object
+      required: [token, username, usertype, mustChangePassword]
+      properties:
+        token:
+          type: string
+        username:
+          type: string
+        usertype:
+          type: string
+        mustChangePassword:
+          type: boolean
+
     CreateMarketRequest:
       type: object
-      required:
-        - questionTitle
-        - outcomeType
-        - resolutionDateTime
+      required: [questionTitle, outcomeType, resolutionDateTime]
       properties:
         questionTitle:
           type: string
           maxLength: 160
-          description: Title of the market question shown to users.
         description:
           type: string
           maxLength: 2000
-          description: Optional long-form description for additional context.
         outcomeType:
           type: string
-          description: Outcome type code supported by the service.
-          example: binary
         resolutionDateTime:
           type: string
           format: date-time
-          description: When the market should be resolved at the latest.
         yesLabel:
           type: string
           maxLength: 20
-          description: Optional custom label for the "yes" outcome.
         noLabel:
           type: string
           maxLength: 20
-          description: Optional custom label for the "no" outcome.
+
     MarketResponse:
       type: object
       properties:
@@ -1666,6 +1617,7 @@ components:
         updatedAt:
           type: string
           format: date-time
+
     CreatorResponse:
       type: object
       properties:
@@ -1673,17 +1625,16 @@ components:
           type: string
         personalEmoji:
           type: string
-          nullable: true
         displayname:
           type: string
-          nullable: true
+
     MarketOverviewResponse:
       type: object
       properties:
         market:
-          $ref: "#/components/schemas/MarketResponse"
+          $ref: '#/components/schemas/MarketResponse'
         creator:
-          $ref: "#/components/schemas/CreatorResponse"
+          $ref: '#/components/schemas/CreatorResponse'
         lastProbability:
           type: number
           format: float
@@ -1695,12 +1646,37 @@ components:
         marketDust:
           type: integer
           format: int64
-      required:
-        - market
-        - lastProbability
-        - numUsers
-        - totalVolume
-        - marketDust
+
+    ListMarketsResponse:
+      type: object
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketOverviewResponse'
+        total:
+          type: integer
+
+    MarketDetailsResponse:
+      type: object
+      properties:
+        market:
+          $ref: '#/components/schemas/PublicMarketResponse'
+        creator:
+          $ref: '#/components/schemas/CreatorResponse'
+        probabilityChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProbabilityChange'
+        numUsers:
+          type: integer
+        totalVolume:
+          type: integer
+          format: int64
+        marketDust:
+          type: integer
+          format: int64
+
     PublicMarketResponse:
       type: object
       properties:
@@ -1737,6 +1713,7 @@ components:
           type: string
         noLabel:
           type: string
+
     ProbabilityChange:
       type: object
       properties:
@@ -1746,85 +1723,22 @@ components:
         timestamp:
           type: string
           format: date-time
-      required:
-        - probability
-        - timestamp
-    MarketBetHistoryItem:
-      type: object
-      properties:
-        username:
-          type: string
-        outcome:
-          type: string
-          enum: [YES, NO]
-        amount:
-          type: integer
-          format: int64
-        probability:
-          type: number
-          format: float
-        placedAt:
-          type: string
-          format: date-time
-      required:
-        - username
-        - outcome
-        - amount
-        - probability
-        - placedAt
-    ListMarketsResponse:
-      type: object
-      properties:
-        markets:
-          type: array
-          items:
-            $ref: "#/components/schemas/MarketOverviewResponse"
-        total:
-          type: integer
-      required:
-        - markets
-        - total
-    MarketDetailsResponse:
-      type: object
-      properties:
-        market:
-          $ref: "#/components/schemas/PublicMarketResponse"
-        creator:
-          $ref: "#/components/schemas/CreatorResponse"
-        probabilityChanges:
-          type: array
-          items:
-            $ref: "#/components/schemas/ProbabilityChange"
-        numUsers:
-          type: integer
-        totalVolume:
-          type: integer
-          format: int64
-        marketDust:
-          type: integer
-          format: int64
-      required:
-        - market
-        - probabilityChanges
-        - numUsers
-        - totalVolume
-        - marketDust
+
     SearchResponse:
       type: object
       properties:
         primaryResults:
           type: array
           items:
-            $ref: "#/components/schemas/MarketOverviewResponse"
+            $ref: '#/components/schemas/MarketOverviewResponse'
         fallbackResults:
           type: array
           items:
-            $ref: "#/components/schemas/MarketOverviewResponse"
+            $ref: '#/components/schemas/MarketOverviewResponse'
         query:
           type: string
         primaryStatus:
           type: string
-          nullable: true
         primaryCount:
           type: integer
         fallbackCount:
@@ -1833,15 +1747,29 @@ components:
           type: integer
         fallbackUsed:
           type: boolean
-      required:
-        - primaryResults
-        - fallbackResults
-        - query
-        - primaryCount
-        - fallbackCount
-        - totalCount
-        - fallbackUsed
-    MarketLeaderboardRow:
+
+    ResolveMarketRequest:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          enum: [yes, no]
+
+    MarketLeaderboardResponse:
+      type: object
+      properties:
+        marketId:
+          type: integer
+          format: int64
+        leaderboard:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardRow'
+        total:
+          type: integer
+
+    LeaderboardRow:
       type: object
       properties:
         username:
@@ -1857,7 +1785,6 @@ components:
           format: int64
         position:
           type: string
-          enum: [YES, NO, NEUTRAL, NONE]
         yesSharesOwned:
           type: integer
           format: int64
@@ -1866,40 +1793,90 @@ components:
           format: int64
         rank:
           type: integer
-      required:
-        - username
-        - profit
-        - currentValue
-        - totalSpent
-        - position
-        - yesSharesOwned
-        - noSharesOwned
-        - rank
-    MarketLeaderboardResponse:
+
+    ProbabilityProjectionResponse:
       type: object
       properties:
         marketId:
           type: integer
           format: int64
-        leaderboard:
-          type: array
-          items:
-            $ref: "#/components/schemas/MarketLeaderboardRow"
-        total:
+        currentProbability:
+          type: number
+          format: float
+        projectedProbability:
+          type: number
+          format: float
+        amount:
           type: integer
-      required:
-        - marketId
-        - leaderboard
-        - total
-    MarketPosition:
+          format: int64
+        outcome:
+          type: string
+
+    PlaceBetRequest:
       type: object
-      description: A user's net holdings within a specific market.
+      properties:
+        marketId:
+          type: integer
+        amount:
+          type: integer
+          format: int64
+        outcome:
+          type: string
+
+    PlaceBetResponse:
+      type: object
       properties:
         username:
           type: string
         marketId:
           type: integer
+        amount:
+          type: integer
           format: int64
+        outcome:
+          type: string
+        placedAt:
+          type: string
+          format: date-time
+
+    SellBetRequest:
+      type: object
+      properties:
+        marketId:
+          type: integer
+        amount:
+          type: integer
+          format: int64
+        outcome:
+          type: string
+
+    SellBetResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        marketId:
+          type: integer
+        sharesSold:
+          type: integer
+          format: int64
+        saleValue:
+          type: integer
+          format: int64
+        dust:
+          type: integer
+          format: int64
+        outcome:
+          type: string
+        transactionAt:
+          type: string
+          format: date-time
+
+    MarketPosition:
+      type: object
+      properties:
+        username:
+          type: string
         yesSharesOwned:
           type: integer
           format: int64
@@ -1909,29 +1886,7 @@ components:
         value:
           type: integer
           format: int64
-          description: Net value of the position.
-        totalSpent:
-          type: integer
-          format: int64
-          description: Lifetime spend on this market.
-        totalSpentInPlay:
-          type: integer
-          format: int64
-          description: Amount currently tied up in open orders.
-        isResolved:
-          type: boolean
-        resolutionResult:
-          type: string
-      required:
-        - username
-        - marketId
-        - yesSharesOwned
-        - noSharesOwned
-        - value
-        - totalSpent
-        - totalSpentInPlay
-        - isResolved
-        - resolutionResult
+
     UserPosition:
       type: object
       properties:
@@ -1959,269 +1914,8 @@ components:
           type: boolean
         resolutionResult:
           type: string
-      required:
-        - username
-        - marketId
-        - yesSharesOwned
-        - noSharesOwned
-        - value
-        - totalSpent
-        - totalSpentInPlay
-        - isResolved
-    StatsResponse:
-      type: object
-      properties:
-        financialStats:
-          $ref: "#/components/schemas/FinancialStats"
-        setupConfiguration:
-          $ref: "#/components/schemas/SetupConfiguration"
-      required:
-        - financialStats
-        - setupConfiguration
-    FinancialStats:
-      type: object
-      properties:
-        totalMoney:
-          type: integer
-          format: int64
-        totalDebtExtended:
-          type: integer
-          format: int64
-        totalDebtUtilized:
-          type: integer
-          format: int64
-        totalFeesCollected:
-          type: integer
-          format: int64
-        totalBonusesPaid:
-          type: integer
-          format: int64
-        outstandingPayouts:
-          type: integer
-          format: int64
-        totalMoneyInCirculation:
-          type: integer
-          format: int64
-      required:
-        - totalMoney
-        - totalDebtExtended
-        - totalDebtUtilized
-        - totalFeesCollected
-        - totalBonusesPaid
-        - outstandingPayouts
-        - totalMoneyInCirculation
-    SetupConfiguration:
-      type: object
-      properties:
-        initialMarketProbability:
-          type: number
-          format: float
-        initialMarketSubsidization:
-          type: integer
-          format: int64
-        initialMarketYes:
-          type: integer
-          format: int64
-        initialMarketNo:
-          type: integer
-          format: int64
-        createMarketCost:
-          type: integer
-          format: int64
-        traderBonus:
-          type: integer
-          format: int64
-        initialAccountBalance:
-          type: integer
-          format: int64
-        maximumDebtAllowed:
-          type: integer
-          format: int64
-        minimumBet:
-          type: integer
-          format: int64
-        maxDustPerSale:
-          type: integer
-          format: int64
-        initialBetFee:
-          type: integer
-          format: int64
-        buySharesFee:
-          type: integer
-          format: int64
-        sellSharesFee:
-          type: integer
-          format: int64
-      required:
-        - initialMarketProbability
-        - initialMarketSubsidization
-        - initialMarketYes
-        - initialMarketNo
-        - createMarketCost
-        - traderBonus
-        - initialAccountBalance
-        - maximumDebtAllowed
-        - minimumBet
-        - maxDustPerSale
-        - initialBetFee
-        - buySharesFee
-        - sellSharesFee
-    SystemMetrics:
-      type: object
-      properties:
-        moneyCreated:
-          $ref: "#/components/schemas/MoneyCreated"
-        moneyUtilized:
-          $ref: "#/components/schemas/MoneyUtilized"
-        verification:
-          $ref: "#/components/schemas/Verification"
-      required:
-        - moneyCreated
-        - moneyUtilized
-        - verification
-    MoneyCreated:
-      type: object
-      properties:
-        userDebtCapacity:
-          $ref: "#/components/schemas/MetricWithExplanation"
-        numUsers:
-          $ref: "#/components/schemas/MetricWithExplanation"
-      required:
-        - userDebtCapacity
-        - numUsers
-    MoneyUtilized:
-      type: object
-      properties:
-        unusedDebt:
-          $ref: "#/components/schemas/MetricWithExplanation"
-        activeBetVolume:
-          $ref: "#/components/schemas/MetricWithExplanation"
-        marketCreationFees:
-          $ref: "#/components/schemas/MetricWithExplanation"
-        participationFees:
-          $ref: "#/components/schemas/MetricWithExplanation"
-        bonusesPaid:
-          $ref: "#/components/schemas/MetricWithExplanation"
-        totalUtilized:
-          $ref: "#/components/schemas/MetricWithExplanation"
-      required:
-        - unusedDebt
-        - activeBetVolume
-        - marketCreationFees
-        - participationFees
-        - bonusesPaid
-        - totalUtilized
-    Verification:
-      type: object
-      properties:
-        balanced:
-          $ref: "#/components/schemas/MetricWithExplanation"
-        surplus:
-          $ref: "#/components/schemas/MetricWithExplanation"
-      required:
-        - balanced
-        - surplus
-    MetricWithExplanation:
-      type: object
-      properties:
-        value:
-          oneOf:
-            - type: number
-            - type: string
-        formula:
-          type: string
-          nullable: true
-        explanation:
-          type: string
-      required:
-        - value
-        - explanation
-    HomeContent:
-      type: object
-      properties:
-        title:
-          type: string
-        format:
-          type: string
-          description: Rendering format (markdown or html).
-        html:
-          type: string
-          nullable: true
-        markdown:
-          type: string
-          nullable: true
-        version:
-          type: integer
-          format: int64
-        updatedAt:
-          type: string
-          format: date-time
-      required:
-        - title
-        - format
-        - version
-    HomeContentUpdateRequest:
-      type: object
-      properties:
-        title:
-          type: string
-        format:
-          type: string
-        markdown:
-          type: string
-          nullable: true
-        html:
-          type: string
-          nullable: true
-        version:
-          type: integer
-          format: int64
-      required:
-        - title
-        - format
-        - version
-    ProbabilityProjectionResponse:
-      type: object
-      properties:
-        marketId:
-          type: integer
-          format: int64
-        currentProbability:
-          type: number
-          format: float
-        projectedProbability:
-          type: number
-          format: float
-        amount:
-          type: integer
-          format: int64
-        outcome:
-          type: string
-          enum: [YES, NO]
-      required:
-        - marketId
-        - currentProbability
-        - projectedProbability
-        - amount
-        - outcome
-    SellRequest:
-      type: object
-      properties:
-        marketId:
-          type: integer
-          format: int64
-        amount:
-          type: integer
-          format: int64
-          description: Credits worth of shares to sell.
-        outcome:
-          type: string
-          enum: [YES, NO]
-      required:
-        - marketId
-        - amount
-        - outcome
-    SellResponse:
+
+    MarketBet:
       type: object
       properties:
         username:
@@ -2229,101 +1923,15 @@ components:
         marketId:
           type: integer
           format: int64
-        sharesSold:
-          type: integer
-          format: int64
-        saleValue:
-          type: integer
-          format: int64
-        dust:
+        amount:
           type: integer
           format: int64
         outcome:
           type: string
-          enum: [YES, NO]
-        transactionAt:
+        placedAt:
           type: string
           format: date-time
-      required:
-        - username
-        - marketId
-        - sharesSold
-        - saleValue
-        - dust
-        - outcome
-        - transactionAt
-    SimpleListMarketsResponse:
-      type: object
-      properties:
-        markets:
-          type: array
-          items:
-            $ref: "#/components/schemas/MarketResponse"
-        total:
-          type: integer
-          description: Number of markets returned in this page.
-      required:
-        - markets
-        - total
-    ResolveMarketRequest:
-      type: object
-      required:
-        - resolution
-      properties:
-        resolution:
-          type: string
-          enum: [yes, no]
-          description: Final outcome for the market.
-    ResolveMarketResponse:
-      type: object
-      properties:
-        message:
-          type: string
-      required:
-        - message
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-        code:
-          type: string
-          nullable: true
-        details:
-          type: string
-          nullable: true
-      required:
-        - error
-    PortfolioItem:
-      type: object
-      properties:
-        marketId:
-          type: integer
-          format: int64
-        questionTitle:
-          type: string
-        yesSharesOwned:
-          type: integer
-          format: int64
-        noSharesOwned:
-          type: integer
-          format: int64
-        lastBetPlaced:
-          type: string
-          format: date-time
-    PortfolioResponse:
-      type: object
-      properties:
-        portfolioItems:
-          type: array
-          items:
-            $ref: "#/components/schemas/PortfolioItem"
-        totalSharesOwned:
-          type: integer
-          format: int64
-      required:
-        - portfolioItems
-        - totalSharesOwned
+
     PrivateUserResponse:
       type: object
       properties:
@@ -2344,30 +1952,23 @@ components:
           format: int64
         personalEmoji:
           type: string
-          nullable: true
         description:
           type: string
-          nullable: true
         personalink1:
           type: string
-          nullable: true
         personalink2:
           type: string
-          nullable: true
         personalink3:
           type: string
-          nullable: true
         personalink4:
           type: string
-          nullable: true
         email:
           type: string
-          format: email
         apiKey:
           type: string
-          nullable: true
         mustChangePassword:
           type: boolean
+
     PublicUserResponse:
       type: object
       properties:
@@ -2385,30 +1986,71 @@ components:
           format: int64
         personalEmoji:
           type: string
-          nullable: true
         description:
           type: string
-          nullable: true
         personalink1:
           type: string
-          nullable: true
         personalink2:
           type: string
-          nullable: true
         personalink3:
           type: string
-          nullable: true
         personalink4:
           type: string
-          nullable: true
+
     UserCreditResponse:
       type: object
       properties:
         credit:
           type: integer
           format: int64
-      required:
-        - credit
+
+    PortfolioItem:
+      type: object
+      properties:
+        marketId:
+          type: integer
+        questionTitle:
+          type: string
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        lastBetPlaced:
+          type: string
+          format: date-time
+
+    PortfolioResponse:
+      type: object
+      properties:
+        portfolioItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioItem'
+        totalSharesOwned:
+          type: integer
+          format: int64
+
+    AdminCreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Desired username for the new user.
+
+    AdminCreateUserResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        usertype:
+          type: string
+
     UserFinancialResponse:
       type: object
       properties:
@@ -2417,76 +2059,133 @@ components:
           additionalProperties:
             type: integer
             format: int64
-    MarketCreationConfig:
+
+    ChangeDescriptionRequest:
       type: object
       properties:
-        InitialMarketProbability:
+        description:
+          type: string
+
+    ChangeDisplayNameRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+
+    ChangeEmojiRequest:
+      type: object
+      properties:
+        emoji:
+          type: string
+
+    ChangePersonalLinksRequest:
+      type: object
+      properties:
+        personalLink1:
+          type: string
+        personalLink2:
+          type: string
+        personalLink3:
+          type: string
+        personalLink4:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+
+    Economics:
+      type: object
+      properties:
+        marketcreation:
+          $ref: '#/components/schemas/MarketCreation'
+        marketincentives:
+          $ref: '#/components/schemas/MarketIncentives'
+        user:
+          $ref: '#/components/schemas/UserEconomics'
+        betting:
+          $ref: '#/components/schemas/Betting'
+
+    MarketCreation:
+      type: object
+      properties:
+        initialMarketProbability:
           type: number
           format: float
-        InitialMarketSubsidization:
+        initialMarketSubsidization:
           type: integer
           format: int64
-        InitialMarketYes:
+        initialMarketYes:
           type: integer
           format: int64
-        InitialMarketNo:
+        initialMarketNo:
           type: integer
           format: int64
-        MinimumFutureHours:
+        minimumFutureHours:
           type: number
           format: float
-    MarketIncentivesConfig:
+
+    MarketIncentives:
       type: object
       properties:
-        CreateMarketCost:
+        createMarketCost:
           type: integer
           format: int64
-        TraderBonus:
+        traderBonus:
           type: integer
           format: int64
-    BetFeesConfig:
+
+    UserEconomics:
       type: object
       properties:
-        InitialBetFee:
+        initialAccountBalance:
           type: integer
           format: int64
-        BuySharesFee:
+        maximumDebtAllowed:
           type: integer
           format: int64
-        SellSharesFee:
-          type: integer
-          format: int64
-    BettingConfig:
+
+    BetFees:
       type: object
       properties:
-        MinimumBet:
+        initialBetFee:
           type: integer
           format: int64
-        MaxDustPerSale:
+        buySharesFee:
           type: integer
           format: int64
-        BetFees:
-          $ref: "#/components/schemas/BetFeesConfig"
-    UserEconomicsConfig:
+        sellSharesFee:
+          type: integer
+          format: int64
+
+    Betting:
       type: object
       properties:
-        InitialAccountBalance:
+        minimumBet:
           type: integer
           format: int64
-        MaximumDebtAllowed:
+        maxDustPerSale:
           type: integer
           format: int64
-    EconomicsConfig:
+        betFees:
+          $ref: '#/components/schemas/BetFees'
+
+    FrontendConfig:
       type: object
       properties:
-        MarketCreation:
-          $ref: "#/components/schemas/MarketCreationConfig"
-        MarketIncentives:
-          $ref: "#/components/schemas/MarketIncentivesConfig"
-        User:
-          $ref: "#/components/schemas/UserEconomicsConfig"
-        Betting:
-          $ref: "#/components/schemas/BettingConfig"
+        charts:
+          $ref: '#/components/schemas/FrontendCharts'
+
+    FrontendCharts:
+      type: object
+      properties:
+        sigFigs:
+          type: integer
+
     GlobalLeaderboardEntry:
       type: object
       properties:
@@ -2510,116 +2209,36 @@ components:
           format: date-time
         rank:
           type: integer
-      required:
-        - username
-        - totalProfit
-        - totalCurrentValue
-        - totalSpent
-        - activeMarkets
-        - resolvedMarkets
-    FrontendConfig:
+
+    HomeContent:
       type: object
       properties:
-        charts:
-          $ref: "#/components/schemas/FrontendChartsConfig"
-      required:
-        - charts
-    FrontendChartsConfig:
-      type: object
-      properties:
-        sigFigs:
-          type: integer
-          format: int32
-          description: Number of significant figures to use when rendering chart probabilities.
-      required:
-        - sigFigs
-    LoginRequest:
-      type: object
-      required:
-        - username
-        - password
-      properties:
-        username:
+        title:
           type: string
-        password:
+        format:
           type: string
-          format: password
-    LoginResponse:
-      type: object
-      properties:
-        token:
+        html:
           type: string
-          description: JWT bearer token
-        username:
+        markdown:
           type: string
-        usertype:
-          type: string
-        mustChangePassword:
-          type: boolean
-      required:
-        - token
-        - username
-        - usertype
-        - mustChangePassword
-    AdminCreateUserRequest:
-      type: object
-      required:
-        - username
-      properties:
-        username:
-          type: string
-          description: Desired username for the new REGULAR user.
-    AdminCreateUserResponse:
-      type: object
-      properties:
-        message:
-          type: string
-        username:
-          type: string
-        password:
-          type: string
-          description: Temporary password that must be changed on first login.
-        usertype:
-          type: string
-      required:
-        - message
-        - username
-        - password
-        - usertype
-    BetRequest:
-      type: object
-      required:
-        - marketId
-        - amount
-        - outcome
-      properties:
-        marketId:
+        version:
           type: integer
           format: int64
-        amount:
-          type: integer
-          minimum: 1
-        outcome:
-          type: string
-          enum: [YES, NO]
-    BetResponse:
-      type: object
-      properties:
-        username:
-          type: string
-        marketId:
-          type: integer
-          format: int64
-        amount:
-          type: integer
-        outcome:
-          type: string
-        placedAt:
+        updatedAt:
           type: string
           format: date-time
-      required:
-        - username
-        - marketId
-        - amount
-        - outcome
-        - placedAt
+
+    HomeContentUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        format:
+          type: string
+        markdown:
+          type: string
+        html:
+          type: string
+        version:
+          type: integer
+          format: int64
