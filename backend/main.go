@@ -21,8 +21,15 @@ func main() {
 		log.Printf("env: warning loading environment: %v", err)
 	}
 
-	util.InitDB()
-	db := util.GetDB()
+	dbCfg, err := util.LoadDBConfigFromEnv()
+	if err != nil {
+		log.Fatalf("db config: %v", err)
+	}
+
+	db, err := util.InitDB(dbCfg, util.PostgresFactory{})
+	if err != nil {
+		log.Fatalf("db init: %v", err)
+	}
 
 	const MAX_ATTEMPTS = 20
 	if err := seed.EnsureDBReady(db, MAX_ATTEMPTS); err != nil {
