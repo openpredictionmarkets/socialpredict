@@ -12,6 +12,26 @@ import (
 	"socialpredict/setup"
 )
 
+// DebtCalculator calculates debt-related metrics.
+type DebtCalculator interface {
+	Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*DebtStats, error)
+}
+
+// VolumeCalculator calculates market volume metrics.
+type VolumeCalculator interface {
+	Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*MarketVolumeStats, error)
+}
+
+// FeeCalculator calculates betting fee metrics.
+type FeeCalculator interface {
+	CalculateParticipationFees(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (int64, error)
+}
+
+// MetricsAssembler combines calculator outputs into the final DTO.
+type MetricsAssembler interface {
+	Assemble(econ *setup.EconomicConfig, debt *DebtStats, volume *MarketVolumeStats, participationFees int64) *SystemMetrics
+}
+
 // Repository exposes the data access required by the analytics domain service.
 type Repository interface {
 	ListUsers(ctx context.Context) ([]models.User, error)
@@ -23,13 +43,69 @@ type Repository interface {
 
 // Service implements analytics calculations.
 type Service struct {
-	repo       Repository
-	econLoader setup.EconConfigLoader
+	repo             Repository
+	econLoader       setup.EconConfigLoader
+	debtCalculator   DebtCalculator
+	volumeCalculator VolumeCalculator
+	feeCalculator    FeeCalculator
+	metricsAssembler MetricsAssembler
 }
 
-// NewService constructs an analytics service.
-func NewService(repo Repository, econLoader setup.EconConfigLoader) *Service {
-	return &Service{repo: repo, econLoader: econLoader}
+// ServiceOption allows customizing analytics strategies.
+type ServiceOption func(*Service)
+
+// WithDebtCalculator overrides the default debt calculator.
+func WithDebtCalculator(c DebtCalculator) ServiceOption {
+	return func(s *Service) {
+		if c != nil {
+			s.debtCalculator = c
+		}
+	}
+}
+
+// WithVolumeCalculator overrides the default volume calculator.
+func WithVolumeCalculator(c VolumeCalculator) ServiceOption {
+	return func(s *Service) {
+		if c != nil {
+			s.volumeCalculator = c
+		}
+	}
+}
+
+// WithFeeCalculator overrides the default fee calculator.
+func WithFeeCalculator(c FeeCalculator) ServiceOption {
+	return func(s *Service) {
+		if c != nil {
+			s.feeCalculator = c
+		}
+	}
+}
+
+// WithMetricsAssembler overrides the default metrics assembler.
+func WithMetricsAssembler(a MetricsAssembler) ServiceOption {
+	return func(s *Service) {
+		if a != nil {
+			s.metricsAssembler = a
+		}
+	}
+}
+
+// NewService constructs an analytics service with optional strategy overrides.
+func NewService(repo Repository, econLoader setup.EconConfigLoader, opts ...ServiceOption) *Service {
+	service := &Service{
+		repo:             repo,
+		econLoader:       econLoader,
+		debtCalculator:   DefaultDebtCalculator{},
+		volumeCalculator: DefaultVolumeCalculator{},
+		feeCalculator:    DefaultFeeCalculator{},
+		metricsAssembler: DefaultMetricsAssembler{},
+	}
+
+	for _, opt := range opts {
+		opt(service)
+	}
+
+	return service
 }
 
 // ComputeUserFinancials calculates comprehensive financial metrics for a user.
@@ -90,53 +166,164 @@ func (s *Service) ComputeSystemMetrics(ctx context.Context) (*SystemMetrics, err
 	if s.econLoader == nil {
 		return nil, errors.New("economic configuration loader not provided")
 	}
+
+	s.ensureStrategyDefaults()
 	econ := s.econLoader()
 
-	debtStats, err := s.computeDebtStats(ctx, econ)
+	debtStats, err := s.debtCalculator.Calculate(ctx, s.repo, econ)
 	if err != nil {
 		return nil, err
 	}
 
-	volumeStats, err := s.computeMarketVolumes(ctx, econ)
+	volumeStats, err := s.volumeCalculator.Calculate(ctx, s.repo, econ)
 	if err != nil {
 		return nil, err
 	}
 
-	participationFees, err := s.computeParticipationFees(ctx, econ)
+	participationFees, err := s.feeCalculator.CalculateParticipationFees(ctx, s.repo, econ)
 	if err != nil {
 		return nil, err
 	}
 
-	bonusesPaid := debtStats.realizedProfits
-	totalUtilized := debtStats.unusedDebt + volumeStats.activeBetVolume + volumeStats.marketCreationFees + participationFees + bonusesPaid
-	surplus := debtStats.totalDebtCapacity - totalUtilized
+	return s.metricsAssembler.Assemble(econ, debtStats, volumeStats, participationFees), nil
+}
+
+// DebtStats represents aggregated debt metrics.
+type DebtStats struct {
+	UserCount         int64
+	UnusedDebt        int64
+	RealizedProfits   int64
+	TotalDebtCapacity int64
+}
+
+// MarketVolumeStats represents market volume metrics.
+type MarketVolumeStats struct {
+	MarketCreationFees int64
+	ActiveBetVolume    int64
+}
+
+// DefaultDebtCalculator implements the existing debt policy.
+type DefaultDebtCalculator struct{}
+
+func (c DefaultDebtCalculator) Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*DebtStats, error) {
+	users, err := repo.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &DebtStats{
+		UserCount: int64(len(users)),
+	}
+
+	for _, user := range users {
+		balance := user.AccountBalance
+		if balance > 0 {
+			stats.RealizedProfits += balance
+		}
+		usedDebt := int64(0)
+		if balance < 0 {
+			usedDebt = -balance
+		}
+		stats.UnusedDebt += econ.Economics.User.MaximumDebtAllowed - usedDebt
+	}
+
+	stats.TotalDebtCapacity = econ.Economics.User.MaximumDebtAllowed * stats.UserCount
+	return stats, nil
+}
+
+// DefaultVolumeCalculator implements the existing volume policy.
+type DefaultVolumeCalculator struct{}
+
+func (c DefaultVolumeCalculator) Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*MarketVolumeStats, error) {
+	markets, err := repo.ListMarkets(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &MarketVolumeStats{
+		MarketCreationFees: int64(len(markets)) * econ.Economics.MarketIncentives.CreateMarketCost,
+	}
+
+	for _, market := range markets {
+		if market.IsResolved {
+			continue
+		}
+
+		bets, err := repo.ListBetsForMarket(ctx, uint(market.ID))
+		if err != nil {
+			return nil, err
+		}
+		stats.ActiveBetVolume += marketmath.GetMarketVolume(bets)
+	}
+
+	return stats, nil
+}
+
+// DefaultFeeCalculator implements the existing participation fee policy.
+type DefaultFeeCalculator struct{}
+
+func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (int64, error) {
+	betsOrdered, err := repo.ListBetsOrdered(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	type userMarket struct {
+		marketID uint
+		username string
+	}
+
+	seen := make(map[userMarket]bool)
+	var participationFees int64
+
+	for _, b := range betsOrdered {
+		if b.Amount <= 0 {
+			continue
+		}
+		key := userMarket{marketID: b.MarketID, username: b.Username}
+		if !seen[key] {
+			participationFees += econ.Economics.Betting.BetFees.InitialBetFee
+			seen[key] = true
+		}
+	}
+
+	return participationFees, nil
+}
+
+// DefaultMetricsAssembler builds the SystemMetrics DTO from calculator outputs.
+type DefaultMetricsAssembler struct{}
+
+func (a DefaultMetricsAssembler) Assemble(econ *setup.EconomicConfig, debt *DebtStats, volume *MarketVolumeStats, participationFees int64) *SystemMetrics {
+	bonusesPaid := debt.RealizedProfits
+	totalUtilized := debt.UnusedDebt + volume.ActiveBetVolume + volume.MarketCreationFees + participationFees + bonusesPaid
+	surplus := debt.TotalDebtCapacity - totalUtilized
 	balanced := surplus == 0
 
-	metrics := &SystemMetrics{
+	return &SystemMetrics{
 		MoneyCreated: MoneyCreated{
 			UserDebtCapacity: MetricWithExplanation{
-				Value:       debtStats.totalDebtCapacity,
+				Value:       debt.TotalDebtCapacity,
 				Formula:     "numUsers × maxDebtPerUser",
 				Explanation: "Total credit capacity made available to all users",
 			},
 			NumUsers: MetricWithExplanation{
-				Value:       debtStats.userCount,
+				Value:       debt.UserCount,
 				Explanation: "Total number of registered users",
 			},
 		},
 		MoneyUtilized: MoneyUtilized{
 			UnusedDebt: MetricWithExplanation{
-				Value:       debtStats.unusedDebt,
+				Value:       debt.UnusedDebt,
 				Formula:     "Σ(maxDebtPerUser - max(0, -balance))",
 				Explanation: "Remaining borrowing capacity available to users",
 			},
 			ActiveBetVolume: MetricWithExplanation{
-				Value:       volumeStats.activeBetVolume,
+				Value:       volume.ActiveBetVolume,
 				Formula:     "Σ(unresolved_market_volumes)",
 				Explanation: "Total value of bets currently active in unresolved markets (excludes fees and subsidies)",
 			},
 			MarketCreationFees: MetricWithExplanation{
-				Value:       volumeStats.marketCreationFees,
+				Value:       volume.MarketCreationFees,
 				Formula:     "number_of_markets × creation_fee_per_market",
 				Explanation: "Fees collected from users creating new markets",
 			},
@@ -167,99 +354,21 @@ func (s *Service) ComputeSystemMetrics(ctx context.Context) (*SystemMetrics, err
 			},
 		},
 	}
-
-	return metrics, nil
 }
 
-type debtStats struct {
-	userCount         int64
-	unusedDebt        int64
-	realizedProfits   int64
-	totalDebtCapacity int64
-}
-
-func (s *Service) computeDebtStats(ctx context.Context, econ *setup.EconomicConfig) (*debtStats, error) {
-	users, err := s.repo.ListUsers(ctx)
-	if err != nil {
-		return nil, err
+func (s *Service) ensureStrategyDefaults() {
+	if s.debtCalculator == nil {
+		s.debtCalculator = DefaultDebtCalculator{}
 	}
-
-	stats := &debtStats{
-		userCount: int64(len(users)),
+	if s.volumeCalculator == nil {
+		s.volumeCalculator = DefaultVolumeCalculator{}
 	}
-
-	for _, user := range users {
-		balance := user.AccountBalance
-		if balance > 0 {
-			stats.realizedProfits += balance
-		}
-		usedDebt := int64(0)
-		if balance < 0 {
-			usedDebt = -balance
-		}
-		stats.unusedDebt += econ.Economics.User.MaximumDebtAllowed - usedDebt
+	if s.feeCalculator == nil {
+		s.feeCalculator = DefaultFeeCalculator{}
 	}
-
-	stats.totalDebtCapacity = econ.Economics.User.MaximumDebtAllowed * stats.userCount
-	return stats, nil
-}
-
-type marketVolumeStats struct {
-	marketCreationFees int64
-	activeBetVolume    int64
-}
-
-func (s *Service) computeMarketVolumes(ctx context.Context, econ *setup.EconomicConfig) (*marketVolumeStats, error) {
-	markets, err := s.repo.ListMarkets(ctx)
-	if err != nil {
-		return nil, err
+	if s.metricsAssembler == nil {
+		s.metricsAssembler = DefaultMetricsAssembler{}
 	}
-
-	stats := &marketVolumeStats{
-		marketCreationFees: int64(len(markets)) * econ.Economics.MarketIncentives.CreateMarketCost,
-	}
-
-	for _, market := range markets {
-		if market.IsResolved {
-			continue
-		}
-
-		bets, err := s.repo.ListBetsForMarket(ctx, uint(market.ID))
-		if err != nil {
-			return nil, err
-		}
-		stats.activeBetVolume += marketmath.GetMarketVolume(bets)
-	}
-
-	return stats, nil
-}
-
-func (s *Service) computeParticipationFees(ctx context.Context, econ *setup.EconomicConfig) (int64, error) {
-	betsOrdered, err := s.repo.ListBetsOrdered(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	type userMarket struct {
-		marketID uint
-		username string
-	}
-
-	seen := make(map[userMarket]bool)
-	var participationFees int64
-
-	for _, b := range betsOrdered {
-		if b.Amount <= 0 {
-			continue
-		}
-		key := userMarket{marketID: b.MarketID, username: b.Username}
-		if !seen[key] {
-			participationFees += econ.Economics.Betting.BetFees.InitialBetFee
-			seen[key] = true
-		}
-	}
-
-	return participationFees, nil
 }
 
 // GlobalUserProfitability summarises a user's profitability across all markets.
