@@ -1,0 +1,27 @@
+{
+  "name": "sdk",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "docker:up": "cd .. && ./SocialPredict up",
+    "docker:down": "cd .. && ./SocialPredict down",
+    "test:int": "SDK_BASE_URL=http://localhost:8080 pnpm docker:up && jest test/integration && pnpm docker:down"
+
+  },
+  "keywords": [ ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@jest/globals": "^30.2.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.2",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.2.2",
+    "yaml": "^2.8.2",
+    "zod": "^4.1.13"
+  },
+  "packageManager": "pnpm@10.25.0"
+}
