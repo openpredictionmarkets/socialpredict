@@ -23,7 +23,7 @@ func SeedMarketsFromSQL(db *gorm.DB, sqlFile string) error {
 	// Check if markets already exist
 	var existingCount int64
 	db.Model(&models.Market{}).Count(&existingCount)
-	
+
 	if existingCount > 0 {
 		fmt.Printf("Found %d existing markets in database.\n", existingCount)
 		fmt.Print("Do you want to add markets from SQL file anyway? (y/N): ")
@@ -64,18 +64,18 @@ func executeSQLFile(db *gorm.DB, filename string) error {
 
 	scanner := bufio.NewScanner(file)
 	var sqlBuffer strings.Builder
-	
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "--") {
 			continue
 		}
-		
+
 		sqlBuffer.WriteString(line)
 		sqlBuffer.WriteString(" ")
-		
+
 		// Execute when we hit a semicolon (end of statement)
 		if strings.HasSuffix(line, ";") {
 			sql := strings.TrimSpace(sqlBuffer.String())
@@ -87,7 +87,7 @@ func executeSQLFile(db *gorm.DB, filename string) error {
 			sqlBuffer.Reset()
 		}
 	}
-	
+
 	// Execute any remaining SQL
 	if sqlBuffer.Len() > 0 {
 		sql := strings.TrimSpace(sqlBuffer.String())
@@ -173,8 +173,15 @@ func main() {
 	loadEnvFile()
 
 	// Initialize database connection
-	util.InitDB()
-	db := util.GetDB()
+	dbCfg, err := util.LoadDBConfigFromEnv()
+	if err != nil {
+		log.Fatalf("db config: %v", err)
+	}
+
+	db, err := util.InitDB(dbCfg, util.PostgresFactory{})
+	if err != nil {
+		log.Fatalf("db init: %v", err)
+	}
 
 	// Ensure database is ready
 	maxAttempts := 5
@@ -186,7 +193,7 @@ func main() {
 	var raischCount, markCount int64
 	db.Model(&models.User{}).Where("username = ?", "raisch").Count(&raischCount)
 	db.Model(&models.User{}).Where("username = ?", "mark").Count(&markCount)
-	
+
 	if raischCount == 0 || markCount == 0 {
 		fmt.Println("Warning: Required users (raisch, mark) not found!")
 		fmt.Println("The markets reference these users as creator_username.")

@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"socialpredict/middleware"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/migration"
 	_ "socialpredict/migration/migrations" // <-- side-effect import: registers migrations via init()
 	"socialpredict/seed"
@@ -14,15 +14,22 @@ import (
 
 func main() {
 	// Secure endpoint example
-	http.Handle("/secure", middleware.Authenticate(http.HandlerFunc(secureEndpoint)))
+	http.Handle("/secure", authsvc.Authenticate(http.HandlerFunc(secureEndpoint)))
 
 	// Load env (.env, .env.dev)
 	if err := util.GetEnv(); err != nil {
 		log.Printf("env: warning loading environment: %v", err)
 	}
 
-	util.InitDB()
-	db := util.GetDB()
+	dbCfg, err := util.LoadDBConfigFromEnv()
+	if err != nil {
+		log.Fatalf("db config: %v", err)
+	}
+
+	db, err := util.InitDB(dbCfg, util.PostgresFactory{})
+	if err != nil {
+		log.Fatalf("db init: %v", err)
+	}
 
 	const MAX_ATTEMPTS = 20
 	if err := seed.EnsureDBReady(db, MAX_ATTEMPTS); err != nil {
@@ -38,7 +45,7 @@ func main() {
 		log.Printf("seed homepage: warning: %v", err)
 	}
 
-	server.Start()
+	server.Start(openAPISpec, swaggerUIFS)
 }
 
 func secureEndpoint(w http.ResponseWriter, r *http.Request) {

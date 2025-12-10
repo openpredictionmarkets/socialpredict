@@ -4,106 +4,89 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-
-	"socialpredict/handlers/math/payout"
-	"socialpredict/logging"
-	"socialpredict/middleware"
-	"socialpredict/models"
-	"socialpredict/util"
+	"os"
 	"strconv"
-	"time"
+	"strings"
 
+	"socialpredict/handlers/markets/dto"
+	dmarkets "socialpredict/internal/domain/markets"
+	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/logging"
+
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
-	"gorm.io/gorm"
 )
 
-func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
+func ResolveMarketHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logging.LogMsg("Attempting to use ResolveMarketHandler.")
 
-	logging.LogMsg("Attempting to use ResolveMarketHandler.")
+		// 1. Parse {id} path param
+		vars := mux.Vars(r)
+		marketIdStr := vars["marketId"]
 
-	// Use database connection
-	db := util.GetDB()
-
-	// Retrieve marketId from URL parameters
-	vars := mux.Vars(r)
-	marketIdStr := vars["marketId"]
-
-	marketId, err := strconv.ParseUint(marketIdStr, 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
-		return
-	}
-
-	// Validate token and get user
-	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
-	if httperr != nil {
-		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	// Parse request body for resolution outcome
-	var resolutionData struct {
-		Outcome string `json:"outcome"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&resolutionData); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	var market models.Market
-	result := db.First(&market, marketId)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			http.Error(w, "Market not found", http.StatusNotFound)
+		marketId, err := strconv.ParseInt(marketIdStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid market ID", http.StatusBadRequest)
 			return
 		}
-		http.Error(w, "Error accessing database", http.StatusInternalServerError)
-		return
+
+		// 2. Parse body into dto.ResolveRequest{Result string}
+		var req dto.ResolveMarketRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		username, err := extractUsernameFromRequest(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		// 4. Call domain service to resolve market
+		err = svc.ResolveMarket(r.Context(), marketId, req.Resolution, username)
+		if err != nil {
+			// 5. Map errors (not found → 404, invalid → 400/409, forbidden → 403)
+			switch err {
+			case dmarkets.ErrMarketNotFound:
+				http.Error(w, "Market not found", http.StatusNotFound)
+			case dmarkets.ErrUnauthorized:
+				http.Error(w, "User is not the creator of the market", http.StatusForbidden) // Changed to 403 per spec
+			case dmarkets.ErrInvalidState:
+				http.Error(w, "Market is already resolved", http.StatusConflict) // 409 Conflict
+			case dmarkets.ErrInvalidInput:
+				http.Error(w, "Invalid resolution outcome", http.StatusBadRequest) // 400 Bad Request
+			default:
+				logging.LogMsg("Error resolving market: " + err.Error())
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// 6. w.WriteHeader(http.StatusNoContent) - per specification
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func extractUsernameFromRequest(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("authorization header required")
 	}
 
-	if &market == nil {
-		// handle nil market if necessary, this is just precautionary, as gorm.First should return found object or error
-		http.Error(w, "No market found with provided ID", http.StatusNotFound)
-		return
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	token, err := jwt.ParseWithClaims(tokenString, &authsvc.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("JWT_SIGNING_KEY")), nil
+	})
+	if err != nil || !token.Valid {
+		return "", errors.New("invalid token")
 	}
 
-	// Check if the logged-in user is the creator of the market
-	if market.CreatorUsername != user.Username {
-		http.Error(w, "User is not the creator of the market", http.StatusUnauthorized)
-		return
+	claims, ok := token.Claims.(*authsvc.UserClaims)
+	if !ok || claims.Username == "" {
+		return "", errors.New("invalid token claims")
 	}
 
-	// Check if the market is already resolved
-	if market.IsResolved {
-		http.Error(w, "Market is already resolved", http.StatusBadRequest)
-		return
-	}
-
-	// Validate the resolution outcome
-	if resolutionData.Outcome != "YES" && resolutionData.Outcome != "NO" && resolutionData.Outcome != "N/A" {
-		http.Error(w, "Invalid resolution outcome", http.StatusBadRequest)
-		return
-	}
-
-	// Update the market with the resolution result
-	market.IsResolved = true
-	market.ResolutionResult = resolutionData.Outcome
-	market.FinalResolutionDateTime = time.Now()
-
-	// Save the market changes first so payout calculation sees the resolved state
-	if err := db.Save(&market).Error; err != nil {
-		http.Error(w, "Error saving market resolution: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Handle payouts (if applicable) - after market is saved as resolved
-	err = payout.DistributePayoutsWithRefund(&market, db)
-	if err != nil {
-		http.Error(w, "Error distributing payouts: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Send a response back
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Market resolved successfully"})
+	return claims.Username, nil
 }

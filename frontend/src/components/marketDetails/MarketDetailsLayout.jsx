@@ -3,11 +3,12 @@ import ResolutionAlert from '../resolutions/ResolutionAlert';
 import MarketChart from '../charts/MarketChart';
 import ActivityTabs from '../../components/tabs/ActivityTabs';
 import ResolveModalButton from '../modals/resolution/ResolveModal';
-import BetModalButton from '../modals/bet/BetModal';
 import TradeCTA from '../TradeCTA';
 import TradeTabs from '../../components/tabs/TradeTabs';
 import { BetButton } from '../buttons/trade/BetButtons';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
+
+const DEFAULT_CREATOR_EMOJI = '👤';
 
 function MarketDetailsTable({
   market,
@@ -17,12 +18,19 @@ function MarketDetailsTable({
   marketDust,
   currentProbability,
   probabilityChanges,
-  marketId,
+  marketId: marketIdProp,
   username,
   isLoggedIn,
   token,
   refetchData,
 }) {
+  const safeMarket = market ?? {};
+  const safeCreator = creator ?? {};
+  const resolvedMarketId = marketIdProp ?? safeMarket.id;
+  const creatorUsername = safeMarket.creatorUsername ?? safeCreator.username ?? 'unknown';
+  const creatorEmoji = safeCreator.personalEmoji ?? DEFAULT_CREATOR_EMOJI;
+  const marketDescription = safeMarket.description ?? '';
+
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showBetModal, setShowBetModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -37,32 +45,36 @@ function MarketDetailsTable({
     setRefreshTrigger(prev => prev + 1); // Trigger positions refresh
   };
 
-  const shouldShowTradeButtons = !market.isResolved && isLoggedIn && new Date(market.resolutionDateTime) > new Date();
+  const shouldShowTradeButtons =
+    !safeMarket.isResolved &&
+    isLoggedIn &&
+    safeMarket.resolutionDateTime &&
+    new Date(safeMarket.resolutionDateTime) > new Date();
 
   return (
     <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
       <ResolutionAlert
-        isResolved={market.isResolved}
-        resolutionResult={market.resolutionResult}
-        market={market}
+        isResolved={safeMarket.isResolved}
+        resolutionResult={safeMarket.resolutionResult}
+        market={safeMarket}
       />
 
       <div className='mb-4'>
         <h1
           className='text-xl font-semibold text-white mb-2 break-words line-clamp-2'
-          title={market.questionTitle}
+          title={safeMarket.questionTitle}
         >
-          {market.questionTitle}
+          {safeMarket.questionTitle}
         </h1>
         <div className='flex flex-wrap items-center gap-2 text-sm text-gray-400'>
           <a
-            href={`/user/${market.creatorUsername}`}
+            href={`/user/${creatorUsername}`}
             className='hover:text-blue-400 transition-colors duration-200'
           >
             <span role='img' aria-label='Creator'>
-              {creator.personalEmoji}
+              {creatorEmoji}
             </span>
-            @{market.creatorUsername}
+            @{creatorUsername}
           </a>
           <span>•</span>
           <span>🪙 {currentProbability.toFixed(2)}</span>
@@ -75,9 +87,9 @@ function MarketDetailsTable({
           currentProbability={currentProbability}
           title='Probability Changes'
           className='w-full'
-          closeDateTime={market.resolutionDateTime}
-          yesLabel={market.yesLabel}
-          noLabel={market.noLabel}
+          closeDateTime={safeMarket.resolutionDateTime}
+          yesLabel={safeMarket.yesLabel}
+          noLabel={safeMarket.noLabel}
         />
       </div>
 
@@ -102,7 +114,7 @@ function MarketDetailsTable({
             hyphens: 'auto',
           }}
         >
-          {market.description}
+          {marketDescription}
         </p>
       </div>
 
@@ -117,9 +129,9 @@ function MarketDetailsTable({
           { label: 'Comments', value: '0', icon: '💬' },
           {
             label: 'Closes',
-            value: market.isResolved
+            value: safeMarket.isResolved
               ? 'Closed'
-              : formatResolutionDate(market.resolutionDateTime),
+              : formatResolutionDate(safeMarket.resolutionDateTime),
             icon: '📅',
           },
         ].map((item, index) => (
@@ -156,9 +168,9 @@ function MarketDetailsTable({
       )}
 
       <div className='flex items-center justify-center mb-4 space-x-4 py-4'>
-        {username === market.creatorUsername && !market.isResolved && (
+        {username === creatorUsername && !safeMarket.isResolved && (
           <ResolveModalButton
-            marketId={marketId}
+            marketId={resolvedMarketId}
             token={token}
             disabled={!token}
             className='text-xs px-4 py-2'
@@ -172,7 +184,7 @@ function MarketDetailsTable({
       </div>
 
       <div className='mx-auto w-full mb-4'>
-        <ActivityTabs marketId={marketId} market={market} refreshTrigger={refreshTrigger} />
+        <ActivityTabs marketId={resolvedMarketId} market={safeMarket} refreshTrigger={refreshTrigger} />
       </div>
 
       {/* Mobile floating CTA */}
@@ -188,8 +200,8 @@ function MarketDetailsTable({
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50">
           <div className="bet-modal relative bg-blue-900 p-6 rounded-lg text-white m-6 mx-auto" style={{ width: '350px' }}>
             <TradeTabs
-              marketId={marketId}
-              market={market}
+              marketId={resolvedMarketId}
+              market={safeMarket}
               token={token}
               onTransactionSuccess={handleTransactionSuccess}
             />

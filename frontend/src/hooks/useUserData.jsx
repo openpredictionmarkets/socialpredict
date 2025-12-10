@@ -15,14 +15,14 @@ const useUserData = (username, usePrivateProfile = false) => {
         
         if (usePrivateProfile) {
           // Use private profile endpoint for authenticated user's own profile
-          url = `${API_URL}/api/v0/privateprofile`;
+          url = `${API_URL}/v0/privateprofile`;
           headers = {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           };
         } else {
           // Use public user endpoint for viewing other users' profiles
-          url = `${API_URL}/api/v0/userinfo/${username}`;
+          url = `${API_URL}/v0/userinfo/${username}`;
           if (token) {
             headers = {
               'Authorization': `Bearer ${token}`,

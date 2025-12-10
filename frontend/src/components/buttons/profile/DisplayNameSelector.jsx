@@ -22,7 +22,6 @@ const DisplayNameSelector = ({ onSave }) => {
             });
             const responseData = await response.json();
             if (response.ok) {
-                console.log('Display name updated successfully:', responseData);
                 onSave(displayName);
             } else {
                 throw new Error('Failed to update display name');
