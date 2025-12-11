@@ -1,5 +1,7 @@
 <script lang="ts">
 	import BrandSelector from '$lib/components/BrandSelector.svelte';
+	import Notation from '$lib/components/Notation.svelte';
+	import { currentBranding } from '$lib/stores/brandingStore';
 </script>
 
 <header class="app-toolbar">
@@ -8,8 +10,14 @@
 		<span class="bar"></span>
 		<span class="bar"></span>
 	</button>
-	<div class="toolbar-spacer"></div>
-	<BrandSelector />
+
+	<div class="toolbar-center">
+		<Notation text={$currentBranding.notation ?? 'Branding driven by config/branding/*.json'} />
+	</div>
+
+	<div class="toolbar-right">
+		<BrandSelector />
+	</div>
 </header>
 
 <style>
@@ -32,8 +40,14 @@
 		min-height: var(--toolbar-height);
 	}
 
-	.toolbar-spacer {
+	.toolbar-center {
 		flex: 1;
+		display: flex;
+		justify-content: center;
+	}
+
+	.toolbar-right {
+		margin-left: auto;
 	}
 
 	.icon-button {

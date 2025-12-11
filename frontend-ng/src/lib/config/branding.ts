@@ -93,6 +93,7 @@ export type LayoutSectionType =
 export interface BrandLayoutSection {
   type: LayoutSectionType;
   variant?: string;
+  span?: 'full' | 'half';
 }
 
 export interface BrandLayout {
@@ -101,6 +102,7 @@ export interface BrandLayout {
 
 export interface Branding {
   theme: 'light' | 'dark';
+  notation?: string;
   brand: BrandMeta;
   colors: BrandColors;
   features: BrandFeatures;

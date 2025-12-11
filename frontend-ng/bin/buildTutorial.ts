@@ -23,29 +23,29 @@ const [step0, step1, step2, step3, step4] = defaultTutorialSteps;
 const html = (value: string | undefined) => JSON.stringify(value ?? '');
 
 // Step 0, 2, 3, 4 descriptions are HTML strings
-const step0Title = html(step0.title);
-const step0Desc = html(step0.description as string);
-const step0Note = html(step0.note as string | undefined);
+const step0Title = step0.title;
+const step0Desc = step0.description as string;
+const step0Note = step0.note as string | undefined;
 
-const step2Title = html(step2.title);
-const step2Desc = html(step2.description as string);
-const step2Note = html(step2.note as string | undefined);
+const step2Title = step2.title;
+const step2Desc = step2.description as string;
+const step2Note = step2.note as string | undefined;
 
-const step3Title = html(step3.title);
-const step3Desc = html(step3.description as string);
-const step3Note = html(step3.note as string | undefined);
+const step3Title = step3.title;
+const step3Desc = step3.description as string;
+const step3Note = step3.note as string | undefined;
 
-const step4Title = html(step4.title);
-const step4Desc = html(step4.description as string);
-const step4Note = html(step4.note as string | undefined);
+const step4Title = step4.title;
+const step4Desc = step4.description as string;
+const step4Note = step4.note as string | undefined;
 
 // Step 1 is the “Tour a market…” feature list
 if (!Array.isArray(step1.description)) {
   throw new Error('buildTutorial: step 1 description is expected to be FeatureDescription[].');
 }
 
-const step1Title = html(step1.title);
-const step1Note = html(step1.note as string | undefined);
+const step1Title = step1.title;
+const step1Note = step1.note as string | undefined;
 
 // Build the feature list <li> items for step 1 inline
 const featureItems = (step1.description as any[])
@@ -210,36 +210,36 @@ svelte += `          <div class="eyebrow">Step {index + 1} of {total}</div>\n`;
 // Inline per-step instructions
 //
 svelte += `          {#if index === 0}\n`;
-svelte += `            <h3 class="demo-title">{@html ${step0Title}}</h3>\n`;
-svelte += `            <p>{@html ${step0Desc}}</p>\n`;
+svelte += `            <h3 class="demo-title">${step0Title}</h3>\n`;
+svelte += `            ${step0Desc}\n`;
 if (step0.note) {
-  svelte += `            <div class="note">{@html ${step0Note}}</div>\n`;
+  svelte += `            <div class="note">${step0Note}</div>\n`;
 }
 svelte += `          {:else if index === 1}\n`;
-svelte += `            <h3 class="demo-title">{@html ${step1Title}}</h3>\n`;
+svelte += `            <h3 class="demo-title">${step1Title}</h3>\n`;
 if (step1.note) {
-  svelte += `            <div class="note">{@html ${step1Note}}</div>\n`;
+  svelte += `            <div class="note">${step1Note}</div>\n`;
 }
 svelte += `            <ul class="feature-list">\n`;
 svelte += featureItems + '\n';
 svelte += `            </ul>\n`;
 svelte += `          {:else if index === 2}\n`;
-svelte += `            <h3 class="demo-title">{@html ${step2Title}}</h3>\n`;
-svelte += `            <p>{@html ${step2Desc}}</p>\n`;
+svelte += `            <h3 class="demo-title">${step2Title}</h3>\n`;
+svelte += `            ${step2Desc}\n`;
 if (step2.note) {
-  svelte += `            <div class="note">{@html ${step2Note}}</div>\n`;
+  svelte += `            <div class="note">${step2Note}</div>\n`;
 }
 svelte += `          {:else if index === 3}\n`;
-svelte += `            <h3 class="demo-title">{@html ${step3Title}}</h3>\n`;
-svelte += `            <p>{@html ${step3Desc}}</p>\n`;
+svelte += `            <h3 class="demo-title">${step3Title}</h3>\n`;
+svelte += `            ${step3Desc}\n`;
 if (step3.note) {
-  svelte += `            <div class="note">{@html ${step3Note}}</div>\n`;
+  svelte += `            <div class="note">${step3Note}</div>\n`;
 }
 svelte += `          {:else}\n`;
-svelte += `            <h3 class="demo-title">{@html ${step4Title}}</h3>\n`;
-svelte += `            <p>{@html ${step4Desc}}</p>\n`;
+svelte += `            <h3 class="demo-title">${step4Title}</h3>\n`;
+svelte += `            ${step4Desc}\n`;
 if (step4.note) {
-  svelte += `            <div class="note">{@html ${step4Note}}</div>\n`;
+  svelte += `            <div class="note">${step4Note}</div>\n`;
 }
 svelte += `          {/if}\n`;
 
@@ -324,8 +324,6 @@ svelte += `                      Net {netProfit >= 0 ? 'profit' : 'loss'}: $ {ne
 svelte += `                      {netProfitPercent}%\n`;
 svelte += `                      )\n`;
 svelte += `                    </div>\n`;
-svelte += `                  {:else}\n`;
-svelte += `                    <div>Adjust the sliders to explore potential outcomes.</div>\n`;
 svelte += `                  {/if}\n`;
 svelte += `                </div>\n`;
 svelte += `              </div>\n`;
@@ -395,10 +393,9 @@ svelte += `  }\n\n`;
 svelte += `  .modal {\n`;
 svelte += `    position: relative;\n`;
 svelte += `    width: min(78vw, 1100px);\n`;
-svelte += `    min-height: 60vh;\n`;
 svelte += `    padding: 1.6rem 1.9rem;\n`;
 svelte += `    border-radius: 1.2rem;\n`;
-svelte += `    background: var(--panel, #12131a);\n`;
+svelte += `    background: var(--color-background, #12131a);\n`;
 svelte += `    border: 1px solid var(--border, rgba(255, 255, 255, 0.1));\n`;
 svelte += `    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45),\n`;
 svelte += `      0 0 0 1px var(--color-primary-soft, rgba(159, 107, 255, 0.18));\n`;

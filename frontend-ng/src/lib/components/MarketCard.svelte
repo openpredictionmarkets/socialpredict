@@ -125,6 +125,7 @@
 		font-weight: 700;
 		min-height: calc(1.2rem * 1.45 * 4);
 		display: -webkit-box;
+    line-clamp: 4;
 		-webkit-line-clamp: 4;
 		-webkit-box-orient: vertical;
 		overflow: hidden;

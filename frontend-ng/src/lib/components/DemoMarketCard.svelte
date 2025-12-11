@@ -30,9 +30,6 @@
 </script>
 
 <article class={`card ${highlightFeature ? 'highlight-mode' : ''}`} aria-labelledby={`demo-${market.title}`}>
-	{#if highlightFeature}
-		<div class="blur-layer" aria-hidden="true"></div>
-	{/if}
 	<div class="content-layer">
 		<div class="card__top">
 			<div
@@ -144,11 +141,20 @@
 		min-width: 360px;
 		width: 100%;
 		border-radius: 1.2rem;
-		background: radial-gradient(140% 140% at 0% 0%, rgba(159, 107, 255, 0.18), transparent 45%),
-			radial-gradient(160% 120% at 100% 10%, rgba(53, 226, 209, 0.12), transparent 50%),
-			rgba(18, 19, 26, 0.95);
-		border: 1px solid rgba(255, 255, 255, 0.06);
-		box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(106, 63, 245, 0.24);
+		background:
+			radial-gradient(
+				140% 140% at 0% 0%,
+				var(--color-primary-soft, rgba(159, 107, 255, 0.16)),
+				transparent 45%
+			),
+			radial-gradient(
+				160% 120% at 100% 10%,
+				var(--color-accent-soft, rgba(53, 226, 209, 0.12)),
+				transparent 50%
+			),
+			var(--panel, rgba(255, 255, 255, 0.96));
+		border: 1px solid var(--border, rgba(148, 163, 184, 0.4));
+		box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
 		overflow: hidden;
 	}
 
@@ -159,43 +165,34 @@
 		gap: inherit;
 	}
 
-	.blur-layer {
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		backdrop-filter: blur(3px);
-		background: rgba(14, 15, 20, 0.4);
-		z-index: 0;
-	}
-
 	.card__top {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.75rem;
 		font-size: 0.9rem;
-		color: #cfcde5;
+		color: var(--text-subtle, #4b5563);
 	}
 
 	.pill {
 		padding: 0.35rem 0.5rem;
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: color-mix(in srgb, var(--color-primary, #2563eb) 10%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-primary, #2563eb) 45%, transparent);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		font-weight: 700;
-		color: #f4f1ff;
+		color: var(--color-primary, #2563eb);
 	}
 
 	.resolves {
-		color: #9ea3c1;
+		color: var(--text-subtle, #6b7280);
 	}
 
 	.title {
 		font-size: 1.2rem;
 		line-height: 1.45;
-		color: #f8f7ff;
+		color: var(--text, #0e0f14);
 		margin: 0;
 		font-weight: 700;
 	}
@@ -216,33 +213,33 @@
 		gap: 0.25rem;
 		font-family: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo,
 			Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(148, 163, 184, 0.35);
 		font-weight: 700;
 		min-width: 0;
 	}
 
 	.price.yes {
-		background: rgba(53, 226, 209, 0.1);
-		color: #c8fff9;
-		box-shadow: 0 0 0 1px rgba(53, 226, 209, 0.35);
+		background: var(--color-accent-soft, rgba(22, 163, 74, 0.14));
+		color: var(--color-accent, #16a34a);
+		box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.35);
 	}
 
 	.price.no {
-		background: rgba(255, 111, 97, 0.08);
-		color: #ffd1ca;
-		box-shadow: 0 0 0 1px rgba(255, 111, 97, 0.26);
+		background: var(--color-danger-soft, rgba(220, 38, 38, 0.15));
+		color: var(--color-danger, #dc2626);
+		box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.26);
 	}
 
 	.label {
 		font-size: 0.85rem;
 		text-transform: uppercase;
-		color: rgba(255, 255, 255, 0.85);
+		color: var(--text-subtle, #4b5563);
 		--padding-right: 0.35rem;
 		white-space: nowrap;
 	}
 
 	.value {
-		font-size: clamp(0.98rem, 2.4vw, 1.08rem);
+		font-size: 0.95rem;
 		white-space: nowrap;
 		text-align: right;
 	}
@@ -254,17 +251,17 @@
 			Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 		padding: 0.7rem 0.9rem;
 		border-radius: 0.9rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(148, 163, 184, 0.35);
 	}
 
 	.trend.up {
-		color: #35e2d1;
-		background: rgba(53, 226, 209, 0.08);
+		color: var(--color-accent, #16a34a);
+		background: var(--color-accent-soft, rgba(22, 163, 74, 0.14));
 	}
 
 	.trend.down {
-		color: #ff8d7f;
-		background: rgba(255, 111, 97, 0.08);
+		color: var(--color-danger, #dc2626);
+		background: var(--color-danger-soft, rgba(220, 38, 38, 0.15));
 	}
 
 	.spark {
@@ -274,9 +271,9 @@
 
 	.spark polyline {
 		fill: none;
-		stroke: #9f6bff;
+		stroke: var(--color-primary, #2563eb);
 		stroke-width: 2.6;
-		filter: drop-shadow(0 0 10px rgba(159, 107, 255, 0.45));
+		filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.35));
 		stroke-linecap: round;
 	}
 
@@ -284,7 +281,7 @@
 		display: flex;
 		gap: 0.75rem;
 		flex-wrap: wrap;
-		color: #c4c8df;
+		color: var(--text-subtle, #4b5563);
 		font-size: 0.95rem;
 	}
 
@@ -294,7 +291,7 @@
 		gap: 0.45rem;
 		padding: 0.45rem 0.65rem;
 		border-radius: 0.7rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(148, 163, 184, 0.35);
 		font-weight: 700;
 	}
 
@@ -305,8 +302,8 @@
 	}
 
 	.liquidity.deep .dot {
-		background: #35e2d1;
-		box-shadow: 0 0 10px rgba(53, 226, 209, 0.7);
+		background: var(--color-accent, #16a34a);
+		box-shadow: 0 0 10px rgba(22, 163, 74, 0.5);
 	}
 
 	.liquidity.moderate .dot {
@@ -315,48 +312,57 @@
 	}
 
 	.liquidity.thin .dot {
-		background: #ff6f61;
-		box-shadow: 0 0 10px rgba(255, 111, 97, 0.6);
+		background: var(--color-danger, #dc2626);
+		box-shadow: 0 0 10px rgba(220, 38, 38, 0.5);
 	}
 
 	.liquidity.very-thin .dot {
-		background: #ff4444;
-		box-shadow: 0 0 10px rgba(255, 68, 68, 0.7);
+		background: #f97316;
+		box-shadow: 0 0 10px rgba(249, 115, 22, 0.6);
 	}
 
 	.community {
 		padding: 0.45rem 0.65rem;
 		border-radius: 0.7rem;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px dashed rgba(255, 255, 255, 0.12);
+		background: rgba(148, 163, 184, 0.06);
+		border: 1px dashed rgba(148, 163, 184, 0.4);
 	}
 
 	.cta {
 		justify-self: start;
 		padding: 0.8rem 1.1rem;
 		border-radius: 0.9rem;
-		background: linear-gradient(135deg, #6a3ff5, #9f6bff);
-		color: #0e0f14;
+		background: linear-gradient(
+			135deg,
+			var(--color-primary, #2563eb),
+			var(--color-accent, #16a34a)
+		);
+		color: var(--color-text-light, #e9edf6);
 		border: none;
 		font-weight: 800;
 		font-size: 0.98rem;
 		letter-spacing: 0.02em;
 		cursor: not-allowed;
-		box-shadow: 0 12px 30px rgba(106, 63, 245, 0.45);
+		box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
 		transition: transform 160ms ease, box-shadow 160ms ease;
 		opacity: 0.7;
 	}
 
 	.highlight {
-		border: 2px solid rgba(255, 255, 255, 0.9);
-		box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6), 0 14px 32px rgba(0, 0, 0, 0.45);
+		border: 2px solid var(--color-primary, #2563eb);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary, #2563eb) 45%, transparent),
+			0 14px 32px rgba(15, 23, 42, 0.45);
 		background: transparent;
 	}
 
 	/* Keep CTA fill consistent; only outline/shine for highlight */
 	.cta.highlight {
-		background: linear-gradient(135deg, #6a3ff5, #9f6bff);
-		color: #0e0f14;
+		background: linear-gradient(
+			135deg,
+			var(--color-primary, #2563eb),
+			var(--color-accent, #16a34a)
+		);
+		color: var(--color-text-light, #e9edf6);
 	}
 
 	.muted {

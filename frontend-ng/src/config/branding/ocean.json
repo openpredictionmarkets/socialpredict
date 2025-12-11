@@ -1,4 +1,5 @@
 {
+  "notation": "Ocean: green-forward, market-native view",
   "brand": {
     "name": "SocialPredict [Ocean]",
     "shortName": "SP",
@@ -41,7 +42,7 @@
   "layout": {
     "sections": [
       { "type": "logo", "variant": "default" },
-      { "type": "hero", "variant": "bottomPanel" },
+      { "type": "hero", "variant": "noPanel", "span": "full" },
       { "type": "trending" },
       { "type": "ticker" },
       { "type": "categories" },

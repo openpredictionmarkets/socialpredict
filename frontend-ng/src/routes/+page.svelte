@@ -12,6 +12,7 @@
 	} from '$lib/components/MarketCard.svelte';
 
   import MarketsList from '$lib/components/MarketsList.svelte';
+  import MarketsCards from '$lib/components/MarketsCards.svelte';
 
 	import CategoryGrid, { type Category } from '$lib/components/CategoryGrid.svelte';
 	import Logo from '$lib/components/Logo.svelte';
@@ -87,13 +88,13 @@
 						: section.variant === 'logoRight'
 							? 'logo-section--right'
 							: 'logo-section--default'
-				}`}
+				} ${section.span === 'half' ? 'section--span-half' : ''}`}
 			>
 				<Logo text={branding.brand.name} />
 			</section>
 		{:else if section.type === 'hero' && branding.features.showHero}
 			{#if section.variant === 'leftPanel'}
-				<section class="hero hero--left-panel">
+				<section class={`hero hero--left-panel ${section.span === 'half' ? 'section--span-half' : ''}`}>
 					<HeroPanel />
 					<div class="hero__copy">
 						<h1>
@@ -122,7 +123,7 @@
 					</div>
 				</section>
 			{:else if section.variant === 'logoRight'}
-				<section class="hero hero--logo-right">
+				<section class={`hero hero--logo-right ${section.span === 'half' ? 'section--span-half' : ''}`}>
 					<div class="hero__copy">
 						<h1>
 							{branding.brand.taglinePrimary}
@@ -153,7 +154,7 @@
 					</div>
 				</section>
 			{:else if section.variant === 'logoCenter'}
-				<section class="hero hero--logo-center">
+				<section class={`hero hero--logo-center ${section.span === 'half' ? 'section--span-half' : ''}`}>
 					<div class="hero__copy">
 						<h1>
 							{branding.brand.taglinePrimary}
@@ -182,7 +183,7 @@
 					<HeroPanel />
 				</section>
 			{:else if section.variant === 'bottomPanel'}
-				<section class="hero hero--bottom-panel">
+				<section class={`hero hero--bottom-panel ${section.span === 'half' ? 'section--span-half' : ''}`}>
 					<div class="hero__copy">
 						<h1>
 							{branding.brand.taglinePrimary}
@@ -210,8 +211,36 @@
 					</div>
 					<HeroPanel />
 				</section>
+			{:else if section.variant === 'noPanel'}
+				<section class={`hero hero--no-panel ${section.span === 'half' ? 'section--span-half' : ''}`}>
+					<div class="hero__copy">
+						<h1>
+							{branding.brand.taglinePrimary}
+							<span>{branding.brand.taglineSecondary}</span>
+						</h1>
+						<p>{branding.brand.description}</p>
+						<div class="hero__actions">
+							<button class="primary" onclick={() => (showTutorial = true)}>
+								{branding.brand.heroCtaPrimary}
+							</button>
+							{#if branding.features.showTutorial}
+								<button class="secondary" type="button" onclick={() => (showTutorial = true)}>
+									{branding.brand.heroCtaSecondary}
+								</button>
+							{/if}
+						</div>
+						<div class="hero__stats">
+							{#each branding.examples.heroStats as stat}
+								<div>
+									<strong>{stat.value}</strong>
+									<span>{stat.label}</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</section>
 			{:else}
-				<section class="hero">
+				<section class={`hero ${section.span === 'half' ? 'section--span-half' : ''}`}>
 					<div class="hero__copy">
 						<h1>
 							{branding.brand.taglinePrimary}
@@ -241,11 +270,11 @@
 				</section>
 			{/if}
 		{:else if section.type === 'ticker' && branding.features.showTicker}
-			<section class="ticker-wrap">
+			<section class={`ticker-wrap ${section.span === 'half' ? 'section--span-half' : ''}`}>
 				<TickerBar items={tickerItems} />
 			</section>
 		{:else if section.type === 'trending' && branding.features.showTrending}
-			<section class="section">
+			<section class={`section ${section.span === 'half' ? 'section--span-half' : ''}`}>
 				<SectionHeader
 					eyebrow="Trending Right Now"
 					title="Markets moving with volume, velocity, and social buzz"
@@ -253,14 +282,10 @@
 					actionLabel="See all markets"
 					actionHref="#"
 				/>
-				<div class="grid grid--markets">
-					{#each trendingMarkets as market}
-						<MarketCard {market} />
-					{/each}
-				</div>
+				<MarketsCards markets={trendingMarkets} />
 			</section>
 		{:else if section.type === 'marketsList' && branding.features.showMarketsList}
-			<section class="section">
+			<section class={`section ${section.span === 'half' ? 'section--span-half' : ''}`}>
 				<SectionHeader
 					eyebrow="All Markets"
 					title="Explore all available markets"
@@ -269,42 +294,22 @@
 				<MarketsList markets={allMarkets} filter="title,yes,no,trend" />
 			</section>
 		{:else if section.type === 'categories' && branding.features.showCategories}
-			<section class="section section--split">
-				<div class="split__left">
-					<SectionHeader
-						eyebrow="Categories"
-						title="Jump into any arena"
-						subtitle="From macro to memes, pick a lane and see what the crowd thinks."
-					/>
-					<CategoryGrid {categories} />
-				</div>
-				{#if branding.features.showEndingSoon}
-					<div class="split__right">
-						<SectionHeader
-							eyebrow="Ending Soon"
-							title="Last chance to get in"
-							subtitle="Markets about to resolve — catch the final moves."
-						/>
-						<div class="stack">
-							{#each endingSoon as market}
-								<MarketCard {market} />
-							{/each}
-						</div>
-					</div>
-				{/if}
+			<section class={`section ${section.span === 'half' ? 'section--span-half' : ''}`}>
+				<SectionHeader
+					eyebrow="Categories"
+					title="Jump into any arena"
+					subtitle="From macro to memes, pick a lane and see what the crowd thinks."
+				/>
+				<CategoryGrid {categories} />
 			</section>
-		{:else if section.type === 'endingSoon' && branding.features.showEndingSoon && !branding.features.showCategories}
-			<section class="section">
+		{:else if section.type === 'endingSoon' && branding.features.showEndingSoon}
+			<section class={`section ${section.span === 'half' ? 'section--span-half' : ''}`}>
 				<SectionHeader
 					eyebrow="Ending Soon"
 					title="Last chance to get in"
 					subtitle="Markets about to resolve — catch the final moves."
 				/>
-				<div class="stack">
-					{#each endingSoon as market}
-						<MarketCard {market} />
-					{/each}
-				</div>
+				<MarketsCards markets={endingSoon} />
 			</section>
 		{/if}
 	{/each}
@@ -360,6 +365,22 @@
   padding: 2.5rem 1.5rem 3rem;
   display: grid;
   gap: 2rem;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+  align-items: flex-start;
+}
+
+.section,
+.hero,
+.ticker-wrap,
+.logo-section {
+  grid-column: 1 / -1;
+}
+
+.section--span-half,
+.hero.section--span-half,
+.ticker-wrap.section--span-half,
+.logo-section.section--span-half {
+  grid-column: auto;
 }
 
 .hero {

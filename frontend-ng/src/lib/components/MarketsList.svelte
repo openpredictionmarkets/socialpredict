@@ -17,7 +17,7 @@
     'community'
   ] as const;
 
-  export type MarketField = (typeof ALL_FIELDS)[number];
+  type MarketField = (typeof ALL_FIELDS)[number];
 
   export let markets: Market[] = [];
   /**
@@ -55,6 +55,13 @@
   }
 
   const columns: MarketField[] = parseFilter(filter);
+
+  function cellClass(field: MarketField, market: Market): string {
+    if (field === 'trend') {
+      return market.trend >= 0 ? 'trend trend-up' : 'trend trend-down';
+    }
+    return field;
+  }
 
   function formatCell(field: MarketField, market: Market): string {
     switch (field) {
@@ -98,7 +105,7 @@
         {#each markets as market}
           <tr>
             {#each columns as field}
-              <td class={field}>{formatCell(field, market)}</td>
+              <td class={cellClass(field, market)}>{formatCell(field, market)}</td>
             {/each}
           </tr>
         {/each}
@@ -131,8 +138,15 @@
   }
 
   .markets-list td.trend {
-    color: var(--color-primary, #2563eb);
     font-weight: 700;
+  }
+
+  .markets-list td.trend-up {
+    color: var(--color-accent, #16a34a);
+  }
+
+  .markets-list td.trend-down {
+    color: var(--color-danger, #dc2626);
   }
 
   table {

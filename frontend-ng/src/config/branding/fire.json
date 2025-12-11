@@ -1,4 +1,5 @@
 {
+  "notation": "Fire: high-energy, volatility-focused layout",
   "brand": {
     "name": "SocialPredict [Fire]",
     "shortName": "SP",
@@ -23,8 +24,8 @@
     "borderLight": "rgba(248, 113, 113, 0.45)",
     "primary": "#f97316",
     "primarySoft": "rgba(249, 115, 22, 0.2)",
-    "accent": "#ef4444",
-    "accentSoft": "rgba(239, 68, 68, 0.2)",
+    "accent": "#22c55e",
+    "accentSoft": "rgba(34, 197, 94, 0.2)",
     "danger": "#b91c1c",
     "dangerSoft": "rgba(185, 28, 28, 0.25)"
   },

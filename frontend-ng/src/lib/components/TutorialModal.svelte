@@ -156,12 +156,17 @@
         <div class="instructions">
           <div class="eyebrow">Step {index + 1} of {total}</div>
           {#if index === 0}
-            <h3 class="demo-title">{@html "A prediction market works like this…"}</h3>
-            <p>{@html "<p class=\"spaced\">You buy YES/NO shares on real-world events.</p>\n<p class=\"spaced\">All markets start at 50¢/50¢ representing equal probability for YES and NO outcomes.</p>\n<p class=\"spaced\">Share prices move with demand, reflecting the crowd’s collective forecast.</p>\n<p>This is the \"<em>Wisdom of the Crowd</em>\" in action.</p>"}</p>
-            <div class="note">{@html "<p>Tip: Share prices represent outcome probabilities. For example, if the market price for YES is 62¢, the market expects that there is a ~62% chance it will resolve YES.</p>"}</div>
+            <h3 class="demo-title">A prediction market works like this…</h3>
+            
+      <p class="spaced">You buy YES/NO shares on real-world events.</p>
+      <p class="spaced">All markets start at 50¢/50¢ representing equal probability for YES and NO outcomes.</p>
+      <p class="spaced">Share prices move with demand, reflecting the crowd’s collective forecast.</p>
+      <p>This is the "<em>Wisdom of the Crowd</em>" in action.</p>
+    
+            <div class="note"><p>Tip: Share prices represent outcome probabilities. For example, if the market price for YES is 62¢, the market expects that there is a ~62% chance it will resolve YES.</p></div>
           {:else if index === 1}
-            <h3 class="demo-title">{@html "Tour a market…"}</h3>
-            <div class="note">{@html "Hover over each bullet to highlight its feature on the market card."}</div>
+            <h3 class="demo-title">Tour a market…</h3>
+            <div class="note">Hover over each bullet to highlight its feature on the market card.</div>
             <ul class="feature-list">
               <li
                 class={hoveredFeature === 'category' ? 'highlighted' : ''}
@@ -229,16 +234,27 @@
               </li>
             </ul>
           {:else if index === 2}
-            <h3 class="demo-title">{@html "See how prices change…"}</h3>
-            <p>{@html "<p class=\"spaced\">Drag the sliders to see how market prices react to trades by users.</p>\n<p class=\"spaced\">Notice how buying more shares of one outcome pushes its price up, while the opposing outcome's price drops accordingly.</p>\n<p>Prices are determined by supply and demand. The more users buy YES shares, the higher the price for YES becomes, indicating increased confidence in that outcome.</p>"}</p>
-            <div class="note">{@html "Tip: If you were actually trading, your actual cost would be set by the price at the time of your trade."}</div>
+            <h3 class="demo-title">See how prices change…</h3>
+            
+      <p class="spaced">Drag the sliders to see how market prices react to trades by users.</p>
+      <p class="spaced">Notice how buying more shares of one outcome pushes its price up, while the opposing outcome's price drops accordingly.</p>
+      <p>Prices are determined by supply and demand. The more users buy YES shares, the higher the price for YES becomes, indicating increased confidence in that outcome.</p>
+    
+            <div class="note">Tip: If you were actually trading, your actual cost would be set by the price at the time of your trade.</div>
           {:else if index === 3}
-            <h3 class="demo-title">{@html "Watch the market resolve — rewards arrive instantly…"}</h3>
-            <p>{@html "<p class=\"spaced\">When an event settles (when its market \"resolves\"), shareholders are paid out.</p>\n<p class=\"spaced\">If you hold shares of the winning outcome, you receive 100% value for each share you own.</p>\n<p class=\"spaced\">If the market resolves to \"YES\", holders of YES shares are paid $1 (100% value) for each of their shares.</p>\n<p class=\"spaced\">Losing shares become worthless.</p>\n<p class=\"spaced\">Funds are credited to your account instantly, ready for withdrawal or reinvestment.</p>\n<p>Let's assume you bought your shares for the current price of your chosen outcome.</p>"}</p>
-            <div class="note">{@html "Press the \"Resolve Market to YES\" button to see how your payout is calculated based on your purchase price versus the resolution outcome."}</div>
+            <h3 class="demo-title">Watch the market resolve — rewards arrive instantly…</h3>
+            
+      <p class="spaced">When an event settles (when its market "resolves"), shareholders are paid out.</p>
+      <p class="spaced">If you hold shares of the winning outcome, you receive 100% value for each share you own.</p>
+      <p class="spaced">If the market resolves to "YES", holders of YES shares are paid $1 (100% value) for each of their shares.</p>
+      <p class="spaced">Losing shares become worthless.</p>
+      <p class="spaced">Funds are credited to your account instantly, ready for withdrawal or reinvestment.</p>
+      <p>Let's assume you bought your shares for the current price of your chosen outcome.</p>
+    
+            <div class="note">Press the "Resolve Market to YES" button to see how your payout is calculated based on your purchase price versus the resolution outcome.</div>
           {:else}
-            <h3 class="demo-title">{@html "Join the SocialPredict community…"}</h3>
-            <p>{@html "Follow top forecasters, join prediction threads, and see sentiment move in real time."}</p>
+            <h3 class="demo-title">Join the SocialPredict community…</h3>
+            Follow top forecasters, join prediction threads, and see sentiment move in real time.
           {/if}
         </div>
 
@@ -323,8 +339,6 @@
                       {netProfitPercent}%
                       )
                     </div>
-                  {:else}
-                    <div>Adjust the sliders to explore potential outcomes.</div>
                   {/if}
                 </div>
               </div>
@@ -396,10 +410,9 @@
   .modal {
     position: relative;
     width: min(78vw, 1100px);
-    min-height: 60vh;
     padding: 1.6rem 1.9rem;
     border-radius: 1.2rem;
-    background: var(--panel, #12131a);
+    background: var(--color-background, #12131a);
     border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45),
       0 0 0 1px var(--color-primary-soft, rgba(159, 107, 255, 0.18));
