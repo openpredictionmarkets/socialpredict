@@ -36,6 +36,7 @@ export interface BrandFeatures {
   showHero: boolean;
   showTicker: boolean;
   showTrending: boolean;
+  showMarketsList: boolean;
   showCategories: boolean;
   showEndingSoon: boolean;
   showTutorial: boolean;
@@ -80,7 +81,14 @@ export interface BrandExamples {
   endingSoon: BrandExampleMarket[];
 }
 
-export type LayoutSectionType = 'logo' | 'hero' | 'ticker' | 'trending' | 'categories' | 'endingSoon';
+export type LayoutSectionType =
+  | 'logo'
+  | 'hero'
+  | 'ticker'
+  | 'trending'
+  | 'marketsList'
+  | 'categories'
+  | 'endingSoon';
 
 export interface BrandLayoutSection {
   type: LayoutSectionType;

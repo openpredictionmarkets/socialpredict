@@ -33,6 +33,7 @@
     "showHero": true,
     "showTicker": true,
     "showTrending": true,
+    "showMarketsList": false,
     "showCategories": true,
     "showEndingSoon": true,
     "showTutorial": true

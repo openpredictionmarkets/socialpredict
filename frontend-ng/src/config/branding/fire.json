@@ -33,6 +33,7 @@
     "showHero": true,
     "showTicker": true,
     "showTrending": false,
+    "showMarketsList": true,
     "showCategories": false,
     "showEndingSoon": false,
     "showTutorial": true
@@ -42,7 +43,7 @@
       { "type": "logo", "variant": "logoCenter" },
       { "type": "ticker" },
       { "type": "hero", "variant": "default" },
-      { "type": "trending" },
+      { "type": "marketsList" },
       { "type": "categories" },
       { "type": "endingSoon" }
     ]

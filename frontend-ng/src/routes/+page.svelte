@@ -11,6 +11,8 @@
 		type Market
 	} from '$lib/components/MarketCard.svelte';
 
+  import MarketsList from '$lib/components/MarketsList.svelte';
+
 	import CategoryGrid, { type Category } from '$lib/components/CategoryGrid.svelte';
 	import Logo from '$lib/components/Logo.svelte';
 	import TutorialModal from '$lib/components/TutorialModal.svelte';
@@ -48,6 +50,8 @@
 			categoryColor: branding.categories.find((c) => c.name === market.category)?.color
 		}))
 	);
+
+	const allMarkets: Market[] = $derived([...trendingMarkets, ...endingSoon]);
 
 	const categoryIcons: Record<string, Category['icon']> = {
 		Flag,
@@ -254,6 +258,15 @@
 						<MarketCard {market} />
 					{/each}
 				</div>
+			</section>
+		{:else if section.type === 'marketsList' && branding.features.showMarketsList}
+			<section class="section">
+				<SectionHeader
+					eyebrow="All Markets"
+					title="Explore all available markets"
+					subtitle="Browse and find markets that interest you."
+				/>
+				<MarketsList markets={allMarkets} filter="title,yes,no,trend" />
 			</section>
 		{:else if section.type === 'categories' && branding.features.showCategories}
 			<section class="section section--split">
