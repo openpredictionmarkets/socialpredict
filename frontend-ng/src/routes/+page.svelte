@@ -1,406 +1,338 @@
 <script lang="ts">
-import TickerBar, {
-  type TickerItem
-} from '$lib/components/TickerBar.svelte';
+	'use runes';
 
-import SectionHeader from '$lib/components/SectionHeader.svelte';
+	import TickerBar, {
+		type TickerItem
+	} from '$lib/components/TickerBar.svelte';
 
-import MarketCard, {
-  type Market
-} from '$lib/components/MarketCard.svelte';
+	import SectionHeader from '$lib/components/SectionHeader.svelte';
 
-import CategoryGrid, {
-  type Category
-} from '$lib/components/CategoryGrid.svelte';
+	import MarketCard, {
+		type Market
+	} from '$lib/components/MarketCard.svelte';
 
-import TutorialModal, {
-  type TutorialStep
-} from '$lib/components/TutorialModal.svelte';
+	import CategoryGrid, { type Category } from '$lib/components/CategoryGrid.svelte';
+	import Logo from '$lib/components/Logo.svelte';
+	import TutorialModal from '$lib/components/TutorialModal.svelte';
+	import AppToolbar from '$lib/components/AppToolbar.svelte';
+	import HeroPanel from '$lib/components/HeroPanel.svelte';
+  import BrandDebugPanel from '$lib/components/BrandDebugPanel.svelte';
+	import { currentBranding } from '$lib/stores/brandingStore';
 
-import AppToolbar from '$lib/components/AppToolbar.svelte';
+	import {
+		Flag,
+		ChartNoAxesCombined,
+		Coins,
+		MonitorSmartphone,
+		Trophy,
+		Sparkles,
+		FlaskConical
+	} from 'lucide-svelte';
 
-import {
-  Flag,
-  ChartNoAxesCombined,
-  Coins,
-  MonitorSmartphone,
-  Trophy,
-  Sparkles,
-  FlaskConical
-} from 'lucide-svelte';
+	const { data } = $props();
 
-const tickerItems: TickerItem[] = [{
-    label: 'BTC above $100k?',
-    yes: 41,
-    no: 59,
-    trend: 3
-  },
-  {
-    label: 'New iPhone folds?',
-    yes: 62,
-    no: 38,
-    trend: -1
-  },
-  {
-    label: 'Taylor Swift wins AOTY?',
-    yes: 55,
-    no: 45,
-    trend: 7
-  },
-  {
-    label: 'Fed cuts rates this year?',
-    yes: 48,
-    no: 52,
-    trend: 2
-  }
-];
+	const branding = $derived($currentBranding);
 
-const trendingMarkets: Market[] = [{
-    title: 'Will Apple release a foldable iPhone in 2025?',
-    yes: 62,
-    no: 38,
-    community: '1,842 predictions',
-    resolves: 'Oct 9 · Apple Event',
-    trend: 12,
-    liquidity: 'deep',
-    category: 'Tech',
-    sparkline: '0,20 10,18 20,16 30,12 40,15 50,10 60,12 70,9 80,11 90,7 100,10 110,6 120,9'
-  },
-  {
-    title: 'Will BTC close above $90k on Dec 31?',
-    yes: 41,
-    no: 59,
-    community: '9,231 predictions',
-    resolves: 'Dec 31',
-    trend: 4,
-    liquidity: 'deep',
-    category: 'Crypto',
-    sparkline: '0,10 10,12 20,9 30,13 40,12 50,15 60,16 70,18 80,14 90,16 100,15 110,17 120,14'
-  },
-  {
-    title: 'Will the US enter a technical recession in 2025?',
-    yes: 33,
-    no: 67,
-    community: '4,105 predictions',
-    resolves: 'Mar 31',
-    trend: -2,
-    liquidity: 'moderate',
-    category: 'Economy',
-    sparkline: '0,18 10,15 20,17 30,14 40,12 50,13 60,10 70,11 80,8 90,7 100,9 110,6 120,5'
-  },
-  {
-    title: 'Will Team USA win the 2026 World Cup?',
-    yes: 22,
-    no: 78,
-    community: '3,210 predictions',
-    resolves: 'Jul 19',
-    trend: 1,
-    liquidity: 'thin',
-    category: 'Sports',
-    sparkline: '0,9 10,10 20,11 30,13 40,12 50,11 60,13 70,12 80,14 90,13 100,12 110,11 120,10'
-  }
-];
+	const tickerItems: TickerItem[] = $derived(branding.examples.tickerItems);
 
-const endingSoon: Market[] = [{
-    title: 'Will a new US stimulus bill pass by Friday?',
-    yes: 58,
-    no: 42,
-    community: '2,018 predictions',
-    resolves: 'Fri · 11:59 PM',
-    trend: 6,
-    liquidity: 'moderate',
-    category: 'Politics'
-  },
-  {
-    title: 'Will ETH flip BTC in market cap by year end?',
-    yes: 17,
-    no: 83,
-    community: '6,523 predictions',
-    resolves: 'Dec 31',
-    trend: -3,
-    liquidity: 'very-thin',
-    category: 'Crypto'
-  },
-  {
-    title: 'Will an AI-first phone ship over 5M units?',
-    yes: 46,
-    no: 54,
-    community: '1,130 predictions',
-    resolves: 'Nov 30',
-    trend: 4,
-    liquidity: 'thin',
-    category: 'Tech'
-  }
-];
+	const trendingMarkets: Market[] = $derived(
+		branding.examples.trendingMarkets.map((market) => ({
+			...market,
+			categoryColor: branding.categories.find((c) => c.name === market.category)?.color
+		}))
+	);
 
-const categories: Category[] = [{
-    name: 'Politics',
-    icon: Flag,
-    color: '#888888'
-  },
-  {
-    name: 'Economy',
-    icon: ChartNoAxesCombined,
-    color: '#F6C947'
-  },
-  {
-    name: 'Crypto',
-    icon: Coins,
-    color: '#35E2D1'
-  },
-  {
-    name: 'Tech',
-    icon: MonitorSmartphone,
-    color: '#9F6BFF'
-  },
-  {
-    name: 'Sports',
-    icon: Trophy,
-    color: '#F6C947'
-  },
-  {
-    name: 'Culture',
-    icon: Sparkles,
-    color: '#FF6F61'
-  },
-  {
-    name: 'Science',
-    icon: FlaskConical,
-    color: '#35E2D1'
-  }
-];
+	const endingSoon: Market[] = $derived(
+		branding.examples.endingSoon.map((market) => ({
+			...market,
+			categoryColor: branding.categories.find((c) => c.name === market.category)?.color
+		}))
+	);
 
-const tutorialSteps: TutorialStep[] = [{
-    title: 'A prediction market works like this…',
-    description: [
-      '<p style="margin-bottom: 1rem !important;">You buy YES/NO shares on real-world events.</p>',
-      '<p style="margin-bottom: 1rem !important;">All markets start at 50¢/50¢ representing equal probability for YES and NO outcomes.</p>',
-      '<p style="margin-bottom: 1rem !important;">Share prices move with demand, reflecting the crowd’s collective forecast.</p>',
-      '<p>This is the "<em>Wisdom of the Crowd</em>" in action.</p>'
-    ].join('\n'),
-    note: [
-      '<p>Tip: Share prices represent outcome probabilities. For example, if the market price for YES is 62¢, the market expects that there is a ~62% chance it will resolve YES.</p>'
-    ].join('\n')
-  },
-  {
-    title: 'Tour a market…',
-    description: [{
-        key: 'category',
-        label: 'Market type',
-        detail: 'Which arena this market belongs to (Politics, Tech, Sports, etc).'
-      },
-      {
-        key: 'resolution',
-        label: 'Resolution time',
-        detail: 'When the market will settle and pay out.'
-      },
-      {
-        key: 'question',
-        label: 'Market question',
-        detail: 'The exact phrasing of what resolves YES vs NO.'
-      },
-      {
-        key: 'prices',
-        label: 'Prices',
-        detail: 'YES/NO quotes show implied probability; they change with trades.'
-      },
-      {
-        key: 'trend',
-        label: 'Trend',
-        detail: 'Recent momentum signal to see which outcome is heating up.'
-      },
-      {
-        key: 'liquidity',
-        label: 'Liquidity',
-        detail: 'Indicates how well funded the market is and how many participants are active within it.'
-      },
-      {
-        key: 'community',
-        label: 'Community',
-        detail: 'How many predictions/comments—shows activity and interest.'
-      },
-      {
-        key: 'cta',
-        label: 'Action',
-        detail: 'How users place trades.'
-      }
-    ],
-    note: 'Hover over each bullet to highlight its feature on the market card.'
-  },
-  {
-    title: 'See how prices change…',
-    description: [
-      '<p style="margin-bottom: 1rem !important;">Drag the sliders to see how market prices react to trades by users.</p>',
-      '<p style="margin-bottom: 1rem !important;">Notice how buying more shares of one outcome pushes its price up, while the opposing outcome\'s price drops accordingly.</p>',
-      '<p>Prices are determined by supply and demand. The more users buy YES shares, the higher the price for YES becomes, indicating increased confidence in that outcome.</p>'
-    ].join('\n'),
-    note: 'Tip: If you were actually trading, your actual cost would be set by the price at the time of your trade.'
-  },
-  {
-    title: 'Watch the market resolve — rewards arrive instantly…',
-    description: [
-      '<p style="margin-bottom: 1rem !important;">When an event settles (when its market "resolves"), shareholders are paid out.</p>',
-      '<p style="margin-bottom: 1rem !important;">If you hold shares of the winning outcome, you receive 100% value for each share you own.</p>',
-      '<p style="margin-bottom: 1rem !important;>If the market resolves to "YES", holders of YES shares are paid $1 (100% value) for each of their shares.</p>',
-      '<p style="margin-bottom: 1rem !important;">Losing shares become worthless.</p>',
-      '<p style="margin-bottom: 1rem !important;">Funds are credited to your account instantly, ready for withdrawal or reinvestment.</p>',
-      '<p>Let\'s assume you bought your shares for the current price of your chosen outcome.</p>'
-    ].join('\n'),
-    note: [
-      'Press the "Resolve Market to YES" button to see how your payout is calculated based on your purchase price versus the resolution outcome.'
-    ].join('\n')
-  },
-  {
-    title: 'Join the SocialPredict community…',
-    description: 'Follow top forecasters, join prediction threads, and see sentiment move in real time.'
-  }
-];
+	const categoryIcons: Record<string, Category['icon']> = {
+		Flag,
+		ChartNoAxesCombined,
+		Coins,
+		MonitorSmartphone,
+		Trophy,
+		Sparkles,
+		FlaskConical
+	};
 
-let showTutorial = false;
+	const categories: Category[] = $derived(
+		branding.categories.map((category) => ({
+			name: category.name,
+			icon: categoryIcons[category.icon] ?? Flag,
+			color: category.color
+		}))
+	);
+
+	let showTutorial = $state(false);
 </script>
 
-<AppToolbar />
+<AppToolbar/>
+
 
 <main class="page">
-	<section class="hero">
-		<div class="hero__copy">
-			<div class="tag">SocialPredict</div>
-			<h1>
-				Predict the future. <span>Influence the conversation.</span>
-			</h1>
-			<p>
-				Trade YES/NO shares on real events with a social layer built in. Follow forecasters, watch
-				the crowd move, and stay in sync with the signals that matter.
-			</p>
-			<div class="hero__actions">
-				<button class="primary">Start Predicting</button>
-				<button class="secondary" type="button" on:click={() => (showTutorial = true)}>
-					Learn How It Works
-				</button>
-			</div>
-			<div class="hero__stats">
-				<div>
-					<strong>218K</strong>
-					<span>Predictions this week</span>
-				</div>
-				<div>
-					<strong>1,204</strong>
-					<span>Active markets</span>
-				</div>
-				<div>
-					<strong>82%</strong>
-					<span>Community accuracy</span>
-				</div>
-			</div>
-		</div>
-		<div class="hero__panel">
-			<div class="panel__glass">
-				<div class="panel__header">
-					<div>
-						<div class="eyebrow">Order Ticket</div>
-						<h3>Will Apple release a foldable iPhone in 2025?</h3>
+	{#each branding.layout.sections as section}
+		{#if section.type === 'logo' && branding.features.showLogo}
+			<section
+				class={`section logo-section ${
+					section.variant === 'logoCenter'
+						? 'logo-section--center'
+						: section.variant === 'logoRight'
+							? 'logo-section--right'
+							: 'logo-section--default'
+				}`}
+			>
+				<Logo text={branding.brand.name} />
+			</section>
+		{:else if section.type === 'hero' && branding.features.showHero}
+			{#if section.variant === 'leftPanel'}
+				<section class="hero hero--left-panel">
+					<HeroPanel />
+					<div class="hero__copy">
+						<h1>
+							{branding.brand.taglinePrimary}
+							<span>{branding.brand.taglineSecondary}</span>
+						</h1>
+						<p>{branding.brand.description}</p>
+						<div class="hero__actions">
+							<button class="primary" onclick={() => (showTutorial = true)}>
+								{branding.brand.heroCtaPrimary}
+							</button>
+							{#if branding.features.showTutorial}
+								<button class="secondary" type="button" onclick={() => (showTutorial = true)}>
+									{branding.brand.heroCtaSecondary}
+								</button>
+							{/if}
+						</div>
+						<div class="hero__stats">
+							{#each branding.examples.heroStats as stat}
+								<div>
+									<strong>{stat.value}</strong>
+									<span>{stat.label}</span>
+								</div>
+							{/each}
+						</div>
 					</div>
-					<div class="score">
-						<div>SP Score</div>
-						<strong>72</strong>
+				</section>
+			{:else if section.variant === 'logoRight'}
+				<section class="hero hero--logo-right">
+					<div class="hero__copy">
+						<h1>
+							{branding.brand.taglinePrimary}
+							<span>{branding.brand.taglineSecondary}</span>
+						</h1>
+						<p>{branding.brand.description}</p>
+						<div class="hero__actions">
+							<button class="primary" onclick={() => (showTutorial = true)}>
+								{branding.brand.heroCtaPrimary}
+							</button>
+							{#if branding.features.showTutorial}
+								<button class="secondary" type="button" onclick={() => (showTutorial = true)}>
+									{branding.brand.heroCtaSecondary}
+								</button>
+							{/if}
+						</div>
+						<div class="hero__stats">
+							{#each branding.examples.heroStats as stat}
+								<div>
+									<strong>{stat.value}</strong>
+									<span>{stat.label}</span>
+								</div>
+							{/each}
+						</div>
 					</div>
-				</div>
-				<div class="panel__row">
-					<div class="pill yes">YES 62¢</div>
-					<div class="pill no">NO 38¢</div>
-					<div class="pill trend up">▲ +12%</div>
-				</div>
-				<div class="slider">
-					<div class="slider__label">Choose stake</div>
-					<div class="slider__track">
-						<div class="slider__fill" style="width: 64%"></div>
-						<div class="slider__thumb" style="left: 64%"></div>
+					<div class="hero__aside">
+						<HeroPanel />
 					</div>
-					<div class="slider__values">
-						<span>$25</span>
-						<span>Potential payout $40.50</span>
+				</section>
+			{:else if section.variant === 'logoCenter'}
+				<section class="hero hero--logo-center">
+					<div class="hero__copy">
+						<h1>
+							{branding.brand.taglinePrimary}
+							<span>{branding.brand.taglineSecondary}</span>
+						</h1>
+						<p>{branding.brand.description}</p>
+						<div class="hero__actions">
+							<button class="primary" onclick={() => (showTutorial = true)}>
+								{branding.brand.heroCtaPrimary}
+							</button>
+							{#if branding.features.showTutorial}
+								<button class="secondary" type="button" onclick={() => (showTutorial = true)}>
+									{branding.brand.heroCtaSecondary}
+								</button>
+							{/if}
+						</div>
+						<div class="hero__stats">
+							{#each branding.examples.heroStats as stat}
+								<div>
+									<strong>{stat.value}</strong>
+									<span>{stat.label}</span>
+								</div>
+							{/each}
+						</div>
 					</div>
+					<HeroPanel />
+				</section>
+			{:else if section.variant === 'bottomPanel'}
+				<section class="hero hero--bottom-panel">
+					<div class="hero__copy">
+						<h1>
+							{branding.brand.taglinePrimary}
+							<span>{branding.brand.taglineSecondary}</span>
+						</h1>
+						<p>{branding.brand.description}</p>
+						<div class="hero__actions">
+							<button class="primary" onclick={() => (showTutorial = true)}>
+								{branding.brand.heroCtaPrimary}
+							</button>
+							{#if branding.features.showTutorial}
+								<button class="secondary" type="button" onclick={() => (showTutorial = true)}>
+									{branding.brand.heroCtaSecondary}
+								</button>
+							{/if}
+						</div>
+						<div class="hero__stats">
+							{#each branding.examples.heroStats as stat}
+								<div>
+									<strong>{stat.value}</strong>
+									<span>{stat.label}</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+					<HeroPanel />
+				</section>
+			{:else}
+				<section class="hero">
+					<div class="hero__copy">
+						<h1>
+							{branding.brand.taglinePrimary}
+							<span>{branding.brand.taglineSecondary}</span>
+						</h1>
+						<p>{branding.brand.description}</p>
+						<div class="hero__actions">
+							<button class="primary" onclick={() => (showTutorial = true)}>
+								{branding.brand.heroCtaPrimary}
+							</button>
+							{#if branding.features.showTutorial}
+								<button class="secondary" type="button" onclick={() => (showTutorial = true)}>
+									{branding.brand.heroCtaSecondary}
+								</button>
+							{/if}
+						</div>
+						<div class="hero__stats">
+							{#each branding.examples.heroStats as stat}
+								<div>
+									<strong>{stat.value}</strong>
+									<span>{stat.label}</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+					<HeroPanel />
+				</section>
+			{/if}
+		{:else if section.type === 'ticker' && branding.features.showTicker}
+			<section class="ticker-wrap">
+				<TickerBar items={tickerItems} />
+			</section>
+		{:else if section.type === 'trending' && branding.features.showTrending}
+			<section class="section">
+				<SectionHeader
+					eyebrow="Trending Right Now"
+					title="Markets moving with volume, velocity, and social buzz"
+					subtitle="A pulse on what the SocialPredict crowd is talking about in real time."
+					actionLabel="See all markets"
+					actionHref="#"
+				/>
+				<div class="grid grid--markets">
+					{#each trendingMarkets as market}
+						<MarketCard {market} />
+					{/each}
 				</div>
-				<button class="primary block">Confirm YES</button>
-				<div class="panel__footer">
-					<div>Maker fee 0.15%</div>
-					<div>Depth preview · Live</div>
+			</section>
+		{:else if section.type === 'categories' && branding.features.showCategories}
+			<section class="section section--split">
+				<div class="split__left">
+					<SectionHeader
+						eyebrow="Categories"
+						title="Jump into any arena"
+						subtitle="From macro to memes, pick a lane and see what the crowd thinks."
+					/>
+					<CategoryGrid {categories} />
 				</div>
-			</div>
-		</div>
-	</section>
+				{#if branding.features.showEndingSoon}
+					<div class="split__right">
+						<SectionHeader
+							eyebrow="Ending Soon"
+							title="Last chance to get in"
+							subtitle="Markets about to resolve — catch the final moves."
+						/>
+						<div class="stack">
+							{#each endingSoon as market}
+								<MarketCard {market} />
+							{/each}
+						</div>
+					</div>
+				{/if}
+			</section>
+		{:else if section.type === 'endingSoon' && branding.features.showEndingSoon && !branding.features.showCategories}
+			<section class="section">
+				<SectionHeader
+					eyebrow="Ending Soon"
+					title="Last chance to get in"
+					subtitle="Markets about to resolve — catch the final moves."
+				/>
+				<div class="stack">
+					{#each endingSoon as market}
+						<MarketCard {market} />
+					{/each}
+				</div>
+			</section>
+		{/if}
+	{/each}
 
-	<section class="ticker-wrap">
-		<TickerBar items={tickerItems} />
-	</section>
-
-	<section class="section">
-		<SectionHeader
-			eyebrow="Trending Right Now"
-			title="Markets moving with volume, velocity, and social buzz"
-			subtitle="A pulse on what the SocialPredict crowd is talking about in real time."
-			actionLabel="See all markets"
-			actionHref="#"
+	{#if branding.features.showTutorial}
+		<TutorialModal
+			open={showTutorial}
+			onClose={() => (showTutorial = false)}
+			onComplete={() => (showTutorial = true)}
 		/>
-		<div class="grid grid--markets">
-			{#each trendingMarkets as market}
-				<MarketCard {market} />
-			{/each}
-		</div>
-	</section>
-
-	<section class="section section--split">
-		<div class="split__left">
-			<SectionHeader
-				eyebrow="Categories"
-				title="Jump into any arena"
-				subtitle="From macro to memes, pick a lane and see what the crowd thinks."
-			/>
-			<CategoryGrid {categories} />
-		</div>
-		<div class="split__right">
-			<SectionHeader
-				eyebrow="Ending Soon"
-				title="Last chance to get in"
-				subtitle="Markets about to resolve — catch the final moves."
-			/>
-			<div class="stack">
-				{#each endingSoon as market}
-					<MarketCard {market} />
-				{/each}
-			</div>
-		</div>
-	</section>
-
-	<TutorialModal
-		open={showTutorial}
-		steps={tutorialSteps}
-		onClose={() => (showTutorial = false)}
-		onComplete={() => (showTutorial = true)}
-	/>
+	{/if}
 </main>
+
+<BrandDebugPanel {branding} />
 
 <style>
 :global(:root) {
-  --bg: radial-gradient(circle at 10% 20%, rgba(159, 107, 255, 0.18), transparent 25%),
-    radial-gradient(circle at 80% 0%, rgba(53, 226, 209, 0.18), transparent 22%),
-    #0e0f14;
-  --text: #e6e4ff;
-  --text-subtle: #c4c8df;
-  --text-muted: #9ea3c1;
-  --panel: rgba(255, 255, 255, 0.03);
-  --border: rgba(255, 255, 255, 0.08);
+  --bg: var(--color-background, #f5f7fb);
+  --text: var(--color-text-dark, #0e0f14);
+  --text-subtle: var(--color-text-subtle-dark, #4b5563);
+  --text-muted: var(--color-text-muted-dark, #6b7280);
+  --panel: var(--color-panel-light, rgba(0, 0, 0, 0.02));
+  --border: var(--color-border-light, rgba(0, 0, 0, 0.08));
 }
 
 :global(:root[data-theme='light']) {
-  --bg: radial-gradient(circle at 15% 20%, rgba(106, 63, 245, 0.08), transparent 30%),
-    radial-gradient(circle at 80% 0%, rgba(53, 226, 209, 0.12), transparent 28%),
-    #f5f7fb;
-  --text: #0e0f14;
-  --text-subtle: #4b5563;
-  --text-muted: #6b7280;
-  --panel: rgba(0, 0, 0, 0.02);
-  --border: rgba(0, 0, 0, 0.08);
+  --bg: var(--color-background, #f5f7fb);
+  --text: var(--color-text-dark, #0e0f14);
+  --text-subtle: var(--color-text-subtle-dark, #4b5563);
+  --text-muted: var(--color-text-muted-dark, #6b7280);
+  --panel: var(--color-panel-light, rgba(0, 0, 0, 0.02));
+  --border: var(--color-border-light, rgba(0, 0, 0, 0.08));
+}
+
+:global(:root[data-theme='dark']) {
+  --bg: var(--color-background, #0e0f14);
+  --text: var(--color-text-light, #e6e4ff);
+  --text-subtle: var(--color-text-subtle-light, #c4c8df);
+  --text-muted: var(--color-text-muted-light, #9ea3c1);
+  --panel: var(--color-panel-dark, rgba(255, 255, 255, 0.03));
+  --border: var(--color-border-dark, rgba(255, 255, 255, 0.08));
 }
 
 :global(body) {
@@ -424,15 +356,47 @@ let showTutorial = false;
   align-items: center;
 }
 
+.logo-section {
+  display: flex;
+}
+
+.logo-section--default {
+  justify-content: flex-start;
+}
+
+.logo-section--center {
+  justify-content: center;
+}
+
+.logo-section--right {
+  justify-content: flex-end;
+}
+
+.hero.hero--logo-right {
+  grid-template-columns: 1.1fr 0.9fr;
+}
+
+.hero.hero--bottom-panel {
+  grid-template-columns: 1fr;
+}
+
+.hero.hero--logo-center .hero__copy {
+  text-align: center;
+}
+
+.hero.hero--logo-center .hero__actions {
+  justify-content: center;
+}
+
 .hero__copy h1 {
   font-size: clamp(2.2rem, 4vw, 3.3rem);
   line-height: 1.1;
   margin: 0.4rem 0;
-  color: #f7f6ff;
+  color: var(--text, #0e0f14);
 }
 
 .hero__copy h1 span {
-  color: #9f6bff;
+  color: var(--color-primary, #16a34a);
   text-shadow: 0 0 18px rgba(159, 107, 255, 0.55);
 }
 
@@ -440,21 +404,6 @@ let showTutorial = false;
   color: var(--text-subtle);
   font-size: 1.05rem;
   margin: 0.5rem 0 1.1rem;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
-  background: rgba(159, 107, 255, 0.14);
-  color: var(--text);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-  border: 1px solid rgba(159, 107, 255, 0.35);
-  box-shadow: 0 10px 25px rgba(159, 107, 255, 0.3);
 }
 
 .hero__actions {
@@ -477,20 +426,15 @@ button.secondary {
 }
 
 button.primary {
-  background: linear-gradient(135deg, #6a3ff5, #9f6bff);
-  color: #0e0f14;
-  box-shadow: 0 14px 36px rgba(159, 107, 255, 0.45);
-}
-
-button.primary.block {
-  width: 100%;
-  justify-content: center;
+  background: linear-gradient(135deg, var(--color-primary, #2563eb), var(--color-accent, #16a34a));
+  color: var(--color-text-light, #e9edf6);
+  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.35);
 }
 
 button.secondary {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e6e4ff;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--panel, rgba(0, 0, 0, 0.02));
+  color: var(--text);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
 }
 
 button.primary:hover {
@@ -499,13 +443,20 @@ button.primary:hover {
 }
 
 button.secondary:hover {
-  border-color: rgba(159, 107, 255, 0.45);
+  border-color: var(--color-primary, #2563eb);
 }
 
 .hero__stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 0.85rem;
+}
+
+.hero__aside {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+  justify-items: end;
 }
 
 .hero__stats div {
@@ -523,139 +474,6 @@ button.secondary:hover {
 .hero__stats span {
   color: var(--text-muted);
   font-size: 0.95rem;
-}
-
-.hero__panel {
-  position: relative;
-}
-
-.panel__glass {
-  position: relative;
-  padding: 1.4rem;
-  border-radius: 1.2rem;
-  background: linear-gradient(135deg, rgba(106, 63, 245, 0.28), rgba(14, 15, 20, 0.9)),
-    rgba(14, 15, 20, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(159, 107, 255, 0.25);
-  backdrop-filter: blur(8px);
-  display: grid;
-  gap: 1rem;
-}
-
-.panel__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.panel__header h3 {
-  margin: 0.2rem 0 0;
-  font-size: 1.05rem;
-}
-
-.score {
-  text-align: right;
-  color: var(--text-subtle);
-}
-
-.score strong {
-  display: block;
-  font-size: 1.8rem;
-  color: #35e2d1;
-  text-shadow: 0 0 12px rgba(53, 226, 209, 0.45);
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.8rem;
-  color: #9f6bff;
-}
-
-.panel__row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
-}
-
-.pill {
-  padding: 0.75rem 0.9rem;
-  border-radius: 0.85rem;
-  text-align: center;
-  font-weight: 800;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pill.yes {
-  background: rgba(53, 226, 209, 0.1);
-  color: #35e2d1;
-}
-
-.pill.no {
-  background: rgba(255, 111, 97, 0.1);
-  color: #ff8d7f;
-}
-
-.pill.trend.up {
-  color: #35e2d1;
-  background: rgba(53, 226, 209, 0.08);
-}
-
-.slider {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.slider__label {
-  color: var(--text-subtle);
-  font-size: 0.95rem;
-}
-
-.slider__track {
-  position: relative;
-  height: 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.slider__fill {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, #6a3ff5, #35e2d1);
-}
-
-.slider__thumb {
-  position: absolute;
-  top: 50%;
-  width: 18px;
-  height: 18px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
-  border: 2px solid #6a3ff5;
-}
-
-.slider__values {
-  display: flex;
-  justify-content: space-between;
-  color: var(--text);
-  font-weight: 700;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo,
-    Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-}
-
-.panel__footer {
-  display: flex;
-  justify-content: space-between;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
-:global(:root[data-theme='light']) :is(h1, h2, h3, h4, h5, h6, p, span, div, li, strong, em, label) {
-  color: #0e0f14;
 }
 
 .ticker-wrap {
@@ -707,10 +525,6 @@ button.secondary:hover {
 @media (max-width: 640px) {
   .page {
     padding: 1.8rem 1.2rem 2.6rem;
-  }
-
-  .panel__row {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 }
 </style>

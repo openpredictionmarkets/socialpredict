@@ -1,3 +1,7 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* * {
+  border: 1px solid red;
+} */

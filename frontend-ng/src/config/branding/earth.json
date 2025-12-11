@@ -1,0 +1,215 @@
+{
+  "brand": {
+    "name": "SocialPredict [Earth]",
+    "shortName": "Earth",
+    "taglinePrimary": "Ground your forecasts.",
+    "taglineSecondary": "Stay rooted in real-world signals.",
+    "description": "A calm, earth‑toned view of prediction markets. Track policy, climate, commodities, and everyday realities with a palette inspired by soil, stone, and sky.",
+    "heroCtaPrimary": "Explore Earth Markets",
+    "heroCtaSecondary": "Why forecasts matter"
+  },
+  "theme": "light",
+  "colors": {
+    "background": "#faf4eb",
+    "textDark": "#1f2933",
+    "textLight": "#fdfaf5",
+    "textSubtleDark": "#6b7280",
+    "textSubtleLight": "#e5d7c3",
+    "textMutedDark": "#9ca3af",
+    "textMutedLight": "#d1c4b0",
+    "panelDark": "rgba(55, 65, 81, 0.92)",
+    "panelLight": "rgba(255, 255, 255, 0.96)",
+    "borderDark": "rgba(75, 85, 99, 0.45)",
+    "borderLight": "rgba(148, 121, 93, 0.35)",
+    "primary": "#8b5a2b",
+    "primarySoft": "rgba(139, 90, 43, 0.18)",
+    "accent": "#3b82f6",
+    "accentSoft": "rgba(59, 130, 246, 0.16)",
+    "danger": "#b91c1c",
+    "dangerSoft": "rgba(185, 28, 28, 0.18)"
+  },
+  "features": {
+    "showLogo": true,
+    "showHero": true,
+    "showTicker": true,
+    "showTrending": true,
+    "showCategories": true,
+    "showEndingSoon": true,
+    "showTutorial": true
+  },
+  "layout": {
+    "sections": [
+      { "type": "ticker" },
+      { "type": "logo", "variant": "default" },
+      { "type": "hero", "variant": "default" },
+      { "type": "trending" },
+      { "type": "categories" },
+      { "type": "endingSoon" }
+    ]
+  },
+  "categories": [
+    {
+      "id": "politics",
+      "name": "Politics",
+      "color": "#92400e",
+      "icon": "Flag"
+    },
+    {
+      "id": "economy",
+      "name": "Economy",
+      "color": "#b45309",
+      "icon": "ChartNoAxesCombined"
+    },
+    {
+      "id": "climate",
+      "name": "Climate",
+      "color": "#16a34a",
+      "icon": "FlaskConical"
+    },
+    {
+      "id": "commodities",
+      "name": "Commodities",
+      "color": "#d97706",
+      "icon": "Coins"
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure",
+      "color": "#2563eb",
+      "icon": "MonitorSmartphone"
+    },
+    {
+      "id": "culture",
+      "name": "Culture",
+      "color": "#a855f7",
+      "icon": "Sparkles"
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "color": "#15803d",
+      "icon": "FlaskConical"
+    }
+  ],
+  "examples": {
+    "tickerItems": [
+      {
+        "label": "Global food prices ease back toward 2019 levels?",
+        "yes": 46,
+        "no": 54,
+        "trend": 2
+      },
+      {
+        "label": "Will a major city announce a new climate adaptation plan this quarter?",
+        "yes": 61,
+        "no": 39,
+        "trend": 4
+      },
+      {
+        "label": "Will global oil demand fall year‑over‑year?",
+        "yes": 37,
+        "no": 63,
+        "trend": -1
+      },
+      {
+        "label": "Will a new public transit megaproject break ground this year?",
+        "yes": 53,
+        "no": 47,
+        "trend": 3
+      }
+    ],
+    "heroStats": [
+      {
+        "label": "Earth‑linked markets",
+        "value": "684"
+      },
+      {
+        "label": "Capital tracking real‑world risk",
+        "value": "$92M"
+      },
+      {
+        "label": "Median time to resolve",
+        "value": "47 days"
+      }
+    ],
+    "trendingMarkets": [
+      {
+        "title": "Will global deforestation decline year‑over‑year?",
+        "yes": 42,
+        "no": 58,
+        "community": "6,104 predictions",
+        "resolves": "Dec 31",
+        "trend": 3,
+        "liquidity": "moderate",
+        "category": "Climate",
+        "sparkline": "0,20 10,19 20,18 30,19 40,21 50,20 60,19 70,21 80,22 90,21 100,20 110,21 120,22"
+      },
+      {
+        "title": "Will any G20 country introduce a nationwide carbon pricing hike this year?",
+        "yes": 55,
+        "no": 45,
+        "community": "4,782 predictions",
+        "resolves": "Nov 30",
+        "trend": 4,
+        "liquidity": "moderate",
+        "category": "Politics",
+        "sparkline": "0,22 10,23 20,25 30,24 40,26 50,27 60,29 70,28 80,30 90,29 100,31 110,30 120,32"
+      },
+      {
+        "title": "Will global wheat prices fall more than 10% from current levels?",
+        "yes": 49,
+        "no": 51,
+        "community": "3,321 predictions",
+        "resolves": "Sep 30",
+        "trend": 1,
+        "liquidity": "deep",
+        "category": "Commodities",
+        "sparkline": "0,18 10,19 20,17 30,18 40,19 50,18 60,20 70,19 80,21 90,20 100,19 110,21 120,20"
+      },
+      {
+        "title": "Will a new long‑distance rail line open to the public by year end?",
+        "yes": 36,
+        "no": 64,
+        "community": "2,114 predictions",
+        "resolves": "Dec 15",
+        "trend": 2,
+        "liquidity": "thin",
+        "category": "Infrastructure",
+        "sparkline": "0,14 10,13 20,15 30,14 40,16 50,15 60,16 70,15 80,17 90,16 100,18 110,17 120,19"
+      }
+    ],
+    "endingSoon": [
+      {
+        "title": "Will any major river hit record low water levels this season?",
+        "yes": 57,
+        "no": 43,
+        "community": "1,932 predictions",
+        "resolves": "Sun · 11:59 PM",
+        "trend": 5,
+        "liquidity": "moderate",
+        "category": "Climate"
+      },
+      {
+        "title": "Will a major city announce a rent stabilization policy this month?",
+        "yes": 39,
+        "no": 61,
+        "community": "1,488 predictions",
+        "resolves": "Fri · 6:00 PM",
+        "trend": 2,
+        "liquidity": "thin",
+        "category": "Politics"
+      },
+      {
+        "title": "Will a new agricultural subsidy package be approved this quarter?",
+        "yes": 51,
+        "no": 49,
+        "community": "1,745 predictions",
+        "resolves": "Thu · 4:00 PM",
+        "trend": 3,
+        "liquidity": "moderate",
+        "category": "Economy"
+      }
+    ]
+  }
+}
+

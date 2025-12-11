@@ -1,0 +1,124 @@
+{
+  "brand": {
+    "name": "SocialPredict",
+    "shortName": "SocialPredict",
+    "taglinePrimary": "Predict the future.",
+    "taglineSecondary": "Influence the conversation.",
+    "description": "Trade YES/NO shares on real events with a social layer built in. Follow forecasters, watch the crowd move, and stay in sync with the signals that matter.",
+    "heroCtaPrimary": "Start Predicting",
+    "heroCtaSecondary": "Learn How It Works"
+  },
+  "colors": {
+    "background": "#0e0f14",
+    "textDark": "#0e0f14",
+    "textLight": "#e6e4ff",
+    "textSubtleDark": "#4b5563",
+    "textSubtleLight": "#c4c8df",
+    "textMutedDark": "#6b7280",
+    "textMutedLight": "#9ea3c1",
+    "panelDark": "rgba(255, 255, 255, 0.03)",
+    "panelLight": "rgba(0, 0, 0, 0.02)",
+    "borderDark": "rgba(255, 255, 255, 0.08)",
+    "borderLight": "rgba(0, 0, 0, 0.08)",
+    "primary": "#9f6bff",
+    "primarySoft": "rgba(159, 107, 255, 0.14)",
+    "accent": "#35e2d1",
+    "accentSoft": "rgba(53, 226, 209, 0.1)",
+    "danger": "#ff6f61",
+    "dangerSoft": "rgba(255, 111, 97, 0.1)"
+  },
+  "features": {
+    "showHero": true,
+    "showTicker": true,
+    "showTrending": true,
+    "showCategories": true,
+    "showEndingSoon": true,
+    "showTutorial": true
+  },
+  "categories": [
+    {
+      "id": "politics",
+      "name": "Politics",
+      "color": "#888888",
+      "icon": "Flag"
+    },
+    {
+      "id": "economy",
+      "name": "Economy",
+      "color": "#F6C947",
+      "icon": "ChartNoAxesCombined"
+    },
+    {
+      "id": "crypto",
+      "name": "Crypto",
+      "color": "#35E2D1",
+      "icon": "Coins"
+    },
+    {
+      "id": "tech",
+      "name": "Tech",
+      "color": "#9F6BFF",
+      "icon": "MonitorSmartphone"
+    },
+    {
+      "id": "sports",
+      "name": "Sports",
+      "color": "#F6C947",
+      "icon": "Trophy"
+    },
+    {
+      "id": "culture",
+      "name": "Culture",
+      "color": "#FF6F61",
+      "icon": "Sparkles"
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "color": "#35E2D1",
+      "icon": "FlaskConical"
+    }
+  ],
+  "examples": {
+    "tickerItems": [
+      {
+        "label": "BTC above $100k?",
+        "yes": 41,
+        "no": 59,
+        "trend": 3
+      },
+      {
+        "label": "New iPhone folds?",
+        "yes": 62,
+        "no": 38,
+        "trend": -1
+      },
+      {
+        "label": "Taylor Swift wins AOTY?",
+        "yes": 55,
+        "no": 45,
+        "trend": 7
+      },
+      {
+        "label": "Fed cuts rates this year?",
+        "yes": 48,
+        "no": 52,
+        "trend": 2
+      }
+    ],
+    "heroStats": [
+      {
+        "label": "Predictions this week",
+        "value": "218K"
+      },
+      {
+        "label": "Active markets",
+        "value": "1,204"
+      },
+      {
+        "label": "Community accuracy",
+        "value": "82%"
+      }
+    ]
+  }
+}

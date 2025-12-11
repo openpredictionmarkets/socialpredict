@@ -1,0 +1,214 @@
+{
+  "brand": {
+    "name": "SocialPredict [Default]",
+    "shortName": "SocialPredict",
+    "taglinePrimary": "Predict the future.",
+    "taglineSecondary": "Influence the conversation.",
+    "description": "Trade YES/NO shares on real events with a social layer built in. Follow forecasters, watch the crowd move, and stay in sync with the signals that matter.",
+    "heroCtaPrimary": "Start Predicting",
+    "heroCtaSecondary": "Learn How It Works"
+  },
+  "theme": "dark",
+  "colors": {
+    "background": "#0e0f14",
+    "textDark": "#0e0f14",
+    "textLight": "#e6e4ff",
+    "textSubtleDark": "#4b5563",
+    "textSubtleLight": "#c4c8df",
+    "textMutedDark": "#6b7280",
+    "textMutedLight": "#9ea3c1",
+    "panelDark": "rgba(255, 255, 255, 0.03)",
+    "panelLight": "rgba(0, 0, 0, 0.02)",
+    "borderDark": "rgba(255, 255, 255, 0.08)",
+    "borderLight": "rgba(0, 0, 0, 0.08)",
+    "primary": "#9f6bff",
+    "primarySoft": "rgba(159, 107, 255, 0.14)",
+    "accent": "#35e2d1",
+    "accentSoft": "rgba(53, 226, 209, 0.1)",
+    "danger": "#ff6f61",
+    "dangerSoft": "rgba(255, 111, 97, 0.1)"
+  },
+  "features": {
+    "showLogo": true,
+    "showHero": true,
+    "showTicker": true,
+    "showTrending": true,
+    "showCategories": true,
+    "showEndingSoon": true,
+    "showTutorial": true
+  },
+  "layout": {
+    "sections": [
+      { "type": "logo", "variant": "default" },
+      { "type": "hero", "variant": "default" },
+      { "type": "ticker" },
+      { "type": "trending" },
+      { "type": "categories" },
+      { "type": "endingSoon" }
+    ]
+  },
+  "categories": [
+    {
+      "id": "politics",
+      "name": "Politics",
+      "color": "#94a3b8",
+      "icon": "Flag"
+    },
+    {
+      "id": "economy",
+      "name": "Economy",
+      "color": "#f4b740",
+      "icon": "ChartNoAxesCombined"
+    },
+    {
+      "id": "crypto",
+      "name": "Crypto",
+      "color": "#2ac6b0",
+      "icon": "Coins"
+    },
+    {
+      "id": "tech",
+      "name": "Tech",
+      "color": "#6473ff",
+      "icon": "MonitorSmartphone"
+    },
+    {
+      "id": "sports",
+      "name": "Sports",
+      "color": "#f9735b",
+      "icon": "Trophy"
+    },
+    {
+      "id": "culture",
+      "name": "Culture",
+      "color": "#f973a5",
+      "icon": "Sparkles"
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "color": "#22c55e",
+      "icon": "FlaskConical"
+    }
+  ],
+  "examples": {
+    "tickerItems": [
+      {
+        "label": "Global inflation back below 3%?",
+        "yes": 48,
+        "no": 52,
+        "trend": 2
+      },
+      {
+        "label": "Ethereum gas fees stay under 20 gwei?",
+        "yes": 57,
+        "no": 43,
+        "trend": 4
+      },
+      {
+        "label": "A major LLM beats humans on a new benchmark?",
+        "yes": 61,
+        "no": 39,
+        "trend": 5
+      },
+      {
+        "label": "A top-10 city pilots congestion-free zones?",
+        "yes": 38,
+        "no": 62,
+        "trend": -1
+      }
+    ],
+    "heroStats": [
+      {
+        "label": "Forecasts this week",
+        "value": "214K"
+      },
+      {
+        "label": "Active markets",
+        "value": "1,180"
+      },
+      {
+        "label": "Median forecaster accuracy",
+        "value": "79%"
+      }
+    ],
+    "trendingMarkets": [
+      {
+        "title": "Will Apple release a foldable iPhone in 2025?",
+        "yes": 62,
+        "no": 38,
+        "community": "1,842 predictions",
+        "resolves": "Oct 9 · Apple Event",
+        "trend": 12,
+        "liquidity": "deep",
+        "category": "Tech",
+        "sparkline": "0,20 10,18 20,16 30,12 40,15 50,10 60,12 70,9 80,11 90,7 100,10 110,6 120,9"
+      },
+      {
+        "title": "Will BTC close above $90k on Dec 31?",
+        "yes": 41,
+        "no": 59,
+        "community": "9,231 predictions",
+        "resolves": "Dec 31",
+        "trend": 4,
+        "liquidity": "deep",
+        "category": "Crypto",
+        "sparkline": "0,10 10,12 20,9 30,13 40,12 50,15 60,16 70,18 80,14 90,16 100,15 110,17 120,14"
+      },
+      {
+        "title": "Will the US enter a technical recession in 2025?",
+        "yes": 33,
+        "no": 67,
+        "community": "4,105 predictions",
+        "resolves": "Mar 31",
+        "trend": -2,
+        "liquidity": "moderate",
+        "category": "Economy",
+        "sparkline": "0,18 10,15 20,17 30,14 40,12 50,13 60,10 70,11 80,8 90,7 100,9 110,6 120,5"
+      },
+      {
+        "title": "Will Team USA win the 2026 World Cup?",
+        "yes": 22,
+        "no": 78,
+        "community": "3,210 predictions",
+        "resolves": "Jul 19",
+        "trend": 1,
+        "liquidity": "thin",
+        "category": "Sports",
+        "sparkline": "0,9 10,10 20,11 30,13 40,12 50,11 60,13 70,12 80,14 90,13 100,12 110,11 120,10"
+      }
+    ],
+    "endingSoon": [
+      {
+        "title": "Will a new US stimulus bill pass by Friday?",
+        "yes": 58,
+        "no": 42,
+        "community": "2,018 predictions",
+        "resolves": "Fri · 11:59 PM",
+        "trend": 6,
+        "liquidity": "moderate",
+        "category": "Politics"
+      },
+      {
+        "title": "Will ETH flip BTC in market cap by year end?",
+        "yes": 17,
+        "no": 83,
+        "community": "6,523 predictions",
+        "resolves": "Dec 31",
+        "trend": -3,
+        "liquidity": "very-thin",
+        "category": "Crypto"
+      },
+      {
+        "title": "Will an AI-first phone ship over 5M units?",
+        "yes": 46,
+        "no": 54,
+        "community": "1,130 predictions",
+        "resolves": "Nov 30",
+        "trend": 4,
+        "liquidity": "thin",
+        "category": "Tech"
+      }
+    ]
+  }
+}

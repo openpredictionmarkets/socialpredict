@@ -1,11 +1,46 @@
 <!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		%sveltekit.head%
-	</head>
-	<body data-sveltekit-preload-data="hover">
-		<div style="display: contents">%sveltekit.body%</div>
-	</body>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --color-background: #0e0f14;
+      --color-text-dark: #0e0f14;
+      --color-text-light: #e6e4ff;
+      --color-text-subtle-dark: #4b5563;
+      --color-text-subtle-light: #c4c8df;
+      --color-text-muted-dark: #6b7280;
+      --color-text-muted-light: #9ea3c1;
+      --color-panel-dark: rgba(255, 255, 255, 0.03);
+      --color-panel-light: rgba(0, 0, 0, 0.02);
+      --color-border-dark: rgba(255, 255, 255, 0.08);
+      --color-border-light: rgba(0, 0, 0, 0.08);
+      --color-primary: #9f6bff;
+      --color-primary-soft: rgba(159, 107, 255, 0.14);
+      --color-accent: #35e2d1;
+      --color-accent-soft: rgba(53, 226, 209, 0.1);
+      --color-danger: #ff6f61;
+      --color-danger-soft: rgba(255, 111, 97, 0.1);
+      --bg: #0e0f14;
+      --text: #e6e4ff;
+      --text-subtle: #c4c8df;
+      --text-muted: #9ea3c1;
+      --panel: rgba(255, 255, 255, 0.03);
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    body {
+      background-color: #0e0f14;
+      color: #e6e4ff;
+    }
+  </style>
+  %sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+  <div style="display: contents">%sveltekit.body%</div>
+</body>
+
 </html>

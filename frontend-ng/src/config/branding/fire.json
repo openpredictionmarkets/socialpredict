@@ -1,0 +1,214 @@
+{
+  "brand": {
+    "name": "SocialPredict [Fire]",
+    "shortName": "SP",
+    "taglinePrimary": "Trade the heat.",
+    "taglineSecondary": "Follow the flames of sentiment.",
+    "description": "A fire-lit view of market conviction. Watch hot narratives ignite, cool off, and resolve as the crowd reprices probability in real time.",
+    "heroCtaPrimary": "See What's Heating Up",
+    "heroCtaSecondary": "How volatility works"
+  },
+  "theme": "dark",
+  "colors": {
+    "background": "#0b0b10",
+    "textDark": "#0b0b10",
+    "textLight": "#fef2f2",
+    "textSubtleDark": "#fecaca",
+    "textSubtleLight": "#fecaca",
+    "textMutedDark": "#fca5a5",
+    "textMutedLight": "#fed7d7",
+    "panelDark": "rgba(17, 24, 39, 0.96)",
+    "panelLight": "rgba(255, 255, 255, 0.96)",
+    "borderDark": "rgba(248, 113, 113, 0.55)",
+    "borderLight": "rgba(248, 113, 113, 0.45)",
+    "primary": "#f97316",
+    "primarySoft": "rgba(249, 115, 22, 0.2)",
+    "accent": "#ef4444",
+    "accentSoft": "rgba(239, 68, 68, 0.2)",
+    "danger": "#b91c1c",
+    "dangerSoft": "rgba(185, 28, 28, 0.25)"
+  },
+  "features": {
+    "showLogo": true,
+    "showHero": true,
+    "showTicker": true,
+    "showTrending": false,
+    "showCategories": false,
+    "showEndingSoon": false,
+    "showTutorial": true
+  },
+  "layout": {
+    "sections": [
+      { "type": "logo", "variant": "logoCenter" },
+      { "type": "ticker" },
+      { "type": "hero", "variant": "default" },
+      { "type": "trending" },
+      { "type": "categories" },
+      { "type": "endingSoon" }
+    ]
+  },
+  "categories": [
+    {
+      "id": "politics",
+      "name": "Politics",
+      "color": "#f97316",
+      "icon": "Flag"
+    },
+    {
+      "id": "economy",
+      "name": "Economy",
+      "color": "#fb923c",
+      "icon": "ChartNoAxesCombined"
+    },
+    {
+      "id": "crypto",
+      "name": "Crypto",
+      "color": "#f97373",
+      "icon": "Coins"
+    },
+    {
+      "id": "tech",
+      "name": "Tech",
+      "color": "#facc15",
+      "icon": "MonitorSmartphone"
+    },
+    {
+      "id": "sports",
+      "name": "Sports",
+      "color": "#ef4444",
+      "icon": "Trophy"
+    },
+    {
+      "id": "culture",
+      "name": "Culture",
+      "color": "#fb7185",
+      "icon": "Sparkles"
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "color": "#f97316",
+      "icon": "FlaskConical"
+    }
+  ],
+  "examples": {
+    "tickerItems": [
+      {
+        "label": "Will a major tech giant face antitrust action this year?",
+        "yes": 59,
+        "no": 41,
+        "trend": 6
+      },
+      {
+        "label": "Will a top-10 crypto lose over 60% from its ATH?",
+        "yes": 44,
+        "no": 56,
+        "trend": -3
+      },
+      {
+        "label": "Will a record-breaking heatwave hit a G20 capital?",
+        "yes": 63,
+        "no": 37,
+        "trend": 4
+      },
+      {
+        "label": "Will a viral meme stock double in a week?",
+        "yes": 35,
+        "no": 65,
+        "trend": 5
+      }
+    ],
+    "heroStats": [
+      {
+        "label": "Markets on fire",
+        "value": "312"
+      },
+      {
+        "label": "24h notional volume",
+        "value": "$48M"
+      },
+      {
+        "label": "Spiciest move today",
+        "value": "+38%"
+      }
+    ],
+    "trendingMarkets": [
+      {
+        "title": "Will a major social network lose 15%+ of its active users this year?",
+        "yes": 47,
+        "no": 53,
+        "community": "6,821 predictions",
+        "resolves": "Dec 31",
+        "trend": 7,
+        "liquidity": "deep",
+        "category": "Tech",
+        "sparkline": "0,16 10,18 20,21 30,19 40,22 50,24 60,23 70,25 80,27 90,26 100,28 110,27 120,29"
+      },
+      {
+        "title": "Will a top meme coin lose 70%+ from its peak?",
+        "yes": 52,
+        "no": 48,
+        "community": "9,304 predictions",
+        "resolves": "Sep 30",
+        "trend": 5,
+        "liquidity": "deep",
+        "category": "Crypto",
+        "sparkline": "0,24 10,23 20,25 30,22 40,26 50,24 60,27 70,25 80,28 90,26 100,29 110,27 120,30"
+      },
+      {
+        "title": "Will an election trigger >5% single-day move in a major index?",
+        "yes": 58,
+        "no": 42,
+        "community": "4,992 predictions",
+        "resolves": "Nov 15",
+        "trend": 3,
+        "liquidity": "moderate",
+        "category": "Politics",
+        "sparkline": "0,18 10,19 20,21 30,20 40,22 50,23 60,24 70,23 80,25 90,24 100,26 110,25 120,27"
+      },
+      {
+        "title": "Will a major sports final end with a record-breaking scoreline?",
+        "yes": 39,
+        "no": 61,
+        "community": "3,117 predictions",
+        "resolves": "Jul 28",
+        "trend": 2,
+        "liquidity": "thin",
+        "category": "Sports",
+        "sparkline": "0,20 10,19 20,21 30,20 40,22 50,20 60,23 70,21 80,22 90,21 100,23 110,22 120,24"
+      }
+    ],
+    "endingSoon": [
+      {
+        "title": "Will any large-cap stock halt trading due to volatility this week?",
+        "yes": 41,
+        "no": 59,
+        "community": "2,203 predictions",
+        "resolves": "Fri · Close",
+        "trend": 4,
+        "liquidity": "moderate",
+        "category": "Economy"
+      },
+      {
+        "title": "Will a major city declare an air quality emergency this month?",
+        "yes": 55,
+        "no": 45,
+        "community": "3,417 predictions",
+        "resolves": "Mon · 9:00 AM",
+        "trend": 6,
+        "liquidity": "thin",
+        "category": "Science"
+      },
+      {
+        "title": "Will a celebrity controversy drive a streaming record within 7 days?",
+        "yes": 62,
+        "no": 38,
+        "community": "4,021 predictions",
+        "resolves": "Sun · 11:59 PM",
+        "trend": 8,
+        "liquidity": "thin",
+        "category": "Culture"
+      }
+    ]
+  }
+}

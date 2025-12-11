@@ -1,0 +1,214 @@
+{
+  "brand": {
+    "name": "SocialPredict [Ocean]",
+    "shortName": "SP",
+    "taglinePrimary": "Price the future.",
+    "taglineSecondary": "See value in every move.",
+    "description": "A market-native view of the world. Track probabilities like prices, follow disciplined forecasters, and see risk and reward in one glance.",
+    "heroCtaPrimary": "See Markets",
+    "heroCtaSecondary": "Check out the Tutorial"
+  },
+  "theme": "light",
+  "colors": {
+    "background": "#f0fdf4",
+    "textDark": "#064e3b",
+    "textLight": "#e9fdf2",
+    "textSubtleDark": "#047857",
+    "textSubtleLight": "#a7f3d0",
+    "textMutedDark": "#0f766e",
+    "textMutedLight": "#6ee7b7",
+    "panelDark": "rgba(6, 95, 70, 0.92)",
+    "panelLight": "rgba(255, 255, 255, 0.96)",
+    "borderDark": "rgba(22, 163, 74, 0.55)",
+    "borderLight": "rgba(34, 197, 94, 0.35)",
+    "primary": "#16a34a",
+    "primarySoft": "rgba(22, 163, 74, 0.16)",
+    "accent": "#0ea5e9",
+    "accentSoft": "rgba(14, 165, 233, 0.14)",
+    "danger": "#dc2626",
+    "dangerSoft": "rgba(220, 38, 38, 0.15)"
+  },
+  "features": {
+    "showLogo": true,
+    "showHero": true,
+    "showTicker": true,
+    "showTrending": true,
+    "showCategories": false,
+    "showEndingSoon": false,
+    "showTutorial": true
+  },
+  "layout": {
+    "sections": [
+      { "type": "logo", "variant": "default" },
+      { "type": "hero", "variant": "bottomPanel" },
+      { "type": "trending" },
+      { "type": "ticker" },
+      { "type": "categories" },
+      { "type": "endingSoon" }
+    ]
+  },
+  "categories": [
+    {
+      "id": "politics",
+      "name": "Politics",
+      "color": "#15803d",
+      "icon": "Flag"
+    },
+    {
+      "id": "economy",
+      "name": "Economy",
+      "color": "#65a30d",
+      "icon": "ChartNoAxesCombined"
+    },
+    {
+      "id": "crypto",
+      "name": "Crypto",
+      "color": "#0ea5e9",
+      "icon": "Coins"
+    },
+    {
+      "id": "tech",
+      "name": "Tech",
+      "color": "#6366f1",
+      "icon": "MonitorSmartphone"
+    },
+    {
+      "id": "sports",
+      "name": "Sports",
+      "color": "#f97316",
+      "icon": "Trophy"
+    },
+    {
+      "id": "culture",
+      "name": "Culture",
+      "color": "#ec4899",
+      "icon": "Sparkles"
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "color": "#22c55e",
+      "icon": "FlaskConical"
+    }
+  ],
+  "examples": {
+    "tickerItems": [
+      {
+        "label": "Global equities finish the year up 10%+?",
+        "yes": 52,
+        "no": 48,
+        "trend": 3
+      },
+      {
+        "label": "US 10Y yield below 3% by year end?",
+        "yes": 44,
+        "no": 56,
+        "trend": -2
+      },
+      {
+        "label": "BTC trades above $120k at any point this year?",
+        "yes": 39,
+        "no": 61,
+        "trend": 4
+      },
+      {
+        "label": "S&P 500 closes at a new all‑time high this quarter?",
+        "yes": 58,
+        "no": 42,
+        "trend": 5
+      }
+    ],
+    "heroStats": [
+      {
+        "label": "Capital at work",
+        "value": "$184M"
+      },
+      {
+        "label": "Active markets",
+        "value": "1,320"
+      },
+      {
+        "label": "Median edge vs. base rate",
+        "value": "7.2%"
+      }
+    ],
+    "trendingMarkets": [
+      {
+        "title": "Will the S&P 500 close above 5,800 this year?",
+        "yes": 57,
+        "no": 43,
+        "community": "8,412 predictions",
+        "resolves": "Dec 31",
+        "trend": 6,
+        "liquidity": "deep",
+        "category": "Economy",
+        "sparkline": "0,18 10,19 20,16 30,20 40,22 50,21 60,23 70,21 80,24 90,22 100,23 110,25 120,24"
+      },
+      {
+        "title": "Will BTC close the year above $100k?",
+        "yes": 48,
+        "no": 52,
+        "community": "12,031 predictions",
+        "resolves": "Dec 31",
+        "trend": 4,
+        "liquidity": "deep",
+        "category": "Crypto",
+        "sparkline": "0,20 10,22 20,19 30,23 40,25 50,24 60,26 70,27 80,25 90,28 100,27 110,29 120,30"
+      },
+      {
+        "title": "Will global inflation fall below 2.5% next year?",
+        "yes": 41,
+        "no": 59,
+        "community": "5,604 predictions",
+        "resolves": "Mar 31",
+        "trend": -1,
+        "liquidity": "moderate",
+        "category": "Economy",
+        "sparkline": "0,24 10,23 20,22 30,21 40,20 50,19 60,18 70,19 80,18 90,17 100,18 110,17 120,16"
+      },
+      {
+        "title": "Will a major tech index correct 15%+ this year?",
+        "yes": 36,
+        "no": 64,
+        "community": "3,287 predictions",
+        "resolves": "Sep 30",
+        "trend": 2,
+        "liquidity": "thin",
+        "category": "Tech",
+        "sparkline": "0,18 10,17 20,19 30,18 40,17 50,19 60,18 70,20 80,19 90,21 100,20 110,22 120,21"
+      }
+    ],
+    "endingSoon": [
+      {
+        "title": "Will a major central bank cut rates at its next meeting?",
+        "yes": 63,
+        "no": 37,
+        "community": "2,104 predictions",
+        "resolves": "Thu · 2:00 PM",
+        "trend": 7,
+        "liquidity": "moderate",
+        "category": "Economy"
+      },
+      {
+        "title": "Will ETH gas fees stay below 25 gwei this weekend?",
+        "yes": 54,
+        "no": 46,
+        "community": "4,318 predictions",
+        "resolves": "Sun · 11:59 PM",
+        "trend": 3,
+        "liquidity": "thin",
+        "category": "Crypto"
+      },
+      {
+        "title": "Will any FAANG stock move 8%+ on earnings?",
+        "yes": 47,
+        "no": 53,
+        "community": "1,992 predictions",
+        "resolves": "Fri · Close",
+        "trend": 1,
+        "liquidity": "thin",
+        "category": "Tech"
+      }
+    ]
+  }
+}

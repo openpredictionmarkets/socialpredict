@@ -1,9 +1,15 @@
+<script lang="ts">
+	import BrandSelector from '$lib/components/BrandSelector.svelte';
+</script>
+
 <header class="app-toolbar">
 	<button class="icon-button" type="button" aria-label="Open menu">
 		<span class="bar"></span>
 		<span class="bar"></span>
 		<span class="bar"></span>
 	</button>
+	<div class="toolbar-spacer"></div>
+	<BrandSelector />
 </header>
 
 <style>
@@ -24,6 +30,10 @@
 		backdrop-filter: blur(10px);
 		border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
 		min-height: var(--toolbar-height);
+	}
+
+	.toolbar-spacer {
+		flex: 1;
 	}
 
 	.icon-button {
