@@ -99,8 +99,6 @@ paths:
       tags: [Config]
       summary: Get economics configuration
       description: Returns the current economic configuration used by the backend.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Economics configuration returned.
@@ -120,8 +118,6 @@ paths:
       tags: [Config]
       summary: Get frontend configuration
       description: Returns minimal configuration values needed by the frontend, such as chart precision.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Frontend configuration returned.
@@ -143,8 +139,6 @@ paths:
       description: >
         Returns markets with optional filtering by status and creator. When status is
         provided, results are backed by a status-specific query.
-      security:
-        - bearerAuth: []
       parameters:
         - in: query
           name: status
@@ -246,8 +240,6 @@ paths:
       description: >
         Searches markets by question title with optional status filtering. Supports both
         "query" and legacy "q" parameters.
-      security:
-        - bearerAuth: []
       parameters:
         - in: query
           name: query
@@ -307,8 +299,6 @@ paths:
       tags: [Markets]
       summary: List markets across all statuses
       description: Convenience endpoint equivalent to `/v0/markets?status=all`.
-      security:
-        - bearerAuth: []
       parameters:
         - in: query
           name: limit
@@ -350,8 +340,6 @@ paths:
       tags: [Markets]
       summary: List markets by status
       description: Returns markets filtered by a specific lifecycle status.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: status
@@ -403,8 +391,6 @@ paths:
       description: >
         Fetches a single market by its identifier, including probability history and
         aggregate statistics.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: id
@@ -505,8 +491,6 @@ paths:
       tags: [Markets]
       summary: Get market leaderboard
       description: Ranks participants in a single market by profit and traded volume.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: id
@@ -562,8 +546,6 @@ paths:
       description: >
         Computes the projected probability for a market after a hypothetical bet,
         using the market identifier and bet parameters.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: id
@@ -605,8 +587,6 @@ paths:
       description: >
         Legacy route for computing a probability projection using path parameters
         instead of query parameters.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -656,8 +636,6 @@ paths:
       tags: [Bets, Markets]
       summary: List bets for a market
       description: Returns the bet history for a specific market.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -699,8 +677,6 @@ paths:
       tags: [Markets, Users]
       summary: List user positions for a market
       description: Returns all user positions (YES/NO shares) in a specific market.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -742,8 +718,6 @@ paths:
       tags: [Markets, Users]
       summary: Get a user's position in a market
       description: Returns the holdings for a specific user in the given market.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -1156,8 +1130,6 @@ paths:
     get:
       tags: [Users]
       summary: Get public user info
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1242,8 +1214,6 @@ paths:
       tags: [Users]
       summary: Get user credit
       description: Returns the user's available credit limit, treating missing users as max debt.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1322,8 +1292,6 @@ paths:
       tags: [Users]
       summary: Get user portfolio
       description: Returns the markets and share counts for a user's portfolio.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1362,8 +1330,6 @@ paths:
       tags: [Users]
       summary: Get user financial snapshot
       description: Returns a map of financial metrics (e.g., balances and exposures) by key.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1402,8 +1368,6 @@ paths:
       tags: [Metrics]
       summary: Get platform stats
       description: Returns aggregate stats and the current economics configuration.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Stats returned successfully.
@@ -1423,8 +1387,6 @@ paths:
       tags: [Metrics]
       summary: Get system metrics
       description: Computes money creation/utilization metrics for auditing the economy.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Metrics returned successfully.
@@ -1444,8 +1406,6 @@ paths:
       tags: [Metrics]
       summary: Get global leaderboard
       description: Returns a leaderboard ranking users by profitability across all markets.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Global leaderboard returned successfully.
