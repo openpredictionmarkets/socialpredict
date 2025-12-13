@@ -697,21 +697,21 @@ paths:
         '400':
           description: Invalid market ID.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '404':
           description: Market not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '500':
           description: Unexpected server error while fetching positions.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/markets/positions/{marketId}/{username}:
     get:
@@ -742,21 +742,21 @@ paths:
         '400':
           description: Invalid market ID or username.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '404':
           description: Market or user not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '500':
           description: Unexpected server error while fetching position.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/bet:
     post:
@@ -781,39 +781,39 @@ paths:
         '400':
           description: Invalid outcome, amount, or request body.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '401':
           description: Authentication failed or password change required.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '404':
           description: Target market not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '409':
           description: Market is closed and does not accept new bets.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '422':
           description: Insufficient balance to place the bet.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '500':
           description: Unexpected server error while placing bet.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/sell:
     post:
@@ -838,39 +838,39 @@ paths:
         '400':
           description: Invalid sale request or amount/outcome.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '401':
           description: Authentication failed or password change required.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '404':
           description: Market not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '409':
           description: Market closed; sale not allowed.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '422':
           description: No position, insufficient shares, or dust cap exceeded.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '500':
           description: Unexpected server error while processing sale.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/privateprofile:
     get:
@@ -989,9 +989,9 @@ paths:
         '500':
           description: Unexpected server error while updating display name.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/profilechange/emoji:
     post:
@@ -1199,15 +1199,15 @@ paths:
         '404':
           description: Market or user not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '500':
           description: Unexpected server error while fetching user position.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/usercredit/{username}:
     get:
@@ -1378,9 +1378,9 @@ paths:
         '500':
           description: Failed to compute stats.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/system/metrics:
     get:
@@ -1397,9 +1397,9 @@ paths:
         '500':
           description: Failed to compute metrics.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/global/leaderboard:
     get:
@@ -1463,9 +1463,9 @@ paths:
         '400':
           description: Invalid request body or update failure.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '401':
           description: Authentication failed or token invalid.
           content:
@@ -1481,9 +1481,9 @@ paths:
         '500':
           description: Unexpected server error while updating content.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
 components:
   securitySchemes:
