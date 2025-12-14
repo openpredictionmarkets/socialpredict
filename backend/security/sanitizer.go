@@ -291,26 +291,48 @@ func containsMaliciousDomain(domain string) bool {
 
 // isValidEmoji performs basic emoji validation
 func isValidEmoji(emoji string) bool {
-	// Basic check for emoji unicode ranges
+	if emoji == "" {
+		return false
+	}
+
 	for _, r := range emoji {
-		// Common emoji ranges (this is simplified - real emoji validation is complex)
-		if (r >= 0x1F600 && r <= 0x1F64F) || // Emoticons
-			(r >= 0x1F300 && r <= 0x1F5FF) || // Misc Symbols
-			(r >= 0x1F680 && r <= 0x1F6FF) || // Transport
-			(r >= 0x2600 && r <= 0x26FF) || // Misc symbols
-			(r >= 0x2700 && r <= 0x27BF) || // Dingbats
-			(r >= 0xFE00 && r <= 0xFE0F) || // Variation selectors
-			(r >= 0x1F900 && r <= 0x1F9FF) || // Supplemental symbols
-			(r >= 0x1F1E6 && r <= 0x1F1FF) { // Regional indicators
-			continue
-		}
-		// Also allow basic ASCII characters for simple emojis like :)
-		if r >= 32 && r <= 126 {
+		if isEmojiRune(r) || isASCIIEmojiRune(r) {
 			continue
 		}
 		return false
 	}
-	return len(emoji) > 0
+	return true
+}
+
+type runeRange struct {
+	start rune
+	end   rune
+}
+
+// Common emoji ranges (simplified)
+var emojiRanges = []runeRange{
+	{start: 0x1F600, end: 0x1F64F}, // Emoticons
+	{start: 0x1F300, end: 0x1F5FF}, // Misc Symbols
+	{start: 0x1F680, end: 0x1F6FF}, // Transport
+	{start: 0x2600, end: 0x26FF},   // Misc symbols
+	{start: 0x2700, end: 0x27BF},   // Dingbats
+	{start: 0xFE00, end: 0xFE0F},   // Variation selectors
+	{start: 0x1F900, end: 0x1F9FF}, // Supplemental symbols
+	{start: 0x1F1E6, end: 0x1F1FF}, // Regional indicators
+}
+
+func isEmojiRune(r rune) bool {
+	for _, emojiRange := range emojiRanges {
+		if r >= emojiRange.start && r <= emojiRange.end {
+			return true
+		}
+	}
+	return false
+}
+
+func isASCIIEmojiRune(r rune) bool {
+	// Allow basic ASCII characters for simple emojis like :)
+	return r >= 32 && r <= 126
 }
 
 func hasUppercase(s string) bool {
