@@ -1,7 +1,9 @@
 package marketshandlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -20,62 +22,14 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		// Read query (allow both query and q), limit, offset
-		query := r.URL.Query().Get("query")
-		if query == "" {
-			query = r.URL.Query().Get("q")
-		}
-		status, statusErr := normalizeStatusParam(r.URL.Query().Get("status"))
-		if statusErr != nil {
-			http.Error(w, statusErr.Error(), http.StatusBadRequest)
+		params, clientErr := parseSearchRequest(r)
+		if clientErr != nil {
+			http.Error(w, clientErr.message, clientErr.statusCode)
 			return
-		}
-		limitStr := r.URL.Query().Get("limit")
-		offsetStr := r.URL.Query().Get("offset")
-
-		// Validate and sanitize input
-		if query == "" {
-			http.Error(w, "Query parameter 'query' is required", http.StatusBadRequest)
-			return
-		}
-
-		// Sanitize the search query
-		sanitizer := security.NewSanitizer()
-		sanitizedQuery, err := sanitizer.SanitizeMarketTitle(query)
-		if err != nil {
-			log.Printf("SearchMarketsHandler: Sanitization failed for query '%s': %v", query, err)
-			http.Error(w, "Invalid search query: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-		if len(sanitizedQuery) > 100 {
-			http.Error(w, "Query too long (max 100 characters)", http.StatusBadRequest)
-			return
-		}
-
-		// Parse limit and offset
-		limit := 20 // Default
-		if limitStr != "" {
-			if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 50 {
-				limit = parsedLimit
-			}
-		}
-
-		offset := 0 // Default
-		if offsetStr != "" {
-			if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
-				offset = parsedOffset
-			}
-		}
-
-		// Build f := dmarkets.SearchFilters{Limit: limit, Offset: offset}
-		filters := dmarkets.SearchFilters{
-			Status: status, // Can be empty, "active", "closed", "resolved", or "all"
-			Limit:  limit,
-			Offset: offset,
 		}
 
 		// ms, err := h.service.SearchMarkets(r.Context(), q, f)
-		searchResults, err := svc.SearchMarkets(r.Context(), sanitizedQuery, filters)
+		searchResults, err := svc.SearchMarkets(r.Context(), params.query, params.filters)
 		if err != nil {
 			// Map errors
 			switch err {
@@ -88,28 +42,10 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		primaryOverviews, err := buildMarketOverviewResponses(r.Context(), svc, searchResults.PrimaryResults)
-		if err != nil {
-			http.Error(w, "Error building primary results", http.StatusInternalServerError)
+		response, buildErr := buildSearchResponse(r.Context(), svc, searchResults)
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
 			return
-		}
-
-		fallbackOverviews, err := buildMarketOverviewResponses(r.Context(), svc, searchResults.FallbackResults)
-		if err != nil {
-			http.Error(w, "Error building fallback results", http.StatusInternalServerError)
-			return
-		}
-
-		// Build search response using domain service results
-		response := dto.SearchResponse{
-			PrimaryResults:  primaryOverviews,
-			FallbackResults: fallbackOverviews,
-			Query:           searchResults.Query,
-			PrimaryStatus:   searchResults.PrimaryStatus,
-			PrimaryCount:    searchResults.PrimaryCount,
-			FallbackCount:   searchResults.FallbackCount,
-			TotalCount:      searchResults.TotalCount,
-			FallbackUsed:    searchResults.FallbackUsed,
 		}
 
 		// Encode response
@@ -119,4 +55,111 @@ func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
+}
+
+type searchRequestParams struct {
+	query   string
+	filters dmarkets.SearchFilters
+}
+
+type httpError struct {
+	message    string
+	statusCode int
+}
+
+func parseSearchRequest(r *http.Request) (searchRequestParams, *httpError) {
+	query := extractQuery(r)
+	status, statusErr := normalizeStatusParam(r.URL.Query().Get("status"))
+	if statusErr != nil {
+		return searchRequestParams{}, &httpError{message: statusErr.Error(), statusCode: http.StatusBadRequest}
+	}
+	if query == "" {
+		return searchRequestParams{}, &httpError{message: "Query parameter 'query' is required", statusCode: http.StatusBadRequest}
+	}
+
+	sanitizedQuery, sanitizeErr := sanitizeQuery(query)
+	if sanitizeErr != nil {
+		return searchRequestParams{}, sanitizeErr
+	}
+
+	filters := dmarkets.SearchFilters{
+		Status: status, // Can be empty, "active", "closed", "resolved", or "all"
+		Limit:  parseLimit(r.URL.Query().Get("limit")),
+		Offset: parseOffset(r.URL.Query().Get("offset")),
+	}
+
+	return searchRequestParams{
+		query:   sanitizedQuery,
+		filters: filters,
+	}, nil
+}
+
+func extractQuery(r *http.Request) string {
+	query := r.URL.Query().Get("query")
+	if query == "" {
+		query = r.URL.Query().Get("q")
+	}
+	return query
+}
+
+func sanitizeQuery(query string) (string, *httpError) {
+	sanitizer := security.NewSanitizer()
+	sanitizedQuery, err := sanitizer.SanitizeMarketTitle(query)
+	if err != nil {
+		log.Printf("SearchMarketsHandler: Sanitization failed for query '%s': %v", query, err)
+		return "", &httpError{message: "Invalid search query: " + err.Error(), statusCode: http.StatusBadRequest}
+	}
+	if len(sanitizedQuery) > 100 {
+		return "", &httpError{message: "Query too long (max 100 characters)", statusCode: http.StatusBadRequest}
+	}
+	return sanitizedQuery, nil
+}
+
+func parseLimit(rawLimit string) int {
+	limit := 20 // Default
+	if rawLimit == "" {
+		return limit
+	}
+
+	parsedLimit, err := strconv.Atoi(rawLimit)
+	if err != nil || parsedLimit <= 0 || parsedLimit > 50 {
+		return limit
+	}
+	return parsedLimit
+}
+
+func parseOffset(rawOffset string) int {
+	if rawOffset == "" {
+		return 0
+	}
+	parsedOffset, err := strconv.Atoi(rawOffset)
+	if err != nil || parsedOffset < 0 {
+		return 0
+	}
+	return parsedOffset
+}
+
+func buildSearchResponse(ctx context.Context, svc dmarkets.ServiceInterface, searchResults *dmarkets.SearchResults) (dto.SearchResponse, error) {
+	primaryOverviews, err := buildMarketOverviewResponses(ctx, svc, searchResults.PrimaryResults)
+	if err != nil {
+		log.Printf("Error building primary results: %v", err)
+		return dto.SearchResponse{}, errors.New("Error building primary results")
+	}
+
+	fallbackOverviews, err := buildMarketOverviewResponses(ctx, svc, searchResults.FallbackResults)
+	if err != nil {
+		log.Printf("Error building fallback results: %v", err)
+		return dto.SearchResponse{}, errors.New("Error building fallback results")
+	}
+
+	return dto.SearchResponse{
+		PrimaryResults:  primaryOverviews,
+		FallbackResults: fallbackOverviews,
+		Query:           searchResults.Query,
+		PrimaryStatus:   searchResults.PrimaryStatus,
+		PrimaryCount:    searchResults.PrimaryCount,
+		FallbackCount:   searchResults.FallbackCount,
+		TotalCount:      searchResults.TotalCount,
+		FallbackUsed:    searchResults.FallbackUsed,
+	}, nil
 }
