@@ -368,82 +368,105 @@ func countUniqueUsers(bets []models.Bet) int {
 
 // SearchMarkets searches for markets by query with fallback logic
 func (s *Service) SearchMarkets(ctx context.Context, query string, filters SearchFilters) (*SearchResults, error) {
-	// Validate query
-	if strings.TrimSpace(query) == "" {
-		return nil, ErrInvalidInput
+	if err := validateSearchQuery(query); err != nil {
+		return nil, err
 	}
 
-	// Validate and set defaults
+	filters = normalizeSearchFilters(filters)
+
+	primaryResults, err := s.repo.Search(ctx, query, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	results := newSearchResults(query, filters.Status, primaryResults)
+	if !shouldFetchFallback(primaryResults, filters.Status) {
+		return results, nil
+	}
+
+	fallbackResults, fallbackErr := s.fetchFallbackMarkets(ctx, query, filters, primaryResults)
+	if fallbackErr != nil || len(fallbackResults) == 0 {
+		return results, nil
+	}
+
+	results.FallbackResults = fallbackResults
+	results.FallbackCount = len(fallbackResults)
+	results.TotalCount = results.PrimaryCount + results.FallbackCount
+	results.FallbackUsed = true
+
+	return results, nil
+}
+
+func validateSearchQuery(query string) error {
+	if strings.TrimSpace(query) == "" {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func normalizeSearchFilters(filters SearchFilters) SearchFilters {
 	if filters.Limit <= 0 || filters.Limit > 50 {
 		filters.Limit = 20
 	}
 	if filters.Offset < 0 {
 		filters.Offset = 0
 	}
+	return filters
+}
 
-	// Primary search within specified status
-	primaryResults, err := s.repo.Search(ctx, query, filters)
-	if err != nil {
-		return nil, err
-	}
-
-	searchResults := &SearchResults{
+func newSearchResults(query string, status string, primaryResults []*Market) *SearchResults {
+	return &SearchResults{
 		PrimaryResults:  primaryResults,
 		FallbackResults: []*Market{},
 		Query:           query,
-		PrimaryStatus:   filters.Status,
+		PrimaryStatus:   status,
 		PrimaryCount:    len(primaryResults),
 		FallbackCount:   0,
 		TotalCount:      len(primaryResults),
 		FallbackUsed:    false,
 	}
+}
 
-	// If we have 5 or fewer primary results and we're not already searching "all", search all markets
-	if len(primaryResults) <= 5 && filters.Status != "" && filters.Status != "all" {
-		// Search all markets for fallback
-		allFilters := SearchFilters{
-			Status: "", // Empty means search all
-			Limit:  filters.Limit * 2,
-			Offset: 0,
+func shouldFetchFallback(primaryResults []*Market, status string) bool {
+	return len(primaryResults) <= 5 && status != "" && status != "all"
+}
+
+func (s *Service) fetchFallbackMarkets(ctx context.Context, query string, filters SearchFilters, primaryResults []*Market) ([]*Market, error) {
+	allFilters := SearchFilters{
+		Status: "", // Empty means search all
+		Limit:  filters.Limit * 2,
+		Offset: 0,
+	}
+
+	allResults, err := s.repo.Search(ctx, query, allFilters)
+	if err != nil {
+		return nil, err
+	}
+
+	primaryIDs := make(map[int64]bool)
+	for _, market := range primaryResults {
+		primaryIDs[market.ID] = true
+	}
+
+	var fallbackResults []*Market
+	for _, market := range allResults {
+		if primaryIDs[market.ID] {
+			continue
 		}
-
-		allResults, err := s.repo.Search(ctx, query, allFilters)
-		if err != nil {
-			return searchResults, nil // Return primary results even if fallback fails
-		}
-
-		// Filter out markets that are already in primary results
-		primaryIDs := make(map[int64]bool)
-		for _, market := range primaryResults {
-			primaryIDs[market.ID] = true
-		}
-
-		var fallbackResults []*Market
-		for _, market := range allResults {
-			if !primaryIDs[market.ID] {
-				fallbackResults = append(fallbackResults, market)
-				if len(fallbackResults) >= filters.Limit {
-					break
-				}
-			}
-		}
-
-		if len(fallbackResults) > 0 {
-			searchResults.FallbackResults = fallbackResults
-			searchResults.FallbackCount = len(fallbackResults)
-			searchResults.TotalCount = searchResults.PrimaryCount + searchResults.FallbackCount
-			searchResults.FallbackUsed = true
+		fallbackResults = append(fallbackResults, market)
+		if len(fallbackResults) >= filters.Limit {
+			break
 		}
 	}
 
-	return searchResults, nil
+	return fallbackResults, nil
 }
 
 // ResolveMarket resolves a market with a given outcome
 func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
-	outcome := strings.ToUpper(strings.TrimSpace(resolution))
-	if outcome != "YES" && outcome != "NO" && outcome != "N/A" {
-		return ErrInvalidInput
+	outcome, err := normalizeResolution(resolution)
+	if err != nil {
+		return err
 	}
 
 	market, err := s.repo.GetByID(ctx, marketID)
@@ -451,6 +474,32 @@ func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution 
 		return ErrMarketNotFound
 	}
 
+	if err := validateResolutionRequest(market, username); err != nil {
+		return err
+	}
+
+	if err := s.repo.ResolveMarket(ctx, marketID, outcome); err != nil {
+		return err
+	}
+
+	if outcome == "N/A" {
+		return s.refundMarketBets(ctx, marketID)
+	}
+
+	return s.payoutWinningPositions(ctx, marketID)
+}
+
+func normalizeResolution(resolution string) (string, error) {
+	outcome := strings.ToUpper(strings.TrimSpace(resolution))
+	switch outcome {
+	case "YES", "NO", "N/A":
+		return outcome, nil
+	default:
+		return "", ErrInvalidInput
+	}
+}
+
+func validateResolutionRequest(market *Market, username string) error {
 	if market.CreatorUsername != username {
 		return ErrUnauthorized
 	}
@@ -459,36 +508,35 @@ func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution 
 		return ErrInvalidState
 	}
 
-	if err := s.repo.ResolveMarket(ctx, marketID, outcome); err != nil {
+	return nil
+}
+
+func (s *Service) refundMarketBets(ctx context.Context, marketID int64) error {
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
 		return err
 	}
-
-	switch outcome {
-	case "N/A":
-		bets, err := s.repo.ListBetsForMarket(ctx, marketID)
-		if err != nil {
+	for _, bet := range bets {
+		if err := s.userService.ApplyTransaction(ctx, bet.Username, bet.Amount, users.TransactionRefund); err != nil {
 			return err
-		}
-		for _, bet := range bets {
-			if err := s.userService.ApplyTransaction(ctx, bet.Username, bet.Amount, users.TransactionRefund); err != nil {
-				return err
-			}
-		}
-	default: // YES or NO
-		positions, err := s.repo.CalculatePayoutPositions(ctx, marketID)
-		if err != nil {
-			return err
-		}
-		for _, pos := range positions {
-			if pos.Value <= 0 {
-				continue
-			}
-			if err := s.userService.ApplyTransaction(ctx, pos.Username, pos.Value, users.TransactionWin); err != nil {
-				return err
-			}
 		}
 	}
+	return nil
+}
 
+func (s *Service) payoutWinningPositions(ctx context.Context, marketID int64) error {
+	positions, err := s.repo.CalculatePayoutPositions(ctx, marketID)
+	if err != nil {
+		return err
+	}
+	for _, pos := range positions {
+		if pos.Value <= 0 {
+			continue
+		}
+		if err := s.userService.ApplyTransaction(ctx, pos.Username, pos.Value, users.TransactionWin); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

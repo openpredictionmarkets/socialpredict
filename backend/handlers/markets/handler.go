@@ -3,6 +3,7 @@ package marketshandlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -367,49 +368,15 @@ func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse status from URL
-	vars := mux.Vars(r)
-	statusValue, err := normalizeStatusParam(vars["status"])
+	statusValue, err := parseStatusFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if vars["status"] == "" {
-		http.Error(w, "Status is required", http.StatusBadRequest)
-		return
-	}
 
-	// Parse pagination parameters
-	limit := 100
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
-			limit = parsedLimit
-		}
-	}
+	page := parsePagination(r, 100)
 
-	offset := 0
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
-			offset = parsedOffset
-		}
-	}
-
-	page := dmarkets.Page{
-		Limit:  limit,
-		Offset: offset,
-	}
-
-	var markets []*dmarkets.Market
-	if statusValue == "" {
-		filters := dmarkets.ListFilters{
-			Status: "",
-			Limit:  limit,
-			Offset: offset,
-		}
-		markets, err = h.service.ListMarkets(r.Context(), filters)
-	} else {
-		markets, err = h.service.ListByStatus(r.Context(), statusValue, page)
-	}
+	markets, err := h.fetchMarketsByStatus(r.Context(), statusValue, page)
 	if err != nil {
 		h.handleError(w, err)
 		return
@@ -478,39 +445,13 @@ func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse market ID from URL
-	vars := mux.Vars(r)
-	idStr := vars["id"]
-	if idStr == "" {
-		http.Error(w, "Market ID is required", http.StatusBadRequest)
-		return
-	}
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := parseMarketIDFromRequest(r)
 	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Parse pagination parameters
-	limit := 100
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
-			limit = parsedLimit
-		}
-	}
-
-	offset := 0
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
-			offset = parsedOffset
-		}
-	}
-
-	page := dmarkets.Page{
-		Limit:  limit,
-		Offset: offset,
-	}
+	page := parsePagination(r, 100)
 
 	// Call service
 	leaderboard, err := h.service.GetMarketLeaderboard(r.Context(), id, page)
@@ -519,25 +460,7 @@ func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert to response DTOs
-	var leaderRows []dto.LeaderboardRow
-	for _, row := range leaderboard {
-		leaderRows = append(leaderRows, dto.LeaderboardRow{
-			Username:       row.Username,
-			Profit:         row.Profit,
-			CurrentValue:   row.CurrentValue,
-			TotalSpent:     row.TotalSpent,
-			Position:       row.Position,
-			YesSharesOwned: row.YesSharesOwned,
-			NoSharesOwned:  row.NoSharesOwned,
-			Rank:           row.Rank,
-		})
-	}
-
-	// Ensure empty array instead of null
-	if leaderRows == nil {
-		leaderRows = make([]dto.LeaderboardRow, 0)
-	}
+	leaderRows := buildLeaderboardRows(leaderboard)
 
 	response := dto.LeaderboardResponse{
 		MarketID:    id,
@@ -637,4 +560,76 @@ func (h *Handler) handleError(w http.ResponseWriter, err error) {
 		Error: message,
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+func parseStatusFromRequest(r *http.Request) (string, error) {
+	vars := mux.Vars(r)
+	if vars["status"] == "" {
+		return "", errors.New("Status is required")
+	}
+	return normalizeStatusParam(vars["status"])
+}
+
+func parsePagination(r *http.Request, defaultLimit int) dmarkets.Page {
+	limit := defaultLimit
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	return dmarkets.Page{
+		Limit:  limit,
+		Offset: offset,
+	}
+}
+
+func (h *Handler) fetchMarketsByStatus(ctx context.Context, statusValue string, page dmarkets.Page) ([]*dmarkets.Market, error) {
+	if statusValue == "" {
+		filters := dmarkets.ListFilters{
+			Status: "",
+			Limit:  page.Limit,
+			Offset: page.Offset,
+		}
+		return h.service.ListMarkets(ctx, filters)
+	}
+	return h.service.ListByStatus(ctx, statusValue, page)
+}
+
+func parseMarketIDFromRequest(r *http.Request) (int64, error) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	if idStr == "" {
+		return 0, errors.New("Market ID is required")
+	}
+
+	return strconv.ParseInt(idStr, 10, 64)
+}
+
+func buildLeaderboardRows(leaderboard []*dmarkets.LeaderboardRow) []dto.LeaderboardRow {
+	if len(leaderboard) == 0 {
+		return []dto.LeaderboardRow{}
+	}
+
+	leaderRows := make([]dto.LeaderboardRow, 0, len(leaderboard))
+	for _, row := range leaderboard {
+		leaderRows = append(leaderRows, dto.LeaderboardRow{
+			Username:       row.Username,
+			Profit:         row.Profit,
+			CurrentValue:   row.CurrentValue,
+			TotalSpent:     row.TotalSpent,
+			Position:       row.Position,
+			YesSharesOwned: row.YesSharesOwned,
+			NoSharesOwned:  row.NoSharesOwned,
+			Rank:           row.Rank,
+		})
+	}
+	return leaderRows
 }

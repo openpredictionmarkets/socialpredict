@@ -67,12 +67,9 @@ func NewService(repo Repository, markets MarketService, users UserService, econ 
 
 // Place creates a buy bet after validating market status and user balance.
 func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, error) {
-	outcome := normalizeOutcome(req.Outcome)
-	if outcome == "" {
-		return nil, ErrInvalidOutcome
-	}
-	if req.Amount <= 0 {
-		return nil, ErrInvalidAmount
+	outcome, err := validatePlaceRequest(req)
+	if err != nil {
+		return nil, err
 	}
 
 	market, err := s.markets.GetMarket(ctx, int64(req.MarketID))
@@ -81,8 +78,8 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 	}
 
 	now := s.clock.Now()
-	if market.Status == "resolved" || now.After(market.ResolutionDateTime) {
-		return nil, ErrMarketClosed
+	if err := ensureMarketOpen(market, now); err != nil {
+		return nil, err
 	}
 
 	user, err := s.users.GetUser(ctx, req.Username)
@@ -95,19 +92,12 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 		return nil, err
 	}
 
-	initialFee := int64(0)
-	if !hasBet {
-		initialFee = int64(s.econ.Economics.Betting.BetFees.InitialBetFee)
-	}
-	transactionFee := int64(s.econ.Economics.Betting.BetFees.BuySharesFee)
-	totalCost := req.Amount + initialFee + transactionFee
-
-	maxDebt := int64(s.econ.Economics.User.MaximumDebtAllowed)
-	if user.AccountBalance-totalCost < -maxDebt {
-		return nil, ErrInsufficientBalance
+	fees := s.calculateBetFees(hasBet, req.Amount)
+	if err := ensureSufficientBalance(user.AccountBalance, fees.totalCost, int64(s.econ.Economics.User.MaximumDebtAllowed)); err != nil {
+		return nil, err
 	}
 
-	if err := s.users.ApplyTransaction(ctx, req.Username, totalCost, dusers.TransactionBuy); err != nil {
+	if err := s.users.ApplyTransaction(ctx, req.Username, fees.totalCost, dusers.TransactionBuy); err != nil {
 		return nil, err
 	}
 
@@ -121,27 +111,18 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 
 	if err := s.repo.Create(ctx, bet); err != nil {
 		// attempt to roll back user deduction
-		_ = s.users.ApplyTransaction(ctx, req.Username, totalCost, dusers.TransactionRefund)
+		_ = s.users.ApplyTransaction(ctx, req.Username, fees.totalCost, dusers.TransactionRefund)
 		return nil, err
 	}
 
-	return &PlacedBet{
-		Username: bet.Username,
-		MarketID: bet.MarketID,
-		Amount:   bet.Amount,
-		Outcome:  bet.Outcome,
-		PlacedAt: bet.PlacedAt,
-	}, nil
+	return placedBetFromModel(bet), nil
 }
 
 // Sell processes a sell request for credits.
 func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error) {
-	outcome := normalizeOutcome(req.Outcome)
-	if outcome == "" {
-		return nil, ErrInvalidOutcome
-	}
-	if req.Amount <= 0 {
-		return nil, ErrInvalidAmount
+	outcome, err := validateSellRequest(req)
+	if err != nil {
+		return nil, err
 	}
 
 	market, err := s.markets.GetMarket(ctx, int64(req.MarketID))
@@ -150,8 +131,8 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 	}
 
 	now := s.clock.Now()
-	if market.Status == "resolved" || now.After(market.ResolutionDateTime) {
-		return nil, ErrMarketClosed
+	if err := ensureMarketOpen(market, now); err != nil {
+		return nil, err
 	}
 
 	position, err := s.markets.GetUserPositionInMarket(ctx, int64(req.MarketID), req.Username)
@@ -260,4 +241,68 @@ func (s *Service) calculateSale(pos *dmarkets.UserPosition, sharesOwned int64, c
 	}
 
 	return sharesToSell, saleValue, dust, nil
+}
+
+func validatePlaceRequest(req PlaceRequest) (string, error) {
+	outcome := normalizeOutcome(req.Outcome)
+	if outcome == "" {
+		return "", ErrInvalidOutcome
+	}
+	if req.Amount <= 0 {
+		return "", ErrInvalidAmount
+	}
+	return outcome, nil
+}
+
+func validateSellRequest(req SellRequest) (string, error) {
+	outcome := normalizeOutcome(req.Outcome)
+	if outcome == "" {
+		return "", ErrInvalidOutcome
+	}
+	if req.Amount <= 0 {
+		return "", ErrInvalidAmount
+	}
+	return outcome, nil
+}
+
+func ensureMarketOpen(market *dmarkets.Market, now time.Time) error {
+	if market.Status == "resolved" || now.After(market.ResolutionDateTime) {
+		return ErrMarketClosed
+	}
+	return nil
+}
+
+type betFees struct {
+	initialFee     int64
+	transactionFee int64
+	totalCost      int64
+}
+
+func (s *Service) calculateBetFees(hasBet bool, amount int64) betFees {
+	fees := betFees{
+		initialFee:     0,
+		transactionFee: int64(s.econ.Economics.Betting.BetFees.BuySharesFee),
+	}
+	if !hasBet {
+		fees.initialFee = int64(s.econ.Economics.Betting.BetFees.InitialBetFee)
+	}
+	fees.totalCost = amount + fees.initialFee + fees.transactionFee
+	return fees
+}
+
+func ensureSufficientBalance(balance, totalCost, maxDebt int64) error {
+	if balance-totalCost < -maxDebt {
+		return ErrInsufficientBalance
+	}
+	return nil
+}
+
+func placedBetFromModel(bet *models.Bet) *PlacedBet {
+	return &PlacedBet{
+		Username: bet.Username,
+		MarketID: bet.MarketID,
+		Amount:   bet.Amount,
+		Outcome:  bet.Outcome,
+		PlacedAt: bet.PlacedAt,
+	}
 }
