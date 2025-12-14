@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"context"
+	"sort"
 
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
@@ -66,19 +67,51 @@ func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]models.Bet, err
 func (r *GormRepository) UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error) {
 	db := r.WithContext(ctx)
 
+	userBets, err := r.listUserBets(db, username)
+	if err != nil {
+		return nil, err
+	}
+	if len(userBets) == 0 {
+		return []positionsmath.MarketPosition{}, nil
+	}
+
+	marketIDs := collectMarketIDs(userBets)
+
+	markets, err := r.listMarketsByIDs(db, marketIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshots := buildMarketSnapshots(markets)
+
+	allBets, err := r.listBetsByMarketIDs(db, marketIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	betsByMarket := groupBetsByMarket(allBets)
+
+	positions, err := calculateUserPositions(username, marketIDs, snapshots, betsByMarket)
+	if err != nil {
+		return nil, err
+	}
+
+	return positions, nil
+}
+
+func (r *GormRepository) listUserBets(db *gorm.DB, username string) ([]models.Bet, error) {
 	var userBets []models.Bet
 	if err := db.Where("username = ?", username).
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&userBets).Error; err != nil {
 		return nil, err
 	}
+	return userBets, nil
+}
 
-	if len(userBets) == 0 {
-		return []positionsmath.MarketPosition{}, nil
-	}
-
+func collectMarketIDs(bets []models.Bet) []uint {
 	marketIDSet := make(map[int64]struct{})
-	for _, bet := range userBets {
+	for _, bet := range bets {
 		marketIDSet[int64(bet.MarketID)] = struct{}{}
 	}
 
@@ -86,12 +119,19 @@ func (r *GormRepository) UserMarketPositions(ctx context.Context, username strin
 	for id := range marketIDSet {
 		marketIDs = append(marketIDs, uint(id))
 	}
+	sort.Slice(marketIDs, func(i, j int) bool { return marketIDs[i] < marketIDs[j] })
+	return marketIDs
+}
 
+func (r *GormRepository) listMarketsByIDs(db *gorm.DB, marketIDs []uint) ([]models.Market, error) {
 	var markets []models.Market
 	if err := db.Where("id IN ?", marketIDs).Find(&markets).Error; err != nil {
 		return nil, err
 	}
+	return markets, nil
+}
 
+func buildMarketSnapshots(markets []models.Market) map[int64]positionsmath.MarketSnapshot {
 	marketSnapshots := make(map[int64]positionsmath.MarketSnapshot, len(markets))
 	for _, market := range markets {
 		marketSnapshots[int64(market.ID)] = positionsmath.MarketSnapshot{
@@ -101,22 +141,31 @@ func (r *GormRepository) UserMarketPositions(ctx context.Context, username strin
 			ResolutionResult: market.ResolutionResult,
 		}
 	}
+	return marketSnapshots
+}
 
+func (r *GormRepository) listBetsByMarketIDs(db *gorm.DB, marketIDs []uint) ([]models.Bet, error) {
 	var allBets []models.Bet
 	if err := db.Where("market_id IN ?", marketIDs).
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&allBets).Error; err != nil {
 		return nil, err
 	}
+	return allBets, nil
+}
 
+func groupBetsByMarket(bets []models.Bet) map[int64][]models.Bet {
 	betsByMarket := make(map[int64][]models.Bet)
-	for _, bet := range allBets {
+	for _, bet := range bets {
 		betsByMarket[int64(bet.MarketID)] = append(betsByMarket[int64(bet.MarketID)], bet)
 	}
+	return betsByMarket
+}
 
+func calculateUserPositions(username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]models.Bet) ([]positionsmath.MarketPosition, error) {
 	var positions []positionsmath.MarketPosition
 	for _, marketID := range marketIDs {
-		snapshot, ok := marketSnapshots[int64(marketID)]
+		snapshot, ok := snapshots[int64(marketID)]
 		if !ok {
 			continue
 		}
