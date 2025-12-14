@@ -2,6 +2,7 @@ package betshandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,34 +20,15 @@ func MarketBetsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFun
 			return
 		}
 
-		// Parse market ID from URL
-		vars := mux.Vars(r)
-		marketIdStr := vars["marketId"]
-		if marketIdStr == "" {
-			http.Error(w, "Market ID is required", http.StatusBadRequest)
-			return
-		}
-
-		// Convert marketId to int64
-		marketID, err := strconv.ParseInt(marketIdStr, 10, 64)
+		marketID, err := parseMarketID(mux.Vars(r)["marketId"])
 		if err != nil {
-			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Call domain service
 		betsDisplayInfo, err := svc.GetMarketBets(r.Context(), marketID)
 		if err != nil {
-			// Map domain errors to HTTP status codes
-			switch err {
-			case dmarkets.ErrMarketNotFound:
-				http.Error(w, "Market not found", http.StatusNotFound)
-			case dmarkets.ErrInvalidInput:
-				http.Error(w, "Invalid market ID", http.StatusBadRequest)
-			default:
-				log.Printf("Error getting market bets for market %d: %v", marketID, err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
+			writeMarketBetsError(w, marketID, err)
 			return
 		}
 
@@ -56,5 +38,29 @@ func MarketBetsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFun
 			log.Printf("Error encoding bets response: %v", err)
 			http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		}
+	}
+}
+
+func parseMarketID(marketIDStr string) (int64, error) {
+	if marketIDStr == "" {
+		return 0, errors.New("Market ID is required")
+	}
+
+	marketID, err := strconv.ParseInt(marketIDStr, 10, 64)
+	if err != nil {
+		return 0, errors.New("Invalid market ID")
+	}
+	return marketID, nil
+}
+
+func writeMarketBetsError(w http.ResponseWriter, marketID int64, err error) {
+	switch err {
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	case dmarkets.ErrInvalidInput:
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+	default:
+		log.Printf("Error getting market bets for market %d: %v", marketID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
