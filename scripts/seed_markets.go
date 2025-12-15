@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -68,40 +69,58 @@ func executeSQLFile(db *gorm.DB, filename string) error {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "--") {
+		if shouldSkipSQLLine(line) {
 			continue
 		}
 
 		sqlBuffer.WriteString(line)
 		sqlBuffer.WriteString(" ")
 
-		// Execute when we hit a semicolon (end of statement)
 		if strings.HasSuffix(line, ";") {
-			sql := strings.TrimSpace(sqlBuffer.String())
-			if sql != "" {
-				if err := db.Exec(sql).Error; err != nil {
-					return fmt.Errorf("error executing SQL: %s\nError: %v", sql, err)
-				}
+			if err := executeSQLBuffer(db, &sqlBuffer); err != nil {
+				return err
 			}
-			sqlBuffer.Reset()
 		}
 	}
 
-	// Execute any remaining SQL
-	if sqlBuffer.Len() > 0 {
-		sql := strings.TrimSpace(sqlBuffer.String())
-		if sql != "" && !strings.HasSuffix(sql, ";") {
-			sql += ";"
-		}
-		if sql != ";" {
-			if err := db.Exec(sql).Error; err != nil {
-				return fmt.Errorf("error executing final SQL: %s\nError: %v", sql, err)
-			}
-		}
+	if err := executeRemainingSQL(db, &sqlBuffer); err != nil {
+		return err
 	}
 
 	return scanner.Err()
+}
+
+func shouldSkipSQLLine(line string) bool {
+	return line == "" || strings.HasPrefix(line, "--")
+}
+
+func executeSQLBuffer(db *gorm.DB, sqlBuffer *strings.Builder) error {
+	sql := strings.TrimSpace(sqlBuffer.String())
+	if sql == "" {
+		sqlBuffer.Reset()
+		return nil
+	}
+	if err := db.Exec(sql).Error; err != nil {
+		return fmt.Errorf("error executing SQL: %s\nError: %v", sql, err)
+	}
+	sqlBuffer.Reset()
+	return nil
+}
+
+func executeRemainingSQL(db *gorm.DB, sqlBuffer *strings.Builder) error {
+	if sqlBuffer.Len() == 0 {
+		return nil
+	}
+	sql := strings.TrimSpace(sqlBuffer.String())
+	if sql != "" && !strings.HasSuffix(sql, ";") {
+		sql += ";"
+	}
+	if sql != ";" {
+		if err := db.Exec(sql).Error; err != nil {
+			return fmt.Errorf("error executing final SQL: %s\nError: %v", sql, err)
+		}
+	}
+	return nil
 }
 
 // loadEnvFile loads environment variables from .env file
@@ -142,75 +161,108 @@ func showUsage() {
 	fmt.Println("  go run seed_markets.go /path/to/custom.sql    # Use absolute path")
 }
 
+var (
+	errShowUsage = errors.New("show usage")
+	errAbort     = errors.New("abort seeding")
+)
+
 func main() {
 	fmt.Println("SocialPredict Market Seeder")
 	fmt.Println("===========================")
 
-	// Parse command line arguments
-	var sqlFile string
-	if len(os.Args) > 1 {
-		if os.Args[1] == "-h" || os.Args[1] == "--help" {
+	sqlFile, err := parseSQLFileArg(os.Args)
+	if err != nil {
+		if errors.Is(err, errShowUsage) {
 			showUsage()
-			os.Exit(0)
+			return
 		}
-		sqlFile = os.Args[1]
-	} else {
-		sqlFile = "example_markets.sql"
+		log.Fatalf("Could not parse arguments: %v", err)
 	}
 
-	// Convert relative path to absolute if needed
-	if !filepath.IsAbs(sqlFile) {
-		scriptDir, err := os.Getwd()
-		if err != nil {
-			log.Fatalf("Could not get current directory: %v", err)
-		}
-		sqlFile = filepath.Join(scriptDir, sqlFile)
+	sqlFile, err = resolveSQLFilePath(sqlFile)
+	if err != nil {
+		log.Fatalf("Could not resolve SQL file path: %v", err)
 	}
-
 	fmt.Printf("Using SQL file: %s\n", sqlFile)
 
-	// Load .env file if it exists
 	loadEnvFile()
 
-	// Initialize database connection
-	dbCfg, err := util.LoadDBConfigFromEnv()
-	if err != nil {
-		log.Fatalf("db config: %v", err)
-	}
-
-	db, err := util.InitDB(dbCfg, util.PostgresFactory{})
+	db, err := initDBFromEnv()
 	if err != nil {
 		log.Fatalf("db init: %v", err)
 	}
 
-	// Ensure database is ready
-	maxAttempts := 5
-	if err := seed.EnsureDBReady(db, maxAttempts); err != nil {
-		log.Fatalf("Database not ready: %v", err)
-	}
-
-	// Check if required users exist (check first few users from SQL file)
-	var raischCount, markCount int64
-	db.Model(&models.User{}).Where("username = ?", "raisch").Count(&raischCount)
-	db.Model(&models.User{}).Where("username = ?", "mark").Count(&markCount)
-
-	if raischCount == 0 || markCount == 0 {
-		fmt.Println("Warning: Required users (raisch, mark) not found!")
-		fmt.Println("The markets reference these users as creator_username.")
-		fmt.Println("Please create these users first by running the main application.")
-		fmt.Print("Do you want to continue anyway? (y/N): ")
-		var response string
-		fmt.Scanln(&response)
-		if response != "y" && response != "Y" {
+	if err := ensureRequiredUsers(db); err != nil {
+		if errors.Is(err, errAbort) {
 			fmt.Println("Aborting market seeding.")
-			os.Exit(1)
+			return
 		}
+		log.Fatalf("User check failed: %v", err)
 	}
 
-	// Seed markets from SQL file
 	if err := SeedMarketsFromSQL(db, sqlFile); err != nil {
 		log.Fatalf("Failed to seed markets: %v", err)
 	}
 
 	fmt.Println("\nMarket seeding completed successfully!")
+}
+
+func parseSQLFileArg(args []string) (string, error) {
+	if len(args) > 1 {
+		if args[1] == "-h" || args[1] == "--help" {
+			return "", errShowUsage
+		}
+		return args[1], nil
+	}
+	return "example_markets.sql", nil
+}
+
+func resolveSQLFilePath(sqlFile string) (string, error) {
+	if filepath.IsAbs(sqlFile) {
+		return sqlFile, nil
+	}
+	scriptDir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("Could not get current directory: %v", err)
+	}
+	return filepath.Join(scriptDir, sqlFile), nil
+}
+
+func initDBFromEnv() (*gorm.DB, error) {
+	dbCfg, err := util.LoadDBConfigFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("db config: %w", err)
+	}
+
+	db, err := util.InitDB(dbCfg, util.PostgresFactory{})
+	if err != nil {
+		return nil, fmt.Errorf("db init: %w", err)
+	}
+
+	maxAttempts := 5
+	if err := seed.EnsureDBReady(db, maxAttempts); err != nil {
+		return nil, fmt.Errorf("Database not ready: %w", err)
+	}
+	return db, nil
+}
+
+func ensureRequiredUsers(db *gorm.DB) error {
+	var raischCount, markCount int64
+	db.Model(&models.User{}).Where("username = ?", "raisch").Count(&raischCount)
+	db.Model(&models.User{}).Where("username = ?", "mark").Count(&markCount)
+
+	if raischCount > 0 && markCount > 0 {
+		return nil
+	}
+
+	fmt.Println("Warning: Required users (raisch, mark) not found!")
+	fmt.Println("The markets reference these users as creator_username.")
+	fmt.Println("Please create these users first by running the main application.")
+	fmt.Print("Do you want to continue anyway? (y/N): ")
+	var response string
+	fmt.Scanln(&response)
+	if response != "y" && response != "Y" {
+		return errAbort
+	}
+	return nil
 }
