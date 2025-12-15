@@ -2,6 +2,7 @@ package positions
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,45 +20,19 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 			return
 		}
 
-		// Parse market ID from URL
-		vars := mux.Vars(r)
-		marketIdStr := vars["marketId"]
-		if marketIdStr == "" {
-			http.Error(w, "Market ID is required", http.StatusBadRequest)
-			return
-		}
-
-		// Convert marketId to int64
-		marketID, err := strconv.ParseInt(marketIdStr, 10, 64)
+		marketID, err := parseMarketID(mux.Vars(r)["marketId"])
 		if err != nil {
-			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Call domain service
 		positions, err := svc.GetMarketPositions(r.Context(), marketID)
 		if err != nil {
-			// Map domain errors to HTTP status codes
-			switch err {
-			case dmarkets.ErrMarketNotFound:
-				http.Error(w, "Market not found", http.StatusNotFound)
-			case dmarkets.ErrInvalidInput:
-				http.Error(w, "Invalid market ID", http.StatusBadRequest)
-			default:
-				log.Printf("Error getting market positions for market %d: %v", marketID, err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
+			writePositionsError(w, marketID, err)
 			return
 		}
 
-		// Map to DTO responses
-		responses := make([]userPositionResponse, 0, len(positions))
-		for _, pos := range positions {
-			if pos == nil {
-				continue
-			}
-			responses = append(responses, newUserPositionResponse(pos))
-		}
+		responses := mapPositionsToResponses(positions)
 
 		// Respond with the positions information
 		w.Header().Set("Content-Type", "application/json")
@@ -76,42 +51,15 @@ func MarketUserPositionHandlerWithService(svc dmarkets.ServiceInterface) http.Ha
 			return
 		}
 
-		// Parse market ID and username from URL
-		vars := mux.Vars(r)
-		marketIdStr := vars["marketId"]
-		username := vars["username"]
-
-		if marketIdStr == "" {
-			http.Error(w, "Market ID is required", http.StatusBadRequest)
-			return
-		}
-		if username == "" {
-			http.Error(w, "Username is required", http.StatusBadRequest)
-			return
-		}
-
-		// Convert marketId to int64
-		marketID, err := strconv.ParseInt(marketIdStr, 10, 64)
+		marketID, username, err := parseMarketUserParams(mux.Vars(r))
 		if err != nil {
-			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Call domain service
 		position, err := svc.GetUserPositionInMarket(r.Context(), marketID, username)
 		if err != nil {
-			// Map domain errors to HTTP status codes
-			switch err {
-			case dmarkets.ErrMarketNotFound:
-				http.Error(w, "Market not found", http.StatusNotFound)
-			case dmarkets.ErrUserNotFound:
-				http.Error(w, "User not found", http.StatusNotFound)
-			case dmarkets.ErrInvalidInput:
-				http.Error(w, "Invalid request parameters", http.StatusBadRequest)
-			default:
-				log.Printf("Error getting user position for market %d, user %s: %v", marketID, username, err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
+			writeUserPositionError(w, marketID, username, err)
 			return
 		}
 
@@ -121,5 +69,68 @@ func MarketUserPositionHandlerWithService(svc dmarkets.ServiceInterface) http.Ha
 			log.Printf("Error encoding user position response: %v", err)
 			http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		}
+	}
+}
+
+func parseMarketID(marketIDStr string) (int64, error) {
+	if marketIDStr == "" {
+		return 0, errors.New("Market ID is required")
+	}
+
+	marketID, err := strconv.ParseInt(marketIDStr, 10, 64)
+	if err != nil {
+		return 0, errors.New("Invalid market ID")
+	}
+	return marketID, nil
+}
+
+func writePositionsError(w http.ResponseWriter, marketID int64, err error) {
+	switch err {
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	case dmarkets.ErrInvalidInput:
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+	default:
+		log.Printf("Error getting market positions for market %d: %v", marketID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func mapPositionsToResponses(positions []*dmarkets.UserPosition) []userPositionResponse {
+	responses := make([]userPositionResponse, 0, len(positions))
+	for _, pos := range positions {
+		if pos == nil {
+			continue
+		}
+		responses = append(responses, newUserPositionResponse(pos))
+	}
+	return responses
+}
+
+func parseMarketUserParams(vars map[string]string) (int64, string, error) {
+	marketID, err := parseMarketID(vars["marketId"])
+	if err != nil {
+		return 0, "", err
+	}
+
+	username := vars["username"]
+	if username == "" {
+		return 0, "", errors.New("Username is required")
+	}
+
+	return marketID, username, nil
+}
+
+func writeUserPositionError(w http.ResponseWriter, marketID int64, username string, err error) {
+	switch err {
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	case dmarkets.ErrUserNotFound:
+		http.Error(w, "User not found", http.StatusNotFound)
+	case dmarkets.ErrInvalidInput:
+		http.Error(w, "Invalid request parameters", http.StatusBadRequest)
+	default:
+		log.Printf("Error getting user position for market %d, user %s: %v", marketID, username, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

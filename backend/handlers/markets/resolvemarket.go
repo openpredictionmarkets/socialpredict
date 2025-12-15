@@ -3,6 +3,7 @@ package marketshandlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -21,20 +22,9 @@ func ResolveMarketHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logging.LogMsg("Attempting to use ResolveMarketHandler.")
 
-		// 1. Parse {id} path param
-		vars := mux.Vars(r)
-		marketIdStr := vars["marketId"]
-
-		marketId, err := strconv.ParseInt(marketIdStr, 10, 64)
+		marketId, req, err := parseResolveRequest(r)
 		if err != nil {
-			http.Error(w, "Invalid market ID", http.StatusBadRequest)
-			return
-		}
-
-		// 2. Parse body into dto.ResolveRequest{Result string}
-		var req dto.ResolveMarketRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -44,28 +34,43 @@ func ResolveMarketHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		// 4. Call domain service to resolve market
-		err = svc.ResolveMarket(r.Context(), marketId, req.Resolution, username)
-		if err != nil {
-			// 5. Map errors (not found → 404, invalid → 400/409, forbidden → 403)
-			switch err {
-			case dmarkets.ErrMarketNotFound:
-				http.Error(w, "Market not found", http.StatusNotFound)
-			case dmarkets.ErrUnauthorized:
-				http.Error(w, "User is not the creator of the market", http.StatusForbidden) // Changed to 403 per spec
-			case dmarkets.ErrInvalidState:
-				http.Error(w, "Market is already resolved", http.StatusConflict) // 409 Conflict
-			case dmarkets.ErrInvalidInput:
-				http.Error(w, "Invalid resolution outcome", http.StatusBadRequest) // 400 Bad Request
-			default:
-				logging.LogMsg("Error resolving market: " + err.Error())
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
+		if err := svc.ResolveMarket(r.Context(), marketId, req.Resolution, username); err != nil {
+			writeResolveError(w, err)
 			return
 		}
 
-		// 6. w.WriteHeader(http.StatusNoContent) - per specification
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func parseResolveRequest(r *http.Request) (int64, dto.ResolveMarketRequest, error) {
+	var req dto.ResolveMarketRequest
+
+	marketIdStr := mux.Vars(r)["marketId"]
+	marketId, err := strconv.ParseInt(marketIdStr, 10, 64)
+	if err != nil {
+		return 0, req, fmt.Errorf("Invalid market ID")
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return 0, req, fmt.Errorf("Invalid request body")
+	}
+	return marketId, req, nil
+}
+
+func writeResolveError(w http.ResponseWriter, err error) {
+	switch err {
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	case dmarkets.ErrUnauthorized:
+		http.Error(w, "User is not the creator of the market", http.StatusForbidden)
+	case dmarkets.ErrInvalidState:
+		http.Error(w, "Market is already resolved", http.StatusConflict)
+	case dmarkets.ErrInvalidInput:
+		http.Error(w, "Invalid resolution outcome", http.StatusBadRequest)
+	default:
+		logging.LogMsg("Error resolving market: " + err.Error())
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
 

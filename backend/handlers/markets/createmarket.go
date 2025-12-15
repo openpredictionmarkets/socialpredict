@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/security"
 	"socialpredict/setup"
@@ -61,94 +62,46 @@ func NewCreateMarketService(svc dmarkets.Service, auth authsvc.Authenticator) *C
 	}
 }
 
+func (h *CreateMarketService) currentUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+	if h.auth == nil {
+		return nil, &authsvc.HTTPError{StatusCode: http.StatusInternalServerError, Message: "authentication service unavailable"}
+	}
+	return h.auth.CurrentUser(r)
+}
+
 func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Validate user and get username
-	if h.auth == nil {
-		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+	user, httpErr := h.currentUser(r)
+	if httpErr != nil {
+		http.Error(w, httpErr.Error(), httpErr.StatusCode)
 		return
 	}
 
-	user, httperr := h.auth.CurrentUser(r)
-	if httperr != nil {
-		http.Error(w, httperr.Error(), httperr.StatusCode)
+	req, decodeErr := decodeCreateMarketRequest(r)
+	if decodeErr != nil {
+		http.Error(w, decodeErr.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Parse request body
-	var req dto.CreateMarketRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("Error reading request body: %v", err)
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
+	sanitized, sanitizeErr := sanitizeMarketRequest(req)
+	if sanitizeErr != nil {
+		http.Error(w, "Invalid market data: "+sanitizeErr.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Optional security validation (keep existing behavior)
-	securityService := security.NewSecurityService()
-	marketInput := security.MarketInput{
-		Title:       req.QuestionTitle,
-		Description: req.Description,
-		EndTime:     req.ResolutionDateTime.String(),
-	}
+	domainReq := toDomainCreateRequest(sanitized)
 
-	sanitizedInput, err := securityService.ValidateAndSanitizeMarketInput(marketInput)
-	if err != nil {
-		http.Error(w, "Invalid market data: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Update with sanitized data
-	req.QuestionTitle = sanitizedInput.Title
-	req.Description = sanitizedInput.Description
-
-	// Convert DTO to domain request
-	domainReq := dmarkets.MarketCreateRequest{
-		QuestionTitle:      req.QuestionTitle,
-		Description:        req.Description,
-		OutcomeType:        req.OutcomeType,
-		ResolutionDateTime: req.ResolutionDateTime,
-		YesLabel:           req.YesLabel,
-		NoLabel:            req.NoLabel,
-	}
-
-	// Call domain service
 	market, err := h.svc.CreateMarket(context.Background(), domainReq, user.Username)
 	if err != nil {
-		// Map domain errors to HTTP status codes
-		switch err {
-		case dmarkets.ErrUserNotFound:
-			http.Error(w, "User not found", http.StatusNotFound)
-		case dmarkets.ErrInsufficientBalance:
-			http.Error(w, "Insufficient balance", http.StatusBadRequest)
-		case dmarkets.ErrInvalidQuestionLength,
-			dmarkets.ErrInvalidDescriptionLength,
-			dmarkets.ErrInvalidLabel,
-			dmarkets.ErrInvalidResolutionTime:
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		default:
-			log.Printf("Error creating market: %v", err)
-			http.Error(w, "Error creating market", http.StatusInternalServerError)
-		}
+		writeCreateMarketError(w, err)
 		return
 	}
 
-	// Convert domain model to response DTO
-	response := dto.CreateMarketResponse{
-		ID:                 market.ID,
-		QuestionTitle:      market.QuestionTitle,
-		Description:        market.Description,
-		OutcomeType:        market.OutcomeType,
-		ResolutionDateTime: market.ResolutionDateTime,
-		CreatorUsername:    market.CreatorUsername,
-		YesLabel:           market.YesLabel,
-		NoLabel:            market.NoLabel,
-		Status:             market.Status,
-		CreatedAt:          market.CreatedAt,
-	}
+	response := toCreateMarketResponse(market)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -163,91 +116,119 @@ func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.
 			return
 		}
 
-		// Validate user and get username
-		if auth == nil {
-			http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
-			return
-		}
-		user, httperr := auth.CurrentUser(r)
-		if httperr != nil {
-			http.Error(w, httperr.Error(), httperr.StatusCode)
+		user, httpErr := currentUserOrError(w, r, auth)
+		if httpErr != nil {
 			return
 		}
 
-		// Parse request body
-		var req dto.CreateMarketRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			log.Printf("Error reading request body: %v", err)
-			http.Error(w, "Error reading request body", http.StatusBadRequest)
+		req, decodeErr := decodeCreateMarketRequest(r)
+		if decodeErr != nil {
+			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Optional security validation (keep existing behavior)
-		securityService := security.NewSecurityService()
-		marketInput := security.MarketInput{
-			Title:       req.QuestionTitle,
-			Description: req.Description,
-			EndTime:     req.ResolutionDateTime.String(),
-		}
-
-		sanitizedInput, err := securityService.ValidateAndSanitizeMarketInput(marketInput)
-		if err != nil {
-			http.Error(w, "Invalid market data: "+err.Error(), http.StatusBadRequest)
+		sanitized, sanitizeErr := sanitizeMarketRequest(req)
+		if sanitizeErr != nil {
+			http.Error(w, "Invalid market data: "+sanitizeErr.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Update with sanitized data
-		req.QuestionTitle = sanitizedInput.Title
-		req.Description = sanitizedInput.Description
+		domainReq := toDomainCreateRequest(sanitized)
 
-		// Convert DTO to domain request
-		domainReq := dmarkets.MarketCreateRequest{
-			QuestionTitle:      req.QuestionTitle,
-			Description:        req.Description,
-			OutcomeType:        req.OutcomeType,
-			ResolutionDateTime: req.ResolutionDateTime,
-			YesLabel:           req.YesLabel,
-			NoLabel:            req.NoLabel,
-		}
-
-		// Call domain service
 		market, err := svc.CreateMarket(r.Context(), domainReq, user.Username)
 		if err != nil {
-			// Map domain errors to HTTP status codes
-			switch err {
-			case dmarkets.ErrUserNotFound:
-				http.Error(w, "User not found", http.StatusNotFound)
-			case dmarkets.ErrInsufficientBalance:
-				http.Error(w, "Insufficient balance", http.StatusBadRequest)
-			case dmarkets.ErrInvalidQuestionLength,
-				dmarkets.ErrInvalidDescriptionLength,
-				dmarkets.ErrInvalidLabel,
-				dmarkets.ErrInvalidResolutionTime:
-				http.Error(w, err.Error(), http.StatusBadRequest)
-			default:
-				log.Printf("Error creating market: %v", err)
-				http.Error(w, "Error creating market", http.StatusInternalServerError)
-			}
+			writeCreateMarketError(w, err)
 			return
 		}
 
-		// Convert domain model to response DTO
-		response := dto.CreateMarketResponse{
-			ID:                 market.ID,
-			QuestionTitle:      market.QuestionTitle,
-			Description:        market.Description,
-			OutcomeType:        market.OutcomeType,
-			ResolutionDateTime: market.ResolutionDateTime,
-			CreatorUsername:    market.CreatorUsername,
-			YesLabel:           market.YesLabel,
-			NoLabel:            market.NoLabel,
-			Status:             market.Status,
-			CreatedAt:          market.CreatedAt,
-		}
+		response := toCreateMarketResponse(market)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func decodeCreateMarketRequest(r *http.Request) (dto.CreateMarketRequest, error) {
+	var req dto.CreateMarketRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("Error reading request body: %v", err)
+		return dto.CreateMarketRequest{}, fmt.Errorf("Error reading request body")
+	}
+	return req, nil
+}
+
+func sanitizeMarketRequest(req dto.CreateMarketRequest) (dto.CreateMarketRequest, error) {
+	securityService := security.NewSecurityService()
+	marketInput := security.MarketInput{
+		Title:       req.QuestionTitle,
+		Description: req.Description,
+		EndTime:     req.ResolutionDateTime.String(),
+	}
+
+	sanitizedInput, err := securityService.ValidateAndSanitizeMarketInput(marketInput)
+	if err != nil {
+		return dto.CreateMarketRequest{}, err
+	}
+
+	req.QuestionTitle = sanitizedInput.Title
+	req.Description = sanitizedInput.Description
+	return req, nil
+}
+
+func toDomainCreateRequest(req dto.CreateMarketRequest) dmarkets.MarketCreateRequest {
+	return dmarkets.MarketCreateRequest{
+		QuestionTitle:      req.QuestionTitle,
+		Description:        req.Description,
+		OutcomeType:        req.OutcomeType,
+		ResolutionDateTime: req.ResolutionDateTime,
+		YesLabel:           req.YesLabel,
+		NoLabel:            req.NoLabel,
+	}
+}
+
+func toCreateMarketResponse(market *dmarkets.Market) dto.CreateMarketResponse {
+	return dto.CreateMarketResponse{
+		ID:                 market.ID,
+		QuestionTitle:      market.QuestionTitle,
+		Description:        market.Description,
+		OutcomeType:        market.OutcomeType,
+		ResolutionDateTime: market.ResolutionDateTime,
+		CreatorUsername:    market.CreatorUsername,
+		YesLabel:           market.YesLabel,
+		NoLabel:            market.NoLabel,
+		Status:             market.Status,
+		CreatedAt:          market.CreatedAt,
+	}
+}
+
+func currentUserOrError(w http.ResponseWriter, r *http.Request, auth authsvc.Authenticator) (*dusers.User, *authsvc.HTTPError) {
+	if auth == nil {
+		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		return nil, &authsvc.HTTPError{StatusCode: http.StatusInternalServerError, Message: "authentication service unavailable"}
+	}
+	user, httperr := auth.CurrentUser(r)
+	if httperr != nil {
+		http.Error(w, httperr.Error(), httperr.StatusCode)
+		return nil, httperr
+	}
+	return user, nil
+}
+
+func writeCreateMarketError(w http.ResponseWriter, err error) {
+	switch err {
+	case dmarkets.ErrUserNotFound:
+		http.Error(w, "User not found", http.StatusNotFound)
+	case dmarkets.ErrInsufficientBalance:
+		http.Error(w, "Insufficient balance", http.StatusBadRequest)
+	case dmarkets.ErrInvalidQuestionLength,
+		dmarkets.ErrInvalidDescriptionLength,
+		dmarkets.ErrInvalidLabel,
+		dmarkets.ErrInvalidResolutionTime:
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
+		log.Printf("Error creating market: %v", err)
+		http.Error(w, "Error creating market", http.StatusInternalServerError)
 	}
 }
 

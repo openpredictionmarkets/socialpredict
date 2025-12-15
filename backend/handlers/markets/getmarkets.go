@@ -12,39 +12,14 @@ import (
 // GetMarketsHandler handles requests for listing all markets (alias for ListMarketsHandler)
 func GetMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// 1. Parse query parameters for filtering
-		status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+		params, err := parseGetMarketsParams(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		limitStr := r.URL.Query().Get("limit")
-		offsetStr := r.URL.Query().Get("offset")
-
-		// Parse with defaults
-		limit := 100
-		if limitStr != "" {
-			if parsedLimit, err := parseIntOrDefault(limitStr, 100); err == nil {
-				limit = parsedLimit
-			}
-		}
-
-		offset := 0
-		if offsetStr != "" {
-			if parsedOffset, err := parseIntOrDefault(offsetStr, 0); err == nil {
-				offset = parsedOffset
-			}
-		}
-
-		// 2. Build domain filter
-		filters := dmarkets.ListFilters{
-			Status: status,
-			Limit:  limit,
-			Offset: offset,
-		}
 
 		// 3. Call domain service
-		markets, err := svc.ListMarkets(r.Context(), filters)
+		markets, err := svc.ListMarkets(r.Context(), params.filters)
 		if err != nil {
 			// 4. Map domain errors to HTTP status codes
 			switch err {
@@ -77,4 +52,43 @@ func parseIntOrDefault(s string, defaultVal int) (int, error) {
 		return defaultVal, nil
 	}
 	return strconv.Atoi(s)
+}
+
+type getMarketsParams struct {
+	status  string
+	limit   int
+	offset  int
+	filters dmarkets.ListFilters
+}
+
+func parseGetMarketsParams(r *http.Request) (getMarketsParams, error) {
+	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+	if err != nil {
+		return getMarketsParams{}, err
+	}
+
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := parseIntOrDefault(limitStr, 100); err == nil {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if parsedOffset, err := parseIntOrDefault(offsetStr, 0); err == nil {
+			offset = parsedOffset
+		}
+	}
+
+	return getMarketsParams{
+		status: status,
+		limit:  limit,
+		offset: offset,
+		filters: dmarkets.ListFilters{
+			Status: status,
+			Limit:  limit,
+			Offset: offset,
+		},
+	}, nil
 }

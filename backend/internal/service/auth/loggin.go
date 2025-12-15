@@ -2,6 +2,8 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"socialpredict/models"
@@ -31,84 +33,109 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Initialize security service
 	securityService := security.NewSecurityService()
 
-	// Parse the request body
-	type loginRequest struct {
-		Username string `json:"username" validate:"required,min=3,max=30,username"`
-		Password string `json:"password" validate:"required,min=1"`
-	}
-
-	var req loginRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
+	req, err := decodeLoginRequest(r)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Validate and sanitize login input
-	if err := securityService.Validator.ValidateStruct(req); err != nil {
-		http.Error(w, "Invalid input: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Sanitize username (basic sanitization for login)
-	sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
+	req, err = validateAndSanitizeLogin(securityService, req)
 	if err != nil {
-		http.Error(w, "Invalid username format", http.StatusBadRequest)
-		return
-	}
-	req.Username = sanitizedUsername
-
-	// Use database connection
-	db := util.GetDB()
-
-	// Find user by username
-	var user models.User
-	result := db.Where("username = ?", req.Username).First(&user)
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
-			return
-		}
-		http.Error(w, "Error accessing database", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Check password
-	if !user.CheckPasswordHash(req.Password) {
-		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
+	user, loginErr := authenticateUser(req)
+	if loginErr != nil {
+		http.Error(w, loginErr.message, loginErr.statusCode)
 		return
 	}
 
-	// Create UserClaim
-	claims := &UserClaims{
-		Username: user.Username,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
-		},
-	}
-
-	// Create a new token object
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Sign and get the complete encoded token as a string
-	tokenString, err := token.SignedString(getJWTKey())
+	tokenString, err := generateJWT(user.Username)
 	if err != nil {
 		http.Error(w, "Error creating token", http.StatusInternalServerError)
 		return
 	}
 
-	// Prepare to send JSON
+	writeLoginResponse(w, user, tokenString)
+}
+
+type loginRequest struct {
+	Username string `json:"username" validate:"required,min=3,max=30,username"`
+	Password string `json:"password" validate:"required,min=1"`
+}
+
+func decodeLoginRequest(r *http.Request) (loginRequest, error) {
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return loginRequest{}, fmt.Errorf("Error reading request body")
+	}
+	return req, nil
+}
+
+func validateAndSanitizeLogin(securityService *security.SecurityService, req loginRequest) (loginRequest, error) {
+	if err := securityService.Validator.ValidateStruct(req); err != nil {
+		return req, fmt.Errorf("Invalid input: %w", err)
+	}
+
+	sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
+	if err != nil {
+		return req, fmt.Errorf("Invalid username format")
+	}
+	req.Username = sanitizedUsername
+	return req, nil
+}
+
+type loginError struct {
+	message    string
+	statusCode int
+}
+
+func authenticateUser(req loginRequest) (models.User, *loginError) {
+	user, err := findUserByUsername(req.Username)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.User{}, &loginError{message: "Invalid Credentials", statusCode: http.StatusUnauthorized}
+		}
+		return models.User{}, &loginError{message: "Error accessing database", statusCode: http.StatusInternalServerError}
+	}
+
+	if !user.CheckPasswordHash(req.Password) {
+		return models.User{}, &loginError{message: "Invalid Credentials", statusCode: http.StatusUnauthorized}
+	}
+
+	return user, nil
+}
+
+func findUserByUsername(username string) (models.User, error) {
+	db := util.GetDB()
+	var user models.User
+	result := db.Where("username = ?", username).First(&user)
+	return user, result.Error
+}
+
+func generateJWT(username string) (string, error) {
+	claims := &UserClaims{
+		Username: username,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(getJWTKey())
+}
+
+func writeLoginResponse(w http.ResponseWriter, user models.User, tokenString string) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Send token, username, and usertype in the response
 	responseData := map[string]interface{}{
 		"token":              tokenString,
 		"username":           user.Username,
 		"usertype":           user.UserType,
 		"mustChangePassword": user.MustChangePassword,
 	}
-	json.NewEncoder(w).Encode(responseData)
+	_ = json.NewEncoder(w).Encode(responseData)
 }

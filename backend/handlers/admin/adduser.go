@@ -23,90 +23,115 @@ func AddUserHandler(loadEconConfig setup.EconConfigLoader, auth authsvc.Authenti
 			return
 		}
 
-		// Initialize security service
-		securityService := security.NewSecurityService()
-
-		var req struct {
-			Username string `json:"username" validate:"required,min=3,max=30,username"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Error decoding request body", http.StatusBadRequest)
-			log.Printf("AddUserHandler: %v", err)
+		responseData, handlerErr := processAddUser(r, loadEconConfig, auth)
+		if handlerErr != nil {
+			http.Error(w, handlerErr.message, handlerErr.statusCode)
+			if handlerErr.logErr != nil {
+				log.Printf("AddUserHandler: %v", handlerErr.logErr)
+			}
 			return
 		}
 
-		// Validate the username using security service
-		if err := securityService.Validator.ValidateStruct(req); err != nil {
-			http.Error(w, "Invalid username: "+err.Error(), http.StatusBadRequest)
-			log.Printf("AddUserHandler: %v", err)
-			return
-		}
-
-		// Sanitize the username
-		sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
-		if err != nil {
-			http.Error(w, "Invalid username format: "+err.Error(), http.StatusBadRequest)
-			log.Printf("AddUserHandler: %v", err)
-			return
-		}
-		req.Username = sanitizedUsername
-
-		db := util.GetDB()
-
-		if auth == nil {
-			http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
-			return
-		}
-		if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
-			http.Error(w, httpErr.Message, httpErr.StatusCode)
-			return
-		}
-
-		appConfig := loadEconConfig()
-		user := models.User{
-			PublicUser: models.PublicUser{
-				Username:              req.Username,
-				DisplayName:           util.UniqueDisplayName(db),
-				UserType:              "REGULAR",
-				InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
-				AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
-				PersonalEmoji:         randomEmoji(),
-			},
-			PrivateUser: models.PrivateUser{
-				Email:  util.UniqueEmail(db),
-				APIKey: util.GenerateUniqueApiKey(db),
-			},
-			MustChangePassword: true,
-		}
-
-		// Check uniqueness of username, displayname, and email
-		if err := checkUniqueFields(db, &user); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			log.Printf("AddUserHandler: %v", err)
-			return
-		}
-
-		password := gofakeit.Password(true, true, true, false, false, 12)
-		if err := user.HashPassword(password); err != nil {
-			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
-			log.Printf("AddUserHandler: %v", err)
-			return
-		}
-
-		if result := db.Create(&user); result.Error != nil {
-			http.Error(w, "Failed to create user", http.StatusInternalServerError)
-			log.Printf("AddUserHandler: %v", result.Error)
-			return
-		}
-
-		responseData := map[string]interface{}{
-			"message":  "User created successfully",
-			"username": user.Username,
-			"password": password,
-			"usertype": user.UserType,
-		}
-		json.NewEncoder(w).Encode(responseData)
+		_ = json.NewEncoder(w).Encode(responseData)
 	}
+}
+
+type handlerError struct {
+	message    string
+	statusCode int
+	logErr     error
+}
+
+func processAddUser(r *http.Request, loadEconConfig setup.EconConfigLoader, auth authsvc.Authenticator) (map[string]interface{}, *handlerError) {
+	securityService := security.NewSecurityService()
+	req, decodeErr := decodeAddUserRequest(r)
+	if decodeErr != nil {
+		return nil, &handlerError{message: decodeErr.Error(), statusCode: http.StatusBadRequest, logErr: decodeErr}
+	}
+
+	if err := validateAddUserUsername(securityService, req.Username); err != nil {
+		return nil, &handlerError{message: "Invalid username: " + err.Error(), statusCode: http.StatusBadRequest, logErr: err}
+	}
+	req.Username, _ = securityService.Sanitizer.SanitizeUsername(req.Username)
+
+	db := util.GetDB()
+
+	if auth == nil {
+		return nil, &handlerError{message: "authentication service unavailable", statusCode: http.StatusInternalServerError}
+	}
+	if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
+		return nil, &handlerError{message: httpErr.Message, statusCode: httpErr.StatusCode}
+	}
+
+	appConfig := loadEconConfig()
+	user := buildNewUser(db, req.Username, appConfig)
+
+	if err := checkUniqueFields(db, &user); err != nil {
+		return nil, &handlerError{message: err.Error(), statusCode: http.StatusBadRequest, logErr: err}
+	}
+
+	password, err := generateAndHashPassword(&user)
+	if err != nil {
+		return nil, &handlerError{message: err.Error(), statusCode: http.StatusInternalServerError, logErr: err}
+	}
+
+	if result := db.Create(&user); result.Error != nil {
+		return nil, &handlerError{message: "Failed to create user", statusCode: http.StatusInternalServerError, logErr: result.Error}
+	}
+
+	responseData := map[string]interface{}{
+		"message":  "User created successfully",
+		"username": user.Username,
+		"password": password,
+		"usertype": user.UserType,
+	}
+	return responseData, nil
+}
+
+type addUserRequest struct {
+	Username string `json:"username" validate:"required,min=3,max=30,username"`
+}
+
+func decodeAddUserRequest(r *http.Request) (addUserRequest, error) {
+	var req addUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return addUserRequest{}, fmt.Errorf("Error decoding request body")
+	}
+	return req, nil
+}
+
+func validateAddUserUsername(securityService *security.SecurityService, username string) error {
+	if err := securityService.Validator.ValidateStruct(addUserRequest{Username: username}); err != nil {
+		return err
+	}
+	_, err := securityService.Sanitizer.SanitizeUsername(username)
+	return err
+}
+
+func buildNewUser(db *gorm.DB, username string, appConfig *setup.EconomicConfig) models.User {
+	return models.User{
+		PublicUser: models.PublicUser{
+			Username:              username,
+			DisplayName:           util.UniqueDisplayName(db),
+			UserType:              "REGULAR",
+			InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
+			AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
+			PersonalEmoji:         randomEmoji(),
+		},
+		PrivateUser: models.PrivateUser{
+			Email:  util.UniqueEmail(db),
+			APIKey: util.GenerateUniqueApiKey(db),
+		},
+		MustChangePassword: true,
+	}
+}
+
+func generateAndHashPassword(user *models.User) (string, error) {
+	password := gofakeit.Password(true, true, true, false, false, 12)
+	if err := user.HashPassword(password); err != nil {
+		return "", fmt.Errorf("Failed to hash password")
+	}
+	return password, nil
 }
 
 func checkUniqueFields(db *gorm.DB, user *models.User) error {

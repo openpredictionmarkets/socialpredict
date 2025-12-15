@@ -124,45 +124,61 @@ func (s *Sanitizer) SanitizeMarketTitle(title string) (string, error) {
 
 // SanitizePersonalLink validates and sanitizes personal links
 func (s *Sanitizer) SanitizePersonalLink(link string) (string, error) {
-	// Remove leading/trailing whitespace
 	link = strings.TrimSpace(link)
-
-	// Empty links are allowed
 	if link == "" {
 		return "", nil
 	}
 
-	// Check length
-	if len(link) > 200 {
-		return "", fmt.Errorf("personal link cannot exceed 200 characters")
+	if err := validatePersonalLinkLength(link); err != nil {
+		return "", err
 	}
 
-	// Parse URL to validate format
-	parsedURL, err := url.Parse(link)
+	parsedURL, err := parseURLWithScheme(link)
 	if err != nil {
-		return "", fmt.Errorf("invalid URL format: %v", err)
+		return "", err
 	}
 
-	// Ensure scheme is provided and is http/https
-	if parsedURL.Scheme == "" {
-		// Add https by default
-		link = "https://" + link
-		parsedURL, err = url.Parse(link)
-		if err != nil {
-			return "", fmt.Errorf("invalid URL format after adding scheme: %v", err)
-		}
+	if err := validateAllowedScheme(parsedURL.Scheme); err != nil {
+		return "", err
 	}
 
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return "", fmt.Errorf("only http and https URLs are allowed")
-	}
-
-	// Check for suspicious domains or patterns
 	if containsMaliciousDomain(parsedURL.Host) {
 		return "", fmt.Errorf("potentially malicious domain detected")
 	}
 
 	return parsedURL.String(), nil
+}
+
+func validatePersonalLinkLength(link string) error {
+	if len(link) > 200 {
+		return fmt.Errorf("personal link cannot exceed 200 characters")
+	}
+	return nil
+}
+
+func parseURLWithScheme(link string) (*url.URL, error) {
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL format: %v", err)
+	}
+
+	if parsedURL.Scheme != "" {
+		return parsedURL, nil
+	}
+
+	withScheme := "https://" + link
+	parsedURL, err = url.Parse(withScheme)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL format after adding scheme: %v", err)
+	}
+	return parsedURL, nil
+}
+
+func validateAllowedScheme(scheme string) error {
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("only http and https URLs are allowed")
+	}
+	return nil
 }
 
 // SanitizeEmoji validates that the emoji is from an allowed set

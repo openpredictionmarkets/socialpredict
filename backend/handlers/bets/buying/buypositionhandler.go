@@ -2,6 +2,7 @@ package buybetshandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"socialpredict/handlers/bets/dto"
@@ -25,48 +26,64 @@ func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInte
 			return
 		}
 
-		var req dto.PlaceBetRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+		req, decodeErr := decodePlaceBetRequest(r)
+		if decodeErr != nil {
+			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
 			return
 		}
 
-		placedBet, err := betsSvc.Place(r.Context(), dbets.PlaceRequest{
-			Username: user.Username,
-			MarketID: req.MarketID,
-			Amount:   req.Amount,
-			Outcome:  req.Outcome,
-		})
+		placedBet, err := betsSvc.Place(r.Context(), toPlaceRequest(req, user.Username))
 		if err != nil {
-			switch err {
-			case dbets.ErrInvalidOutcome, dbets.ErrInvalidAmount:
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			case dbets.ErrMarketClosed:
-				http.Error(w, err.Error(), http.StatusConflict)
-				return
-			case dbets.ErrInsufficientBalance:
-				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
-				return
-			case dmarkets.ErrMarketNotFound:
-				http.Error(w, "Market not found", http.StatusNotFound)
-				return
-			default:
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
+			writePlaceBetError(w, err)
+			return
 		}
 
-		response := dto.PlaceBetResponse{
-			Username: placedBet.Username,
-			MarketID: placedBet.MarketID,
-			Amount:   placedBet.Amount,
-			Outcome:  placedBet.Outcome,
-			PlacedAt: placedBet.PlacedAt,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(response)
+		writePlaceBetResponse(w, placedBet)
 	}
+}
+
+func decodePlaceBetRequest(r *http.Request) (dto.PlaceBetRequest, error) {
+	var req dto.PlaceBetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return dto.PlaceBetRequest{}, errors.New("Invalid request body")
+	}
+	return req, nil
+}
+
+func toPlaceRequest(req dto.PlaceBetRequest, username string) dbets.PlaceRequest {
+	return dbets.PlaceRequest{
+		Username: username,
+		MarketID: req.MarketID,
+		Amount:   req.Amount,
+		Outcome:  req.Outcome,
+	}
+}
+
+func writePlaceBetError(w http.ResponseWriter, err error) {
+	switch err {
+	case dbets.ErrInvalidOutcome, dbets.ErrInvalidAmount:
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case dbets.ErrMarketClosed:
+		http.Error(w, err.Error(), http.StatusConflict)
+	case dbets.ErrInsufficientBalance:
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	default:
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func writePlaceBetResponse(w http.ResponseWriter, placedBet *dbets.PlacedBet) {
+	response := dto.PlaceBetResponse{
+		Username: placedBet.Username,
+		MarketID: placedBet.MarketID,
+		Amount:   placedBet.Amount,
+		Outcome:  placedBet.Outcome,
+		PlacedAt: placedBet.PlacedAt,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(response)
 }

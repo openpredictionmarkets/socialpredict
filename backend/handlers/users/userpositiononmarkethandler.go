@@ -2,6 +2,7 @@ package usershandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -27,31 +28,15 @@ func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, u
 			return
 		}
 
-		vars := mux.Vars(r)
-		marketIDStr := vars["marketId"]
-		if marketIDStr == "" {
-			http.Error(w, "Market ID is required", http.StatusBadRequest)
-			return
-		}
-
-		marketID, err := strconv.ParseInt(marketIDStr, 10, 64)
+		marketID, err := parseMarketID(mux.Vars(r)["marketId"])
 		if err != nil {
-			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		position, err := marketSvc.GetUserPositionInMarket(r.Context(), marketID, user.Username)
 		if err != nil {
-			switch err {
-			case dmarkets.ErrMarketNotFound:
-				http.Error(w, "Market not found", http.StatusNotFound)
-			case dmarkets.ErrUserNotFound:
-				http.Error(w, "User not found", http.StatusNotFound)
-			case dmarkets.ErrInvalidInput:
-				http.Error(w, "Invalid request parameters", http.StatusBadRequest)
-			default:
-				http.Error(w, "Failed to fetch user position", http.StatusInternalServerError)
-			}
+			writeUserPositionError(w, marketID, user.Username, err)
 			return
 		}
 
@@ -59,5 +44,30 @@ func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, u
 		if err := json.NewEncoder(w).Encode(position); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
+	}
+}
+
+func parseMarketID(marketIDStr string) (int64, error) {
+	if marketIDStr == "" {
+		return 0, errors.New("Market ID is required")
+	}
+
+	marketID, err := strconv.ParseInt(marketIDStr, 10, 64)
+	if err != nil {
+		return 0, errors.New("Invalid market ID")
+	}
+	return marketID, nil
+}
+
+func writeUserPositionError(w http.ResponseWriter, marketID int64, username string, err error) {
+	switch err {
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	case dmarkets.ErrUserNotFound:
+		http.Error(w, "User not found", http.StatusNotFound)
+	case dmarkets.ErrInvalidInput:
+		http.Error(w, "Invalid request parameters", http.StatusBadRequest)
+	default:
+		http.Error(w, "Failed to fetch user position", http.StatusInternalServerError)
 	}
 }

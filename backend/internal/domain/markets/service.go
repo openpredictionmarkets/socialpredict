@@ -138,67 +138,26 @@ func NewService(repo Repository, userService UserService, clock Clock, config Co
 
 // CreateMarket creates a new market with validation
 func (s *Service) CreateMarket(ctx context.Context, req MarketCreateRequest, creatorUsername string) (*Market, error) {
-	// Validate question title length
-	if err := s.validateQuestionTitle(req.QuestionTitle); err != nil {
+	if err := s.validateCreateRequest(req); err != nil {
 		return nil, err
 	}
 
-	// Validate description length
-	if err := s.validateDescription(req.Description); err != nil {
-		return nil, err
-	}
+	labels := normalizeLabels(req.YesLabel, req.NoLabel)
 
-	// Validate custom labels
-	if err := s.validateCustomLabels(req.YesLabel, req.NoLabel); err != nil {
-		return nil, err
-	}
-
-	// Set default labels if not provided
-	yesLabel := strings.TrimSpace(req.YesLabel)
-	if yesLabel == "" {
-		yesLabel = "YES"
-	}
-
-	noLabel := strings.TrimSpace(req.NoLabel)
-	if noLabel == "" {
-		noLabel = "NO"
-	}
-
-	// Validate user exists
 	if err := s.userService.ValidateUserExists(ctx, creatorUsername); err != nil {
 		return nil, ErrUserNotFound
 	}
 
-	// Validate market resolution time
 	if err := s.ValidateMarketResolutionTime(req.ResolutionDateTime); err != nil {
 		return nil, err
 	}
 
-	// Check user balance and deduct fee
-	if err := s.userService.ValidateUserBalance(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
-		return nil, ErrInsufficientBalance
-	}
-
-	// Deduct market creation fee
-	if err := s.userService.DeductBalance(ctx, creatorUsername, s.config.CreateMarketCost); err != nil {
+	if err := s.ensureCreateMarketBalance(ctx, creatorUsername); err != nil {
 		return nil, err
 	}
 
-	// Create market object
-	market := &Market{
-		QuestionTitle:      req.QuestionTitle,
-		Description:        req.Description,
-		OutcomeType:        req.OutcomeType,
-		ResolutionDateTime: req.ResolutionDateTime,
-		CreatorUsername:    creatorUsername,
-		YesLabel:           yesLabel,
-		NoLabel:            noLabel,
-		Status:             "active", // Default status
-		CreatedAt:          s.clock.Now(),
-		UpdatedAt:          s.clock.Now(),
-	}
+	market := s.buildMarketEntity(req, creatorUsername, labels)
 
-	// Create market in repository
 	if err := s.repo.Create(ctx, market); err != nil {
 		return nil, err
 	}
@@ -226,6 +185,56 @@ func (s *Service) SetCustomLabels(ctx context.Context, marketID int64, yesLabel,
 // GetMarket retrieves a market by ID
 func (s *Service) GetMarket(ctx context.Context, id int64) (*Market, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+type labelPair struct {
+	yes string
+	no  string
+}
+
+func (s *Service) validateCreateRequest(req MarketCreateRequest) error {
+	if err := s.validateQuestionTitle(req.QuestionTitle); err != nil {
+		return err
+	}
+	if err := s.validateDescription(req.Description); err != nil {
+		return err
+	}
+	return s.validateCustomLabels(req.YesLabel, req.NoLabel)
+}
+
+func normalizeLabels(yesLabel string, noLabel string) labelPair {
+	y := strings.TrimSpace(yesLabel)
+	n := strings.TrimSpace(noLabel)
+	if y == "" {
+		y = "YES"
+	}
+	if n == "" {
+		n = "NO"
+	}
+	return labelPair{yes: y, no: n}
+}
+
+func (s *Service) ensureCreateMarketBalance(ctx context.Context, creatorUsername string) error {
+	if err := s.userService.ValidateUserBalance(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
+		return ErrInsufficientBalance
+	}
+	return s.userService.DeductBalance(ctx, creatorUsername, s.config.CreateMarketCost)
+}
+
+func (s *Service) buildMarketEntity(req MarketCreateRequest, creatorUsername string, labels labelPair) *Market {
+	now := s.clock.Now()
+	return &Market{
+		QuestionTitle:      req.QuestionTitle,
+		Description:        req.Description,
+		OutcomeType:        req.OutcomeType,
+		ResolutionDateTime: req.ResolutionDateTime,
+		CreatorUsername:    creatorUsername,
+		YesLabel:           labels.yes,
+		NoLabel:            labels.no,
+		Status:             "active",
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
 }
 
 // GetPublicMarket returns a public representation of a market.
@@ -628,24 +637,13 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 		return nil, ErrInvalidInput
 	}
 
-	// 1. Validate market exists
 	market, err := s.repo.GetByID(ctx, marketID)
 	if err != nil {
 		return nil, ErrMarketNotFound
 	}
 
-	// 2. Validate pagination
-	if p.Limit <= 0 {
-		p.Limit = 100
-	}
-	if p.Limit > 1000 {
-		p.Limit = 1000
-	}
-	if p.Offset < 0 {
-		p.Offset = 0
-	}
+	p = normalizePage(p, 100, 1000)
 
-	// 3. Fetch bets for the market
 	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
 	if err != nil {
 		return nil, err
@@ -656,13 +654,7 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 	}
 
 	modelBets := convertToModelBets(bets)
-
-	snapshot := positionsmath.MarketSnapshot{
-		ID:               market.ID,
-		CreatedAt:        market.CreatedAt,
-		IsResolved:       strings.EqualFold(market.Status, "resolved"),
-		ResolutionResult: market.ResolutionResult,
-	}
+	snapshot := marketSnapshotFromModel(market)
 
 	profitability, err := positionsmath.CalculateMarketLeaderboard(snapshot, modelBets)
 	if err != nil {
@@ -673,7 +665,64 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 		return []*LeaderboardRow{}, nil
 	}
 
-	// Apply pagination manually since profitability list is already sorted
+	paged := paginateProfitability(profitability, p)
+	return mapLeaderboardRows(paged), nil
+}
+
+// ProjectProbability projects what the probability would be after a hypothetical bet
+func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProjectionRequest) (*ProbabilityProjection, error) {
+	if err := validateProbabilityRequest(req); err != nil {
+		return nil, err
+	}
+
+	market, err := s.repo.GetByID(ctx, req.MarketID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateMarketForProjection(market, s.clock.Now()); err != nil {
+		return nil, err
+	}
+
+	bets, err := s.repo.ListBetsForMarket(ctx, req.MarketID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectionInput := projectionInputs{
+		market:    market,
+		outcome:   normalizeOutcome(req.Outcome),
+		amount:    req.Amount,
+		now:       s.clock.Now(),
+		modelBets: convertToModelBets(bets),
+	}
+
+	return calculateProbabilityProjection(projectionInput), nil
+}
+
+func normalizePage(p Page, defaultLimit, maxLimit int) Page {
+	if p.Limit <= 0 {
+		p.Limit = defaultLimit
+	}
+	if p.Limit > maxLimit {
+		p.Limit = maxLimit
+	}
+	if p.Offset < 0 {
+		p.Offset = 0
+	}
+	return p
+}
+
+func marketSnapshotFromModel(market *Market) positionsmath.MarketSnapshot {
+	return positionsmath.MarketSnapshot{
+		ID:               market.ID,
+		CreatedAt:        market.CreatedAt,
+		IsResolved:       strings.EqualFold(market.Status, "resolved"),
+		ResolutionResult: market.ResolutionResult,
+	}
+}
+
+func paginateProfitability(profitability []positionsmath.UserProfitability, p Page) []positionsmath.UserProfitability {
 	start := p.Offset
 	if start > len(profitability) {
 		start = len(profitability)
@@ -682,10 +731,15 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 	if end > len(profitability) {
 		end = len(profitability)
 	}
-	paged := profitability[start:end]
+	return profitability[start:end]
+}
 
-	leaderboard := make([]*LeaderboardRow, len(paged))
-	for i, row := range paged {
+func mapLeaderboardRows(rows []positionsmath.UserProfitability) []*LeaderboardRow {
+	if len(rows) == 0 {
+		return []*LeaderboardRow{}
+	}
+	leaderboard := make([]*LeaderboardRow, len(rows))
+	for i, row := range rows {
 		leaderboard[i] = &LeaderboardRow{
 			Username:       row.Username,
 			Profit:         row.Profit,
@@ -697,43 +751,42 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 			Rank:           row.Rank,
 		}
 	}
-
-	return leaderboard, nil
+	return leaderboard
 }
 
-// ProjectProbability projects what the probability would be after a hypothetical bet
-func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProjectionRequest) (*ProbabilityProjection, error) {
-	// 1. Validate market exists
+type projectionInputs struct {
+	market    *Market
+	outcome   string
+	amount    int64
+	now       time.Time
+	modelBets []models.Bet
+}
+
+func validateProbabilityRequest(req ProbabilityProjectionRequest) error {
 	if req.MarketID <= 0 || req.MarketID > int64(math.MaxUint32) || strings.TrimSpace(req.Outcome) == "" || req.Amount <= 0 {
-		return nil, ErrInvalidInput
+		return ErrInvalidInput
 	}
 
 	outcome := strings.ToUpper(strings.TrimSpace(req.Outcome))
 	if outcome != "YES" && outcome != "NO" {
-		return nil, ErrInvalidInput
+		return ErrInvalidInput
 	}
+	return nil
+}
 
-	market, err := s.repo.GetByID(ctx, req.MarketID)
-	if err != nil {
-		return nil, err
-	}
-
+func validateMarketForProjection(market *Market, now time.Time) error {
 	if strings.EqualFold(market.Status, "resolved") {
-		return nil, ErrInvalidState
+		return ErrInvalidState
 	}
 
-	now := s.clock.Now()
 	if now.After(market.ResolutionDateTime) {
-		return nil, ErrInvalidState
+		return ErrInvalidState
 	}
+	return nil
+}
 
-	bets, err := s.repo.ListBetsForMarket(ctx, req.MarketID)
-	if err != nil {
-		return nil, err
-	}
-
-	modelBets := convertToModelBets(bets)
-	probabilityTrack := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets)
+func calculateProbabilityProjection(input projectionInputs) *ProbabilityProjection {
+	probabilityTrack := wpam.CalculateMarketProbabilitiesWPAM(input.market.CreatedAt, input.modelBets)
 
 	currentProbability := 0.5
 	if len(probabilityTrack) > 0 {
@@ -742,18 +795,29 @@ func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProject
 
 	newBet := models.Bet{
 		Username: "preview",
-		MarketID: uint(req.MarketID),
-		Amount:   req.Amount,
-		Outcome:  outcome,
-		PlacedAt: now,
+		MarketID: uint(input.market.ID),
+		Amount:   input.amount,
+		Outcome:  input.outcome,
+		PlacedAt: input.now,
 	}
 
-	projection := wpam.ProjectNewProbabilityWPAM(market.CreatedAt, modelBets, newBet)
+	projection := wpam.ProjectNewProbabilityWPAM(input.market.CreatedAt, input.modelBets, newBet)
 
 	return &ProbabilityProjection{
 		CurrentProbability:   currentProbability,
 		ProjectedProbability: projection.Probability,
-	}, nil
+	}
+}
+
+func normalizeOutcome(outcome string) string {
+	switch strings.ToUpper(strings.TrimSpace(outcome)) {
+	case "YES":
+		return "YES"
+	case "NO":
+		return "NO"
+	default:
+		return ""
+	}
 }
 
 // CalculateMarketVolume returns the total traded volume for a market.
@@ -795,42 +859,55 @@ func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisp
 		return nil, err
 	}
 
+	modelBets, err := s.loadMarketBets(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	if len(modelBets) == 0 {
+		return []*BetDisplayInfo{}, nil
+	}
+
+	probabilityChanges := ensureProbabilityChanges(wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets), market.CreatedAt)
+	sortProbabilityChanges(probabilityChanges)
+	sortBetsByTime(modelBets)
+
+	return buildBetDisplayInfos(modelBets, probabilityChanges), nil
+}
+
+func (s *Service) loadMarketBets(ctx context.Context, marketID int64) ([]models.Bet, error) {
 	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
 	if err != nil {
 		return nil, err
 	}
-	if len(bets) == 0 {
-		return []*BetDisplayInfo{}, nil
-	}
+	return convertToModelBets(bets), nil
+}
 
-	modelBets := convertToModelBets(bets)
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets)
-	if len(probabilityChanges) == 0 {
-		probabilityChanges = []wpam.ProbabilityChange{{
+func ensureProbabilityChanges(changes []wpam.ProbabilityChange, createdAt time.Time) []wpam.ProbabilityChange {
+	if len(changes) == 0 {
+		return []wpam.ProbabilityChange{{
 			Probability: 0,
-			Timestamp:   market.CreatedAt,
+			Timestamp:   createdAt,
 		}}
 	}
+	return changes
+}
 
-	sort.Slice(probabilityChanges, func(i, j int) bool {
-		return probabilityChanges[i].Timestamp.Before(probabilityChanges[j].Timestamp)
+func sortProbabilityChanges(changes []wpam.ProbabilityChange) {
+	sort.Slice(changes, func(i, j int) bool {
+		return changes[i].Timestamp.Before(changes[j].Timestamp)
 	})
+}
 
-	// Ensure bets are processed in chronological order
-	sort.Slice(modelBets, func(i, j int) bool {
-		return modelBets[i].PlacedAt.Before(modelBets[j].PlacedAt)
+func sortBetsByTime(bets []models.Bet) {
+	sort.Slice(bets, func(i, j int) bool {
+		return bets[i].PlacedAt.Before(bets[j].PlacedAt)
 	})
+}
 
+func buildBetDisplayInfos(modelBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []*BetDisplayInfo {
 	results := make([]*BetDisplayInfo, 0, len(modelBets))
 	for _, bet := range modelBets {
-		matchedProbability := probabilityChanges[0].Probability
-		for _, change := range probabilityChanges {
-			if change.Timestamp.After(bet.PlacedAt) {
-				break
-			}
-			matchedProbability = change.Probability
-		}
-
+		matchedProbability := latestProbabilityAt(probabilityChanges, bet.PlacedAt)
 		results = append(results, &BetDisplayInfo{
 			Username:    bet.Username,
 			Outcome:     bet.Outcome,
@@ -839,8 +916,18 @@ func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisp
 			PlacedAt:    bet.PlacedAt,
 		})
 	}
+	return results
+}
 
-	return results, nil
+func latestProbabilityAt(changes []wpam.ProbabilityChange, timestamp time.Time) float64 {
+	matched := changes[0].Probability
+	for _, change := range changes {
+		if change.Timestamp.After(timestamp) {
+			break
+		}
+		matched = change.Probability
+	}
+	return matched
 }
 
 // GetMarketPositions returns all user positions in a market

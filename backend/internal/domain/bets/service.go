@@ -82,22 +82,13 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 		return nil, err
 	}
 
-	user, err := s.users.GetUser(ctx, req.Username)
-	if err != nil {
-		return nil, err
-	}
-
-	hasBet, err := s.repo.UserHasBet(ctx, req.MarketID, req.Username)
+	user, hasBet, err := s.loadUserAndBetStatus(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	fees := s.calculateBetFees(hasBet, req.Amount)
 	if err := ensureSufficientBalance(user.AccountBalance, fees.totalCost, int64(s.econ.Economics.User.MaximumDebtAllowed)); err != nil {
-		return nil, err
-	}
-
-	if err := s.users.ApplyTransaction(ctx, req.Username, fees.totalCost, dusers.TransactionBuy); err != nil {
 		return nil, err
 	}
 
@@ -109,9 +100,7 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 		PlacedAt: now,
 	}
 
-	if err := s.repo.Create(ctx, bet); err != nil {
-		// attempt to roll back user deduction
-		_ = s.users.ApplyTransaction(ctx, req.Username, fees.totalCost, dusers.TransactionRefund)
+	if err := s.createBetWithCharge(ctx, bet, fees.totalCost); err != nil {
 		return nil, err
 	}
 
@@ -135,47 +124,29 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 		return nil, err
 	}
 
-	position, err := s.markets.GetUserPositionInMarket(ctx, int64(req.MarketID), req.Username)
+	sharesOwned, position, err := s.loadUserShares(ctx, req, outcome)
 	if err != nil {
 		return nil, err
 	}
 
-	sharesOwned, err := sharesOwnedForOutcome(position, outcome)
+	sale, err := s.calculateSale(position, sharesOwned, req.Amount)
 	if err != nil {
 		return nil, err
 	}
-
-	sharesToSell, saleValue, dust, err := s.calculateSale(position, sharesOwned, req.Amount)
-	if err != nil {
-		return nil, err
-	}
-	if sharesToSell == 0 {
+	if sale.sharesToSell == 0 {
 		return nil, ErrInsufficientShares
 	}
 
-	if err := s.users.ApplyTransaction(ctx, req.Username, saleValue, dusers.TransactionSale); err != nil {
-		return nil, err
-	}
-
-	bet := &models.Bet{
-		Username: req.Username,
-		MarketID: req.MarketID,
-		Amount:   -sharesToSell,
-		Outcome:  outcome,
-		PlacedAt: now,
-	}
-	if err := s.repo.Create(ctx, bet); err != nil {
-		// Roll back the credit deposited
-		_ = s.users.ApplyTransaction(ctx, req.Username, saleValue, dusers.TransactionBuy)
+	if err := s.applySaleAndRecordBet(ctx, req, outcome, sale, now); err != nil {
 		return nil, err
 	}
 
 	return &SellResult{
 		Username:      req.Username,
 		MarketID:      req.MarketID,
-		SharesSold:    sharesToSell,
-		SaleValue:     saleValue,
-		Dust:          dust,
+		SharesSold:    sale.sharesToSell,
+		SaleValue:     sale.saleValue,
+		Dust:          sale.dust,
 		Outcome:       outcome,
 		TransactionAt: now,
 	}, nil
@@ -209,16 +180,57 @@ func sharesOwnedForOutcome(pos *dmarkets.UserPosition, outcome string) (int64, e
 	}
 }
 
-func (s *Service) calculateSale(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (int64, int64, int64, error) {
-	if pos.Value <= 0 {
-		return 0, 0, 0, ErrNoPosition
+type saleResult struct {
+	sharesToSell int64
+	saleValue    int64
+	dust         int64
+}
+
+func (s *Service) loadUserShares(ctx context.Context, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, error) {
+	position, err := s.markets.GetUserPositionInMarket(ctx, int64(req.MarketID), req.Username)
+	if err != nil {
+		return 0, nil, err
 	}
+
+	sharesOwned, err := sharesOwnedForOutcome(position, outcome)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return sharesOwned, position, nil
+}
+
+func (s *Service) applySaleAndRecordBet(ctx context.Context, req SellRequest, outcome string, sale saleResult, now time.Time) error {
+	if err := s.users.ApplyTransaction(ctx, req.Username, sale.saleValue, dusers.TransactionSale); err != nil {
+		return err
+	}
+
+	bet := &models.Bet{
+		Username: req.Username,
+		MarketID: req.MarketID,
+		Amount:   -sale.sharesToSell,
+		Outcome:  outcome,
+		PlacedAt: now,
+	}
+	if err := s.repo.Create(ctx, bet); err != nil {
+		// Roll back the credit deposited
+		_ = s.users.ApplyTransaction(ctx, req.Username, sale.saleValue, dusers.TransactionBuy)
+		return err
+	}
+	return nil
+}
+
+func (s *Service) calculateSale(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (saleResult, error) {
+	if err := validatePositionValue(pos.Value); err != nil {
+		return saleResult{}, err
+	}
+
 	valuePerShare := pos.Value / sharesOwned
 	if valuePerShare <= 0 {
-		return 0, 0, 0, ErrNoPosition
+		return saleResult{}, ErrNoPosition
 	}
 	if creditsRequested < valuePerShare {
-		return 0, 0, 0, ErrInvalidAmount
+		return saleResult{}, ErrInvalidAmount
 	}
 
 	sharesToSell := creditsRequested / valuePerShare
@@ -226,21 +238,39 @@ func (s *Service) calculateSale(pos *dmarkets.UserPosition, sharesOwned int64, c
 		sharesToSell = sharesOwned
 	}
 	if sharesToSell == 0 {
-		return 0, 0, 0, ErrInsufficientShares
+		return saleResult{}, ErrInsufficientShares
 	}
 
 	saleValue := sharesToSell * valuePerShare
-	dust := creditsRequested - saleValue
+	dust := calculateDust(creditsRequested, saleValue)
+
+	if err := validateDustCap(dust, s.econ.Economics.Betting.MaxDustPerSale); err != nil {
+		return saleResult{}, err
+	}
+
+	return saleResult{sharesToSell: sharesToSell, saleValue: saleValue, dust: dust}, nil
+}
+
+func validatePositionValue(value int64) error {
+	if value <= 0 {
+		return ErrNoPosition
+	}
+	return nil
+}
+
+func calculateDust(requested, saleValue int64) int64 {
+	dust := requested - saleValue
 	if dust < 0 {
-		dust = 0
+		return 0
 	}
+	return dust
+}
 
-	cap := s.econ.Economics.Betting.MaxDustPerSale
+func validateDustCap(dust int64, cap int64) error {
 	if cap > 0 && dust > cap {
-		return 0, 0, 0, ErrDustCapExceeded{Cap: cap, Requested: dust}
+		return ErrDustCapExceeded{Cap: cap, Requested: dust}
 	}
-
-	return sharesToSell, saleValue, dust, nil
+	return nil
 }
 
 func validatePlaceRequest(req PlaceRequest) (string, error) {
@@ -305,4 +335,30 @@ func placedBetFromModel(bet *models.Bet) *PlacedBet {
 		Outcome:  bet.Outcome,
 		PlacedAt: bet.PlacedAt,
 	}
+}
+
+func (s *Service) loadUserAndBetStatus(ctx context.Context, req PlaceRequest) (*dusers.User, bool, error) {
+	user, err := s.users.GetUser(ctx, req.Username)
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasBet, err := s.repo.UserHasBet(ctx, req.MarketID, req.Username)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return user, hasBet, nil
+}
+
+func (s *Service) createBetWithCharge(ctx context.Context, bet *models.Bet, totalCost int64) error {
+	if err := s.users.ApplyTransaction(ctx, bet.Username, totalCost, dusers.TransactionBuy); err != nil {
+		return err
+	}
+
+	if err := s.repo.Create(ctx, bet); err != nil {
+		_ = s.users.ApplyTransaction(ctx, bet.Username, totalCost, dusers.TransactionRefund)
+		return err
+	}
+	return nil
 }

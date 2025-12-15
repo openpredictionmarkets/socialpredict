@@ -414,6 +414,28 @@ func (s *Service) UpdatePersonalLinks(ctx context.Context, username string, link
 		return nil, ErrInvalidUserData
 	}
 
+	sanitized, err := s.sanitizePersonalLinks(links)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	user.PersonalLink1 = sanitized[0]
+	user.PersonalLink2 = sanitized[1]
+	user.PersonalLink3 = sanitized[2]
+	user.PersonalLink4 = sanitized[3]
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *Service) sanitizePersonalLinks(links PersonalLinks) ([]string, error) {
 	values := []string{
 		links.PersonalLink1,
 		links.PersonalLink2,
@@ -439,21 +461,7 @@ func (s *Service) UpdatePersonalLinks(ctx context.Context, username string, link
 		}
 		sanitized[i] = clean
 	}
-
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, err
-	}
-
-	user.PersonalLink1 = sanitized[0]
-	user.PersonalLink2 = sanitized[1]
-	user.PersonalLink3 = sanitized[2]
-	user.PersonalLink4 = sanitized[3]
-
-	if err := s.repo.Update(ctx, user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	return sanitized, nil
 }
 
 func financialSnapshotToMap(snapshot *analytics.FinancialSnapshot) map[string]int64 {
@@ -516,8 +524,7 @@ func PasswordHashCost() int {
 	return passwordHashCost
 }
 
-// ChangePassword validates credentials and persists a new hashed password.
-func (s *Service) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
+func (s *Service) validatePasswordChangeInputs(username, currentPassword, newPassword string) error {
 	if username == "" {
 		return ErrInvalidUserData
 	}
@@ -529,6 +536,14 @@ func (s *Service) ChangePassword(ctx context.Context, username, currentPassword,
 	}
 	if s.sanitizer == nil {
 		return ErrInvalidUserData
+	}
+	return nil
+}
+
+// ChangePassword validates credentials and persists a new hashed password.
+func (s *Service) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
+	if err := s.validatePasswordChangeInputs(username, currentPassword, newPassword); err != nil {
+		return err
 	}
 
 	creds, err := s.repo.GetCredentials(ctx, username)

@@ -175,43 +175,19 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse query parameters
-	var params dto.ListMarketsQueryParams
-	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+	params, err := parseListMarketsParams(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	params.Status = status
-	params.CreatedBy = r.URL.Query().Get("created_by")
-
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if limit, err := strconv.Atoi(limitStr); err == nil {
-			params.Limit = limit
-		}
-	}
-
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if offset, err := strconv.Atoi(offsetStr); err == nil {
-			params.Offset = offset
-		}
-	}
-
-	// Convert to domain filters
-	filters := dmarkets.ListFilters{
-		Status:    params.Status,
-		CreatedBy: params.CreatedBy,
-		Limit:     params.Limit,
-		Offset:    params.Offset,
-	}
 
 	// Call service
 	var markets []*dmarkets.Market
-	if params.Status != "" {
-		page := dmarkets.Page{Limit: params.Limit, Offset: params.Offset}
-		markets, err = h.service.ListByStatus(r.Context(), params.Status, page)
+	if params.status != "" {
+		page := dmarkets.Page{Limit: params.limit, Offset: params.offset}
+		markets, err = h.service.ListByStatus(r.Context(), params.status, page)
 	} else {
-		markets, err = h.service.ListMarkets(r.Context(), filters)
+		markets, err = h.service.ListMarkets(r.Context(), params.filters)
 	}
 	if err != nil {
 		h.handleError(w, err)
@@ -239,71 +215,23 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse query parameters
-	var params dto.SearchMarketsQueryParams
-	params.Query = r.URL.Query().Get("query")
-	if params.Query == "" {
-		params.Query = r.URL.Query().Get("q")
-	}
-	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+	params, err := h.parseSearchParams(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	params.Status = status
-
-	if params.Query == "" {
-		http.Error(w, "Query parameter 'query' is required", http.StatusBadRequest)
-		return
-	}
-
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if limit, err := strconv.Atoi(limitStr); err == nil {
-			params.Limit = limit
-		}
-	}
-
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if offset, err := strconv.Atoi(offsetStr); err == nil {
-			params.Offset = offset
-		}
-	}
-
-	// Convert to domain filters
-	filters := dmarkets.SearchFilters{
-		Status: params.Status,
-		Limit:  params.Limit,
-		Offset: params.Offset,
-	}
 
 	// Call service
-	searchResults, err := h.service.SearchMarkets(r.Context(), params.Query, filters)
+	searchResults, err := h.service.SearchMarkets(r.Context(), params.Query, params.Filters)
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
 
-	primaryOverviews, err := buildMarketOverviewResponses(r.Context(), h.service, searchResults.PrimaryResults)
-	if err != nil {
-		h.handleError(w, err)
+	response, buildErr := h.buildSearchResponse(r, searchResults)
+	if buildErr != nil {
+		h.handleError(w, buildErr)
 		return
-	}
-
-	fallbackOverviews, err := buildMarketOverviewResponses(r.Context(), h.service, searchResults.FallbackResults)
-	if err != nil {
-		h.handleError(w, err)
-		return
-	}
-
-	response := dto.SearchResponse{
-		PrimaryResults:  primaryOverviews,
-		FallbackResults: fallbackOverviews,
-		Query:           searchResults.Query,
-		PrimaryStatus:   searchResults.PrimaryStatus,
-		PrimaryCount:    searchResults.PrimaryCount,
-		FallbackCount:   searchResults.FallbackCount,
-		TotalCount:      searchResults.TotalCount,
-		FallbackUsed:    searchResults.FallbackUsed,
 	}
 
 	// Send response
@@ -632,4 +560,70 @@ func buildLeaderboardRows(leaderboard []*dmarkets.LeaderboardRow) []dto.Leaderbo
 		})
 	}
 	return leaderRows
+}
+
+type searchParams struct {
+	Query   string
+	Filters dmarkets.SearchFilters
+}
+
+func (h *Handler) parseSearchParams(r *http.Request) (searchParams, error) {
+	query := r.URL.Query().Get("query")
+	if query == "" {
+		query = r.URL.Query().Get("q")
+	}
+	if query == "" {
+		return searchParams{}, errors.New("Query parameter 'query' is required")
+	}
+
+	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
+	if err != nil {
+		return searchParams{}, err
+	}
+
+	limit := 0
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil {
+			offset = parsedOffset
+		}
+	}
+
+	return searchParams{
+		Query: query,
+		Filters: dmarkets.SearchFilters{
+			Status: status,
+			Limit:  limit,
+			Offset: offset,
+		},
+	}, nil
+}
+
+func (h *Handler) buildSearchResponse(r *http.Request, searchResults *dmarkets.SearchResults) (dto.SearchResponse, error) {
+	primaryOverviews, err := buildMarketOverviewResponses(r.Context(), h.service, searchResults.PrimaryResults)
+	if err != nil {
+		return dto.SearchResponse{}, err
+	}
+
+	fallbackOverviews, err := buildMarketOverviewResponses(r.Context(), h.service, searchResults.FallbackResults)
+	if err != nil {
+		return dto.SearchResponse{}, err
+	}
+
+	return dto.SearchResponse{
+		PrimaryResults:  primaryOverviews,
+		FallbackResults: fallbackOverviews,
+		Query:           searchResults.Query,
+		PrimaryStatus:   searchResults.PrimaryStatus,
+		PrimaryCount:    searchResults.PrimaryCount,
+		FallbackCount:   searchResults.FallbackCount,
+		TotalCount:      searchResults.TotalCount,
+		FallbackUsed:    searchResults.FallbackUsed,
+	}, nil
 }

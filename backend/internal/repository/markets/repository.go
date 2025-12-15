@@ -105,26 +105,9 @@ func (r *GormRepository) UpdateLabels(ctx context.Context, id int64, yesLabel, n
 func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
 	query := r.db.WithContext(ctx).Model(&models.Market{})
 
-	if filters.Status != "" {
-		if filters.Status == "active" {
-			query = query.Where("is_resolved = ?", false)
-		} else if filters.Status == "resolved" {
-			query = query.Where("is_resolved = ?", true)
-		}
-	}
-
-	if filters.CreatedBy != "" {
-		query = query.Where("creator_username = ?", filters.CreatedBy)
-	}
-
-	if filters.Limit > 0 {
-		query = query.Limit(filters.Limit)
-	}
-
-	if filters.Offset > 0 {
-		query = query.Offset(filters.Offset)
-	}
-
+	query = applyListStatusFilter(query, filters.Status)
+	query = applyCreatedByFilter(query, filters.CreatedBy)
+	query = applyPagination(query, filters.Limit, filters.Offset)
 	query = query.Order("created_at DESC")
 
 	var dbMarkets []models.Market
@@ -132,39 +115,15 @@ func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters)
 		return nil, err
 	}
 
-	markets := make([]*dmarkets.Market, len(dbMarkets))
-	for i, dbMarket := range dbMarkets {
-		markets[i] = r.modelToDomain(&dbMarket)
-	}
-
-	return markets, nil
+	return r.mapMarkets(dbMarkets), nil
 }
 
 // ListByStatus retrieves markets filtered by status with pagination
 func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
 	query := r.db.WithContext(ctx).Model(&models.Market{})
 
-	// Apply status filter
-	now := time.Now()
-	switch status {
-	case "active":
-		query = query.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
-	case "closed":
-		query = query.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
-	case "resolved":
-		query = query.Where("is_resolved = ?", true)
-	case "all":
-		// No status filter
-	}
-
-	// Apply pagination
-	if p.Limit > 0 {
-		query = query.Limit(p.Limit)
-	}
-	if p.Offset > 0 {
-		query = query.Offset(p.Offset)
-	}
-
+	query = applyStatusByResolution(query, status, time.Now())
+	query = applyPagination(query, p.Limit, p.Offset)
 	query = query.Order("created_at DESC")
 
 	var dbMarkets []models.Market
@@ -172,43 +131,47 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 		return nil, err
 	}
 
-	markets := make([]*dmarkets.Market, len(dbMarkets))
-	for i, dbMarket := range dbMarkets {
-		markets[i] = r.modelToDomain(&dbMarket)
-	}
+	return r.mapMarkets(dbMarkets), nil
+}
 
-	return markets, nil
+func applyListStatusFilter(query *gorm.DB, status string) *gorm.DB {
+	switch status {
+	case "active":
+		return query.Where("is_resolved = ?", false)
+	case "resolved":
+		return query.Where("is_resolved = ?", true)
+	default:
+		return query
+	}
+}
+
+func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
+	if createdBy == "" {
+		return query
+	}
+	return query.Where("creator_username = ?", createdBy)
+}
+
+func applyStatusByResolution(query *gorm.DB, status string, now time.Time) *gorm.DB {
+	switch status {
+	case "active":
+		return query.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+	case "closed":
+		return query.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+	case "resolved":
+		return query.Where("is_resolved = ?", true)
+	default:
+		return query
+	}
 }
 
 // Search searches for markets by query string
 func (r *GormRepository) Search(ctx context.Context, query string, filters dmarkets.SearchFilters) ([]*dmarkets.Market, error) {
 	dbQuery := r.db.WithContext(ctx).Model(&models.Market{})
 
-	// Search in question title and description (case insensitive, SQLite compatible)
-	searchTerm := strings.ToLower(query)
-	searchPattern := "%" + searchTerm + "%"
-	dbQuery = dbQuery.Where("(LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?)", searchPattern, searchPattern)
-
-	if filters.Status != "" && filters.Status != "all" {
-		now := time.Now()
-		switch filters.Status {
-		case "active":
-			dbQuery = dbQuery.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
-		case "closed":
-			dbQuery = dbQuery.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
-		case "resolved":
-			dbQuery = dbQuery.Where("is_resolved = ?", true)
-		}
-	}
-
-	if filters.Limit > 0 {
-		dbQuery = dbQuery.Limit(filters.Limit)
-	}
-
-	if filters.Offset > 0 {
-		dbQuery = dbQuery.Offset(filters.Offset)
-	}
-
+	dbQuery = applySearchTerm(dbQuery, query)
+	dbQuery = applyStatusFilter(dbQuery, filters.Status)
+	dbQuery = applyPagination(dbQuery, filters.Limit, filters.Offset)
 	dbQuery = dbQuery.Order("created_at DESC")
 
 	var dbMarkets []models.Market
@@ -216,12 +179,50 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 		return nil, err
 	}
 
+	return r.mapMarkets(dbMarkets), nil
+}
+
+func applySearchTerm(dbQuery *gorm.DB, query string) *gorm.DB {
+	searchTerm := strings.ToLower(query)
+	searchPattern := "%" + searchTerm + "%"
+	return dbQuery.Where("(LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?)", searchPattern, searchPattern)
+}
+
+func applyStatusFilter(dbQuery *gorm.DB, status string) *gorm.DB {
+	if status == "" || status == "all" {
+		return dbQuery
+	}
+
+	now := time.Now()
+	switch status {
+	case "active":
+		return dbQuery.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+	case "closed":
+		return dbQuery.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+	case "resolved":
+		return dbQuery.Where("is_resolved = ?", true)
+	default:
+		return dbQuery
+	}
+}
+
+func applyPagination(dbQuery *gorm.DB, limit, offset int) *gorm.DB {
+	if limit > 0 {
+		dbQuery = dbQuery.Limit(limit)
+	}
+
+	if offset > 0 {
+		dbQuery = dbQuery.Offset(offset)
+	}
+	return dbQuery
+}
+
+func (r *GormRepository) mapMarkets(dbMarkets []models.Market) []*dmarkets.Market {
 	markets := make([]*dmarkets.Market, len(dbMarkets))
 	for i, dbMarket := range dbMarkets {
 		markets[i] = r.modelToDomain(&dbMarket)
 	}
-
-	return markets, nil
+	return markets
 }
 
 // GetUserPosition retrieves the aggregated position for a specific user in a market.
