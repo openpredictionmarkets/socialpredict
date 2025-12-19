@@ -6,6 +6,7 @@ import (
 
 	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
+	usermodels "socialpredict/internal/domain/users/models"
 	"socialpredict/models"
 
 	"gorm.io/gorm"
@@ -102,7 +103,7 @@ func (r *GormRepository) Delete(ctx context.Context, username string) error {
 }
 
 // List retrieves users with the given filters
-func (r *GormRepository) List(ctx context.Context, filters dusers.ListFilters) ([]*dusers.User, error) {
+func (r *GormRepository) List(ctx context.Context, filters usermodels.ListFilters) ([]*dusers.User, error) {
 	query := r.db.WithContext(ctx).Model(&models.User{})
 
 	if filters.UserType != "" {

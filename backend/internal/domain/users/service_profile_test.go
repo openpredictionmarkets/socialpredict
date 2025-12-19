@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	users "socialpredict/internal/domain/users"
+	usermodels "socialpredict/internal/domain/users/models"
 	"socialpredict/security"
 	"socialpredict/setup"
 
@@ -23,7 +24,7 @@ type fakeRepository struct {
 const initialTestPassword = "CurrentPass123!"
 
 func newFakeRepository(username string) *fakeRepository {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(initialTestPassword), users.PasswordHashCost())
+	hash, _ := bcrypt.GenerateFromPassword([]byte(initialTestPassword), usermodels.PasswordHashCost())
 	return &fakeRepository{
 		user: &users.User{
 			ID:                 1,
@@ -77,7 +78,7 @@ func (f *fakeRepository) Delete(_ context.Context, username string) error {
 	return users.ErrUserNotFound
 }
 
-func (f *fakeRepository) List(context.Context, users.ListFilters) ([]*users.User, error) {
+func (f *fakeRepository) List(context.Context, usermodels.ListFilters) ([]*users.User, error) {
 	return nil, nil
 }
 

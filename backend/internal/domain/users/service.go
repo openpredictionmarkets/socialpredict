@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	analytics "socialpredict/internal/domain/analytics"
+	usermodels "socialpredict/internal/domain/users/models"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -34,20 +35,13 @@ type Repository interface {
 	Create(ctx context.Context, user *User) error
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, username string) error
-	List(ctx context.Context, filters ListFilters) ([]*User, error)
+	List(ctx context.Context, filters usermodels.ListFilters) ([]*User, error)
 	ListUserBets(ctx context.Context, username string) ([]*UserBet, error)
 	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
 	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
 	GetCredentials(ctx context.Context, username string) (*Credentials, error)
 	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
-}
-
-// ListFilters represents filters for listing users
-type ListFilters struct {
-	UserType string
-	Limit    int
-	Offset   int
 }
 
 // Sanitizer defines the behavior needed to sanitize user profile inputs.
@@ -191,7 +185,7 @@ func (s *Service) UpdateUser(ctx context.Context, username string, req UserUpdat
 }
 
 // ListUsers returns a list of users with filters
-func (s *Service) ListUsers(ctx context.Context, filters ListFilters) ([]*User, error) {
+func (s *Service) ListUsers(ctx context.Context, filters usermodels.ListFilters) ([]*User, error) {
 	return s.repo.List(ctx, filters)
 }
 
@@ -517,13 +511,6 @@ func (s *Service) GetPrivateProfile(ctx context.Context, username string) (*Priv
 	}, nil
 }
 
-const passwordHashCost = 14
-
-// PasswordHashCost exposes the bcrypt cost used for hashing user passwords.
-func PasswordHashCost() int {
-	return passwordHashCost
-}
-
 func (s *Service) validatePasswordChangeInputs(username, currentPassword, newPassword string) error {
 	if username == "" {
 		return ErrInvalidUserData
@@ -564,7 +551,7 @@ func (s *Service) ChangePassword(ctx context.Context, username, currentPassword,
 		return fmt.Errorf("new password must differ from the current password")
 	}
 
-	hashed, err := bcrypt.GenerateFromPassword([]byte(sanitized), passwordHashCost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(sanitized), usermodels.PasswordHashCost())
 	if err != nil {
 		return fmt.Errorf("failed to hash new password: %w", err)
 	}

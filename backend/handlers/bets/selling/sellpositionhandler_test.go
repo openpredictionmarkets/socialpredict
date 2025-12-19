@@ -13,6 +13,7 @@ import (
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
+	usermodels "socialpredict/internal/domain/users/models"
 	"socialpredict/models/modelstesting"
 )
 
@@ -85,7 +86,7 @@ func (f *fakeUsersService) UpdateUser(ctx context.Context, username string, req 
 	return nil, nil
 }
 func (f *fakeUsersService) DeleteUser(ctx context.Context, username string) error { return nil }
-func (f *fakeUsersService) List(ctx context.Context, filters dusers.ListFilters) ([]*dusers.User, error) {
+func (f *fakeUsersService) List(ctx context.Context, filters usermodels.ListFilters) ([]*dusers.User, error) {
 	return nil, nil
 }
 func (f *fakeUsersService) ListUserBets(ctx context.Context, username string) ([]*dusers.UserBet, error) {
