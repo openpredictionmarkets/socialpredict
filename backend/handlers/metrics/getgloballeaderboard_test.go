@@ -11,6 +11,7 @@ import (
 	analytics "socialpredict/internal/domain/analytics"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
+	"socialpredict/models/modelstesting"
 )
 
 type leaderboardRepo struct {
@@ -40,6 +41,8 @@ func (r *leaderboardRepo) UserMarketPositions(context.Context, string) ([]positi
 }
 
 func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
+	modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
+
 	now := time.Now()
 	repo := &leaderboardRepo{
 		users: []models.User{

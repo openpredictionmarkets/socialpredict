@@ -101,6 +101,8 @@ func (m *mockPositionsService) GetPublicMarket(ctx context.Context, marketID int
 }
 
 func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.T) {
+	modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
+
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 

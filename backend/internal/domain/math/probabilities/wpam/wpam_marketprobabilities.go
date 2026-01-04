@@ -1,9 +1,7 @@
 package wpam
 
 import (
-	"log"
 	"socialpredict/models"
-	"socialpredict/setup"
 	"time"
 )
 
@@ -16,27 +14,41 @@ type ProjectedProbability struct {
 	Probability float64 `json:"projectedprobability"`
 }
 
-// appConfig holds the loaded application configuration accessible within the package
-var appConfig *setup.EconomicConfig
+// Seeds captures the initial market parameters needed for WPAM calculations.
+type Seeds struct {
+	InitialProbability     float64
+	InitialSubsidization   int64
+	InitialYesContribution int64
+	InitialNoContribution  int64
+}
 
-func init() {
-	// Load configuration
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+var (
+	configSeeds Seeds
+	seedsSet    bool
+)
+
+// SetSeeds configures the initial values for WPAM calculations.
+func SetSeeds(seeds Seeds) {
+	configSeeds = seeds
+	seedsSet = true
+}
+
+func mustGetSeeds() Seeds {
+	if !seedsSet {
+		panic("wpam seeds not configured: call wpam.SetSeeds with initial market parameters")
 	}
+	return configSeeds
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
 func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+	seeds := mustGetSeeds()
 	var probabilityChanges []ProbabilityChange
 
-	// Initial state using values from appConfig
-	P_initial := appConfig.Economics.MarketCreation.InitialMarketProbability
-	I_initial := appConfig.Economics.MarketCreation.InitialMarketSubsidization
-	totalYes := appConfig.Economics.MarketCreation.InitialMarketYes
-	totalNo := appConfig.Economics.MarketCreation.InitialMarketNo
+	P_initial := seeds.InitialProbability
+	I_initial := seeds.InitialSubsidization
+	totalYes := seeds.InitialYesContribution
+	totalNo := seeds.InitialNoContribution
 
 	probabilityChanges = append(probabilityChanges, ProbabilityChange{Probability: P_initial, Timestamp: marketCreatedAtTime})
 
@@ -56,6 +68,7 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 }
 
 func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
+	_ = mustGetSeeds() // ensure seeds set before proceeding
 
 	updatedBets := append(currentBets, newBet)
 
