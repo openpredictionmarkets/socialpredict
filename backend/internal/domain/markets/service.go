@@ -2,16 +2,9 @@ package markets
 
 import (
 	"context"
-	"math"
-	"sort"
-	"strings"
 	"time"
 
-	marketmath "socialpredict/internal/domain/math/market"
-	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/internal/domain/math/probabilities/wpam"
 	users "socialpredict/internal/domain/users"
-	"socialpredict/models"
 )
 
 const (
@@ -21,12 +14,12 @@ const (
 	MinLabelLength         = 1
 )
 
-// Clock provides time functionality for testability
+// Clock provides time functionality for testability.
 type Clock interface {
 	Now() time.Time
 }
 
-// Repository defines the interface for market data access
+// Repository defines the interface for market data access.
 type Repository interface {
 	Create(ctx context.Context, market *Market) error
 	GetByID(ctx context.Context, id int64) (*Market, error)
@@ -56,7 +49,7 @@ type ProbabilityPoint struct {
 	Timestamp   time.Time
 }
 
-// UserService defines the interface for user-related operations
+// UserService defines the interface for user-related operations.
 type UserService interface {
 	ValidateUserExists(ctx context.Context, username string) error
 	ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error
@@ -65,14 +58,14 @@ type UserService interface {
 	GetPublicUser(ctx context.Context, username string) (*users.PublicUser, error)
 }
 
-// Config holds configuration for the markets service
+// Config holds configuration for the markets service.
 type Config struct {
 	MinimumFutureHours float64
 	CreateMarketCost   int64
 	MaximumDebtAllowed int64
 }
 
-// ListFilters represents filters for listing markets
+// ListFilters represents filters for listing markets.
 type ListFilters struct {
 	Status    string
 	CreatedBy string
@@ -80,14 +73,14 @@ type ListFilters struct {
 	Offset    int
 }
 
-// SearchFilters represents filters for searching markets
+// SearchFilters represents filters for searching markets.
 type SearchFilters struct {
 	Status string
 	Limit  int
 	Offset int
 }
 
-// SearchResults represents the result of a market search with fallback
+// SearchResults represents the result of a market search with fallback.
 type SearchResults struct {
 	PrimaryResults  []*Market `json:"primaryResults"`
 	FallbackResults []*Market `json:"fallbackResults"`
@@ -99,7 +92,7 @@ type SearchResults struct {
 	FallbackUsed    bool      `json:"fallbackUsed"`
 }
 
-// ServiceInterface defines the interface for market service operations
+// ServiceInterface defines the interface for market service operations.
 type ServiceInterface interface {
 	CreateMarket(ctx context.Context, req MarketCreateRequest, creatorUsername string) (*Market, error)
 	SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error
@@ -118,7 +111,7 @@ type ServiceInterface interface {
 	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)
 }
 
-// Service implements the core market business logic
+// Service implements the core market business logic.
 type Service struct {
 	repo        Repository
 	userService UserService
@@ -126,7 +119,7 @@ type Service struct {
 	config      Config
 }
 
-// NewService creates a new markets service
+// NewService creates a new markets service.
 func NewService(repo Repository, userService UserService, clock Clock, config Config) *Service {
 	return &Service{
 		repo:        repo,
@@ -136,116 +129,7 @@ func NewService(repo Repository, userService UserService, clock Clock, config Co
 	}
 }
 
-// CreateMarket creates a new market with validation
-func (s *Service) CreateMarket(ctx context.Context, req MarketCreateRequest, creatorUsername string) (*Market, error) {
-	if err := s.validateCreateRequest(req); err != nil {
-		return nil, err
-	}
-
-	labels := normalizeLabels(req.YesLabel, req.NoLabel)
-
-	if err := s.userService.ValidateUserExists(ctx, creatorUsername); err != nil {
-		return nil, ErrUserNotFound
-	}
-
-	if err := s.ValidateMarketResolutionTime(req.ResolutionDateTime); err != nil {
-		return nil, err
-	}
-
-	if err := s.ensureCreateMarketBalance(ctx, creatorUsername); err != nil {
-		return nil, err
-	}
-
-	market := s.buildMarketEntity(req, creatorUsername, labels)
-
-	if err := s.repo.Create(ctx, market); err != nil {
-		return nil, err
-	}
-
-	return market, nil
-}
-
-// SetCustomLabels updates the custom labels for a market
-func (s *Service) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
-	// Validate labels
-	if err := s.validateCustomLabels(yesLabel, noLabel); err != nil {
-		return err
-	}
-
-	// Check market exists
-	_, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return ErrMarketNotFound
-	}
-
-	// Update labels
-	return s.repo.UpdateLabels(ctx, marketID, yesLabel, noLabel)
-}
-
-// GetMarket retrieves a market by ID
-func (s *Service) GetMarket(ctx context.Context, id int64) (*Market, error) {
-	return s.repo.GetByID(ctx, id)
-}
-
-type labelPair struct {
-	yes string
-	no  string
-}
-
-func (s *Service) validateCreateRequest(req MarketCreateRequest) error {
-	if err := s.validateQuestionTitle(req.QuestionTitle); err != nil {
-		return err
-	}
-	if err := s.validateDescription(req.Description); err != nil {
-		return err
-	}
-	return s.validateCustomLabels(req.YesLabel, req.NoLabel)
-}
-
-func normalizeLabels(yesLabel string, noLabel string) labelPair {
-	y := strings.TrimSpace(yesLabel)
-	n := strings.TrimSpace(noLabel)
-	if y == "" {
-		y = "YES"
-	}
-	if n == "" {
-		n = "NO"
-	}
-	return labelPair{yes: y, no: n}
-}
-
-func (s *Service) ensureCreateMarketBalance(ctx context.Context, creatorUsername string) error {
-	if err := s.userService.ValidateUserBalance(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
-		return ErrInsufficientBalance
-	}
-	return s.userService.DeductBalance(ctx, creatorUsername, s.config.CreateMarketCost)
-}
-
-func (s *Service) buildMarketEntity(req MarketCreateRequest, creatorUsername string, labels labelPair) *Market {
-	now := s.clock.Now()
-	return &Market{
-		QuestionTitle:      req.QuestionTitle,
-		Description:        req.Description,
-		OutcomeType:        req.OutcomeType,
-		ResolutionDateTime: req.ResolutionDateTime,
-		CreatorUsername:    creatorUsername,
-		YesLabel:           labels.yes,
-		NoLabel:            labels.no,
-		Status:             "active",
-		CreatedAt:          now,
-		UpdatedAt:          now,
-	}
-}
-
-// GetPublicMarket returns a public representation of a market.
-func (s *Service) GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error) {
-	if marketID <= 0 {
-		return nil, ErrInvalidInput
-	}
-	return s.repo.GetPublicMarket(ctx, marketID)
-}
-
-// MarketOverview represents enriched market data with calculations
+// MarketOverview represents enriched market data with calculations.
 type MarketOverview struct {
 	Market             *Market
 	Creator            *CreatorSummary
@@ -256,333 +140,13 @@ type MarketOverview struct {
 	MarketDust         int64
 }
 
-// ListMarkets returns a list of markets with filters
-func (s *Service) ListMarkets(ctx context.Context, filters ListFilters) ([]*Market, error) {
-	return s.repo.List(ctx, filters)
-}
-
-// GetMarketOverviews returns enriched market data with calculations
-func (s *Service) GetMarketOverviews(ctx context.Context, filters ListFilters) ([]*MarketOverview, error) {
-	markets, err := s.repo.List(ctx, filters)
-	if err != nil {
-		return nil, err
-	}
-
-	var overviews []*MarketOverview
-	for _, market := range markets {
-		overview := &MarketOverview{
-			Market:  market,
-			Creator: s.buildCreatorSummary(ctx, market.CreatorUsername),
-			// Complex calculations will be added here
-			// This is placeholder for now - calculations should be moved from handlers
-		}
-		overviews = append(overviews, overview)
-	}
-
-	return overviews, nil
-}
-
-// GetMarketDetails returns detailed market information with calculations
-func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*MarketOverview, error) {
-	if marketID <= 0 {
-		return nil, ErrInvalidInput
-	}
-
-	market, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return nil, err
-	}
-
-	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
-	if err != nil {
-		return nil, err
-	}
-
-	modelBets := convertToModelBets(bets)
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets)
-	probabilityPoints := make([]ProbabilityPoint, len(probabilityChanges))
-	for i, change := range probabilityChanges {
-		probabilityPoints[i] = ProbabilityPoint{
-			Probability: change.Probability,
-			Timestamp:   change.Timestamp,
-		}
-	}
-
-	lastProbability := 0.0
-	if len(probabilityPoints) > 0 {
-		lastProbability = probabilityPoints[len(probabilityPoints)-1].Probability
-	}
-
-	totalVolumeWithDust := marketmath.GetMarketVolumeWithDust(modelBets)
-	marketDust := marketmath.GetMarketDust(modelBets)
-	numUsers := countUniqueUsers(modelBets)
-
-	return &MarketOverview{
-		Market:             market,
-		Creator:            s.buildCreatorSummary(ctx, market.CreatorUsername),
-		ProbabilityChanges: probabilityPoints,
-		LastProbability:    lastProbability,
-		NumUsers:           numUsers,
-		TotalVolume:        totalVolumeWithDust,
-		MarketDust:         marketDust,
-	}, nil
-}
-
-func (s *Service) buildCreatorSummary(ctx context.Context, username string) *CreatorSummary {
-	summary := &CreatorSummary{Username: username}
-	if s.userService == nil {
-		return summary
-	}
-	user, err := s.userService.GetPublicUser(ctx, username)
-	if err != nil || user == nil {
-		return summary
-	}
-	summary.DisplayName = user.DisplayName
-	summary.PersonalEmoji = user.PersonalEmoji
-	return summary
-}
-
-func convertToModelBets(bets []*Bet) []models.Bet {
-	if len(bets) == 0 {
-		return []models.Bet{}
-	}
-	out := make([]models.Bet, len(bets))
-	for i, bet := range bets {
-		out[i] = models.Bet{
-			Username: bet.Username,
-			MarketID: bet.MarketID,
-			Amount:   bet.Amount,
-			PlacedAt: bet.PlacedAt,
-			Outcome:  bet.Outcome,
-		}
-	}
-	return out
-}
-
-func countUniqueUsers(bets []models.Bet) int {
-	if len(bets) == 0 {
-		return 0
-	}
-	seen := make(map[string]struct{})
-	for _, bet := range bets {
-		if bet.Username == "" {
-			continue
-		}
-		if _, ok := seen[bet.Username]; !ok {
-			seen[bet.Username] = struct{}{}
-		}
-	}
-	return len(seen)
-}
-
-// SearchMarkets searches for markets by query with fallback logic
-func (s *Service) SearchMarkets(ctx context.Context, query string, filters SearchFilters) (*SearchResults, error) {
-	if err := validateSearchQuery(query); err != nil {
-		return nil, err
-	}
-
-	filters = normalizeSearchFilters(filters)
-
-	primaryResults, err := s.repo.Search(ctx, query, filters)
-	if err != nil {
-		return nil, err
-	}
-
-	results := newSearchResults(query, filters.Status, primaryResults)
-	if !shouldFetchFallback(primaryResults, filters.Status) {
-		return results, nil
-	}
-
-	fallbackResults, fallbackErr := s.fetchFallbackMarkets(ctx, query, filters, primaryResults)
-	if fallbackErr != nil || len(fallbackResults) == 0 {
-		return results, nil
-	}
-
-	results.FallbackResults = fallbackResults
-	results.FallbackCount = len(fallbackResults)
-	results.TotalCount = results.PrimaryCount + results.FallbackCount
-	results.FallbackUsed = true
-
-	return results, nil
-}
-
-func validateSearchQuery(query string) error {
-	if strings.TrimSpace(query) == "" {
-		return ErrInvalidInput
-	}
-	return nil
-}
-
-func normalizeSearchFilters(filters SearchFilters) SearchFilters {
-	if filters.Limit <= 0 || filters.Limit > 50 {
-		filters.Limit = 20
-	}
-	if filters.Offset < 0 {
-		filters.Offset = 0
-	}
-	return filters
-}
-
-func newSearchResults(query string, status string, primaryResults []*Market) *SearchResults {
-	return &SearchResults{
-		PrimaryResults:  primaryResults,
-		FallbackResults: []*Market{},
-		Query:           query,
-		PrimaryStatus:   status,
-		PrimaryCount:    len(primaryResults),
-		FallbackCount:   0,
-		TotalCount:      len(primaryResults),
-		FallbackUsed:    false,
-	}
-}
-
-func shouldFetchFallback(primaryResults []*Market, status string) bool {
-	return len(primaryResults) <= 5 && status != "" && status != "all"
-}
-
-func (s *Service) fetchFallbackMarkets(ctx context.Context, query string, filters SearchFilters, primaryResults []*Market) ([]*Market, error) {
-	allFilters := SearchFilters{
-		Status: "", // Empty means search all
-		Limit:  filters.Limit * 2,
-		Offset: 0,
-	}
-
-	allResults, err := s.repo.Search(ctx, query, allFilters)
-	if err != nil {
-		return nil, err
-	}
-
-	primaryIDs := make(map[int64]bool)
-	for _, market := range primaryResults {
-		primaryIDs[market.ID] = true
-	}
-
-	var fallbackResults []*Market
-	for _, market := range allResults {
-		if primaryIDs[market.ID] {
-			continue
-		}
-		fallbackResults = append(fallbackResults, market)
-		if len(fallbackResults) >= filters.Limit {
-			break
-		}
-	}
-
-	return fallbackResults, nil
-}
-
-// ResolveMarket resolves a market with a given outcome
-func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
-	outcome, err := normalizeResolution(resolution)
-	if err != nil {
-		return err
-	}
-
-	market, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return ErrMarketNotFound
-	}
-
-	if err := validateResolutionRequest(market, username); err != nil {
-		return err
-	}
-
-	if err := s.repo.ResolveMarket(ctx, marketID, outcome); err != nil {
-		return err
-	}
-
-	if outcome == "N/A" {
-		return s.refundMarketBets(ctx, marketID)
-	}
-
-	return s.payoutWinningPositions(ctx, marketID)
-}
-
-func normalizeResolution(resolution string) (string, error) {
-	outcome := strings.ToUpper(strings.TrimSpace(resolution))
-	switch outcome {
-	case "YES", "NO", "N/A":
-		return outcome, nil
-	default:
-		return "", ErrInvalidInput
-	}
-}
-
-func validateResolutionRequest(market *Market, username string) error {
-	if market.CreatorUsername != username {
-		return ErrUnauthorized
-	}
-
-	if market.Status == "resolved" {
-		return ErrInvalidState
-	}
-
-	return nil
-}
-
-func (s *Service) refundMarketBets(ctx context.Context, marketID int64) error {
-	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
-	if err != nil {
-		return err
-	}
-	for _, bet := range bets {
-		if err := s.userService.ApplyTransaction(ctx, bet.Username, bet.Amount, users.TransactionRefund); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Service) payoutWinningPositions(ctx context.Context, marketID int64) error {
-	positions, err := s.repo.CalculatePayoutPositions(ctx, marketID)
-	if err != nil {
-		return err
-	}
-	for _, pos := range positions {
-		if pos.Value <= 0 {
-			continue
-		}
-		if err := s.userService.ApplyTransaction(ctx, pos.Username, pos.Value, users.TransactionWin); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// ListActiveMarkets returns markets that are not resolved and active
-func (s *Service) ListActiveMarkets(ctx context.Context, limit int) ([]*Market, error) {
-	filters := ListFilters{
-		Status: "active",
-		Limit:  limit,
-	}
-	return s.repo.List(ctx, filters)
-}
-
-// ListClosedMarkets returns markets that are closed but not resolved
-func (s *Service) ListClosedMarkets(ctx context.Context, limit int) ([]*Market, error) {
-	filters := ListFilters{
-		Status: "closed",
-		Limit:  limit,
-	}
-	return s.repo.List(ctx, filters)
-}
-
-// ListResolvedMarkets returns markets that have been resolved
-func (s *Service) ListResolvedMarkets(ctx context.Context, limit int) ([]*Market, error) {
-	filters := ListFilters{
-		Status: "resolved",
-		Limit:  limit,
-	}
-	return s.repo.List(ctx, filters)
-}
-
-// Page represents pagination parameters
+// Page represents pagination parameters.
 type Page struct {
 	Limit  int
 	Offset int
 }
 
-// LeaderboardRow represents a single row in the market leaderboard
+// LeaderboardRow represents a single row in the market leaderboard.
 type LeaderboardRow struct {
 	Username       string
 	Profit         int64
@@ -594,465 +158,24 @@ type LeaderboardRow struct {
 	Rank           int
 }
 
-// ProbabilityProjectionRequest represents a request for probability projection
+// ProbabilityProjectionRequest represents a request for probability projection.
 type ProbabilityProjectionRequest struct {
 	MarketID int64
 	Amount   int64
 	Outcome  string
 }
 
-// ProbabilityProjection represents the result of a probability projection
+// ProbabilityProjection represents the result of a probability projection.
 type ProbabilityProjection struct {
 	CurrentProbability   float64
 	ProjectedProbability float64
 }
 
-// ListByStatus returns markets filtered by status with pagination
-func (s *Service) ListByStatus(ctx context.Context, status string, p Page) ([]*Market, error) {
-	// Validate status
-	switch status {
-	case "active", "closed", "resolved", "all":
-		// Valid status
-	default:
-		return nil, ErrInvalidInput
-	}
-
-	// Validate pagination
-	if p.Limit <= 0 {
-		p.Limit = 100
-	}
-	if p.Limit > 1000 {
-		p.Limit = 1000
-	}
-	if p.Offset < 0 {
-		p.Offset = 0
-	}
-
-	return s.repo.ListByStatus(ctx, status, p)
-}
-
-// GetMarketLeaderboard returns the leaderboard for a specific market
-func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Page) ([]*LeaderboardRow, error) {
-	if marketID <= 0 {
-		return nil, ErrInvalidInput
-	}
-
-	market, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return nil, ErrMarketNotFound
-	}
-
-	p = normalizePage(p, 100, 1000)
-
-	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(bets) == 0 {
-		return []*LeaderboardRow{}, nil
-	}
-
-	modelBets := convertToModelBets(bets)
-	snapshot := marketSnapshotFromModel(market)
-
-	profitability, err := positionsmath.CalculateMarketLeaderboard(snapshot, modelBets)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(profitability) == 0 {
-		return []*LeaderboardRow{}, nil
-	}
-
-	paged := paginateProfitability(profitability, p)
-	return mapLeaderboardRows(paged), nil
-}
-
-// ProjectProbability projects what the probability would be after a hypothetical bet
-func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProjectionRequest) (*ProbabilityProjection, error) {
-	if err := validateProbabilityRequest(req); err != nil {
-		return nil, err
-	}
-
-	market, err := s.repo.GetByID(ctx, req.MarketID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := validateMarketForProjection(market, s.clock.Now()); err != nil {
-		return nil, err
-	}
-
-	bets, err := s.repo.ListBetsForMarket(ctx, req.MarketID)
-	if err != nil {
-		return nil, err
-	}
-
-	projectionInput := projectionInputs{
-		market:    market,
-		outcome:   normalizeOutcome(req.Outcome),
-		amount:    req.Amount,
-		now:       s.clock.Now(),
-		modelBets: convertToModelBets(bets),
-	}
-
-	return calculateProbabilityProjection(projectionInput), nil
-}
-
-func normalizePage(p Page, defaultLimit, maxLimit int) Page {
-	if p.Limit <= 0 {
-		p.Limit = defaultLimit
-	}
-	if p.Limit > maxLimit {
-		p.Limit = maxLimit
-	}
-	if p.Offset < 0 {
-		p.Offset = 0
-	}
-	return p
-}
-
-func marketSnapshotFromModel(market *Market) positionsmath.MarketSnapshot {
-	return positionsmath.MarketSnapshot{
-		ID:               market.ID,
-		CreatedAt:        market.CreatedAt,
-		IsResolved:       strings.EqualFold(market.Status, "resolved"),
-		ResolutionResult: market.ResolutionResult,
-	}
-}
-
-func paginateProfitability(profitability []positionsmath.UserProfitability, p Page) []positionsmath.UserProfitability {
-	start := p.Offset
-	if start > len(profitability) {
-		start = len(profitability)
-	}
-	end := start + p.Limit
-	if end > len(profitability) {
-		end = len(profitability)
-	}
-	return profitability[start:end]
-}
-
-func mapLeaderboardRows(rows []positionsmath.UserProfitability) []*LeaderboardRow {
-	if len(rows) == 0 {
-		return []*LeaderboardRow{}
-	}
-	leaderboard := make([]*LeaderboardRow, len(rows))
-	for i, row := range rows {
-		leaderboard[i] = &LeaderboardRow{
-			Username:       row.Username,
-			Profit:         row.Profit,
-			CurrentValue:   row.CurrentValue,
-			TotalSpent:     row.TotalSpent,
-			Position:       row.Position,
-			YesSharesOwned: row.YesSharesOwned,
-			NoSharesOwned:  row.NoSharesOwned,
-			Rank:           row.Rank,
-		}
-	}
-	return leaderboard
-}
-
-type projectionInputs struct {
-	market    *Market
-	outcome   string
-	amount    int64
-	now       time.Time
-	modelBets []models.Bet
-}
-
-func validateProbabilityRequest(req ProbabilityProjectionRequest) error {
-	if req.MarketID <= 0 || req.MarketID > int64(math.MaxUint32) || strings.TrimSpace(req.Outcome) == "" || req.Amount <= 0 {
-		return ErrInvalidInput
-	}
-
-	outcome := strings.ToUpper(strings.TrimSpace(req.Outcome))
-	if outcome != "YES" && outcome != "NO" {
-		return ErrInvalidInput
-	}
-	return nil
-}
-
-func validateMarketForProjection(market *Market, now time.Time) error {
-	if strings.EqualFold(market.Status, "resolved") {
-		return ErrInvalidState
-	}
-
-	if now.After(market.ResolutionDateTime) {
-		return ErrInvalidState
-	}
-	return nil
-}
-
-func calculateProbabilityProjection(input projectionInputs) *ProbabilityProjection {
-	probabilityTrack := wpam.CalculateMarketProbabilitiesWPAM(input.market.CreatedAt, input.modelBets)
-
-	currentProbability := 0.5
-	if len(probabilityTrack) > 0 {
-		currentProbability = probabilityTrack[len(probabilityTrack)-1].Probability
-	}
-
-	newBet := models.Bet{
-		Username: "preview",
-		MarketID: uint(input.market.ID),
-		Amount:   input.amount,
-		Outcome:  input.outcome,
-		PlacedAt: input.now,
-	}
-
-	projection := wpam.ProjectNewProbabilityWPAM(input.market.CreatedAt, input.modelBets, newBet)
-
-	return &ProbabilityProjection{
-		CurrentProbability:   currentProbability,
-		ProjectedProbability: projection.Probability,
-	}
-}
-
-func normalizeOutcome(outcome string) string {
-	switch strings.ToUpper(strings.TrimSpace(outcome)) {
-	case "YES":
-		return "YES"
-	case "NO":
-		return "NO"
-	default:
-		return ""
-	}
-}
-
-// CalculateMarketVolume returns the total traded volume for a market.
-func (s *Service) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
-	if marketID <= 0 {
-		return 0, ErrInvalidInput
-	}
-
-	if _, err := s.repo.GetByID(ctx, marketID); err != nil {
-		return 0, err
-	}
-
-	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
-	if err != nil {
-		return 0, err
-	}
-
-	modelBets := convertToModelBets(bets)
-	return marketmath.GetMarketVolume(modelBets), nil
-}
-
-// BetDisplayInfo represents a bet with probability information
+// BetDisplayInfo represents a bet with probability information.
 type BetDisplayInfo struct {
 	Username    string    `json:"username"`
 	Outcome     string    `json:"outcome"`
 	Amount      int64     `json:"amount"`
 	Probability float64   `json:"probability"`
 	PlacedAt    time.Time `json:"placedAt"`
-}
-
-// GetMarketBets returns the bet history for a market with probabilities
-func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error) {
-	if marketID <= 0 {
-		return nil, ErrInvalidInput
-	}
-
-	market, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return nil, err
-	}
-
-	modelBets, err := s.loadMarketBets(ctx, marketID)
-	if err != nil {
-		return nil, err
-	}
-	if len(modelBets) == 0 {
-		return []*BetDisplayInfo{}, nil
-	}
-
-	probabilityChanges := ensureProbabilityChanges(wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets), market.CreatedAt)
-	sortProbabilityChanges(probabilityChanges)
-	sortBetsByTime(modelBets)
-
-	return buildBetDisplayInfos(modelBets, probabilityChanges), nil
-}
-
-func (s *Service) loadMarketBets(ctx context.Context, marketID int64) ([]models.Bet, error) {
-	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
-	if err != nil {
-		return nil, err
-	}
-	return convertToModelBets(bets), nil
-}
-
-func ensureProbabilityChanges(changes []wpam.ProbabilityChange, createdAt time.Time) []wpam.ProbabilityChange {
-	if len(changes) == 0 {
-		return []wpam.ProbabilityChange{{
-			Probability: 0,
-			Timestamp:   createdAt,
-		}}
-	}
-	return changes
-}
-
-func sortProbabilityChanges(changes []wpam.ProbabilityChange) {
-	sort.Slice(changes, func(i, j int) bool {
-		return changes[i].Timestamp.Before(changes[j].Timestamp)
-	})
-}
-
-func sortBetsByTime(bets []models.Bet) {
-	sort.Slice(bets, func(i, j int) bool {
-		return bets[i].PlacedAt.Before(bets[j].PlacedAt)
-	})
-}
-
-func buildBetDisplayInfos(modelBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []*BetDisplayInfo {
-	results := make([]*BetDisplayInfo, 0, len(modelBets))
-	for _, bet := range modelBets {
-		matchedProbability := latestProbabilityAt(probabilityChanges, bet.PlacedAt)
-		results = append(results, &BetDisplayInfo{
-			Username:    bet.Username,
-			Outcome:     bet.Outcome,
-			Amount:      bet.Amount,
-			Probability: matchedProbability,
-			PlacedAt:    bet.PlacedAt,
-		})
-	}
-	return results
-}
-
-func latestProbabilityAt(changes []wpam.ProbabilityChange, timestamp time.Time) float64 {
-	matched := changes[0].Probability
-	for _, change := range changes {
-		if change.Timestamp.After(timestamp) {
-			break
-		}
-		matched = change.Probability
-	}
-	return matched
-}
-
-// GetMarketPositions returns all user positions in a market
-func (s *Service) GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error) {
-	if marketID <= 0 {
-		return nil, ErrInvalidInput
-	}
-
-	// Ensure market exists
-	if _, err := s.repo.GetByID(ctx, marketID); err != nil {
-		return nil, err
-	}
-
-	positions, err := s.repo.ListMarketPositions(ctx, marketID)
-	if err != nil {
-		return nil, err
-	}
-	if positions == nil {
-		return MarketPositions{}, nil
-	}
-	return positions, nil
-}
-
-// GetUserPositionInMarket returns a specific user's position in a market
-func (s *Service) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*UserPosition, error) {
-	// 1. Validate market exists
-	_, err := s.repo.GetByID(ctx, marketID)
-	if err != nil {
-		return nil, ErrMarketNotFound
-	}
-
-	if strings.TrimSpace(username) == "" {
-		return nil, ErrInvalidInput
-	}
-
-	position, err := s.repo.GetUserPosition(ctx, marketID, username)
-	if err != nil {
-		return nil, err
-	}
-	return position, nil
-}
-
-// validateQuestionTitle validates the market question title
-func (s *Service) validateQuestionTitle(title string) error {
-	if len(title) > MaxQuestionTitleLength || len(title) < 1 {
-		return ErrInvalidQuestionLength
-	}
-	return nil
-}
-
-// validateDescription validates the market description
-func (s *Service) validateDescription(description string) error {
-	if len(description) > MaxDescriptionLength {
-		return ErrInvalidDescriptionLength
-	}
-	return nil
-}
-
-// validateCustomLabels validates the custom yes/no labels
-func (s *Service) validateCustomLabels(yesLabel, noLabel string) error {
-	// Validate yes label
-	if yesLabel != "" {
-		yesLabel = strings.TrimSpace(yesLabel)
-		if len(yesLabel) < MinLabelLength || len(yesLabel) > MaxLabelLength {
-			return ErrInvalidLabel
-		}
-	}
-
-	// Validate no label
-	if noLabel != "" {
-		noLabel = strings.TrimSpace(noLabel)
-		if len(noLabel) < MinLabelLength || len(noLabel) > MaxLabelLength {
-			return ErrInvalidLabel
-		}
-	}
-
-	return nil
-}
-
-// ValidateQuestionTitle validates the market question title
-func (s *Service) ValidateQuestionTitle(title string) error {
-	if len(title) > MaxQuestionTitleLength || len(title) < 1 {
-		return ErrInvalidQuestionLength
-	}
-	return nil
-}
-
-// ValidateDescription validates the market description
-func (s *Service) ValidateDescription(description string) error {
-	if len(description) > MaxDescriptionLength {
-		return ErrInvalidDescriptionLength
-	}
-	return nil
-}
-
-// ValidateLabels validates the custom yes/no labels
-func (s *Service) ValidateLabels(yesLabel, noLabel string) error {
-	// Validate yes label
-	if yesLabel != "" {
-		yesLabel = strings.TrimSpace(yesLabel)
-		if len(yesLabel) < MinLabelLength || len(yesLabel) > MaxLabelLength {
-			return ErrInvalidLabel
-		}
-	}
-
-	// Validate no label
-	if noLabel != "" {
-		noLabel = strings.TrimSpace(noLabel)
-		if len(noLabel) < MinLabelLength || len(noLabel) > MaxLabelLength {
-			return ErrInvalidLabel
-		}
-	}
-
-	return nil
-}
-
-// ValidateMarketResolutionTime validates that the market resolution time meets business logic requirements.
-func (s *Service) ValidateMarketResolutionTime(resolutionTime time.Time) error {
-	now := s.clock.Now()
-	minimumDuration := time.Duration(s.config.MinimumFutureHours * float64(time.Hour))
-	minimumFutureTime := now.Add(minimumDuration)
-
-	if resolutionTime.Before(minimumFutureTime) || resolutionTime.Equal(minimumFutureTime) {
-		// Use sentinel error so HTTP handlers can map this to a 400 response
-		return ErrInvalidResolutionTime
-	}
-	return nil
 }
