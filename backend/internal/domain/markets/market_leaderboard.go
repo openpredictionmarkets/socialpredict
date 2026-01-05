@@ -18,7 +18,7 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 		return nil, ErrMarketNotFound
 	}
 
-	p = normalizePage(p, 100, 1000)
+	p = s.statusPolicy.NormalizePage(p, 100, 1000)
 
 	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 	modelBets := convertToModelBets(bets)
 	snapshot := marketSnapshotFromModel(market)
 
-	profitability, err := positionsmath.CalculateMarketLeaderboard(snapshot, modelBets)
+	profitability, err := s.leaderboardCalculator.Calculate(snapshot, modelBets)
 	if err != nil {
 		return nil, err
 	}
@@ -43,19 +43,6 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 
 	paged := paginateProfitability(profitability, p)
 	return mapLeaderboardRows(paged), nil
-}
-
-func normalizePage(p Page, defaultLimit, maxLimit int) Page {
-	if p.Limit <= 0 {
-		p.Limit = defaultLimit
-	}
-	if p.Limit > maxLimit {
-		p.Limit = maxLimit
-	}
-	if p.Offset < 0 {
-		p.Offset = 0
-	}
-	return p
 }
 
 func marketSnapshotFromModel(market *Market) positionsmath.MarketSnapshot {

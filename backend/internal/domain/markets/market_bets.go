@@ -5,7 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 )
 
@@ -28,7 +27,7 @@ func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisp
 		return []*BetDisplayInfo{}, nil
 	}
 
-	probabilityChanges := ensureProbabilityChanges(wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets), market.CreatedAt)
+	probabilityChanges := ensureProbabilityChanges(s.probabilityEngine.Calculate(market.CreatedAt, modelBets), market.CreatedAt)
 	sortProbabilityChanges(probabilityChanges)
 	sortBetsByTime(modelBets)
 
@@ -43,9 +42,9 @@ func (s *Service) loadMarketBets(ctx context.Context, marketID int64) ([]models.
 	return convertToModelBets(bets), nil
 }
 
-func ensureProbabilityChanges(changes []wpam.ProbabilityChange, createdAt time.Time) []wpam.ProbabilityChange {
+func ensureProbabilityChanges(changes []ProbabilityChange, createdAt time.Time) []ProbabilityChange {
 	if len(changes) == 0 {
-		return []wpam.ProbabilityChange{{
+		return []ProbabilityChange{{
 			Probability: 0,
 			Timestamp:   createdAt,
 		}}
@@ -53,7 +52,7 @@ func ensureProbabilityChanges(changes []wpam.ProbabilityChange, createdAt time.T
 	return changes
 }
 
-func sortProbabilityChanges(changes []wpam.ProbabilityChange) {
+func sortProbabilityChanges(changes []ProbabilityChange) {
 	sort.Slice(changes, func(i, j int) bool {
 		return changes[i].Timestamp.Before(changes[j].Timestamp)
 	})
@@ -65,7 +64,7 @@ func sortBetsByTime(bets []models.Bet) {
 	})
 }
 
-func buildBetDisplayInfos(modelBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []*BetDisplayInfo {
+func buildBetDisplayInfos(modelBets []models.Bet, probabilityChanges []ProbabilityChange) []*BetDisplayInfo {
 	results := make([]*BetDisplayInfo, 0, len(modelBets))
 	for _, bet := range modelBets {
 		matchedProbability := latestProbabilityAt(probabilityChanges, bet.PlacedAt)
@@ -80,7 +79,7 @@ func buildBetDisplayInfos(modelBets []models.Bet, probabilityChanges []wpam.Prob
 	return results
 }
 
-func latestProbabilityAt(changes []wpam.ProbabilityChange, timestamp time.Time) float64 {
+func latestProbabilityAt(changes []ProbabilityChange, timestamp time.Time) float64 {
 	matched := changes[0].Probability
 	for _, change := range changes {
 		if change.Timestamp.After(timestamp) {

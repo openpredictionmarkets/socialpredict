@@ -31,21 +31,11 @@ func (s *Service) ListResolvedMarkets(ctx context.Context, limit int) ([]*Market
 
 // ListByStatus returns markets filtered by status with pagination.
 func (s *Service) ListByStatus(ctx context.Context, status string, p Page) ([]*Market, error) {
-	switch status {
-	case "active", "closed", "resolved", "all":
-	default:
-		return nil, ErrInvalidInput
+	if err := s.statusPolicy.ValidateStatus(status); err != nil {
+		return nil, err
 	}
 
-	if p.Limit <= 0 {
-		p.Limit = 100
-	}
-	if p.Limit > 1000 {
-		p.Limit = 1000
-	}
-	if p.Offset < 0 {
-		p.Offset = 0
-	}
+	p = s.statusPolicy.NormalizePage(p, 100, 1000)
 
 	return s.repo.ListByStatus(ctx, status, p)
 }

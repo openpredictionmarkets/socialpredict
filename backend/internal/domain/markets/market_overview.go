@@ -3,8 +3,6 @@ package markets
 import (
 	"context"
 
-	marketmath "socialpredict/internal/domain/math/market"
-	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 )
 
@@ -57,7 +55,7 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 	}
 
 	modelBets := convertToModelBets(bets)
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, modelBets)
+	probabilityChanges := s.probabilityEngine.Calculate(market.CreatedAt, modelBets)
 	probabilityPoints := make([]ProbabilityPoint, len(probabilityChanges))
 	for i, change := range probabilityChanges {
 		probabilityPoints[i] = ProbabilityPoint{
@@ -71,8 +69,8 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 		lastProbability = probabilityPoints[len(probabilityPoints)-1].Probability
 	}
 
-	totalVolumeWithDust := marketmath.GetMarketVolumeWithDust(modelBets)
-	marketDust := marketmath.GetMarketDust(modelBets)
+	totalVolumeWithDust := s.metricsCalculator.VolumeWithDust(modelBets)
+	marketDust := s.metricsCalculator.Dust(modelBets)
 	numUsers := countUniqueUsers(modelBets)
 
 	return &MarketOverview{

@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	positionsmath "socialpredict/internal/domain/math/positions"
 	users "socialpredict/internal/domain/users"
+	"socialpredict/models"
 )
 
 const (
@@ -65,6 +67,69 @@ type Config struct {
 	MaximumDebtAllowed int64
 }
 
+// CreationPolicy governs validation and construction of markets.
+type CreationPolicy interface {
+	ValidateCreateRequest(req MarketCreateRequest) error
+	ValidateCustomLabels(yesLabel, noLabel string) error
+	NormalizeLabels(yesLabel, noLabel string) labelPair
+	ValidateResolutionTime(now time.Time, resolution time.Time, minimumFutureHours float64) error
+	EnsureCreateMarketBalance(ctx context.Context, users UserService, creatorUsername string, cost int64, maxDebt int64) error
+	BuildMarketEntity(now time.Time, req MarketCreateRequest, creatorUsername string, labels labelPair) *Market
+}
+
+// ResolutionPolicy encapsulates resolution rules and post-resolution actions.
+type ResolutionPolicy interface {
+	NormalizeResolution(resolution string) (string, error)
+	ValidateResolutionRequest(market *Market, username string) error
+	Resolve(ctx context.Context, repo Repository, userService UserService, marketID int64, outcome string) error
+}
+
+// ProbabilityChange represents a change in market probability at a timestamp.
+type ProbabilityChange struct {
+	Probability float64
+	Timestamp   time.Time
+}
+
+// ProbabilityEngine provides probability calculations and projections.
+type ProbabilityEngine interface {
+	Calculate(createdAt time.Time, bets []models.Bet) []ProbabilityChange
+	Project(createdAt time.Time, bets []models.Bet, newBet models.Bet) ProbabilityProjection
+}
+
+// ProbabilityValidator validates projection requests and market eligibility.
+type ProbabilityValidator interface {
+	ValidateRequest(req ProbabilityProjectionRequest) error
+	ValidateMarket(market *Market, now time.Time) error
+}
+
+// SearchPolicy encapsulates search query validation and fallback logic.
+type SearchPolicy interface {
+	ValidateQuery(query string) error
+	NormalizeFilters(filters SearchFilters) SearchFilters
+	ShouldFetchFallback(primary []*Market, status string) bool
+	NewSearchResults(query string, status string, primary []*Market) *SearchResults
+	BuildFallbackFilters(primary SearchFilters) SearchFilters
+	SelectFallback(primary []*Market, all []*Market, limit int) []*Market
+}
+
+// MetricsCalculator computes volume and dust metrics.
+type MetricsCalculator interface {
+	Volume(bets []models.Bet) int64
+	VolumeWithDust(bets []models.Bet) int64
+	Dust(bets []models.Bet) int64
+}
+
+// LeaderboardCalculator computes leaderboard standings.
+type LeaderboardCalculator interface {
+	Calculate(snapshot positionsmath.MarketSnapshot, bets []models.Bet) ([]positionsmath.UserProfitability, error)
+}
+
+// StatusPolicy validates status filters and pagination rules.
+type StatusPolicy interface {
+	ValidateStatus(status string) error
+	NormalizePage(p Page, defaultLimit, maxLimit int) Page
+}
+
 // ListFilters represents filters for listing markets.
 type ListFilters struct {
 	Status    string
@@ -117,6 +182,15 @@ type Service struct {
 	userService UserService
 	clock       Clock
 	config      Config
+
+	creationPolicy        CreationPolicy
+	resolutionPolicy      ResolutionPolicy
+	probabilityEngine     ProbabilityEngine
+	probabilityValidator  ProbabilityValidator
+	searchPolicy          SearchPolicy
+	metricsCalculator     MetricsCalculator
+	leaderboardCalculator LeaderboardCalculator
+	statusPolicy          StatusPolicy
 }
 
 // NewService creates a new markets service.
@@ -126,6 +200,15 @@ func NewService(repo Repository, userService UserService, clock Clock, config Co
 		userService: userService,
 		clock:       clock,
 		config:      config,
+
+		creationPolicy:        defaultCreationPolicy{config: config},
+		resolutionPolicy:      defaultResolutionPolicy{},
+		probabilityEngine:     defaultProbabilityEngine{},
+		probabilityValidator:  defaultProbabilityValidator{},
+		searchPolicy:          defaultSearchPolicy{},
+		metricsCalculator:     defaultMetricsCalculator{},
+		leaderboardCalculator: defaultLeaderboardCalculator{},
+		statusPolicy:          defaultStatusPolicy{},
 	}
 }
 
