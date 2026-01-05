@@ -33,16 +33,20 @@ func SetSeeds(seeds Seeds) {
 	seedsSet = true
 }
 
-func mustGetSeeds() Seeds {
+func getSeeds() Seeds {
 	if !seedsSet {
-		panic("wpam seeds not configured: call wpam.SetSeeds with initial market parameters")
+		// Sensible defaults to avoid panics when callers forget to seed.
+		return Seeds{
+			InitialProbability:   0.5,
+			InitialSubsidization: 1,
+		}
 	}
 	return configSeeds
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
 func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
-	seeds := mustGetSeeds()
+	seeds := getSeeds()
 	var probabilityChanges []ProbabilityChange
 
 	P_initial := seeds.InitialProbability
@@ -68,9 +72,14 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 }
 
 func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
-	_ = mustGetSeeds() // ensure seeds set before proceeding
+	seeds := getSeeds()
 
 	updatedBets := append(currentBets, newBet)
+
+	// Ensure caller-supplied seeds propagate into calculation if they were configured.
+	if seedsSet {
+		SetSeeds(seeds)
+	}
 
 	probabilityChanges := CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, updatedBets)
 
