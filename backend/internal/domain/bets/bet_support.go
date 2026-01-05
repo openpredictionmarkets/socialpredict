@@ -44,6 +44,18 @@ func validateSellRequest(req SellRequest) (string, error) {
 	return outcome, nil
 }
 
+type defaultPlaceValidator struct{}
+
+func (defaultPlaceValidator) Validate(ctx context.Context, req PlaceRequest) (string, error) {
+	return validatePlaceRequest(req)
+}
+
+type defaultSellValidator struct{}
+
+func (defaultSellValidator) Validate(ctx context.Context, req SellRequest) (string, error) {
+	return validateSellRequest(req)
+}
+
 // marketGate ensures markets are open before interacting with them.
 type marketGate struct {
 	markets MarketService

@@ -9,7 +9,7 @@ import (
 
 // Sell processes a sell request for credits.
 func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error) {
-	outcome, err := validateSellRequest(req)
+	outcome, err := s.sellValidator.Validate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
