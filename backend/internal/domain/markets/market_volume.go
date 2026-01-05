@@ -2,8 +2,6 @@ package markets
 
 import (
 	"context"
-
-	marketmath "socialpredict/internal/domain/math/market"
 )
 
 // CalculateMarketVolume returns the total traded volume for a market.
@@ -22,5 +20,5 @@ func (s *Service) CalculateMarketVolume(ctx context.Context, marketID int64) (in
 	}
 
 	modelBets := convertToModelBets(bets)
-	return marketmath.GetMarketVolume(modelBets), nil
+	return s.metricsCalculator.Volume(modelBets), nil
 }

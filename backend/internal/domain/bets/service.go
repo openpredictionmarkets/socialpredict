@@ -28,6 +28,21 @@ type UserService interface {
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
 }
 
+// PlaceValidator allows validation rules to be extended without changing the service.
+type PlaceValidator interface {
+	Validate(ctx context.Context, req PlaceRequest) (string, error)
+}
+
+// SellValidator allows sell validation rules to be extended without changing the service.
+type SellValidator interface {
+	Validate(ctx context.Context, req SellRequest) (string, error)
+}
+
+// SaleCalculator encapsulates sale pricing and dust rules.
+type SaleCalculator interface {
+	Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (saleResult, error)
+}
+
 // Clock allows time to be mocked in tests.
 type Clock interface {
 	Now() time.Time
@@ -51,11 +66,14 @@ type Service struct {
 	econ    *setup.EconomicConfig
 	clock   Clock
 
+	placeValidator PlaceValidator
+	sellValidator  SellValidator
+
 	marketGate     marketGate
 	fees           feeCalculator
 	balances       balanceGuard
 	ledger         betLedger
-	saleCalculator saleCalculator
+	saleCalculator SaleCalculator
 }
 
 // NewService constructs a bets service.
@@ -70,6 +88,8 @@ func NewService(repo Repository, markets MarketService, users UserService, econ 
 		econ:    econ,
 		clock:   clock,
 
+		placeValidator: defaultPlaceValidator{},
+		sellValidator:  defaultSellValidator{},
 		marketGate:     marketGate{markets: markets, clock: clock},
 		fees:           feeCalculator{econ: econ},
 		balances:       balanceGuard{maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)},

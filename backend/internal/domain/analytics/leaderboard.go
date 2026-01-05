@@ -87,7 +87,11 @@ func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []model
 			ResolutionResult: market.ResolutionResult,
 		}
 
-		marketPositions, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
+		if s.positions == nil {
+			s.ensureStrategyDefaults()
+		}
+
+		marketPositions, err := s.positions.Calculate(snapshot, bets)
 		if err != nil {
 			return nil, err
 		}

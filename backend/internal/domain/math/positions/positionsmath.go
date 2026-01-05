@@ -1,12 +1,13 @@
 package positionsmath
 
 import (
+	"sort"
+	"time"
+
 	marketmath "socialpredict/internal/domain/math/market"
 	"socialpredict/internal/domain/math/outcomes/dbpm"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
-	"sort"
-	"time"
 )
 
 // holds the number of YES and NO shares owned by all users in a market
@@ -41,17 +42,53 @@ type MarketSnapshot struct {
 	ResolutionResult string
 }
 
+// ProbabilityProvider abstracts probability timeline calculations.
+type ProbabilityProvider interface {
+	Calculate(createdAt time.Time, bets []models.Bet) []wpam.ProbabilityChange
+	Current(changes []wpam.ProbabilityChange) float64
+}
+
+// PayoutModel defines how to compute market positions and payouts.
+type PayoutModel interface {
+	DivideShares(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64)
+	CoursePayouts(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.CourseBetPayout
+	NormalizationFactors(yesShares, noShares int64, coursePayouts []dbpm.CourseBetPayout) (float64, float64)
+	ScaledPayouts(bets []models.Bet, coursePayouts []dbpm.CourseBetPayout, yesFactor, noFactor float64) []int64
+	AdjustFinalPayouts(bets []models.Bet, scaledPayouts []int64) []int64
+	AggregateUserPayouts(bets []models.Bet, finalPayouts []int64) []dbpm.DBPMMarketPosition
+	NetAggregateMarketPositions(positions []dbpm.DBPMMarketPosition) []dbpm.DBPMMarketPosition
+}
+
+// PositionCalculator encapsulates dependencies used to compute positions.
+type PositionCalculator struct {
+	probabilities ProbabilityProvider
+	payouts       PayoutModel
+}
+
+// NewPositionCalculator creates a calculator with default WPAM/DBPM components.
+func NewPositionCalculator() PositionCalculator {
+	return PositionCalculator{
+		probabilities: defaultProbabilityProvider{},
+		payouts:       defaultPayoutModel{},
+	}
+}
+
 // CalculateMarketPositions_WPAM_DBPM summarizes positions for a given market using WPAM/DBPM math.
 func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error) {
+	return NewPositionCalculator().CalculateMarketPositions(snapshot, bets)
+}
+
+// CalculateMarketPositions runs the position calculation using the calculator's injected strategies.
+func (c PositionCalculator) CalculateMarketPositions(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error) {
 	marketIDUint := uint(snapshot.ID)
 
 	sortedBets := sortBetsChronologically(bets)
 
-	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(snapshot.CreatedAt, sortedBets)
-	netPositions := calculateNetPositions(sortedBets, allProbabilityChangesOnMarket)
+	allProbabilityChangesOnMarket := c.probabilities.Calculate(snapshot.CreatedAt, sortedBets)
+	netPositions := c.calculateNetPositions(sortedBets, allProbabilityChangesOnMarket)
 
 	userPositionMap := mapUserPositions(netPositions)
-	currentProbability := wpam.GetCurrentProbability(allProbabilityChangesOnMarket)
+	currentProbability := c.probabilities.Current(allProbabilityChangesOnMarket)
 	totalVolume := marketmath.GetMarketVolume(sortedBets)
 	earliestBets := computeEarliestBets(sortedBets)
 
@@ -93,13 +130,17 @@ func sortBetsChronologically(bets []models.Bet) []models.Bet {
 }
 
 func calculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
-	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(sortedBets, probabilityChanges)
-	coursePayouts := dbpm.CalculateCoursePayoutsDBPM(sortedBets, probabilityChanges)
-	F_YES, F_NO := dbpm.CalculateNormalizationFactorsDBPM(S_YES, S_NO, coursePayouts)
-	scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(sortedBets, coursePayouts, F_YES, F_NO)
-	finalPayouts := dbpm.AdjustPayouts(sortedBets, scaledPayouts)
-	aggreatedPositions := dbpm.AggregateUserPayoutsDBPM(sortedBets, finalPayouts)
-	return dbpm.NetAggregateMarketPositions(aggreatedPositions)
+	return NewPositionCalculator().calculateNetPositions(sortedBets, probabilityChanges)
+}
+
+func (c PositionCalculator) calculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
+	S_YES, S_NO := c.payouts.DivideShares(sortedBets, probabilityChanges)
+	coursePayouts := c.payouts.CoursePayouts(sortedBets, probabilityChanges)
+	F_YES, F_NO := c.payouts.NormalizationFactors(S_YES, S_NO, coursePayouts)
+	scaledPayouts := c.payouts.ScaledPayouts(sortedBets, coursePayouts, F_YES, F_NO)
+	finalPayouts := c.payouts.AdjustFinalPayouts(sortedBets, scaledPayouts)
+	aggreatedPositions := c.payouts.AggregateUserPayouts(sortedBets, finalPayouts)
+	return c.payouts.NetAggregateMarketPositions(aggreatedPositions)
 }
 
 func mapUserPositions(netPositions []dbpm.DBPMMarketPosition) map[string]UserMarketPosition {

@@ -28,6 +28,11 @@ type MetricsAssembler interface {
 	Assemble(econ *setup.EconomicConfig, debt *DebtStats, volume *MarketVolumeStats, participationFees int64) *SystemMetrics
 }
 
+// MarketPositionCalculator calculates market positions for analytics consumers.
+type MarketPositionCalculator interface {
+	Calculate(snapshot positionsmath.MarketSnapshot, bets []models.Bet) ([]positionsmath.MarketPosition, error)
+}
+
 // Repository exposes the data access required by the analytics domain service.
 type Repository interface {
 	ListUsers(ctx context.Context) ([]models.User, error)
@@ -45,6 +50,7 @@ type Service struct {
 	volumeCalculator VolumeCalculator
 	feeCalculator    FeeCalculator
 	metricsAssembler MetricsAssembler
+	positions        MarketPositionCalculator
 }
 
 // ServiceOption allows customizing analytics strategies.
@@ -86,6 +92,15 @@ func WithMetricsAssembler(a MetricsAssembler) ServiceOption {
 	}
 }
 
+// WithPositionCalculator overrides the default position calculator.
+func WithPositionCalculator(c MarketPositionCalculator) ServiceOption {
+	return func(s *Service) {
+		if c != nil {
+			s.positions = c
+		}
+	}
+}
+
 // NewService constructs an analytics service with optional strategy overrides.
 func NewService(repo Repository, econLoader setup.EconConfigLoader, opts ...ServiceOption) *Service {
 	service := &Service{
@@ -95,6 +110,7 @@ func NewService(repo Repository, econLoader setup.EconConfigLoader, opts ...Serv
 		volumeCalculator: DefaultVolumeCalculator{},
 		feeCalculator:    DefaultFeeCalculator{},
 		metricsAssembler: DefaultMetricsAssembler{},
+		positions:        defaultMarketPositionCalculator{},
 	}
 
 	for _, opt := range opts {
@@ -116,5 +132,8 @@ func (s *Service) ensureStrategyDefaults() {
 	}
 	if s.metricsAssembler == nil {
 		s.metricsAssembler = DefaultMetricsAssembler{}
+	}
+	if s.positions == nil {
+		s.positions = defaultMarketPositionCalculator{}
 	}
 }

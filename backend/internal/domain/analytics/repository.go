@@ -12,12 +12,32 @@ import (
 
 // GormRepository implements the analytics repository interface using GORM.
 type GormRepository struct {
-	db *gorm.DB
+	db                 *gorm.DB
+	positionCalculator MarketPositionCalculator
+}
+
+// RepositoryOption configures the GormRepository strategies.
+type RepositoryOption func(*GormRepository)
+
+// WithRepositoryPositionCalculator overrides the default position calculator for the repository.
+func WithRepositoryPositionCalculator(c MarketPositionCalculator) RepositoryOption {
+	return func(r *GormRepository) {
+		if c != nil {
+			r.positionCalculator = c
+		}
+	}
 }
 
 // NewGormRepository constructs a GORM-backed analytics repository.
-func NewGormRepository(db *gorm.DB) *GormRepository {
-	return &GormRepository{db: db}
+func NewGormRepository(db *gorm.DB, opts ...RepositoryOption) *GormRepository {
+	repo := &GormRepository{
+		db:                 db,
+		positionCalculator: defaultMarketPositionCalculator{},
+	}
+	for _, opt := range opts {
+		opt(repo)
+	}
+	return repo
 }
 
 func (r *GormRepository) WithContext(ctx context.Context) *gorm.DB {
@@ -91,7 +111,7 @@ func (r *GormRepository) UserMarketPositions(ctx context.Context, username strin
 
 	betsByMarket := groupBetsByMarket(allBets)
 
-	positions, err := calculateUserPositions(username, marketIDs, snapshots, betsByMarket)
+	positions, err := r.calculateUserPositions(username, marketIDs, snapshots, betsByMarket)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +182,14 @@ func groupBetsByMarket(bets []models.Bet) map[int64][]models.Bet {
 	return betsByMarket
 }
 
-func calculateUserPositions(username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]models.Bet) ([]positionsmath.MarketPosition, error) {
+func (r *GormRepository) ensurePositionCalculator() {
+	if r.positionCalculator == nil {
+		r.positionCalculator = defaultMarketPositionCalculator{}
+	}
+}
+
+func (r *GormRepository) calculateUserPositions(username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]models.Bet) ([]positionsmath.MarketPosition, error) {
+	r.ensurePositionCalculator()
 	var positions []positionsmath.MarketPosition
 	for _, marketID := range marketIDs {
 		snapshot, ok := snapshots[int64(marketID)]
@@ -175,7 +202,7 @@ func calculateUserPositions(username string, marketIDs []uint, snapshots map[int
 			continue
 		}
 
-		calculated, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
+		calculated, err := r.positionCalculator.Calculate(snapshot, bets)
 		if err != nil {
 			return nil, err
 		}

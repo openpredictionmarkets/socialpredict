@@ -9,7 +9,7 @@ import (
 
 // Place creates a buy bet after validating market status and user balance.
 func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, error) {
-	outcome, err := validatePlaceRequest(req)
+	outcome, err := s.placeValidator.Validate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
