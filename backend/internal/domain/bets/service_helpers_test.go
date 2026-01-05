@@ -173,7 +173,7 @@ func TestSaleCalculator_Calculate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
-	if result.sharesToSell != 2 || result.saleValue != 20 || result.dust != 3 {
+	if result.SharesToSell != 2 || result.SaleValue != 20 || result.Dust != 3 {
 		t.Fatalf("unexpected sale result: %+v", result)
 	}
 

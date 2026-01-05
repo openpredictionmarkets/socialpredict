@@ -67,6 +67,9 @@ func (g marketGate) Open(ctx context.Context, marketID int64) (*dmarkets.Market,
 	if err != nil {
 		return nil, err
 	}
+	if market == nil {
+		return nil, dmarkets.ErrMarketNotFound
+	}
 	if err := ensureMarketOpen(market, g.clock.Now()); err != nil {
 		return nil, err
 	}

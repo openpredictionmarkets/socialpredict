@@ -13,6 +13,9 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 	if err != nil {
 		return nil, err
 	}
+	if outcome == "" {
+		return nil, ErrInvalidOutcome
+	}
 
 	if _, err := s.marketGate.Open(ctx, int64(req.MarketID)); err != nil {
 		return nil, err
@@ -27,7 +30,7 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 	if err != nil {
 		return nil, err
 	}
-	if sale.sharesToSell == 0 {
+	if sale.SharesToSell == 0 {
 		return nil, ErrInsufficientShares
 	}
 
@@ -35,20 +38,20 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 	bet := &models.Bet{
 		Username: req.Username,
 		MarketID: req.MarketID,
-		Amount:   -sale.sharesToSell,
+		Amount:   -sale.SharesToSell,
 		Outcome:  outcome,
 		PlacedAt: now,
 	}
-	if err := s.ledger.CreditSale(ctx, bet, sale.saleValue); err != nil {
+	if err := s.ledger.CreditSale(ctx, bet, sale.SaleValue); err != nil {
 		return nil, err
 	}
 
 	return &SellResult{
 		Username:      req.Username,
 		MarketID:      req.MarketID,
-		SharesSold:    sale.sharesToSell,
-		SaleValue:     sale.saleValue,
-		Dust:          sale.dust,
+		SharesSold:    sale.SharesToSell,
+		SaleValue:     sale.SaleValue,
+		Dust:          sale.Dust,
 		Outcome:       outcome,
 		TransactionAt: now,
 	}, nil
@@ -59,6 +62,9 @@ func (s *Service) loadUserShares(ctx context.Context, req SellRequest, outcome s
 	if err != nil {
 		return 0, nil, err
 	}
+	if position == nil {
+		return 0, nil, ErrNoPosition
+	}
 
 	sharesOwned, err := sharesOwnedForOutcome(position, outcome)
 	if err != nil {
@@ -68,27 +74,35 @@ func (s *Service) loadUserShares(ctx context.Context, req SellRequest, outcome s
 	return sharesOwned, position, nil
 }
 
-type saleResult struct {
-	sharesToSell int64
-	saleValue    int64
-	dust         int64
+// SaleQuote summarises how a sale request would be executed.
+// Exported so alternative SaleCalculator implementations can return it.
+type SaleQuote struct {
+	SharesToSell int64
+	SaleValue    int64
+	Dust         int64
 }
 
 type saleCalculator struct {
 	maxDustPerSale int64
 }
 
-func (s saleCalculator) Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (saleResult, error) {
+func (s saleCalculator) Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error) {
+	if pos == nil {
+		return SaleQuote{}, ErrNoPosition
+	}
+	if sharesOwned <= 0 {
+		return SaleQuote{}, ErrNoPosition
+	}
 	if err := validatePositionValue(pos.Value); err != nil {
-		return saleResult{}, err
+		return SaleQuote{}, err
 	}
 
 	valuePerShare := pos.Value / sharesOwned
 	if valuePerShare <= 0 {
-		return saleResult{}, ErrNoPosition
+		return SaleQuote{}, ErrNoPosition
 	}
 	if creditsRequested < valuePerShare {
-		return saleResult{}, ErrInvalidAmount
+		return SaleQuote{}, ErrInvalidAmount
 	}
 
 	sharesToSell := creditsRequested / valuePerShare
@@ -96,17 +110,17 @@ func (s saleCalculator) Calculate(pos *dmarkets.UserPosition, sharesOwned int64,
 		sharesToSell = sharesOwned
 	}
 	if sharesToSell == 0 {
-		return saleResult{}, ErrInsufficientShares
+		return SaleQuote{}, ErrInsufficientShares
 	}
 
 	saleValue := sharesToSell * valuePerShare
 	dust := calculateDust(creditsRequested, saleValue)
 
 	if err := validateDustCap(dust, s.maxDustPerSale); err != nil {
-		return saleResult{}, err
+		return SaleQuote{}, err
 	}
 
-	return saleResult{sharesToSell: sharesToSell, saleValue: saleValue, dust: dust}, nil
+	return SaleQuote{SharesToSell: sharesToSell, SaleValue: saleValue, Dust: dust}, nil
 }
 
 func sharesOwnedForOutcome(pos *dmarkets.UserPosition, outcome string) (int64, error) {

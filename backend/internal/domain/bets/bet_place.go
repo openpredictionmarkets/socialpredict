@@ -13,6 +13,9 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 	if err != nil {
 		return nil, err
 	}
+	if outcome == "" {
+		return nil, ErrInvalidOutcome
+	}
 
 	if _, err := s.marketGate.Open(ctx, int64(req.MarketID)); err != nil {
 		return nil, err
@@ -48,6 +51,9 @@ func (s *Service) loadUserAndBetStatus(ctx context.Context, req PlaceRequest) (*
 	user, err := s.users.GetUser(ctx, req.Username)
 	if err != nil {
 		return nil, false, err
+	}
+	if user == nil {
+		return nil, false, dusers.ErrUserNotFound
 	}
 
 	hasBet, err := s.repo.UserHasBet(ctx, req.MarketID, req.Username)
