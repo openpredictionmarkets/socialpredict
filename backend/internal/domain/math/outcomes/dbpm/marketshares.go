@@ -1,12 +1,10 @@
 package dbpm
 
 import (
-	"log"
 	"math"
 	marketmath "socialpredict/internal/domain/math/market"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
-	"socialpredict/setup"
 )
 
 // holds betting payout information
@@ -19,17 +17,6 @@ type DBPMMarketPosition struct {
 	Username       string
 	NoSharesOwned  int64
 	YesSharesOwned int64
-}
-
-// appConfig holds the loaded application configuration accessible within the package
-var appConfig *setup.EconomicConfig
-
-func init() {
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
 }
 
 // DivideUpMarketPoolSharesDBPM divides the market pool into YES and NO pools based on the resolution probability.

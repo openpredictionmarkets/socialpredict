@@ -14,6 +14,7 @@ import (
 
 func newAnalyticsService(t *testing.T, db *gorm.DB, econ *setup.EconomicConfig) *Service {
 	t.Helper()
+	modelstesting.SeedWPAMFromConfig(econ)
 	repo := NewGormRepository(db)
 	loader := func() *setup.EconomicConfig { return econ }
 	return NewService(repo, loader)

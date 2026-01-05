@@ -11,6 +11,7 @@ import (
 	analytics "socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	dusers "socialpredict/internal/domain/users"
 
 	// Repositories
@@ -81,6 +82,13 @@ func (c *Container) InitializeServices() {
 	// Users service depends on users repository and configuration
 	securityService := security.NewSecurityService()
 	configLoader := func() *setup.EconomicConfig { return c.config }
+
+	wpam.SetSeeds(wpam.Seeds{
+		InitialProbability:     c.config.Economics.MarketCreation.InitialMarketProbability,
+		InitialSubsidization:   c.config.Economics.MarketCreation.InitialMarketSubsidization,
+		InitialYesContribution: c.config.Economics.MarketCreation.InitialMarketYes,
+		InitialNoContribution:  c.config.Economics.MarketCreation.InitialMarketNo,
+	})
 	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader)
 	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
 	c.authService = authsvc.NewAuthService(c.usersService)

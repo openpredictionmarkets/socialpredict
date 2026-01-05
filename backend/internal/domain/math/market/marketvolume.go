@@ -1,22 +1,6 @@
 package marketmath
 
-import (
-	"log"
-	"socialpredict/models"
-	"socialpredict/setup"
-)
-
-// appConfig holds the loaded application configuration accessible within the package
-var appConfig *setup.EconomicConfig
-
-func init() {
-	// Load configuration
-	var err error
-	appConfig, err = setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
-}
+import "socialpredict/models"
 
 // getMarketVolume returns the total volume of trades for a given market
 func GetMarketVolume(bets []models.Bet) int64 {
@@ -33,8 +17,6 @@ func GetMarketVolume(bets []models.Bet) int64 {
 
 // returns the market volume + subsidization added into pool,
 // subsidzation in pool could be paid out after resolution but not sold mid-market
-func GetEndMarketVolume(bets []models.Bet) int64 {
-
-	return GetMarketVolume(bets) + appConfig.Economics.MarketCreation.InitialMarketSubsidization
-
+func GetEndMarketVolume(bets []models.Bet, initialMarketSubsidization int64) int64 {
+	return GetMarketVolume(bets) + initialMarketSubsidization
 }

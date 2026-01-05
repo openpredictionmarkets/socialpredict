@@ -84,6 +84,8 @@ func TestRankLeaderboardEntries_TieBreaksByEarliestBet(t *testing.T) {
 }
 
 func TestComputeGlobalLeaderboard_OrdersByProfit(t *testing.T) {
+	modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
+
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()
 

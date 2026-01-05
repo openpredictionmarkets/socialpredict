@@ -4,6 +4,7 @@ import (
 	"socialpredict/internal/domain/math/outcomes/dbpm"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
+	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
 )
@@ -144,6 +145,14 @@ var TestCases = []TestCase{
 }
 
 func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
+	econ := modelstesting.GenerateEconomicConfig()
+	wpam.SetSeeds(wpam.Seeds{
+		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
+		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
+		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
+		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
+	})
+
 	for _, tc := range TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
 

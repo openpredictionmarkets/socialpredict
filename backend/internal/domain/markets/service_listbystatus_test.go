@@ -8,6 +8,7 @@ import (
 
 	markets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	rmarkets "socialpredict/internal/repository/markets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -47,6 +48,14 @@ func (f fixedClock) Now() time.Time {
 
 func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB) {
 	t.Helper()
+
+	econ := modelstesting.GenerateEconomicConfig()
+	wpam.SetSeeds(wpam.Seeds{
+		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
+		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
+		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
+		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
+	})
 
 	db := modelstesting.NewFakeDB(t)
 	repo := rmarkets.NewGormRepository(db)
