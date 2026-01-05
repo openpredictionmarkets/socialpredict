@@ -18,6 +18,9 @@ func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisp
 	if err != nil {
 		return nil, err
 	}
+	if market == nil {
+		return nil, ErrMarketNotFound
+	}
 
 	modelBets, err := s.loadMarketBets(ctx, marketID)
 	if err != nil {

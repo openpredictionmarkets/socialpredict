@@ -25,6 +25,9 @@ func (s *Service) GetMarketOverviews(ctx context.Context, filters ListFilters) (
 	if err != nil {
 		return nil, err
 	}
+	if markets == nil {
+		return []*MarketOverview{}, nil
+	}
 
 	var overviews []*MarketOverview
 	for _, market := range markets {
@@ -47,6 +50,9 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 	market, err := s.repo.GetByID(ctx, marketID)
 	if err != nil {
 		return nil, err
+	}
+	if market == nil {
+		return nil, ErrMarketNotFound
 	}
 
 	bets, err := s.repo.ListBetsForMarket(ctx, marketID)

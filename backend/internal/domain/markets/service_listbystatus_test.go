@@ -7,8 +7,8 @@ import (
 	"time"
 
 	markets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
 	"socialpredict/internal/domain/math/probabilities/wpam"
+	dusers "socialpredict/internal/domain/users"
 	rmarkets "socialpredict/internal/repository/markets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"

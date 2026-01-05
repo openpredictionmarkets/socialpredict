@@ -21,6 +21,10 @@ type Clock interface {
 	Now() time.Time
 }
 
+type serviceClock struct{}
+
+func (serviceClock) Now() time.Time { return time.Now() }
+
 // Repository defines the interface for market data access.
 type Repository interface {
 	Create(ctx context.Context, market *Market) error
@@ -195,6 +199,9 @@ type Service struct {
 
 // NewService creates a new markets service.
 func NewService(repo Repository, userService UserService, clock Clock, config Config) *Service {
+	if clock == nil {
+		clock = serviceClock{}
+	}
 	return &Service{
 		repo:        repo,
 		userService: userService,
@@ -211,6 +218,11 @@ func NewService(repo Repository, userService UserService, clock Clock, config Co
 		statusPolicy:          defaultStatusPolicy{},
 	}
 }
+
+var (
+	_ ServiceInterface = (*Service)(nil)
+	_ Clock            = serviceClock{}
+)
 
 // MarketOverview represents enriched market data with calculations.
 type MarketOverview struct {

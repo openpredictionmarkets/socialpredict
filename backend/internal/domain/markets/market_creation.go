@@ -46,7 +46,11 @@ func (s *Service) SetCustomLabels(ctx context.Context, marketID int64, yesLabel,
 		return err
 	}
 
-	if _, err := s.repo.GetByID(ctx, marketID); err != nil {
+	market, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
+		return ErrMarketNotFound
+	}
+	if market == nil {
 		return ErrMarketNotFound
 	}
 
@@ -55,7 +59,14 @@ func (s *Service) SetCustomLabels(ctx context.Context, marketID int64, yesLabel,
 
 // GetMarket retrieves a market by ID.
 func (s *Service) GetMarket(ctx context.Context, id int64) (*Market, error) {
-	return s.repo.GetByID(ctx, id)
+	market, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if market == nil {
+		return nil, ErrMarketNotFound
+	}
+	return market, nil
 }
 
 // ValidateQuestionTitle validates the market question title.

@@ -10,8 +10,12 @@ func (s *Service) CalculateMarketVolume(ctx context.Context, marketID int64) (in
 		return 0, ErrInvalidInput
 	}
 
-	if _, err := s.repo.GetByID(ctx, marketID); err != nil {
+	market, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
 		return 0, err
+	}
+	if market == nil {
+		return 0, ErrMarketNotFound
 	}
 
 	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
