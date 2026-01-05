@@ -44,6 +44,15 @@ func calculateDustStack(bets []models.Bet) int64 {
 	return calculateDustStackWithCalculator(sortedBets, defaultSellDustCalculator)
 }
 
+// GetMarketDustWithCalculator allows callers to supply a custom dust calculator.
+// Falls back to default dust behavior if a nil calculator is provided.
+func GetMarketDustWithCalculator(bets []models.Bet, calculator SellDustCalculator) int64 {
+	if calculator == nil {
+		calculator = defaultSellDustCalculator
+	}
+	return calculateDustStackWithCalculator(sortBetsChronologically(bets), calculator)
+}
+
 func calculateDustStackWithCalculator(bets []models.Bet, calculator SellDustCalculator) int64 {
 	if calculator == nil {
 		return 0
