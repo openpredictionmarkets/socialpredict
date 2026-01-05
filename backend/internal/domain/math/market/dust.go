@@ -5,6 +5,25 @@ import (
 	"sort"
 )
 
+// SellDustCalculator defines how to compute dust for a sell bet.
+type SellDustCalculator interface {
+	DustForSell(sellBet models.Bet, allBets []models.Bet) int64
+}
+
+// ConstantSellDustCalculator returns a fixed dust amount for every sell.
+type ConstantSellDustCalculator struct {
+	DustPerSell int64
+}
+
+func (c ConstantSellDustCalculator) DustForSell(sellBet models.Bet, allBets []models.Bet) int64 {
+	if sellBet.Amount < 0 {
+		return c.DustPerSell
+	}
+	return 0
+}
+
+var defaultSellDustCalculator = ConstantSellDustCalculator{DustPerSell: 1}
+
 // GetMarketVolumeWithDust returns the market volume including accumulated dust from selling
 // This ensures currency conservation by accounting for dust that remains in the market
 func GetMarketVolumeWithDust(bets []models.Bet) int64 {
@@ -20,24 +39,23 @@ func calculateDustStack(bets []models.Bet) int64 {
 		return 0
 	}
 
-	// Sort bets chronologically by PlacedAt timestamp
-	sortedBets := make([]models.Bet, len(bets))
-	copy(sortedBets, bets)
-	sort.Slice(sortedBets, func(i, j int) bool {
-		return sortedBets[i].PlacedAt.Before(sortedBets[j].PlacedAt)
-	})
+	sortedBets := sortBetsChronologically(bets)
 
-	totalDust := int64(0)
+	return calculateDustStackWithCalculator(sortedBets, defaultSellDustCalculator)
+}
 
-	// Process bets chronologically, calculating dust for each sell
-	for _, bet := range sortedBets {
-		if bet.Amount < 0 { // Negative amount indicates a sell transaction
-			// Calculate dust for this specific sell transaction
-			dust := calculateDustForSell(bet, sortedBets)
-			totalDust += dust
-		}
+func calculateDustStackWithCalculator(bets []models.Bet, calculator SellDustCalculator) int64 {
+	if calculator == nil {
+		return 0
 	}
 
+	var totalDust int64
+	for _, bet := range bets {
+		if bet.Amount >= 0 {
+			continue
+		}
+		totalDust += calculator.DustForSell(bet, bets)
+	}
 	return totalDust
 }
 
@@ -45,24 +63,20 @@ func calculateDustStack(bets []models.Bet) int64 {
 // This is a placeholder implementation - actual dust calculation will depend on
 // the selling mechanism and how shares are valued at the time of sale
 func calculateDustForSell(sellBet models.Bet, allBets []models.Bet) int64 {
-	// TODO: Implement actual dust calculation based on market state at time of sell
-	// For now, return a conservative estimate
-	// This will need to be enhanced with proper position calculation logic
-
-	// Simple placeholder: assume 1 point of dust per sell for now
-	// In reality, this should calculate based on:
-	// 1. Market state at time of sell
-	// 2. User's position value per share
-	// 3. Difference between requested amount and actual payout
-
-	if sellBet.Amount < 0 {
-		return 1 // Placeholder: 1 dust point per sell transaction
-	}
-	return 0
+	return defaultSellDustCalculator.DustForSell(sellBet, allBets)
 }
 
 // GetMarketDust calculates accumulated dust for a market
 // This is a utility function for dust-related calculations
 func GetMarketDust(bets []models.Bet) int64 {
 	return calculateDustStack(bets)
+}
+
+func sortBetsChronologically(bets []models.Bet) []models.Bet {
+	sortedBets := make([]models.Bet, len(bets))
+	copy(sortedBets, bets)
+	sort.Slice(sortedBets, func(i, j int) bool {
+		return sortedBets[i].PlacedAt.Before(sortedBets[j].PlacedAt)
+	})
+	return sortedBets
 }
