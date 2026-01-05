@@ -1,6 +1,7 @@
 package positionsmath
 
 import (
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"testing"
@@ -8,6 +9,14 @@ import (
 )
 
 func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
+	econ := modelstesting.GenerateEconomicConfig()
+	wpam.SetSeeds(wpam.Seeds{
+		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
+		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
+		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
+		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
+	})
+
 	testcases := []struct {
 		Name       string
 		BetConfigs []struct {

@@ -45,58 +45,16 @@ type MarketSnapshot struct {
 func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error) {
 	marketIDUint := uint(snapshot.ID)
 
-	// Ensure bets are processed in chronological order
-	sortedBets := make([]models.Bet, len(bets))
-	copy(sortedBets, bets)
-	sort.Slice(sortedBets, func(i, j int) bool {
-		return sortedBets[i].PlacedAt.Before(sortedBets[j].PlacedAt)
-	})
+	sortedBets := sortBetsChronologically(bets)
 
-	// Get a timeline of probability changes for the market
 	allProbabilityChangesOnMarket := wpam.CalculateMarketProbabilitiesWPAM(snapshot.CreatedAt, sortedBets)
+	netPositions := calculateNetPositions(sortedBets, allProbabilityChangesOnMarket)
 
-	// Calculate the distribution of YES and NO shares based on DBPM
-	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(sortedBets, allProbabilityChangesOnMarket)
-
-	// Calculate course payout pools
-	coursePayouts := dbpm.CalculateCoursePayoutsDBPM(sortedBets, allProbabilityChangesOnMarket)
-
-	// Calculate normalization factors
-	F_YES, F_NO := dbpm.CalculateNormalizationFactorsDBPM(S_YES, S_NO, coursePayouts)
-
-	// Calculate scaled payouts
-	scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(sortedBets, coursePayouts, F_YES, F_NO)
-
-	// Adjust payouts to align with the available betting pool using modularized functions
-	finalPayouts := dbpm.AdjustPayouts(sortedBets, scaledPayouts)
-
-	// Aggregate user payouts into market positions
-	aggreatedPositions := dbpm.AggregateUserPayoutsDBPM(sortedBets, finalPayouts)
-
-	// enforce all users are betting on either one side or the other, or net zero
-	netPositions := dbpm.NetAggregateMarketPositions(aggreatedPositions)
-
-	// === Add valuation logic below ===
-
-	// Step 1: Map to positions.UserMarketPosition
-	userPositionMap := make(map[string]UserMarketPosition)
-	for _, p := range netPositions {
-		userPositionMap[p.Username] = UserMarketPosition{
-			YesSharesOwned: p.YesSharesOwned,
-			NoSharesOwned:  p.NoSharesOwned,
-		}
-	}
-
-	// Step 2: Get current market probability
+	userPositionMap := mapUserPositions(netPositions)
 	currentProbability := wpam.GetCurrentProbability(allProbabilityChangesOnMarket)
-
-	// Step 3: Get total volume
 	totalVolume := marketmath.GetMarketVolume(sortedBets)
-
-	// Step 4: Determine earliest bet per user
 	earliestBets := computeEarliestBets(sortedBets)
 
-	// Step 5: Calculate valuations
 	valuations, err := CalculateRoundedUserValuationsFromUserMarketPositions(
 		userPositionMap,
 		currentProbability,
@@ -109,7 +67,56 @@ func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.B
 		return nil, err
 	}
 
-	// Step 6: Calculate user bet totals
+	userBetTotals := aggregateUserBetTotals(sortedBets, snapshot.IsResolved)
+	displayPositions := assembleDisplayPositions(netPositions, valuations, userBetTotals, snapshot, marketIDUint)
+
+	return displayPositions, nil
+}
+
+func computeEarliestBets(bets []models.Bet) map[string]time.Time {
+	earliest := make(map[string]time.Time)
+	for _, bet := range bets {
+		if existing, ok := earliest[bet.Username]; !ok || bet.PlacedAt.Before(existing) {
+			earliest[bet.Username] = bet.PlacedAt
+		}
+	}
+	return earliest
+}
+
+func sortBetsChronologically(bets []models.Bet) []models.Bet {
+	sortedBets := make([]models.Bet, len(bets))
+	copy(sortedBets, bets)
+	sort.Slice(sortedBets, func(i, j int) bool {
+		return sortedBets[i].PlacedAt.Before(sortedBets[j].PlacedAt)
+	})
+	return sortedBets
+}
+
+func calculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
+	S_YES, S_NO := dbpm.DivideUpMarketPoolSharesDBPM(sortedBets, probabilityChanges)
+	coursePayouts := dbpm.CalculateCoursePayoutsDBPM(sortedBets, probabilityChanges)
+	F_YES, F_NO := dbpm.CalculateNormalizationFactorsDBPM(S_YES, S_NO, coursePayouts)
+	scaledPayouts := dbpm.CalculateScaledPayoutsDBPM(sortedBets, coursePayouts, F_YES, F_NO)
+	finalPayouts := dbpm.AdjustPayouts(sortedBets, scaledPayouts)
+	aggreatedPositions := dbpm.AggregateUserPayoutsDBPM(sortedBets, finalPayouts)
+	return dbpm.NetAggregateMarketPositions(aggreatedPositions)
+}
+
+func mapUserPositions(netPositions []dbpm.DBPMMarketPosition) map[string]UserMarketPosition {
+	userPositionMap := make(map[string]UserMarketPosition)
+	for _, p := range netPositions {
+		userPositionMap[p.Username] = UserMarketPosition{
+			YesSharesOwned: p.YesSharesOwned,
+			NoSharesOwned:  p.NoSharesOwned,
+		}
+	}
+	return userPositionMap
+}
+
+func aggregateUserBetTotals(sortedBets []models.Bet, isResolved bool) map[string]struct {
+	TotalSpent       int64
+	TotalSpentInPlay int64
+} {
 	userBetTotals := make(map[string]struct {
 		TotalSpent       int64
 		TotalSpentInPlay int64
@@ -118,18 +125,29 @@ func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.B
 	for _, bet := range sortedBets {
 		totals := userBetTotals[bet.Username]
 		totals.TotalSpent += bet.Amount
-		if !snapshot.IsResolved {
+		if !isResolved {
 			totals.TotalSpentInPlay += bet.Amount
 		}
 		userBetTotals[bet.Username] = totals
 	}
+	return userBetTotals
+}
 
-	// Step 7: Append valuation to each MarketPosition struct
-	// Convert to []positions.MarketPosition for external use
+func assembleDisplayPositions(
+	netPositions []dbpm.DBPMMarketPosition,
+	valuations map[string]UserValuationResult,
+	userBetTotals map[string]struct {
+		TotalSpent       int64
+		TotalSpentInPlay int64
+	},
+	snapshot MarketSnapshot,
+	marketIDUint uint,
+) []MarketPosition {
 	var (
 		displayPositions []MarketPosition
 		seenUsers        = make(map[string]bool)
 	)
+
 	for _, p := range netPositions {
 		val := valuations[p.Username]
 		betTotals := userBetTotals[p.Username]
@@ -147,7 +165,6 @@ func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.B
 		seenUsers[p.Username] = true
 	}
 
-	// Ensure every bettor appears in the output even if their net position is zero.
 	for username, totals := range userBetTotals {
 		if seenUsers[username] {
 			continue
@@ -166,18 +183,7 @@ func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.B
 		})
 	}
 
-	return displayPositions, nil
-
-}
-
-func computeEarliestBets(bets []models.Bet) map[string]time.Time {
-	earliest := make(map[string]time.Time)
-	for _, bet := range bets {
-		if existing, ok := earliest[bet.Username]; !ok || bet.PlacedAt.Before(existing) {
-			earliest[bet.Username] = bet.PlacedAt
-		}
-	}
-	return earliest
+	return displayPositions
 }
 
 // CalculateMarketPositionForUser_WPAM_DBPM fetches and summarizes the position for a given user in a specific market.

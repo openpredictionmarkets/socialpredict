@@ -32,5 +32,10 @@ func TestGetCurrentProbability(t *testing.T) {
 		}
 	})
 
-	// 🚫 No test for empty input — we are okay with panics in this case
+	t.Run("returns 0 for empty input", func(t *testing.T) {
+		prob := GetCurrentProbability(nil)
+		if prob != 0 {
+			t.Errorf("expected 0 for empty input, got %f", prob)
+		}
+	})
 }

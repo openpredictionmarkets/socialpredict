@@ -103,6 +103,7 @@ func TestServiceGetUserCredit(t *testing.T) {
 func TestServiceGetUserPortfolio(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
+	modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
 	repo := rusers.NewGormRepository(db)
 	service := users.NewService(repo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
 

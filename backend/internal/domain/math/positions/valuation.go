@@ -1,7 +1,6 @@
 package positionsmath
 
 import (
-	"fmt"
 	"math"
 	"time"
 )
@@ -41,9 +40,6 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 				floatVal = float64(pos.NoSharesOwned) * (1 - finalProb)
 			}
 		}
-
-		fmt.Printf("user=%s YES=%d NO=%d isResolved=%v result=%s val=%v\n",
-			username, pos.YesSharesOwned, pos.NoSharesOwned, isResolved, resolutionResult, floatVal)
 
 		roundedVal := int64(math.Round(floatVal))
 
