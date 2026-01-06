@@ -8,19 +8,46 @@ import (
 	"socialpredict/setup"
 )
 
+// DebtRepository exposes only the user data needed for debt calculations.
+type DebtRepository interface {
+	ListUsers(ctx context.Context) ([]models.User, error)
+}
+
+// VolumeRepository exposes the market and bet data needed for volume calculations.
+type VolumeRepository interface {
+	ListMarkets(ctx context.Context) ([]models.Market, error)
+	ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error)
+}
+
+// FeeRepository exposes the ordered bet data needed for participation fee calculations.
+type FeeRepository interface {
+	ListBetsOrdered(ctx context.Context) ([]models.Bet, error)
+}
+
+// LeaderboardRepository provides the data required to compute leaderboards.
+type LeaderboardRepository interface {
+	DebtRepository
+	VolumeRepository
+}
+
+// FinancialsRepository provides the data required for per-user financial snapshots.
+type FinancialsRepository interface {
+	UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error)
+}
+
 // DebtCalculator calculates debt-related metrics.
 type DebtCalculator interface {
-	Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*DebtStats, error)
+	Calculate(ctx context.Context, repo DebtRepository, econ *setup.EconomicConfig) (*DebtStats, error)
 }
 
 // VolumeCalculator calculates market volume metrics.
 type VolumeCalculator interface {
-	Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*MarketVolumeStats, error)
+	Calculate(ctx context.Context, repo VolumeRepository, econ *setup.EconomicConfig) (*MarketVolumeStats, error)
 }
 
 // FeeCalculator calculates betting fee metrics.
 type FeeCalculator interface {
-	CalculateParticipationFees(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (int64, error)
+	CalculateParticipationFees(ctx context.Context, repo FeeRepository, econ *setup.EconomicConfig) (int64, error)
 }
 
 // MetricsAssembler combines calculator outputs into the final DTO.
@@ -35,11 +62,9 @@ type MarketPositionCalculator interface {
 
 // Repository exposes the data access required by the analytics domain service.
 type Repository interface {
-	ListUsers(ctx context.Context) ([]models.User, error)
-	ListMarkets(ctx context.Context) ([]models.Market, error)
-	ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error)
-	ListBetsOrdered(ctx context.Context) ([]models.Bet, error)
-	UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error)
+	LeaderboardRepository
+	FeeRepository
+	FinancialsRepository
 }
 
 // Service implements analytics calculations.

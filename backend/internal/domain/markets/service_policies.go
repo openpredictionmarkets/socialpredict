@@ -113,7 +113,14 @@ func (defaultResolutionPolicy) ValidateResolutionRequest(market *Market, usernam
 	return nil
 }
 
-func (defaultResolutionPolicy) Resolve(ctx context.Context, repo Repository, userService UserService, marketID int64, outcome string) error {
+// ResolutionRepository contains the persistence needs for market resolution flows.
+type ResolutionRepository interface {
+	ResolveMarket(ctx context.Context, id int64, resolution string) error
+	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
+	CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*PayoutPosition, error)
+}
+
+func (defaultResolutionPolicy) Resolve(ctx context.Context, repo ResolutionRepository, userService UserService, marketID int64, outcome string) error {
 	if err := repo.ResolveMarket(ctx, marketID, outcome); err != nil {
 		return err
 	}
@@ -278,7 +285,7 @@ func (defaultStatusPolicy) NormalizePage(p Page, defaultLimit, maxLimit int) Pag
 	return p
 }
 
-func refundMarketBets(ctx context.Context, repo Repository, userService UserService, marketID int64) error {
+func refundMarketBets(ctx context.Context, repo ResolutionRepository, userService UserService, marketID int64) error {
 	bets, err := repo.ListBetsForMarket(ctx, marketID)
 	if err != nil {
 		return err
@@ -291,7 +298,7 @@ func refundMarketBets(ctx context.Context, repo Repository, userService UserServ
 	return nil
 }
 
-func payoutWinningPositions(ctx context.Context, repo Repository, userService UserService, marketID int64) error {
+func payoutWinningPositions(ctx context.Context, repo ResolutionRepository, userService UserService, marketID int64) error {
 	positions, err := repo.CalculatePayoutPositions(ctx, marketID)
 	if err != nil {
 		return err

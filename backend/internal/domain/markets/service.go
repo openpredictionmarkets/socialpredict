@@ -25,21 +25,41 @@ type serviceClock struct{}
 
 func (serviceClock) Now() time.Time { return time.Now() }
 
-// Repository defines the interface for market data access.
-type Repository interface {
-	Create(ctx context.Context, market *Market) error
+// MarketReadRepository exposes market reads.
+type MarketReadRepository interface {
 	GetByID(ctx context.Context, id int64) (*Market, error)
-	UpdateLabels(ctx context.Context, id int64, yesLabel, noLabel string) error
 	List(ctx context.Context, filters ListFilters) ([]*Market, error)
 	ListByStatus(ctx context.Context, status string, p Page) ([]*Market, error)
 	Search(ctx context.Context, query string, filters SearchFilters) ([]*Market, error)
+	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)
+}
+
+// MarketWriteRepository exposes market writes and maintenance operations.
+type MarketWriteRepository interface {
+	Create(ctx context.Context, market *Market) error
+	UpdateLabels(ctx context.Context, id int64, yesLabel, noLabel string) error
 	Delete(ctx context.Context, id int64) error
 	ResolveMarket(ctx context.Context, id int64, resolution string) error
+}
+
+// MarketPositionRepository exposes position-related queries.
+type MarketPositionRepository interface {
 	GetUserPosition(ctx context.Context, marketID int64, username string) (*UserPosition, error)
 	ListMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
-	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
 	CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*PayoutPosition, error)
-	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)
+}
+
+// MarketBetRepository exposes bet history queries.
+type MarketBetRepository interface {
+	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
+}
+
+// Repository defines the interface for market data access.
+type Repository interface {
+	MarketReadRepository
+	MarketWriteRepository
+	MarketPositionRepository
+	MarketBetRepository
 }
 
 // CreatorSummary captures lightweight information about a market creator.
@@ -85,7 +105,7 @@ type CreationPolicy interface {
 type ResolutionPolicy interface {
 	NormalizeResolution(resolution string) (string, error)
 	ValidateResolutionRequest(market *Market, username string) error
-	Resolve(ctx context.Context, repo Repository, userService UserService, marketID int64, outcome string) error
+	Resolve(ctx context.Context, repo ResolutionRepository, userService UserService, marketID int64, outcome string) error
 }
 
 // ProbabilityChange represents a change in market probability at a timestamp.

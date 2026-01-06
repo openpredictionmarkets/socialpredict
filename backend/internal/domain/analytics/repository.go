@@ -233,3 +233,12 @@ func (r *GormRepository) calculateUserPositions(username string, marketIDs []uin
 
 	return positions, nil
 }
+
+var (
+	_ Repository            = (*GormRepository)(nil)
+	_ LeaderboardRepository = (*GormRepository)(nil)
+	_ FinancialsRepository  = (*GormRepository)(nil)
+	_ DebtRepository        = (*GormRepository)(nil)
+	_ VolumeRepository      = (*GormRepository)(nil)
+	_ FeeRepository         = (*GormRepository)(nil)
+)

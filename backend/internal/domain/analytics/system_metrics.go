@@ -55,7 +55,7 @@ func (s *Service) ComputeSystemMetrics(ctx context.Context) (*SystemMetrics, err
 // DefaultDebtCalculator implements the existing debt policy.
 type DefaultDebtCalculator struct{}
 
-func (c DefaultDebtCalculator) Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*DebtStats, error) {
+func (c DefaultDebtCalculator) Calculate(ctx context.Context, repo DebtRepository, econ *setup.EconomicConfig) (*DebtStats, error) {
 	users, err := repo.ListUsers(ctx)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (c DefaultDebtCalculator) Calculate(ctx context.Context, repo Repository, e
 // DefaultVolumeCalculator implements the existing volume policy.
 type DefaultVolumeCalculator struct{}
 
-func (c DefaultVolumeCalculator) Calculate(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (*MarketVolumeStats, error) {
+func (c DefaultVolumeCalculator) Calculate(ctx context.Context, repo VolumeRepository, econ *setup.EconomicConfig) (*MarketVolumeStats, error) {
 	markets, err := repo.ListMarkets(ctx)
 	if err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (c DefaultVolumeCalculator) Calculate(ctx context.Context, repo Repository,
 // DefaultFeeCalculator implements the existing participation fee policy.
 type DefaultFeeCalculator struct{}
 
-func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, repo Repository, econ *setup.EconomicConfig) (int64, error) {
+func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, repo FeeRepository, econ *setup.EconomicConfig) (int64, error) {
 	betsOrdered, err := repo.ListBetsOrdered(ctx)
 	if err != nil {
 		return 0, err
