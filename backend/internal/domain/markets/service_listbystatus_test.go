@@ -50,19 +50,25 @@ func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB) {
 	t.Helper()
 
 	econ := modelstesting.GenerateEconomicConfig()
-	wpam.SetSeeds(wpam.Seeds{
+	calculator := wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpam.Seeds{
 		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
 		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
 		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
 		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
-	})
+	}})
 
 	db := modelstesting.NewFakeDB(t)
 	repo := rmarkets.NewGormRepository(db)
 	clock := fixedClock{now: time.Now()}
 	cfg := markets.Config{}
 
-	service := markets.NewService(repo, noopUserService{}, clock, cfg)
+	service := markets.NewService(
+		repo,
+		noopUserService{},
+		clock,
+		cfg,
+		markets.WithProbabilityEngine(markets.DefaultProbabilityEngine(calculator)),
+	)
 	return service, db
 }
 

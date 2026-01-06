@@ -65,11 +65,46 @@ type PositionCalculator struct {
 	payouts       PayoutModel
 }
 
+// PositionCalculatorOption configures calculator strategies.
+type PositionCalculatorOption func(*PositionCalculator)
+
+// WithProbabilityProvider overrides the probability provider.
+func WithProbabilityProvider(p ProbabilityProvider) PositionCalculatorOption {
+	return func(c *PositionCalculator) {
+		if p != nil {
+			c.probabilities = p
+		}
+	}
+}
+
+// WithPayoutModel overrides the payout model.
+func WithPayoutModel(p PayoutModel) PositionCalculatorOption {
+	return func(c *PositionCalculator) {
+		if p != nil {
+			c.payouts = p
+		}
+	}
+}
+
 // NewPositionCalculator creates a calculator with default WPAM/DBPM components.
-func NewPositionCalculator() PositionCalculator {
-	return PositionCalculator{
-		probabilities: defaultProbabilityProvider{},
+func NewPositionCalculator(opts ...PositionCalculatorOption) PositionCalculator {
+	calc := PositionCalculator{
+		probabilities: defaultProbabilityProvider{calculator: wpam.NewProbabilityCalculator(nil)},
 		payouts:       defaultPayoutModel{},
+	}
+	for _, opt := range opts {
+		opt(&calc)
+	}
+	calc.ensureDefaults()
+	return calc
+}
+
+func (c *PositionCalculator) ensureDefaults() {
+	if c.probabilities == nil {
+		c.probabilities = defaultProbabilityProvider{calculator: wpam.NewProbabilityCalculator(nil)}
+	}
+	if c.payouts == nil {
+		c.payouts = defaultPayoutModel{}
 	}
 }
 
@@ -80,14 +115,9 @@ func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.B
 
 // CalculateMarketPositions runs the position calculation using the calculator's injected strategies.
 func (c PositionCalculator) CalculateMarketPositions(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error) {
+	c.ensureDefaults()
 	probabilities := c.probabilities
-	if probabilities == nil {
-		probabilities = defaultProbabilityProvider{}
-	}
 	payouts := c.payouts
-	if payouts == nil {
-		payouts = defaultPayoutModel{}
-	}
 
 	marketIDUint := uint(snapshot.ID)
 
@@ -143,10 +173,8 @@ func calculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.Pr
 }
 
 func (c PositionCalculator) calculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
+	c.ensureDefaults()
 	payouts := c.payouts
-	if payouts == nil {
-		payouts = defaultPayoutModel{}
-	}
 	return c.calculateNetPositionsWith(payouts, sortedBets, probabilityChanges)
 }
 

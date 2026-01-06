@@ -11,6 +11,7 @@ import (
 	analytics "socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	dusers "socialpredict/internal/domain/users"
 
@@ -73,7 +74,6 @@ func NewContainer(db *gorm.DB, config *setup.EconomicConfig) *Container {
 func (c *Container) InitializeRepositories() {
 	c.marketsRepo = *rmarkets.NewGormRepository(c.db)
 	c.usersRepo = *rusers.NewGormRepository(c.db)
-	c.analyticsRepo = *analytics.NewGormRepository(c.db)
 	c.betsRepo = *rbets.NewGormRepository(c.db)
 }
 
@@ -83,13 +83,22 @@ func (c *Container) InitializeServices() {
 	securityService := security.NewSecurityService()
 	configLoader := func() *setup.EconomicConfig { return c.config }
 
-	wpam.SetSeeds(wpam.Seeds{
+	wpamSeeds := wpam.Seeds{
 		InitialProbability:     c.config.Economics.MarketCreation.InitialMarketProbability,
 		InitialSubsidization:   c.config.Economics.MarketCreation.InitialMarketSubsidization,
 		InitialYesContribution: c.config.Economics.MarketCreation.InitialMarketYes,
 		InitialNoContribution:  c.config.Economics.MarketCreation.InitialMarketNo,
-	})
-	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader)
+	}
+	wpamCalculator := wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpamSeeds})
+	positionProbabilityProvider := positionsmath.NewWPAMProbabilityProvider(wpamCalculator)
+	positionCalculator := positionsmath.NewPositionCalculator(
+		positionsmath.WithProbabilityProvider(positionProbabilityProvider),
+	)
+
+	positionCalcAdapter := analytics.NewMarketPositionCalculator(positionCalculator)
+
+	c.analyticsRepo = *analytics.NewGormRepository(c.db, analytics.WithRepositoryPositionCalculator(positionCalcAdapter))
+	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader, analytics.WithPositionCalculator(positionCalcAdapter))
 	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
 	c.authService = authsvc.NewAuthService(c.usersService)
 
@@ -100,7 +109,13 @@ func (c *Container) InitializeServices() {
 		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
 	}
 
-	c.marketsService = dmarkets.NewService(&c.marketsRepo, c.usersService, c.clock, marketsConfig)
+	c.marketsService = dmarkets.NewService(
+		&c.marketsRepo,
+		c.usersService,
+		c.clock,
+		marketsConfig,
+		dmarkets.WithProbabilityEngine(dmarkets.DefaultProbabilityEngine(wpamCalculator)),
+	)
 
 	c.betsService = dbets.NewService(&c.betsRepo, c.marketsService, c.usersService, c.config, c.clock)
 }

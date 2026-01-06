@@ -146,18 +146,18 @@ var TestCases = []TestCase{
 
 func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
-	wpam.SetSeeds(wpam.Seeds{
+	calculator := wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpam.Seeds{
 		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
 		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
 		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
 		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
-	})
+	}})
 
 	for _, tc := range TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
 
 			// Call the function under test
-			probChanges := wpam.CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
+			probChanges := calculator.CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
 
 			if len(probChanges) != len(tc.ProbabilityChanges) {
 				t.Fatalf("expected %d probability changes, got %d", len(tc.ProbabilityChanges), len(probChanges))
