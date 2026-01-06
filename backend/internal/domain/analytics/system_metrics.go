@@ -24,6 +24,9 @@ type MarketVolumeStats struct {
 
 // ComputeSystemMetrics aggregates system-wide monetary metrics.
 func (s *Service) ComputeSystemMetrics(ctx context.Context) (*SystemMetrics, error) {
+	if s.repo == nil {
+		return nil, errors.New("repository not provided")
+	}
 	if s.econLoader == nil {
 		return nil, errors.New("economic configuration loader not provided")
 	}

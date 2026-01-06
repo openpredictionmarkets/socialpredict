@@ -40,7 +40,7 @@ type SellValidator interface {
 
 // SaleCalculator encapsulates sale pricing and dust rules.
 type SaleCalculator interface {
-	Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (saleResult, error)
+	Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error)
 }
 
 // Clock allows time to be mocked in tests.
@@ -75,6 +75,11 @@ type Service struct {
 	ledger         betLedger
 	saleCalculator SaleCalculator
 }
+
+var (
+	_ ServiceInterface = (*Service)(nil)
+	_ SaleCalculator   = saleCalculator{}
+)
 
 // NewService constructs a bets service.
 func NewService(repo Repository, markets MarketService, users UserService, econ *setup.EconomicConfig, clock Clock) *Service {

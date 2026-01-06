@@ -17,6 +17,9 @@ func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProject
 	if err != nil {
 		return nil, err
 	}
+	if market == nil {
+		return nil, ErrMarketNotFound
+	}
 
 	if err := s.probabilityValidator.ValidateMarket(market, s.clock.Now()); err != nil {
 		return nil, err

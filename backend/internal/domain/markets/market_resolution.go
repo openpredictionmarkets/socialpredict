@@ -15,6 +15,9 @@ func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution 
 	if err != nil {
 		return ErrMarketNotFound
 	}
+	if market == nil {
+		return ErrMarketNotFound
+	}
 
 	if err := s.resolutionPolicy.ValidateResolutionRequest(market, username); err != nil {
 		return err

@@ -104,18 +104,15 @@ func WithPositionCalculator(c MarketPositionCalculator) ServiceOption {
 // NewService constructs an analytics service with optional strategy overrides.
 func NewService(repo Repository, econLoader setup.EconConfigLoader, opts ...ServiceOption) *Service {
 	service := &Service{
-		repo:             repo,
-		econLoader:       econLoader,
-		debtCalculator:   DefaultDebtCalculator{},
-		volumeCalculator: DefaultVolumeCalculator{},
-		feeCalculator:    DefaultFeeCalculator{},
-		metricsAssembler: DefaultMetricsAssembler{},
-		positions:        defaultMarketPositionCalculator{},
+		repo:       repo,
+		econLoader: econLoader,
 	}
 
 	for _, opt := range opts {
 		opt(service)
 	}
+
+	service.ensureStrategyDefaults()
 
 	return service
 }
@@ -137,3 +134,11 @@ func (s *Service) ensureStrategyDefaults() {
 		s.positions = defaultMarketPositionCalculator{}
 	}
 }
+
+var (
+	_ DebtCalculator           = DefaultDebtCalculator{}
+	_ VolumeCalculator         = DefaultVolumeCalculator{}
+	_ FeeCalculator            = DefaultFeeCalculator{}
+	_ MetricsAssembler         = DefaultMetricsAssembler{}
+	_ MarketPositionCalculator = defaultMarketPositionCalculator{}
+)

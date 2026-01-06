@@ -17,6 +17,9 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 	if err != nil {
 		return nil, ErrMarketNotFound
 	}
+	if market == nil {
+		return nil, ErrMarketNotFound
+	}
 
 	p = s.statusPolicy.NormalizePage(p, 100, 1000)
 

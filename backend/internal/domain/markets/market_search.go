@@ -17,6 +17,10 @@ func (s *Service) SearchMarkets(ctx context.Context, query string, filters Searc
 		return nil, err
 	}
 
+	if primaryResults == nil {
+		primaryResults = []*Market{}
+	}
+
 	results := s.searchPolicy.NewSearchResults(query, filters.Status, primaryResults)
 	if !s.searchPolicy.ShouldFetchFallback(primaryResults, filters.Status) {
 		return results, nil

@@ -11,6 +11,10 @@ func (s *Service) ComputeUserFinancials(ctx context.Context, req FinancialSnapsh
 		return nil, errors.New("username is required")
 	}
 
+	if s.repo == nil {
+		return nil, errors.New("repository not provided")
+	}
+
 	if s.econLoader == nil {
 		return nil, errors.New("economic configuration loader not provided")
 	}
