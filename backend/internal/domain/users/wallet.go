@@ -8,21 +8,12 @@ type Account struct {
     UserID   int64
     Balance  int64
 }
-
-var (
-    ErrInvalidAccountID  = errors.New("account id must be positive")
-    ErrInvalidUserID     = errors.New("user id must be positive")
-    ErrInvalidAmount     = errors.New("amount must be positive")
-    ErrInsufficientFunds = errors.New("insufficient funds")
-)
-
 // NewAccount constructs an account with a starting balance.
 func NewAccount(id, userID, balance int64, currency string) (Account, error) {
     a := Account{
         ID:       id,
         UserID:   userID,
         Balance:  balance,
-        Currency: currency,
     }
     if err := a.Validate(); err != nil {
         return Account{}, err
@@ -44,7 +35,7 @@ func (a Account) Validate() error {
 // Credit increases the balance by amount.
 func (a *Account) Credit(amount int64) error {
     if amount <= 0 {
-        return ErrInvalidAmount
+        return ErrInsufficientBalance
     }
     a.Balance += amount
     return nil
@@ -53,10 +44,10 @@ func (a *Account) Credit(amount int64) error {
 // Debit decreases the balance by amount if funds are available.
 func (a *Account) Debit(amount int64) error {
     if amount <= 0 {
-        return ErrInvalidAmount
+        return ErrInvalidTransactionType
     }
     if amount > a.Balance {
-        return ErrInsufficientFunds
+        return ErrInsufficientBalance
     }
     a.Balance -= amount
     return nil

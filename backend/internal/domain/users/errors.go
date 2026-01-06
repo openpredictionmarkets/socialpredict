@@ -10,4 +10,6 @@ var (
 	ErrInvalidUserData        = errors.New("invalid user data")
 	ErrUnauthorized           = errors.New("unauthorized")
 	ErrInvalidTransactionType = errors.New("invalid transaction type")
+	ErrInvalidAccountID  = errors.New("account id must be positive")
+	ErrInvalidUserID     = errors.New("account user id must exist")
 )
