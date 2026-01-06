@@ -46,7 +46,7 @@ func (f fixedClock) Now() time.Time {
 	return f.now
 }
 
-func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB) {
+func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB, wpam.ProbabilityCalculator) {
 	t.Helper()
 
 	econ := modelstesting.GenerateEconomicConfig()
@@ -69,11 +69,11 @@ func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB) {
 		cfg,
 		markets.WithProbabilityEngine(markets.DefaultProbabilityEngine(calculator)),
 	)
-	return service, db
+	return service, db, calculator
 }
 
 func TestServiceListByStatusFiltersMarkets(t *testing.T) {
-	service, db := setupServiceWithDB(t)
+	service, db, _ := setupServiceWithDB(t)
 
 	now := time.Now()
 
@@ -177,7 +177,7 @@ func TestServiceListByStatusFiltersMarkets(t *testing.T) {
 }
 
 func TestServiceListByStatusInvalidStatus(t *testing.T) {
-	service, _ := setupServiceWithDB(t)
+	service, _, _ := setupServiceWithDB(t)
 
 	_, err := service.ListByStatus(context.Background(), "unknown", markets.Page{})
 	if err == nil {

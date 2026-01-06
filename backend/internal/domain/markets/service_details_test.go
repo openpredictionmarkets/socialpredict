@@ -13,7 +13,7 @@ import (
 )
 
 func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
-	service, db := setupServiceWithDB(t)
+	service, db, calculator := setupServiceWithDB(t)
 
 	creator := modelstesting.GenerateUser("creator", 0)
 	if err := db.Create(&creator).Error; err != nil {
@@ -46,7 +46,7 @@ func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
 
 	expectedVolume := marketmath.GetMarketVolumeWithDust(bets)
 	expectedDust := marketmath.GetMarketDust(bets)
-	expectedProbabilities := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
+	expectedProbabilities := calculator.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
 
 	if overview.TotalVolume != expectedVolume {
 		t.Fatalf("total volume = %d, want %d", overview.TotalVolume, expectedVolume)
@@ -69,7 +69,7 @@ func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
 }
 
 func TestServiceGetMarketDetails_InvalidAndMissing(t *testing.T) {
-	service, _ := setupServiceWithDB(t)
+	service, _, _ := setupServiceWithDB(t)
 
 	if _, err := service.GetMarketDetails(context.Background(), 0); err != markets.ErrInvalidInput {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)

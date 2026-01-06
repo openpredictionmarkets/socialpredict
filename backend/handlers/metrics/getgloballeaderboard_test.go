@@ -41,7 +41,7 @@ func (r *leaderboardRepo) UserMarketPositions(context.Context, string) ([]positi
 }
 
 func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
-	modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
+	_ = modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
 
 	now := time.Now()
 	repo := &leaderboardRepo{
@@ -51,10 +51,10 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 		},
 		markets: []models.Market{
 			{
-				ID:                1,
-				CreatorUsername:   "alice",
-				IsResolved:        true,
-				ResolutionResult:  "YES",
+				ID:                 1,
+				CreatorUsername:    "alice",
+				IsResolved:         true,
+				ResolutionResult:   "YES",
 				ResolutionDateTime: now.Add(24 * time.Hour),
 			},
 		},
