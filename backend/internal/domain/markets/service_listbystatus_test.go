@@ -46,28 +46,34 @@ func (f fixedClock) Now() time.Time {
 	return f.now
 }
 
-func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB) {
+func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB, wpam.ProbabilityCalculator) {
 	t.Helper()
 
 	econ := modelstesting.GenerateEconomicConfig()
-	wpam.SetSeeds(wpam.Seeds{
+	calculator := wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpam.Seeds{
 		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
 		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
 		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
 		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
-	})
+	}})
 
 	db := modelstesting.NewFakeDB(t)
 	repo := rmarkets.NewGormRepository(db)
 	clock := fixedClock{now: time.Now()}
 	cfg := markets.Config{}
 
-	service := markets.NewService(repo, noopUserService{}, clock, cfg)
-	return service, db
+	service := markets.NewService(
+		repo,
+		noopUserService{},
+		clock,
+		cfg,
+		markets.WithProbabilityEngine(markets.DefaultProbabilityEngine(calculator)),
+	)
+	return service, db, calculator
 }
 
 func TestServiceListByStatusFiltersMarkets(t *testing.T) {
-	service, db := setupServiceWithDB(t)
+	service, db, _ := setupServiceWithDB(t)
 
 	now := time.Now()
 
@@ -171,7 +177,7 @@ func TestServiceListByStatusFiltersMarkets(t *testing.T) {
 }
 
 func TestServiceListByStatusInvalidStatus(t *testing.T) {
-	service, _ := setupServiceWithDB(t)
+	service, _, _ := setupServiceWithDB(t)
 
 	_, err := service.ListByStatus(context.Background(), "unknown", markets.Page{})
 	if err == nil {

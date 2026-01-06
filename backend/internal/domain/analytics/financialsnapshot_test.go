@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
@@ -14,10 +15,13 @@ import (
 
 func newAnalyticsService(t *testing.T, db *gorm.DB, econ *setup.EconomicConfig) *Service {
 	t.Helper()
-	modelstesting.SeedWPAMFromConfig(econ)
-	repo := NewGormRepository(db)
+	wpamCalculator := modelstesting.SeedWPAMFromConfig(econ)
+	positionCalculator := positionsmath.NewPositionCalculator(
+		positionsmath.WithProbabilityProvider(positionsmath.NewWPAMProbabilityProvider(wpamCalculator)),
+	)
+	repo := NewGormRepository(db, WithRepositoryPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
 	loader := func() *setup.EconomicConfig { return econ }
-	return NewService(repo, loader)
+	return NewService(repo, loader, WithPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
 }
 
 func TestComputeUserFinancials_NewUser_NoPositions(t *testing.T) {

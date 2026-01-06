@@ -8,13 +8,24 @@ import (
 	"socialpredict/models"
 )
 
-type defaultProbabilityProvider struct{}
-
-func (defaultProbabilityProvider) Calculate(createdAt time.Time, bets []models.Bet) []wpam.ProbabilityChange {
-	return wpam.CalculateMarketProbabilitiesWPAM(createdAt, bets)
+type defaultProbabilityProvider struct {
+	calculator wpam.ProbabilityCalculator
 }
 
-func (defaultProbabilityProvider) Current(changes []wpam.ProbabilityChange) float64 {
+// NewWPAMProbabilityProvider constructs a WPAM-backed probability provider with the supplied calculator.
+func NewWPAMProbabilityProvider(calculator wpam.ProbabilityCalculator) ProbabilityProvider {
+	return defaultProbabilityProvider{calculator: calculator}
+}
+
+func (p defaultProbabilityProvider) Calculate(createdAt time.Time, bets []models.Bet) []wpam.ProbabilityChange {
+	calc := p.calculator
+	if calc.Seeds().InitialSubsidization == 0 {
+		calc = wpam.NewProbabilityCalculator(nil)
+	}
+	return calc.CalculateMarketProbabilitiesWPAM(createdAt, bets)
+}
+
+func (p defaultProbabilityProvider) Current(changes []wpam.ProbabilityChange) float64 {
 	return wpam.GetCurrentProbability(changes)
 }
 

@@ -217,25 +217,135 @@ type Service struct {
 	statusPolicy          StatusPolicy
 }
 
-// NewService creates a new markets service.
-func NewService(repo Repository, userService UserService, clock Clock, config Config) *Service {
-	if clock == nil {
-		clock = serviceClock{}
+// ServiceOption configures the markets service strategies.
+type ServiceOption func(*Service)
+
+// WithCreationPolicy overrides the market creation policy.
+func WithCreationPolicy(p CreationPolicy) ServiceOption {
+	return func(s *Service) {
+		if p != nil {
+			s.creationPolicy = p
+		}
 	}
-	return &Service{
+}
+
+// WithResolutionPolicy overrides the resolution policy.
+func WithResolutionPolicy(p ResolutionPolicy) ServiceOption {
+	return func(s *Service) {
+		if p != nil {
+			s.resolutionPolicy = p
+		}
+	}
+}
+
+// WithProbabilityEngine overrides the probability engine.
+func WithProbabilityEngine(e ProbabilityEngine) ServiceOption {
+	return func(s *Service) {
+		if e != nil {
+			s.probabilityEngine = e
+		}
+	}
+}
+
+// WithProbabilityValidator overrides the probability validator.
+func WithProbabilityValidator(v ProbabilityValidator) ServiceOption {
+	return func(s *Service) {
+		if v != nil {
+			s.probabilityValidator = v
+		}
+	}
+}
+
+// WithSearchPolicy overrides the search policy.
+func WithSearchPolicy(p SearchPolicy) ServiceOption {
+	return func(s *Service) {
+		if p != nil {
+			s.searchPolicy = p
+		}
+	}
+}
+
+// WithMetricsCalculator overrides the metrics calculator.
+func WithMetricsCalculator(c MetricsCalculator) ServiceOption {
+	return func(s *Service) {
+		if c != nil {
+			s.metricsCalculator = c
+		}
+	}
+}
+
+// WithLeaderboardCalculator overrides the leaderboard calculator.
+func WithLeaderboardCalculator(c LeaderboardCalculator) ServiceOption {
+	return func(s *Service) {
+		if c != nil {
+			s.leaderboardCalculator = c
+		}
+	}
+}
+
+// WithStatusPolicy overrides the status policy.
+func WithStatusPolicy(p StatusPolicy) ServiceOption {
+	return func(s *Service) {
+		if p != nil {
+			s.statusPolicy = p
+		}
+	}
+}
+
+// WithClock overrides the clock used by the service.
+func WithClock(clock Clock) ServiceOption {
+	return func(s *Service) {
+		if clock != nil {
+			s.clock = clock
+		}
+	}
+}
+
+// NewService creates a new markets service.
+func NewService(repo Repository, userService UserService, clock Clock, config Config, opts ...ServiceOption) *Service {
+	s := &Service{
 		repo:        repo,
 		userService: userService,
 		clock:       clock,
 		config:      config,
+	}
 
-		creationPolicy:        defaultCreationPolicy{config: config},
-		resolutionPolicy:      defaultResolutionPolicy{},
-		probabilityEngine:     defaultProbabilityEngine{},
-		probabilityValidator:  defaultProbabilityValidator{},
-		searchPolicy:          defaultSearchPolicy{},
-		metricsCalculator:     defaultMetricsCalculator{},
-		leaderboardCalculator: defaultLeaderboardCalculator{},
-		statusPolicy:          defaultStatusPolicy{},
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	s.ensureDefaults()
+
+	return s
+}
+
+func (s *Service) ensureDefaults() {
+	if s.clock == nil {
+		s.clock = serviceClock{}
+	}
+	if s.creationPolicy == nil {
+		s.creationPolicy = defaultCreationPolicy{config: s.config}
+	}
+	if s.resolutionPolicy == nil {
+		s.resolutionPolicy = defaultResolutionPolicy{}
+	}
+	if s.probabilityEngine == nil {
+		s.probabilityEngine = defaultProbabilityEngine{}
+	}
+	if s.probabilityValidator == nil {
+		s.probabilityValidator = defaultProbabilityValidator{}
+	}
+	if s.searchPolicy == nil {
+		s.searchPolicy = defaultSearchPolicy{}
+	}
+	if s.metricsCalculator == nil {
+		s.metricsCalculator = defaultMetricsCalculator{}
+	}
+	if s.leaderboardCalculator == nil {
+		s.leaderboardCalculator = defaultLeaderboardCalculator{}
+	}
+	if s.statusPolicy == nil {
+		s.statusPolicy = defaultStatusPolicy{}
 	}
 }
 

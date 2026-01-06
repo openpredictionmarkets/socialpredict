@@ -22,31 +22,53 @@ type Seeds struct {
 	InitialNoContribution  int64
 }
 
-var (
-	configSeeds Seeds
-	seedsSet    bool
-)
-
-// SetSeeds configures the initial values for WPAM calculations.
-func SetSeeds(seeds Seeds) {
-	configSeeds = seeds
-	seedsSet = true
+// SeedProvider supplies seeds for probability calculations.
+type SeedProvider interface {
+	Seeds() Seeds
 }
 
-func getSeeds() Seeds {
-	if !seedsSet {
-		// Sensible defaults to avoid panics when callers forget to seed.
-		return Seeds{
-			InitialProbability:   0.5,
-			InitialSubsidization: 1,
+// StaticSeedProvider returns a fixed seed configuration.
+type StaticSeedProvider struct {
+	Value Seeds
+}
+
+func (p StaticSeedProvider) Seeds() Seeds { return p.Value }
+
+// ProbabilityCalculator performs WPAM probability calculations using supplied seeds.
+type ProbabilityCalculator struct {
+	seeds SeedProvider
+}
+
+// NewProbabilityCalculator constructs a calculator with the provided seed source.
+// If provider is nil, sensible defaults are used.
+func NewProbabilityCalculator(provider SeedProvider) ProbabilityCalculator {
+	if provider == nil {
+		provider = StaticSeedProvider{
+			Value: Seeds{
+				InitialProbability:   0.5,
+				InitialSubsidization: 1,
+			},
 		}
 	}
-	return configSeeds
+	return ProbabilityCalculator{seeds: provider}
+}
+
+// Seeds returns the configured seeds for the calculator.
+func (c ProbabilityCalculator) Seeds() Seeds {
+	if c.seeds == nil {
+		return Seeds{}
+	}
+	return c.seeds.Seeds()
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
 func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
-	seeds := getSeeds()
+	return NewProbabilityCalculator(nil).CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, bets)
+}
+
+// CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets using the calculator seeds.
+func (c ProbabilityCalculator) CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+	seeds := c.seeds.Seeds()
 	var probabilityChanges []ProbabilityChange
 
 	P_initial := seeds.InitialProbability
@@ -72,17 +94,13 @@ func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []mode
 }
 
 func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
-	seeds := getSeeds()
+	return NewProbabilityCalculator(nil).ProjectNewProbabilityWPAM(marketCreatedAtTime, currentBets, newBet)
+}
 
+// ProjectNewProbabilityWPAM projects the probability after a new bet using calculator seeds.
+func (c ProbabilityCalculator) ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
 	updatedBets := append(currentBets, newBet)
-
-	// Ensure caller-supplied seeds propagate into calculation if they were configured.
-	if seedsSet {
-		SetSeeds(seeds)
-	}
-
-	probabilityChanges := CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, updatedBets)
-
+	probabilityChanges := c.CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, updatedBets)
 	finalProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
 	return ProjectedProbability{Probability: finalProbability}

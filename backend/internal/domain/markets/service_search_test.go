@@ -71,7 +71,7 @@ func seedSearchMarkets(t *testing.T, db *gorm.DB, username string) {
 }
 
 func TestServiceSearchMarketsFiltersByStatus(t *testing.T) {
-	service, db := setupServiceWithDB(t)
+	service, db, _ := setupServiceWithDB(t)
 
 	user := modelstesting.GenerateUser("testuser", 0)
 	if err := db.Create(&user).Error; err != nil {
@@ -162,7 +162,7 @@ func TestServiceSearchMarketsFiltersByStatus(t *testing.T) {
 }
 
 func TestServiceSearchMarketsInvalidInput(t *testing.T) {
-	service, _ := setupServiceWithDB(t)
+	service, _, _ := setupServiceWithDB(t)
 
 	_, err := service.SearchMarkets(context.Background(), "   ", markets.SearchFilters{})
 	if err == nil {

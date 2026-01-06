@@ -10,12 +10,15 @@ import (
 
 func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
-	wpam.SetSeeds(wpam.Seeds{
+	calculator := wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpam.Seeds{
 		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
 		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
 		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
 		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
-	})
+	}})
+	positionCalculator := NewPositionCalculator(
+		WithProbabilityProvider(NewWPAMProbabilityProvider(calculator)),
+	)
 
 	testcases := []struct {
 		Name       string
@@ -73,7 +76,7 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 				CreatedAt: market.CreatedAt,
 			}
 
-			actualPositions, err := CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
+			actualPositions, err := positionCalculator.CalculateMarketPositions(snapshot, bets)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

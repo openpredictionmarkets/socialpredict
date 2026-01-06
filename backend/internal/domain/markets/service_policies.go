@@ -132,10 +132,25 @@ func (defaultResolutionPolicy) Resolve(ctx context.Context, repo ResolutionRepos
 	return payoutWinningPositions(ctx, repo, userService, marketID)
 }
 
-type defaultProbabilityEngine struct{}
+type defaultProbabilityEngine struct {
+	calculator wpam.ProbabilityCalculator
+}
 
-func (defaultProbabilityEngine) Calculate(createdAt time.Time, bets []models.Bet) []ProbabilityChange {
-	changes := wpam.CalculateMarketProbabilitiesWPAM(createdAt, bets)
+// DefaultProbabilityEngine builds the WPAM-backed probability engine with a supplied calculator.
+func DefaultProbabilityEngine(calculator wpam.ProbabilityCalculator) ProbabilityEngine {
+	return defaultProbabilityEngine{calculator: calculator}
+}
+
+func (e defaultProbabilityEngine) ensureCalculator() wpam.ProbabilityCalculator {
+	if e.calculator.Seeds().InitialSubsidization == 0 {
+		return wpam.NewProbabilityCalculator(nil)
+	}
+	return e.calculator
+}
+
+func (e defaultProbabilityEngine) Calculate(createdAt time.Time, bets []models.Bet) []ProbabilityChange {
+	calculator := e.ensureCalculator()
+	changes := calculator.CalculateMarketProbabilitiesWPAM(createdAt, bets)
 	points := make([]ProbabilityChange, len(changes))
 	for i, change := range changes {
 		points[i] = ProbabilityChange{
@@ -146,8 +161,9 @@ func (defaultProbabilityEngine) Calculate(createdAt time.Time, bets []models.Bet
 	return points
 }
 
-func (defaultProbabilityEngine) Project(createdAt time.Time, bets []models.Bet, newBet models.Bet) ProbabilityProjection {
-	projection := wpam.ProjectNewProbabilityWPAM(createdAt, bets, newBet)
+func (e defaultProbabilityEngine) Project(createdAt time.Time, bets []models.Bet, newBet models.Bet) ProbabilityProjection {
+	calculator := e.ensureCalculator()
+	projection := calculator.ProjectNewProbabilityWPAM(createdAt, bets, newBet)
 	return ProbabilityProjection{
 		ProjectedProbability: projection.Probability,
 	}
