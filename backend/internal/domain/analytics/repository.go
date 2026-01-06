@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"context"
+	"errors"
 	"sort"
 
 	positionsmath "socialpredict/internal/domain/math/positions"
@@ -48,6 +49,9 @@ func (r *GormRepository) WithContext(ctx context.Context) *gorm.DB {
 }
 
 func (r *GormRepository) ListUsers(ctx context.Context) ([]models.User, error) {
+	if r.db == nil {
+		return nil, errors.New("gorm repository not initialized")
+	}
 	var users []models.User
 	if err := r.WithContext(ctx).Find(&users).Error; err != nil {
 		return nil, err
@@ -56,6 +60,9 @@ func (r *GormRepository) ListUsers(ctx context.Context) ([]models.User, error) {
 }
 
 func (r *GormRepository) ListMarkets(ctx context.Context) ([]models.Market, error) {
+	if r.db == nil {
+		return nil, errors.New("gorm repository not initialized")
+	}
 	var markets []models.Market
 	if err := r.WithContext(ctx).Find(&markets).Error; err != nil {
 		return nil, err
@@ -64,6 +71,9 @@ func (r *GormRepository) ListMarkets(ctx context.Context) ([]models.Market, erro
 }
 
 func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error) {
+	if r.db == nil {
+		return nil, errors.New("gorm repository not initialized")
+	}
 	var bets []models.Bet
 	if err := r.WithContext(ctx).
 		Where("market_id = ?", marketID).
@@ -75,6 +85,9 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) (
 }
 
 func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]models.Bet, error) {
+	if r.db == nil {
+		return nil, errors.New("gorm repository not initialized")
+	}
 	var bets []models.Bet
 	if err := r.WithContext(ctx).
 		Order("market_id ASC, placed_at ASC, id ASC").
@@ -85,6 +98,9 @@ func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]models.Bet, err
 }
 
 func (r *GormRepository) UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error) {
+	if r.db == nil {
+		return nil, errors.New("gorm repository not initialized")
+	}
 	db := r.WithContext(ctx)
 
 	userBets, err := r.listUserBets(db, username)
