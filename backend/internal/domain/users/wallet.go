@@ -1,6 +1,6 @@
 package wallet
 
-import "errors"
+import "time"
 
 // Account holds balance state for a user. Auth, identity, and market data live elsewhere.
 type Account struct {
@@ -8,8 +8,16 @@ type Account struct {
     UserID   int64
     Balance  int64
 }
+
+// LedgerEntry captures a single balance-affecting operation for auditing.
+type LedgerEntry struct {
+	AccountID int64
+	Amount    int64
+	Kind      string // e.g. credit, debit, win, refund, fee
+	CreatedAt time.Time
+}
 // NewAccount constructs an account with a starting balance.
-func NewAccount(id, userID, balance int64, currency string) (Account, error) {
+func NewAccount(id, userID, balance int64) (Account, error) {
     a := Account{
         ID:       id,
         UserID:   userID,
