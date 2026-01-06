@@ -41,6 +41,8 @@ func (a *Account) Credit(amount int64) error {
     return nil
 }
 
+// Should this validation function even be here, or would it get rewritten into a test and put into a different file?
+
 // Debit decreases the balance by amount if funds are available.
 func (a *Account) Debit(amount int64) error {
     if amount <= 0 {
