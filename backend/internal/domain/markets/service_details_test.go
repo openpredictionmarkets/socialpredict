@@ -7,7 +7,6 @@ import (
 
 	markets "socialpredict/internal/domain/markets"
 	marketmath "socialpredict/internal/domain/math/market"
-	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
