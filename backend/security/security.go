@@ -80,22 +80,13 @@ func (s *SecurityService) ValidateAndSanitizeUserInput(input UserInput) (*Saniti
 		return nil, err
 	}
 
-	// Sanitize personal links
-	var sanitizedLinks [4]string
-	links := [4]string{input.PersonalLink1, input.PersonalLink2, input.PersonalLink3, input.PersonalLink4}
-	for i, link := range links {
-		sanitized, err := s.Sanitizer.SanitizePersonalLink(link)
-		if err != nil {
-			return nil, err
-		}
-		sanitizedLinks[i] = sanitized
+	sanitizedLinks, err := s.sanitizePersonalLinks(input)
+	if err != nil {
+		return nil, err
 	}
 
-	// Validate password if provided
-	if input.Password != "" {
-		if _, err := s.Sanitizer.SanitizePassword(input.Password); err != nil {
-			return nil, err
-		}
+	if err := s.validateOptionalPassword(input.Password); err != nil {
+		return nil, err
 	}
 
 	return &SanitizedUserInput{
@@ -109,6 +100,27 @@ func (s *SecurityService) ValidateAndSanitizeUserInput(input UserInput) (*Saniti
 		PersonalLink4: sanitizedLinks[3],
 		Password:      input.Password, // Keep original for hashing
 	}, nil
+}
+
+func (s *SecurityService) sanitizePersonalLinks(input UserInput) ([4]string, error) {
+	var sanitizedLinks [4]string
+	links := [4]string{input.PersonalLink1, input.PersonalLink2, input.PersonalLink3, input.PersonalLink4}
+	for i, link := range links {
+		sanitized, err := s.Sanitizer.SanitizePersonalLink(link)
+		if err != nil {
+			return sanitizedLinks, err
+		}
+		sanitizedLinks[i] = sanitized
+	}
+	return sanitizedLinks, nil
+}
+
+func (s *SecurityService) validateOptionalPassword(password string) error {
+	if password == "" {
+		return nil
+	}
+	_, err := s.Sanitizer.SanitizePassword(password)
+	return err
 }
 
 // ValidateAndSanitizeMarketInput validates and sanitizes market creation data

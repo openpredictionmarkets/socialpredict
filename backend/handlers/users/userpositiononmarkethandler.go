@@ -2,32 +2,72 @@ package usershandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
-	positionsmath "socialpredict/handlers/math/positions"
-	"socialpredict/middleware"
-	"socialpredict/util"
+	"strconv"
 
 	"github.com/gorilla/mux"
+
+	dmarkets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
+	authsvc "socialpredict/internal/service/auth"
 )
 
-func UserMarketPositionHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	marketId := vars["marketId"]
+// UserMarketPositionHandlerWithService returns an HTTP handler that resolves the authenticated
+// user's position in the specified market via the markets service.
+func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			return
+		}
 
-	// Open up database to utilize connection pooling
-	db := util.GetDB()
-	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
-	if httperr != nil {
-		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
-		return
+		user, httperr := authsvc.ValidateTokenAndGetUser(r, usersSvc)
+		if httperr != nil {
+			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		marketID, err := parseMarketID(mux.Vars(r)["marketId"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		position, err := marketSvc.GetUserPositionInMarket(r.Context(), marketID, user.Username)
+		if err != nil {
+			writeUserPositionError(w, marketID, user.Username, err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(position); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+func parseMarketID(marketIDStr string) (int64, error) {
+	if marketIDStr == "" {
+		return 0, errors.New("Market ID is required")
 	}
 
-	userPosition, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(db, marketId, user.Username)
+	marketID, err := strconv.ParseInt(marketIDStr, 10, 64)
 	if err != nil {
-		http.Error(w, "Error calculating user market position: "+err.Error(), http.StatusInternalServerError)
-		return
+		return 0, errors.New("Invalid market ID")
 	}
+	return marketID, nil
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(userPosition)
+func writeUserPositionError(w http.ResponseWriter, marketID int64, username string, err error) {
+	switch err {
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	case dmarkets.ErrUserNotFound:
+		http.Error(w, "User not found", http.StatusNotFound)
+	case dmarkets.ErrInvalidInput:
+		http.Error(w, "Invalid request parameters", http.StatusBadRequest)
+	default:
+		http.Error(w, "Failed to fetch user position", http.StatusInternalServerError)
+	}
 }

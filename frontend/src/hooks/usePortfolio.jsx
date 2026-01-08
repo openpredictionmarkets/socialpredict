@@ -17,7 +17,7 @@ const usePortfolio = (username) => {
           headers['Content-Type'] = 'application/json';
         }
 
-        const response = await fetch(`${API_URL}/api/v0/portfolio/${username}`, { headers });
+        const response = await fetch(`${API_URL}/v0/portfolio/${username}`, { headers });
         if (!response.ok) {
           throw new Error('Failed to fetch portfolio');
         }

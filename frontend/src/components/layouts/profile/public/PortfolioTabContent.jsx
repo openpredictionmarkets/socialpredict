@@ -13,18 +13,14 @@ const PortfolioTabContent = ({ username }) => {
     useEffect(() => {
         const fetchPositions = async () => {
             try {
-                console.log(`Fetching portfolio for: ${username} from ${API_URL}/v0/portfolio/${username}`);
                 const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Portfolio data:', data);
-                    // Backend returns { portfolioItems: [...], totalSharesOwned: ... }
                     setPositions(data.portfolioItems || []);
                 } else {
                     throw new Error(`Error fetching portfolio: ${response.statusText}`);
                 }
             } catch (err) {
-                console.error('Error fetching portfolio:', err);
                 setError(err.message);
             } finally {
                 setLoading(false);

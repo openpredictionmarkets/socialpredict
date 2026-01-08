@@ -3,6 +3,7 @@ package modelstesting
 import (
 	"testing"
 
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/setup"
 )
 
@@ -23,4 +24,17 @@ func UseStandardTestEconomics(t *testing.T) (*setup.EconomicConfig, func() *setu
 	return econConfig, func() *setup.EconomicConfig {
 		return econConfig
 	}
+}
+
+// SeedWPAMFromConfig configures WPAM seeds using the provided economics config.
+func SeedWPAMFromConfig(config *setup.EconomicConfig) {
+	if config == nil {
+		return
+	}
+	wpam.SetSeeds(wpam.Seeds{
+		InitialProbability:     config.Economics.MarketCreation.InitialMarketProbability,
+		InitialSubsidization:   config.Economics.MarketCreation.InitialMarketSubsidization,
+		InitialYesContribution: config.Economics.MarketCreation.InitialMarketYes,
+		InitialNoContribution:  config.Economics.MarketCreation.InitialMarketNo,
+	})
 }

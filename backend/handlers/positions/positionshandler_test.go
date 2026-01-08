@@ -1,27 +1,109 @@
 package positions
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 
-	positionsmath "socialpredict/handlers/math/positions"
+	dmarkets "socialpredict/internal/domain/markets"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
 
 	"github.com/gorilla/mux"
 )
 
-func TestMarketDBPMPositionsHandler_IncludesZeroPositionUsers(t *testing.T) {
+type mockPositionsService struct {
+	positions dmarkets.MarketPositions
+	err       error
+}
+
+func toDomainPositions(input []positionsmath.MarketPosition) dmarkets.MarketPositions {
+	out := make(dmarkets.MarketPositions, 0, len(input))
+	for _, p := range input {
+		out = append(out, &dmarkets.UserPosition{
+			Username:         p.Username,
+			MarketID:         int64(p.MarketID),
+			YesSharesOwned:   p.YesSharesOwned,
+			NoSharesOwned:    p.NoSharesOwned,
+			Value:            p.Value,
+			TotalSpent:       p.TotalSpent,
+			TotalSpentInPlay: p.TotalSpentInPlay,
+			IsResolved:       p.IsResolved,
+			ResolutionResult: p.ResolutionResult,
+		})
+	}
+	return out
+}
+
+func (m *mockPositionsService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
+	return nil
+}
+
+func (m *mockPositionsService) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
+	return nil
+}
+
+func (m *mockPositionsService) ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) ProjectProbability(ctx context.Context, req dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return m.positions, m.err
+}
+
+func (m *mockPositionsService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
+	return nil, nil
+}
+
+func (m *mockPositionsService) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockPositionsService) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
+	return &dmarkets.PublicMarket{ID: marketID}, nil
+}
+
+func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.T) {
+	modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
+
 	db := modelstesting.NewFakeDB(t)
-	origDB := util.DB
-	util.DB = db
-	t.Cleanup(func() {
-		util.DB = origDB
-	})
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 
 	creator := modelstesting.GenerateUser("creator", 0)
@@ -64,15 +146,41 @@ func TestMarketDBPMPositionsHandler_IncludesZeroPositionUsers(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest("GET", "/v0/markets/positions/"+strconv.FormatInt(market.ID, 10), nil)
+	marketIDStr := strconv.FormatInt(market.ID, 10)
+	var marketModel models.Market
+	if err := db.First(&marketModel, market.ID).Error; err != nil {
+		t.Fatalf("reload market: %v", err)
+	}
+
+	var betsRecords []models.Bet
+	if err := db.Where("market_id = ?", market.ID).Order("placed_at ASC").Find(&betsRecords).Error; err != nil {
+		t.Fatalf("load bets: %v", err)
+	}
+
+	snapshot := positionsmath.MarketSnapshot{
+		ID:               int64(marketModel.ID),
+		CreatedAt:        marketModel.CreatedAt,
+		IsResolved:       marketModel.IsResolved,
+		ResolutionResult: marketModel.ResolutionResult,
+	}
+
+	positionSnapshot, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, betsRecords)
+	if err != nil {
+		t.Fatalf("calculate positions: %v", err)
+	}
+
+	mockSvc := &mockPositionsService{positions: toDomainPositions(positionSnapshot)}
+	handler := MarketPositionsHandlerWithService(mockSvc)
+
+	req := httptest.NewRequest("GET", "/v0/markets/positions/"+marketIDStr, nil)
 	req = mux.SetURLVars(req, map[string]string{
-		"marketId": strconv.FormatInt(market.ID, 10),
+		"marketId": marketIDStr,
 	})
 	rec := httptest.NewRecorder()
 
-	MarketDBPMPositionsHandler(rec, req)
+	handler.ServeHTTP(rec, req)
 
-	if rec.Code != 200 {
+	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
 

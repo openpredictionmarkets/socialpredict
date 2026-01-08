@@ -4,92 +4,122 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"socialpredict/handlers/marketpublicresponse"
-	marketmath "socialpredict/handlers/math/market"
-	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/handlers/tradingdata"
-	"socialpredict/handlers/users/publicuser"
-	"socialpredict/models"
-	"socialpredict/util"
 	"strconv"
 
-	"gorm.io/gorm"
+	"socialpredict/handlers/markets/dto"
+	dmarkets "socialpredict/internal/domain/markets"
 )
 
-// ListMarketsResponse defines the structure for the list markets response
-type ListMarketsResponse struct {
-	Markets []MarketOverview `json:"markets"`
-}
-
-type MarketOverview struct {
-	Market          marketpublicresponse.PublicResponseMarket `json:"market"`
-	Creator         models.PublicUser                         `json:"creator"`
-	LastProbability float64                                   `json:"lastProbability"`
-	NumUsers        int                                       `json:"numUsers"`
-	TotalVolume     int64                                     `json:"totalVolume"`
-}
-
-// ListMarketsHandler handles the HTTP request for listing markets.
-func ListMarketsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("ListMarketsHandler: Request received")
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
-
-	db := util.GetDB()
-	markets, err := ListMarkets(db)
-	if err != nil {
-		http.Error(w, "Error fetching markets", http.StatusInternalServerError)
-		return
-	}
-
-	var marketOverviews []MarketOverview
-	for _, market := range markets {
-		bets := tradingdata.GetBetsForMarket(db, uint(market.ID))
-		probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(market.CreatedAt, bets)
-		numUsers := models.GetNumMarketUsers(bets)
-		marketVolume := marketmath.GetMarketVolume(bets)
-		lastProbability := probabilityChanges[len(probabilityChanges)-1].Probability
-
-		creatorInfo := publicuser.GetPublicUserInfo(db, market.CreatorUsername)
-
-		// return the PublicResponse type with information about the market
-		marketIDStr := strconv.FormatUint(uint64(market.ID), 10)
-		publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketIDStr)
-		if err != nil {
-			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+// ListMarketsHandlerFactory creates an HTTP handler for listing markets with service injection
+func ListMarketsHandlerFactory(svc dmarkets.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("ListMarketsHandler: Request received")
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 			return
 		}
 
-		marketOverview := MarketOverview{
-			Market:          publicResponseMarket,
-			Creator:         creatorInfo,
-			LastProbability: lastProbability,
-			NumUsers:        numUsers,
-			TotalVolume:     marketVolume,
+		params, parseErr := parseListMarketsParams(r)
+		if parseErr != nil {
+			http.Error(w, parseErr.Error(), http.StatusBadRequest)
+			return
 		}
-		marketOverviews = append(marketOverviews, marketOverview)
-	}
 
-	response := ListMarketsResponse{
-		Markets: marketOverviews,
-	}
+		markets, err := fetchMarkets(r, svc, params)
+		if err != nil {
+			writeListMarketsError(w, err)
+			return
+		}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		overviews, err := buildMarketOverviewResponses(r.Context(), svc, markets)
+		if err != nil {
+			log.Printf("Error building market overviews: %v", err)
+			http.Error(w, "Error fetching markets", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+			Markets: overviews,
+			Total:   len(overviews),
+		}); err != nil {
+			log.Printf("Error encoding response: %v", err)
+			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		}
 	}
 }
 
-// ListMarkets fetches a random list of all markets from the database.
-func ListMarkets(db *gorm.DB) ([]models.Market, error) {
-	var markets []models.Market
-	result := db.Order("RANDOM()").Limit(100).Find(&markets) // Set a reasonable limit
-	if result.Error != nil {
-		log.Printf("Error fetching markets: %v", result.Error)
-		return nil, result.Error
+type listMarketsParams struct {
+	status  string
+	limit   int
+	offset  int
+	filters dmarkets.ListFilters
+	page    dmarkets.Page
+}
+
+func parseListMarketsParams(r *http.Request) (listMarketsParams, error) {
+	status, statusErr := normalizeStatusParam(r.URL.Query().Get("status"))
+	if statusErr != nil {
+		return listMarketsParams{}, statusErr
 	}
 
-	return markets, nil
+	limit := parseListLimit(r.URL.Query().Get("limit"))
+	offset := parseListOffset(r.URL.Query().Get("offset"))
+
+	return listMarketsParams{
+		status: status,
+		limit:  limit,
+		offset: offset,
+		filters: dmarkets.ListFilters{
+			Status: status,
+			Limit:  limit,
+			Offset: offset,
+		},
+		page: dmarkets.Page{
+			Limit:  limit,
+			Offset: offset,
+		},
+	}, nil
+}
+
+func parseListLimit(rawLimit string) int {
+	limit := 50
+	if rawLimit == "" {
+		return limit
+	}
+
+	if parsedLimit, err := strconv.Atoi(rawLimit); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
+		return parsedLimit
+	}
+	return limit
+}
+
+func parseListOffset(rawOffset string) int {
+	if rawOffset == "" {
+		return 0
+	}
+	if parsedOffset, err := strconv.Atoi(rawOffset); err == nil && parsedOffset >= 0 {
+		return parsedOffset
+	}
+	return 0
+}
+
+func fetchMarkets(r *http.Request, svc dmarkets.ServiceInterface, params listMarketsParams) ([]*dmarkets.Market, error) {
+	if params.status != "" {
+		return svc.ListByStatus(r.Context(), params.status, params.page)
+	}
+	return svc.ListMarkets(r.Context(), params.filters)
+}
+
+func writeListMarketsError(w http.ResponseWriter, err error) {
+	switch err {
+	case dmarkets.ErrInvalidInput:
+		http.Error(w, "Invalid input parameters", http.StatusBadRequest)
+	case dmarkets.ErrUnauthorized:
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	default:
+		log.Printf("Error fetching markets: %v", err)
+		http.Error(w, "Error fetching markets", http.StatusInternalServerError)
+	}
 }

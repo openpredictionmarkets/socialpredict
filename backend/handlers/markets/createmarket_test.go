@@ -107,7 +107,7 @@ func TestValidateMarketResolutionTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateMarketResolutionTime(tt.resolutionTime, config)
+			err := ValidateMarketResolutionTime(tt.resolutionTime, config)
 
 			if tt.expectedError {
 				if err == nil {
@@ -169,7 +169,7 @@ func TestValidateMarketResolutionTimeCustomConfig(t *testing.T) {
 			}
 
 			resolutionTime := time.Now().Add(tt.testTime)
-			err := validateMarketResolutionTime(resolutionTime, config)
+			err := ValidateMarketResolutionTime(resolutionTime, config)
 
 			if tt.expectedError {
 				if err == nil {

@@ -1,140 +1,136 @@
 package usershandlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 	"testing"
 
 	"github.com/gorilla/mux"
+
+	dusers "socialpredict/internal/domain/users"
 )
 
-func TestGetUserFinancialHandler_ValidUser(t *testing.T) {
-	// Set up test database and user
-	db := modelstesting.NewFakeDB(t)
-	user := modelstesting.GenerateUser("testuser", 1000)
-	if err := db.Create(&user).Error; err != nil {
-		t.Fatalf("Failed to create user: %v", err)
+type financialServiceMock struct {
+	snapshot map[string]int64
+	err      error
+}
+
+func (m *financialServiceMock) GetPublicUser(context.Context, string) (*dusers.PublicUser, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) ApplyTransaction(context.Context, string, int64, string) error {
+	return nil
+}
+
+func (m *financialServiceMock) GetUser(context.Context, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) GetUserCredit(context.Context, string, int64) (int64, error) {
+	return 0, nil
+}
+
+func (m *financialServiceMock) GetUserPortfolio(context.Context, string) (*dusers.Portfolio, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) GetUserFinancials(context.Context, string) (map[string]int64, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.snapshot, nil
+}
+
+func (m *financialServiceMock) ListUserMarkets(context.Context, int64) ([]*dusers.UserMarket, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) UpdateDescription(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) UpdateDisplayName(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) UpdateEmoji(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) GetPrivateProfile(context.Context, string) (*dusers.PrivateProfile, error) {
+	return nil, nil
+}
+
+func (m *financialServiceMock) ChangePassword(context.Context, string, string, string) error {
+	return nil
+}
+
+func TestGetUserFinancialHandlerSuccess(t *testing.T) {
+	mock := &financialServiceMock{snapshot: map[string]int64{"accountBalance": 500}}
+	handler := GetUserFinancialHandler(mock)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/users/alice/financial", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "alice"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	// Create request with username parameter
-	req := httptest.NewRequest(http.MethodGet, "/v0/users/testuser/financial", nil)
-
-	// Use Gorilla mux to handle path parameters
-	vars := map[string]string{"username": "testuser"}
-	req = mux.SetURLVars(req, vars)
-
-	w := httptest.NewRecorder()
-
-	// Create mock config loader using modelstesting helper
-	mockConfigLoader := func() (*setup.EconomicConfig, error) {
-		return modelstesting.GenerateEconomicConfig(), nil
+	var wrapper map[string]map[string]int64
+	if err := json.Unmarshal(rec.Body.Bytes(), &wrapper); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
 	}
 
-	// Use the testable handler with injected database
-	handler := GetUserFinancialHandlerWithDB(db, mockConfigLoader)
-	handler(w, req)
-
-	// Verify response
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
-	}
-
-	// Check content type
-	contentType := w.Header().Get("Content-Type")
-	if contentType != "application/json" {
-		t.Errorf("Expected content type application/json, got %s", contentType)
-	}
-
-	// Parse response body
-	var response map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse response JSON: %v", err)
-	}
-
-	// Verify response structure
-	financialData, ok := response["financial"].(map[string]interface{})
-	if !ok {
-		t.Fatal("Response should contain 'financial' object")
-	}
-
-	// Check required fields
-	requiredFields := []string{
-		"accountBalance", "maximumDebtAllowed", "amountInPlay", "amountBorrowed",
-		"retainedEarnings", "equity", "tradingProfits", "workProfits", "totalProfits",
-		"amountInPlayActive", "totalSpent", "totalSpentInPlay", "realizedProfits",
-		"potentialProfits", "realizedValue", "potentialValue",
-	}
-
-	for _, field := range requiredFields {
-		if _, exists := financialData[field]; !exists {
-			t.Errorf("Missing required field: %s", field)
-		}
-	}
-
-	// Verify specific values for clean user
-	if financialData["accountBalance"] != float64(1000) {
-		t.Errorf("Expected accountBalance 1000, got %v", financialData["accountBalance"])
-	}
-	if financialData["amountInPlay"] != float64(0) {
-		t.Errorf("Expected amountInPlay 0 for new user, got %v", financialData["amountInPlay"])
+	if wrapper["financial"]["accountBalance"] != 500 {
+		t.Fatalf("expected accountBalance 500, got %d", wrapper["financial"]["accountBalance"])
 	}
 }
 
-func TestGetUserFinancialHandler_InvalidMethod(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-	mockConfigLoader := func() (*setup.EconomicConfig, error) {
-		return modelstesting.GenerateEconomicConfig(), nil
-	}
+func TestGetUserFinancialHandlerUserNotFound(t *testing.T) {
+	handler := GetUserFinancialHandler(&financialServiceMock{err: dusers.ErrUserNotFound})
+	req := httptest.NewRequest(http.MethodGet, "/v0/users/missing/financial", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "missing"})
+	rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodPost, "/v0/users/testuser/financial", nil)
-	w := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 
-	handler := GetUserFinancialHandlerWithDB(db, mockConfigLoader)
-	handler(w, req)
-
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Errorf("Expected status code %d, got %d", http.StatusMethodNotAllowed, w.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Code)
 	}
 }
 
-func TestGetUserFinancialHandler_MissingUsername(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-	mockConfigLoader := func() (*setup.EconomicConfig, error) {
-		return modelstesting.GenerateEconomicConfig(), nil
-	}
+func TestGetUserFinancialHandlerInternalError(t *testing.T) {
+	handler := GetUserFinancialHandler(&financialServiceMock{err: errors.New("boom")})
+	req := httptest.NewRequest(http.MethodGet, "/v0/users/alice/financial", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "alice"})
+	rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodGet, "/v0/users//financial", nil)
-	w := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 
-	handler := GetUserFinancialHandlerWithDB(db, mockConfigLoader)
-	handler(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rec.Code)
 	}
 }
 
-func TestGetUserFinancialHandler_NonexistentUser(t *testing.T) {
-	// Set up test database (no user created)
-	db := modelstesting.NewFakeDB(t)
-	mockConfigLoader := func() (*setup.EconomicConfig, error) {
-		return modelstesting.GenerateEconomicConfig(), nil
-	}
+func TestGetUserFinancialHandlerInvalidMethod(t *testing.T) {
+	handler := GetUserFinancialHandler(&financialServiceMock{})
+	req := httptest.NewRequest(http.MethodPost, "/v0/users/alice/financial", nil)
+	rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodGet, "/v0/users/nonexistent/financial", nil)
-	vars := map[string]string{"username": "nonexistent"}
-	req = mux.SetURLVars(req, vars)
+	handler.ServeHTTP(rec, req)
 
-	w := httptest.NewRecorder()
-
-	handler := GetUserFinancialHandlerWithDB(db, mockConfigLoader)
-	handler(w, req)
-
-	// The response should be successful but with zero balances
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status 405, got %d", rec.Code)
 	}
 }
