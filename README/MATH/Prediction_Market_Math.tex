@@ -35,11 +35,11 @@
     \item \textbf{Only NO or YES Positions Held:} By convention, a user can only hold either a NO or a YES position, but not both. There is a force sale in the selling function when one attempts to buy the opposite amount of shares currently held. One must neutralize one's own position prior to buying an opposite position.
 \end{itemize}
 
-\section{Positions Flow Cart}
+\section{Positions Flow Chart}
 
 \begin{itemize}
     \item \textbf{Exchange, Transform, Load:} The net positions that every trader has on any given market are calculated through what is basically an Exchange, Transform and Load (ETL) pipeline. We Exchange the data in the form of transactions, Transform it through a series of steps as shown in the chart below, and finally we Load the net positions as an object.
-    \item \textbf{Works Anytime:} The ETL pipeline shown in the chart works at any point in the market's history, including after the resolution. Positions could be calculated for a market resolution at ay given percentage between 0 pc and 100 pc or at 0 (NO) or 100 (YES) pc resolutions.
+    \item \textbf{Works Anytime:} The ETL pipeline shown in the chart works at any point in the market's history, including after the resolution. Positions could be calculated for a market resolution at any given percentage between 0 pc and 100 pc or at 0 (NO) or 100 (YES) pc resolutions.
 \end{itemize}
 
 
@@ -1517,7 +1517,7 @@ F_{\text{YES}} \approx 5.067, \quad F_{\text{NO}} \approx 1.200
 \begin{itemize}
     \item \textbf{Fourth Transaction:}
     \begin{itemize}
-        \item We can now see the effects of the course payout on scaling toward older transactions. While both Bet 2 and Bet 3 were of equal amounts, because Bet 2 was made at at a point when the YES outcome was less likely based upon the price, there is proportionally more weight given to this bet.
+        \item We can now see the effects of the course payout on scaling toward older transactions. While both Bet 2 and Bet 3 were of equal amounts, because Bet 2 was made at a point when the YES outcome was less likely based upon the price, there is proportionally more weight given to this bet.
         \item The fourth bet is a negative amount because it was a sale. Because the fourth bet occurs at the resolution price R, the Scaled Payout is zero. However in a future transaction, the Scaled Payout for this transaction could become negative, which would reduce the user's final payout, because they are no longer participating in the market at this amount.
     \end{itemize}
 \end{itemize}
