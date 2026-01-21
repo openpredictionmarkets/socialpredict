@@ -493,13 +493,33 @@ func TestIsValidEmoji(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "multiple unicode emojis",
+			input:    "😀👍",
+			expected: true,
+		},
+		{
 			name:     "ASCII emoji",
 			input:    ":)",
 			expected: true,
 		},
 		{
+			name:     "regional indicator pair",
+			input:    "🇺🇸",
+			expected: true,
+		},
+		{
 			name:     "empty string",
 			input:    "",
+			expected: false,
+		},
+		{
+			name:     "contains control character",
+			input:    "😀\n",
+			expected: false,
+		},
+		{
+			name:     "non-emoji non-ascii characters",
+			input:    "中文",
 			expected: false,
 		},
 		{

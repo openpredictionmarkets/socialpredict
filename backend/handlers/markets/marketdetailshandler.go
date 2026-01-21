@@ -2,104 +2,56 @@ package marketshandlers
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
-	"socialpredict/handlers/marketpublicresponse"
-	marketmath "socialpredict/handlers/math/market"
-	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/handlers/tradingdata"
-	"socialpredict/handlers/users/publicuser"
-	"socialpredict/models"
-	"socialpredict/util"
 	"strconv"
+
+	"socialpredict/handlers/markets/dto"
+	dmarkets "socialpredict/internal/domain/markets"
 
 	"github.com/gorilla/mux"
 )
 
-// MarketDetailResponse defines the structure for the market detail response
-type MarketDetailHandlerResponse struct {
-	Market             marketpublicresponse.PublicResponseMarket `json:"market"`
-	Creator            models.PublicUser                         `json:"creator"`
-	ProbabilityChanges []wpam.ProbabilityChange                  `json:"probabilityChanges"`
-	NumUsers           int                                       `json:"numUsers"`
-	TotalVolume        int64                                     `json:"totalVolume"`
-	MarketDust         int64                                     `json:"marketDust"`
-}
+// MarketDetailsHandler handles requests for detailed market information
+func MarketDetailsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// 1. Parse HTTP parameters
+		vars := mux.Vars(r)
+		marketIdStr := vars["marketId"]
 
-func MarketDetailsHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	marketId := vars["marketId"]
+		marketId, err := strconv.ParseInt(marketIdStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			return
+		}
 
-	// Parsing a String to an Unsigned Integer, base10, 64bits
-	marketIDUint64, err := strconv.ParseUint(marketId, 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
-		return
+		// 2. Call domain service to get market details
+		details, err := svc.GetMarketDetails(r.Context(), marketId)
+		if err != nil {
+			// 3. Map domain errors to HTTP status codes
+			switch err {
+			case dmarkets.ErrMarketNotFound:
+				http.Error(w, "Market not found", http.StatusNotFound)
+			case dmarkets.ErrInvalidInput:
+				http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			default:
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// 4. Convert domain model to response DTO
+		// The domain service should provide all necessary data including creator info
+		response := dto.MarketDetailsResponse{
+			Market:             publicMarketResponseFromDomain(details.Market),
+			Creator:            creatorResponseFromSummary(details.Creator),
+			ProbabilityChanges: probabilityChangesToResponse(details.ProbabilityChanges),
+			NumUsers:           details.NumUsers,
+			TotalVolume:        details.TotalVolume,
+			MarketDust:         details.MarketDust,
+		}
+
+		// 5. Return response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
 	}
-
-	// 32-bit platform compatibility check (Convention CONV-32BIT-001 in README-CONVENTIONS.md)
-	// Platform detection constants for 32-bit compatibility check
-	const (
-		bitsInByte                  = 8
-		bytesInUint32               = 4
-		rightShiftFor64BitDetection = 63
-		baseBitWidth                = 32
-	)
-
-	// Detect platform bit width using named constants
-	maxUintValue := ^uint(0)
-	platformBitWidth := baseBitWidth << (maxUintValue >> rightShiftFor64BitDetection)
-	isPlatform32Bit := platformBitWidth == baseBitWidth
-
-	// Validate that the uint64 value fits in platform uint
-	if isPlatform32Bit && marketIDUint64 > math.MaxUint32 {
-		http.Error(w, "Market ID out of range", http.StatusBadRequest)
-		return
-	}
-	marketIDUint := uint(marketIDUint64)
-
-	// open up database to utilize connection pooling
-	db := util.GetDB()
-
-	// Fetch all bets for the market
-	bets := tradingdata.GetBetsForMarket(db, marketIDUint)
-
-	// return the PublicResponse type with information about the market
-	publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketId)
-	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
-		return
-	}
-
-	// Calculate probabilities using the fetched bets
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(publicResponseMarket.CreatedAt, bets)
-
-	// find the number of users on the market
-	numUsers := models.GetNumMarketUsers(bets)
-
-	// market volume represents actual liquidity remaining (including dust)
-	marketVolume := marketmath.GetMarketVolumeWithDust(bets)
-	if err != nil {
-		// Handle error
-	}
-
-	// calculate market dust from selling transactions
-	marketDust := marketmath.GetMarketDust(bets)
-
-	// get market creator
-	// Fetch the Creator's public information using utility function
-	publicCreator := publicuser.GetPublicUserInfo(db, publicResponseMarket.CreatorUsername)
-
-	// Manually construct the response
-	response := MarketDetailHandlerResponse{
-		Market:             publicResponseMarket,
-		Creator:            publicCreator,
-		ProbabilityChanges: probabilityChanges,
-		NumUsers:           numUsers,
-		TotalVolume:        marketVolume,
-		MarketDust:         marketDust,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }

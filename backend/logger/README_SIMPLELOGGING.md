@@ -42,7 +42,7 @@ logger.LogInfo("ChangePassword", "ChangePassword", "ChangePassword handler calle
 securityService := security.NewSecurityService()
 db := util.GetDB()
 
-user, httperr := middleware.ValidateTokenAndGetUser(r, db)
+user, httperr := auth.ValidateTokenAndGetUser(r, usersSvc)
 if httperr != nil {
 http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 logger.LogError("ChangePassword", "ValidateTokenAndGetUser", httperr)

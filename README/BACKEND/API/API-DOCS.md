@@ -24,8 +24,8 @@
 
 SocialPredict is a prediction market platform where users can create markets, place bets on outcomes, and track their performance. The API provides endpoints for user management, market operations, betting, and administrative functions.
 
-**Version**: 1.0.0  
-**License**: MIT  
+**Version**: 1.0.0
+**License**: MIT
 **Contact**: [SocialPredict Team](https://github.com/raisch/socialpredict)
 
 ## Authentication
@@ -34,13 +34,14 @@ Most endpoints require authentication using JWT Bearer tokens. To authenticate:
 
 1. Obtain a JWT token by calling the `/v0/login` endpoint
 2. Include the token in the `Authorization` header of subsequent requests:
-   ```
+
+   ```code
    Authorization: Bearer <your-jwt-token>
    ```
 
 ## Base URL
 
-```
+```code
 http://localhost:8080
 ```
 
@@ -60,6 +61,7 @@ Error responses follow this format:
 ```
 
 Common HTTP status codes:
+
 - **200**: Success
 - **201**: Created
 - **400**: Bad Request
@@ -81,6 +83,7 @@ These endpoints do not require authentication.
 Get home page data and verify API connectivity.
 
 **Response**:
+
 ```json
 {
   "message": "Data From the Backend!"
@@ -96,6 +99,7 @@ Get home page data and verify API connectivity.
 Authenticate user and receive JWT token.
 
 **Request Body**:
+
 ```json
 {
   "username": "string",    // Required, 3-30 characters
@@ -104,6 +108,7 @@ Authenticate user and receive JWT token.
 ```
 
 **Response** (200):
+
 ```json
 {
   "token": "jwt-token-string",
@@ -114,6 +119,7 @@ Authenticate user and receive JWT token.
 ```
 
 **Error Response** (401):
+
 ```json
 {
   "error": "unauthorized",
@@ -130,6 +136,7 @@ Authenticate user and receive JWT token.
 Get application setup and economics configuration.
 
 **Response** (200):
+
 ```json
 {
   "marketcreation": {
@@ -168,6 +175,7 @@ Get application setup and economics configuration.
 Get general application statistics.
 
 **Response** (200):
+
 ```json
 {
   // Statistics object (structure varies)
@@ -179,6 +187,7 @@ Get general application statistics.
 Get system performance and health metrics.
 
 **Response** (200):
+
 ```json
 {
   // System metrics object (structure varies)
@@ -190,6 +199,7 @@ Get system performance and health metrics.
 Get the global user leaderboard.
 
 **Response** (200):
+
 ```json
 {
   // Global leaderboard object (structure varies)
@@ -205,6 +215,7 @@ Get the global user leaderboard.
 List all markets (random selection, up to 100).
 
 **Response** (200):
+
 ```json
 {
   "markets": [
@@ -241,6 +252,7 @@ List all markets (random selection, up to 100).
 Search for markets based on query parameters.
 
 **Query Parameters**:
+
 - `q` (string): Search query
 
 **Response**: Same format as `/v0/markets`
@@ -268,9 +280,11 @@ List all resolved markets.
 Get detailed information about a specific market.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 
 **Response** (200):
+
 ```json
 {
   "id": 1,
@@ -292,11 +306,13 @@ Get detailed information about a specific market.
 Calculate the new probability if a bet of specified amount and outcome were placed.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 - `amount` (integer): Bet amount
 - `outcome` (string): Bet outcome
 
 **Response** (200):
+
 ```json
 {
   "newProbability": 0.68
@@ -308,9 +324,11 @@ Calculate the new probability if a bet of specified amount and outcome were plac
 Get all bets for a specific market.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 
 **Response** (200):
+
 ```json
 [
   {
@@ -330,9 +348,11 @@ Get all bets for a specific market.
 Get all positions for a specific market.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 
 **Response** (200):
+
 ```json
 {
   // Market positions object (structure varies)
@@ -344,10 +364,12 @@ Get all positions for a specific market.
 Get a specific user's positions in a market.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 - `username` (string): Username
 
 **Response** (200):
+
 ```json
 {
   // User positions in market (structure varies)
@@ -359,9 +381,11 @@ Get a specific user's positions in a market.
 Get the leaderboard for a specific market.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 
 **Response** (200):
+
 ```json
 {
   // Market leaderboard object (structure varies)
@@ -377,9 +401,11 @@ Get the leaderboard for a specific market.
 Get public information about a user.
 
 **Path Parameters**:
+
 - `username` (string): Username
 
 **Response** (200):
+
 ```json
 {
   "username": "trader1",
@@ -401,9 +427,11 @@ Get public information about a user.
 Get user credit/balance information.
 
 **Path Parameters**:
+
 - `username` (string): Username
 
 **Response** (200):
+
 ```json
 {
   "accountBalance": 9500
@@ -415,9 +443,11 @@ Get user credit/balance information.
 Get a user's investment portfolio.
 
 **Path Parameters**:
+
 - `username` (string): Username
 
 **Response** (200):
+
 ```json
 {
   // User portfolio object (structure varies)
@@ -429,9 +459,11 @@ Get a user's investment portfolio.
 Get financial information for a user.
 
 **Path Parameters**:
+
 - `username` (string): Username
 
 **Response** (200):
+
 ```json
 {
   // User financial information (structure varies)
@@ -449,6 +481,7 @@ These endpoints require authentication and operate on the authenticated user's p
 Get private profile information for the authenticated user.
 
 **Response** (200):
+
 ```json
 {
   "username": "trader1",
@@ -472,6 +505,7 @@ Get private profile information for the authenticated user.
 Change the authenticated user's password.
 
 **Request Body**:
+
 ```json
 {
   "currentPassword": "oldpassword",  // Optional
@@ -486,6 +520,7 @@ Change the authenticated user's password.
 Change the authenticated user's display name.
 
 **Request Body**:
+
 ```json
 {
   "displayName": "New Display Name"
@@ -499,6 +534,7 @@ Change the authenticated user's display name.
 Change the authenticated user's personal emoji.
 
 **Request Body**:
+
 ```json
 {
   "emoji": "🚀"
@@ -512,6 +548,7 @@ Change the authenticated user's personal emoji.
 Change the authenticated user's profile description.
 
 **Request Body**:
+
 ```json
 {
   "description": "New profile description"
@@ -525,6 +562,7 @@ Change the authenticated user's profile description.
 Change the authenticated user's personal links.
 
 **Request Body**:
+
 ```json
 {
   "personalLink1": "https://twitter.com/user",
@@ -545,6 +583,7 @@ Change the authenticated user's personal links.
 Place a bet on a market outcome.
 
 **Request Body**:
+
 ```json
 {
   "marketId": 1,        // Required
@@ -554,6 +593,7 @@ Place a bet on a market outcome.
 ```
 
 **Response** (201):
+
 ```json
 {
   "id": 123,
@@ -571,9 +611,11 @@ Place a bet on a market outcome.
 Get the authenticated user's position in a specific market.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 
 **Response** (200):
+
 ```json
 {
   // User position in market (structure varies)
@@ -585,6 +627,7 @@ Get the authenticated user's position in a specific market.
 Sell shares in a market position.
 
 **Request Body**:
+
 ```json
 {
   "marketId": 1,
@@ -604,6 +647,7 @@ Sell shares in a market position.
 Create a new prediction market.
 
 **Request Body**:
+
 ```json
 {
   "questionTitle": "Will it snow next week?",      // Required
@@ -616,6 +660,7 @@ Create a new prediction market.
 ```
 
 **Response** (201):
+
 ```json
 {
   "id": 2,
@@ -637,9 +682,11 @@ Create a new prediction market.
 Resolve a market with the final outcome.
 
 **Path Parameters**:
+
 - `marketId` (integer): Market ID
 
 **Request Body**:
+
 ```json
 {
   "resolutionResult": "yes"  // Required
@@ -659,6 +706,7 @@ These endpoints require admin privileges.
 Create a new user account (admin only).
 
 **Request Body**:
+
 ```json
 {
   "username": "newuser",           // Required
@@ -670,6 +718,7 @@ Create a new user account (admin only).
 ```
 
 **Response** (201):
+
 ```json
 {
   "id": 456,

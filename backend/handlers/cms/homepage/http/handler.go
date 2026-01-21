@@ -5,16 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"socialpredict/handlers/cms/homepage"
-	"socialpredict/middleware"
-	"socialpredict/util"
+	authsvc "socialpredict/internal/service/auth"
 )
 
 type Handler struct {
-	svc *homepage.Service
+	svc  *homepage.Service
+	auth authsvc.Authenticator
 }
 
-func NewHandler(svc *homepage.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *homepage.Service, auth authsvc.Authenticator) *Handler {
+	return &Handler{svc: svc, auth: auth}
 }
 
 func (h *Handler) PublicGet(w http.ResponseWriter, r *http.Request) {
@@ -45,14 +45,11 @@ type updateReq struct {
 
 func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	// Validate admin access
-	db := util.GetDB()
-	if err := middleware.ValidateAdminToken(r, db); err != nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	if h.auth == nil {
+		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
 		return
 	}
-
-	// Get username from context/token
-	user, httpErr := middleware.ValidateTokenAndGetUser(r, db)
+	admin, httpErr := h.auth.RequireAdmin(r)
 	if httpErr != nil {
 		http.Error(w, httpErr.Message, httpErr.StatusCode)
 		return
@@ -70,7 +67,7 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		Markdown:  in.Markdown,
 		HTML:      in.HTML,
 		Version:   in.Version,
-		UpdatedBy: user.Username,
+		UpdatedBy: admin.Username,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -86,12 +83,15 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// RequireAdmin middleware wrapper that can be used in routes
-func RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
+// RequireAdmin middleware wrapper that can be used in routes when an authenticator is available.
+func RequireAdmin(auth authsvc.Authenticator, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		db := util.GetDB()
-		if err := middleware.ValidateAdminToken(r, db); err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		if auth == nil {
+			http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+			return
+		}
+		if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
+			http.Error(w, httpErr.Message, httpErr.StatusCode)
 			return
 		}
 		next.ServeHTTP(w, r)

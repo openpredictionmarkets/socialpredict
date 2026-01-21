@@ -124,45 +124,61 @@ func (s *Sanitizer) SanitizeMarketTitle(title string) (string, error) {
 
 // SanitizePersonalLink validates and sanitizes personal links
 func (s *Sanitizer) SanitizePersonalLink(link string) (string, error) {
-	// Remove leading/trailing whitespace
 	link = strings.TrimSpace(link)
-
-	// Empty links are allowed
 	if link == "" {
 		return "", nil
 	}
 
-	// Check length
-	if len(link) > 200 {
-		return "", fmt.Errorf("personal link cannot exceed 200 characters")
+	if err := validatePersonalLinkLength(link); err != nil {
+		return "", err
 	}
 
-	// Parse URL to validate format
-	parsedURL, err := url.Parse(link)
+	parsedURL, err := parseURLWithScheme(link)
 	if err != nil {
-		return "", fmt.Errorf("invalid URL format: %v", err)
+		return "", err
 	}
 
-	// Ensure scheme is provided and is http/https
-	if parsedURL.Scheme == "" {
-		// Add https by default
-		link = "https://" + link
-		parsedURL, err = url.Parse(link)
-		if err != nil {
-			return "", fmt.Errorf("invalid URL format after adding scheme: %v", err)
-		}
+	if err := validateAllowedScheme(parsedURL.Scheme); err != nil {
+		return "", err
 	}
 
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return "", fmt.Errorf("only http and https URLs are allowed")
-	}
-
-	// Check for suspicious domains or patterns
 	if containsMaliciousDomain(parsedURL.Host) {
 		return "", fmt.Errorf("potentially malicious domain detected")
 	}
 
 	return parsedURL.String(), nil
+}
+
+func validatePersonalLinkLength(link string) error {
+	if len(link) > 200 {
+		return fmt.Errorf("personal link cannot exceed 200 characters")
+	}
+	return nil
+}
+
+func parseURLWithScheme(link string) (*url.URL, error) {
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL format: %v", err)
+	}
+
+	if parsedURL.Scheme != "" {
+		return parsedURL, nil
+	}
+
+	withScheme := "https://" + link
+	parsedURL, err = url.Parse(withScheme)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL format after adding scheme: %v", err)
+	}
+	return parsedURL, nil
+}
+
+func validateAllowedScheme(scheme string) error {
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("only http and https URLs are allowed")
+	}
+	return nil
 }
 
 // SanitizeEmoji validates that the emoji is from an allowed set
@@ -291,26 +307,48 @@ func containsMaliciousDomain(domain string) bool {
 
 // isValidEmoji performs basic emoji validation
 func isValidEmoji(emoji string) bool {
-	// Basic check for emoji unicode ranges
+	if emoji == "" {
+		return false
+	}
+
 	for _, r := range emoji {
-		// Common emoji ranges (this is simplified - real emoji validation is complex)
-		if (r >= 0x1F600 && r <= 0x1F64F) || // Emoticons
-			(r >= 0x1F300 && r <= 0x1F5FF) || // Misc Symbols
-			(r >= 0x1F680 && r <= 0x1F6FF) || // Transport
-			(r >= 0x2600 && r <= 0x26FF) || // Misc symbols
-			(r >= 0x2700 && r <= 0x27BF) || // Dingbats
-			(r >= 0xFE00 && r <= 0xFE0F) || // Variation selectors
-			(r >= 0x1F900 && r <= 0x1F9FF) || // Supplemental symbols
-			(r >= 0x1F1E6 && r <= 0x1F1FF) { // Regional indicators
-			continue
-		}
-		// Also allow basic ASCII characters for simple emojis like :)
-		if r >= 32 && r <= 126 {
+		if isEmojiRune(r) || isASCIIEmojiRune(r) {
 			continue
 		}
 		return false
 	}
-	return len(emoji) > 0
+	return true
+}
+
+type runeRange struct {
+	start rune
+	end   rune
+}
+
+// Common emoji ranges (simplified)
+var emojiRanges = []runeRange{
+	{start: 0x1F600, end: 0x1F64F}, // Emoticons
+	{start: 0x1F300, end: 0x1F5FF}, // Misc Symbols
+	{start: 0x1F680, end: 0x1F6FF}, // Transport
+	{start: 0x2600, end: 0x26FF},   // Misc symbols
+	{start: 0x2700, end: 0x27BF},   // Dingbats
+	{start: 0xFE00, end: 0xFE0F},   // Variation selectors
+	{start: 0x1F900, end: 0x1F9FF}, // Supplemental symbols
+	{start: 0x1F1E6, end: 0x1F1FF}, // Regional indicators
+}
+
+func isEmojiRune(r rune) bool {
+	for _, emojiRange := range emojiRanges {
+		if r >= emojiRange.start && r <= emojiRange.end {
+			return true
+		}
+	}
+	return false
+}
+
+func isASCIIEmojiRune(r rune) bool {
+	// Allow basic ASCII characters for simple emojis like :)
+	return r >= 32 && r <= 126
 }
 
 func hasUppercase(s string) bool {

@@ -2,92 +2,88 @@ package buybetshandlers
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
-	betutils "socialpredict/handlers/bets/betutils"
-	"socialpredict/middleware"
-	"socialpredict/models"
-	"socialpredict/setup"
-	"socialpredict/util"
 
-	"gorm.io/gorm"
+	"socialpredict/handlers/bets/dto"
+	dbets "socialpredict/internal/domain/bets"
+	dmarkets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
+	authsvc "socialpredict/internal/service/auth"
 )
 
-func PlaceBetHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
+// PlaceBetHandler returns an HTTP handler that delegates bet placement to the bets domain service.
+func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		db := util.GetDB()
-		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
-		if httperr != nil {
-			http.Error(w, httperr.Error(), httperr.StatusCode)
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 			return
 		}
 
-		var betRequest models.Bet
-		err := json.NewDecoder(r.Body).Decode(&betRequest)
+		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		if httpErr != nil {
+			http.Error(w, httpErr.Error(), httpErr.StatusCode)
+			return
+		}
+
+		req, decodeErr := decodePlaceBetRequest(r)
+		if decodeErr != nil {
+			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
+			return
+		}
+
+		placedBet, err := betsSvc.Place(r.Context(), toPlaceRequest(req, user.Username))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writePlaceBetError(w, err)
 			return
 		}
 
-		bet, err := PlaceBetCore(user, betRequest, db, loadEconConfig)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		// Return a success response
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(bet)
+		writePlaceBetResponse(w, placedBet)
 	}
 }
 
-// PlaceBetCore handles the core logic of placing a bet.
-// It assumes user authentication and JSON decoding is already done.
-func PlaceBetCore(user *models.User, betRequest models.Bet, db *gorm.DB, loadEconConfig setup.EconConfigLoader) (*models.Bet, error) {
-	// Validate the request (check if market exists, if not closed/resolved, etc.)
-	if err := betutils.CheckMarketStatus(db, betRequest.MarketID); err != nil {
-		return nil, err
+func decodePlaceBetRequest(r *http.Request) (dto.PlaceBetRequest, error) {
+	var req dto.PlaceBetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return dto.PlaceBetRequest{}, errors.New("Invalid request body")
 	}
-
-	sumOfBetFees := betutils.GetBetFees(db, user, betRequest)
-
-	// Check if the user's balance after the bet would be lower than the allowed maximum debt
-	if err := checkUserBalance(user, betRequest, sumOfBetFees, loadEconConfig); err != nil {
-		return nil, err
-	}
-
-	// Create a new Bet object
-	bet := models.CreateBet(user.Username, betRequest.MarketID, betRequest.Amount, betRequest.Outcome)
-
-	// Validate the final bet before putting into database
-	if err := betutils.ValidateBuy(db, &bet); err != nil {
-		return nil, err
-	}
-
-	// Deduct bet amount and fee from user balance
-	totalCost := bet.Amount + sumOfBetFees
-	user.AccountBalance -= totalCost
-
-	// Save updated user balance
-	if err := db.Save(user).Error; err != nil {
-		return nil, fmt.Errorf("failed to update user balance: %w", err)
-	}
-
-	// Save the Bet
-	if err := db.Create(&bet).Error; err != nil {
-		return nil, fmt.Errorf("failed to create bet: %w", err)
-	}
-
-	return &bet, nil
+	return req, nil
 }
 
-func checkUserBalance(user *models.User, betRequest models.Bet, sumOfBetFees int64, loadEconConfig setup.EconConfigLoader) error {
-	appConfig := loadEconConfig()
-	maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
-
-	// Check if the user's balance after the bet would be lower than the allowed maximum debt
-	if user.AccountBalance-betRequest.Amount-sumOfBetFees < -maximumDebtAllowed {
-		return fmt.Errorf("Insufficient balance")
+func toPlaceRequest(req dto.PlaceBetRequest, username string) dbets.PlaceRequest {
+	return dbets.PlaceRequest{
+		Username: username,
+		MarketID: req.MarketID,
+		Amount:   req.Amount,
+		Outcome:  req.Outcome,
 	}
-	return nil
+}
+
+func writePlaceBetError(w http.ResponseWriter, err error) {
+	switch err {
+	case dbets.ErrInvalidOutcome, dbets.ErrInvalidAmount:
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case dbets.ErrMarketClosed:
+		http.Error(w, err.Error(), http.StatusConflict)
+	case dbets.ErrInsufficientBalance:
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+	case dmarkets.ErrMarketNotFound:
+		http.Error(w, "Market not found", http.StatusNotFound)
+	default:
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func writePlaceBetResponse(w http.ResponseWriter, placedBet *dbets.PlacedBet) {
+	response := dto.PlaceBetResponse{
+		Username: placedBet.Username,
+		MarketID: placedBet.MarketID,
+		Amount:   placedBet.Amount,
+		Outcome:  placedBet.Outcome,
+		PlacedAt: placedBet.PlacedAt,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(response)
 }

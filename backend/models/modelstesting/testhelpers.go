@@ -2,7 +2,7 @@ package modelstesting
 
 import (
 	"fmt"
-	"socialpredict/handlers/math/probabilities/wpam"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/setup"
 	"time"

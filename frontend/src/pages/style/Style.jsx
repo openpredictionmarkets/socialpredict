@@ -9,7 +9,7 @@ import {
   SelectYesButton,
   ConfirmResolveButton,
 } from '../../components/buttons/marketDetails/ResolveButtons';
-import SiteButton from '../../components/buttons/SiteButtons';
+import SiteButton, { SiteButtonSmall } from '../../components/buttons/SiteButtons';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import Sidebar from '../../components/sidebar/Sidebar';
 import Header from '../../components/header/Header';
@@ -507,6 +507,17 @@ const Style = () => {
             <td className='px-6 py-4 text-sm text-gray-500'>SiteButton</td>
             <td className='px-6 py-4 text-sm font-mono text-gray-500'>
               <code>{`import SiteButton from '../../components/buttons/SiteButton';`}</code>
+            </td>
+          </tr>
+          <tr>
+            <td className='px-6 py-4'>
+              <div className='flex flex-wrap items-center gap-4'>
+                <SiteButtonSmall>Small Action</SiteButtonSmall>
+              </div>
+            </td>
+            <td className='px-6 py-4 text-sm text-gray-500'>SiteButtonSmall</td>
+            <td className='px-6 py-4 text-sm font-mono text-gray-500'>
+              <code>{`import { SiteButtonSmall } from '../../components/buttons/SiteButtons';`}</code>
             </td>
           </tr>
           <tr>

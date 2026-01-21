@@ -10,17 +10,14 @@ const UserFinancialStatementsLayout = ({ username }) => {
     useEffect(() => {
         const fetchFinancialData = async () => {
             try {
-                console.log(`Fetching financial data for user: ${username} from ${API_URL}/v0/users/${username}/financial`);
                 const response = await fetch(`${API_URL}/v0/users/${username}/financial`);
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Financial data:', data);
                     setFinancialData(data.financial);
                 } else {
                     throw new Error(`Error fetching financial data: ${response.statusText}`);
                 }
             } catch (err) {
-                console.error('Error fetching financial data:', err);
                 setError(err.message);
             } finally {
                 setLoading(false);
