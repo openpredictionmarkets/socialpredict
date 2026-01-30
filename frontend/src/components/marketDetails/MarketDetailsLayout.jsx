@@ -160,6 +160,7 @@ function MarketDetailsTable({
           <ResolveModalButton
             marketId={marketId}
             token={token}
+            market={market}
             disabled={!token}
             className='text-xs px-4 py-2'
           />

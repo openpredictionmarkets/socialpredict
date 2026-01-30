@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+# --------------------------------------------------------------------------------------
+# Path resolution (stable even when this script is "sourced" by ./SocialPredict)
+# --------------------------------------------------------------------------------------
+__SP_CMD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+__SP_ROOT_DIR="${SOCIALPREDICT_ROOT:-$(cd "${__SP_CMD_DIR}/.." && pwd)}"
 
 # --------------------------------------------------------------------------------------
 # Platform handling (Apple Silicon, etc.) – absolute path to avoid CWD issues
 # --------------------------------------------------------------------------------------
-if [ -f "${SCRIPT_DIR}/scripts/lib/arch.sh" ]; then
-  source "${SCRIPT_DIR}/scripts/lib/arch.sh"
+if [ -f "${__SP_ROOT_DIR}/scripts/lib/arch.sh" ]; then
+  # shellcheck source=/dev/null
+  source "${__SP_ROOT_DIR}/scripts/lib/arch.sh"
 fi
 
 # --------------------------------------------------------------------------------------
@@ -25,7 +33,7 @@ case "${APP_ENV}" in
   *) echo "ERROR: unknown APP_ENV='${APP_ENV}'. Expected one of: development | localhost | production"; exit 1 ;;
 esac
 
-COMPOSE_MAIN="${SCRIPT_DIR}/scripts/${COMPOSE_BASENAME}"
+COMPOSE_MAIN="${__SP_ROOT_DIR}/scripts/${COMPOSE_BASENAME}"
 if [ ! -f "${COMPOSE_MAIN}" ]; then
   echo "ERROR: compose file not found for APP_ENV='${APP_ENV}': ${COMPOSE_MAIN}"
   exit 1
@@ -34,9 +42,12 @@ echo "Using compose file: ${COMPOSE_MAIN}"
 
 # optional override (e.g., Apple Silicon platform pinning)
 COMPOSE_FILES=(-f "${COMPOSE_MAIN}")
-if [ -f "${SCRIPT_DIR}/scripts/docker-compose.override.yml" ]; then
-  COMPOSE_FILES+=(-f "${SCRIPT_DIR}/scripts/docker-compose.override.yml")
+if [ -f "${__SP_ROOT_DIR}/docker-compose.override.yml" ]; then
+  COMPOSE_FILES+=(-f "${__SP_ROOT_DIR}/docker-compose.override.yml")
 fi
+
+# absolute .env
+ENV_FILE="--env-file ${__SP_ROOT_DIR}/.env"
 
 # --------------------------------------------------------------------------------------
 # Helpers
@@ -48,7 +59,7 @@ sp_up() {
       docker network create --driver bridge socialpredict_external_network
 
     # Ensure acme.json exists with correct perms
-    ACME_FILE="${SCRIPT_DIR}/data/traefik/config/acme.json"
+    ACME_FILE="${__SP_ROOT_DIR}/data/traefik/config/acme.json"
     if [ ! -f "${ACME_FILE}" ]; then
       mkdir -p "$(dirname "${ACME_FILE}")"
       touch "${ACME_FILE}"
@@ -56,72 +67,38 @@ sp_up() {
     fi
   fi
 
-  docker compose --env-file "${SCRIPT_DIR}/.env" "${COMPOSE_FILES[@]}" up -d
+  docker compose "${COMPOSE_FILES[@]}" ${ENV_FILE} up -d
 
   if [ "${APP_ENV}" = "development" ]; then
     echo "SocialPredict may be found at http://localhost:${FRONTEND_PORT} ."
     echo "This may take a few seconds to load initially."
     echo "Here are the initial settings. These can be changed in setup.yaml"
-    if [ -f "${SCRIPT_DIR}/backend/setup/setup.yaml" ]; then
-      cat "${SCRIPT_DIR}/backend/setup/setup.yaml"
+    if [ -f "${__SP_ROOT_DIR}/backend/setup/setup.yaml" ]; then
+      cat "${__SP_ROOT_DIR}/backend/setup/setup.yaml"
     fi
   fi
 }
 
 sp_down() {
-  docker compose --env-file "${SCRIPT_DIR}/.env" "${COMPOSE_FILES[@]}" down -v
+  docker compose "${COMPOSE_FILES[@]}" ${ENV_FILE} down -v
 }
 
 sp_exec() {
   local target="${1:-}"
+  local cmd="${2:-/bin/bash}"
 
   case "${target}" in
     nginx)
-      if [ "$#" -lt 2 ]; then
-        docker exec -it "${NGINX_CONTAINER_NAME}" /bin/bash
-      else
-        if [ "$2" == "/bin/bash" ] || [ "$2" == /bin/sh ]; then
-          docker exec -it "${NGINX_CONTAINER_NAME}" /bin/bash
-        else
-          shift
-          docker exec -i "${NGINX_CONTAINER_NAME}" "$@"
-        fi
-      fi
+      docker exec -it "${NGINX_CONTAINER_NAME}" ${cmd}
       ;;
     backend)
-      if [ "$#" -lt 2 ]; then
-        docker exec -it "${BACKEND_CONTAINER_NAME}" /bin/bash
-      else
-        if [ "$2" == "/bin/bash" ] || [ "$2" == "/bin/sh" ]; then
-          docker exec -it "${BACKEND_CONTAINER_NAME}" /bin/bash
-        else
-          shift
-          docker exec -i "${BACKEND_CONTAINER_NAME}" "$@"
-        fi
-      fi
+      docker exec -it "${BACKEND_CONTAINER_NAME}" ${cmd}
       ;;
     frontend)
-      if [ "$#" -lt 2 ]; then
-        docker exec -it "${FRONTEND_CONTAINER_NAME}" /bin/bash
-      else
-        if [ "$2" == "/bin/bash" ] || [ "$2" == "/bin/sh" ]; then
-          docker exec -it "${FRONTEND_CONTAINER_NAME}" /bin/bash
-        else
-          shift
-          docker exec -i "${FRONTEND_CONTAINER_NAME}" "$@"
-        fi
-      fi
+      docker exec -it "${FRONTEND_CONTAINER_NAME}" ${cmd}
       ;;
     postgres|db)
-      if [ "$#" -lt 2 ]; then
-        docker exec -it "${POSTGRES_CONTAINER_NAME}" /bin/bash
-      else
-        if [ "$2" == "/bin/bash" ] || [ "$2" == "/bin/sh" ]; then
-          docker exec -it "${POSTGRES_CONTAINER_NAME}" /bin/bash
-        else
-          docker exec -i "${POSTGRES_CONTAINER_NAME}" "$@"
-        fi
-      fi
+      docker exec -it "${POSTGRES_CONTAINER_NAME}" ${cmd}
       ;;
     *)
       echo "Unknown service '${target}'. Use one of: nginx | backend | frontend | postgres"
@@ -141,8 +118,15 @@ case "${1:-}" in
     sp_down
     ;;
   exec)
-    shift
-    sp_exec "$@"
+    # Usage: docker-commands.sh exec <service> [command]
+    # Example: docker-commands.sh exec backend "bash -lc 'ls -la'"
+    svc="${2:-}"
+    shift 2 || true
+    if [ -z "${svc}" ]; then
+      echo "Usage: $0 exec <nginx|backend|frontend|postgres> [command]"
+      exit 1
+    fi
+    sp_exec "${svc}" "$*"
     ;;
   *)
     echo "Usage: $0 {up|down|exec <service> [command]}"
