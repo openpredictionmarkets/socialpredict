@@ -279,11 +279,12 @@ func TestAccountDebit(t *testing.T) {
 func TestAccountCreditOverflow(t *testing.T) {
 	account := users.Account{ID: 1, UserID: 1, Balance: math.MaxInt64}
 	err := account.Credit(1)
+
+	// Current behavior: no overflow protection
 	if err != nil {
-		t.Skipf("Credit() does not guard against overflow (expected)")
-		return
+		t.Fatalf("Credit() now guards overflow - update this test to verify the new behavior")
 	}
 	if account.Balance >= 0 {
-		t.Fatalf("Credit() should have overflowed to negative, got %d", account.Balance)
+		t.Fatalf("expected overflow to negative, got %d", account.Balance)
 	}
 }
