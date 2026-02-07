@@ -71,14 +71,6 @@ func (m *portfolioServiceMock) GetPrivateProfile(context.Context, string) (*duse
 	return nil, nil
 }
 
-func (m *portfolioServiceMock) ChangePassword(context.Context, string, string, string) error {
-	return nil
-}
-
-func (m *portfolioServiceMock) MustChangePassword(context.Context, string) (bool, error) {
-	return false, nil
-}
-
 func TestGetPortfolioHandlerSuccess(t *testing.T) {
 	portfolio := &dusers.Portfolio{
 		Items: []dusers.PortfolioItem{

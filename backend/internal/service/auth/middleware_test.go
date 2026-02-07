@@ -299,7 +299,7 @@ func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 func TestValidateAdminToken_MissingHeader(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	auth := NewAuthService(svc)
+	auth := NewAuthService(svc, rusers.NewGormRepository(db), security.NewSecurityService().Sanitizer)
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
@@ -314,7 +314,7 @@ func TestValidateAdminToken_MissingHeader(t *testing.T) {
 func TestValidateAdminToken_InvalidToken(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	auth := NewAuthService(svc)
+	auth := NewAuthService(svc, rusers.NewGormRepository(db), security.NewSecurityService().Sanitizer)
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	req := httptest.NewRequest("GET", "/test", nil)
@@ -366,26 +366,6 @@ func TestAuthenticate_MiddlewareStructure(t *testing.T) {
 	// The middleware currently doesn't implement any logic, so this is just testing structure
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
-	}
-}
-
-func TestValidateUserAndEnforcePasswordChangeGetUser_MissingToken(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	// No Authorization header
-
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
-
-	if user != nil {
-		t.Error("Expected nil user")
-	}
-	if httpErr == nil {
-		t.Error("Expected error but got none")
-	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
 	}
 }
 

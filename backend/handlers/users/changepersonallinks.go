@@ -10,14 +10,14 @@ import (
 )
 
 // ChangePersonalLinksHandler returns an HTTP handler that delegates personal link updates to the users service.
-func ChangePersonalLinksHandler(svc dusers.ServiceInterface) http.HandlerFunc {
+func ChangePersonalLinksHandler(svc dusers.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 			return
 		}
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
+		user, httperr := auth.RequireUser(r)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), httperr.StatusCode)
 			return

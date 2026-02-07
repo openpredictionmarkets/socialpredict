@@ -36,7 +36,7 @@ func TestPublicGet_ReturnsHomepageContent(t *testing.T) {
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
 	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	auth := authsvc.NewAuthService(usersSvc)
+	auth := authsvc.NewAuthService(usersSvc, rusers.NewGormRepository(db), security.NewSecurityService().Sanitizer)
 	handler := NewHandler(svc, auth)
 
 	req := httptest.NewRequest("GET", "/v0/content/home", nil)
@@ -84,7 +84,7 @@ func TestAdminUpdate_Success(t *testing.T) {
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
 	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	auth := authsvc.NewAuthService(usersSvc)
+	auth := authsvc.NewAuthService(usersSvc, rusers.NewGormRepository(db), security.NewSecurityService().Sanitizer)
 	handler := NewHandler(svc, auth)
 
 	payload := updateReq{
@@ -135,7 +135,7 @@ func TestAdminUpdate_Unauthorized(t *testing.T) {
 	renderer := homepage.NewDefaultRenderer()
 	svc := homepage.NewService(repo, renderer)
 	usersSvc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
-	auth := authsvc.NewAuthService(usersSvc)
+	auth := authsvc.NewAuthService(usersSvc, rusers.NewGormRepository(db), security.NewSecurityService().Sanitizer)
 	handler := NewHandler(svc, auth)
 
 	req := httptest.NewRequest("PUT", "/v0/admin/content/home", bytes.NewReader([]byte(`{}`)))

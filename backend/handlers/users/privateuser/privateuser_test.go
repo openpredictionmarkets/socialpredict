@@ -28,7 +28,7 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 	config := modelstesting.GenerateEconomicConfig()
 	container := app.BuildApplication(db, config)
 
-	handler := GetPrivateProfileHandler(container.GetUsersService())
+	handler := GetPrivateProfileHandler(container.GetUsersService(), container.GetAuthService())
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != 200 {
@@ -58,7 +58,7 @@ func TestGetPrivateProfileUserResponse_Unauthorized(t *testing.T) {
 	config := modelstesting.GenerateEconomicConfig()
 	container := app.BuildApplication(db, config)
 
-	handler := GetPrivateProfileHandler(container.GetUsersService())
+	handler := GetPrivateProfileHandler(container.GetUsersService(), container.GetAuthService())
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != 401 {

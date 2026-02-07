@@ -91,7 +91,7 @@ func (c *Container) InitializeServices() {
 	})
 	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader)
 	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
-	c.authService = authsvc.NewAuthService(c.usersService)
+	c.authService = authsvc.NewAuthService(c.usersService, &c.usersRepo, securityService.Sanitizer)
 
 	// Markets service depends on markets repository and users service
 	marketsConfig := dmarkets.Config{

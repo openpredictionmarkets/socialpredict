@@ -8,19 +8,18 @@ import (
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
 )
 
 // SellPositionHandler returns an HTTP handler that delegates sales to the bets service.
-func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+func SellPositionHandler(betsSvc bets.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 			return
 		}
 
-		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		user, httpErr := auth.CurrentUser(r)
 		if httpErr != nil {
 			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return

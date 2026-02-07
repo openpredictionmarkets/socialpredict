@@ -290,6 +290,21 @@ func (r *GormRepository) GetAPIKey(ctx context.Context, username string) (string
 	return user.APIKey, nil
 }
 
+// GetMustChangePasswordFlag returns the must-change-password flag for the specified user.
+func (r *GormRepository) GetMustChangePasswordFlag(ctx context.Context, username string) (bool, error) {
+	var user models.User
+	if err := r.db.WithContext(ctx).
+		Select("must_change_password").
+		Where("username = ?", username).
+		Take(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, dusers.ErrUserNotFound
+		}
+		return false, err
+	}
+	return user.MustChangePassword, nil
+}
+
 // domainToModel converts a domain user to a GORM model.
 // Auth fields (APIKey, MustChangePassword) are not mapped here; they are
 // managed through dedicated repository methods.

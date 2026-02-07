@@ -8,19 +8,18 @@ import (
 	"socialpredict/handlers/bets/dto"
 	dbets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
 )
 
 // PlaceBetHandler returns an HTTP handler that delegates bet placement to the bets domain service.
-func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+func PlaceBetHandler(betsSvc dbets.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 			return
 		}
 
-		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		user, httpErr := auth.CurrentUser(r)
 		if httpErr != nil {
 			http.Error(w, httpErr.Error(), httpErr.StatusCode)
 			return

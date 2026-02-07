@@ -81,7 +81,7 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 	})
 	rec := httptest.NewRecorder()
 
-	handler := UserMarketPositionHandlerWithService(container.GetMarketsService(), container.GetUsersService())
+	handler := UserMarketPositionHandlerWithService(container.GetMarketsService(), container.GetAuthService())
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -108,7 +108,7 @@ func TestUserMarketPositionHandlerUnauthorizedWithoutToken(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"marketId": "1"})
 	rec := httptest.NewRecorder()
 
-	handler := UserMarketPositionHandlerWithService(container.GetMarketsService(), container.GetUsersService())
+	handler := UserMarketPositionHandlerWithService(container.GetMarketsService(), container.GetAuthService())
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {

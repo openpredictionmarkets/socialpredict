@@ -9,9 +9,9 @@ import (
 	authsvc "socialpredict/internal/service/auth"
 )
 
-func GetPrivateProfileHandler(svc dusers.ServiceInterface) http.HandlerFunc {
+func GetPrivateProfileHandler(svc dusers.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
+		user, httperr := auth.RequireUser(r)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 			return

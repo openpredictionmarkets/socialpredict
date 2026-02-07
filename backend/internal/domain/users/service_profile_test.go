@@ -2,30 +2,22 @@ package users_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
-	"socialpredict/internal/domain/auth"
 	users "socialpredict/internal/domain/users"
 	usermodels "socialpredict/internal/domain/users/models"
 	"socialpredict/security"
 	"socialpredict/setup"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 type fakeRepository struct {
-	user         *users.User
-	passwordHash string
-	mustChange   bool
+	user       *users.User
+	mustChange bool
 }
 
-const initialTestPassword = "CurrentPass123!"
-
 func newFakeRepository(username string) *fakeRepository {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(initialTestPassword), usermodels.PasswordHashCost())
 	return &fakeRepository{
 		user: &users.User{
 			ID:          1,
@@ -34,8 +26,7 @@ func newFakeRepository(username string) *fakeRepository {
 			Email:       username + "@example.com",
 			UserType:    "regular",
 		},
-		passwordHash: string(hash),
-		mustChange:   true,
+		mustChange: true,
 	}
 }
 
@@ -99,24 +90,8 @@ func (f *fakeRepository) ListUserMarkets(context.Context, int64) ([]*users.UserM
 	return nil, nil
 }
 
-func (f *fakeRepository) GetCredentials(_ context.Context, username string) (*auth.Credentials, error) {
-	if f.user == nil || f.user.Username != username {
-		return nil, users.ErrUserNotFound
-	}
-	return &auth.Credentials{
-		UserID:             f.user.ID,
-		PasswordHash:       f.passwordHash,
-		MustChangePassword: f.mustChange,
-	}, nil
-}
-
-func (f *fakeRepository) UpdatePassword(_ context.Context, username string, hashedPassword string, mustChange bool) error {
-	if f.user == nil || f.user.Username != username {
-		return users.ErrUserNotFound
-	}
-	f.passwordHash = hashedPassword
-	f.mustChange = mustChange
-	return nil
+func (f *fakeRepository) GetMustChangePasswordFlag(_ context.Context, username string) (bool, error) {
+	return f.mustChange, nil
 }
 
 func (f *fakeRepository) GetAPIKey(_ context.Context, username string) (string, error) {
@@ -255,48 +230,6 @@ func TestServiceUpdatePersonalLinks(t *testing.T) {
 	if _, err := service.UpdatePersonalLinks(ctx, username, users.PersonalLinks{PersonalLink1: "javascript:alert('xss')"}); err == nil {
 		t.Fatal("expected error for unsafe personal link")
 	}
-}
-
-func TestServiceChangePassword(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		username, service, repo, ctx := newServiceWithUser(t)
-
-		if err := service.ChangePassword(ctx, username, initialTestPassword, "NewPassword456!"); err != nil {
-			t.Fatalf("ChangePassword returned error: %v", err)
-		}
-
-		if err := bcrypt.CompareHashAndPassword([]byte(repo.passwordHash), []byte("NewPassword456!")); err != nil {
-			t.Fatalf("expected password hash to update: %v", err)
-		}
-		if repo.mustChange {
-			t.Fatalf("expected mustChangePassword to be cleared")
-		}
-	})
-
-	t.Run("invalid current password", func(t *testing.T) {
-		username, service, _, ctx := newServiceWithUser(t)
-
-		err := service.ChangePassword(ctx, username, "wrong", "AnotherPass789!")
-		if !errors.Is(err, auth.ErrInvalidCredentials) {
-			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
-		}
-	})
-
-	t.Run("weak new password", func(t *testing.T) {
-		username, service, _, ctx := newServiceWithUser(t)
-
-		if err := service.ChangePassword(ctx, username, initialTestPassword, "short"); err == nil {
-			t.Fatal("expected error for weak password")
-		}
-	})
-
-	t.Run("same password", func(t *testing.T) {
-		username, service, _, ctx := newServiceWithUser(t)
-
-		if err := service.ChangePassword(ctx, username, initialTestPassword, initialTestPassword); err == nil {
-			t.Fatal("expected error when new password matches current password")
-		}
-	})
 }
 
 func TestServiceGetPrivateProfile(t *testing.T) {

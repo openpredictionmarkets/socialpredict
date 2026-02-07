@@ -9,20 +9,19 @@ import (
 	"github.com/gorilla/mux"
 
 	dmarkets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
 )
 
 // UserMarketPositionHandlerWithService returns an HTTP handler that resolves the authenticated
 // user's position in the specified market via the markets service.
-func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 			return
 		}
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, usersSvc)
+		user, httperr := auth.RequireUser(r)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
 			return

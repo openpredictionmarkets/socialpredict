@@ -74,14 +74,6 @@ func (m *creditServiceMock) GetPrivateProfile(context.Context, string) (*dusers.
 	return nil, nil
 }
 
-func (m *creditServiceMock) ChangePassword(context.Context, string, string, string) error {
-	return nil
-}
-
-func (m *creditServiceMock) MustChangePassword(context.Context, string) (bool, error) {
-	return false, nil
-}
-
 func TestGetUserCreditHandlerSuccess(t *testing.T) {
 	mock := &creditServiceMock{credit: 750}
 	handler := GetUserCreditHandler(mock, 500)

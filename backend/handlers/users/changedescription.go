@@ -10,14 +10,14 @@ import (
 )
 
 // ChangeDescriptionHandler returns an HTTP handler that delegates description updates to the users service.
-func ChangeDescriptionHandler(svc dusers.ServiceInterface) http.HandlerFunc {
+func ChangeDescriptionHandler(svc dusers.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeProfileJSONError(w, http.StatusMethodNotAllowed, "Method is not supported.")
 			return
 		}
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
+		user, httperr := auth.RequireUser(r)
 		if httperr != nil {
 			writeProfileJSONError(w, httperr.StatusCode, "Invalid token: "+httperr.Error())
 			return

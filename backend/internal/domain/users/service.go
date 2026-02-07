@@ -6,10 +6,7 @@ import (
 	"sort"
 
 	analytics "socialpredict/internal/domain/analytics"
-	"socialpredict/internal/domain/auth"
 	usermodels "socialpredict/internal/domain/users/models"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 // ServiceInterface defines the behavior required by HTTP handlers and other consumers.
@@ -17,7 +14,6 @@ type ServiceInterface interface {
 	GetPublicUser(ctx context.Context, username string) (*PublicUser, error)
 	GetUser(ctx context.Context, username string) (*User, error)
 	GetPrivateProfile(ctx context.Context, username string) (*PrivateProfile, error)
-	MustChangePassword(ctx context.Context, username string) (bool, error)
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
 	GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error)
 	GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error)
@@ -27,7 +23,6 @@ type ServiceInterface interface {
 	UpdateDisplayName(ctx context.Context, username, displayName string) (*User, error)
 	UpdateEmoji(ctx context.Context, username, emoji string) (*User, error)
 	UpdatePersonalLinks(ctx context.Context, username string, links PersonalLinks) (*User, error)
-	ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error
 }
 
 // Repository defines the interface for user data access
@@ -42,9 +37,8 @@ type Repository interface {
 	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
 	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
-	GetCredentials(ctx context.Context, username string) (*auth.Credentials, error)
 	GetAPIKey(ctx context.Context, username string) (string, error)
-	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
+	GetMustChangePasswordFlag(ctx context.Context, username string) (bool, error)
 }
 
 // Sanitizer defines the behavior needed to sanitize user profile inputs.
@@ -492,7 +486,7 @@ func (s *Service) GetPrivateProfile(ctx context.Context, username string) (*Priv
 		return nil, err
 	}
 
-	creds, err := s.repo.GetCredentials(ctx, username)
+	mustChange, err := s.repo.GetMustChangePasswordFlag(ctx, username)
 	if err != nil {
 		return nil, err
 	}
@@ -517,67 +511,10 @@ func (s *Service) GetPrivateProfile(ctx context.Context, username string) (*Priv
 		PersonalLink4:         user.PersonalLink4,
 		Email:                 user.Email,
 		APIKey:                apiKey,
-		MustChangePassword:    creds.MustChangePassword,
+		MustChangePassword:    mustChange,
 		CreatedAt:             user.CreatedAt,
 		UpdatedAt:             user.UpdatedAt,
 	}, nil
-}
-
-// MustChangePassword reports whether the specified user is required to change their password.
-func (s *Service) MustChangePassword(ctx context.Context, username string) (bool, error) {
-	creds, err := s.repo.GetCredentials(ctx, username)
-	if err != nil {
-		return false, err
-	}
-	return creds.MustChangePassword, nil
-}
-
-func (s *Service) validatePasswordChangeInputs(username, currentPassword, newPassword string) error {
-	if username == "" {
-		return ErrInvalidUserData
-	}
-	if currentPassword == "" {
-		return fmt.Errorf("current password is required")
-	}
-	if newPassword == "" {
-		return fmt.Errorf("new password is required")
-	}
-	if s.sanitizer == nil {
-		return ErrInvalidUserData
-	}
-	return nil
-}
-
-// ChangePassword validates credentials and persists a new hashed password.
-func (s *Service) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
-	if err := s.validatePasswordChangeInputs(username, currentPassword, newPassword); err != nil {
-		return err
-	}
-
-	creds, err := s.repo.GetCredentials(ctx, username)
-	if err != nil {
-		return err
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(currentPassword)); err != nil {
-		return auth.ErrInvalidCredentials
-	}
-
-	sanitized, err := s.sanitizer.SanitizePassword(newPassword)
-	if err != nil {
-		return fmt.Errorf("new password does not meet security requirements: %w", err)
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(sanitized)); err == nil {
-		return fmt.Errorf("new password must differ from the current password")
-	}
-
-	hashed, err := bcrypt.GenerateFromPassword([]byte(sanitized), usermodels.PasswordHashCost())
-	if err != nil {
-		return fmt.Errorf("failed to hash new password: %w", err)
-	}
-
-	return s.repo.UpdatePassword(ctx, username, string(hashed), false)
 }
 
 var _ ServiceInterface = (*Service)(nil)

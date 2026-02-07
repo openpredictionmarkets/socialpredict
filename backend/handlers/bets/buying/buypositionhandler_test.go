@@ -11,10 +11,9 @@ import (
 
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
-	"socialpredict/internal/domain/auth"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	usermodels "socialpredict/internal/domain/users/models"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/models/modelstesting"
 )
 
@@ -36,82 +35,23 @@ func (f *fakeBetsService) Sell(ctx context.Context, req bets.SellRequest) (*bets
 	return nil, nil
 }
 
-type fakeUsersService struct {
+type fakeAuth struct {
 	user *dusers.User
 }
 
-func (f *fakeUsersService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) GetUser(ctx context.Context, username string) (*dusers.User, error) {
+func (f *fakeAuth) CurrentUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
 	return f.user, nil
 }
-func (f *fakeUsersService) GetPrivateProfile(ctx context.Context, username string) (*dusers.PrivateProfile, error) {
-	return nil, nil
+func (f *fakeAuth) RequireUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+	return f.user, nil
 }
-func (f *fakeUsersService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+func (f *fakeAuth) RequireAdmin(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+	return f.user, nil
+}
+func (f *fakeAuth) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
 	return nil
 }
-func (f *fakeUsersService) GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error) {
-	return 0, nil
-}
-func (f *fakeUsersService) GetUserPortfolio(ctx context.Context, username string) (*dusers.Portfolio, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) GetUserFinancials(ctx context.Context, username string) (map[string]int64, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) ListUserMarkets(ctx context.Context, userID int64) ([]*dusers.UserMarket, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) UpdateDescription(ctx context.Context, username, description string) (*dusers.User, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) UpdateDisplayName(ctx context.Context, username, displayName string) (*dusers.User, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) UpdateEmoji(ctx context.Context, username, emoji string) (*dusers.User, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) UpdatePersonalLinks(ctx context.Context, username string, links dusers.PersonalLinks) (*dusers.User, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
-	return nil
-}
-func (f *fakeUsersService) ValidateUserExists(ctx context.Context, username string) error { return nil }
-func (f *fakeUsersService) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
-	return nil
-}
-func (f *fakeUsersService) DeductBalance(ctx context.Context, username string, amount int64) error {
-	return nil
-}
-func (f *fakeUsersService) CreateUser(ctx context.Context, req dusers.UserCreateRequest) (*dusers.User, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) UpdateUser(ctx context.Context, username string, req dusers.UserUpdateRequest) (*dusers.User, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) DeleteUser(ctx context.Context, username string) error { return nil }
-func (f *fakeUsersService) List(ctx context.Context, filters usermodels.ListFilters) ([]*dusers.User, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) ListUserBets(ctx context.Context, username string) ([]*dusers.UserBet, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) GetMarketQuestion(ctx context.Context, marketID uint) (string, error) {
-	return "", nil
-}
-func (f *fakeUsersService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dusers.MarketUserPosition, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) GetCredentials(ctx context.Context, username string) (*auth.Credentials, error) {
-	return nil, nil
-}
-func (f *fakeUsersService) UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error {
-	return nil
-}
-func (f *fakeUsersService) MustChangePassword(ctx context.Context, username string) (bool, error) {
+func (f *fakeAuth) MustChangePassword(ctx context.Context, username string) (bool, error) {
 	return false, nil
 }
 
@@ -119,7 +59,7 @@ func TestPlaceBetHandler_Success(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	betsSvc := &fakeBetsService{resp: &bets.PlacedBet{Username: "alice", MarketID: 5, Amount: 120, Outcome: "YES", PlacedAt: time.Now()}}
-	userSvc := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	userSvc := &fakeAuth{user: &dusers.User{Username: "alice"}}
 
 	payload := dto.PlaceBetRequest{MarketID: 5, Amount: 120, Outcome: "YES"}
 	body, _ := json.Marshal(payload)
@@ -151,7 +91,7 @@ func TestPlaceBetHandler_Success(t *testing.T) {
 
 func TestPlaceBetHandler_ErrorMapping(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
-	userSvc := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	userSvc := &fakeAuth{user: &dusers.User{Username: "alice"}}
 
 	cases := []struct {
 		name       string
@@ -187,7 +127,7 @@ func TestPlaceBetHandler_ErrorMapping(t *testing.T) {
 
 func TestPlaceBetHandler_InvalidJSON(t *testing.T) {
 	betsSvc := &fakeBetsService{}
-	userSvc := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	userSvc := &fakeAuth{user: &dusers.User{Username: "alice"}}
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	req := httptest.NewRequest(http.MethodPost, "/v0/bet", bytes.NewBufferString("{invalid"))

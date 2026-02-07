@@ -67,14 +67,6 @@ func (m *publicUserServiceMock) GetPrivateProfile(context.Context, string) (*dus
 	return nil, nil
 }
 
-func (m *publicUserServiceMock) ChangePassword(context.Context, string, string, string) error {
-	return nil
-}
-
-func (m *publicUserServiceMock) MustChangePassword(context.Context, string) (bool, error) {
-	return false, nil
-}
-
 func TestGetPublicUserHandlerReturnsPublicUser(t *testing.T) {
 	mockUser := &dusers.PublicUser{
 		Username:              "alice",

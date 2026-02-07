@@ -10,14 +10,14 @@ import (
 )
 
 // ChangeDisplayNameHandler returns an HTTP handler that delegates display name updates to the users service.
-func ChangeDisplayNameHandler(svc dusers.ServiceInterface) http.HandlerFunc {
+func ChangeDisplayNameHandler(svc dusers.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 			return
 		}
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
+		user, httperr := auth.RequireUser(r)
 		if httperr != nil {
 			http.Error(w, "Invalid token: "+httperr.Error(), httperr.StatusCode)
 			return

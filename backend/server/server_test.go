@@ -106,17 +106,17 @@ func buildTestHandler(t *testing.T) http.Handler {
 	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(usershandlers.GetUserFinancialHandler(usersService))).Methods("GET")
 
-	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")
+	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService, authService))).Methods("GET")
 
-	router.Handle("/v0/changepassword", securityMiddleware(usershandlers.ChangePasswordHandler(usersService))).Methods("POST")
-	router.Handle("/v0/profilechange/displayname", securityMiddleware(usershandlers.ChangeDisplayNameHandler(usersService))).Methods("POST")
-	router.Handle("/v0/profilechange/emoji", securityMiddleware(usershandlers.ChangeEmojiHandler(usersService))).Methods("POST")
-	router.Handle("/v0/profilechange/description", securityMiddleware(usershandlers.ChangeDescriptionHandler(usersService))).Methods("POST")
-	router.Handle("/v0/profilechange/links", securityMiddleware(usershandlers.ChangePersonalLinksHandler(usersService))).Methods("POST")
+	router.Handle("/v0/changepassword", securityMiddleware(usershandlers.ChangePasswordHandler(authService))).Methods("POST")
+	router.Handle("/v0/profilechange/displayname", securityMiddleware(usershandlers.ChangeDisplayNameHandler(usersService, authService))).Methods("POST")
+	router.Handle("/v0/profilechange/emoji", securityMiddleware(usershandlers.ChangeEmojiHandler(usersService, authService))).Methods("POST")
+	router.Handle("/v0/profilechange/description", securityMiddleware(usershandlers.ChangeDescriptionHandler(usersService, authService))).Methods("POST")
+	router.Handle("/v0/profilechange/links", securityMiddleware(usershandlers.ChangePersonalLinksHandler(usersService, authService))).Methods("POST")
 
-	router.Handle("/v0/bet", securityMiddleware(buybetshandlers.PlaceBetHandler(betsService, usersService))).Methods("POST")
-	router.Handle("/v0/userposition/{marketId}", securityMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
-	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(betsService, usersService))).Methods("POST")
+	router.Handle("/v0/bet", securityMiddleware(buybetshandlers.PlaceBetHandler(betsService, authService))).Methods("POST")
+	router.Handle("/v0/userposition/{marketId}", securityMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, authService))).Methods("GET")
+	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(betsService, authService))).Methods("POST")
 
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig, authService)))).Methods("POST")
 
