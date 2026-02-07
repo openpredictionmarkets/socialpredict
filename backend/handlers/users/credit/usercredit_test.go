@@ -78,6 +78,10 @@ func (m *creditServiceMock) ChangePassword(context.Context, string, string, stri
 	return nil
 }
 
+func (m *creditServiceMock) MustChangePassword(context.Context, string) (bool, error) {
+	return false, nil
+}
+
 func TestGetUserCreditHandlerSuccess(t *testing.T) {
 	mock := &creditServiceMock{credit: 750}
 	handler := GetUserCreditHandler(mock, 500)

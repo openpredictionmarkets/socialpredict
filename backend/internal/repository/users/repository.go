@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"socialpredict/internal/domain/auth"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	usermodels "socialpredict/internal/domain/users/models"
@@ -57,6 +58,7 @@ func (r *GormRepository) UpdateBalance(ctx context.Context, username string, new
 // Create creates a new user in the database
 func (r *GormRepository) Create(ctx context.Context, user *dusers.User) error {
 	dbUser := r.domainToModel(user)
+	dbUser.MustChangePassword = true
 
 	result := r.db.WithContext(ctx).Create(&dbUser)
 	if result.Error != nil {
@@ -76,7 +78,7 @@ func (r *GormRepository) Create(ctx context.Context, user *dusers.User) error {
 func (r *GormRepository) Update(ctx context.Context, user *dusers.User) error {
 	dbUser := r.domainToModel(user)
 
-	result := r.db.WithContext(ctx).Save(&dbUser)
+	result := r.db.WithContext(ctx).Omit("api_key", "must_change_password").Save(&dbUser)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -235,10 +237,10 @@ func (r *GormRepository) ListUserMarkets(ctx context.Context, userID int64) ([]*
 }
 
 // GetCredentials returns the hashed password and password-change flag for the specified user.
-func (r *GormRepository) GetCredentials(ctx context.Context, username string) (*dusers.Credentials, error) {
+func (r *GormRepository) GetCredentials(ctx context.Context, username string) (*auth.Credentials, error) {
 	var user models.User
 	if err := r.db.WithContext(ctx).
-		Select("password", "must_change_password").
+		Select("id", "password", "must_change_password").
 		Where("username = ?", username).
 		Take(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -247,7 +249,8 @@ func (r *GormRepository) GetCredentials(ctx context.Context, username string) (*
 		return nil, err
 	}
 
-	return &dusers.Credentials{
+	return &auth.Credentials{
+		UserID:             user.ID,
 		PasswordHash:       user.Password,
 		MustChangePassword: user.MustChangePassword,
 	}, nil
@@ -272,7 +275,24 @@ func (r *GormRepository) UpdatePassword(ctx context.Context, username string, ha
 	return nil
 }
 
-// domainToModel converts a domain user to a GORM model
+// GetAPIKey returns the API key for the specified user.
+func (r *GormRepository) GetAPIKey(ctx context.Context, username string) (string, error) {
+	var user models.User
+	if err := r.db.WithContext(ctx).
+		Select("api_key").
+		Where("username = ?", username).
+		Take(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", dusers.ErrUserNotFound
+		}
+		return "", err
+	}
+	return user.APIKey, nil
+}
+
+// domainToModel converts a domain user to a GORM model.
+// Auth fields (APIKey, MustChangePassword) are not mapped here; they are
+// managed through dedicated repository methods.
 func (r *GormRepository) domainToModel(user *dusers.User) models.User {
 	return models.User{
 		ID: int64(user.ID),
@@ -295,14 +315,14 @@ func (r *GormRepository) domainToModel(user *dusers.User) models.User {
 			PersonalLink4:         user.PersonalLink4,
 		},
 		PrivateUser: models.PrivateUser{
-			Email:  user.Email,
-			APIKey: user.APIKey,
+			Email: user.Email,
 		},
-		MustChangePassword: user.MustChangePassword,
 	}
 }
 
-// modelToDomain converts a GORM model to a domain user
+// modelToDomain converts a GORM model to a domain user.
+// Auth fields (APIKey, MustChangePassword) are not mapped; they live in the
+// auth domain and are accessed through GetCredentials / GetAPIKey.
 func (r *GormRepository) modelToDomain(dbUser *models.User) *dusers.User {
 	return &dusers.User{
 		ID:                    int64(dbUser.ID),
@@ -318,8 +338,6 @@ func (r *GormRepository) modelToDomain(dbUser *models.User) *dusers.User {
 		PersonalLink2:         dbUser.PersonalLink2,
 		PersonalLink3:         dbUser.PersonalLink3,
 		PersonalLink4:         dbUser.PersonalLink4,
-		APIKey:                dbUser.APIKey,
-		MustChangePassword:    dbUser.MustChangePassword,
 		CreatedAt:             dbUser.CreatedAt,
 		UpdatedAt:             dbUser.UpdatedAt,
 	}

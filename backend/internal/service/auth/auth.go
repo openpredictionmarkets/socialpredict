@@ -25,8 +25,12 @@ func ValidateUserAndEnforcePasswordChangeGetUser(r *http.Request, svc dusers.Ser
 		return nil, httpErr
 	}
 
-	// Check if a password change is required
-	if httpErr := CheckMustChangePasswordFlag(user); httpErr != nil {
+	mustChange, err := svc.MustChangePassword(r.Context(), user.Username)
+	if err != nil {
+		return nil, &HTTPError{StatusCode: http.StatusInternalServerError, Message: "Failed to check password status"}
+	}
+
+	if httpErr := CheckMustChangePasswordFlag(mustChange); httpErr != nil {
 		return nil, httpErr
 	}
 
@@ -61,9 +65,9 @@ func ValidateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface) (*dus
 	return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
 }
 
-// CheckMustChangePasswordFlag checks if the user needs to change their password
-func CheckMustChangePasswordFlag(user *dusers.User) *HTTPError {
-	if user.MustChangePassword {
+// CheckMustChangePasswordFlag checks if a password change is required.
+func CheckMustChangePasswordFlag(mustChange bool) *HTTPError {
+	if mustChange {
 		return &HTTPError{
 			StatusCode: http.StatusForbidden,
 			Message:    "Password change required",

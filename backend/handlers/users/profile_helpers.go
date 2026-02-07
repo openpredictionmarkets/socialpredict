@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"socialpredict/handlers/users/dto"
+	"socialpredict/internal/domain/auth"
 	dusers "socialpredict/internal/domain/users"
 )
 
@@ -16,7 +17,7 @@ func writeProfileError(w http.ResponseWriter, err error, field string) {
 		writeProfileJSONError(w, http.StatusNotFound, "User not found")
 	case errors.Is(err, dusers.ErrInvalidUserData):
 		writeProfileJSONError(w, http.StatusBadRequest, "Invalid user data")
-	case errors.Is(err, dusers.ErrInvalidCredentials):
+	case errors.Is(err, auth.ErrInvalidCredentials):
 		writeProfileJSONError(w, http.StatusUnauthorized, "Current password is incorrect")
 	default:
 		message := err.Error()
@@ -65,7 +66,5 @@ func toPrivateUserResponse(user *dusers.User) dto.PrivateUserResponse {
 		PersonalLink3:         user.PersonalLink3,
 		PersonalLink4:         user.PersonalLink4,
 		Email:                 user.Email,
-		APIKey:                user.APIKey,
-		MustChangePassword:    user.MustChangePassword,
 	}
 }

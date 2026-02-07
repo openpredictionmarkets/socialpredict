@@ -73,6 +73,10 @@ func (m *financialServiceMock) ChangePassword(context.Context, string, string, s
 	return nil
 }
 
+func (m *financialServiceMock) MustChangePassword(context.Context, string) (bool, error) {
+	return false, nil
+}
+
 func TestGetUserFinancialHandlerSuccess(t *testing.T) {
 	mock := &financialServiceMock{snapshot: map[string]int64{"accountBalance": 500}}
 	handler := GetUserFinancialHandler(mock)

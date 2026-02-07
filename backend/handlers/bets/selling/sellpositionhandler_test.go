@@ -11,6 +11,7 @@ import (
 
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
+	"socialpredict/internal/domain/auth"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 	usermodels "socialpredict/internal/domain/users/models"
@@ -98,11 +99,14 @@ func (f *fakeUsersService) GetMarketQuestion(ctx context.Context, marketID uint)
 func (f *fakeUsersService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dusers.MarketUserPosition, error) {
 	return nil, nil
 }
-func (f *fakeUsersService) GetCredentials(ctx context.Context, username string) (*dusers.Credentials, error) {
+func (f *fakeUsersService) GetCredentials(ctx context.Context, username string) (*auth.Credentials, error) {
 	return nil, nil
 }
 func (f *fakeUsersService) UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error {
 	return nil
+}
+func (f *fakeUsersService) MustChangePassword(ctx context.Context, username string) (bool, error) {
+	return false, nil
 }
 
 func TestSellPositionHandler_Success(t *testing.T) {

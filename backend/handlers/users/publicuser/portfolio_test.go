@@ -75,6 +75,10 @@ func (m *portfolioServiceMock) ChangePassword(context.Context, string, string, s
 	return nil
 }
 
+func (m *portfolioServiceMock) MustChangePassword(context.Context, string) (bool, error) {
+	return false, nil
+}
+
 func TestGetPortfolioHandlerSuccess(t *testing.T) {
 	portfolio := &dusers.Portfolio{
 		Items: []dusers.PortfolioItem{

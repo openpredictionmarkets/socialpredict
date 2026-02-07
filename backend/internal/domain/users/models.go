@@ -19,8 +19,6 @@ type User struct {
 	PersonalLink2         string
 	PersonalLink3         string
 	PersonalLink4         string
-	APIKey                string
-	MustChangePassword    bool
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
@@ -113,12 +111,6 @@ type PersonalLinks struct {
 	PersonalLink2 string
 	PersonalLink3 string
 	PersonalLink4 string
-}
-
-// Credentials represents the sensitive authentication fields associated with a user.
-type Credentials struct {
-	PasswordHash       string
-	MustChangePassword bool
 }
 
 // PrivateProfile combines public and private user information for authenticated views.

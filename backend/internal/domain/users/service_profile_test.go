@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"socialpredict/internal/domain/auth"
 	users "socialpredict/internal/domain/users"
 	usermodels "socialpredict/internal/domain/users/models"
 	"socialpredict/security"
@@ -27,12 +28,11 @@ func newFakeRepository(username string) *fakeRepository {
 	hash, _ := bcrypt.GenerateFromPassword([]byte(initialTestPassword), usermodels.PasswordHashCost())
 	return &fakeRepository{
 		user: &users.User{
-			ID:                 1,
-			Username:           username,
-			DisplayName:        "Display " + username,
-			Email:              username + "@example.com",
-			UserType:           "regular",
-			MustChangePassword: true,
+			ID:          1,
+			Username:    username,
+			DisplayName: "Display " + username,
+			Email:       username + "@example.com",
+			UserType:    "regular",
 		},
 		passwordHash: string(hash),
 		mustChange:   true,
@@ -44,7 +44,6 @@ func (f *fakeRepository) GetByUsername(_ context.Context, username string) (*use
 		return nil, users.ErrUserNotFound
 	}
 	copy := *f.user
-	copy.MustChangePassword = f.mustChange
 	return &copy, nil
 }
 
@@ -59,14 +58,12 @@ func (f *fakeRepository) UpdateBalance(_ context.Context, username string, newBa
 func (f *fakeRepository) Create(_ context.Context, user *users.User) error {
 	copy := *user
 	f.user = &copy
-	f.mustChange = user.MustChangePassword
 	return nil
 }
 
 func (f *fakeRepository) Update(_ context.Context, user *users.User) error {
 	copy := *user
 	f.user = &copy
-	f.mustChange = user.MustChangePassword
 	return nil
 }
 
@@ -102,11 +99,12 @@ func (f *fakeRepository) ListUserMarkets(context.Context, int64) ([]*users.UserM
 	return nil, nil
 }
 
-func (f *fakeRepository) GetCredentials(_ context.Context, username string) (*users.Credentials, error) {
+func (f *fakeRepository) GetCredentials(_ context.Context, username string) (*auth.Credentials, error) {
 	if f.user == nil || f.user.Username != username {
 		return nil, users.ErrUserNotFound
 	}
-	return &users.Credentials{
+	return &auth.Credentials{
+		UserID:             f.user.ID,
 		PasswordHash:       f.passwordHash,
 		MustChangePassword: f.mustChange,
 	}, nil
@@ -118,10 +116,14 @@ func (f *fakeRepository) UpdatePassword(_ context.Context, username string, hash
 	}
 	f.passwordHash = hashedPassword
 	f.mustChange = mustChange
-	if f.user != nil {
-		f.user.MustChangePassword = mustChange
-	}
 	return nil
+}
+
+func (f *fakeRepository) GetAPIKey(_ context.Context, username string) (string, error) {
+	if f.user == nil || f.user.Username != username {
+		return "", users.ErrUserNotFound
+	}
+	return "fake-api-key", nil
 }
 
 func newServiceWithUser(t *testing.T) (string, users.ServiceInterface, *fakeRepository, context.Context) {
@@ -275,7 +277,7 @@ func TestServiceChangePassword(t *testing.T) {
 		username, service, _, ctx := newServiceWithUser(t)
 
 		err := service.ChangePassword(ctx, username, "wrong", "AnotherPass789!")
-		if !errors.Is(err, users.ErrInvalidCredentials) {
+		if !errors.Is(err, auth.ErrInvalidCredentials) {
 			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 		}
 	})

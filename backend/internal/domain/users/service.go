@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	analytics "socialpredict/internal/domain/analytics"
+	"socialpredict/internal/domain/auth"
 	usermodels "socialpredict/internal/domain/users/models"
 
 	"golang.org/x/crypto/bcrypt"
@@ -16,6 +17,7 @@ type ServiceInterface interface {
 	GetPublicUser(ctx context.Context, username string) (*PublicUser, error)
 	GetUser(ctx context.Context, username string) (*User, error)
 	GetPrivateProfile(ctx context.Context, username string) (*PrivateProfile, error)
+	MustChangePassword(ctx context.Context, username string) (bool, error)
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
 	GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error)
 	GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error)
@@ -40,7 +42,8 @@ type Repository interface {
 	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
 	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
-	GetCredentials(ctx context.Context, username string) (*Credentials, error)
+	GetCredentials(ctx context.Context, username string) (*auth.Credentials, error)
+	GetAPIKey(ctx context.Context, username string) (string, error)
 	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
 }
 
@@ -151,7 +154,6 @@ func (s *Service) CreateUser(ctx context.Context, req UserCreateRequest) (*User,
 		UserType:              req.UserType,
 		InitialAccountBalance: 0,
 		AccountBalance:        0,
-		MustChangePassword:    true,
 	}
 
 	if err := s.repo.Create(ctx, user); err != nil {
@@ -490,6 +492,16 @@ func (s *Service) GetPrivateProfile(ctx context.Context, username string) (*Priv
 		return nil, err
 	}
 
+	creds, err := s.repo.GetCredentials(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	apiKey, err := s.repo.GetAPIKey(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
 	return &PrivateProfile{
 		ID:                    user.ID,
 		Username:              user.Username,
@@ -504,11 +516,20 @@ func (s *Service) GetPrivateProfile(ctx context.Context, username string) (*Priv
 		PersonalLink3:         user.PersonalLink3,
 		PersonalLink4:         user.PersonalLink4,
 		Email:                 user.Email,
-		APIKey:                user.APIKey,
-		MustChangePassword:    user.MustChangePassword,
+		APIKey:                apiKey,
+		MustChangePassword:    creds.MustChangePassword,
 		CreatedAt:             user.CreatedAt,
 		UpdatedAt:             user.UpdatedAt,
 	}, nil
+}
+
+// MustChangePassword reports whether the specified user is required to change their password.
+func (s *Service) MustChangePassword(ctx context.Context, username string) (bool, error) {
+	creds, err := s.repo.GetCredentials(ctx, username)
+	if err != nil {
+		return false, err
+	}
+	return creds.MustChangePassword, nil
 }
 
 func (s *Service) validatePasswordChangeInputs(username, currentPassword, newPassword string) error {
@@ -539,7 +560,7 @@ func (s *Service) ChangePassword(ctx context.Context, username, currentPassword,
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(currentPassword)); err != nil {
-		return ErrInvalidCredentials
+		return auth.ErrInvalidCredentials
 	}
 
 	sanitized, err := s.sanitizer.SanitizePassword(newPassword)
