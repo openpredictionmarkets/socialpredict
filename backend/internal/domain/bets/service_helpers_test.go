@@ -7,7 +7,7 @@ import (
 	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
@@ -102,36 +102,58 @@ type ledgerCall struct {
 	username    string
 	amount      int64
 	transaction string
+	kind        string
+	maxDebt     int64
 }
 
-type ledgerUsers struct {
-	calls    []ledgerCall
-	applyErr error
+type ledgerWallet struct {
+	calls     []ledgerCall
+	debitErr  error
+	creditErr error
 }
 
-func (u *ledgerUsers) GetUser(ctx context.Context, username string) (*dusers.User, error) {
-	return nil, errors.New("unexpected call")
+func (w *ledgerWallet) ValidateBalance(ctx context.Context, username string, amount int64, maxDebt int64) error {
+	return errors.New("unexpected call")
 }
 
-func (u *ledgerUsers) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
-	if u.applyErr != nil {
-		return u.applyErr
+func (w *ledgerWallet) Debit(ctx context.Context, username string, amount int64, maxDebt int64, txType string) error {
+	if w.debitErr != nil {
+		return w.debitErr
 	}
-	u.calls = append(u.calls, ledgerCall{username: username, amount: amount, transaction: transactionType})
+	w.calls = append(w.calls, ledgerCall{
+		username:    username,
+		amount:      amount,
+		transaction: txType,
+		kind:        "debit",
+		maxDebt:     maxDebt,
+	})
+	return nil
+}
+
+func (w *ledgerWallet) Credit(ctx context.Context, username string, amount int64, txType string) error {
+	if w.creditErr != nil {
+		return w.creditErr
+	}
+	w.calls = append(w.calls, ledgerCall{
+		username:    username,
+		amount:      amount,
+		transaction: txType,
+		kind:        "credit",
+	})
 	return nil
 }
 
 func TestBetLedger_ChargeAndRecord(t *testing.T) {
-	users := &ledgerUsers{}
+	wallet := &ledgerWallet{}
 	repo := &ledgerRepo{}
-	ledger := betLedger{repo: repo, users: users}
+	ledger := betLedger{repo: repo, wallet: wallet, maxDebtAllowed: 100}
 	bet := &models.Bet{Username: "bob"}
 
 	if err := ledger.ChargeAndRecord(context.Background(), bet, 25); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
-	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionBuy || users.calls[0].amount != 25 {
-		t.Fatalf("unexpected user calls: %+v", users.calls)
+	if len(wallet.calls) != 1 || wallet.calls[0].transaction != dwallet.TxBuy || wallet.calls[0].amount != 25 || wallet.calls[0].kind != "debit" {
+		t.Fatalf("unexpected wallet calls: %+v", wallet.calls)
 	}
 	if repo.bet == nil {
 		t.Fatalf("expected bet persisted")
@@ -139,29 +161,54 @@ func TestBetLedger_ChargeAndRecord(t *testing.T) {
 }
 
 func TestBetLedger_ChargeAndRecord_RollsBackOnRepoError(t *testing.T) {
-	users := &ledgerUsers{}
+	wallet := &ledgerWallet{}
 	repo := &ledgerRepo{createErr: errors.New("db down")}
-	ledger := betLedger{repo: repo, users: users}
+	ledger := betLedger{repo: repo, wallet: wallet, maxDebtAllowed: 100}
 
 	err := ledger.ChargeAndRecord(context.Background(), &models.Bet{Username: "alice"}, 10)
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if len(users.calls) != 2 || users.calls[1].transaction != dusers.TransactionRefund {
-		t.Fatalf("expected refund on failure, calls: %+v", users.calls)
+	if len(wallet.calls) != 2 || wallet.calls[1].transaction != dwallet.TxRefund || wallet.calls[1].kind != "credit" {
+		t.Fatalf("expected refund on failure, calls: %+v", wallet.calls)
 	}
 }
 
 func TestBetLedger_CreditSale(t *testing.T) {
-	users := &ledgerUsers{}
+	wallet := &ledgerWallet{}
 	repo := &ledgerRepo{}
-	ledger := betLedger{repo: repo, users: users}
+	ledger := betLedger{repo: repo, wallet: wallet, maxDebtAllowed: 100}
 
 	if err := ledger.CreditSale(context.Background(), &models.Bet{Username: "alice"}, 15); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
-	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionSale || users.calls[0].amount != 15 {
-		t.Fatalf("unexpected user calls: %+v", users.calls)
+	if len(wallet.calls) != 1 || wallet.calls[0].transaction != dwallet.TxSale || wallet.calls[0].amount != 15 || wallet.calls[0].kind != "credit" {
+		t.Fatalf("unexpected wallet calls: %+v", wallet.calls)
+	}
+}
+
+func TestBetLedger_CreditSale_RollsBackOnRepoError(t *testing.T) {
+	wallet := &ledgerWallet{}
+	repo := &ledgerRepo{createErr: errors.New("db down")}
+	ledger := betLedger{repo: repo, wallet: wallet, maxDebtAllowed: 100}
+
+	err := ledger.CreditSale(context.Background(), &models.Bet{Username: "alice"}, 15)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(wallet.calls) != 2 || wallet.calls[1].transaction != dwallet.TxBuy || wallet.calls[1].kind != "debit" {
+		t.Fatalf("expected debit rollback on failure, calls: %+v", wallet.calls)
+	}
+}
+
+func TestBetLedger_ChargeAndRecord_MapsInsufficientBalance(t *testing.T) {
+	wallet := &ledgerWallet{debitErr: dwallet.ErrInsufficientBalance}
+	repo := &ledgerRepo{}
+	ledger := betLedger{repo: repo, wallet: wallet, maxDebtAllowed: 100}
+
+	err := ledger.ChargeAndRecord(context.Background(), &models.Bet{Username: "alice"}, 10)
+	if !errors.Is(err, ErrInsufficientBalance) {
+		t.Fatalf("expected ErrInsufficientBalance, got %v", err)
 	}
 }
 

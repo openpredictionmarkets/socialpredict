@@ -2,11 +2,12 @@ package bets
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
@@ -96,28 +97,32 @@ func (g balanceGuard) EnsureSufficient(balance, totalCost int64) error {
 }
 
 type betLedger struct {
-	repo  Repository
-	users UserService
+	repo           Repository
+	wallet         WalletService
+	maxDebtAllowed int64
 }
 
 func (l betLedger) ChargeAndRecord(ctx context.Context, bet *models.Bet, totalCost int64) error {
-	if err := l.users.ApplyTransaction(ctx, bet.Username, totalCost, dusers.TransactionBuy); err != nil {
+	if err := l.wallet.Debit(ctx, bet.Username, totalCost, l.maxDebtAllowed, dwallet.TxBuy); err != nil {
+		if errors.Is(err, dwallet.ErrInsufficientBalance) {
+			return ErrInsufficientBalance
+		}
 		return err
 	}
 
 	if err := l.repo.Create(ctx, bet); err != nil {
-		_ = l.users.ApplyTransaction(ctx, bet.Username, totalCost, dusers.TransactionRefund)
+		_ = l.wallet.Credit(ctx, bet.Username, totalCost, dwallet.TxRefund)
 		return err
 	}
 	return nil
 }
 
 func (l betLedger) CreditSale(ctx context.Context, bet *models.Bet, saleValue int64) error {
-	if err := l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionSale); err != nil {
+	if err := l.wallet.Credit(ctx, bet.Username, saleValue, dwallet.TxSale); err != nil {
 		return err
 	}
 	if err := l.repo.Create(ctx, bet); err != nil {
-		_ = l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionBuy)
+		_ = l.wallet.Debit(ctx, bet.Username, saleValue, l.maxDebtAllowed, dwallet.TxBuy)
 		return err
 	}
 	return nil

@@ -111,7 +111,7 @@ func NewService(repo Repository, markets MarketService, users UserService, econ 
 		marketGate:     marketGate{markets: markets, clock: clock},
 		fees:           feeCalculator{econ: econ},
 		balances:       balanceGuard{maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)},
-		ledger:         betLedger{repo: repo, users: users},
+		ledger:         betLedger{repo: repo, wallet: userWalletAdapter{users: users}, maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)},
 		saleCalculator: saleCalculator{maxDustPerSale: int64(econ.Economics.Betting.MaxDustPerSale)},
 	}
 }
