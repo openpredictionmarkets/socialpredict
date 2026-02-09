@@ -2,8 +2,9 @@ package bets
 
 import (
 	"context"
+	"errors"
 
-	dusers "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 	"socialpredict/models"
 )
 
@@ -18,13 +19,16 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 		return nil, err
 	}
 
-	user, hasBet, err := s.loadUserAndBetStatus(ctx, req)
+	hasBet, err := s.loadBetStatus(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	fees := s.fees.Calculate(hasBet, req.Amount)
-	if err := s.balances.EnsureSufficient(user.AccountBalance, fees.totalCost); err != nil {
+	if err := s.wallet.ValidateBalance(ctx, req.Username, fees.totalCost, s.balances.maxDebtAllowed); err != nil {
+		if errors.Is(err, dwallet.ErrInsufficientBalance) {
+			return nil, ErrInsufficientBalance
+		}
 		return nil, err
 	}
 
@@ -44,18 +48,13 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 	return placedBetFromModel(bet), nil
 }
 
-func (s *Service) loadUserAndBetStatus(ctx context.Context, req PlaceRequest) (*dusers.User, bool, error) {
-	user, err := s.users.GetUser(ctx, req.Username)
-	if err != nil {
-		return nil, false, err
-	}
-
+func (s *Service) loadBetStatus(ctx context.Context, req PlaceRequest) (bool, error) {
 	hasBet, err := s.repo.UserHasBet(ctx, req.MarketID, req.Username)
 	if err != nil {
-		return nil, false, err
+		return false, err
 	}
 
-	return user, hasBet, nil
+	return hasBet, nil
 }
 
 type betFees struct {
