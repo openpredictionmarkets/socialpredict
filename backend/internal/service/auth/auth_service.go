@@ -2,16 +2,11 @@ package auth
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/http"
-	"strings"
 
 	dauth "socialpredict/internal/domain/auth"
 	dusers "socialpredict/internal/domain/users"
-	usermodels "socialpredict/internal/domain/users/models"
-
-	"github.com/golang-jwt/jwt/v4"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // UserReader is the narrow view of the users service that AuthService needs.
@@ -30,30 +25,51 @@ type CredentialRepository interface {
 	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
 }
 
-// Authenticator exposes the authentication operations used by HTTP handlers.
-type Authenticator interface {
+// RequestAuthenticator defines HTTP-facing identity/authz operations.
+type RequestAuthenticator interface {
 	CurrentUser(r *http.Request) (*dusers.User, *HTTPError)
 	RequireUser(r *http.Request) (*dusers.User, *HTTPError)
 	RequireAdmin(r *http.Request) (*dusers.User, *HTTPError)
+}
+
+// PasswordManager defines password and credential lifecycle operations.
+type PasswordManager interface {
 	ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error
 	MustChangePassword(ctx context.Context, username string) (bool, error)
 }
 
-// AuthService provides a façade over the authentication helpers so callers can
-// depend on a single injected object rather than package-level functions.
-type AuthService struct {
-	users     UserReader
-	repo      CredentialRepository
-	sanitizer PasswordSanitizer
+// IdentityResolver defines token-to-user and role authorization operations.
+type IdentityResolver interface {
+	UserFromToken(ctx context.Context, tokenString string) (*dusers.User, error)
+	EnsureAdmin(user *dusers.User) error
 }
 
-// NewAuthService constructs a façade that uses the provided dependencies for
-// token validation, password-change enforcement, and credential management.
+// Authenticator is the backwards-compatible façade used by handlers.
+// It intentionally embeds the HTTP adapter and password management contracts.
+type Authenticator interface {
+	RequestAuthenticator
+	PasswordManager
+}
+
+// AuthService adapts HTTP requests to the split identity and password services.
+type AuthService struct {
+	identity  IdentityResolver
+	passwords PasswordManager
+}
+
+// NewAuthService wires the default identity and password implementations.
 func NewAuthService(users UserReader, repo CredentialRepository, sanitizer PasswordSanitizer) *AuthService {
+	return NewAuthServiceWithDependencies(
+		NewIdentityService(users),
+		NewPasswordService(repo, sanitizer),
+	)
+}
+
+// NewAuthServiceWithDependencies allows injecting custom identity/password services.
+func NewAuthServiceWithDependencies(identity IdentityResolver, passwords PasswordManager) *AuthService {
 	return &AuthService{
-		users:     users,
-		repo:      repo,
-		sanitizer: sanitizer,
+		identity:  identity,
+		passwords: passwords,
 	}
 }
 
@@ -83,30 +99,20 @@ func (a *AuthService) CurrentUser(r *http.Request) (*dusers.User, *HTTPError) {
 // RequireUser resolves the authenticated user without checking the
 // must-change-password flag.
 func (a *AuthService) RequireUser(r *http.Request) (*dusers.User, *HTTPError) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
+	if a.identity == nil {
+		return nil, &HTTPError{StatusCode: http.StatusInternalServerError, Message: "Authentication service misconfigured"}
+	}
+
+	tokenString, err := extractTokenFromHeader(r)
+	if err != nil {
 		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Authorization header is required"}
 	}
 
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-	token, err := parseToken(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return getJWTKey(), nil
-	})
+	user, err := a.identity.UserFromToken(r.Context(), tokenString)
 	if err != nil {
-		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
+		return nil, mapIdentityError(err)
 	}
-
-	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-		user, err := a.users.GetUser(r.Context(), claims.Username)
-		if err != nil {
-			if err == dusers.ErrUserNotFound {
-				return nil, &HTTPError{StatusCode: http.StatusNotFound, Message: "User not found"}
-			}
-			return nil, &HTTPError{StatusCode: http.StatusInternalServerError, Message: "Failed to load user"}
-		}
-		return user, nil
-	}
-	return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
+	return user, nil
 }
 
 // RequireAdmin ensures the current user is authenticated and has admin privileges.
@@ -116,11 +122,8 @@ func (a *AuthService) RequireAdmin(r *http.Request) (*dusers.User, *HTTPError) {
 		return nil, err
 	}
 
-	if strings.ToUpper(user.UserType) != "ADMIN" {
-		return nil, &HTTPError{
-			StatusCode: http.StatusForbidden,
-			Message:    "admin privileges required",
-		}
+	if err := a.identity.EnsureAdmin(user); err != nil {
+		return nil, mapIdentityError(err)
 	}
 
 	return user, nil
@@ -128,52 +131,33 @@ func (a *AuthService) RequireAdmin(r *http.Request) (*dusers.User, *HTTPError) {
 
 // MustChangePassword reports whether the specified user is required to change their password.
 func (a *AuthService) MustChangePassword(ctx context.Context, username string) (bool, error) {
-	creds, err := a.repo.GetCredentials(ctx, username)
-	if err != nil {
-		return false, err
+	if a.passwords == nil {
+		return false, dusers.ErrInvalidUserData
 	}
-	return creds.MustChangePassword, nil
+	return a.passwords.MustChangePassword(ctx, username)
 }
 
 // ChangePassword validates credentials and persists a new hashed password.
 func (a *AuthService) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
-	if username == "" {
+	if a.passwords == nil {
 		return dusers.ErrInvalidUserData
 	}
-	if currentPassword == "" {
-		return fmt.Errorf("current password is required")
-	}
-	if newPassword == "" {
-		return fmt.Errorf("new password is required")
-	}
-	if a.sanitizer == nil {
-		return dusers.ErrInvalidUserData
-	}
+	return a.passwords.ChangePassword(ctx, username, currentPassword, newPassword)
+}
 
-	creds, err := a.repo.GetCredentials(ctx, username)
-	if err != nil {
-		return err
+func mapIdentityError(err error) *HTTPError {
+	switch {
+	case errors.Is(err, ErrInvalidToken):
+		return &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
+	case errors.Is(err, ErrAdminPrivilegesRequired):
+		return &HTTPError{StatusCode: http.StatusForbidden, Message: "admin privileges required"}
+	case errors.Is(err, dusers.ErrUserNotFound):
+		return &HTTPError{StatusCode: http.StatusNotFound, Message: "User not found"}
+	case errors.Is(err, dusers.ErrInvalidUserData):
+		return &HTTPError{StatusCode: http.StatusInternalServerError, Message: "Authentication service misconfigured"}
+	default:
+		return &HTTPError{StatusCode: http.StatusInternalServerError, Message: "Failed to load user"}
 	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(currentPassword)); err != nil {
-		return dauth.ErrInvalidCredentials
-	}
-
-	sanitized, err := a.sanitizer.SanitizePassword(newPassword)
-	if err != nil {
-		return fmt.Errorf("new password does not meet security requirements: %w", err)
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(sanitized)); err == nil {
-		return fmt.Errorf("new password must differ from the current password")
-	}
-
-	hashed, err := bcrypt.GenerateFromPassword([]byte(sanitized), usermodels.PasswordHashCost())
-	if err != nil {
-		return fmt.Errorf("failed to hash new password: %w", err)
-	}
-
-	return a.repo.UpdatePassword(ctx, username, string(hashed), false)
 }
 
 var _ Authenticator = (*AuthService)(nil)
