@@ -13,11 +13,13 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	dusers "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 
 	// Repositories
 	rbets "socialpredict/internal/repository/bets"
 	rmarkets "socialpredict/internal/repository/markets"
 	rusers "socialpredict/internal/repository/users"
+	rwallet "socialpredict/internal/repository/wallet"
 
 	// Handlers
 	hmarkets "socialpredict/handlers/markets"
@@ -48,12 +50,14 @@ type Container struct {
 	usersRepo     rusers.GormRepository
 	analyticsRepo analytics.GormRepository
 	betsRepo      rbets.GormRepository
+	walletRepo    rwallet.GormRepository
 
 	// Domain services
 	analyticsService *analytics.Service
 	marketsService   *dmarkets.Service
 	usersService     *dusers.Service
 	betsService      *dbets.Service
+	walletService    dwallet.Service
 	authService      *authsvc.AuthService
 
 	// Handlers
@@ -75,6 +79,7 @@ func (c *Container) InitializeRepositories() {
 	c.usersRepo = *rusers.NewGormRepository(c.db)
 	c.analyticsRepo = *analytics.NewGormRepository(c.db)
 	c.betsRepo = *rbets.NewGormRepository(c.db)
+	c.walletRepo = *rwallet.NewGormRepository(c.db)
 }
 
 // InitializeServices sets up all domain services with their dependencies
@@ -91,18 +96,19 @@ func (c *Container) InitializeServices() {
 	})
 	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader)
 	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
+	c.walletService = dwallet.NewService(&c.walletRepo, c.clock)
 	c.authService = authsvc.NewAuthService(c.usersService, &c.usersRepo, securityService.Sanitizer)
 
-	// Markets service depends on markets repository and users service
+	// Markets service depends on markets repository, creator/profile service, and wallet service.
 	marketsConfig := dmarkets.Config{
 		MinimumFutureHours: c.config.Economics.MarketCreation.MinimumFutureHours,
 		CreateMarketCost:   c.config.Economics.MarketIncentives.CreateMarketCost,
 		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
 	}
 
-	c.marketsService = dmarkets.NewService(&c.marketsRepo, c.usersService, c.clock, marketsConfig)
+	c.marketsService = dmarkets.NewServiceWithWallet(&c.marketsRepo, c.usersService, c.walletService, c.clock, marketsConfig)
 
-	c.betsService = dbets.NewService(&c.betsRepo, c.marketsService, c.usersService, c.config, c.clock)
+	c.betsService = dbets.NewServiceWithWallet(&c.betsRepo, c.marketsService, c.usersService, c.walletService, c.config, c.clock)
 }
 
 // InitializeHandlers sets up all HTTP handlers with their service dependencies

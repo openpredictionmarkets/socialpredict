@@ -65,19 +65,25 @@ func (a userWalletAdapter) Credit(ctx context.Context, username string, amount i
 	return a.users.ApplyTransaction(ctx, username, amount, txType)
 }
 
-// NewService creates a new markets service.
-func NewService(repo Repository, userService UserService, clock Clock, config Config) *Service {
-	var walletService WalletService
-	if userService != nil {
-		walletService = userWalletAdapter{users: userService}
+// NewServiceWithWallet creates a markets service with explicit creator/profile and wallet dependencies.
+func NewServiceWithWallet(repo Repository, creatorProfileService CreatorProfileService, walletService WalletService, clock Clock, config Config) *Service {
+	if walletService == nil {
+		if legacyUserService, ok := creatorProfileService.(UserService); ok && legacyUserService != nil {
+			walletService = userWalletAdapter{users: legacyUserService}
+		}
 	}
 	return &Service{
 		repo:                  repo,
-		creatorProfileService: userService,
+		creatorProfileService: creatorProfileService,
 		walletService:         walletService,
 		clock:                 clock,
 		config:                config,
 	}
+}
+
+// NewService creates a new markets service using the legacy users dependency wiring.
+func NewService(repo Repository, userService UserService, clock Clock, config Config) *Service {
+	return NewServiceWithWallet(repo, userService, nil, clock, config)
 }
 
 // Compile-time interface compliance checks.

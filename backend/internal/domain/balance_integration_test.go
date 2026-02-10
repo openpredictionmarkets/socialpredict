@@ -9,12 +9,13 @@ import (
 	bets "socialpredict/internal/domain/bets"
 	markets "socialpredict/internal/domain/markets"
 	users "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 	rbets "socialpredict/internal/repository/bets"
 	rmarkets "socialpredict/internal/repository/markets"
 	rusers "socialpredict/internal/repository/users"
+	rwallet "socialpredict/internal/repository/wallet"
 	"socialpredict/models/modelstesting"
 	"socialpredict/security"
-	"socialpredict/setup"
 )
 
 type realClock struct{}
@@ -35,6 +36,8 @@ func TestIntegration_BetPlacement_DeductsBalance(t *testing.T) {
 	// Setup services with real repositories
 	userRepo := rusers.NewGormRepository(db)
 	userService := users.NewService(userRepo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	walletRepo := rwallet.NewGormRepository(db)
+	walletService := dwallet.NewService(walletRepo, realClock{})
 
 	marketRepo := rmarkets.NewGormRepository(db)
 	marketConfig := markets.Config{
@@ -42,11 +45,11 @@ func TestIntegration_BetPlacement_DeductsBalance(t *testing.T) {
 		CreateMarketCost:   10,
 		MaximumDebtAllowed: 500,
 	}
-	marketService := markets.NewService(marketRepo, userService, realClock{}, marketConfig)
+	marketService := markets.NewServiceWithWallet(marketRepo, userService, walletService, realClock{}, marketConfig)
 
 	betRepo := rbets.NewGormRepository(db)
 	econ := modelstesting.GenerateEconomicConfig()
-	betService := bets.NewService(betRepo, marketService, userService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -65,7 +68,6 @@ func TestIntegration_BetPlacement_DeductsBalance(t *testing.T) {
 	// Create market
 	market := modelstesting.GenerateMarket(9001, creator.Username)
 	market.ResolutionDateTime = time.Now().Add(48 * time.Hour)
-	market.Status = "active"
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}
@@ -76,7 +78,7 @@ func TestIntegration_BetPlacement_DeductsBalance(t *testing.T) {
 	betAmount := int64(100)
 	_, err := betService.Place(ctx, bets.PlaceRequest{
 		Username: user.Username,
-		MarketID: market.ID,
+		MarketID: uint(market.ID),
 		Amount:   betAmount,
 		Outcome:  "YES",
 	})
@@ -107,6 +109,8 @@ func TestIntegration_BetPlacement_InsufficientBalance_Fails(t *testing.T) {
 
 	userRepo := rusers.NewGormRepository(db)
 	userService := users.NewService(userRepo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	walletRepo := rwallet.NewGormRepository(db)
+	walletService := dwallet.NewService(walletRepo, realClock{})
 
 	marketRepo := rmarkets.NewGormRepository(db)
 	marketConfig := markets.Config{
@@ -114,12 +118,12 @@ func TestIntegration_BetPlacement_InsufficientBalance_Fails(t *testing.T) {
 		CreateMarketCost:   10,
 		MaximumDebtAllowed: 100, // Low debt limit
 	}
-	marketService := markets.NewService(marketRepo, userService, realClock{}, marketConfig)
+	marketService := markets.NewServiceWithWallet(marketRepo, userService, walletService, realClock{}, marketConfig)
 
 	betRepo := rbets.NewGormRepository(db)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.User.MaximumDebtAllowed = 100 // Match the market config
-	betService := bets.NewService(betRepo, marketService, userService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -137,7 +141,6 @@ func TestIntegration_BetPlacement_InsufficientBalance_Fails(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(9002, creator.Username)
 	market.ResolutionDateTime = time.Now().Add(48 * time.Hour)
-	market.Status = "active"
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}
@@ -145,7 +148,7 @@ func TestIntegration_BetPlacement_InsufficientBalance_Fails(t *testing.T) {
 	// Try to place a bet exceeding available credit (balance + maxDebt = 50 + 100 = 150)
 	_, err := betService.Place(ctx, bets.PlaceRequest{
 		Username: user.Username,
-		MarketID: market.ID,
+		MarketID: uint(market.ID),
 		Amount:   200, // Exceeds available credit
 		Outcome:  "YES",
 	})
@@ -172,6 +175,8 @@ func TestIntegration_BetPlacement_AtDebtLimit(t *testing.T) {
 
 	userRepo := rusers.NewGormRepository(db)
 	userService := users.NewService(userRepo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	walletRepo := rwallet.NewGormRepository(db)
+	walletService := dwallet.NewService(walletRepo, realClock{})
 
 	marketRepo := rmarkets.NewGormRepository(db)
 	marketConfig := markets.Config{
@@ -179,14 +184,14 @@ func TestIntegration_BetPlacement_AtDebtLimit(t *testing.T) {
 		CreateMarketCost:   10,
 		MaximumDebtAllowed: 100,
 	}
-	marketService := markets.NewService(marketRepo, userService, realClock{}, marketConfig)
+	marketService := markets.NewServiceWithWallet(marketRepo, userService, walletService, realClock{}, marketConfig)
 
 	betRepo := rbets.NewGormRepository(db)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.User.MaximumDebtAllowed = 100
 	econ.Economics.Betting.BetFees.InitialBetFee = 0
 	econ.Economics.Betting.BetFees.BuySharesFee = 0
-	betService := bets.NewService(betRepo, marketService, userService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -204,7 +209,6 @@ func TestIntegration_BetPlacement_AtDebtLimit(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(9003, creator.Username)
 	market.ResolutionDateTime = time.Now().Add(48 * time.Hour)
-	market.Status = "active"
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}
@@ -212,7 +216,7 @@ func TestIntegration_BetPlacement_AtDebtLimit(t *testing.T) {
 	// Try to place any bet - should fail since already at debt limit
 	_, err := betService.Place(ctx, bets.PlaceRequest{
 		Username: user.Username,
-		MarketID: market.ID,
+		MarketID: uint(market.ID),
 		Amount:   1, // Even smallest amount should fail
 		Outcome:  "YES",
 	})
@@ -229,6 +233,8 @@ func TestIntegration_MarketCreation_DeductsBalance(t *testing.T) {
 
 	userRepo := rusers.NewGormRepository(db)
 	userService := users.NewService(userRepo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	walletRepo := rwallet.NewGormRepository(db)
+	walletService := dwallet.NewService(walletRepo, realClock{})
 
 	marketRepo := rmarkets.NewGormRepository(db)
 	createCost := int64(50)
@@ -237,7 +243,7 @@ func TestIntegration_MarketCreation_DeductsBalance(t *testing.T) {
 		CreateMarketCost:   createCost,
 		MaximumDebtAllowed: 500,
 	}
-	marketService := markets.NewService(marketRepo, userService, realClock{}, marketConfig)
+	marketService := markets.NewServiceWithWallet(marketRepo, userService, walletService, realClock{}, marketConfig)
 
 	ctx := context.Background()
 
@@ -279,6 +285,8 @@ func TestIntegration_MarketCreation_InsufficientBalance_Fails(t *testing.T) {
 
 	userRepo := rusers.NewGormRepository(db)
 	userService := users.NewService(userRepo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	walletRepo := rwallet.NewGormRepository(db)
+	walletService := dwallet.NewService(walletRepo, realClock{})
 
 	marketRepo := rmarkets.NewGormRepository(db)
 	createCost := int64(100)
@@ -287,7 +295,7 @@ func TestIntegration_MarketCreation_InsufficientBalance_Fails(t *testing.T) {
 		CreateMarketCost:   createCost,
 		MaximumDebtAllowed: 50, // Low debt limit
 	}
-	marketService := markets.NewService(marketRepo, userService, realClock{}, marketConfig)
+	marketService := markets.NewServiceWithWallet(marketRepo, userService, walletService, realClock{}, marketConfig)
 
 	ctx := context.Background()
 
@@ -328,6 +336,8 @@ func TestIntegration_MultipleBets_CumulativeBalanceChange(t *testing.T) {
 
 	userRepo := rusers.NewGormRepository(db)
 	userService := users.NewService(userRepo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	walletRepo := rwallet.NewGormRepository(db)
+	walletService := dwallet.NewService(walletRepo, realClock{})
 
 	marketRepo := rmarkets.NewGormRepository(db)
 	marketConfig := markets.Config{
@@ -335,13 +345,13 @@ func TestIntegration_MultipleBets_CumulativeBalanceChange(t *testing.T) {
 		CreateMarketCost:   10,
 		MaximumDebtAllowed: 500,
 	}
-	marketService := markets.NewService(marketRepo, userService, realClock{}, marketConfig)
+	marketService := markets.NewServiceWithWallet(marketRepo, userService, walletService, realClock{}, marketConfig)
 
 	betRepo := rbets.NewGormRepository(db)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.Betting.BetFees.InitialBetFee = 0
 	econ.Economics.Betting.BetFees.BuySharesFee = 0
-	betService := bets.NewService(betRepo, marketService, userService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -357,7 +367,6 @@ func TestIntegration_MultipleBets_CumulativeBalanceChange(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(9004, creator.Username)
 	market.ResolutionDateTime = time.Now().Add(48 * time.Hour)
-	market.Status = "active"
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}
@@ -369,7 +378,7 @@ func TestIntegration_MultipleBets_CumulativeBalanceChange(t *testing.T) {
 	for i, amount := range betAmounts {
 		_, err := betService.Place(ctx, bets.PlaceRequest{
 			Username: user.Username,
-			MarketID: market.ID,
+			MarketID: uint(market.ID),
 			Amount:   amount,
 			Outcome:  "YES",
 		})
@@ -399,6 +408,8 @@ func TestIntegration_BalanceGoesNegative_WithinDebtLimit(t *testing.T) {
 
 	userRepo := rusers.NewGormRepository(db)
 	userService := users.NewService(userRepo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	walletRepo := rwallet.NewGormRepository(db)
+	walletService := dwallet.NewService(walletRepo, realClock{})
 
 	marketRepo := rmarkets.NewGormRepository(db)
 	marketConfig := markets.Config{
@@ -406,13 +417,13 @@ func TestIntegration_BalanceGoesNegative_WithinDebtLimit(t *testing.T) {
 		CreateMarketCost:   10,
 		MaximumDebtAllowed: 500,
 	}
-	marketService := markets.NewService(marketRepo, userService, realClock{}, marketConfig)
+	marketService := markets.NewServiceWithWallet(marketRepo, userService, walletService, realClock{}, marketConfig)
 
 	betRepo := rbets.NewGormRepository(db)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.Betting.BetFees.InitialBetFee = 0
 	econ.Economics.Betting.BetFees.BuySharesFee = 0
-	betService := bets.NewService(betRepo, marketService, userService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -429,7 +440,6 @@ func TestIntegration_BalanceGoesNegative_WithinDebtLimit(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(9005, creator.Username)
 	market.ResolutionDateTime = time.Now().Add(48 * time.Hour)
-	market.Status = "active"
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}
@@ -438,7 +448,7 @@ func TestIntegration_BalanceGoesNegative_WithinDebtLimit(t *testing.T) {
 	betAmount := int64(200) // Will result in -150 balance
 	_, err := betService.Place(ctx, bets.PlaceRequest{
 		Username: user.Username,
-		MarketID: market.ID,
+		MarketID: uint(market.ID),
 		Amount:   betAmount,
 		Outcome:  "YES",
 	})

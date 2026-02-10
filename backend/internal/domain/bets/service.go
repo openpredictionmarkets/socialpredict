@@ -95,23 +95,31 @@ type Service struct {
 	saleCalculator saleCalculator
 }
 
-// NewService constructs a bets service.
-func NewService(repo Repository, markets MarketService, users UserService, econ *setup.EconomicConfig, clock Clock) *Service {
+// NewServiceWithWallet constructs a bets service with an explicit wallet dependency.
+func NewServiceWithWallet(repo Repository, markets MarketService, users UserService, wallet WalletService, econ *setup.EconomicConfig, clock Clock) *Service {
 	if clock == nil {
 		clock = serviceClock{}
+	}
+	if wallet == nil && users != nil {
+		wallet = userWalletAdapter{users: users}
 	}
 	return &Service{
 		repo:    repo,
 		markets: markets,
 		users:   users,
-		wallet:  userWalletAdapter{users: users},
+		wallet:  wallet,
 		econ:    econ,
 		clock:   clock,
 
 		marketGate:     marketGate{markets: markets, clock: clock},
 		fees:           feeCalculator{econ: econ},
 		balances:       balanceGuard{maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)},
-		ledger:         betLedger{repo: repo, wallet: userWalletAdapter{users: users}, maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)},
+		ledger:         betLedger{repo: repo, wallet: wallet, maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)},
 		saleCalculator: saleCalculator{maxDustPerSale: int64(econ.Economics.Betting.MaxDustPerSale)},
 	}
+}
+
+// NewService constructs a bets service using the legacy users dependency wiring.
+func NewService(repo Repository, markets MarketService, users UserService, econ *setup.EconomicConfig, clock Clock) *Service {
+	return NewServiceWithWallet(repo, markets, users, nil, econ, clock)
 }
