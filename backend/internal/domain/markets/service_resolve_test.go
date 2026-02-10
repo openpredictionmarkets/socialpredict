@@ -6,7 +6,8 @@ import (
 	"time"
 
 	markets "socialpredict/internal/domain/markets"
-	users "socialpredict/internal/domain/users"
+	dusers "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 )
 
 type resolveRepo struct {
@@ -90,7 +91,7 @@ func (s *resolveUserService) ApplyTransaction(ctx context.Context, username stri
 	return nil
 }
 
-func (resolveUserService) GetPublicUser(context.Context, string) (*users.PublicUser, error) {
+func (resolveUserService) GetPublicUser(context.Context, string) (*dusers.PublicUser, error) {
 	return nil, nil
 }
 
@@ -122,7 +123,7 @@ func TestResolveMarketRefundsOnNA(t *testing.T) {
 	}
 
 	for _, call := range userSvc.applied {
-		if call.txType != users.TransactionRefund {
+		if call.txType != dwallet.TxRefund {
 			t.Fatalf("expected refund transaction, got %s", call.txType)
 		}
 	}
@@ -152,7 +153,7 @@ func TestResolveMarketPaysWinners(t *testing.T) {
 	}
 
 	call := userSvc.applied[0]
-	if call.username != "winner" || call.amount != 120 || call.txType != users.TransactionWin {
+	if call.username != "winner" || call.amount != 120 || call.txType != dwallet.TxWin {
 		t.Fatalf("unexpected payout %+v", call)
 	}
 }

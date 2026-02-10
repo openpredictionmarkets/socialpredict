@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	users "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 )
 
 // ResolveMarket resolves a market with a given outcome.
@@ -62,7 +62,7 @@ func (s *Service) refundMarketBets(ctx context.Context, marketID int64) error {
 		return err
 	}
 	for _, bet := range bets {
-		if err := s.walletService.Credit(ctx, bet.Username, bet.Amount, users.TransactionRefund); err != nil {
+		if err := s.walletService.Credit(ctx, bet.Username, bet.Amount, dwallet.TxRefund); err != nil {
 			return err
 		}
 	}
@@ -78,7 +78,7 @@ func (s *Service) payoutWinningPositions(ctx context.Context, marketID int64) er
 		if pos.Value <= 0 {
 			continue
 		}
-		if err := s.walletService.Credit(ctx, pos.Username, pos.Value, users.TransactionWin); err != nil {
+		if err := s.walletService.Credit(ctx, pos.Username, pos.Value, dwallet.TxWin); err != nil {
 			return err
 		}
 	}
