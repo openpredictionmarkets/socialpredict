@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	users "socialpredict/internal/domain/users"
 )
 
 type labelPair struct {
@@ -19,7 +21,7 @@ func (s *Service) CreateMarket(ctx context.Context, req MarketCreateRequest, cre
 
 	labels := normalizeLabels(req.YesLabel, req.NoLabel)
 
-	if err := s.userService.ValidateUserExists(ctx, creatorUsername); err != nil {
+	if err := s.creatorProfileService.ValidateUserExists(ctx, creatorUsername); err != nil {
 		return nil, ErrUserNotFound
 	}
 
@@ -81,10 +83,10 @@ func normalizeLabels(yesLabel string, noLabel string) labelPair {
 }
 
 func (s *Service) ensureCreateMarketBalance(ctx context.Context, creatorUsername string) error {
-	if err := s.userService.ValidateUserBalance(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
+	if err := s.walletService.ValidateBalance(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
 		return ErrInsufficientBalance
 	}
-	return s.userService.DeductBalance(ctx, creatorUsername, s.config.CreateMarketCost)
+	return s.walletService.Debit(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed, users.TransactionFee)
 }
 
 func (s *Service) buildMarketEntity(req MarketCreateRequest, creatorUsername string, labels labelPair) *Market {

@@ -62,7 +62,7 @@ func (s *Service) refundMarketBets(ctx context.Context, marketID int64) error {
 		return err
 	}
 	for _, bet := range bets {
-		if err := s.userService.ApplyTransaction(ctx, bet.Username, bet.Amount, users.TransactionRefund); err != nil {
+		if err := s.walletService.Credit(ctx, bet.Username, bet.Amount, users.TransactionRefund); err != nil {
 			return err
 		}
 	}
@@ -78,7 +78,7 @@ func (s *Service) payoutWinningPositions(ctx context.Context, marketID int64) er
 		if pos.Value <= 0 {
 			continue
 		}
-		if err := s.userService.ApplyTransaction(ctx, pos.Username, pos.Value, users.TransactionWin); err != nil {
+		if err := s.walletService.Credit(ctx, pos.Username, pos.Value, users.TransactionWin); err != nil {
 			return err
 		}
 	}

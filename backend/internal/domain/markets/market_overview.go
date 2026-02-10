@@ -88,10 +88,10 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 
 func (s *Service) buildCreatorSummary(ctx context.Context, username string) *CreatorSummary {
 	summary := &CreatorSummary{Username: username}
-	if s.userService == nil {
+	if s.creatorProfileService == nil {
 		return summary
 	}
-	user, err := s.userService.GetPublicUser(ctx, username)
+	user, err := s.creatorProfileService.GetPublicUser(ctx, username)
 	if err != nil || user == nil {
 		return summary
 	}

@@ -29,13 +29,26 @@ type Repository interface {
 	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)
 }
 
-// UserService defines the interface for user-related operations.
-type UserService interface {
+// CreatorProfileService defines creator existence and profile lookups used by markets.
+type CreatorProfileService interface {
 	ValidateUserExists(ctx context.Context, username string) error
+	GetPublicUser(ctx context.Context, username string) (*users.PublicUser, error)
+}
+
+// WalletService defines balance operations used by markets.
+type WalletService interface {
+	ValidateBalance(ctx context.Context, username string, amount int64, maxDebt int64) error
+	Debit(ctx context.Context, username string, amount int64, maxDebt int64, txType string) error
+	Credit(ctx context.Context, username string, amount int64, txType string) error
+}
+
+// UserService is a temporary compatibility interface for legacy constructor wiring.
+// It will be removed once callers inject creator/profile and wallet dependencies directly.
+type UserService interface {
+	CreatorProfileService
 	ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error
 	DeductBalance(ctx context.Context, username string, amount int64) error
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
-	GetPublicUser(ctx context.Context, username string) (*users.PublicUser, error)
 }
 
 // --- Focused Service Interfaces ---
