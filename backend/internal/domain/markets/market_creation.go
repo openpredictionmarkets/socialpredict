@@ -2,10 +2,11 @@ package markets
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
-	users "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 )
 
 type labelPair struct {
@@ -83,10 +84,13 @@ func normalizeLabels(yesLabel string, noLabel string) labelPair {
 }
 
 func (s *Service) ensureCreateMarketBalance(ctx context.Context, creatorUsername string) error {
-	if err := s.walletService.ValidateBalance(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
-		return ErrInsufficientBalance
+	if err := s.walletService.Debit(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed, dwallet.TxFee); err != nil {
+		if errors.Is(err, dwallet.ErrInsufficientBalance) {
+			return ErrInsufficientBalance
+		}
+		return err
 	}
-	return s.walletService.Debit(ctx, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed, users.TransactionFee)
+	return nil
 }
 
 func (s *Service) buildMarketEntity(req MarketCreateRequest, creatorUsername string, labels labelPair) *Market {

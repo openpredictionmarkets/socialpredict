@@ -1,6 +1,12 @@
 package markets
 
-import "context"
+import (
+	"context"
+	"errors"
+
+	dusers "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
+)
 
 // Constants for validation limits.
 const (
@@ -35,11 +41,20 @@ type userWalletAdapter struct {
 var _ WalletService = userWalletAdapter{}
 
 func (a userWalletAdapter) ValidateBalance(ctx context.Context, username string, amount int64, maxDebt int64) error {
-	return a.users.ValidateUserBalance(ctx, username, amount, maxDebt)
+	if err := a.users.ValidateUserBalance(ctx, username, amount, maxDebt); err != nil {
+		if errors.Is(err, dusers.ErrInsufficientBalance) {
+			return dwallet.ErrInsufficientBalance
+		}
+		return err
+	}
+	return nil
 }
 
 func (a userWalletAdapter) Debit(ctx context.Context, username string, amount int64, maxDebt int64, _ string) error {
 	if err := a.users.ValidateUserBalance(ctx, username, amount, maxDebt); err != nil {
+		if errors.Is(err, dusers.ErrInsufficientBalance) {
+			return dwallet.ErrInsufficientBalance
+		}
 		return err
 	}
 	// Legacy users service only supports raw balance deduction for debits.
