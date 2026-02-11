@@ -108,7 +108,7 @@ func (c *Container) InitializeServices() {
 
 	c.marketsService = dmarkets.NewServiceWithWallet(&c.marketsRepo, c.usersService, c.walletService, c.clock, marketsConfig)
 
-	c.betsService = dbets.NewServiceWithWallet(&c.betsRepo, c.marketsService, c.usersService, c.walletService, c.config, c.clock)
+	c.betsService = dbets.NewServiceWithWallet(&c.betsRepo, c.marketsService, c.walletService, c.config, c.clock)
 }
 
 // InitializeHandlers sets up all HTTP handlers with their service dependencies

@@ -5,8 +5,6 @@ import (
 	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
-	dwallet "socialpredict/internal/domain/wallet"
 	"socialpredict/models"
 	"socialpredict/setup"
 )
@@ -23,45 +21,12 @@ type MarketService interface {
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
-// UserService exposes the subset of user operations required by bets.
-type UserService interface {
-	GetUser(ctx context.Context, username string) (*dusers.User, error)
-	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
-}
-
 // WalletService exposes balance checks and mutations needed by the bets domain.
-// This will become the primary integration point as balance logic migrates out of users.
+// This is the single balance mutation dependency for bets.
 type WalletService interface {
 	ValidateBalance(ctx context.Context, username string, amount int64, maxDebt int64) error
 	Debit(ctx context.Context, username string, amount int64, maxDebt int64, txType string) error
 	Credit(ctx context.Context, username string, amount int64, txType string) error
-}
-
-// userWalletAdapter temporarily adapts the legacy users service to the wallet port.
-// It keeps constructor wiring stable while callers migrate to wallet.Service.
-type userWalletAdapter struct {
-	users UserService
-}
-
-var _ WalletService = userWalletAdapter{}
-
-func (a userWalletAdapter) ValidateBalance(ctx context.Context, username string, amount int64, maxDebt int64) error {
-	user, err := a.users.GetUser(ctx, username)
-	if err != nil {
-		return err
-	}
-	if user.AccountBalance-amount < -maxDebt {
-		return dwallet.ErrInsufficientBalance
-	}
-	return nil
-}
-
-func (a userWalletAdapter) Debit(ctx context.Context, username string, amount int64, _ int64, txType string) error {
-	return a.users.ApplyTransaction(ctx, username, amount, txType)
-}
-
-func (a userWalletAdapter) Credit(ctx context.Context, username string, amount int64, txType string) error {
-	return a.users.ApplyTransaction(ctx, username, amount, txType)
 }
 
 // Clock allows time to be mocked in tests.
@@ -83,7 +48,6 @@ type ServiceInterface interface {
 type Service struct {
 	repo    Repository
 	markets MarketService
-	users   UserService
 	wallet  WalletService
 	econ    *setup.EconomicConfig
 	clock   Clock
@@ -95,15 +59,14 @@ type Service struct {
 	saleCalculator saleCalculator
 }
 
-// NewServiceWithWallet constructs a bets service with an explicit wallet dependency.
-func NewServiceWithWallet(repo Repository, markets MarketService, users UserService, wallet WalletService, econ *setup.EconomicConfig, clock Clock) *Service {
+// NewServiceWithWallet constructs a bets service with explicit wallet dependency.
+func NewServiceWithWallet(repo Repository, markets MarketService, wallet WalletService, econ *setup.EconomicConfig, clock Clock) *Service {
 	if clock == nil {
 		clock = serviceClock{}
 	}
 	return &Service{
 		repo:    repo,
 		markets: markets,
-		users:   users,
 		wallet:  wallet,
 		econ:    econ,
 		clock:   clock,
@@ -114,13 +77,4 @@ func NewServiceWithWallet(repo Repository, markets MarketService, users UserServ
 		ledger:         betLedger{repo: repo, wallet: wallet, maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)},
 		saleCalculator: saleCalculator{maxDustPerSale: int64(econ.Economics.Betting.MaxDustPerSale)},
 	}
-}
-
-// NewService constructs a bets service using the legacy users dependency wiring.
-func NewService(repo Repository, markets MarketService, users UserService, econ *setup.EconomicConfig, clock Clock) *Service {
-	var wallet WalletService
-	if users != nil {
-		wallet = userWalletAdapter{users: users}
-	}
-	return NewServiceWithWallet(repo, markets, users, wallet, econ, clock)
 }

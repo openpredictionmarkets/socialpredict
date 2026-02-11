@@ -49,7 +49,7 @@ func TestIntegration_BetPlacement_DeductsBalance(t *testing.T) {
 
 	betRepo := rbets.NewGormRepository(db)
 	econ := modelstesting.GenerateEconomicConfig()
-	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -123,7 +123,7 @@ func TestIntegration_BetPlacement_InsufficientBalance_Fails(t *testing.T) {
 	betRepo := rbets.NewGormRepository(db)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.User.MaximumDebtAllowed = 100 // Match the market config
-	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -191,7 +191,7 @@ func TestIntegration_BetPlacement_AtDebtLimit(t *testing.T) {
 	econ.Economics.User.MaximumDebtAllowed = 100
 	econ.Economics.Betting.BetFees.InitialBetFee = 0
 	econ.Economics.Betting.BetFees.BuySharesFee = 0
-	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -351,7 +351,7 @@ func TestIntegration_MultipleBets_CumulativeBalanceChange(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.Betting.BetFees.InitialBetFee = 0
 	econ.Economics.Betting.BetFees.BuySharesFee = 0
-	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 
@@ -423,7 +423,7 @@ func TestIntegration_BalanceGoesNegative_WithinDebtLimit(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.Betting.BetFees.InitialBetFee = 0
 	econ.Economics.Betting.BetFees.BuySharesFee = 0
-	betService := bets.NewServiceWithWallet(betRepo, marketService, userService, walletService, econ, realClock{})
+	betService := bets.NewServiceWithWallet(betRepo, marketService, walletService, econ, realClock{})
 
 	ctx := context.Background()
 

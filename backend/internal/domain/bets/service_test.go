@@ -116,7 +116,7 @@ func TestServicePlace_Succeeds(t *testing.T) {
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}}
 	wallet := &fakeWallet{}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	placed, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 100, Outcome: "yes"})
 	if err != nil {
@@ -154,7 +154,7 @@ func TestServicePlace_InsufficientBalance(t *testing.T) {
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}}
 	wallet := &fakeWallet{validateErr: dwallet.ErrInsufficientBalance}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 9999, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrInsufficientBalance) {
@@ -173,7 +173,7 @@ func TestServicePlace_InvalidOutcome(t *testing.T) {
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}}
 	wallet := &fakeWallet{}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "MAYBE"})
 	if !errors.Is(err, bets.ErrInvalidOutcome) {
@@ -192,7 +192,7 @@ func TestServicePlace_MarketClosed(t *testing.T) {
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "resolved", ResolutionDateTime: now.Add(-time.Hour)}}
 	wallet := &fakeWallet{}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrMarketClosed) {
@@ -215,7 +215,7 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	}
 	wallet := &fakeWallet{}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	res, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 25, Outcome: "YES"})
 	if err != nil {
@@ -243,7 +243,7 @@ func TestServiceSell_NoPosition(t *testing.T) {
 	}
 	wallet := &fakeWallet{}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrNoPosition) {
@@ -266,7 +266,7 @@ func TestServiceSell_DustCapExceeded(t *testing.T) {
 	}
 	wallet := &fakeWallet{}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 33, Outcome: "YES"})
 	if _, ok := err.(bets.ErrDustCapExceeded); !ok {
@@ -293,7 +293,7 @@ func TestServiceSell_RequestTooSmall(t *testing.T) {
 	}
 	wallet := &fakeWallet{}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{
 		Username: "alice",
@@ -321,7 +321,7 @@ func TestServiceSell_WalletCreditFailure(t *testing.T) {
 	}
 	wallet := &fakeWallet{creditErr: errors.New("wallet unavailable")}
 
-	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 25, Outcome: "YES"})
 	if err == nil {
