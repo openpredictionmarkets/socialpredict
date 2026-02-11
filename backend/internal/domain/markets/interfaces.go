@@ -80,7 +80,9 @@ type ProjectionService interface {
 }
 
 // ServiceInterface combines all market service capabilities.
-// Prefer using focused interfaces (CoreService, SearchService, etc.) for new code.
+//
+// Deprecated: prefer focused interfaces (CoreService, SearchService, etc.) or
+// narrow consumer-specific interfaces at the call site.
 type ServiceInterface interface {
 	CoreService
 	SearchService

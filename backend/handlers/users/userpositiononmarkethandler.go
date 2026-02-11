@@ -14,7 +14,7 @@ import (
 
 // UserMarketPositionHandlerWithService returns an HTTP handler that resolves the authenticated
 // user's position in the specified market via the markets service.
-func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, auth authsvc.Authenticator) http.HandlerFunc {
+func UserMarketPositionHandlerWithService(marketSvc dmarkets.PositionsService, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)

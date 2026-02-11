@@ -8,6 +8,11 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 )
 
+// PublicMarketService is the subset of market functionality required to build public responses.
+type PublicMarketService interface {
+	GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error)
+}
+
 // PublicResponseMarket mirrors the fields exposed by the legacy public market response.
 type PublicResponseMarket struct {
 	ID                      int64     `json:"id"`
@@ -27,7 +32,7 @@ type PublicResponseMarket struct {
 }
 
 // GetPublicResponseMarket fetches a market's public data through the markets service.
-func GetPublicResponseMarket(ctx context.Context, svc dmarkets.ServiceInterface, marketID int64) (*PublicResponseMarket, error) {
+func GetPublicResponseMarket(ctx context.Context, svc PublicMarketService, marketID int64) (*PublicResponseMarket, error) {
 	if svc == nil {
 		return nil, errors.New("market service is nil")
 	}

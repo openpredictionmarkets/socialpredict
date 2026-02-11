@@ -12,8 +12,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// MarketPositionsHandlerWithService creates a service-injected positions handler for all users
-func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
+// MarketPositionsHandlerWithService creates a service-injected positions handler for all users.
+func MarketPositionsHandlerWithService(svc dmarkets.PositionsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
@@ -43,8 +43,8 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 	}
 }
 
-// MarketUserPositionHandlerWithService creates a service-injected handler for a specific user's position
-func MarketUserPositionHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
+// MarketUserPositionHandlerWithService creates a service-injected handler for a specific user's position.
+func MarketUserPositionHandlerWithService(svc dmarkets.PositionsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)

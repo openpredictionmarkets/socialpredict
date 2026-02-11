@@ -13,48 +13,6 @@ type marketServiceStub struct {
 	getPublicMarketFunc func(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error)
 }
 
-func (m marketServiceStub) CreateMarket(context.Context, dmarkets.MarketCreateRequest, string) (*dmarkets.Market, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) SetCustomLabels(context.Context, int64, string, string) error {
-	panic("not implemented")
-}
-func (m marketServiceStub) GetMarket(context.Context, int64) (*dmarkets.Market, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) ListMarkets(context.Context, dmarkets.ListFilters) ([]*dmarkets.Market, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) SearchMarkets(context.Context, string, dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) ResolveMarket(context.Context, int64, string, string) error {
-	panic("not implemented")
-}
-func (m marketServiceStub) ListByStatus(context.Context, string, dmarkets.Page) ([]*dmarkets.Market, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) GetMarketLeaderboard(context.Context, int64, dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) ProjectProbability(context.Context, dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) GetMarketDetails(context.Context, int64) (*dmarkets.MarketOverview, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) GetMarketBets(context.Context, int64) ([]*dmarkets.BetDisplayInfo, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) GetMarketPositions(context.Context, int64) (dmarkets.MarketPositions, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) GetUserPositionInMarket(context.Context, int64, string) (*dmarkets.UserPosition, error) {
-	panic("not implemented")
-}
-func (m marketServiceStub) CalculateMarketVolume(context.Context, int64) (int64, error) {
-	panic("not implemented")
-}
 func (m marketServiceStub) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
 	if m.getPublicMarketFunc == nil {
 		panic("GetPublicMarket called without stub")

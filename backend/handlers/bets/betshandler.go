@@ -1,6 +1,7 @@
 package betshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -12,8 +13,13 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// MarketBetsHandlerWithService creates a service-injected bets handler
-func MarketBetsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
+// MarketBetsService is the subset of market functionality required by this handler.
+type MarketBetsService interface {
+	GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error)
+}
+
+// MarketBetsHandlerWithService creates a service-injected bets handler.
+func MarketBetsHandlerWithService(svc MarketBetsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
