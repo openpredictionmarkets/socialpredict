@@ -78,32 +78,6 @@ func (r *resolveRepo) GetPublicMarket(context.Context, int64) (*markets.PublicMa
 	return nil, nil
 }
 
-type resolveUserService struct {
-	applied []struct {
-		username string
-		amount   int64
-		txType   string
-	}
-}
-
-func (resolveUserService) ValidateUserExists(context.Context, string) error { return nil }
-func (resolveUserService) ValidateUserBalance(context.Context, string, int64, int64) error {
-	return nil
-}
-func (resolveUserService) DeductBalance(context.Context, string, int64) error { return nil }
-func (s *resolveUserService) ApplyTransaction(ctx context.Context, username string, amount int64, tx string) error {
-	s.applied = append(s.applied, struct {
-		username string
-		amount   int64
-		txType   string
-	}{username: username, amount: amount, txType: tx})
-	return nil
-}
-
-func (resolveUserService) GetPublicUser(context.Context, string) (*dusers.PublicUser, error) {
-	return nil, nil
-}
-
 type nopClock struct{}
 
 func (nopClock) Now() time.Time { return time.Now() }
@@ -120,18 +94,18 @@ func TestResolveMarketRefundsOnNA(t *testing.T) {
 			{Username: "bob", Amount: 30},
 		},
 	}
-	userSvc := &resolveUserService{}
-	service := markets.NewService(repo, userSvc, nopClock{}, markets.Config{})
+	wallet := &resolveWallet{}
+	service := markets.NewServiceWithWallet(repo, resolveCreatorProfile{}, wallet, nopClock{}, markets.Config{})
 
 	if err := service.ResolveMarket(context.Background(), 1, "N/A", "creator"); err != nil {
 		t.Fatalf("ResolveMarket returned error: %v", err)
 	}
 
-	if len(userSvc.applied) != 2 {
-		t.Fatalf("expected 2 refund transactions, got %d", len(userSvc.applied))
+	if len(wallet.credited) != 2 {
+		t.Fatalf("expected 2 refund transactions, got %d", len(wallet.credited))
 	}
 
-	for _, call := range userSvc.applied {
+	for _, call := range wallet.credited {
 		if call.txType != dwallet.TxRefund {
 			t.Fatalf("expected refund transaction, got %s", call.txType)
 		}
@@ -150,18 +124,18 @@ func TestResolveMarketPaysWinners(t *testing.T) {
 			{Username: "loser", Value: 0},
 		},
 	}
-	userSvc := &resolveUserService{}
-	service := markets.NewService(repo, userSvc, nopClock{}, markets.Config{})
+	wallet := &resolveWallet{}
+	service := markets.NewServiceWithWallet(repo, resolveCreatorProfile{}, wallet, nopClock{}, markets.Config{})
 
 	if err := service.ResolveMarket(context.Background(), 42, "YES", "creator"); err != nil {
 		t.Fatalf("ResolveMarket returned error: %v", err)
 	}
 
-	if len(userSvc.applied) != 1 {
-		t.Fatalf("expected single payout, got %d", len(userSvc.applied))
+	if len(wallet.credited) != 1 {
+		t.Fatalf("expected single payout, got %d", len(wallet.credited))
 	}
 
-	call := userSvc.applied[0]
+	call := wallet.credited[0]
 	if call.username != "winner" || call.amount != 120 || call.txType != dwallet.TxWin {
 		t.Fatalf("unexpected payout %+v", call)
 	}
@@ -307,11 +281,14 @@ func TestResolveMarketRejectsUnauthorized(t *testing.T) {
 			Status:          "active",
 		},
 	}
-	userSvc := &resolveUserService{}
-	service := markets.NewService(repo, userSvc, nopClock{}, markets.Config{})
+	wallet := &resolveWallet{}
+	service := markets.NewServiceWithWallet(repo, resolveCreatorProfile{}, wallet, nopClock{}, markets.Config{})
 
 	err := service.ResolveMarket(context.Background(), 5, "YES", "intruder")
 	if err != markets.ErrUnauthorized {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+	if wallet.calls != 0 {
+		t.Fatalf("expected no wallet calls on unauthorized resolve, got %d", wallet.calls)
 	}
 }

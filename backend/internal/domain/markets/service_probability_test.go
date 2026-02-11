@@ -74,7 +74,7 @@ func TestProjectProbability_ComputesProjection(t *testing.T) {
 		},
 	}
 
-	svc := markets.NewService(repo, nil, projectionClock{now: createdAt.Add(20 * time.Minute)}, markets.Config{})
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, projectionClock{now: createdAt.Add(20 * time.Minute)}, markets.Config{})
 
 	projection, err := svc.ProjectProbability(context.Background(), markets.ProbabilityProjectionRequest{
 		MarketID: 55,
@@ -97,7 +97,7 @@ func TestProjectProbability_ComputesProjection(t *testing.T) {
 
 func TestProjectProbability_InvalidOutcome(t *testing.T) {
 	repo := &projectionRepo{market: &markets.Market{ID: 1, Status: "active", CreatedAt: time.Now(), ResolutionDateTime: time.Now().Add(time.Hour)}}
-	svc := markets.NewService(repo, nil, projectionClock{now: time.Now()}, markets.Config{})
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, projectionClock{now: time.Now()}, markets.Config{})
 
 	if _, err := svc.ProjectProbability(context.Background(), markets.ProbabilityProjectionRequest{MarketID: 1, Amount: 10, Outcome: "MAYBE"}); err != markets.ErrInvalidInput {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)

@@ -7,7 +7,6 @@ import (
 
 	markets "socialpredict/internal/domain/markets"
 	"socialpredict/internal/domain/math/probabilities/wpam"
-	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
 )
 
@@ -65,18 +64,6 @@ func (r *betsRepo) GetPublicMarket(context.Context, int64) (*markets.PublicMarke
 	panic("unexpected call")
 }
 
-type nopUserService struct{}
-
-func (nopUserService) ValidateUserExists(context.Context, string) error { return nil }
-func (nopUserService) ValidateUserBalance(context.Context, string, int64, int64) error {
-	return nil
-}
-func (nopUserService) DeductBalance(context.Context, string, int64) error            { return nil }
-func (nopUserService) ApplyTransaction(context.Context, string, int64, string) error { return nil }
-func (nopUserService) GetPublicUser(context.Context, string) (*dusers.PublicUser, error) {
-	return nil, nil
-}
-
 type betsClock struct{ now time.Time }
 
 func (c betsClock) Now() time.Time { return c.now }
@@ -97,7 +84,7 @@ func TestGetMarketBets_ReturnsProbabilities(t *testing.T) {
 		bets: bets,
 	}
 
-	service := markets.NewService(repo, nopUserService{}, betsClock{now: createdAt}, markets.Config{})
+	service := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, betsClock{now: createdAt}, markets.Config{})
 
 	results, err := service.GetMarketBets(context.Background(), 42)
 	if err != nil {
@@ -154,7 +141,7 @@ func TestGetMarketBets_EmptyWhenNoBets(t *testing.T) {
 		bets: nil,
 	}
 
-	service := markets.NewService(repo, nopUserService{}, betsClock{now: createdAt}, markets.Config{})
+	service := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, betsClock{now: createdAt}, markets.Config{})
 
 	results, err := service.GetMarketBets(context.Background(), 7)
 	if err != nil {
@@ -167,7 +154,7 @@ func TestGetMarketBets_EmptyWhenNoBets(t *testing.T) {
 
 func TestGetMarketBets_ValidatesInputAndMarket(t *testing.T) {
 	repo := &betsRepo{}
-	service := markets.NewService(repo, nopUserService{}, betsClock{now: time.Now()}, markets.Config{})
+	service := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, betsClock{now: time.Now()}, markets.Config{})
 
 	if _, err := service.GetMarketBets(context.Background(), 0); err != markets.ErrInvalidInput {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)
@@ -206,7 +193,7 @@ func TestGetMarketPositions_ReturnsRepositoryData(t *testing.T) {
 			},
 		},
 	}
-	svc := markets.NewService(repo, nopUserService{}, betsClock{now: time.Now()}, markets.Config{})
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, betsClock{now: time.Now()}, markets.Config{})
 
 	out, err := svc.GetMarketPositions(context.Background(), 101)
 	if err != nil {
@@ -225,7 +212,7 @@ func TestGetMarketPositions_ReturnsRepositoryData(t *testing.T) {
 
 func TestGetMarketPositions_ValidatesInputAndMarket(t *testing.T) {
 	repo := &betsRepo{}
-	svc := markets.NewService(repo, nopUserService{}, betsClock{now: time.Now()}, markets.Config{})
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, betsClock{now: time.Now()}, markets.Config{})
 
 	if _, err := svc.GetMarketPositions(context.Background(), 0); err != markets.ErrInvalidInput {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)

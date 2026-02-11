@@ -42,15 +42,6 @@ type WalletService interface {
 	Credit(ctx context.Context, username string, amount int64, txType string) error
 }
 
-// UserService is a temporary compatibility interface for legacy constructor wiring.
-// It will be removed once callers inject creator/profile and wallet dependencies directly.
-type UserService interface {
-	CreatorProfileService
-	ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error
-	DeductBalance(ctx context.Context, username string, amount int64) error
-	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
-}
-
 // --- Focused Service Interfaces ---
 
 // CoreService handles core market CRUD operations.

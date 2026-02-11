@@ -7,7 +7,6 @@ import (
 	"time"
 
 	markets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	rmarkets "socialpredict/internal/repository/markets"
 	"socialpredict/models"
@@ -15,28 +14,6 @@ import (
 
 	"gorm.io/gorm"
 )
-
-type noopUserService struct{}
-
-func (noopUserService) ValidateUserExists(ctx context.Context, username string) error {
-	return nil
-}
-
-func (noopUserService) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
-	return nil
-}
-
-func (noopUserService) DeductBalance(ctx context.Context, username string, amount int64) error {
-	return nil
-}
-
-func (noopUserService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
-	return nil
-}
-
-func (noopUserService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
-	return nil, nil
-}
 
 type fixedClock struct {
 	now time.Time
@@ -62,7 +39,7 @@ func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB) {
 	clock := fixedClock{now: time.Now()}
 	cfg := markets.Config{}
 
-	service := markets.NewService(repo, noopUserService{}, clock, cfg)
+	service := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, clock, cfg)
 	return service, db
 }
 
