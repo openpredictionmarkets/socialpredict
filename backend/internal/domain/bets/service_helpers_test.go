@@ -212,6 +212,20 @@ func TestBetLedger_ChargeAndRecord_MapsInsufficientBalance(t *testing.T) {
 	}
 }
 
+func TestBetLedger_CreditSale_ReturnsCreditError(t *testing.T) {
+	wallet := &ledgerWallet{creditErr: errors.New("wallet unavailable")}
+	repo := &ledgerRepo{}
+	ledger := betLedger{repo: repo, wallet: wallet, maxDebtAllowed: 100}
+
+	err := ledger.CreditSale(context.Background(), &models.Bet{Username: "alice"}, 15)
+	if err == nil || err.Error() != "wallet unavailable" {
+		t.Fatalf("expected credit error, got %v", err)
+	}
+	if repo.bet != nil {
+		t.Fatalf("expected no bet persisted when credit fails")
+	}
+}
+
 func TestSaleCalculator_Calculate(t *testing.T) {
 	calc := saleCalculator{maxDustPerSale: 3}
 	pos := &dmarkets.UserPosition{Value: 100}

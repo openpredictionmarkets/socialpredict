@@ -268,3 +268,26 @@ func TestServiceSell_RequestTooSmall(t *testing.T) {
 		t.Fatalf("expected ErrInvalidAmount, got %v", err)
 	}
 }
+
+func TestServiceSell_WalletCreditFailure(t *testing.T) {
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.Betting.MaxDustPerSale = 0
+	now := time.Now()
+
+	repo := &fakeRepo{}
+	markets := &fakeMarkets{
+		market:  &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)},
+		userPos: &dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 10, NoSharesOwned: 0, Value: 100},
+	}
+	users := &fakeUsers{user: &dusers.User{Username: "alice"}, applyErr: errors.New("wallet unavailable")}
+
+	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+
+	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 25, Outcome: "YES"})
+	if err == nil {
+		t.Fatalf("expected error from wallet credit failure")
+	}
+	if repo.created != nil {
+		t.Fatalf("expected no bet persisted when wallet credit fails")
+	}
+}
