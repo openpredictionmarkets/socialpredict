@@ -8,7 +8,7 @@ import (
 
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
-	dusers "socialpredict/internal/domain/users"
+	dwallet "socialpredict/internal/domain/wallet"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
@@ -57,32 +57,50 @@ func (f *fakeMarkets) GetUserPositionInMarket(ctx context.Context, marketID int6
 	return f.userPos, nil
 }
 
-type applyCall struct {
+type walletCall struct {
+	kind        string
 	username    string
 	amount      int64
+	maxDebt     int64
 	transaction string
 }
 
-type fakeUsers struct {
-	user     *dusers.User
-	getErr   error
-	applyErr error
-	calls    []applyCall
+type fakeWallet struct {
+	validateErr error
+	debitErr    error
+	creditErr   error
+	calls       []walletCall
 }
 
-func (f *fakeUsers) GetUser(ctx context.Context, username string) (*dusers.User, error) {
-	if f.getErr != nil {
-		return nil, f.getErr
-	}
-	return f.user, nil
+func (f *fakeWallet) ValidateBalance(ctx context.Context, username string, amount int64, maxDebt int64) error {
+	f.calls = append(f.calls, walletCall{
+		kind:     "validate",
+		username: username,
+		amount:   amount,
+		maxDebt:  maxDebt,
+	})
+	return f.validateErr
 }
 
-func (f *fakeUsers) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
-	if f.applyErr != nil {
-		return f.applyErr
-	}
-	f.calls = append(f.calls, applyCall{username: username, amount: amount, transaction: transactionType})
-	return nil
+func (f *fakeWallet) Debit(ctx context.Context, username string, amount int64, maxDebt int64, txType string) error {
+	f.calls = append(f.calls, walletCall{
+		kind:        "debit",
+		username:    username,
+		amount:      amount,
+		maxDebt:     maxDebt,
+		transaction: txType,
+	})
+	return f.debitErr
+}
+
+func (f *fakeWallet) Credit(ctx context.Context, username string, amount int64, txType string) error {
+	f.calls = append(f.calls, walletCall{
+		kind:        "credit",
+		username:    username,
+		amount:      amount,
+		transaction: txType,
+	})
+	return f.creditErr
 }
 
 type fixedClock struct{ now time.Time }
@@ -92,12 +110,13 @@ func (c fixedClock) Now() time.Time { return c.now }
 func TestServicePlace_Succeeds(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
 	now := time.Now()
+	expectedMaxDebt := int64(econ.Economics.User.MaximumDebtAllowed)
 
 	repo := &fakeRepo{}
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}}
-	users := &fakeUsers{user: &dusers.User{Username: "alice", AccountBalance: 500}}
+	wallet := &fakeWallet{}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	placed, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 100, Outcome: "yes"})
 	if err != nil {
@@ -115,12 +134,15 @@ func TestServicePlace_Succeeds(t *testing.T) {
 		t.Fatalf("expected outcome YES, got %s", repo.created.Outcome)
 	}
 
-	if len(users.calls) != 1 {
-		t.Fatalf("expected one ApplyTransaction call, got %d", len(users.calls))
-	}
 	totalCost := int64(100 + econ.Economics.Betting.BetFees.InitialBetFee + econ.Economics.Betting.BetFees.BuySharesFee)
-	if users.calls[0].amount != totalCost {
-		t.Fatalf("unexpected transaction amount: %d", users.calls[0].amount)
+	if len(wallet.calls) != 2 {
+		t.Fatalf("expected validate+debit wallet calls, got %+v", wallet.calls)
+	}
+	if wallet.calls[0].kind != "validate" || wallet.calls[0].amount != totalCost || wallet.calls[0].maxDebt != expectedMaxDebt {
+		t.Fatalf("unexpected validate wallet call: %+v", wallet.calls[0])
+	}
+	if wallet.calls[1].kind != "debit" || wallet.calls[1].amount != totalCost || wallet.calls[1].maxDebt != expectedMaxDebt || wallet.calls[1].transaction != dwallet.TxBuy {
+		t.Fatalf("unexpected debit wallet call: %+v", wallet.calls[1])
 	}
 }
 
@@ -130,13 +152,16 @@ func TestServicePlace_InsufficientBalance(t *testing.T) {
 
 	repo := &fakeRepo{}
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}}
-	users := &fakeUsers{user: &dusers.User{Username: "alice", AccountBalance: 0}}
+	wallet := &fakeWallet{validateErr: dwallet.ErrInsufficientBalance}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 9999, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrInsufficientBalance) {
 		t.Fatalf("expected ErrInsufficientBalance, got %v", err)
+	}
+	if repo.created != nil {
+		t.Fatalf("expected no persisted bet on insufficient balance")
 	}
 }
 
@@ -146,13 +171,16 @@ func TestServicePlace_InvalidOutcome(t *testing.T) {
 
 	repo := &fakeRepo{}
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}}
-	users := &fakeUsers{user: &dusers.User{Username: "alice", AccountBalance: 100}}
+	wallet := &fakeWallet{}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "MAYBE"})
 	if !errors.Is(err, bets.ErrInvalidOutcome) {
 		t.Fatalf("expected ErrInvalidOutcome, got %v", err)
+	}
+	if len(wallet.calls) != 0 {
+		t.Fatalf("expected no wallet calls on invalid input, got %+v", wallet.calls)
 	}
 }
 
@@ -162,13 +190,16 @@ func TestServicePlace_MarketClosed(t *testing.T) {
 
 	repo := &fakeRepo{}
 	markets := &fakeMarkets{market: &dmarkets.Market{ID: 1, Status: "resolved", ResolutionDateTime: now.Add(-time.Hour)}}
-	users := &fakeUsers{user: &dusers.User{Username: "alice", AccountBalance: 100}}
+	wallet := &fakeWallet{}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrMarketClosed) {
 		t.Fatalf("expected ErrMarketClosed, got %v", err)
+	}
+	if len(wallet.calls) != 0 {
+		t.Fatalf("expected no wallet calls when market is closed, got %+v", wallet.calls)
 	}
 }
 
@@ -182,9 +213,9 @@ func TestServiceSell_Succeeds(t *testing.T) {
 		market:  &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)},
 		userPos: &dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 10, NoSharesOwned: 0, Value: 100},
 	}
-	users := &fakeUsers{user: &dusers.User{Username: "alice"}}
+	wallet := &fakeWallet{}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	res, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 25, Outcome: "YES"})
 	if err != nil {
@@ -196,8 +227,8 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	if repo.created == nil || repo.created.Amount != -2 || repo.created.Outcome != "YES" {
 		t.Fatalf("unexpected stored bet: %+v", repo.created)
 	}
-	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionSale || users.calls[0].amount != 20 {
-		t.Fatalf("unexpected user transaction: %+v", users.calls)
+	if len(wallet.calls) != 1 || wallet.calls[0].kind != "credit" || wallet.calls[0].transaction != dwallet.TxSale || wallet.calls[0].amount != 20 {
+		t.Fatalf("unexpected wallet calls: %+v", wallet.calls)
 	}
 }
 
@@ -210,13 +241,16 @@ func TestServiceSell_NoPosition(t *testing.T) {
 		market:  &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)},
 		userPos: &dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 0, NoSharesOwned: 0, Value: 0},
 	}
-	users := &fakeUsers{user: &dusers.User{Username: "alice"}}
+	wallet := &fakeWallet{}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrNoPosition) {
 		t.Fatalf("expected ErrNoPosition, got %v", err)
+	}
+	if len(wallet.calls) != 0 {
+		t.Fatalf("expected no wallet calls when no position exists, got %+v", wallet.calls)
 	}
 }
 
@@ -230,13 +264,16 @@ func TestServiceSell_DustCapExceeded(t *testing.T) {
 		market:  &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)},
 		userPos: &dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 10, Value: 100},
 	}
-	users := &fakeUsers{user: &dusers.User{Username: "alice"}}
+	wallet := &fakeWallet{}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 33, Outcome: "YES"})
 	if _, ok := err.(bets.ErrDustCapExceeded); !ok {
 		t.Fatalf("expected ErrDustCapExceeded, got %v", err)
+	}
+	if len(wallet.calls) != 0 {
+		t.Fatalf("expected no wallet calls on dust cap failure, got %+v", wallet.calls)
 	}
 }
 
@@ -254,9 +291,9 @@ func TestServiceSell_RequestTooSmall(t *testing.T) {
 			Value:          50,
 		},
 	}
-	users := &fakeUsers{user: &dusers.User{Username: "alice"}}
+	wallet := &fakeWallet{}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{
 		Username: "alice",
@@ -266,6 +303,9 @@ func TestServiceSell_RequestTooSmall(t *testing.T) {
 	})
 	if !errors.Is(err, bets.ErrInvalidAmount) {
 		t.Fatalf("expected ErrInvalidAmount, got %v", err)
+	}
+	if len(wallet.calls) != 0 {
+		t.Fatalf("expected no wallet calls for invalid sell request, got %+v", wallet.calls)
 	}
 }
 
@@ -279,9 +319,9 @@ func TestServiceSell_WalletCreditFailure(t *testing.T) {
 		market:  &dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)},
 		userPos: &dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 10, NoSharesOwned: 0, Value: 100},
 	}
-	users := &fakeUsers{user: &dusers.User{Username: "alice"}, applyErr: errors.New("wallet unavailable")}
+	wallet := &fakeWallet{creditErr: errors.New("wallet unavailable")}
 
-	svc := bets.NewService(repo, markets, users, econ, fixedClock{now: now})
+	svc := bets.NewServiceWithWallet(repo, markets, nil, wallet, econ, fixedClock{now: now})
 
 	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 25, Outcome: "YES"})
 	if err == nil {

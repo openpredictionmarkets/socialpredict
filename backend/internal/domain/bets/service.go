@@ -100,9 +100,6 @@ func NewServiceWithWallet(repo Repository, markets MarketService, users UserServ
 	if clock == nil {
 		clock = serviceClock{}
 	}
-	if wallet == nil && users != nil {
-		wallet = userWalletAdapter{users: users}
-	}
 	return &Service{
 		repo:    repo,
 		markets: markets,
@@ -121,5 +118,9 @@ func NewServiceWithWallet(repo Repository, markets MarketService, users UserServ
 
 // NewService constructs a bets service using the legacy users dependency wiring.
 func NewService(repo Repository, markets MarketService, users UserService, econ *setup.EconomicConfig, clock Clock) *Service {
-	return NewServiceWithWallet(repo, markets, users, nil, econ, clock)
+	var wallet WalletService
+	if users != nil {
+		wallet = userWalletAdapter{users: users}
+	}
+	return NewServiceWithWallet(repo, markets, users, wallet, econ, clock)
 }
