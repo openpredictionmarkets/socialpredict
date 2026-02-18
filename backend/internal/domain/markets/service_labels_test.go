@@ -12,6 +12,7 @@ import (
 
 type labelsRepo struct {
 	market       *markets.Market
+	getByIDErr   error
 	updatedID    int64
 	updatedYes   string
 	updatedNo    string
@@ -21,6 +22,9 @@ type labelsRepo struct {
 func (r *labelsRepo) Create(context.Context, *markets.Market) error { panic("unexpected call") }
 
 func (r *labelsRepo) GetByID(_ context.Context, id int64) (*markets.Market, error) {
+	if r.getByIDErr != nil {
+		return nil, r.getByIDErr
+	}
 	if r.market == nil || r.market.ID != id {
 		return nil, markets.ErrMarketNotFound
 	}
@@ -130,5 +134,85 @@ func TestSetCustomLabels_RepoUpdateError(t *testing.T) {
 	err := svc.SetCustomLabels(context.Background(), 1, "Yes", "No")
 	if !errors.Is(err, repoErr) {
 		t.Fatalf("expected repo error, got %v", err)
+	}
+}
+
+func TestSetCustomLabels_LabelExactlyAtMaxLength(t *testing.T) {
+	repo := &labelsRepo{market: &markets.Market{ID: 1}}
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, labelsClock{}, markets.Config{})
+
+	exactLabel := strings.Repeat("x", 20) // MaxLabelLength is 20
+	err := svc.SetCustomLabels(context.Background(), 1, exactLabel, "No")
+	if err != nil {
+		t.Fatalf("expected label at max length to succeed, got %v", err)
+	}
+
+	err = svc.SetCustomLabels(context.Background(), 1, "Yes", exactLabel)
+	if err != nil {
+		t.Fatalf("expected label at max length to succeed, got %v", err)
+	}
+}
+
+func TestSetCustomLabels_WhitespaceTrimmedForLengthCheck(t *testing.T) {
+	repo := &labelsRepo{market: &markets.Market{ID: 1}}
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, labelsClock{}, markets.Config{})
+
+	// " YES " trims to "YES" (3 chars) — should pass validation
+	err := svc.SetCustomLabels(context.Background(), 1, " YES ", " NO ")
+	if err != nil {
+		t.Fatalf("expected padded labels to pass after trimming, got %v", err)
+	}
+	// But the original (untrimmed) string is written to repo
+	if repo.updatedYes != " YES " {
+		t.Fatalf("expected repo to receive original string ' YES ', got %q", repo.updatedYes)
+	}
+	if repo.updatedNo != " NO " {
+		t.Fatalf("expected repo to receive original string ' NO ', got %q", repo.updatedNo)
+	}
+}
+
+func TestSetCustomLabels_WhitespaceOnlyLabel(t *testing.T) {
+	repo := &labelsRepo{market: &markets.Market{ID: 1}}
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, labelsClock{}, markets.Config{})
+
+	// " " is non-empty so validation kicks in, trims to "" which is < MinLabelLength
+	err := svc.SetCustomLabels(context.Background(), 1, " ", "No")
+	if err != markets.ErrInvalidLabel {
+		t.Fatalf("expected ErrInvalidLabel for whitespace-only label, got %v", err)
+	}
+}
+
+func TestSetCustomLabels_OneEmptyOneNonEmpty(t *testing.T) {
+	repo := &labelsRepo{market: &markets.Market{ID: 1}}
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, labelsClock{}, markets.Config{})
+
+	err := svc.SetCustomLabels(context.Background(), 1, "Agree", "")
+	if err != nil {
+		t.Fatalf("expected yes-only label to succeed, got %v", err)
+	}
+	if repo.updatedYes != "Agree" || repo.updatedNo != "" {
+		t.Fatalf("expected (Agree, ''), got (%s, %s)", repo.updatedYes, repo.updatedNo)
+	}
+
+	repo.updatedYes = ""
+	repo.updatedNo = ""
+	err = svc.SetCustomLabels(context.Background(), 1, "", "Disagree")
+	if err != nil {
+		t.Fatalf("expected no-only label to succeed, got %v", err)
+	}
+	if repo.updatedYes != "" || repo.updatedNo != "Disagree" {
+		t.Fatalf("expected ('', Disagree), got (%s, %s)", repo.updatedYes, repo.updatedNo)
+	}
+}
+
+func TestSetCustomLabels_GetByIDNonNotFoundError(t *testing.T) {
+	// Any GetByID error gets mapped to ErrMarketNotFound by the implementation
+	dbErr := errors.New("database connection lost")
+	repo := &labelsRepo{market: &markets.Market{ID: 1}, getByIDErr: dbErr}
+	svc := markets.NewServiceWithWallet(repo, noOpCreatorProfile{}, noOpWallet{}, labelsClock{}, markets.Config{})
+
+	err := svc.SetCustomLabels(context.Background(), 1, "Yes", "No")
+	if err != markets.ErrMarketNotFound {
+		t.Fatalf("expected ErrMarketNotFound for non-not-found GetByID error, got %v", err)
 	}
 }

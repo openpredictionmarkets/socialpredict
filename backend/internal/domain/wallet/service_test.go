@@ -3,6 +3,8 @@ package wallet_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -541,5 +543,261 @@ func TestLedgerEntryTimestamp(t *testing.T) {
 	}
 	if !repo.entries[0].CreatedAt.Equal(now) {
 		t.Fatalf("expected CreatedAt %v, got %v", now, repo.entries[0].CreatedAt)
+	}
+}
+
+// --- Generic GetBalance error propagation ---
+
+func TestCredit_GetBalanceGenericError(t *testing.T) {
+	dbErr := errors.New("connection refused")
+	repo := newFakeRepo()
+	repo.getBalanceErr = dbErr
+	svc := wallet.NewService(repo, fixedClock{})
+
+	err := svc.Credit(context.Background(), "alice", 100, wallet.TxWin)
+	if !errors.Is(err, dbErr) {
+		t.Fatalf("expected generic GetBalance error, got %v", err)
+	}
+}
+
+func TestDebit_GetBalanceGenericError(t *testing.T) {
+	dbErr := errors.New("connection refused")
+	repo := newFakeRepo()
+	repo.getBalanceErr = dbErr
+	svc := wallet.NewService(repo, fixedClock{})
+
+	err := svc.Debit(context.Background(), "alice", 100, 0, wallet.TxBuy)
+	if !errors.Is(err, dbErr) {
+		t.Fatalf("expected generic GetBalance error, got %v", err)
+	}
+}
+
+func TestValidateBalance_GetBalanceGenericError(t *testing.T) {
+	dbErr := errors.New("connection refused")
+	repo := newFakeRepo()
+	repo.getBalanceErr = dbErr
+	svc := wallet.NewService(repo, fixedClock{})
+
+	err := svc.ValidateBalance(context.Background(), "alice", 100, 0)
+	if !errors.Is(err, dbErr) {
+		t.Fatalf("expected generic GetBalance error, got %v", err)
+	}
+}
+
+// --- Balance unchanged on failure ---
+
+func TestCredit_BalanceUnchangedOnInvalidAmount(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 500
+	svc := wallet.NewService(repo, fixedClock{})
+
+	_ = svc.Credit(context.Background(), "alice", 0, wallet.TxWin)
+	if repo.balances["alice"] != 500 {
+		t.Fatalf("expected balance unchanged at 500, got %d", repo.balances["alice"])
+	}
+}
+
+func TestCredit_BalanceUnchangedOnInvalidTxType(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 500
+	svc := wallet.NewService(repo, fixedClock{})
+
+	_ = svc.Credit(context.Background(), "alice", 100, wallet.TxBuy)
+	if repo.balances["alice"] != 500 {
+		t.Fatalf("expected balance unchanged at 500, got %d", repo.balances["alice"])
+	}
+}
+
+func TestCredit_BalanceUnchangedOnRepoUpdateError(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 500
+	repo.updateErr = errors.New("write failed")
+	svc := wallet.NewService(repo, fixedClock{})
+
+	_ = svc.Credit(context.Background(), "alice", 100, wallet.TxWin)
+	// fakeRepo doesn't update balance when updateErr is set
+	if repo.balances["alice"] != 500 {
+		t.Fatalf("expected balance unchanged at 500, got %d", repo.balances["alice"])
+	}
+}
+
+func TestDebit_BalanceUnchangedOnInsufficientBalance(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 100
+	svc := wallet.NewService(repo, fixedClock{})
+
+	_ = svc.Debit(context.Background(), "alice", 200, 0, wallet.TxBuy)
+	if repo.balances["alice"] != 100 {
+		t.Fatalf("expected balance unchanged at 100, got %d", repo.balances["alice"])
+	}
+}
+
+func TestDebit_BalanceUnchangedOnInvalidAmount(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 500
+	svc := wallet.NewService(repo, fixedClock{})
+
+	_ = svc.Debit(context.Background(), "alice", -1, 0, wallet.TxBuy)
+	if repo.balances["alice"] != 500 {
+		t.Fatalf("expected balance unchanged at 500, got %d", repo.balances["alice"])
+	}
+}
+
+func TestDebit_BalanceUnchangedOnRepoUpdateError(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 500
+	repo.updateErr = errors.New("write failed")
+	svc := wallet.NewService(repo, fixedClock{})
+
+	_ = svc.Debit(context.Background(), "alice", 100, 0, wallet.TxBuy)
+	if repo.balances["alice"] != 500 {
+		t.Fatalf("expected balance unchanged at 500, got %d", repo.balances["alice"])
+	}
+}
+
+// --- GetCredit wrapped ErrAccountNotFound ---
+
+func TestGetCredit_WrappedAccountNotFoundDoesNotFallback(t *testing.T) {
+	// Service uses direct equality (==), so a wrapped ErrAccountNotFound
+	// will NOT trigger the maxDebt fallback — it returns (0, error) instead.
+	wrappedErr := fmt.Errorf("repo layer: %w", wallet.ErrAccountNotFound)
+	repo := newFakeRepo()
+	repo.getBalanceErr = wrappedErr
+	svc := wallet.NewService(repo, fixedClock{})
+
+	credit, err := svc.GetCredit(context.Background(), "alice", 500)
+	if err == nil {
+		t.Fatalf("expected error for wrapped ErrAccountNotFound, got nil")
+	}
+	if credit == 500 {
+		t.Fatalf("expected wrapped error NOT to trigger maxDebt fallback, but got %d", credit)
+	}
+	if credit != 0 {
+		t.Fatalf("expected credit 0, got %d", credit)
+	}
+}
+
+// --- Negative maxDebt behavior ---
+
+func TestDebit_NegativeMaxDebt(t *testing.T) {
+	// With negative maxDebt, -maxDebt becomes positive, raising the minimum balance
+	// threshold. newBalance must be >= -maxDebt (which is positive).
+	repo := newFakeRepo()
+	repo.balances["alice"] = 100
+	svc := wallet.NewService(repo, fixedClock{})
+
+	// balance=100, amount=50, newBalance=50, maxDebt=-1, check: 50 < 1 → false → succeeds
+	// Large positive balance still passes even with negative maxDebt
+	err := svc.Debit(context.Background(), "alice", 50, -1, wallet.TxBuy)
+	if err != nil {
+		t.Fatalf("expected success when newBalance exceeds threshold, got %v", err)
+	}
+
+	// But draining to zero fails: newBalance=0, check: 0 < 1 → true → insufficient
+	repo2 := newFakeRepo()
+	repo2.balances["bob"] = 10
+	svc2 := wallet.NewService(repo2, fixedClock{})
+
+	err = svc2.Debit(context.Background(), "bob", 10, -1, wallet.TxBuy)
+	if !errors.Is(err, wallet.ErrInsufficientBalance) {
+		t.Fatalf("expected ErrInsufficientBalance when draining to zero with negative maxDebt, got %v", err)
+	}
+	if repo2.balances["bob"] != 10 {
+		t.Fatalf("expected balance unchanged at 10, got %d", repo2.balances["bob"])
+	}
+}
+
+func TestValidateBalance_NegativeMaxDebt(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 10
+	svc := wallet.NewService(repo, fixedClock{})
+
+	// balance=10, amount=10, check: 0 < 1 → true → insufficient
+	err := svc.ValidateBalance(context.Background(), "alice", 10, -1)
+	if !errors.Is(err, wallet.ErrInsufficientBalance) {
+		t.Fatalf("expected ErrInsufficientBalance, got %v", err)
+	}
+
+	// balance=10, amount=9, check: 1 < 1 → false → passes
+	err = svc.ValidateBalance(context.Background(), "alice", 9, -1)
+	if err != nil {
+		t.Fatalf("expected success when remaining balance exceeds threshold, got %v", err)
+	}
+}
+
+func TestGetCredit_NegativeMaxDebt(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 100
+	svc := wallet.NewService(repo, fixedClock{})
+
+	// credit = balance + maxDebt = 100 + (-50) = 50
+	credit, err := svc.GetCredit(context.Background(), "alice", -50)
+	if err != nil {
+		t.Fatalf("GetCredit returned error: %v", err)
+	}
+	if credit != 50 {
+		t.Fatalf("expected credit 50 (100 + -50), got %d", credit)
+	}
+}
+
+// --- ValidateBalance with zero/negative amount ---
+
+func TestValidateBalance_ZeroAmount(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 100
+	svc := wallet.NewService(repo, fixedClock{})
+
+	// No amount validation in ValidateBalance — balance(100) - 0 = 100, 100 < 0 → false → passes
+	err := svc.ValidateBalance(context.Background(), "alice", 0, 0)
+	if err != nil {
+		t.Fatalf("expected no error for zero amount, got %v", err)
+	}
+}
+
+func TestValidateBalance_NegativeAmount(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = 0
+	svc := wallet.NewService(repo, fixedClock{})
+
+	// No amount validation — balance(0) - (-100) = 100, 100 < 0 → false → passes
+	// This effectively makes the balance appear larger.
+	err := svc.ValidateBalance(context.Background(), "alice", -100, 0)
+	if err != nil {
+		t.Fatalf("expected no error for negative amount (no validation), got %v", err)
+	}
+}
+
+// --- int64 overflow boundary tests ---
+
+func TestCredit_Overflow(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = math.MaxInt64
+	svc := wallet.NewService(repo, fixedClock{})
+
+	// MaxInt64 + 1 overflows to negative — service doesn't guard against this
+	err := svc.Credit(context.Background(), "alice", 1, wallet.TxWin)
+	if err != nil {
+		t.Fatalf("Credit returned error: %v", err)
+	}
+	// Verify overflow actually happened (documents the behavior)
+	if repo.balances["alice"] != math.MinInt64 {
+		t.Fatalf("expected overflow to MinInt64, got %d", repo.balances["alice"])
+	}
+}
+
+func TestDebit_Overflow(t *testing.T) {
+	repo := newFakeRepo()
+	repo.balances["alice"] = math.MinInt64
+	svc := wallet.NewService(repo, fixedClock{})
+
+	// MinInt64 - 1 overflows to MaxInt64 — would pass the < -maxDebt check
+	// because MaxInt64 is not < 0
+	err := svc.Debit(context.Background(), "alice", 1, 0, wallet.TxBuy)
+	if err != nil {
+		t.Fatalf("Debit returned error: %v", err)
+	}
+	// Documents overflow behavior
+	if repo.balances["alice"] != math.MaxInt64 {
+		t.Fatalf("expected overflow to MaxInt64, got %d", repo.balances["alice"])
 	}
 }
