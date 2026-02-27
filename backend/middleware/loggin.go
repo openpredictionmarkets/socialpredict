@@ -7,6 +7,7 @@ import (
 	"socialpredict/models"
 	"socialpredict/security"
 	"socialpredict/util"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -46,6 +47,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
+
+	// Trim whitespace from username before validation
+	req.Username = strings.TrimSpace(req.Username)
 
 	// Validate and sanitize login input
 	if err := securityService.Validator.ValidateStruct(req); err != nil {
