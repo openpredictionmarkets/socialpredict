@@ -12,10 +12,11 @@ const LeaderboardActivity = ({ marketId, market }) => {
         const fetchLeaderboard = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/v0/markets/leaderboard/${marketId}`);
+                const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard`);
                 if (response.ok) {
                     const data = await response.json();
-                    setLeaderboard(data);
+                    const rows = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
+                    setLeaderboard(rows);
                 } else {
                     console.error('Error fetching leaderboard:', response.statusText);
                     setError('Failed to load leaderboard data');

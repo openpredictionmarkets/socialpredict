@@ -41,9 +41,7 @@ const PersonalLinksSelector = ({ onSave, initialLinks }) => {
                     personalLink4: links.personalLink4
                 }),
             });
-            const responseData = await response.json();
             if (response.ok) {
-                console.log('Links updated successfully:', responseData);
                 onSave(links);
                 setSuccessMessage('Links updated successfully.');
                 setTimeout(() => setSuccessMessage(''), 3000);
