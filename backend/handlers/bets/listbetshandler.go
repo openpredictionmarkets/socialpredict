@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"socialpredict/handlers/marketpublicresponse"
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/handlers/tradingdata"
 	"socialpredict/models"
@@ -28,39 +29,29 @@ func MarketBetsDisplayHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	marketIdStr := vars["marketId"]
 
-	// Convert marketId to uint
 	parsedUint64, err := strconv.ParseUint(marketIdStr, 10, 32)
 	if err != nil {
-		// handle error
+		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		return
 	}
-
-	// Convert uint64 to uint safely.
 	marketIDUint := uint(parsedUint64)
 
-	// Database connection
 	db := util.GetDB()
 
-	// Fetch bets for the market
-	bets := tradingdata.GetBetsForMarket(db, marketIDUint)
-
-	// feed in the time created
-	// note we are not using GetPublicResponseMarketByID because of circular import
-	var market models.Market
-	result := db.Where("ID = ?", marketIdStr).First(&market)
-	if result.Error != nil {
-		// Handle error, for example:
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			// Market not found
+	market, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketIdStr)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Market not found", http.StatusNotFound)
 		} else {
-			// Other error fetching market
+			http.Error(w, "Error fetching market", http.StatusInternalServerError)
 		}
-		return // Make sure to return or appropriately handle the error
+		return
 	}
 
-	// Process bets and calculate market probability at the time of each bet
+	bets := tradingdata.GetBetsForMarket(db, marketIDUint)
+
 	betsDisplayInfo := processBetsForDisplay(market.CreatedAt, bets, db)
 
-	// Respond with the bets display information
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(betsDisplayInfo)
 }
