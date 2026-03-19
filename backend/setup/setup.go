@@ -22,6 +22,7 @@ type MarketCreation struct {
 type MarketIncentives struct {
 	CreateMarketCost int64 `yaml:"createMarketCost"`
 	TraderBonus      int64 `yaml:"traderBonus"`
+	PollVoteReward   int64 `yaml:"pollVoteReward"`
 }
 
 type User struct {

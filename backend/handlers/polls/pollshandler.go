@@ -2,6 +2,7 @@ package pollshandlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"socialpredict/middleware"
 	"socialpredict/models"
+	"socialpredict/setup"
 	"socialpredict/util"
 
 	"github.com/gorilla/mux"
@@ -153,64 +155,77 @@ func CreatePollHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(loadPollResponse(poll, user.Username))
 }
 
-// VotePollHandler POST /v0/polls/{pollId}/vote — auth required, one vote per user.
-func VotePollHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.ParseUint(vars["pollId"], 10, 64)
-	if err != nil {
-		http.Error(w, "invalid poll id", http.StatusBadRequest)
-		return
-	}
+// VotePollHandler returns a handler for POST /v0/polls/{pollId}/vote — auth required, one vote per user.
+// Awards the voter a small credit reward configured via loadEconConfig.
+func VotePollHandler(loadEconConfig setup.EconConfigLoader) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		id, err := strconv.ParseUint(vars["pollId"], 10, 64)
+		if err != nil {
+			http.Error(w, "invalid poll id", http.StatusBadRequest)
+			return
+		}
 
-	db := util.GetDB()
-	user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
-	if httperr != nil {
-		http.Error(w, httperr.Error(), httperr.StatusCode)
-		return
-	}
+		db := util.GetDB()
+		user, httperr := middleware.ValidateUserAndEnforcePasswordChangeGetUser(r, db)
+		if httperr != nil {
+			http.Error(w, httperr.Error(), httperr.StatusCode)
+			return
+		}
 
-	var poll models.Poll
-	if err := db.First(&poll, uint(id)).Error; err != nil {
-		http.Error(w, "poll not found", http.StatusNotFound)
-		return
-	}
-	if poll.IsClosed {
-		http.Error(w, "poll is closed", http.StatusConflict)
-		return
-	}
+		var poll models.Poll
+		if err := db.First(&poll, uint(id)).Error; err != nil {
+			http.Error(w, "poll not found", http.StatusNotFound)
+			return
+		}
+		if poll.IsClosed {
+			http.Error(w, "poll is closed", http.StatusConflict)
+			return
+		}
 
-	// Check for existing vote
-	var existing models.PollVote
-	if err := db.Where("poll_id = ? AND username = ?", poll.ID, user.Username).First(&existing).Error; err == nil {
-		http.Error(w, "already voted on this poll", http.StatusConflict)
-		return
-	}
+		// Check for existing vote
+		var existing models.PollVote
+		if err := db.Where("poll_id = ? AND username = ?", poll.ID, user.Username).First(&existing).Error; err == nil {
+			http.Error(w, "already voted on this poll", http.StatusConflict)
+			return
+		}
 
-	var input struct {
-		Vote string `json:"vote"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	input.Vote = strings.ToUpper(strings.TrimSpace(input.Vote))
-	if input.Vote != "YES" && input.Vote != "NO" {
-		http.Error(w, "vote must be YES or NO", http.StatusBadRequest)
-		return
-	}
+		var input struct {
+			Vote string `json:"vote"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		input.Vote = strings.ToUpper(strings.TrimSpace(input.Vote))
+		if input.Vote != "YES" && input.Vote != "NO" {
+			http.Error(w, "vote must be YES or NO", http.StatusBadRequest)
+			return
+		}
 
-	vote := models.PollVote{
-		PollID:   poll.ID,
-		Username: user.Username,
-		Vote:     input.Vote,
-	}
-	if err := db.Create(&vote).Error; err != nil {
-		http.Error(w, "failed to record vote", http.StatusInternalServerError)
-		return
-	}
+		vote := models.PollVote{
+			PollID:   poll.ID,
+			Username: user.Username,
+			Vote:     input.Vote,
+		}
+		if err := db.Create(&vote).Error; err != nil {
+			http.Error(w, "failed to record vote", http.StatusInternalServerError)
+			return
+		}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(loadPollResponse(poll, user.Username))
+		// Award poll vote reward (non-fatal — vote is already recorded)
+		cfg := loadEconConfig()
+		reward := cfg.Economics.MarketIncentives.PollVoteReward
+		if reward > 0 {
+			user.AccountBalance += reward
+			if err := db.Save(&user).Error; err != nil {
+				log.Printf("poll vote reward failed for %s: %v", user.Username, err)
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(loadPollResponse(poll, user.Username))
+	}
 }
 
 // ClosePollHandler POST /v0/polls/{pollId}/close — creator or admin only.

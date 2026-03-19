@@ -164,7 +164,7 @@ func Start() {
 	router.Handle("/v0/polls", securityMiddleware(http.HandlerFunc(pollshandlers.ListPollsHandler))).Methods("GET")
 	router.Handle("/v0/polls", securityMiddleware(http.HandlerFunc(pollshandlers.CreatePollHandler))).Methods("POST")
 	router.Handle("/v0/polls/{pollId}", securityMiddleware(http.HandlerFunc(pollshandlers.GetPollHandler))).Methods("GET")
-	router.Handle("/v0/polls/{pollId}/vote", securityMiddleware(http.HandlerFunc(pollshandlers.VotePollHandler))).Methods("POST")
+	router.Handle("/v0/polls/{pollId}/vote", securityMiddleware(http.HandlerFunc(pollshandlers.VotePollHandler(setup.EconomicsConfig)))).Methods("POST")
 	router.Handle("/v0/polls/{pollId}/close", securityMiddleware(http.HandlerFunc(pollshandlers.ClosePollHandler))).Methods("POST")
 
 	// notifications

@@ -11,8 +11,15 @@ import (
 
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
+	"socialpredict/setup"
 	"socialpredict/util"
 )
+
+// testVoteHandler uses the test economics config (reward=0 to keep tests simple).
+var testVoteHandler = VotePollHandler(func() *setup.EconomicConfig {
+	cfg, _ := setup.LoadEconomicsConfig()
+	return cfg
+})
 
 func setupPollTest(t *testing.T) string {
 	t.Helper()
@@ -126,7 +133,7 @@ func TestVotePoll_Success(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"pollId": "1"})
 	rec := httptest.NewRecorder()
 
-	VotePollHandler(rec, req)
+	testVoteHandler(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -154,7 +161,7 @@ func TestVotePoll_DoubleVoteForbidden(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"pollId": "1"})
 	rec := httptest.NewRecorder()
 
-	VotePollHandler(rec, req)
+	testVoteHandler(rec, req)
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("expected 409 for double vote, got %d", rec.Code)
@@ -173,7 +180,7 @@ func TestVotePoll_InvalidVoteValue(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"pollId": "1"})
 	rec := httptest.NewRecorder()
 
-	VotePollHandler(rec, req)
+	testVoteHandler(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid vote, got %d", rec.Code)
@@ -192,7 +199,7 @@ func TestVotePoll_ClosedPoll(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"pollId": "1"})
 	rec := httptest.NewRecorder()
 
-	VotePollHandler(rec, req)
+	testVoteHandler(rec, req)
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("expected 409 for closed poll, got %d", rec.Code)
@@ -241,5 +248,44 @@ func TestClosePoll_NotCreatorForbidden(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+}
+
+func TestVotePoll_RewardCredited(t *testing.T) {
+	jwt := setupPollTest(t)
+
+	// Reward handler with explicit 5-credit reward
+	rewardHandler := VotePollHandler(func() *setup.EconomicConfig {
+		return &setup.EconomicConfig{
+			Economics: setup.Economics{
+				MarketIncentives: setup.MarketIncentives{PollVoteReward: 5},
+			},
+		}
+	})
+
+	poll := models.Poll{CreatorUsername: "alice", Question: "Reward?"}
+	util.DB.Create(&poll)
+
+	// Record initial balance
+	var before models.User
+	util.DB.Where("username = ?", "alice").First(&before)
+	initialBalance := before.AccountBalance
+
+	body, _ := json.Marshal(map[string]string{"vote": "YES"})
+	req := httptest.NewRequest("POST", "/v0/polls/1/vote", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+jwt)
+	req = mux.SetURLVars(req, map[string]string{"pollId": "1"})
+	rec := httptest.NewRecorder()
+
+	rewardHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var after models.User
+	util.DB.Where("username = ?", "alice").First(&after)
+	if after.AccountBalance != initialBalance+5 {
+		t.Errorf("expected balance %d, got %d", initialBalance+5, after.AccountBalance)
 	}
 }
