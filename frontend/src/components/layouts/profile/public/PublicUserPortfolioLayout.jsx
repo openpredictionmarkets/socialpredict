@@ -62,6 +62,7 @@ const PublicUserPortfolioLayout = ({ username, userData }) => {
             </div>
             <div className="p-6">
                 <h3 className="text-lg font-medium text-gray-700 mb-2">Portfolio</h3>
+                <div className="overflow-x-auto">
                 <table className="w-full divide-y divide-gray-200 bg-primary-background">
                     <thead className="bg-gray-50">
                         <tr>
@@ -84,6 +85,7 @@ const PublicUserPortfolioLayout = ({ username, userData }) => {
                         ))}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     );
