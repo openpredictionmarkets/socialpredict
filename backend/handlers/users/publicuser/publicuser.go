@@ -2,6 +2,7 @@ package publicuser
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"socialpredict/models"
 	"socialpredict/util"
@@ -17,10 +18,18 @@ func GetPublicUserResponse(w http.ResponseWriter, r *http.Request) {
 
 	db := util.GetDB()
 
-	response := GetPublicUserInfo(db, username)
+	var user models.User
+	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Error fetching user", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(user.PublicUser)
 }
 
 // Function to get the users public info From the Database

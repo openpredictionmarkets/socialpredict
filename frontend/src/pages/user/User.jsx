@@ -9,16 +9,31 @@ import UserFinancialStatementsLayout from '../../components/layouts/profile/publ
 
 const User = () => {
   const [userData, setUserData] = useState(null);
+  const [notFound, setNotFound] = useState(false);
   const { username } = useParams();
   const { isLoggedIn, username: loggedInUsername } = useAuth();
   const history = useHistory();
 
   useEffect(() => {
     fetch(`${API_URL}/v0/userinfo/${username}`)
-      .then((response) => response.json())
-      .then((data) => setUserData(data))
+      .then((response) => {
+        if (response.status === 404) {
+          setNotFound(true);
+          return null;
+        }
+        return response.json();
+      })
+      .then((data) => { if (data) setUserData(data); })
       .catch((error) => console.error('Error fetching user data:', error));
   }, [username]);
+
+  if (notFound) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-primary-background">
+        <div className="text-white text-lg">User not found.</div>
+      </div>
+    );
+  }
 
   if (!userData) {
     return (
