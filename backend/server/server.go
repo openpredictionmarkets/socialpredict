@@ -9,6 +9,7 @@ import (
 	betshandlers "socialpredict/handlers/bets"
 	buybetshandlers "socialpredict/handlers/bets/buying"
 	sellbetshandlers "socialpredict/handlers/bets/selling"
+	pollshandlers "socialpredict/handlers/polls"
 	"socialpredict/handlers/cms/homepage"
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
 	marketshandlers "socialpredict/handlers/markets"
@@ -157,6 +158,21 @@ func Start() {
 	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
 	router.Handle("/v0/create", securityMiddleware(http.HandlerFunc(marketshandlers.CreateMarketHandler(setup.EconomicsConfig)))).Methods("POST")
 
+<<<<<<< HEAD
+=======
+	// polls
+	router.Handle("/v0/polls", securityMiddleware(http.HandlerFunc(pollshandlers.ListPollsHandler))).Methods("GET")
+	router.Handle("/v0/polls", securityMiddleware(http.HandlerFunc(pollshandlers.CreatePollHandler))).Methods("POST")
+	router.Handle("/v0/polls/{pollId}", securityMiddleware(http.HandlerFunc(pollshandlers.GetPollHandler))).Methods("GET")
+	router.Handle("/v0/polls/{pollId}/vote", securityMiddleware(http.HandlerFunc(pollshandlers.VotePollHandler))).Methods("POST")
+	router.Handle("/v0/polls/{pollId}/close", securityMiddleware(http.HandlerFunc(pollshandlers.ClosePollHandler))).Methods("POST")
+
+	// notifications
+	router.Handle("/v0/notifications", securityMiddleware(http.HandlerFunc(notificationshandlers.ListNotificationsHandler))).Methods("GET")
+	router.Handle("/v0/notifications/unread", securityMiddleware(http.HandlerFunc(notificationshandlers.UnreadCountHandler))).Methods("GET")
+	router.Handle("/v0/notifications/read-all", securityMiddleware(http.HandlerFunc(notificationshandlers.MarkAllReadHandler))).Methods("PATCH")
+
+>>>>>>> 8ffffa9 (feat: polls — create, vote, close, list (Closes #19))
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")
 
