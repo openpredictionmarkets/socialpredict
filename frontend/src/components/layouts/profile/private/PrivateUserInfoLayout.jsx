@@ -13,10 +13,10 @@ const PrivateUserInfoLayout = ({ userData }) => {
     const [personalDisplayName, setPersonalDisplayName] = useState(userData ? userData.displayname : '');
     const [personalDescription, setPersonalDescription] = useState(userData ? userData.description : '');
     const [personalLinks, setPersonalLinks] = useState({
-        personallink1: userData?.personalLink1 || '',
-        personallink2: userData?.personalLink2 || '',
-        personallink3: userData?.personalLink3 || '',
-        personallink4: userData?.personalLink4 || ''
+        personalLink1: userData?.personalink1 || '',
+        personalLink2: userData?.personalink2 || '',
+        personalLink3: userData?.personalink3 || '',
+        personalLink4: userData?.personalink4 || ''
     });
 
     const handleEditClick = (type) => {
