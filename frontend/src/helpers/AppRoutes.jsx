@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Route, Switch, Redirect } from 'react-router-dom';
 import { useAuth } from './AuthContent';
+import { usePlatformConfig } from '../hooks/usePlatformConfig';
 import ChangePassword from '../pages/changepassword/ChangePassword';
 import Profile from '../pages/profile/Profile';
 import Markets from '../pages/markets/Markets';
@@ -18,54 +19,70 @@ import NotFound from '../pages/notfound/NotFound';
 
 const AppRoutes = () => {
   const auth = useAuth();
+  const { platformPrivate } = usePlatformConfig();
 
   const isLoggedIn = !!auth.username;
   const isRegularUser = isLoggedIn && auth.usertype !== 'ADMIN';
   const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
+
+  // When the platform is private, unauthenticated users see only Home (login page).
+  const blockPublic = platformPrivate && !isLoggedIn;
 
   return (
     <Switch>
       {/* Stylepage */}
       <Route exact path='/style' component={Style} />
 
-      {/* Public Routes */}
+      {/* Public Routes — gated when platform is private */}
       <Route exact path='/about'>
-        {isLoggedIn && mustChangePassword ? (
+        {blockPublic ? (
+          <Redirect to='/' />
+        ) : isLoggedIn && mustChangePassword ? (
           <Redirect to='/changepassword' />
         ) : (
           <About />
         )}
       </Route>
       <Route exact path='/markets/:marketId'>
-        {isLoggedIn && mustChangePassword ? (
+        {blockPublic ? (
+          <Redirect to='/' />
+        ) : isLoggedIn && mustChangePassword ? (
           <Redirect to='/changepassword' />
         ) : (
           <MarketDetails />
         )}
       </Route>
       <Route exact path='/markets'>
-        {isLoggedIn && mustChangePassword ? (
+        {blockPublic ? (
+          <Redirect to='/' />
+        ) : isLoggedIn && mustChangePassword ? (
           <Redirect to='/changepassword' />
         ) : (
           <Markets />
         )}
       </Route>
       <Route exact path='/polls'>
-        {isLoggedIn && mustChangePassword ? (
+        {blockPublic ? (
+          <Redirect to='/' />
+        ) : isLoggedIn && mustChangePassword ? (
           <Redirect to='/changepassword' />
         ) : (
           <Polls />
         )}
       </Route>
       <Route exact path='/user/:username'>
-        {isLoggedIn && mustChangePassword ? (
+        {blockPublic ? (
+          <Redirect to='/' />
+        ) : isLoggedIn && mustChangePassword ? (
           <Redirect to='/changepassword' />
         ) : (
           <User />
         )}
       </Route>
       <Route exact path='/stats'>
-        {isLoggedIn && mustChangePassword ? (
+        {blockPublic ? (
+          <Redirect to='/' />
+        ) : isLoggedIn && mustChangePassword ? (
           <Redirect to='/changepassword' />
         ) : (
           <Stats />

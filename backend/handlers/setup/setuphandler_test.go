@@ -25,7 +25,7 @@ func TestGetSetupHandler(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedResponse: `{
 				"MarketCreation":{"InitialMarketProbability":0.5,"InitialMarketSubsidization":10,"InitialMarketYes":0,"InitialMarketNo":0,"MinimumFutureHours":1},
-				"MarketIncentives":{"CreateMarketCost":10,"TraderBonus":1},
+				"MarketIncentives":{"CreateMarketCost":10,"TraderBonus":1,"PollVoteReward":1},
 				"User":{"InitialAccountBalance":0,"MaximumDebtAllowed":500},
 				"Betting":{"MinimumBet":1,"MaxDustPerSale":2,"BetFees":{"InitialBetFee":1,"BuySharesFee":0,"SellSharesFee":0}}}`,
 			IsJSONResponse: true,
@@ -81,6 +81,36 @@ func TestGetSetupHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetFrontendSetupHandler_PlatformPrivate(t *testing.T) {
+	loadCfg := func() (*setup.EconomicConfig, error) { return setup.LoadEconomicsConfig() }
+
+	t.Run("default is not private", func(t *testing.T) {
+		t.Setenv("PLATFORM_PRIVATE", "")
+		req, _ := http.NewRequest("GET", "/v0/setup/frontend", nil)
+		rr := httptest.NewRecorder()
+		GetFrontendSetupHandler(loadCfg)(rr, req)
+
+		var resp map[string]interface{}
+		json.NewDecoder(rr.Body).Decode(&resp)
+		if resp["platformPrivate"] != false {
+			t.Errorf("expected platformPrivate=false, got %v", resp["platformPrivate"])
+		}
+	})
+
+	t.Run("PLATFORM_PRIVATE=true exposes flag", func(t *testing.T) {
+		t.Setenv("PLATFORM_PRIVATE", "true")
+		req, _ := http.NewRequest("GET", "/v0/setup/frontend", nil)
+		rr := httptest.NewRecorder()
+		GetFrontendSetupHandler(loadCfg)(rr, req)
+
+		var resp map[string]interface{}
+		json.NewDecoder(rr.Body).Decode(&resp)
+		if resp["platformPrivate"] != true {
+			t.Errorf("expected platformPrivate=true, got %v", resp["platformPrivate"])
+		}
+	})
 }
 
 // jsonEqual compares two JSON objects for equality
