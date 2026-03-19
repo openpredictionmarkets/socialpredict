@@ -1,6 +1,8 @@
 package seed
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -21,6 +23,16 @@ func getEnv(key string) (string, error) {
 	return value, nil
 }
 
+// generateRandomPassword generates a cryptographically random password of the
+// given byte length, returned as a URL-safe base64 string.
+func generateRandomPassword(byteLen int) (string, error) {
+	b := make([]byte, byteLen)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate random password: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
 func SeedUsers(db *gorm.DB) {
 
 	config, err := setup.LoadEconomicsConfig()
@@ -28,13 +40,18 @@ func SeedUsers(db *gorm.DB) {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	adminPassword, err := getEnv("ADMIN_PASSWORD")
-	if err != nil {
-		log.Fatalf("Error retrieving ADMIN_PASSWORD: %v", err)
-	}
+	adminPassword, _ := getEnv("ADMIN_PASSWORD")
 	if adminPassword == "" {
-		log.Fatalf("ADMIN_PASSWORD is set but empty")
-	} else {
+		generated, err := generateRandomPassword(18)
+		if err != nil {
+			log.Fatalf("Failed to generate admin password: %v", err)
+		}
+		adminPassword = generated
+		log.Printf("ADMIN_PASSWORD not set — generated random admin password: %s", adminPassword)
+		log.Printf("Please log in with username 'admin' and the password above, then change it immediately.")
+	}
+
+	{
 		// Check if the admin user already exists
 		var count int64
 		db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)

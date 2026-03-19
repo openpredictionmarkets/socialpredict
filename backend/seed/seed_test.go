@@ -9,6 +9,59 @@ import (
 	"socialpredict/models/modelstesting"
 )
 
+// Tests for issue #211 — random admin password generation
+
+func TestGenerateRandomPassword_Length(t *testing.T) {
+	pw, err := generateRandomPassword(18)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(pw) == 0 {
+		t.Error("expected non-empty password")
+	}
+}
+
+func TestGenerateRandomPassword_Uniqueness(t *testing.T) {
+	a, err := generateRandomPassword(18)
+	if err != nil {
+		t.Fatalf("unexpected error generating first password: %v", err)
+	}
+	b, err := generateRandomPassword(18)
+	if err != nil {
+		t.Fatalf("unexpected error generating second password: %v", err)
+	}
+	if a == b {
+		t.Error("two sequential random passwords should not be equal")
+	}
+}
+
+func TestSeedUsers_GeneratesPasswordWhenEnvUnset(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+
+	// Ensure ADMIN_PASSWORD is not set
+	original, hadOriginal := os.LookupEnv("ADMIN_PASSWORD")
+	os.Unsetenv("ADMIN_PASSWORD")
+	if hadOriginal {
+		defer os.Setenv("ADMIN_PASSWORD", original)
+	}
+
+	// SeedUsers should not fatal — it should generate a password instead
+	// We can't test log output easily, but we can verify the admin user was created.
+	SeedUsers(db)
+
+	var count int64
+	db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
+	if count != 1 {
+		t.Errorf("expected admin user to be created, got count = %d", count)
+	}
+
+	var adminUser models.User
+	db.Where("username = ?", "admin").First(&adminUser)
+	if !adminUser.MustChangePassword {
+		t.Error("expected MustChangePassword=true for seeded admin")
+	}
+}
+
 func TestSeedHomepage_RendersHTML(t *testing.T) {
 	// Create fake database for testing
 	db := modelstesting.NewFakeDB(t)
