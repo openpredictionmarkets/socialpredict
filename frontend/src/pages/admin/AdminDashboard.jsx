@@ -1,17 +1,22 @@
 import React from 'react';
 import AdminAddUser from '../../components/layouts/admin/AddUser';
 import HomeEditor from './HomeEditor';
+import DataExport from '../../components/layouts/admin/DataExport';
 import SiteTabs from '../../components/tabs/SiteTabs';
 
 function AdminDashboard() {
     const tabsData = [
-        { 
-            label: 'Add User', 
-            content: <AdminAddUser /> 
+        {
+            label: 'Add User',
+            content: <AdminAddUser />
         },
-        { 
-            label: 'Homepage Editor', 
-            content: <HomeEditor /> 
+        {
+            label: 'Homepage Editor',
+            content: <HomeEditor />
+        },
+        {
+            label: 'Data Export',
+            content: <DataExport />
         }
     ];
 

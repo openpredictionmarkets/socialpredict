@@ -159,6 +159,9 @@ func Start() {
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")
+	router.Handle("/v0/admin/export/bets", securityMiddleware(http.HandlerFunc(adminhandlers.ExportBetsCSVHandler))).Methods("GET")
+	router.Handle("/v0/admin/export/markets", securityMiddleware(http.HandlerFunc(adminhandlers.ExportMarketsCSVHandler))).Methods("GET")
+	router.Handle("/v0/admin/export/users", securityMiddleware(http.HandlerFunc(adminhandlers.ExportUsersCSVHandler))).Methods("GET")
 
 	// homepage content routes
 	db := util.GetDB()
