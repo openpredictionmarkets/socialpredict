@@ -333,6 +333,31 @@ func TestValidateAndSanitizeBetInput(t *testing.T) {
 	}
 }
 
+// TestCORPHeaderAllowsCrossOrigin ensures the Cross-Origin-Resource-Policy header
+// is set to "cross-origin" so Firefox + content-blocking extensions (UBlock, UMatrix)
+// do not block API responses fetched from a different origin (e.g. frontend on :3000
+// calling backend on :8080). See GitHub issue #4.
+func TestCORPHeaderAllowsCrossOrigin(t *testing.T) {
+	service := NewSecurityService()
+	middleware := service.SecurityMiddleware()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	wrappedHandler := middleware(testHandler)
+
+	req := httptest.NewRequest("POST", "/v0/login", nil)
+	req.RemoteAddr = "192.168.1.1:12345"
+	rr := httptest.NewRecorder()
+	wrappedHandler.ServeHTTP(rr, req)
+
+	corp := rr.Header().Get("Cross-Origin-Resource-Policy")
+	if corp != "cross-origin" {
+		t.Errorf("Cross-Origin-Resource-Policy = %q, want %q (same-origin blocks cross-origin fetches in Firefox with UBlock/UMatrix)", corp, "cross-origin")
+	}
+}
+
 func TestGetDefaultConfig(t *testing.T) {
 	config := GetDefaultConfig()
 
