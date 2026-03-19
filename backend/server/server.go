@@ -9,6 +9,7 @@ import (
 	betshandlers "socialpredict/handlers/bets"
 	buybetshandlers "socialpredict/handlers/bets/buying"
 	sellbetshandlers "socialpredict/handlers/bets/selling"
+	notificationshandlers "socialpredict/handlers/notifications"
 	"socialpredict/handlers/cms/homepage"
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
 	marketshandlers "socialpredict/handlers/markets"
@@ -156,6 +157,11 @@ func Start() {
 	router.Handle("/v0/userposition/{marketId}", securityMiddleware(http.HandlerFunc(usershandlers.UserMarketPositionHandler))).Methods("GET")
 	router.Handle("/v0/sell", securityMiddleware(http.HandlerFunc(sellbetshandlers.SellPositionHandler(setup.EconomicsConfig)))).Methods("POST")
 	router.Handle("/v0/create", securityMiddleware(http.HandlerFunc(marketshandlers.CreateMarketHandler(setup.EconomicsConfig)))).Methods("POST")
+
+	// notifications
+	router.Handle("/v0/notifications", securityMiddleware(http.HandlerFunc(notificationshandlers.ListNotificationsHandler))).Methods("GET")
+	router.Handle("/v0/notifications/unread", securityMiddleware(http.HandlerFunc(notificationshandlers.UnreadCountHandler))).Methods("GET")
+	router.Handle("/v0/notifications/read-all", securityMiddleware(http.HandlerFunc(notificationshandlers.MarkAllReadHandler))).Methods("PATCH")
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig)))).Methods("POST")

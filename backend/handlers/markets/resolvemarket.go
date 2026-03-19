@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"socialpredict/handlers/math/payout"
+	notificationshandlers "socialpredict/handlers/notifications"
 	"socialpredict/logging"
 	"socialpredict/middleware"
 	"socialpredict/models"
@@ -101,6 +102,11 @@ func ResolveMarketHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Error distributing payouts: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Notify all bettors that this market was resolved (non-fatal if it fails)
+	if err := notificationshandlers.CreateMarketResolutionNotifications(db, &market); err != nil {
+		logging.LogMsg("notifications: failed to create market resolution notifications: " + err.Error())
 	}
 
 	// Send a response back

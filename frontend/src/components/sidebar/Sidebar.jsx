@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent'
 import useUserCredit from '../utils/userFinanceTools/FetchUserCredit';
+import { useUnreadNotifications } from '../../hooks/useUnreadNotifications';
 import LoginModalButton from '../modals/login/LoginModalClick';
 import {
   AboutSVG,
@@ -37,6 +38,7 @@ const Sidebar = () => {
   const { isLoggedIn, usertype, logout, changePasswordNeeded, username } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { userCredit, loading, error } = useUserCredit(username); // Correct destructuring
+  const { unreadCount } = useUnreadNotifications(isLoggedIn);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -149,6 +151,11 @@ const Sidebar = () => {
         </SidebarLink>
         <SidebarLink to='/notifications' icon={NotificationsSVG}>
           Alerts
+          {unreadCount > 0 && (
+            <span className='ml-auto px-1.5 py-0.5 text-xs font-bold bg-blue-600 text-white rounded-full'>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </SidebarLink>
         <SidebarLink to='/create' icon={CreateSVG}>
           Create
