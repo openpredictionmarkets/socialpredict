@@ -1,6 +1,5 @@
-// import API_URL from your config
 import { API_URL } from '../../../config';
-import React, { useState, useEffect } from 'react';
+import { parseApiError } from '../../../utils/apiError';
 
 export const submitBet = (betData, token, onSuccess, onError) => {
 
@@ -35,24 +34,14 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         },
         body: JSON.stringify(betData),
     })
-    .then(response => {
+    .then(async response => {
         if (!response.ok) {
-            // Try to get error message from response body
-            return response.text().then(text => {
-                let errorMessage;
-                try {
-                    const errorData = JSON.parse(text);
-                    errorMessage = errorData.message || errorData.error || text;
-                } catch {
-                    errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
-                }
-                throw new Error(`Bet failed (${response.status}): ${errorMessage}`);
-            });
+            const msg = await parseApiError(response);
+            throw new Error(msg);
         }
         return response.json();
     })
     .then(data => {
-        console.log('Success:', data);
         onSuccess(data);
     })
     .catch(error => {
@@ -107,24 +96,14 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
         },
         body: JSON.stringify(saleData),
     })
-    .then(response => {
+    .then(async response => {
         if (!response.ok) {
-            // Try to get error message from response body
-            return response.text().then(text => {
-                let errorMessage;
-                try {
-                    const errorData = JSON.parse(text);
-                    errorMessage = errorData.message || errorData.error || text;
-                } catch {
-                    errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
-                }
-                throw new Error(`Sale failed (${response.status}): ${errorMessage}`);
-            });
+            const msg = await parseApiError(response);
+            throw new Error(msg);
         }
         return response.json();
     })
     .then(data => {
-        console.log('Success:', data);
         onSuccess(data);
     })
     .catch(error => {

@@ -1,4 +1,5 @@
 import { API_URL } from '../../../config';
+import { parseApiError } from '../../../utils/apiError';
 
 export const submitBet = (betData, token, onSuccess, onError) => {
 
@@ -17,22 +18,19 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         },
         body: JSON.stringify(betData),
     })
-    .then(response => {
+    .then(async response => {
         if (!response.ok) {
-            return response.json().then(err => {
-                // Construct a new error object and throw it
-                throw new Error(`Error placing bet: ${err.error || 'Unknown error'}`);
-            });
+            const msg = await parseApiError(response);
+            throw new Error(msg);
         }
         return response.json();
     })
     .then(data => {
-        console.log('Success:', data);
-        onSuccess(data);  // Handle success outside this utility function
+        onSuccess(data);
     })
     .catch(error => {
         console.error('Error:', error);
-        alert(error.message);  // Use error.message to display the custom error message
-        onError(error);  // Handle error outside this utility function
+        alert(error.message);
+        onError(error);
     });
 };
