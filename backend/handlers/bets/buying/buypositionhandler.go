@@ -64,8 +64,10 @@ func PlaceBetCore(user *models.User, betRequest models.Bet, db *gorm.DB, loadEco
 		return nil, err
 	}
 
-	// Deduct bet amount and fee from user balance
-	totalCost := bet.Amount + sumOfBetFees
+	// Deduct bet amount and fee from user balance, then credit the trader bonus
+	appConfig := loadEconConfig()
+	traderBonus := appConfig.Economics.MarketIncentives.TraderBonus
+	totalCost := bet.Amount + sumOfBetFees - traderBonus
 	user.AccountBalance -= totalCost
 
 	// Save updated user balance
@@ -84,9 +86,11 @@ func PlaceBetCore(user *models.User, betRequest models.Bet, db *gorm.DB, loadEco
 func checkUserBalance(user *models.User, betRequest models.Bet, sumOfBetFees int64, loadEconConfig setup.EconConfigLoader) error {
 	appConfig := loadEconConfig()
 	maximumDebtAllowed := appConfig.Economics.User.MaximumDebtAllowed
+	traderBonus := appConfig.Economics.MarketIncentives.TraderBonus
 
-	// Check if the user's balance after the bet would be lower than the allowed maximum debt
-	if user.AccountBalance-betRequest.Amount-sumOfBetFees < -maximumDebtAllowed {
+	// Check if the user's balance after the bet (net of the trader bonus) would be
+	// lower than the allowed maximum debt.
+	if user.AccountBalance-betRequest.Amount-sumOfBetFees+traderBonus < -maximumDebtAllowed {
 		return fmt.Errorf("Insufficient balance")
 	}
 	return nil

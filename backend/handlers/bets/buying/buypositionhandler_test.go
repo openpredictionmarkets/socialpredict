@@ -102,6 +102,41 @@ func TestCheckUserBalance_CustomConfig(t *testing.T) {
 	}
 }
 
+// TestPlaceBetCore_TraderBonusCredited verifies that the trader bonus is credited
+// to the user's balance when a bet is placed (issue #162).
+func TestPlaceBetCore_TraderBonusCredited(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+
+	initialBalance := int64(100)
+	user := modelstesting.GenerateUser("bonususer", initialBalance)
+	market := modelstesting.GenerateMarket(50, "bonususer")
+	db.Create(&user)
+	db.Create(&market)
+
+	betAmount := int64(10)
+	betRequest := models.Bet{
+		MarketID: 50,
+		Amount:   betAmount,
+		Outcome:  "YES",
+	}
+
+	cfg := modelstesting.GenerateEconomicConfig()
+	_, err := PlaceBetCore(&user, betRequest, db, func() *setup.EconomicConfig { return cfg })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var updated models.User
+	db.First(&updated, "username = ?", "bonususer")
+
+	fee := cfg.Economics.Betting.BetFees.InitialBetFee
+	bonus := cfg.Economics.MarketIncentives.TraderBonus
+	want := initialBalance - betAmount - fee + bonus
+	if updated.AccountBalance != want {
+		t.Errorf("balance = %d, want %d (bonus %d should be credited)", updated.AccountBalance, want, bonus)
+	}
+}
+
 func TestPlaceBetCore_BalanceAdjustment(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
@@ -130,7 +165,8 @@ func TestPlaceBetCore_BalanceAdjustment(t *testing.T) {
 	var updatedUser models.User
 	db.First(&updatedUser, "username = ?", "testuser")
 
-	expectedBalance := initialBalance - betRequest.Amount - modelstesting.GenerateEconomicConfig().Economics.Betting.BetFees.InitialBetFee
+	cfg := modelstesting.GenerateEconomicConfig()
+	expectedBalance := initialBalance - betRequest.Amount - cfg.Economics.Betting.BetFees.InitialBetFee + cfg.Economics.MarketIncentives.TraderBonus
 	if updatedUser.AccountBalance != expectedBalance {
 		t.Fatalf("Expected balance %d, got %d", expectedBalance, updatedUser.AccountBalance)
 	}
