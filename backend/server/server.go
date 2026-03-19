@@ -9,6 +9,7 @@ import (
 	betshandlers "socialpredict/handlers/bets"
 	buybetshandlers "socialpredict/handlers/bets/buying"
 	sellbetshandlers "socialpredict/handlers/bets/selling"
+	commentshandlers "socialpredict/handlers/comments"
 	"socialpredict/handlers/cms/homepage"
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
 	marketshandlers "socialpredict/handlers/markets"
@@ -127,6 +128,11 @@ func Start() {
 	router.Handle("/v0/markets/resolved", securityMiddleware(http.HandlerFunc(marketshandlers.ListResolvedMarketsHandler))).Methods("GET")
 	router.Handle("/v0/markets/{marketId}", securityMiddleware(http.HandlerFunc(marketshandlers.MarketDetailsHandler))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(http.HandlerFunc(marketshandlers.ProjectNewProbabilityHandler))).Methods("GET")
+
+	// comments on markets
+	router.Handle("/v0/markets/{marketId}/comments", securityMiddleware(http.HandlerFunc(commentshandlers.ListCommentsHandler))).Methods("GET")
+	router.Handle("/v0/markets/{marketId}/comments", securityMiddleware(http.HandlerFunc(commentshandlers.CreateCommentHandler))).Methods("POST")
+	router.Handle("/v0/markets/{marketId}/comments/{commentId}", securityMiddleware(http.HandlerFunc(commentshandlers.DeleteCommentHandler))).Methods("DELETE")
 
 	// handle market positions, get trades
 	router.Handle("/v0/markets/bets/{marketId}", securityMiddleware(http.HandlerFunc(betshandlers.MarketBetsDisplayHandler))).Methods("GET")

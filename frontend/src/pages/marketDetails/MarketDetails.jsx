@@ -1,5 +1,6 @@
 import React from 'react';
 import MarketDetailsTable from '../../components/marketDetails/MarketDetailsLayout';
+import MarketComments from '../../components/comments/MarketComments';
 import { useMarketDetails } from '../../hooks/useMarketDetails';
 import { useAuth } from '../../helpers/AuthContent';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
@@ -30,6 +31,13 @@ const MarketDetails = () => {
           token={token}
           refetchData={refetchData}
         />
+        <div className='px-4 sm:px-6 pb-6'>
+          <MarketComments
+            marketId={details.market.id}
+            isLoggedIn={isLoggedIn}
+            token={token}
+          />
+        </div>
       </div>
     </div>
   );
