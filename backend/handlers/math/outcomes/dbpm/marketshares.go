@@ -7,6 +7,7 @@ import (
 	"socialpredict/handlers/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/setup"
+	"socialpredict/util"
 )
 
 // holds betting payout information
@@ -55,8 +56,8 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 		yesShares, noShares = singleCreditYesNoAllocator(bets)
 	} else {
 		// Calculate YES and NO pools using floating-point arithmetic
-		yesShares = int64(math.Round(totalSharePool * currentProbability))
-		noShares = int64(math.Round(totalSharePool * (1 - currentProbability)))
+		yesShares = int64(util.BankersRound(totalSharePool * currentProbability))
+		noShares = int64(util.BankersRound(totalSharePool * (1 - currentProbability)))
 	}
 
 	// Return calculated shares
@@ -136,7 +137,7 @@ func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []Co
 			scaledPayout = payout.Payout * noNormalizationFactor
 		}
 
-		scaledPayouts[i] = int64(math.Round(scaledPayout))
+		scaledPayouts[i] = int64(util.BankersRound(scaledPayout))
 	}
 
 	return scaledPayouts

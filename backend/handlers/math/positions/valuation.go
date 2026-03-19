@@ -2,7 +2,7 @@ package positionsmath
 
 import (
 	"fmt"
-	"math"
+	"socialpredict/util"
 
 	"gorm.io/gorm"
 )
@@ -47,7 +47,7 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 		fmt.Printf("user=%s YES=%d NO=%d isResolved=%v result=%s val=%v\n",
 			username, pos.YesSharesOwned, pos.NoSharesOwned, isResolved, resolutionResult, floatVal)
 
-		roundedVal := int64(math.Round(floatVal))
+		roundedVal := int64(util.BankersRound(floatVal))
 
 		result[username] = UserValuationResult{
 			Username:     username,
