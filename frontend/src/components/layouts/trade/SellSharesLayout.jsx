@@ -87,7 +87,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
         };
 
         submitSale(saleData, token, (data) => {
-                alert(`Sale successful! Sale ID: ${data.id}`);
+                alert('Sale successful!');
                 console.log('Sale response:', data);
                 onTransactionSuccess();
             }, (error) => {

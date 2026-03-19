@@ -49,7 +49,7 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
         };
 
         submitBet(betData, token, (data) => {
-            alert(`Bet placed successfully! Bet ID: ${data.id}`);
+            alert('Bet placed successfully!');
             onTransactionSuccess();
         }, (error) => {
             alert(`Error placing bet: ${error.message}`);
