@@ -6,6 +6,7 @@ import SiteTabs from '../../components/tabs/SiteTabs';
 import UserInfoTabContent from '../../components/layouts/profile/public/UserInfoTabContent';
 import PortfolioTabContent from '../../components/layouts/profile/public/PortfolioTabContent';
 import UserFinancialStatementsLayout from '../../components/layouts/profile/public/UserFinancialStatementsLayout';
+import BetHistoryTabContent from '../../components/layouts/profile/public/BetHistoryTabContent';
 
 const User = () => {
   const [userData, setUserData] = useState(null);
@@ -41,6 +42,10 @@ const User = () => {
     {
       label: 'Financials',
       content: <UserFinancialStatementsLayout username={username} />
+    },
+    {
+      label: 'Bet History',
+      content: <BetHistoryTabContent username={username} />
     }
   ];
 
