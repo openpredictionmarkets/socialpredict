@@ -228,3 +228,40 @@ Apply this pattern whenever:
 - Working with numeric values that might exceed 32-bit limits
 
 To find all implementations of this convention, search for "Convention CONV-32BIT-001" in the codebase.
+
+---
+
+## Code Organisation: Handlers, Helpers, Utils, and Hooks
+
+**Issue #67** — This section defines the purpose of each top-level code-organisation category so contributors know where to put new code.
+
+### Backend (`backend/`)
+
+| Directory | Purpose | Examples |
+|-----------|---------|---------|
+| `handlers/` | HTTP request handlers — the first function called when a route is hit. Each sub-package maps to a resource domain (markets, bets, users…). Handlers own request parsing, auth checks, and response encoding. | `MarketDetailsHandler`, `PlaceBetHandler` |
+| `handlers/math/` | Pure computation sub-packages with no HTTP concern. Organised by domain: `probabilities/`, `outcomes/`, `positions/`, `financials/`. All functions are deterministic and easily unit-tested. | `CalculateMarketProbabilitiesWPAM`, `BankersRound` |
+| `middleware/` | Cross-cutting HTTP concerns applied to routes: authentication, JWT validation, login rate enforcement. Not business logic. | `LoginHandler`, `ValidateAdminToken` |
+| `models/` | GORM model structs only. No business logic, no DB queries — just the schema definition and test helpers. | `models.Market`, `models.Bet` |
+| `util/` | Tiny, stateless helper functions that have no better home: DB connection getter, env-var reader, numeric utilities. Keep this shallow — if a function only makes sense inside one domain, put it there instead. | `GetDB`, `BankersRound`, `GetEnvWithFallback` |
+| `security/` | Input sanitisation, validation, rate-limiting infrastructure. These are framework-level concerns, not application logic. | `RateLimitManager`, `Sanitizer` |
+| `setup/` | Application configuration loading (YAML → structs). One source of truth for economics config. | `LoadEconomicsConfig`, `EconConfigLoader` |
+| `migration/` | GORM migration registration. One file per migration, named `YYYYMMDDHHMMSS_description.go`. | `20260319180000_add_polls.go` |
+
+**Rule of thumb for the backend:** If a function handles an HTTP request → `handlers/`. If it transforms data with no HTTP concern → `handlers/math/` (or the relevant domain sub-package). If it is a tiny, widely reused primitive → `util/`. If it owns request-level cross-cutting concerns → `middleware/`.
+
+---
+
+### Frontend (`frontend/src/`)
+
+| Directory | Purpose | Examples |
+|-----------|---------|---------|
+| `pages/` | Top-level route components. Each page maps to a URL. Pages own layout and compose smaller components; they do not contain shared logic. | `Markets.jsx`, `MarketDetails.jsx` |
+| `components/` | Reusable UI building blocks. Organised by domain (`tabs/`, `modals/`, `layouts/`). A component should be renderable in isolation with just its props. | `ActivityTabs`, `BetsActivity`, `SiteTabs` |
+| `hooks/` | Custom React hooks — logic that uses React's `useState` / `useEffect` and is reused across more than one component. Hooks start with `use`. | `useMarketDetails`, `usePlatformConfig`, `useDocumentMeta` |
+| `helpers/` | App-level singletons and React context providers. Things that are "infrastructure" for the SPA rather than domain logic: routing, auth context. Should be small and few. | `AppRoutes.jsx`, `AuthContent.jsx` |
+| `utils/` | Pure functions with no React dependency. Formatting, mapping, parsing. Can be called from hooks, components, or tests without a React tree. | `apiError.js`, `labelMapping.js`, `chartFormatter.js` |
+| `api/` | Functions that encapsulate `fetch()` calls to specific backend endpoints. Keeps HTTP details out of components and hooks. | `marketsApi.js` |
+| `config.js` | Single export of runtime configuration (e.g. `API_URL`). Never hard-code URLs elsewhere. | `API_URL` |
+
+**Rule of thumb for the frontend:** If it renders JSX → `components/` (or `pages/` if it is a route). If it calls `useState`/`useEffect` → `hooks/`. If it is a pure function → `utils/`. If it wraps `fetch()` calls → `api/`. If it is app-level infrastructure (routing, auth) → `helpers/`.
