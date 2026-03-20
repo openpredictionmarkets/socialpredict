@@ -265,3 +265,30 @@ To find all implementations of this convention, search for "Convention CONV-32BI
 | `config.js` | Single export of runtime configuration (e.g. `API_URL`). Never hard-code URLs elsewhere. | `API_URL` |
 
 **Rule of thumb for the frontend:** If it renders JSX → `components/` (or `pages/` if it is a route). If it calls `useState`/`useEffect` → `hooks/`. If it is a pure function → `utils/`. If it wraps `fetch()` calls → `api/`. If it is app-level infrastructure (routing, auth) → `helpers/`.
+
+---
+
+## Icons — Use Tabler Icons
+
+**Issue #152** — All icons in the SocialPredict UI come from [Tabler Icons](https://github.com/tabler/tabler-icons), a free, MIT-licensed icon library with a clean, consistent stroke style (2px, rounded caps).
+
+### Convention
+
+- **Inline SVG only** — Tabler icons are copied as inline SVG into `frontend/src/assets/components/SvgIcons.jsx`. We do **not** install `@tabler/icons-react` as an npm dependency.
+- **Why inline?** Keeps the bundle minimal (only the icons we actually use), avoids a large package, and makes it trivial to see which icons are in use.
+- **Adding a new icon:** Go to [tabler.io/icons](https://tabler.io/icons), find the icon, copy the SVG, add a named component to `SvgIcons.jsx`. Follow the existing pattern: `className="icon icon-tabler icons-tabler-outline icon-tabler-<name>"`.
+- **Don't mix icon libraries.** If a new icon is needed, use Tabler. Do not add Heroicons, Feather, Font Awesome, or similar.
+
+### Example
+
+```jsx
+// In frontend/src/assets/components/SvgIcons.jsx
+const MyNewSVG = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+       viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+       className="icon icon-tabler icons-tabler-outline icon-tabler-my-new">
+    {/* paths from tabler.io */}
+  </svg>
+);
+```
