@@ -55,3 +55,5 @@ tmp/
 
 # Apple Silicon Docker Compose Override
 docker-compose.override.yml
+
+.vscode
