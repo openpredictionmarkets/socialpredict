@@ -38,7 +38,7 @@ function App() {
           <div className='App bg-primary-background min-h-screen text-white flex flex-col md:flex-row'>
             <Sidebar />
             <div className='flex flex-col flex-grow'>
-              <main className='flex-grow p-4 sm:p-6 overflow-y-auto'>
+              <main className='flex-grow p-4 sm:p-6 pb-16 md:pb-6 overflow-y-auto'>
                 <AppRoutes />
               </main>
             </div>

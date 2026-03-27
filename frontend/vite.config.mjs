@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(() => {
   return {
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: './src/test/setup.js',
+    },
     server: {
       allowedHosts: [
         'frontend', // we need this to be able to access the app on localhost
