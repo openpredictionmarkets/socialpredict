@@ -173,7 +173,7 @@ function MarketDetailsTable({
       </div>
 
       <div className='mx-auto w-full mb-4'>
-        <ActivityTabs marketId={marketId} market={market} refreshTrigger={refreshTrigger} />
+        <ActivityTabs marketId={marketId} market={market} refreshTrigger={refreshTrigger} isLoggedIn={isLoggedIn} token={token} />
       </div>
 
       {/* Mobile floating CTA */}
