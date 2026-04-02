@@ -11,14 +11,14 @@
     "d3": "^7.8.5",
     "emoji-picker-react": "^4.14.0",
     "jwt-decode": "^4.0.0",
-    "path-to-regexp": ">=8.2.0",
+    "path-to-regexp": ">=8.4.0",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
     "react-error-boundary": "^4.0.13",
     "react-router-dom": "^5.3.0",
     "recharts": "^2.10.3",
-    "rollup": ">=4.22.4",
+    "rollup": ">=4.59.0",
     "vite-plugin-commonjs": "^0.10.3",
     "web-vitals": "^2.1.4"
   },
@@ -57,9 +57,9 @@
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.17",
     "esbuild": "0.25.9",
-    "path-to-regexp": ">=8.2.0",
+    "path-to-regexp": ">=8.4.0",
     "postcss": "^8.4.35",
-    "rollup": ">=4.22.4",
+    "rollup": ">=4.59.0",
     "tailwindcss": "^3.4.1",
     "vite": "^7.1.11"
   }
