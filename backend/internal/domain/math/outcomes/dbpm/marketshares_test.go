@@ -11,15 +11,14 @@ import (
 	"time"
 )
 
-var now = time.Now()
+var marketSharesBaseTime = time.Date(2025, 1, 1, 8, 0, 0, 0, time.UTC)
 
-// helper function to create course payouts succinctly
 func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayout {
 	if len(payouts) != len(outcomes) {
 		panic("payouts and outcomes slices must have the same length")
 	}
 
-	var coursePayouts []CourseBetPayout
+	coursePayouts := make([]CourseBetPayout, 0, len(payouts))
 	for i, payout := range payouts {
 		coursePayouts = append(coursePayouts, CourseBetPayout{
 			Payout:  payout,
@@ -27,6 +26,57 @@ func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayo
 		})
 	}
 	return coursePayouts
+}
+
+func makeDBPMBet(amount int64, outcome, username string, minutes int) models.Bet {
+	return modelstesting.GenerateBet(amount, outcome, username, 1, marketSharesBaseTime.Add(time.Duration(minutes)*time.Minute).Sub(marketSharesBaseTime))
+}
+
+func assertCoursePayoutsEqual(t *testing.T, name string, actual, expected []CourseBetPayout) {
+	t.Helper()
+	if len(actual) != len(expected) {
+		t.Fatalf("%s: expected %d payouts, got %d", name, len(expected), len(actual))
+	}
+	for i, payout := range actual {
+		want := expected[i]
+		if payout.Payout != want.Payout || payout.Outcome != want.Outcome {
+			t.Fatalf(
+				"%s: payout %d mismatch. expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
+				name, i, want.Payout, want.Outcome, payout.Payout, payout.Outcome,
+			)
+		}
+	}
+}
+
+func assertInt64SliceEqual(t *testing.T, name string, actual, expected []int64) {
+	t.Helper()
+	if len(actual) != len(expected) {
+		t.Fatalf("%s: expected %d values, got %d", name, len(expected), len(actual))
+	}
+	for i, got := range actual {
+		if got != expected[i] {
+			t.Fatalf("%s: index %d expected %d, got %d", name, i, expected[i], got)
+		}
+	}
+}
+
+func assertDBPMPositionsEqual(t *testing.T, name string, actual, expected []DBPMMarketPosition) {
+	t.Helper()
+	if actual == nil {
+		actual = []DBPMMarketPosition{}
+	}
+	if expected == nil {
+		expected = []DBPMMarketPosition{}
+	}
+	sort.Slice(expected, func(i, j int) bool {
+		return expected[i].Username < expected[j].Username
+	})
+	sort.Slice(actual, func(i, j int) bool {
+		return actual[i].Username < actual[j].Username
+	})
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("%s: expected %+v, got %+v", name, expected, actual)
+	}
 }
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
@@ -47,7 +97,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
+				makeDBPMBet(20, "NO", "one", 0),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167),
 			yesShares:          3,
@@ -56,8 +106,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375),
 			yesShares:          11,
@@ -66,9 +116,9 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
+				makeDBPMBet(10, "YES", "three", 2),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500),
 			yesShares:          20,
@@ -77,10 +127,10 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
-				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
+				makeDBPMBet(10, "YES", "three", 2),
+				makeDBPMBet(-10, "NO", "one", 3),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			yesShares:          19,
@@ -89,8 +139,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "NOResolution",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.0), // Final resolution R = 0
 			yesShares:          0,
@@ -99,8 +149,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "YESResolution",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 1.0), // Final resolution R = 1
 			yesShares:          30,                                                   // All shares go to YES
@@ -192,30 +242,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateCoursePayoutsDBPM(tc.Bets, tc.ProbabilityChanges)
-
-			// Debug output: Actual payouts
-			if t.Failed() {
-				t.Logf(
-					"[DEBUG] %s: Actual payouts: %+v",
-					tc.Name, actualPayouts,
-				)
-			}
-
-			// Ensure payout counts match
-			if len(actualPayouts) != len(tc.ExpectedPayouts) {
-				t.Fatalf("%s: Expected %d payouts, got %d", tc.Name, len(tc.ExpectedPayouts), len(actualPayouts))
-			}
-
-			// Check each payout
-			for i, payout := range actualPayouts {
-				expected := tc.ExpectedPayouts[i]
-				if payout.Payout != expected.Payout || payout.Outcome != expected.Outcome {
-					t.Errorf(
-						"%s: Payout %d mismatch. Expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
-						tc.Name, i, expected.Payout, expected.Outcome, payout.Payout, payout.Outcome,
-					)
-				}
-			}
+			assertCoursePayoutsEqual(t, tc.Name, actualPayouts, tc.ExpectedPayouts)
 		})
 	}
 
@@ -383,16 +410,7 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.yesNormalizationFactor, tc.noNormalizationFactor)
-
-			// Ensure payouts match exactly
-			for i, payout := range actualPayouts {
-				if payout != tc.ExpectedScaledPayouts[i] {
-					t.Errorf(
-						"at index %d: expected payout %d, got %d",
-						i, tc.ExpectedScaledPayouts[i], payout,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualPayouts, tc.ExpectedScaledPayouts)
 		})
 	}
 
@@ -490,14 +508,7 @@ func TestAdjustForPositiveExcess(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := adjustForPositiveExcess(tc.ScaledPayouts, tc.Excess)
-			for i, result := range actualResult {
-				if result != tc.ExpectedResult[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedResult[i], result,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedResult)
 		})
 	}
 }
@@ -531,14 +542,7 @@ func TestAdjustForNegativeExcess(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := adjustForNegativeExcess(tc.ScaledPayouts, tc.Excess)
-			for i, result := range actualResult {
-				if result != tc.ExpectedResult[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedResult[i], result,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedResult)
 		})
 	}
 
@@ -599,14 +603,7 @@ func TestAdjustPayouts(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := AdjustPayouts(tc.Bets, tc.ScaledPayouts)
-			for i, result := range actualResult {
-				if result != tc.ExpectedAdjustedPayouts[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedAdjustedPayouts[i], result,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedAdjustedPayouts)
 		})
 	}
 }
@@ -680,32 +677,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPositions := AggregateUserPayoutsDBPM(tc.Bets, tc.FinalPayouts)
-
-			// Sort both expected and actual results by Username for comparison
-			sort.Slice(tc.ExpectedPositions, func(i, j int) bool {
-				return tc.ExpectedPositions[i].Username < tc.ExpectedPositions[j].Username
-			})
-			sort.Slice(actualPositions, func(i, j int) bool {
-				return actualPositions[i].Username < actualPositions[j].Username
-			})
-
-			// Ensure lengths match
-			if len(actualPositions) != len(tc.ExpectedPositions) {
-				t.Fatalf("Test %s failed: expected %d positions, got %d", tc.Name, len(tc.ExpectedPositions), len(actualPositions))
-			}
-
-			// Ensure positions match exactly
-			for i, position := range actualPositions {
-				expected := tc.ExpectedPositions[i]
-				if position.Username != expected.Username ||
-					position.NoSharesOwned != expected.NoSharesOwned ||
-					position.YesSharesOwned != expected.YesSharesOwned {
-					t.Errorf(
-						"Test %s failed at index %d: expected %+v, got %+v",
-						tc.Name, i, expected, position,
-					)
-				}
-			}
+			assertDBPMPositionsEqual(t, tc.Name, actualPositions, tc.ExpectedPositions)
 		})
 	}
 }
@@ -729,10 +701,8 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actual := NetAggregateMarketPositions(tc.AggregatedPositions)
-			expected := tc.NetPositions
-
-			if !reflect.DeepEqual(actual, expected) {
-				t.Errorf("Failed %s: expected %+v, got %+v", tc.Name, expected, actual)
+			if !reflect.DeepEqual(actual, tc.NetPositions) {
+				t.Fatalf("failed %s: expected %+v, got %+v", tc.Name, tc.NetPositions, actual)
 			}
 		})
 	}
@@ -747,21 +717,21 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 	}{
 		{
 			name:    "Net YES",
-			bets:    []models.Bet{modelstesting.GenerateBet(1, "YES", "one", 1, 0)},
+			bets:    []models.Bet{makeDBPMBet(1, "YES", "one", 0)},
 			wantYes: 1,
 			wantNo:  0,
 		},
 		{
 			name:    "Net NO",
-			bets:    []models.Bet{modelstesting.GenerateBet(1, "NO", "one", 1, 0)},
+			bets:    []models.Bet{makeDBPMBet(1, "NO", "one", 0)},
 			wantYes: 0,
 			wantNo:  1,
 		},
 		{
 			name: "Net YES after mix",
 			bets: []models.Bet{
-				modelstesting.GenerateBet(2, "YES", "one", 1, 0),
-				modelstesting.GenerateBet(1, "NO", "two", 1, 1),
+				makeDBPMBet(2, "YES", "one", 0),
+				makeDBPMBet(1, "NO", "two", 1),
 			},
 			wantYes: 1,
 			wantNo:  0,
@@ -769,8 +739,8 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		{
 			name: "Net NO after mix",
 			bets: []models.Bet{
-				modelstesting.GenerateBet(1, "YES", "one", 1, 0),
-				modelstesting.GenerateBet(2, "NO", "two", 1, 1),
+				makeDBPMBet(1, "YES", "one", 0),
+				makeDBPMBet(2, "NO", "two", 1),
 			},
 			wantYes: 0,
 			wantNo:  1,
@@ -784,8 +754,8 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		{
 			name: "Ambiguous (net 0)",
 			bets: []models.Bet{
-				modelstesting.GenerateBet(1, "YES", "one", 1, 0),
-				modelstesting.GenerateBet(1, "NO", "two", 1, 1),
+				makeDBPMBet(1, "YES", "one", 0),
+				makeDBPMBet(1, "NO", "two", 1),
 			},
 			wantYes: 0,
 			wantNo:  0,
@@ -796,7 +766,7 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gotYes, gotNo := singleCreditYesNoAllocator(tc.bets)
 			if gotYes != tc.wantYes || gotNo != tc.wantNo {
-				t.Errorf("%s: expected (YES=%d, NO=%d), got (YES=%d, NO=%d)",
+				t.Fatalf("%s: expected (YES=%d, NO=%d), got (YES=%d, NO=%d)",
 					tc.name, tc.wantYes, tc.wantNo, gotYes, gotNo)
 			}
 		})

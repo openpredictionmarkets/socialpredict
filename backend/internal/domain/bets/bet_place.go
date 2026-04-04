@@ -4,7 +4,6 @@ import (
 	"context"
 
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
 )
 
 // Place creates a buy bet after validating market status and user balance.
@@ -32,19 +31,13 @@ func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, erro
 	}
 
 	now := s.clock.Now()
-	bet := &models.Bet{
-		Username: req.Username,
-		MarketID: req.MarketID,
-		Amount:   req.Amount,
-		Outcome:  outcome,
-		PlacedAt: now,
-	}
+	bet := req.NewBet(outcome, now)
 
 	if err := s.ledger.ChargeAndRecord(ctx, bet, fees.totalCost); err != nil {
 		return nil, err
 	}
 
-	return placedBetFromModel(bet), nil
+	return new(PlacedBet).FromModel(bet), nil
 }
 
 func (s *Service) loadUserAndBetStatus(ctx context.Context, req PlaceRequest) (*dusers.User, bool, error) {
@@ -68,14 +61,4 @@ type betFees struct {
 	initialFee     int64
 	transactionFee int64
 	totalCost      int64
-}
-
-func placedBetFromModel(bet *models.Bet) *PlacedBet {
-	return &PlacedBet{
-		Username: bet.Username,
-		MarketID: bet.MarketID,
-		Amount:   bet.Amount,
-		Outcome:  bet.Outcome,
-		PlacedAt: bet.PlacedAt,
-	}
 }

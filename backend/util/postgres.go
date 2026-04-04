@@ -3,12 +3,15 @@ package util
 import (
 	"fmt"
 	"os"
+	"strings"
+	"sync"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
+var dbMu sync.RWMutex
 
 // DBConfig holds the normalized database configuration.
 type DBConfig struct {
@@ -58,6 +61,13 @@ func LoadDBConfigFromEnv() (DBConfig, error) {
 
 // BuildPostgresDSN assembles the postgres DSN from config.
 func BuildPostgresDSN(cfg DBConfig) (string, error) {
+	cfg.Host = strings.TrimSpace(cfg.Host)
+	cfg.User = strings.TrimSpace(cfg.User)
+	cfg.Name = strings.TrimSpace(cfg.Name)
+	cfg.Port = strings.TrimSpace(cfg.Port)
+	cfg.SSLMode = strings.TrimSpace(cfg.SSLMode)
+	cfg.TimeZone = strings.TrimSpace(cfg.TimeZone)
+
 	if cfg.Host == "" || cfg.User == "" || cfg.Name == "" {
 		return "", fmt.Errorf("invalid DB config: host/user/name required")
 	}
@@ -116,20 +126,27 @@ func InitDB(cfg DBConfig, factory DBFactory) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+	if db == nil {
+		return nil, fmt.Errorf("open db: factory returned nil db")
+	}
 
+	dbMu.Lock()
 	DB = db
+	dbMu.Unlock()
 	return db, nil
 }
 
 // GetDB returns the database connection.
 func GetDB() *gorm.DB {
+	dbMu.RLock()
+	defer dbMu.RUnlock()
 	return DB
 }
 
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
-		if v != "" {
-			return v
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			return trimmed
 		}
 	}
 	return ""

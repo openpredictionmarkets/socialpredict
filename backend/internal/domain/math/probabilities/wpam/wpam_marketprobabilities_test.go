@@ -26,7 +26,7 @@ type TestCase struct {
 	NetPositions          []dbpm.DBPMMarketPosition
 }
 
-var now = time.Now() // Capture current time for consistent test data
+var wpamProbabilityBaseTime = time.Date(2025, 1, 1, 14, 0, 0, 0, time.UTC)
 
 var TestCases = []TestCase{
 	{
@@ -78,35 +78,35 @@ var TestCases = []TestCase{
 				Amount:   1,
 				Outcome:  "YES",
 				Username: "user2",
-				PlacedAt: now,
+				PlacedAt: wpamProbabilityBaseTime,
 				MarketID: 1,
 			},
 			{
 				Amount:   -1,
 				Outcome:  "YES",
 				Username: "user2",
-				PlacedAt: now.Add(time.Minute),
+				PlacedAt: wpamProbabilityBaseTime.Add(time.Minute),
 				MarketID: 1,
 			},
 			{
 				Amount:   1,
 				Outcome:  "NO",
 				Username: "user1",
-				PlacedAt: now.Add(2 * time.Minute),
+				PlacedAt: wpamProbabilityBaseTime.Add(2 * time.Minute),
 				MarketID: 1,
 			},
 			{
 				Amount:   -1,
 				Outcome:  "NO",
 				Username: "user1",
-				PlacedAt: now.Add(3 * time.Minute),
+				PlacedAt: wpamProbabilityBaseTime.Add(3 * time.Minute),
 				MarketID: 1,
 			},
 			{
 				Amount:   1,
 				Outcome:  "NO",
 				Username: "user1",
-				PlacedAt: now.Add(4 * time.Minute),
+				PlacedAt: wpamProbabilityBaseTime.Add(4 * time.Minute),
 				MarketID: 1,
 			},
 		},
@@ -144,36 +144,36 @@ var TestCases = []TestCase{
 	},
 }
 
-func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
+func newWPAMTestCalculator() wpam.ProbabilityCalculator {
 	econ := modelstesting.GenerateEconomicConfig()
-	calculator := wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpam.Seeds{
+	return wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpam.Seeds{
 		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
 		InitialSubsidization:   econ.Economics.MarketCreation.InitialMarketSubsidization,
 		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
 		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
 	}})
+}
+
+func assertProbabilityChangesEqual(t *testing.T, actual, expected []wpam.ProbabilityChange) {
+	t.Helper()
+	if len(actual) != len(expected) {
+		t.Fatalf("expected %d probability changes, got %d", len(expected), len(actual))
+	}
+
+	for i, change := range actual {
+		if change.Probability != expected[i].Probability {
+			t.Fatalf("at index %d, expected probability %.17f, got %.17f", i, expected[i].Probability, change.Probability)
+		}
+	}
+}
+
+func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
+	calculator := newWPAMTestCalculator()
 
 	for _, tc := range TestCases {
 		t.Run(tc.Name, func(t *testing.T) {
-
-			// Call the function under test
 			probChanges := calculator.CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
-
-			if len(probChanges) != len(tc.ProbabilityChanges) {
-				t.Fatalf("expected %d probability changes, got %d", len(tc.ProbabilityChanges), len(probChanges))
-			}
-
-			for i, pc := range probChanges {
-				expected := tc.ProbabilityChanges[i]
-
-				// Change fmt.Printf to t.Logf for debug logging
-				t.Logf("at index %d, expected probability %.17f, got %.17f", i, expected.Probability, pc.Probability)
-
-				if pc.Probability != expected.Probability {
-					t.Errorf("at index %d, expected probability %.17f, got %.17f", i, expected.Probability, pc.Probability)
-				}
-			}
-
+			assertProbabilityChangesEqual(t, probChanges, tc.ProbabilityChanges)
 		})
 	}
 }

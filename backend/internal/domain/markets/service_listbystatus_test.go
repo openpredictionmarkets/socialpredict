@@ -2,6 +2,7 @@ package markets_test
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"testing"
 	"time"
@@ -16,34 +17,65 @@ import (
 	"gorm.io/gorm"
 )
 
-type noopUserService struct{}
+var errUnexpectedMarketsTestCall = errors.New("unexpected markets test call")
 
-func (noopUserService) ValidateUserExists(ctx context.Context, username string) error {
-	return nil
+type noopUserService struct {
+	validateUserExistsFunc  func(context.Context, string) error
+	validateUserBalanceFunc func(context.Context, string, int64, int64) error
+	deductBalanceFunc       func(context.Context, string, int64) error
+	applyTransactionFunc    func(context.Context, string, int64, string) error
+	getPublicUserFunc       func(context.Context, string) (*dusers.PublicUser, error)
 }
 
-func (noopUserService) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
-	return nil
+func newNoopUserService(opts ...func(*noopUserService)) noopUserService {
+	service := noopUserService{
+		validateUserExistsFunc:  func(context.Context, string) error { return nil },
+		validateUserBalanceFunc: func(context.Context, string, int64, int64) error { return nil },
+		deductBalanceFunc:       func(context.Context, string, int64) error { return nil },
+		applyTransactionFunc:    func(context.Context, string, int64, string) error { return nil },
+		getPublicUserFunc:       func(context.Context, string) (*dusers.PublicUser, error) { return nil, nil },
+	}
+	for _, opt := range opts {
+		opt(&service)
+	}
+	return service
 }
 
-func (noopUserService) DeductBalance(ctx context.Context, username string, amount int64) error {
-	return nil
+func (s noopUserService) ValidateUserExists(ctx context.Context, username string) error {
+	return s.validateUserExistsFunc(ctx, username)
 }
 
-func (noopUserService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
-	return nil
+func (s noopUserService) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
+	return s.validateUserBalanceFunc(ctx, username, requiredAmount, maxDebt)
 }
 
-func (noopUserService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
-	return nil, nil
+func (s noopUserService) DeductBalance(ctx context.Context, username string, amount int64) error {
+	return s.deductBalanceFunc(ctx, username, amount)
+}
+
+func (s noopUserService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+	return s.applyTransactionFunc(ctx, username, amount, transactionType)
+}
+
+func (s noopUserService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
+	return s.getPublicUserFunc(ctx, username)
 }
 
 type fixedClock struct {
-	now time.Time
+	nowFunc func() time.Time
+}
+
+func newFixedClock(now time.Time) fixedClock {
+	return fixedClock{
+		nowFunc: func() time.Time { return now },
+	}
 }
 
 func (f fixedClock) Now() time.Time {
-	return f.now
+	if f.nowFunc == nil {
+		return time.Time{}
+	}
+	return f.nowFunc()
 }
 
 func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB, wpam.ProbabilityCalculator) {
@@ -59,17 +91,67 @@ func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB, wpam.Probabil
 
 	db := modelstesting.NewFakeDB(t)
 	repo := rmarkets.NewGormRepository(db)
-	clock := fixedClock{now: time.Now()}
+	clock := newFixedClock(time.Now())
 	cfg := markets.Config{}
 
 	service := markets.NewService(
 		repo,
-		noopUserService{},
+		newNoopUserService(),
 		clock,
 		cfg,
 		markets.WithProbabilityEngine(markets.DefaultProbabilityEngine(calculator)),
 	)
 	return service, db, calculator
+}
+
+func buildStatusMarkets(username string, now time.Time) []models.Market {
+	return []models.Market{
+		{
+			ID:                 1,
+			QuestionTitle:      "Active Market",
+			Description:        "Active",
+			OutcomeType:        "BINARY",
+			ResolutionDateTime: now.Add(24 * time.Hour),
+			IsResolved:         false,
+			InitialProbability: 0.5,
+			CreatorUsername:    username,
+		},
+		{
+			ID:                 2,
+			QuestionTitle:      "Closed Market",
+			Description:        "Closed",
+			OutcomeType:        "BINARY",
+			ResolutionDateTime: now.Add(-24 * time.Hour),
+			IsResolved:         false,
+			InitialProbability: 0.5,
+			CreatorUsername:    username,
+		},
+		{
+			ID:                      3,
+			QuestionTitle:           "Resolved Market",
+			Description:             "Resolved",
+			OutcomeType:             "BINARY",
+			ResolutionDateTime:      now.Add(-48 * time.Hour),
+			FinalResolutionDateTime: now.Add(-24 * time.Hour),
+			IsResolved:              true,
+			ResolutionResult:        "YES",
+			InitialProbability:      0.5,
+			CreatorUsername:         username,
+		},
+	}
+}
+
+func assertSortedIDs(t *testing.T, got []int64, want []int64) {
+	t.Helper()
+	sort.Slice(got, func(i, j int) bool { return got[i] < got[j] })
+	if len(got) != len(want) {
+		t.Fatalf("expected %d markets, got %d (ids=%v)", len(want), len(got), got)
+	}
+	for i, id := range got {
+		if id != want[i] {
+			t.Fatalf("expected ids %v, got %v", want, got)
+		}
+	}
 }
 
 func TestServiceListByStatusFiltersMarkets(t *testing.T) {
@@ -82,42 +164,7 @@ func TestServiceListByStatusFiltersMarkets(t *testing.T) {
 		t.Fatalf("create user: %v", err)
 	}
 
-	active := models.Market{
-		ID:                 1,
-		QuestionTitle:      "Active Market",
-		Description:        "Active",
-		OutcomeType:        "BINARY",
-		ResolutionDateTime: now.Add(24 * time.Hour),
-		IsResolved:         false,
-		InitialProbability: 0.5,
-		CreatorUsername:    user.Username,
-	}
-
-	closed := models.Market{
-		ID:                 2,
-		QuestionTitle:      "Closed Market",
-		Description:        "Closed",
-		OutcomeType:        "BINARY",
-		ResolutionDateTime: now.Add(-24 * time.Hour),
-		IsResolved:         false,
-		InitialProbability: 0.5,
-		CreatorUsername:    user.Username,
-	}
-
-	resolved := models.Market{
-		ID:                      3,
-		QuestionTitle:           "Resolved Market",
-		Description:             "Resolved",
-		OutcomeType:             "BINARY",
-		ResolutionDateTime:      now.Add(-48 * time.Hour),
-		FinalResolutionDateTime: now.Add(-24 * time.Hour),
-		IsResolved:              true,
-		ResolutionResult:        "YES",
-		InitialProbability:      0.5,
-		CreatorUsername:         user.Username,
-	}
-
-	for _, market := range []models.Market{active, closed, resolved} {
+	for _, market := range buildStatusMarkets(user.Username, now) {
 		if err := db.Create(&market).Error; err != nil {
 			t.Fatalf("create market %s: %v", market.QuestionTitle, err)
 		}
@@ -161,17 +208,7 @@ func TestServiceListByStatusFiltersMarkets(t *testing.T) {
 			for _, market := range results {
 				ids = append(ids, market.ID)
 			}
-			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-
-			if len(ids) != len(tt.expectedIDs) {
-				t.Fatalf("expected %d markets, got %d (ids=%v)", len(tt.expectedIDs), len(ids), ids)
-			}
-
-			for i, id := range ids {
-				if id != tt.expectedIDs[i] {
-					t.Fatalf("expected ids %v, got %v", tt.expectedIDs, ids)
-				}
-			}
+			assertSortedIDs(t, ids, tt.expectedIDs)
 		})
 	}
 }
@@ -180,11 +217,7 @@ func TestServiceListByStatusInvalidStatus(t *testing.T) {
 	service, _, _ := setupServiceWithDB(t)
 
 	_, err := service.ListByStatus(context.Background(), "unknown", markets.Page{})
-	if err == nil {
-		t.Fatal("expected error for invalid status, got nil")
-	}
-
-	if err != markets.ErrInvalidInput {
+	if !errors.Is(err, markets.ErrInvalidInput) {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)
 	}
 }

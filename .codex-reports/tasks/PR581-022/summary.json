@@ -1,0 +1,16 @@
+{
+  "task_id": "PR581-022",
+  "status": "pending",
+  "updated_at": "2026-04-04T15:11:44.393312+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "",
+  "current_focus": "",
+  "files_changed": [],
+  "checks_run": [],
+  "open_questions": [],
+  "follow_ups": [],
+  "last_event_seq": 1,
+  "context": {
+    "handoff_requested": false
+  }
+}

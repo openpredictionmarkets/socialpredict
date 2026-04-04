@@ -8,7 +8,9 @@ import (
 	"time"
 )
 
-func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
+var positionsMathBaseTime = time.Date(2025, 1, 1, 15, 0, 0, 0, time.UTC)
+
+func newTestPositionCalculator() PositionCalculator {
 	econ := modelstesting.GenerateEconomicConfig()
 	calculator := wpam.NewProbabilityCalculator(wpam.StaticSeedProvider{Value: wpam.Seeds{
 		InitialProbability:     econ.Economics.MarketCreation.InitialMarketProbability,
@@ -16,9 +18,26 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 		InitialYesContribution: econ.Economics.MarketCreation.InitialMarketYes,
 		InitialNoContribution:  econ.Economics.MarketCreation.InitialMarketNo,
 	}})
-	positionCalculator := NewPositionCalculator(
+	return NewPositionCalculator(
 		WithProbabilityProvider(NewWPAMProbabilityProvider(calculator)),
 	)
+}
+
+func buildPositionBets(marketID uint, entries []struct {
+	Amount   int64
+	Outcome  string
+	Username string
+	Offset   time.Duration
+}) []models.Bet {
+	bets := make([]models.Bet, 0, len(entries))
+	for _, entry := range entries {
+		bets = append(bets, modelstesting.GenerateBet(entry.Amount, entry.Outcome, entry.Username, marketID, entry.Offset))
+	}
+	return bets
+}
+
+func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
+	positionCalculator := newTestPositionCalculator()
 
 	testcases := []struct {
 		Name       string
@@ -63,13 +82,9 @@ func TestCalculateMarketPositions_WPAM_DBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			market := modelstesting.GenerateMarket(1, "testcreator")
-			market.CreatedAt = time.Now()
+			market.CreatedAt = positionsMathBaseTime
 
-			var bets []models.Bet
-			for _, betConf := range tc.BetConfigs {
-				bet := modelstesting.GenerateBet(betConf.Amount, betConf.Outcome, betConf.Username, uint(market.ID), betConf.Offset)
-				bets = append(bets, bet)
-			}
+			bets := buildPositionBets(uint(market.ID), tc.BetConfigs)
 
 			snapshot := MarketSnapshot{
 				ID:        market.ID,
@@ -107,26 +122,20 @@ func TestCalculateMarketPositions_IncludesZeroPositionUsers(t *testing.T) {
 	market := modelstesting.GenerateMarket(42, "creator")
 	market.IsResolved = true
 	market.ResolutionResult = "YES"
-	market.CreatedAt = time.Now()
+	market.CreatedAt = positionsMathBaseTime
 
-	bets := []struct {
-		amount   int64
-		outcome  string
-		username string
-		offset   time.Duration
+	betRecords := buildPositionBets(uint(market.ID), []struct {
+		Amount   int64
+		Outcome  string
+		Username string
+		Offset   time.Duration
 	}{
-		{amount: 50, outcome: "NO", username: "patrick", offset: 0},
-		{amount: 51, outcome: "NO", username: "jimmy", offset: time.Second},
-		{amount: 51, outcome: "NO", username: "jimmy", offset: 2 * time.Second},
-		{amount: 10, outcome: "YES", username: "jyron", offset: 3 * time.Second},
-		{amount: 30, outcome: "YES", username: "testuser03", offset: 4 * time.Second},
-	}
-
-	var betRecords []models.Bet
-	for _, b := range bets {
-		bet := modelstesting.GenerateBet(b.amount, b.outcome, b.username, uint(market.ID), b.offset)
-		betRecords = append(betRecords, bet)
-	}
+		{Amount: 50, Outcome: "NO", Username: "patrick", Offset: 0},
+		{Amount: 51, Outcome: "NO", Username: "jimmy", Offset: time.Second},
+		{Amount: 51, Outcome: "NO", Username: "jimmy", Offset: 2 * time.Second},
+		{Amount: 10, Outcome: "YES", Username: "jyron", Offset: 3 * time.Second},
+		{Amount: 30, Outcome: "YES", Username: "testuser03", Offset: 4 * time.Second},
+	})
 
 	snapshot := MarketSnapshot{
 		ID:               market.ID,

@@ -319,6 +319,12 @@ func TestSanitizer_SanitizeEmoji(t *testing.T) {
 			wantErr:  true,
 		},
 		{
+			name:     "plain text is not emoji",
+			input:    "abc",
+			expected: "",
+			wantErr:  true,
+		},
+		{
 			name:     "emoji too long",
 			input:    string(make([]byte, 21)),
 			expected: "",
@@ -376,6 +382,16 @@ func TestSanitizer_SanitizePassword(t *testing.T) {
 		{
 			name:    "password too long",
 			input:   string(make([]byte, 129)),
+			wantErr: true,
+		},
+		{
+			name:    "password with surrounding whitespace",
+			input:   " StrongPass123 ",
+			wantErr: true,
+		},
+		{
+			name:    "password with internal whitespace",
+			input:   "Strong Pass123",
 			wantErr: true,
 		},
 	}
@@ -465,6 +481,16 @@ func TestContainsMaliciousDomain(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "subdomain of shortener",
+			input:    "foo.bit.ly",
+			expected: true,
+		},
+		{
+			name:     "safe suffix collision",
+			input:    "bit.ly.example.com",
+			expected: false,
+		},
+		{
 			name:     "local IP",
 			input:    "127.0.0.1",
 			expected: true,
@@ -525,7 +551,7 @@ func TestIsValidEmoji(t *testing.T) {
 		{
 			name:     "regular text",
 			input:    "abc",
-			expected: true, // ASCII characters are allowed
+			expected: false,
 		},
 	}
 

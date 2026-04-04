@@ -81,11 +81,66 @@ type Service struct {
 // ServiceOption allows customizing analytics strategies.
 type ServiceOption func(*Service)
 
+func defaultDebtCalculator() DebtCalculator {
+	return DefaultDebtCalculator{}
+}
+
+func defaultVolumeCalculator() VolumeCalculator {
+	return DefaultVolumeCalculator{}
+}
+
+func defaultFeeCalculator() FeeCalculator {
+	return DefaultFeeCalculator{}
+}
+
+func defaultMetricsAssembler() MetricsAssembler {
+	return DefaultMetricsAssembler{}
+}
+
+func defaultPositionCalculator() MarketPositionCalculator {
+	return defaultMarketPositionCalculator{}
+}
+
+func debtCalculatorOrDefault(calculator DebtCalculator) DebtCalculator {
+	if calculator == nil {
+		return defaultDebtCalculator()
+	}
+	return calculator
+}
+
+func volumeCalculatorOrDefault(calculator VolumeCalculator) VolumeCalculator {
+	if calculator == nil {
+		return defaultVolumeCalculator()
+	}
+	return calculator
+}
+
+func feeCalculatorOrDefault(calculator FeeCalculator) FeeCalculator {
+	if calculator == nil {
+		return defaultFeeCalculator()
+	}
+	return calculator
+}
+
+func metricsAssemblerOrDefault(assembler MetricsAssembler) MetricsAssembler {
+	if assembler == nil {
+		return defaultMetricsAssembler()
+	}
+	return assembler
+}
+
+func positionCalculatorOrDefaultStrategy(calculator MarketPositionCalculator) MarketPositionCalculator {
+	if calculator == nil {
+		return defaultPositionCalculator()
+	}
+	return calculator
+}
+
 // WithDebtCalculator overrides the default debt calculator.
 func WithDebtCalculator(c DebtCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.debtCalculator = c
+		if s != nil {
+			s.debtCalculator = debtCalculatorOrDefault(c)
 		}
 	}
 }
@@ -93,8 +148,8 @@ func WithDebtCalculator(c DebtCalculator) ServiceOption {
 // WithVolumeCalculator overrides the default volume calculator.
 func WithVolumeCalculator(c VolumeCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.volumeCalculator = c
+		if s != nil {
+			s.volumeCalculator = volumeCalculatorOrDefault(c)
 		}
 	}
 }
@@ -102,8 +157,8 @@ func WithVolumeCalculator(c VolumeCalculator) ServiceOption {
 // WithFeeCalculator overrides the default fee calculator.
 func WithFeeCalculator(c FeeCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.feeCalculator = c
+		if s != nil {
+			s.feeCalculator = feeCalculatorOrDefault(c)
 		}
 	}
 }
@@ -111,8 +166,8 @@ func WithFeeCalculator(c FeeCalculator) ServiceOption {
 // WithMetricsAssembler overrides the default metrics assembler.
 func WithMetricsAssembler(a MetricsAssembler) ServiceOption {
 	return func(s *Service) {
-		if a != nil {
-			s.metricsAssembler = a
+		if s != nil {
+			s.metricsAssembler = metricsAssemblerOrDefault(a)
 		}
 	}
 }
@@ -120,8 +175,8 @@ func WithMetricsAssembler(a MetricsAssembler) ServiceOption {
 // WithPositionCalculator overrides the default position calculator.
 func WithPositionCalculator(c MarketPositionCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.positions = c
+		if s != nil {
+			s.positions = positionCalculatorOrDefaultStrategy(c)
 		}
 	}
 }
@@ -143,27 +198,20 @@ func NewService(repo Repository, econLoader setup.EconConfigLoader, opts ...Serv
 }
 
 func (s *Service) ensureStrategyDefaults() {
-	if s.debtCalculator == nil {
-		s.debtCalculator = DefaultDebtCalculator{}
+	if s == nil {
+		return
 	}
-	if s.volumeCalculator == nil {
-		s.volumeCalculator = DefaultVolumeCalculator{}
-	}
-	if s.feeCalculator == nil {
-		s.feeCalculator = DefaultFeeCalculator{}
-	}
-	if s.metricsAssembler == nil {
-		s.metricsAssembler = DefaultMetricsAssembler{}
-	}
-	if s.positions == nil {
-		s.positions = defaultMarketPositionCalculator{}
-	}
+	s.debtCalculator = debtCalculatorOrDefault(s.debtCalculator)
+	s.volumeCalculator = volumeCalculatorOrDefault(s.volumeCalculator)
+	s.feeCalculator = feeCalculatorOrDefault(s.feeCalculator)
+	s.metricsAssembler = metricsAssemblerOrDefault(s.metricsAssembler)
+	s.positions = positionCalculatorOrDefaultStrategy(s.positions)
 }
 
 var (
-	_ DebtCalculator           = DefaultDebtCalculator{}
-	_ VolumeCalculator         = DefaultVolumeCalculator{}
-	_ FeeCalculator            = DefaultFeeCalculator{}
-	_ MetricsAssembler         = DefaultMetricsAssembler{}
-	_ MarketPositionCalculator = defaultMarketPositionCalculator{}
+	_ DebtCalculator           = defaultDebtCalculator()
+	_ VolumeCalculator         = defaultVolumeCalculator()
+	_ FeeCalculator            = defaultFeeCalculator()
+	_ MetricsAssembler         = defaultMetricsAssembler()
+	_ MarketPositionCalculator = defaultPositionCalculator()
 )

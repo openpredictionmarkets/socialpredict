@@ -6,35 +6,36 @@ import (
 
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 )
 
-func requireMetricInt64(t *testing.T, metric MetricWithExplanation) int64 {
+func requireMetricInt64(t *testing.T, metric Int64Metric) int64 {
 	t.Helper()
-
-	value, err := metric.Int64Value()
-	if err != nil {
-		t.Fatalf("read metric value: %v", err)
-	}
-	return value
+	return metric.Int64Value()
 }
 
-func TestComputeSystemMetrics_EmptyDatabase(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-	econ := modelstesting.GenerateEconomicConfig()
-
-	svc := NewService(NewGormRepository(db), func() *setup.EconomicConfig { return econ })
+func requireSystemMetrics(t *testing.T, svc *Service) *SystemMetrics {
+	t.Helper()
 
 	metrics, err := svc.ComputeSystemMetrics(context.Background())
 	if err != nil {
 		t.Fatalf("ComputeSystemMetrics returned error: %v", err)
 	}
 
-	if val, err := metrics.MoneyCreated.UserDebtCapacityValue(); err != nil || val != 0 {
-		t.Fatalf("expected user debt capacity 0, got %d (err=%v)", val, err)
+	return metrics
+}
+
+func TestComputeSystemMetrics_EmptyDatabase(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+
+	svc := newAnalyticsService(t, db, econ)
+	metrics := requireSystemMetrics(t, svc)
+
+	if val := metrics.MoneyCreated.UserDebtCapacityValue(); val != 0 {
+		t.Fatalf("expected user debt capacity 0, got %d", val)
 	}
-	if val, err := metrics.MoneyUtilized.TotalUtilizedValue(); err != nil || val != 0 {
-		t.Fatalf("expected total utilized 0, got %d (err=%v)", val, err)
+	if val := metrics.MoneyUtilized.TotalUtilizedValue(); val != 0 {
+		t.Fatalf("expected total utilized 0, got %d", val)
 	}
 }
 
@@ -71,12 +72,8 @@ func TestComputeSystemMetrics_WithData(t *testing.T) {
 		}
 	}
 
-	svc := NewService(NewGormRepository(db), func() *setup.EconomicConfig { return econ })
-
-	metrics, err := svc.ComputeSystemMetrics(context.Background())
-	if err != nil {
-		t.Fatalf("ComputeSystemMetrics returned error: %v", err)
-	}
+	svc := newAnalyticsService(t, db, econ)
+	metrics := requireSystemMetrics(t, svc)
 
 	if val := requireMetricInt64(t, metrics.MoneyCreated.UserDebtCapacity); val != 1000 {
 		t.Errorf("expected user debt capacity 1000, got %d", val)

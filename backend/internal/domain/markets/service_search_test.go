@@ -2,6 +2,7 @@ package markets_test
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"testing"
 	"time"
@@ -16,9 +17,15 @@ import (
 func seedSearchMarkets(t *testing.T, db *gorm.DB, username string) {
 	t.Helper()
 
-	now := time.Now()
+	for _, market := range buildSearchMarkets(username, time.Now()) {
+		if err := db.Create(&market).Error; err != nil {
+			t.Fatalf("seed market %d: %v", market.ID, err)
+		}
+	}
+}
 
-	markets := []models.Market{
+func buildSearchMarkets(username string, now time.Time) []models.Market {
+	return []models.Market{
 		{
 			ID:                 1,
 			QuestionTitle:      "Will Bitcoin reach $100k by end of year?",
@@ -61,12 +68,6 @@ func seedSearchMarkets(t *testing.T, db *gorm.DB, username string) {
 			InitialProbability: 0.5,
 			CreatorUsername:    username,
 		},
-	}
-
-	for _, market := range markets {
-		if err := db.Create(&market).Error; err != nil {
-			t.Fatalf("seed market %d: %v", market.ID, err)
-		}
 	}
 }
 
@@ -144,11 +145,7 @@ func TestServiceSearchMarketsFiltersByStatus(t *testing.T) {
 				t.Fatalf("expected primary ids %v, got %v", tt.expectedIDs, primaryIDs)
 			}
 
-			for i, id := range primaryIDs {
-				if id != tt.expectedIDs[i] {
-					t.Fatalf("expected primary ids %v, got %v", tt.expectedIDs, primaryIDs)
-				}
-			}
+			assertSortedIDs(t, primaryIDs, tt.expectedIDs)
 
 			if tt.expectedFallback && !result.FallbackUsed {
 				t.Fatalf("expected fallback to be used")
@@ -165,11 +162,7 @@ func TestServiceSearchMarketsInvalidInput(t *testing.T) {
 	service, _, _ := setupServiceWithDB(t)
 
 	_, err := service.SearchMarkets(context.Background(), "   ", markets.SearchFilters{})
-	if err == nil {
-		t.Fatal("expected error for empty query")
-	}
-
-	if err != markets.ErrInvalidInput {
+	if !errors.Is(err, markets.ErrInvalidInput) {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)
 	}
 }

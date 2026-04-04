@@ -20,11 +20,22 @@ type GormRepository struct {
 // RepositoryOption configures the GormRepository strategies.
 type RepositoryOption func(*GormRepository)
 
+func defaultRepositoryPositionCalculator() MarketPositionCalculator {
+	return defaultMarketPositionCalculator{}
+}
+
+func positionCalculatorOrDefault(calculator MarketPositionCalculator) MarketPositionCalculator {
+	if calculator == nil {
+		return defaultRepositoryPositionCalculator()
+	}
+	return calculator
+}
+
 // WithRepositoryPositionCalculator overrides the default position calculator for the repository.
 func WithRepositoryPositionCalculator(c MarketPositionCalculator) RepositoryOption {
 	return func(r *GormRepository) {
-		if c != nil {
-			r.positionCalculator = c
+		if r != nil {
+			r.positionCalculator = positionCalculatorOrDefault(c)
 		}
 	}
 }
@@ -33,7 +44,7 @@ func WithRepositoryPositionCalculator(c MarketPositionCalculator) RepositoryOpti
 func NewGormRepository(db *gorm.DB, opts ...RepositoryOption) *GormRepository {
 	repo := &GormRepository{
 		db:                 db,
-		positionCalculator: defaultMarketPositionCalculator{},
+		positionCalculator: defaultRepositoryPositionCalculator(),
 	}
 	for _, opt := range opts {
 		opt(repo)
@@ -220,9 +231,10 @@ func groupBetsByMarket(bets []models.Bet) map[int64][]models.Bet {
 }
 
 func (r *GormRepository) ensurePositionCalculator() MarketPositionCalculator {
-	if r.positionCalculator == nil {
-		r.positionCalculator = defaultMarketPositionCalculator{}
+	if r == nil {
+		return defaultRepositoryPositionCalculator()
 	}
+	r.positionCalculator = positionCalculatorOrDefault(r.positionCalculator)
 	return r.positionCalculator
 }
 

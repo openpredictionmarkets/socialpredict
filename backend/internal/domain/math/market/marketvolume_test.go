@@ -5,6 +5,13 @@ import (
 	"testing"
 )
 
+func assertMarketVolume(t *testing.T, bets []models.Bet, want int64) {
+	t.Helper()
+	if got := GetMarketVolume(bets); got != want {
+		t.Fatalf("expected volume %d, got %d", want, got)
+	}
+}
+
 // TestGetMarketVolume tests that the total volume of trades is returned correctly
 func TestGetMarketVolume(t *testing.T) {
 	tests := []struct {
@@ -68,10 +75,7 @@ func TestGetMarketVolume(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			volume := GetMarketVolume(test.Bets)
-			if volume != test.ExpectedVolume {
-				t.Errorf("%s: expected %d, got %d", test.Name, test.ExpectedVolume, volume)
-			}
+			assertMarketVolume(t, test.Bets, test.ExpectedVolume)
 		})
 	}
 }

@@ -9,7 +9,6 @@ import (
 
 	users "socialpredict/internal/domain/users"
 	"socialpredict/security"
-	"socialpredict/setup"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,6 +17,19 @@ type fakeRepository struct {
 	user         *users.User
 	passwordHash string
 	mustChange   bool
+
+	getByUsernameFn     func(context.Context, string) (*users.User, error)
+	updateBalanceFn     func(context.Context, string, int64) error
+	createFn            func(context.Context, *users.User) error
+	updateFn            func(context.Context, *users.User) error
+	deleteFn            func(context.Context, string) error
+	listFn              func(context.Context, users.ListFilters) ([]*users.User, error)
+	listUserBetsFn      func(context.Context, string) ([]*users.UserBet, error)
+	getMarketQuestionFn func(context.Context, uint) (string, error)
+	getUserPositionFn   func(context.Context, int64, string) (*users.MarketUserPosition, error)
+	listUserMarketsFn   func(context.Context, int64) ([]*users.UserMarket, error)
+	getCredentialsFn    func(context.Context, string) (*users.Credentials, error)
+	updatePasswordFn    func(context.Context, string, string, bool) error
 }
 
 const initialTestPassword = "CurrentPass123!"
@@ -25,85 +37,136 @@ const initialTestPassword = "CurrentPass123!"
 func newFakeRepository(username string) *fakeRepository {
 	hash, _ := bcrypt.GenerateFromPassword([]byte(initialTestPassword), users.PasswordHashCost())
 	return &fakeRepository{
-		user: &users.User{
-			ID:                 1,
-			Username:           username,
-			DisplayName:        "Display " + username,
-			Email:              username + "@example.com",
-			UserType:           "regular",
-			MustChangePassword: true,
-		},
+		user:         seededUser(username),
 		passwordHash: string(hash),
 		mustChange:   true,
 	}
 }
 
-func (f *fakeRepository) GetByUsername(_ context.Context, username string) (*users.User, error) {
+func seededUser(username string) *users.User {
+	return &users.User{
+		ID:                 1,
+		Username:           username,
+		DisplayName:        "Display " + username,
+		Email:              username + "@example.com",
+		UserType:           "regular",
+		MustChangePassword: true,
+	}
+}
+
+func cloneUser(user *users.User) *users.User {
+	if user == nil {
+		return nil
+	}
+
+	copy := *user
+	return &copy
+}
+
+func (f *fakeRepository) storedUser(username string) (*users.User, error) {
 	if f.user == nil || f.user.Username != username {
 		return nil, users.ErrUserNotFound
 	}
-	copy := *f.user
+	copy := cloneUser(f.user)
 	copy.MustChangePassword = f.mustChange
-	return &copy, nil
+	return copy, nil
 }
 
-func (f *fakeRepository) UpdateBalance(_ context.Context, username string, newBalance int64) error {
-	if f.user == nil || f.user.Username != username {
-		return users.ErrUserNotFound
+func (f *fakeRepository) persistUser(user *users.User) {
+	f.user = cloneUser(user)
+	if user != nil {
+		f.mustChange = user.MustChangePassword
 	}
-	f.user.AccountBalance = newBalance
-	return nil
 }
 
-func (f *fakeRepository) Create(_ context.Context, user *users.User) error {
-	copy := *user
-	f.user = &copy
-	f.mustChange = user.MustChangePassword
-	return nil
-}
-
-func (f *fakeRepository) Update(_ context.Context, user *users.User) error {
-	copy := *user
-	f.user = &copy
-	f.mustChange = user.MustChangePassword
-	return nil
-}
-
-func (f *fakeRepository) Delete(_ context.Context, username string) error {
-	if f.user != nil && f.user.Username == username {
-		f.user = nil
-		return nil
+func (f *fakeRepository) GetByUsername(ctx context.Context, username string) (*users.User, error) {
+	if f.getByUsernameFn != nil {
+		return f.getByUsernameFn(ctx, username)
 	}
-	return users.ErrUserNotFound
+	return f.storedUser(username)
 }
 
-func (f *fakeRepository) List(context.Context, users.ListFilters) ([]*users.User, error) {
+func (f *fakeRepository) UpdateBalance(ctx context.Context, username string, newBalance int64) error {
+	if f.updateBalanceFn != nil {
+		return f.updateBalanceFn(ctx, username, newBalance)
+	}
+	user, err := f.storedUser(username)
+	if err != nil {
+		return err
+	}
+	user.AccountBalance = newBalance
+	f.persistUser(user)
+	return nil
+}
+
+func (f *fakeRepository) Create(ctx context.Context, user *users.User) error {
+	if f.createFn != nil {
+		return f.createFn(ctx, user)
+	}
+	f.persistUser(user)
+	return nil
+}
+
+func (f *fakeRepository) Update(ctx context.Context, user *users.User) error {
+	if f.updateFn != nil {
+		return f.updateFn(ctx, user)
+	}
+	f.persistUser(user)
+	return nil
+}
+
+func (f *fakeRepository) Delete(ctx context.Context, username string) error {
+	if f.deleteFn != nil {
+		return f.deleteFn(ctx, username)
+	}
+	if _, err := f.storedUser(username); err != nil {
+		return err
+	}
+	f.user = nil
+	return nil
+}
+
+func (f *fakeRepository) List(ctx context.Context, filters users.ListFilters) ([]*users.User, error) {
+	if f.listFn != nil {
+		return f.listFn(ctx, filters)
+	}
 	return nil, nil
 }
 
-func (f *fakeRepository) ListUserBets(context.Context, string) ([]*users.UserBet, error) {
+func (f *fakeRepository) ListUserBets(ctx context.Context, username string) ([]*users.UserBet, error) {
+	if f.listUserBetsFn != nil {
+		return f.listUserBetsFn(ctx, username)
+	}
 	return nil, nil
 }
 
-func (f *fakeRepository) GetMarketQuestion(context.Context, uint) (string, error) {
+func (f *fakeRepository) GetMarketQuestion(ctx context.Context, marketID uint) (string, error) {
+	if f.getMarketQuestionFn != nil {
+		return f.getMarketQuestionFn(ctx, marketID)
+	}
 	return "", nil
 }
 
-func (f *fakeRepository) GetUserPositionInMarket(context.Context, int64, string) (*users.MarketUserPosition, error) {
+func (f *fakeRepository) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*users.MarketUserPosition, error) {
+	if f.getUserPositionFn != nil {
+		return f.getUserPositionFn(ctx, marketID, username)
+	}
 	return &users.MarketUserPosition{}, nil
 }
 
-func (f *fakeRepository) ComputeUserFinancials(context.Context, string, int64, *setup.EconomicConfig) (map[string]int64, error) {
+func (f *fakeRepository) ListUserMarkets(ctx context.Context, userID int64) ([]*users.UserMarket, error) {
+	if f.listUserMarketsFn != nil {
+		return f.listUserMarketsFn(ctx, userID)
+	}
 	return nil, nil
 }
 
-func (f *fakeRepository) ListUserMarkets(context.Context, int64) ([]*users.UserMarket, error) {
-	return nil, nil
-}
-
-func (f *fakeRepository) GetCredentials(_ context.Context, username string) (*users.Credentials, error) {
-	if f.user == nil || f.user.Username != username {
-		return nil, users.ErrUserNotFound
+func (f *fakeRepository) GetCredentials(ctx context.Context, username string) (*users.Credentials, error) {
+	if f.getCredentialsFn != nil {
+		return f.getCredentialsFn(ctx, username)
+	}
+	if _, err := f.storedUser(username); err != nil {
+		return nil, err
 	}
 	return &users.Credentials{
 		PasswordHash:       f.passwordHash,
@@ -111,15 +174,18 @@ func (f *fakeRepository) GetCredentials(_ context.Context, username string) (*us
 	}, nil
 }
 
-func (f *fakeRepository) UpdatePassword(_ context.Context, username string, hashedPassword string, mustChange bool) error {
-	if f.user == nil || f.user.Username != username {
-		return users.ErrUserNotFound
+func (f *fakeRepository) UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error {
+	if f.updatePasswordFn != nil {
+		return f.updatePasswordFn(ctx, username, hashedPassword, mustChange)
+	}
+	user, err := f.storedUser(username)
+	if err != nil {
+		return err
 	}
 	f.passwordHash = hashedPassword
 	f.mustChange = mustChange
-	if f.user != nil {
-		f.user.MustChangePassword = mustChange
-	}
+	user.MustChangePassword = mustChange
+	f.persistUser(user)
 	return nil
 }
 

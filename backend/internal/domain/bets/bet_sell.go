@@ -4,7 +4,6 @@ import (
 	"context"
 
 	dmarkets "socialpredict/internal/domain/markets"
-	"socialpredict/models"
 )
 
 // Sell processes a sell request for credits.
@@ -35,26 +34,12 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 	}
 
 	now := s.clock.Now()
-	bet := &models.Bet{
-		Username: req.Username,
-		MarketID: req.MarketID,
-		Amount:   -sale.SharesToSell,
-		Outcome:  outcome,
-		PlacedAt: now,
-	}
+	bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
 	if err := s.ledger.CreditSale(ctx, bet, sale.SaleValue); err != nil {
 		return nil, err
 	}
 
-	return &SellResult{
-		Username:      req.Username,
-		MarketID:      req.MarketID,
-		SharesSold:    sale.SharesToSell,
-		SaleValue:     sale.SaleValue,
-		Dust:          sale.Dust,
-		Outcome:       outcome,
-		TransactionAt: now,
-	}, nil
+	return new(SellResult).Build(req, outcome, sale, now), nil
 }
 
 func (s *Service) loadUserShares(ctx context.Context, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, error) {
@@ -157,7 +142,7 @@ func calculateDust(requested, saleValue int64) int64 {
 
 func validateDustCap(dust int64, cap int64) error {
 	if cap > 0 && dust > cap {
-		return ErrDustCapExceeded{Cap: cap, Requested: dust}
+		return newDustCapExceeded(cap, dust)
 	}
 	return nil
 }

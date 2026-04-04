@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task": {
+    "id": "PR581-023",
+    "title": "Align all analytics files with ISP",
+    "working_dir": "../socialpredict/backend"
+  },
+  "dispatcher_agent": "dispatcher_agent",
+  "control_repo": "/workspace/spec-socialpredict-tasks",
+  "target_repo": "/workspace/socialpredict",
+  "report_dir": "/workspace/socialpredict/.codex-reports/tasks/PR581-023",
+  "created_at": "2026-04-04T15:11:47.433117+00:00",
+  "updated_at": "2026-04-04T15:11:51.085463+00:00",
+  "files": {
+    "summary": "/workspace/socialpredict/.codex-reports/tasks/PR581-023/summary.json",
+    "conversation": "/workspace/socialpredict/.codex-reports/tasks/PR581-023/conversation.ndjson",
+    "decisions": "/workspace/socialpredict/.codex-reports/tasks/PR581-023/decisions.ndjson"
+  }
+}

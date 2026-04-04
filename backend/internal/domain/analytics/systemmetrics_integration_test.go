@@ -9,16 +9,30 @@ import (
 	dbets "socialpredict/internal/domain/bets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
+	"socialpredict/setup"
+
+	"gorm.io/gorm"
 )
 
-func requireAnalyticsMetricInt64(t *testing.T, metric analytics.MetricWithExplanation) int64 {
+func newAnalyticsMetricsService(db *gorm.DB, loadEcon setup.EconConfigLoader, opts ...analytics.ServiceOption) *analytics.Service {
+	repo := analytics.NewGormRepository(db)
+	return analytics.NewService(repo, loadEcon, opts...)
+}
+
+func requireAnalyticsMetricInt64(t *testing.T, metric analytics.Int64Metric) int64 {
+	t.Helper()
+	return metric.Int64Value()
+}
+
+func requireAnalyticsSystemMetrics(t *testing.T, svc *analytics.Service) *analytics.SystemMetrics {
 	t.Helper()
 
-	value, err := metric.Int64Value()
+	metrics, err := svc.ComputeSystemMetrics(context.Background())
 	if err != nil {
-		t.Fatalf("read metric value: %v", err)
+		t.Fatalf("compute metrics: %v", err)
 	}
-	return value
+
+	return metrics
 }
 
 func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
@@ -67,11 +81,8 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	placeBet("bob", 10, "NO")
 	placeBet("carol", 30, "YES")
 
-	svc := analytics.NewService(analytics.NewGormRepository(db), loadEcon)
-	metrics, err := svc.ComputeSystemMetrics(context.Background())
-	if err != nil {
-		t.Fatalf("compute metrics: %v", err)
-	}
+	svc := newAnalyticsMetricsService(db, loadEcon)
+	metrics := requireAnalyticsSystemMetrics(t, svc)
 
 	maxDebt := econConfig.Economics.User.MaximumDebtAllowed
 
@@ -177,13 +188,10 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 	}
 
 	repo := analytics.NewGormRepository(db)
-	metricsSvc := analytics.NewService(repo, loadEcon)
-	metrics, err := metricsSvc.ComputeSystemMetrics(context.Background())
-	if err != nil {
-		t.Fatalf("metrics after resolve: %v", err)
-	}
+	metricsSvc := newAnalyticsMetricsService(db, loadEcon)
+	metrics := requireAnalyticsSystemMetrics(t, metricsSvc)
 
-	if surplus, err := metrics.Verification.SurplusValue(); err != nil || surplus != 0 {
+	if surplus := metrics.Verification.SurplusValue(); surplus != 0 {
 		t.Fatalf("expected zero surplus after resolution, got %d", surplus)
 	}
 

@@ -7,6 +7,57 @@ import (
 	"socialpredict/models"
 )
 
+const (
+	dbpmOutcomeYes = "YES"
+	dbpmOutcomeNo  = "NO"
+)
+
+type poolShareWeight func(probability float64) float64
+type normalizationAccumulator func(*normalizationSums, float64)
+type normalizationFactorSelector func(normalizationFactors) float64
+type payoutAggregator func(*DBPMMarketPosition, int64)
+type exposureAccumulator func(*sideExposure, int64)
+
+type normalizationSums struct {
+	yes float64
+	no  float64
+}
+
+type normalizationFactors struct {
+	yes float64
+	no  float64
+}
+
+type sideExposure struct {
+	yes int64
+	no  int64
+}
+
+var dbpmPoolShareWeights = map[string]poolShareWeight{
+	dbpmOutcomeYes: func(probability float64) float64 { return probability },
+	dbpmOutcomeNo:  func(probability float64) float64 { return 1 - probability },
+}
+
+var dbpmNormalizationAccumulators = map[string]normalizationAccumulator{
+	dbpmOutcomeYes: func(sums *normalizationSums, payout float64) { sums.yes += payout },
+	dbpmOutcomeNo:  func(sums *normalizationSums, payout float64) { sums.no += payout },
+}
+
+var dbpmNormalizationSelectors = map[string]normalizationFactorSelector{
+	dbpmOutcomeYes: func(factors normalizationFactors) float64 { return factors.yes },
+	dbpmOutcomeNo:  func(factors normalizationFactors) float64 { return factors.no },
+}
+
+var dbpmPayoutAggregators = map[string]payoutAggregator{
+	dbpmOutcomeYes: func(position *DBPMMarketPosition, payout int64) { position.YesSharesOwned += payout },
+	dbpmOutcomeNo:  func(position *DBPMMarketPosition, payout int64) { position.NoSharesOwned += payout },
+}
+
+var dbpmExposureAccumulators = map[string]exposureAccumulator{
+	dbpmOutcomeYes: func(exposure *sideExposure, amount int64) { exposure.yes += amount },
+	dbpmOutcomeNo:  func(exposure *sideExposure, amount int64) { exposure.no += amount },
+}
+
 // holds betting payout information
 type CourseBetPayout struct {
 	Payout  float64
@@ -41,13 +92,19 @@ func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.P
 	if marketmath.GetMarketVolume(bets) == 1 {
 		yesShares, noShares = singleCreditYesNoAllocator(bets)
 	} else {
-		// Calculate YES and NO pools using floating-point arithmetic
-		yesShares = int64(math.Round(totalSharePool * currentProbability))
-		noShares = int64(math.Round(totalSharePool * (1 - currentProbability)))
+		yesShares, noShares = dividePoolShares(totalSharePool, currentProbability)
 	}
 
 	// Return calculated shares
 	return yesShares, noShares
+}
+
+func dividePoolShares(totalSharePool, probability float64) (int64, int64) {
+	var totals sideExposure
+	for outcome, weight := range dbpmPoolShareWeights {
+		allocateExposure(&totals, outcome, int64(math.Round(totalSharePool*weight(probability))))
+	}
+	return totals.yes, totals.no
 }
 
 // CalculateCoursePayoutsDBPM calculates the course payout for each bet in the market,
@@ -82,48 +139,21 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 // F_NO calculates the normalization factor for "NO" by dividing the total stake by the cumulative payout for "NO".
 // Return absolute values of normalization factors to ensure non-negative values for further calculations.
 func CalculateNormalizationFactorsDBPM(yesShares int64, noShares int64, coursePayouts []CourseBetPayout) (float64, float64) {
-	var yesNormalizationFactor, noNormalizationFactor float64
-	var yesCoursePayoutsSum, noCoursePayoutsSum float64
-
-	// Iterate over coursePayouts to sum payouts based on outcome
+	var payoutSums normalizationSums
 	for _, payout := range coursePayouts {
-		if payout.Outcome == "YES" {
-			yesCoursePayoutsSum += payout.Payout
-		} else if payout.Outcome == "NO" {
-			noCoursePayoutsSum += payout.Payout
-		}
+		accumulateNormalizationPayout(&payoutSums, payout)
 	}
 
-	// Calculate normalization factor for YES
-	if yesCoursePayoutsSum > 0 {
-		yesNormalizationFactor = float64(yesShares) / yesCoursePayoutsSum
-	} else {
-		yesNormalizationFactor = 0
-	}
-
-	// Calculate normalization factor for NO
-	if noCoursePayoutsSum > 0 {
-		noNormalizationFactor = float64(noShares) / noCoursePayoutsSum
-	} else {
-		noNormalizationFactor = 0
-	}
-
-	return math.Abs(yesNormalizationFactor), math.Abs(noNormalizationFactor)
+	return normalizationFactor(yesShares, payoutSums.yes), normalizationFactor(noShares, payoutSums.no)
 }
 
 // CalculateFinalPayouts calculates the final payouts for each bet, adjusted by normalization factors.
 func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, yesNormalizationFactor, noNormalizationFactor float64) []int64 {
 	scaledPayouts := make([]int64, len(allBetsOnMarket))
+	factors := normalizationFactors{yes: yesNormalizationFactor, no: noNormalizationFactor}
 
 	for i, payout := range coursePayouts {
-		var scaledPayout float64
-		if payout.Outcome == "YES" {
-			scaledPayout = payout.Payout * yesNormalizationFactor
-		} else if payout.Outcome == "NO" {
-			scaledPayout = payout.Payout * noNormalizationFactor
-		}
-
-		scaledPayouts[i] = int64(math.Round(scaledPayout))
+		scaledPayouts[i] = int64(math.Round(scalePayout(payout, factors)))
 	}
 
 	return scaledPayouts
@@ -222,12 +252,7 @@ func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []int64) []DBPMMar
 			userPayouts[bet.Username] = &DBPMMarketPosition{Username: bet.Username}
 		}
 
-		// Aggregate payouts based on the outcome
-		if bet.Outcome == "YES" {
-			userPayouts[bet.Username].YesSharesOwned += payout
-		} else if bet.Outcome == "NO" {
-			userPayouts[bet.Username].NoSharesOwned += payout
-		}
+		aggregatePositionByOutcome(userPayouts[bet.Username], bet.Outcome, payout)
 	}
 
 	// Convert map to slice for output
@@ -272,19 +297,48 @@ func NetAggregateMarketPositions(positions []DBPMMarketPosition) []DBPMMarketPos
 
 // SingleCreditYesNoAllocator assigns the remaining credit/share to YES or NO, based on net position.
 func singleCreditYesNoAllocator(bets []models.Bet) (yesShares int64, noShares int64) {
-	var netYes, netNo int64
+	var exposure sideExposure
 	for _, bet := range bets {
-		if bet.Outcome == "YES" {
-			netYes += bet.Amount
-		} else if bet.Outcome == "NO" {
-			netNo += bet.Amount
-		}
+		allocateExposure(&exposure, bet.Outcome, bet.Amount)
 	}
-	if netYes > netNo {
+	if exposure.yes > exposure.no {
 		return 1, 0
-	} else if netNo > netYes {
+	} else if exposure.no > exposure.yes {
 		return 0, 1
 	}
 	// If equal or ambiguous, assign to neither (fallback)
 	return 0, 0
+}
+
+func accumulateNormalizationPayout(sums *normalizationSums, payout CourseBetPayout) {
+	if accumulator, ok := dbpmNormalizationAccumulators[payout.Outcome]; ok {
+		accumulator(sums, payout.Payout)
+	}
+}
+
+func normalizationFactor(shares int64, payoutSum float64) float64 {
+	if payoutSum <= 0 {
+		return 0
+	}
+	return math.Abs(float64(shares) / payoutSum)
+}
+
+func scalePayout(payout CourseBetPayout, factors normalizationFactors) float64 {
+	selector, ok := dbpmNormalizationSelectors[payout.Outcome]
+	if !ok {
+		return 0
+	}
+	return payout.Payout * selector(factors)
+}
+
+func aggregatePositionByOutcome(position *DBPMMarketPosition, outcome string, payout int64) {
+	if aggregate, ok := dbpmPayoutAggregators[outcome]; ok {
+		aggregate(position, payout)
+	}
+}
+
+func allocateExposure(exposure *sideExposure, outcome string, amount int64) {
+	if accumulate, ok := dbpmExposureAccumulators[outcome]; ok {
+		accumulate(exposure, amount)
+	}
 }

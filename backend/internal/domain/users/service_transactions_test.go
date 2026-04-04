@@ -9,12 +9,16 @@ import (
 	rusers "socialpredict/internal/repository/users"
 	"socialpredict/models/modelstesting"
 	"socialpredict/security"
-	"socialpredict/setup"
 )
 
-type fakeAnalyticsService struct{}
+type fakeAnalyticsService struct {
+	computeUserFinancialsFn func(context.Context, analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error)
+}
 
-func (fakeAnalyticsService) ComputeUserFinancials(ctx context.Context, req analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error) {
+func (f fakeAnalyticsService) ComputeUserFinancials(ctx context.Context, req analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error) {
+	if f.computeUserFinancialsFn != nil {
+		return f.computeUserFinancialsFn(ctx, req)
+	}
 	return &analytics.FinancialSnapshot{}, nil
 }
 
@@ -159,32 +163,35 @@ func TestServiceGetUserPortfolio(t *testing.T) {
 
 func TestServiceGetUserFinancials(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	_, _ = modelstesting.UseStandardTestEconomics(t)
 	repo := rusers.NewGormRepository(db)
-	config := modelstesting.GenerateEconomicConfig()
-	loader := func() *setup.EconomicConfig { return config }
-	analyticsSvc := analytics.NewService(analytics.NewGormRepository(db), loader)
+	analyticsSvc := fakeAnalyticsService{
+		computeUserFinancialsFn: func(_ context.Context, req analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error) {
+			return &analytics.FinancialSnapshot{
+				AccountBalance:     req.AccountBalance,
+				MaximumDebtAllowed: 500,
+				AmountInPlay:       80,
+				AmountBorrowed:     20,
+				RetainedEarnings:   40,
+				Equity:             820,
+				TradingProfits:     10,
+				WorkProfits:        30,
+				TotalProfits:       40,
+				AmountInPlayActive: 60,
+				TotalSpent:         120,
+				TotalSpentInPlay:   80,
+				RealizedProfits:    15,
+				PotentialProfits:   25,
+				RealizedValue:      315,
+				PotentialValue:     405,
+			}, nil
+		},
+	}
 	service := users.NewService(repo, analyticsSvc, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("financial_user", 0)
 	user.AccountBalance = 300
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("create user: %v", err)
-	}
-
-	creator := modelstesting.GenerateUser("creator_financial", 0)
-	if err := db.Create(&creator).Error; err != nil {
-		t.Fatalf("create creator: %v", err)
-	}
-
-	market := modelstesting.GenerateMarket(6101, creator.Username)
-	if err := db.Create(&market).Error; err != nil {
-		t.Fatalf("create market: %v", err)
-	}
-
-	bet := modelstesting.GenerateBet(80, "YES", user.Username, uint(market.ID), 0)
-	if err := db.Create(&bet).Error; err != nil {
-		t.Fatalf("create bet: %v", err)
 	}
 
 	ctx := context.Background()

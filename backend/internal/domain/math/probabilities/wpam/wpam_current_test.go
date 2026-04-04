@@ -5,37 +5,47 @@ import (
 	"time"
 )
 
+var currentProbabilityBaseTime = time.Date(2025, 1, 1, 13, 0, 0, 0, time.UTC)
+
+func makeProbabilityChanges(values ...float64) []ProbabilityChange {
+	changes := make([]ProbabilityChange, 0, len(values))
+	for i, value := range values {
+		changes = append(changes, ProbabilityChange{
+			Probability: value,
+			Timestamp:   currentProbabilityBaseTime.Add(time.Duration(i) * time.Minute),
+		})
+	}
+	return changes
+}
+
 func TestGetCurrentProbability(t *testing.T) {
-	now := time.Now()
+	tests := []struct {
+		name    string
+		changes []ProbabilityChange
+		want    float64
+	}{
+		{
+			name:    "returns last probability from multiple entries",
+			changes: makeProbabilityChanges(0.5, 0.6, 0.7),
+			want:    0.7,
+		},
+		{
+			name:    "returns only probability in single entry",
+			changes: makeProbabilityChanges(0.42),
+			want:    0.42,
+		},
+		{
+			name:    "returns 0 for empty input",
+			changes: nil,
+			want:    0,
+		},
+	}
 
-	t.Run("returns last probability from multiple entries", func(t *testing.T) {
-		probChanges := []ProbabilityChange{
-			{Probability: 0.5, Timestamp: now},
-			{Probability: 0.6, Timestamp: now.Add(time.Minute)},
-			{Probability: 0.7, Timestamp: now.Add(2 * time.Minute)},
-		}
-
-		prob := GetCurrentProbability(probChanges)
-		if prob != 0.7 {
-			t.Errorf("expected 0.7, got %f", prob)
-		}
-	})
-
-	t.Run("returns only probability in single entry", func(t *testing.T) {
-		probChanges := []ProbabilityChange{
-			{Probability: 0.42, Timestamp: now},
-		}
-
-		prob := GetCurrentProbability(probChanges)
-		if prob != 0.42 {
-			t.Errorf("expected 0.42, got %f", prob)
-		}
-	})
-
-	t.Run("returns 0 for empty input", func(t *testing.T) {
-		prob := GetCurrentProbability(nil)
-		if prob != 0 {
-			t.Errorf("expected 0 for empty input, got %f", prob)
-		}
-	})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := GetCurrentProbability(test.changes); got != test.want {
+				t.Fatalf("expected %f, got %f", test.want, got)
+			}
+		})
+	}
 }
