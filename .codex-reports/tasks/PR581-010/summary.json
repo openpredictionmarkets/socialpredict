@@ -1,0 +1,24 @@
+{
+  "task_id": "PR581-010",
+  "status": "completed",
+  "updated_at": "2026-04-04T06:19:52.108782+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Completed SRP refactor for the scoped math symbols under backend/handlers/math.",
+  "current_focus": "Verification and report finalization completed; no further code changes pending for this task.",
+  "files_changed": [
+    "[\"backend/handlers/math/market/dust_test.go\",\"backend/handlers/math/market/marketvolume_test.go\",\"backend/handlers/math/outcomes/dbpm/marketshares_test.go\",\"backend/handlers/math/positions/adjust_valuation.go\",\"backend/handlers/math/positions/adjust_valuation_test.go\",\"backend/handlers/math/positions/profitability.go\",\"backend/handlers/math/positions/profitability_test.go\",\"backend/handlers/math/positions/valuation_test.go\"]"
+  ],
+  "checks_run": [
+    "[\"gofmt -w backend/handlers/math/{market/dust_test.go,market/marketvolume_test.go,outcomes/dbpm/marketshares_test.go,positions/adjust_valuation.go,positions/adjust_valuation_test.go,positions/profitability.go,positions/profitability_test.go,positions/valuation_test.go}\",\"GOCACHE=/workspace/socialpredict/.gocache GOPATH=/workspace/socialpredict/.gopath GOMODCACHE=/workspace/socialpredict/.gomodcache go test ./handlers/math/market ./handlers/math/positions ./handlers/math/outcomes/dbpm -count=1\",\"GOCACHE=/workspace/socialpredict/.gocache GOPATH=/workspace/socialpredict/.gopath GOMODCACHE=/workspace/socialpredict/.gomodcache /workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-testing-reliability/scripts/run_reliability_suite.sh /workspace/socialpredict ./handlers/math/...\",\"/workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-architecture-governance/scripts/run_boundary_checks.sh /workspace/socialpredict (fails on pre-existing repo-wide violations outside the scoped files)\"]"
+  ],
+  "open_questions": [
+    "[]"
+  ],
+  "follow_ups": [
+    "[\"Repo boundary-check script still reports pre-existing direct DB usage and assumes a missing backend/internal/service path; not caused by this task.\"]"
+  ],
+  "last_event_seq": 3,
+  "context": {
+    "handoff_requested": false
+  }
+}

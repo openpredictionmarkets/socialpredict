@@ -1,0 +1,25 @@
+{
+  "task_id": "PR581-006",
+  "status": "in_progress",
+  "updated_at": "2026-04-04T05:55:29.045395+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Canonical target-repo reports bootstrapped.",
+  "current_focus": "Validate NDJSON append and summary rollup mechanics.",
+  "files_changed": [],
+  "checks_run": [],
+  "open_questions": [],
+  "follow_ups": [],
+  "last_event_seq": 2,
+  "context": {
+    "handoff_requested": false,
+    "updated_at": "2026-04-03T13:15:57.049690+00:00",
+    "session_id": "test-session",
+    "used_tokens": 12345,
+    "context_window": 200000,
+    "remaining_tokens": 187655,
+    "used_pct": 6.17,
+    "soft_threshold_pct": 60.0,
+    "threshold_pct": 70.0,
+    "reason": "context_progress"
+  }
+}

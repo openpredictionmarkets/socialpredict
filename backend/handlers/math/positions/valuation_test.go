@@ -7,12 +7,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// Optional: Helper to create bets for test, mimics user position logic.
-func addTestBets(t *testing.T, db *gorm.DB, marketID uint, userPos []struct {
+type userPositionInput struct {
 	Username       string
 	YesSharesOwned int64
 	NoSharesOwned  int64
-}) {
+}
+
+func addTestBets(t *testing.T, db *gorm.DB, marketID uint, userPos []userPositionInput) {
+	t.Helper()
+
 	for _, pos := range userPos {
 		if pos.YesSharesOwned > 0 {
 			bet := modelstesting.GenerateBet(
@@ -29,30 +32,25 @@ func addTestBets(t *testing.T, db *gorm.DB, marketID uint, userPos []struct {
 	}
 }
 
-// private helper function just for this specific use case
-func makeUserPositions(data []struct {
-	Username       string
-	YesSharesOwned int64
-	NoSharesOwned  int64
-}) map[string]UserMarketPosition {
-	result := make(map[string]UserMarketPosition)
+func makeUserPositions(data []userPositionInput) map[string]UserMarketPosition {
+	positions := make(map[string]UserMarketPosition, len(data))
 	for _, d := range data {
-		result[d.Username] = UserMarketPosition{
-			YesSharesOwned: d.YesSharesOwned,
-			NoSharesOwned:  d.NoSharesOwned,
-		}
+		positions[d.Username] = newUserMarketPosition(d.YesSharesOwned, d.NoSharesOwned)
 	}
-	return result
+	return positions
+}
+
+func newUserMarketPosition(yesSharesOwned, noSharesOwned int64) UserMarketPosition {
+	return UserMarketPosition{
+		YesSharesOwned: yesSharesOwned,
+		NoSharesOwned:  noSharesOwned,
+	}
 }
 
 func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 	testcases := []struct {
-		Name          string
-		UserPositions []struct {
-			Username       string
-			YesSharesOwned int64
-			NoSharesOwned  int64
-		}
+		Name             string
+		UserPositions    []userPositionInput
 		Probability      float64
 		TotalVolume      int64
 		IsResolved       bool
@@ -61,11 +59,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 	}{
 		{
 			Name: "Unresolved market, YES/NO users at 50%",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []userPositionInput{
 				{"alice", 10, 0},
 				{"bob", 0, 10},
 			},
@@ -77,11 +71,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: YES wins",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []userPositionInput{
 				{"alice", 10, 0},
 				{"bob", 0, 10},
 			},
@@ -93,11 +83,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: NO wins",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []userPositionInput{
 				{"alice", 10, 0},
 				{"bob", 0, 10},
 			},
@@ -109,11 +95,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: All YES, NO wins (all get zero)",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []userPositionInput{
 				{"alice", 10, 0},
 				{"bob", 5, 0},
 			},
@@ -125,11 +107,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: All NO, YES wins (all get zero)",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []userPositionInput{
 				{"alice", 0, 10},
 				{"bob", 0, 5},
 			},

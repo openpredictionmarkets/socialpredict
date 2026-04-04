@@ -8,18 +8,44 @@ import (
 	"time"
 )
 
+type marketVolumeDustExpectation struct {
+	base     int64
+	withDust int64
+}
+
+func assertMarketVolumeWithDust(t *testing.T, bets []models.Bet, expected marketVolumeDustExpectation) {
+	t.Helper()
+
+	baseVolume := GetMarketVolume(bets)
+	if baseVolume != expected.base {
+		t.Errorf("expected base volume %d, got %d", expected.base, baseVolume)
+	}
+
+	volumeWithDust := GetMarketVolumeWithDust(bets)
+	if volumeWithDust != expected.withDust {
+		t.Errorf("expected volume with dust %d, got %d", expected.withDust, volumeWithDust)
+	}
+}
+
+func assertDustAmount(t *testing.T, bets []models.Bet, expectedDust int64) {
+	t.Helper()
+
+	dust := calculateDustStack(bets)
+	if dust != expectedDust {
+		t.Errorf("expected dust %d, got %d", expectedDust, dust)
+	}
+}
+
 func TestGetMarketVolumeWithDust(t *testing.T) {
 	tests := []struct {
-		name             string
-		bets             []models.Bet
-		expectedBase     int64
-		expectedWithDust int64
+		name     string
+		bets     []models.Bet
+		expected marketVolumeDustExpectation
 	}{
 		{
-			name:             "empty market",
-			bets:             []models.Bet{},
-			expectedBase:     0,
-			expectedWithDust: 0,
+			name:     "empty market",
+			bets:     []models.Bet{},
+			expected: marketVolumeDustExpectation{base: 0, withDust: 0},
 		},
 		{
 			name: "only buy bets - no dust",
@@ -27,33 +53,23 @@ func TestGetMarketVolumeWithDust(t *testing.T) {
 				modelstesting.GenerateBet(100, "YES", "user1", 1, 0),
 				modelstesting.GenerateBet(200, "NO", "user2", 1, time.Minute),
 			},
-			expectedBase:     300,
-			expectedWithDust: 300, // No sells, so no dust
+			expected: marketVolumeDustExpectation{base: 300, withDust: 300},
 		},
 		{
 			name: "mixed buys and sells - with dust",
 			bets: []models.Bet{
 				modelstesting.GenerateBet(100, "YES", "user1", 1, 0),
 				modelstesting.GenerateBet(200, "NO", "user2", 1, time.Minute),
-				modelstesting.GenerateBet(-50, "YES", "user1", 1, 2*time.Minute), // Sell
-				modelstesting.GenerateBet(-75, "NO", "user2", 1, 3*time.Minute),  // Sell
+				modelstesting.GenerateBet(-50, "YES", "user1", 1, 2*time.Minute),
+				modelstesting.GenerateBet(-75, "NO", "user2", 1, 3*time.Minute),
 			},
-			expectedBase:     175, // 100 + 200 - 50 - 75
-			expectedWithDust: 177, // Base + 2 dust (1 per sell as placeholder)
+			expected: marketVolumeDustExpectation{base: 175, withDust: 177},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			baseVolume := GetMarketVolume(test.bets)
-			if baseVolume != test.expectedBase {
-				t.Errorf("expected base volume %d, got %d", test.expectedBase, baseVolume)
-			}
-
-			volumeWithDust := GetMarketVolumeWithDust(test.bets)
-			if volumeWithDust != test.expectedWithDust {
-				t.Errorf("expected volume with dust %d, got %d", test.expectedWithDust, volumeWithDust)
-			}
+			assertMarketVolumeWithDust(t, test.bets, test.expected)
 		})
 	}
 }
@@ -99,10 +115,7 @@ func TestCalculateDustStack(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dust := calculateDustStack(test.bets)
-			if dust != test.expectedDust {
-				t.Errorf("expected dust %d, got %d", test.expectedDust, dust)
-			}
+			assertDustAmount(t, test.bets, test.expectedDust)
 		})
 	}
 }
@@ -115,7 +128,7 @@ func TestGetMarketDust(t *testing.T) {
 	}
 
 	dust := GetMarketDust(bets)
-	expectedDust := int64(2) // 2 sells = 2 dust points
+	expectedDust := int64(2)
 
 	if dust != expectedDust {
 		t.Errorf("expected dust %d, got %d", expectedDust, dust)
@@ -123,32 +136,34 @@ func TestGetMarketDust(t *testing.T) {
 }
 
 func TestCalculateDustForSell_Placeholder(t *testing.T) {
-	// Test the placeholder implementation
 	sellBet := modelstesting.GenerateBet(-50, "YES", "user1", 1, 0)
 	buyBet := modelstesting.GenerateBet(100, "YES", "user1", 1, 0)
-
 	allBets := []models.Bet{buyBet, sellBet}
-
-	// Test sell bet
-	dust := calculateDustForSell(sellBet, allBets)
-	if dust != 1 {
-		t.Errorf("expected 1 dust for sell bet, got %d", dust)
+	tests := []struct {
+		name     string
+		bet      models.Bet
+		expected int64
+	}{
+		{name: "sell bet", bet: sellBet, expected: 1},
+		{name: "buy bet", bet: buyBet, expected: 0},
 	}
 
-	// Test buy bet
-	dust = calculateDustForSell(buyBet, allBets)
-	if dust != 0 {
-		t.Errorf("expected 0 dust for buy bet, got %d", dust)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dust := calculateDustForSell(test.bet, allBets)
+			if dust != test.expected {
+				t.Errorf("expected %d dust, got %d", test.expected, dust)
+			}
+		})
 	}
 }
 
 func TestCurrencyConservationInvariant(t *testing.T) {
-	// Test that GetMarketVolumeWithDust always returns >= GetMarketVolume
 	testCases := [][]models.Bet{
-		{}, // Empty
-		{modelstesting.GenerateBet(100, "YES", "user1", 1, 0)}, // Only buys
-		{modelstesting.GenerateBet(-50, "YES", "user1", 1, 0)}, // Only sells
-		{ // Mixed
+		{},
+		{modelstesting.GenerateBet(100, "YES", "user1", 1, 0)},
+		{modelstesting.GenerateBet(-50, "YES", "user1", 1, 0)},
+		{
 			modelstesting.GenerateBet(100, "YES", "user1", 1, 0),
 			modelstesting.GenerateBet(-50, "YES", "user1", 1, time.Minute),
 			modelstesting.GenerateBet(200, "NO", "user2", 1, 2*time.Minute),
@@ -166,7 +181,6 @@ func TestCurrencyConservationInvariant(t *testing.T) {
 					volumeWithDust, baseVolume)
 			}
 
-			// Dust should be non-negative
 			dust := volumeWithDust - baseVolume
 			if dust < 0 {
 				t.Errorf("dust cannot be negative, got %d", dust)

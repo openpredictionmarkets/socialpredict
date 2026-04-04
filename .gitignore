@@ -51,6 +51,10 @@ tmp/
 /frontend/vite.config.mjs
 /frontend/public/env-config.js
 
+# Go cache
+.gocache/
+.gomodcache/
+
 /backend/.air.toml
 
 # Apple Silicon Docker Compose Override

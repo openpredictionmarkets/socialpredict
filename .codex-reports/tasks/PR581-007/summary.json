@@ -1,0 +1,24 @@
+{
+  "task_id": "PR581-007",
+  "status": "blocked",
+  "updated_at": "2026-04-04T06:02:01.221642+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Blocked: requested internal/domain/markets scope is missing on current branch",
+  "current_focus": "Verified task metadata against target checkout and stopped after confirming the mandated files and symbols do not exist in /workspace/socialpredict/backend.",
+  "files_changed": [],
+  "checks_run": [
+    "rg symbol lookup in /workspace/socialpredict/backend",
+    "git branch --show-current",
+    "git status --short"
+  ],
+  "open_questions": [
+    "Should PR581-007 be run against a different target branch or after PR581-001/PR581-002 land the internal/domain/markets package?"
+  ],
+  "follow_ups": [
+    "Re-run on the branch containing internal/domain/markets/errors.go, models.go, and the listed service_*_test.go files."
+  ],
+  "last_event_seq": 2,
+  "context": {
+    "handoff_requested": false
+  }
+}

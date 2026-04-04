@@ -1,0 +1,25 @@
+{
+  "task_id": "PR581-009",
+  "status": "blocked",
+  "updated_at": "2026-04-04T06:05:45.385080+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Blocked: task-scoped bets domain files are absent in this checkout",
+  "current_focus": "Waiting for the PR581-004 dependency or the expected backend/internal/domain/bets files to exist before making SRP changes.",
+  "files_changed": [],
+  "checks_run": [
+    "python3 /workspace/spec-socialpredict-tasks/scripts/codex-report.py read-summary --report-dir /workspace/socialpredict/.codex-reports/tasks/PR581-009",
+    "find /workspace/socialpredict/backend -maxdepth 3 -type d",
+    "rg -n \"ErrDustCapExceeded|PlaceRequest|SellResult|fakeRepo|stubMarketService\" /workspace/socialpredict/backend",
+    "git -C /workspace/socialpredict branch --show-current"
+  ],
+  "open_questions": [
+    "The target repo is on main and lacks backend/internal/domain/bets; PR581-004 may not be present in this checkout."
+  ],
+  "follow_ups": [
+    "Re-run this task after checking out the dependency branch or merging the missing internal/domain/bets implementation into /workspace/socialpredict."
+  ],
+  "last_event_seq": 2,
+  "context": {
+    "handoff_requested": false
+  }
+}

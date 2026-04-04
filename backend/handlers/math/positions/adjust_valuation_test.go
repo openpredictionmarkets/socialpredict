@@ -10,6 +10,8 @@ import (
 
 // Helper: Create users and bets in DB and return bet times for asserts
 func seedBetsAndTimes(t *testing.T, db *gorm.DB, marketID uint, userBetOffsets map[string]time.Duration) map[string]time.Time {
+	t.Helper()
+
 	betTimes := make(map[string]time.Time)
 	for username, offset := range userBetOffsets {
 		bet := modelstesting.GenerateBet(10, "YES", username, marketID, offset)
@@ -17,6 +19,24 @@ func seedBetsAndTimes(t *testing.T, db *gorm.DB, marketID uint, userBetOffsets m
 		betTimes[username] = bet.PlacedAt
 	}
 	return betTimes
+}
+
+func newEqualUserValuations(values map[string]int64) map[string]UserValuationResult {
+	userVals := make(map[string]UserValuationResult, len(values))
+	for username, roundedValue := range values {
+		userVals[username] = UserValuationResult{Username: username, RoundedValue: roundedValue}
+	}
+	return userVals
+}
+
+func assertRoundedValues(t *testing.T, adjusted map[string]UserValuationResult, expected map[string]int64) {
+	t.Helper()
+
+	for user, want := range expected {
+		if adjusted[user].RoundedValue != want {
+			t.Errorf("user %s: want %d, got %d", user, want, adjusted[user].RoundedValue)
+		}
+	}
 }
 
 func TestGetAllUserEarliestBetsForMarket(t *testing.T) {
@@ -53,7 +73,6 @@ func TestAdjustUserValuationsToMarketVolume(t *testing.T) {
 	market := modelstesting.GenerateMarket(2, "creator")
 	db.Create(&market)
 
-	// Users will have identical values, but alice's bet is earliest, then bob, then carol
 	userBetOffsets := map[string]time.Duration{
 		"alice": 0,
 		"bob":   1 * time.Minute,
@@ -61,49 +80,45 @@ func TestAdjustUserValuationsToMarketVolume(t *testing.T) {
 	}
 	seedBetsAndTimes(t, db, 2, userBetOffsets)
 
-	// All users have a rounded value of 10
-	userVals := map[string]UserValuationResult{
-		"alice": {Username: "alice", RoundedValue: 10},
-		"bob":   {Username: "bob", RoundedValue: 10},
-		"carol": {Username: "carol", RoundedValue: 10},
+	tests := []struct {
+		name         string
+		targetVolume int64
+		expected     map[string]int64
+	}{
+		{
+			name:         "positive delta favors earlier bets",
+			targetVolume: 32,
+			expected:     map[string]int64{"alice": 11, "bob": 11, "carol": 10},
+		},
+		{
+			name:         "negative delta removes from earlier bets first",
+			targetVolume: 28,
+			expected:     map[string]int64{"alice": 9, "bob": 9, "carol": 10},
+		},
 	}
 
-	// Delta: need to add 2 (should go to alice then bob, since they are first by earliest bet)
-	targetVolume := int64(32)
-	adjusted, err := AdjustUserValuationsToMarketVolume(db, 2, userVals, targetVolume)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	want := map[string]int64{"alice": 11, "bob": 11, "carol": 10}
-	for user, exp := range want {
-		if adjusted[user].RoundedValue != exp {
-			t.Errorf("user %s: want %d, got %d", user, exp, adjusted[user].RoundedValue)
-		}
-	}
-	// Check total
-	var sum int64
-	for _, v := range adjusted {
-		sum += v.RoundedValue
-	}
-	if sum != targetVolume {
-		t.Errorf("expected total %d, got %d", targetVolume, sum)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			userVals := newEqualUserValuations(map[string]int64{
+				"alice": 10,
+				"bob":   10,
+				"carol": 10,
+			})
 
-	// Test negative delta (removes from alice then bob)
-	userVals = map[string]UserValuationResult{
-		"alice": {Username: "alice", RoundedValue: 10},
-		"bob":   {Username: "bob", RoundedValue: 10},
-		"carol": {Username: "carol", RoundedValue: 10},
-	}
-	targetVolume = int64(28) // Remove 2
-	adjusted, err = AdjustUserValuationsToMarketVolume(db, 2, userVals, targetVolume)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	want = map[string]int64{"alice": 9, "bob": 9, "carol": 10}
-	for user, exp := range want {
-		if adjusted[user].RoundedValue != exp {
-			t.Errorf("user %s: want %d, got %d", user, exp, adjusted[user].RoundedValue)
-		}
+			adjusted, err := AdjustUserValuationsToMarketVolume(db, 2, userVals, test.targetVolume)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			assertRoundedValues(t, adjusted, test.expected)
+
+			var sum int64
+			for _, v := range adjusted {
+				sum += v.RoundedValue
+			}
+			if sum != test.targetVolume {
+				t.Errorf("expected total %d, got %d", test.targetVolume, sum)
+			}
+		})
 	}
 }

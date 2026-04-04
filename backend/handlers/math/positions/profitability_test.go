@@ -2,39 +2,49 @@ package positionsmath
 
 import (
 	"socialpredict/models"
+	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
 )
 
-func TestCalculateUserSpend(t *testing.T) {
-	// Create test bets data
-	testTime := time.Now()
-	bets := []models.Bet{
-		{Username: "alice", Amount: 100, PlacedAt: testTime},   // Alice buys 100
-		{Username: "alice", Amount: 50, PlacedAt: testTime},    // Alice buys 50 more
-		{Username: "alice", Amount: -25, PlacedAt: testTime},   // Alice sells 25
-		{Username: "bob", Amount: 200, PlacedAt: testTime},     // Bob buys 200
-		{Username: "charlie", Amount: 75, PlacedAt: testTime},  // Charlie buys 75
-		{Username: "charlie", Amount: -75, PlacedAt: testTime}, // Charlie sells all 75
+func fixedTestBets() []models.Bet {
+	testTime := time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)
+	return []models.Bet{
+		{Username: "alice", Amount: 100, PlacedAt: testTime},
+		{Username: "alice", Amount: 50, PlacedAt: testTime.Add(1 * time.Minute)},
+		{Username: "alice", Amount: -25, PlacedAt: testTime.Add(2 * time.Minute)},
+		{Username: "bob", Amount: 200, PlacedAt: testTime.Add(3 * time.Minute)},
+		{Username: "charlie", Amount: 75, PlacedAt: testTime.Add(4 * time.Minute)},
+		{Username: "charlie", Amount: -75, PlacedAt: testTime.Add(5 * time.Minute)},
 	}
+}
+
+func TestCalculateUserSpend(t *testing.T) {
+	bets := fixedTestBets()
 
 	tests := []struct {
 		username      string
 		expectedSpend int64
 	}{
-		{"alice", 125}, // 100 + 50 - 25 = 125
-		{"bob", 200},   // 200
-		{"charlie", 0}, // 75 - 75 = 0
-		{"dave", 0},    // No bets = 0
+		{"alice", 125},
+		{"bob", 200},
+		{"charlie", 0},
+		{"dave", 0},
 	}
 
 	for _, test := range tests {
 		t.Run(test.username, func(t *testing.T) {
-			spend := CalculateUserSpend(bets, test.username)
-			if spend != test.expectedSpend {
-				t.Errorf("Expected spend for %s to be %d, got %d", test.username, test.expectedSpend, spend)
-			}
+			assertSpend(t, bets, test.username, test.expectedSpend)
 		})
+	}
+}
+
+func assertSpend(t *testing.T, bets []models.Bet, username string, expected int64) {
+	t.Helper()
+
+	spend := CalculateUserSpend(bets, username)
+	if spend != expected {
+		t.Errorf("expected spend for %s to be %d, got %d", username, expected, spend)
 	}
 }
 
@@ -53,19 +63,24 @@ func TestGetEarliestBetTime(t *testing.T) {
 		username     string
 		expectedTime time.Time
 	}{
-		{"alice", baseTime.Add(1 * time.Hour)},  // 11:00
-		{"bob", baseTime.Add(30 * time.Minute)}, // 10:30
-		{"charlie", time.Time{}},                // No bets, zero time
+		{"alice", baseTime.Add(1 * time.Hour)},
+		{"bob", baseTime.Add(30 * time.Minute)},
+		{"charlie", time.Time{}},
 	}
 
 	for _, test := range tests {
 		t.Run(test.username, func(t *testing.T) {
-			earliestTime := GetEarliestBetTime(bets, test.username)
-			if !earliestTime.Equal(test.expectedTime) {
-				t.Errorf("Expected earliest time for %s to be %v, got %v",
-					test.username, test.expectedTime, earliestTime)
-			}
+			assertEarliestBet(t, bets, test.username, test.expectedTime)
 		})
+	}
+}
+
+func assertEarliestBet(t *testing.T, bets []models.Bet, username string, expected time.Time) {
+	t.Helper()
+
+	earliestTime := GetEarliestBetTime(bets, username)
+	if !earliestTime.Equal(expected) {
+		t.Errorf("expected earliest time for %s to be %v, got %v", username, expected, earliestTime)
 	}
 }
 
@@ -75,27 +90,34 @@ func TestDeterminePositionType(t *testing.T) {
 		noShares     int64
 		expectedType string
 	}{
-		{100, 0, "YES"},     // Only YES shares
-		{0, 150, "NO"},      // Only NO shares
-		{50, 75, "NEUTRAL"}, // Both YES and NO shares
-		{0, 0, "NONE"},      // No shares (shouldn't happen in practice)
+		{100, 0, "YES"},
+		{0, 150, "NO"},
+		{50, 75, "NEUTRAL"},
+		{0, 0, "NONE"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.expectedType, func(t *testing.T) {
 			positionType := DeterminePositionType(test.yesShares, test.noShares)
 			if positionType != test.expectedType {
-				t.Errorf("Expected position type to be %s, got %s", test.expectedType, positionType)
+				t.Errorf("expected position type to be %s, got %s", test.expectedType, positionType)
 			}
 		})
 	}
 }
 
-// Integration test would require database setup, so we'll keep it simple for now
-// In a real implementation, you'd want to test CalculateMarketLeaderboard with test data
 func TestCalculateMarketLeaderboard_EmptyBets(t *testing.T) {
-	// This test would require more setup with database mocking
-	// For now, we can test the core logic components above
-	// In practice, you'd mock the database and test the full function
-	t.Skip("Integration test requires database setup - core logic tested above")
+	db := modelstesting.NewFakeDB(t)
+	market := modelstesting.GenerateMarket(1, "creator")
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+
+	leaderboard, err := CalculateMarketLeaderboard(db, "1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(leaderboard) != 0 {
+		t.Fatalf("expected empty leaderboard, got %+v", leaderboard)
+	}
 }

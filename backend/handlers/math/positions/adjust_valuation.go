@@ -19,13 +19,7 @@ type ByValBetTimeUsername []UserHolder
 func (s ByValBetTimeUsername) Len() int      { return len(s) }
 func (s ByValBetTimeUsername) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s ByValBetTimeUsername) Less(i, j int) bool {
-	if s[i].RoundedValue != s[j].RoundedValue {
-		return s[i].RoundedValue > s[j].RoundedValue
-	}
-	if !s[i].EarliestBet.Equal(s[j].EarliestBet) {
-		return s[i].EarliestBet.Before(s[j].EarliestBet)
-	}
-	return s[i].Username < s[j].Username
+	return ranksBefore(s[i], s[j])
 }
 
 // AdjustUserValuationsToMarketVolume ensures user values match total market volume,
@@ -36,28 +30,21 @@ func AdjustUserValuationsToMarketVolume(
 	userValuations map[string]UserValuationResult,
 	targetMarketVolume int64,
 ) (map[string]UserValuationResult, error) {
-	// Filter out users with zero valuation
 	filtered := filterWinningValuations(userValuations)
 	if len(filtered) == 0 {
 		return userValuations, nil
 	}
 
-	// Fetch earliest bets for ordering
 	earliestBets, err := GetAllUserEarliestBetsForMarket(db, marketID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create sortable holder list
 	holders, sum := buildUserHolders(filtered, earliestBets)
-
-	// Apply delta correction
-	adjusted := adjustValuations(filtered, holders, sum, targetMarketVolume)
-
-	return adjusted, nil
+	return adjustValuations(filtered, holders, sum, targetMarketVolume), nil
 }
 
-// filterWinningValuations drops users with zero rounded value
+// filterWinningValuations keeps only users eligible for deterministic delta adjustment.
 func filterWinningValuations(all map[string]UserValuationResult) map[string]UserValuationResult {
 	filtered := make(map[string]UserValuationResult)
 	for username, val := range all {
@@ -68,7 +55,7 @@ func filterWinningValuations(all map[string]UserValuationResult) map[string]User
 	return filtered
 }
 
-// buildUserHolders prepares sorted holders and computes total value sum
+// buildUserHolders converts user values into sortable holders and returns their total value.
 func buildUserHolders(
 	userVals map[string]UserValuationResult,
 	earliest map[string]time.Time,
@@ -85,34 +72,61 @@ func buildUserHolders(
 			EarliestBet:  earliest[username],
 		})
 	}
-	sort.Sort(ByValBetTimeUsername(holders))
+	sortUserHolders(holders)
 	return holders, sum
 }
 
-// adjustValuations spreads rounding delta among holders
+func sortUserHolders(holders []UserHolder) {
+	sort.Sort(ByValBetTimeUsername(holders))
+}
+
+// adjustValuations applies the market-level rounding delta to eligible users.
 func adjustValuations(
 	userVals map[string]UserValuationResult,
 	holders []UserHolder,
 	sum int64,
 	target int64,
 ) map[string]UserValuationResult {
-	delta := target - sum
-	if delta == 0 {
-		return userVals
-	}
-
-	adjustment := int64(1)
-	if delta < 0 {
-		adjustment = -1
-		delta = -delta
+	adjusted := cloneUserValuations(userVals)
+	delta, adjustment := normalizeDelta(target - sum)
+	if delta == 0 || len(holders) == 0 {
+		return adjusted
 	}
 
 	holderCount := int64(len(holders))
 	for i := int64(0); i < delta; i++ {
 		holder := holders[i%holderCount]
-		val := userVals[holder.Username]
+		val := adjusted[holder.Username]
 		val.RoundedValue += adjustment
-		userVals[holder.Username] = val
+		adjusted[holder.Username] = val
 	}
-	return userVals
+	return adjusted
+}
+
+func cloneUserValuations(userVals map[string]UserValuationResult) map[string]UserValuationResult {
+	cloned := make(map[string]UserValuationResult, len(userVals))
+	for username, valuation := range userVals {
+		cloned[username] = valuation
+	}
+	return cloned
+}
+
+func normalizeDelta(delta int64) (int64, int64) {
+	if delta == 0 {
+		return 0, 0
+	}
+	if delta < 0 {
+		return -delta, -1
+	}
+	return delta, 1
+}
+
+func ranksBefore(left, right UserHolder) bool {
+	if left.RoundedValue != right.RoundedValue {
+		return left.RoundedValue > right.RoundedValue
+	}
+	if !left.EarliestBet.Equal(right.EarliestBet) {
+		return left.EarliestBet.Before(right.EarliestBet)
+	}
+	return left.Username < right.Username
 }

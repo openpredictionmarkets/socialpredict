@@ -39,128 +39,134 @@ func ErrorLogger(err error, errMsg string) bool {
 // CalculateUserSpend calculates the total amount a user has spent on a market
 // by summing all positive amounts (purchases) and subtracting negative amounts (sales)
 func CalculateUserSpend(bets []models.Bet, username string) int64 {
-	var totalSpend int64 = 0
-
-	for _, bet := range bets {
-		if bet.Username == username {
-			totalSpend += bet.Amount // Amount can be positive (buy) or negative (sell)
-		}
-	}
-
-	return totalSpend
+	return sumUserBetAmounts(bets, username)
 }
 
 // GetEarliestBetTime finds the earliest bet timestamp for a user in a market
 // Used as a tiebreaker for ranking users with identical profitability
 func GetEarliestBetTime(bets []models.Bet, username string) time.Time {
-	var earliestTime time.Time
-	found := false
-
-	for _, bet := range bets {
-		if bet.Username == username {
-			if !found || bet.PlacedAt.Before(earliestTime) {
-				earliestTime = bet.PlacedAt
-				found = true
-			}
-		}
-	}
-
+	earliestTime, _ := findEarliestBetTime(bets, username)
 	return earliestTime
 }
 
 // DeterminePositionType determines if a user is holding YES, NO, or NEUTRAL positions
 func DeterminePositionType(yesShares, noShares int64) string {
-	if yesShares > 0 && noShares == 0 {
+	switch {
+	case yesShares > 0 && noShares == 0:
 		return "YES"
-	} else if noShares > 0 && yesShares == 0 {
+	case noShares > 0 && yesShares == 0:
 		return "NO"
-	} else if yesShares > 0 && noShares > 0 {
+	case yesShares > 0 && noShares > 0:
 		return "NEUTRAL"
+	default:
+		return "NONE"
 	}
-	// This case shouldn't happen since we filter out zero positions
-	return "NONE"
 }
 
 // CalculateMarketLeaderboard calculates profitability rankings for all users with positions in a market
 func CalculateMarketLeaderboard(db *gorm.DB, marketIdStr string) ([]UserProfitability, error) {
-	// Convert marketId string to uint64
-	marketIDUint64, err := strconv.ParseUint(marketIdStr, 10, 64)
+	marketIDUint, err := parseMarketID(marketIdStr)
 	if err != nil {
-		ErrorLogger(err, "Can't convert marketIdStr to uint64.")
 		return nil, err
 	}
 
-	// Check that marketIDUint64 fits in uint using explicit constant bound (security vulnerability fix)
-	if marketIDUint64 > maxUintValue32Bit {
-		err := errors.New("marketId out of range for uint")
-		ErrorLogger(err, "marketIdStr is too large for uint.")
-		return nil, err
-	}
-
-	marketIDUint := uint(marketIDUint64)
-
-	// Get current positions and values using existing function
 	marketPositions, err := CalculateMarketPositions_WPAM_DBPM(db, marketIdStr)
 	if err != nil {
 		ErrorLogger(err, "Failed to calculate market positions.")
 		return nil, err
 	}
 
-	// Get all bets for the market to calculate spend
 	allBetsOnMarket := tradingdata.GetBetsForMarket(db, marketIDUint)
 	if len(allBetsOnMarket) == 0 {
 		return []UserProfitability{}, nil
 	}
 
-	// Calculate profitability for each user with positions
-	var leaderboard []UserProfitability
+	leaderboard := buildMarketLeaderboard(marketPositions, allBetsOnMarket)
+	sortMarketLeaderboard(leaderboard)
+	assignLeaderboardRanks(leaderboard)
+	return leaderboard, nil
+}
 
+func sumUserBetAmounts(bets []models.Bet, username string) int64 {
+	var totalSpend int64
+	for _, bet := range bets {
+		if bet.Username == username {
+			totalSpend += bet.Amount
+		}
+	}
+	return totalSpend
+}
+
+func findEarliestBetTime(bets []models.Bet, username string) (time.Time, bool) {
+	var earliestTime time.Time
+	found := false
+	for _, bet := range bets {
+		if bet.Username != username {
+			continue
+		}
+		if !found || bet.PlacedAt.Before(earliestTime) {
+			earliestTime = bet.PlacedAt
+			found = true
+		}
+	}
+	return earliestTime, found
+}
+
+func parseMarketID(marketIDStr string) (uint, error) {
+	marketIDUint64, err := strconv.ParseUint(marketIDStr, 10, 64)
+	if err != nil {
+		ErrorLogger(err, "Can't convert marketIdStr to uint64.")
+		return 0, err
+	}
+	if marketIDUint64 > maxUintValue32Bit {
+		rangeErr := errors.New("marketId out of range for uint")
+		ErrorLogger(rangeErr, "marketIdStr is too large for uint.")
+		return 0, rangeErr
+	}
+	return uint(marketIDUint64), nil
+}
+
+func buildMarketLeaderboard(
+	marketPositions []MarketPosition,
+	allBetsOnMarket []models.Bet,
+) []UserProfitability {
+	leaderboard := make([]UserProfitability, 0, len(marketPositions))
 	for _, position := range marketPositions {
-		// Filter out users with zero positions (no current stake in market)
 		if position.YesSharesOwned == 0 && position.NoSharesOwned == 0 {
 			continue
 		}
-
-		// Calculate total spend for this user
-		totalSpent := CalculateUserSpend(allBetsOnMarket, position.Username)
-
-		// Calculate profit = current value - total spent
-		profit := position.Value - totalSpent
-
-		// Determine position type
-		positionType := DeterminePositionType(position.YesSharesOwned, position.NoSharesOwned)
-
-		// Get earliest bet time for tiebreaker
-		earliestBet := GetEarliestBetTime(allBetsOnMarket, position.Username)
-
-		leaderboard = append(leaderboard, UserProfitability{
-			Username:       position.Username,
-			CurrentValue:   position.Value,
-			TotalSpent:     totalSpent,
-			Profit:         profit,
-			Position:       positionType,
-			YesSharesOwned: position.YesSharesOwned,
-			NoSharesOwned:  position.NoSharesOwned,
-			EarliestBet:    earliestBet,
-		})
+		leaderboard = append(leaderboard, makeUserProfitability(position, allBetsOnMarket))
 	}
+	return leaderboard
+}
 
-	// Sort by profit (descending), then by earliest bet time (ascending) for ties
+func makeUserProfitability(position MarketPosition, allBetsOnMarket []models.Bet) UserProfitability {
+	totalSpent := CalculateUserSpend(allBetsOnMarket, position.Username)
+	return UserProfitability{
+		Username:       position.Username,
+		CurrentValue:   position.Value,
+		TotalSpent:     totalSpent,
+		Profit:         position.Value - totalSpent,
+		Position:       DeterminePositionType(position.YesSharesOwned, position.NoSharesOwned),
+		YesSharesOwned: position.YesSharesOwned,
+		NoSharesOwned:  position.NoSharesOwned,
+		EarliestBet:    GetEarliestBetTime(allBetsOnMarket, position.Username),
+	}
+}
+
+func sortMarketLeaderboard(leaderboard []UserProfitability) {
 	sort.Slice(leaderboard, func(i, j int) bool {
 		if leaderboard[i].Profit == leaderboard[j].Profit {
-			// If profits are equal, rank by who bet earlier (ascending time)
 			return leaderboard[i].EarliestBet.Before(leaderboard[j].EarliestBet)
 		}
-		// Otherwise rank by profit (descending)
 		return leaderboard[i].Profit > leaderboard[j].Profit
 	})
+}
 
-	// Assign ranks
+func assignLeaderboardRanks(leaderboard []UserProfitability) {
 	for i := range leaderboard {
 		leaderboard[i].Rank = i + 1
 	}
-
-	return leaderboard, nil
 }
 
 // GlobalUserProfitability represents a user's total profitability across all markets

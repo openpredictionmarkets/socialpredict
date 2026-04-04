@@ -13,13 +13,12 @@ import (
 
 var now = time.Now()
 
-// helper function to create course payouts succinctly
 func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayout {
 	if len(payouts) != len(outcomes) {
 		panic("payouts and outcomes slices must have the same length")
 	}
 
-	var coursePayouts []CourseBetPayout
+	coursePayouts := make([]CourseBetPayout, 0, len(payouts))
 	for i, payout := range payouts {
 		coursePayouts = append(coursePayouts, CourseBetPayout{
 			Payout:  payout,
@@ -27,6 +26,60 @@ func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayo
 		})
 	}
 	return coursePayouts
+}
+
+func assertCoursePayouts(t *testing.T, actual, expected []CourseBetPayout) {
+	t.Helper()
+
+	if len(actual) != len(expected) {
+		t.Fatalf("expected %d payouts, got %d", len(expected), len(actual))
+	}
+
+	for i, payout := range actual {
+		if payout.Payout != expected[i].Payout || payout.Outcome != expected[i].Outcome {
+			t.Errorf(
+				"payout %d mismatch: expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
+				i, expected[i].Payout, expected[i].Outcome, payout.Payout, payout.Outcome,
+			)
+		}
+	}
+}
+
+func assertInt64Slice(t *testing.T, actual, expected []int64) {
+	t.Helper()
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("expected %v, got %v", expected, actual)
+	}
+}
+
+func assertNormalizationFactors(t *testing.T, actualYes, actualNo, expectedYes, expectedNo float64) {
+	t.Helper()
+
+	if actualYes != expectedYes || actualNo != expectedNo {
+		t.Errorf(
+			"expected yesNormalizationFactor=%f, noNormalizationFactor=%f; got yesNormalizationFactor=%f, noNormalizationFactor=%f",
+			expectedYes, expectedNo, actualYes, actualNo,
+		)
+	}
+}
+
+func sortPositionsByUsername(positions []DBPMMarketPosition) {
+	sort.Slice(positions, func(i, j int) bool {
+		return positions[i].Username < positions[j].Username
+	})
+}
+
+func assertPositionsByUsername(t *testing.T, actual, expected []DBPMMarketPosition) {
+	t.Helper()
+
+	expectedPositions := append([]DBPMMarketPosition(nil), expected...)
+	sortPositionsByUsername(expectedPositions)
+	sortPositionsByUsername(actual)
+
+	if !reflect.DeepEqual(actual, expectedPositions) {
+		t.Errorf("expected %+v, got %+v", expectedPositions, actual)
+	}
 }
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
@@ -192,30 +245,7 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateCoursePayoutsDBPM(tc.Bets, tc.ProbabilityChanges)
-
-			// Debug output: Actual payouts
-			if t.Failed() {
-				t.Logf(
-					"[DEBUG] %s: Actual payouts: %+v",
-					tc.Name, actualPayouts,
-				)
-			}
-
-			// Ensure payout counts match
-			if len(actualPayouts) != len(tc.ExpectedPayouts) {
-				t.Fatalf("%s: Expected %d payouts, got %d", tc.Name, len(tc.ExpectedPayouts), len(actualPayouts))
-			}
-
-			// Check each payout
-			for i, payout := range actualPayouts {
-				expected := tc.ExpectedPayouts[i]
-				if payout.Payout != expected.Payout || payout.Outcome != expected.Outcome {
-					t.Errorf(
-						"%s: Payout %d mismatch. Expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
-						tc.Name, i, expected.Payout, expected.Outcome, payout.Payout, payout.Outcome,
-					)
-				}
-			}
+			assertCoursePayouts(t, actualPayouts, tc.ExpectedPayouts)
 		})
 	}
 
@@ -286,18 +316,13 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualyesNormalizationFactor, actualnoNormalizationFactor := CalculateNormalizationFactorsDBPM(tc.yesShares, tc.noShares, tc.CoursePayouts)
-
-			// Debug output for verbose mode
-			t.Logf(
-				"[DEBUG] %s: yesNormalizationFactor=%f, noNormalizationFactor=%f", tc.Name, actualyesNormalizationFactor, actualnoNormalizationFactor,
+			assertNormalizationFactors(
+				t,
+				actualyesNormalizationFactor,
+				actualnoNormalizationFactor,
+				tc.ExpectedyesNormalizationFactor,
+				tc.ExpectednoNormalizationFactor,
 			)
-
-			if actualyesNormalizationFactor != tc.ExpectedyesNormalizationFactor || actualnoNormalizationFactor != tc.ExpectednoNormalizationFactor {
-				t.Errorf(
-					"%s: expected yesNormalizationFactor=%f, noNormalizationFactor=%f; got yesNormalizationFactor=%f, noNormalizationFactor=%f",
-					tc.Name, tc.ExpectedyesNormalizationFactor, tc.ExpectednoNormalizationFactor, actualyesNormalizationFactor, actualnoNormalizationFactor,
-				)
-			}
 		})
 	}
 
@@ -383,16 +408,7 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.yesNormalizationFactor, tc.noNormalizationFactor)
-
-			// Ensure payouts match exactly
-			for i, payout := range actualPayouts {
-				if payout != tc.ExpectedScaledPayouts[i] {
-					t.Errorf(
-						"at index %d: expected payout %d, got %d",
-						i, tc.ExpectedScaledPayouts[i], payout,
-					)
-				}
-			}
+			assertInt64Slice(t, actualPayouts, tc.ExpectedScaledPayouts)
 		})
 	}
 
@@ -490,14 +506,7 @@ func TestAdjustForPositiveExcess(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := adjustForPositiveExcess(tc.ScaledPayouts, tc.Excess)
-			for i, result := range actualResult {
-				if result != tc.ExpectedResult[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedResult[i], result,
-					)
-				}
-			}
+			assertInt64Slice(t, actualResult, tc.ExpectedResult)
 		})
 	}
 }
@@ -531,14 +540,7 @@ func TestAdjustForNegativeExcess(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := adjustForNegativeExcess(tc.ScaledPayouts, tc.Excess)
-			for i, result := range actualResult {
-				if result != tc.ExpectedResult[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedResult[i], result,
-					)
-				}
-			}
+			assertInt64Slice(t, actualResult, tc.ExpectedResult)
 		})
 	}
 
@@ -599,14 +601,7 @@ func TestAdjustPayouts(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := AdjustPayouts(tc.Bets, tc.ScaledPayouts)
-			for i, result := range actualResult {
-				if result != tc.ExpectedAdjustedPayouts[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedAdjustedPayouts[i], result,
-					)
-				}
-			}
+			assertInt64Slice(t, actualResult, tc.ExpectedAdjustedPayouts)
 		})
 	}
 }
@@ -680,32 +675,7 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPositions := AggregateUserPayoutsDBPM(tc.Bets, tc.FinalPayouts)
-
-			// Sort both expected and actual results by Username for comparison
-			sort.Slice(tc.ExpectedPositions, func(i, j int) bool {
-				return tc.ExpectedPositions[i].Username < tc.ExpectedPositions[j].Username
-			})
-			sort.Slice(actualPositions, func(i, j int) bool {
-				return actualPositions[i].Username < actualPositions[j].Username
-			})
-
-			// Ensure lengths match
-			if len(actualPositions) != len(tc.ExpectedPositions) {
-				t.Fatalf("Test %s failed: expected %d positions, got %d", tc.Name, len(tc.ExpectedPositions), len(actualPositions))
-			}
-
-			// Ensure positions match exactly
-			for i, position := range actualPositions {
-				expected := tc.ExpectedPositions[i]
-				if position.Username != expected.Username ||
-					position.NoSharesOwned != expected.NoSharesOwned ||
-					position.YesSharesOwned != expected.YesSharesOwned {
-					t.Errorf(
-						"Test %s failed at index %d: expected %+v, got %+v",
-						tc.Name, i, expected, position,
-					)
-				}
-			}
+			assertPositionsByUsername(t, actualPositions, tc.ExpectedPositions)
 		})
 	}
 }
