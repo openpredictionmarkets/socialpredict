@@ -63,3 +63,7 @@ docker-compose.override.yml
 # Node modules
 /frontend/node_modules/
 node_modules/
+
+# Go cache
+.gocache
+.gomodcache
