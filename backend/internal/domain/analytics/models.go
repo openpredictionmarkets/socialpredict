@@ -1,5 +1,7 @@
 package analytics
 
+import "fmt"
+
 // FinancialSnapshot captures a user's financial aggregates.
 type FinancialSnapshot struct {
 	AccountBalance     int64
@@ -34,9 +36,35 @@ type MetricWithExplanation struct {
 	Explanation string      `json:"explanation"`
 }
 
+// Int64Value returns the metric as an int64 when the underlying value matches.
+func (m MetricWithExplanation) Int64Value() (int64, error) {
+	value, ok := m.Value.(int64)
+	if !ok {
+		return 0, fmt.Errorf("metric value is %T, want int64", m.Value)
+	}
+	return value, nil
+}
+
+// BoolValue returns the metric as a bool when the underlying value matches.
+func (m MetricWithExplanation) BoolValue() (bool, error) {
+	value, ok := m.Value.(bool)
+	if !ok {
+		return false, fmt.Errorf("metric value is %T, want bool", m.Value)
+	}
+	return value, nil
+}
+
 type MoneyCreated struct {
 	UserDebtCapacity MetricWithExplanation `json:"userDebtCapacity"`
 	NumUsers         MetricWithExplanation `json:"numUsers"`
+}
+
+func (m MoneyCreated) UserDebtCapacityValue() (int64, error) {
+	return m.UserDebtCapacity.Int64Value()
+}
+
+func (m MoneyCreated) NumUsersValue() (int64, error) {
+	return m.NumUsers.Int64Value()
 }
 
 type MoneyUtilized struct {
@@ -48,9 +76,41 @@ type MoneyUtilized struct {
 	TotalUtilized      MetricWithExplanation `json:"totalUtilized"`
 }
 
+func (m MoneyUtilized) UnusedDebtValue() (int64, error) {
+	return m.UnusedDebt.Int64Value()
+}
+
+func (m MoneyUtilized) ActiveBetVolumeValue() (int64, error) {
+	return m.ActiveBetVolume.Int64Value()
+}
+
+func (m MoneyUtilized) MarketCreationFeesValue() (int64, error) {
+	return m.MarketCreationFees.Int64Value()
+}
+
+func (m MoneyUtilized) ParticipationFeesValue() (int64, error) {
+	return m.ParticipationFees.Int64Value()
+}
+
+func (m MoneyUtilized) BonusesPaidValue() (int64, error) {
+	return m.BonusesPaid.Int64Value()
+}
+
+func (m MoneyUtilized) TotalUtilizedValue() (int64, error) {
+	return m.TotalUtilized.Int64Value()
+}
+
 type Verification struct {
 	Balanced MetricWithExplanation `json:"balanced"`
 	Surplus  MetricWithExplanation `json:"surplus"`
+}
+
+func (v Verification) BalancedValue() (bool, error) {
+	return v.Balanced.BoolValue()
+}
+
+func (v Verification) SurplusValue() (int64, error) {
+	return v.Surplus.Int64Value()
 }
 
 type SystemMetrics struct {

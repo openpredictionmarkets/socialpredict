@@ -42,40 +42,54 @@ func NewGormRepository(db *gorm.DB, opts ...RepositoryOption) *GormRepository {
 }
 
 func (r *GormRepository) WithContext(ctx context.Context) *gorm.DB {
-	if ctx != nil {
-		return r.db.WithContext(ctx)
+	if r == nil || r.db == nil {
+		return nil
 	}
-	return r.db
+	if ctx == nil {
+		return r.db
+	}
+	return r.db.WithContext(ctx)
+}
+
+func (r *GormRepository) dbWithContext(ctx context.Context) (*gorm.DB, error) {
+	db := r.WithContext(ctx)
+	if db == nil {
+		return nil, errors.New("gorm repository not initialized")
+	}
+	return db, nil
 }
 
 func (r *GormRepository) ListUsers(ctx context.Context) ([]models.User, error) {
-	if r.db == nil {
-		return nil, errors.New("gorm repository not initialized")
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 	var users []models.User
-	if err := r.WithContext(ctx).Find(&users).Error; err != nil {
+	if err := db.Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil
 }
 
 func (r *GormRepository) ListMarkets(ctx context.Context) ([]models.Market, error) {
-	if r.db == nil {
-		return nil, errors.New("gorm repository not initialized")
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 	var markets []models.Market
-	if err := r.WithContext(ctx).Find(&markets).Error; err != nil {
+	if err := db.Find(&markets).Error; err != nil {
 		return nil, err
 	}
 	return markets, nil
 }
 
 func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error) {
-	if r.db == nil {
-		return nil, errors.New("gorm repository not initialized")
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 	var bets []models.Bet
-	if err := r.WithContext(ctx).
+	if err := db.
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC").
 		Find(&bets).Error; err != nil {
@@ -85,11 +99,12 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) (
 }
 
 func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]models.Bet, error) {
-	if r.db == nil {
-		return nil, errors.New("gorm repository not initialized")
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 	var bets []models.Bet
-	if err := r.WithContext(ctx).
+	if err := db.
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
@@ -98,10 +113,10 @@ func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]models.Bet, err
 }
 
 func (r *GormRepository) UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error) {
-	if r.db == nil {
-		return nil, errors.New("gorm repository not initialized")
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-	db := r.WithContext(ctx)
 
 	userBets, err := r.listUserBets(db, username)
 	if err != nil {
@@ -146,9 +161,9 @@ func (r *GormRepository) listUserBets(db *gorm.DB, username string) ([]models.Be
 }
 
 func collectMarketIDs(bets []models.Bet) []uint {
-	marketIDSet := make(map[int64]struct{})
+	marketIDSet := make(map[uint]struct{}, len(bets))
 	for _, bet := range bets {
-		marketIDSet[int64(bet.MarketID)] = struct{}{}
+		marketIDSet[bet.MarketID] = struct{}{}
 	}
 
 	marketIDs := make([]uint, 0, len(marketIDSet))
@@ -160,6 +175,9 @@ func collectMarketIDs(bets []models.Bet) []uint {
 }
 
 func (r *GormRepository) listMarketsByIDs(db *gorm.DB, marketIDs []uint) ([]models.Market, error) {
+	if len(marketIDs) == 0 {
+		return []models.Market{}, nil
+	}
 	var markets []models.Market
 	if err := db.Where("id IN ?", marketIDs).Find(&markets).Error; err != nil {
 		return nil, err
@@ -181,6 +199,9 @@ func buildMarketSnapshots(markets []models.Market) map[int64]positionsmath.Marke
 }
 
 func (r *GormRepository) listBetsByMarketIDs(db *gorm.DB, marketIDs []uint) ([]models.Bet, error) {
+	if len(marketIDs) == 0 {
+		return []models.Bet{}, nil
+	}
 	var allBets []models.Bet
 	if err := db.Where("market_id IN ?", marketIDs).
 		Order("market_id ASC, placed_at ASC, id ASC").
@@ -191,21 +212,22 @@ func (r *GormRepository) listBetsByMarketIDs(db *gorm.DB, marketIDs []uint) ([]m
 }
 
 func groupBetsByMarket(bets []models.Bet) map[int64][]models.Bet {
-	betsByMarket := make(map[int64][]models.Bet)
+	betsByMarket := make(map[int64][]models.Bet, len(bets))
 	for _, bet := range bets {
 		betsByMarket[int64(bet.MarketID)] = append(betsByMarket[int64(bet.MarketID)], bet)
 	}
 	return betsByMarket
 }
 
-func (r *GormRepository) ensurePositionCalculator() {
+func (r *GormRepository) ensurePositionCalculator() MarketPositionCalculator {
 	if r.positionCalculator == nil {
 		r.positionCalculator = defaultMarketPositionCalculator{}
 	}
+	return r.positionCalculator
 }
 
 func (r *GormRepository) calculateUserPositions(username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]models.Bet) ([]positionsmath.MarketPosition, error) {
-	r.ensurePositionCalculator()
+	calculator := r.ensurePositionCalculator()
 	var positions []positionsmath.MarketPosition
 	for _, marketID := range marketIDs {
 		snapshot, ok := snapshots[int64(marketID)]
@@ -218,7 +240,7 @@ func (r *GormRepository) calculateUserPositions(username string, marketIDs []uin
 			continue
 		}
 
-		calculated, err := r.positionCalculator.Calculate(snapshot, bets)
+		calculated, err := calculator.Calculate(snapshot, bets)
 		if err != nil {
 			return nil, err
 		}
