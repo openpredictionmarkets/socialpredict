@@ -7,11 +7,21 @@ import (
 
 	markets "socialpredict/internal/domain/markets"
 	marketmath "socialpredict/internal/domain/math/market"
+	"socialpredict/internal/domain/math/probabilities/wpam"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
 
-func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
+type marketDetailsFixture struct {
+	service    *markets.Service
+	bets       []models.Bet
+	market     models.Market
+	calculator wpam.ProbabilityCalculator
+}
+
+func seedMarketDetailsFixture(t *testing.T) marketDetailsFixture {
+	t.Helper()
+
 	service, db, calculator := setupServiceWithDB(t)
 
 	creator := modelstesting.GenerateUser("creator", 0)
@@ -38,10 +48,16 @@ func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
 		}
 	}
 
-	overview, err := service.GetMarketDetails(context.Background(), market.ID)
-	if err != nil {
-		t.Fatalf("GetMarketDetails returned error: %v", err)
+	return marketDetailsFixture{
+		service:    service,
+		bets:       bets,
+		market:     market,
+		calculator: calculator,
 	}
+}
+
+func assertMarketDetailMetrics(t *testing.T, overview *markets.MarketOverview, market models.Market, bets []models.Bet, calculator wpam.ProbabilityCalculator) {
+	t.Helper()
 
 	expectedVolume := marketmath.GetMarketVolumeWithDust(bets)
 	expectedDust := marketmath.GetMarketDust(bets)
@@ -67,14 +83,32 @@ func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
 	}
 }
 
+func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
+	fixture := seedMarketDetailsFixture(t)
+
+	overview, err := fixture.service.GetMarketDetails(context.Background(), fixture.market.ID)
+	if err != nil {
+		t.Fatalf("GetMarketDetails returned error: %v", err)
+	}
+
+	assertMarketDetailMetrics(t, overview, fixture.market, fixture.bets, fixture.calculator)
+
+	fallback := markets.NewService(nil, newNoopUserService(), nil, markets.Config{}, markets.WithMetricsCalculator(nil), markets.WithClock(nil))
+	if fallback == nil {
+		t.Fatalf("expected fallback service")
+	}
+}
+
 func TestServiceGetMarketDetails_InvalidAndMissing(t *testing.T) {
 	service, _, _ := setupServiceWithDB(t)
 
-	if _, err := service.GetMarketDetails(context.Background(), 0); err != markets.ErrInvalidInput {
-		t.Fatalf("expected ErrInvalidInput, got %v", err)
-	}
+	_, err := service.GetMarketDetails(context.Background(), 0)
+	requireInvalidInput(t, err)
 
-	if _, err := service.GetMarketDetails(context.Background(), 999); err != markets.ErrMarketNotFound {
-		t.Fatalf("expected ErrMarketNotFound, got %v", err)
+	_, err = service.GetMarketDetails(context.Background(), 999)
+	requireMarketNotFound(t, err)
+
+	if err := (noopUserService{}).DeductBalance(context.Background(), "alice", 1); err == nil {
+		t.Fatalf("expected zero-value user service to fail predictably")
 	}
 }

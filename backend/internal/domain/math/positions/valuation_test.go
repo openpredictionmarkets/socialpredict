@@ -5,12 +5,33 @@ import (
 	"time"
 )
 
-// private helper function just for this specific use case
-func makeUserPositions(data []struct {
+type stubValuationModel struct {
+	finalProbability float64
+	value            float64
+}
+
+func (s stubValuationModel) FinalProbability(float64, bool, string) float64 {
+	return s.finalProbability
+}
+func (s stubValuationModel) PositionValue(UserMarketPosition, float64, bool, string) float64 {
+	return s.value
+}
+
+type passthroughAdjuster struct{}
+
+func (passthroughAdjuster) Adjust(vals map[string]UserValuationResult, _ map[string]time.Time, _ int64) map[string]UserValuationResult {
+	return vals
+}
+
+type valuationPositionInput struct {
 	Username       string
 	YesSharesOwned int64
 	NoSharesOwned  int64
-}) map[string]UserMarketPosition {
+}
+
+var valuationTestBaseTime = time.Date(2025, 1, 1, 11, 0, 0, 0, time.UTC)
+
+func makeUserPositions(data []valuationPositionInput) map[string]UserMarketPosition {
 	result := make(map[string]UserMarketPosition)
 	for _, d := range data {
 		result[d.Username] = UserMarketPosition{
@@ -21,14 +42,27 @@ func makeUserPositions(data []struct {
 	return result
 }
 
+func makeEarliestValuationBets(data []valuationPositionInput) map[string]time.Time {
+	earliest := make(map[string]time.Time, len(data))
+	for i, pos := range data {
+		earliest[pos.Username] = valuationTestBaseTime.Add(time.Duration(i) * time.Minute)
+	}
+	return earliest
+}
+
+func assertValuations(t *testing.T, actual map[string]UserValuationResult, expected map[string]int64) {
+	t.Helper()
+	for user, want := range expected {
+		if got := actual[user].RoundedValue; got != want {
+			t.Fatalf("user %s: expected value %d, got %d", user, want, got)
+		}
+	}
+}
+
 func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 	testcases := []struct {
-		Name          string
-		UserPositions []struct {
-			Username       string
-			YesSharesOwned int64
-			NoSharesOwned  int64
-		}
+		Name             string
+		UserPositions    []valuationPositionInput
 		Probability      float64
 		TotalVolume      int64
 		IsResolved       bool
@@ -37,11 +71,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 	}{
 		{
 			Name: "Unresolved market, YES/NO users at 50%",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []valuationPositionInput{
 				{"alice", 10, 0},
 				{"bob", 0, 10},
 			},
@@ -53,11 +83,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: YES wins",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []valuationPositionInput{
 				{"alice", 10, 0},
 				{"bob", 0, 10},
 			},
@@ -69,11 +95,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: NO wins",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []valuationPositionInput{
 				{"alice", 10, 0},
 				{"bob", 0, 10},
 			},
@@ -85,11 +107,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: All YES, NO wins (all get zero)",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []valuationPositionInput{
 				{"alice", 10, 0},
 				{"bob", 5, 0},
 			},
@@ -101,11 +119,7 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 		},
 		{
 			Name: "Resolved market: All NO, YES wins (all get zero)",
-			UserPositions: []struct {
-				Username       string
-				YesSharesOwned int64
-				NoSharesOwned  int64
-			}{
+			UserPositions: []valuationPositionInput{
 				{"alice", 0, 10},
 				{"bob", 0, 5},
 			},
@@ -120,30 +134,41 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			positions := makeUserPositions(tc.UserPositions)
-			earliest := make(map[string]time.Time)
-			base := time.Now()
-			for i, pos := range tc.UserPositions {
-				earliest[pos.Username] = base.Add(time.Duration(i) * time.Minute)
-			}
-
 			actual, err := CalculateRoundedUserValuationsFromUserMarketPositions(
 				positions,
 				tc.Probability,
 				tc.TotalVolume,
 				tc.IsResolved,
 				tc.ResolutionResult,
-				earliest,
+				makeEarliestValuationBets(tc.UserPositions),
 			)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			for user, want := range tc.Expected {
-				got := actual[user].RoundedValue
-				if got != want {
-					t.Errorf("user %s: expected value %d, got %d", user, want, got)
-				}
-			}
+			assertValuations(t, actual, tc.Expected)
 		})
+	}
+}
+
+func TestCalculateRoundedUserValuationsFromUserMarketPositions_UsesInjectedCalculator(t *testing.T) {
+	calculator := ValuationCalculator{
+		model:    stubValuationModel{finalProbability: 0.9, value: 7.6},
+		adjuster: passthroughAdjuster{},
+	}
+
+	actual, err := calculator.Calculate(
+		makeUserPositions([]valuationPositionInput{{Username: "alice", YesSharesOwned: 10}}),
+		0.1,
+		100,
+		false,
+		"",
+		makeEarliestValuationBets([]valuationPositionInput{{Username: "alice"}}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if actual["alice"].RoundedValue != 8 {
+		t.Fatalf("expected injected rounded value 8, got %d", actual["alice"].RoundedValue)
 	}
 }

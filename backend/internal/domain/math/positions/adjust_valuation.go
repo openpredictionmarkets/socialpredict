@@ -5,11 +5,19 @@ import (
 	"time"
 )
 
-// UserHolder is for sorting only—combines valuation and earliest bet.
+// UserHolder carries the ordering data used for deterministic valuation adjustments.
 type UserHolder struct {
 	Username     string
 	RoundedValue int64
 	EarliestBet  time.Time
+}
+
+type UserValuationAdjuster interface {
+	Adjust(
+		userValuations map[string]UserValuationResult,
+		earliestBets map[string]time.Time,
+		targetMarketVolume int64,
+	) map[string]UserValuationResult
 }
 
 type ByValBetTimeUsername []UserHolder
@@ -26,6 +34,10 @@ func (s ByValBetTimeUsername) Less(i, j int) bool {
 	return s[i].Username < s[j].Username
 }
 
+type deterministicValuationAdjuster struct{}
+
+var defaultUserValuationAdjuster UserValuationAdjuster = deterministicValuationAdjuster{}
+
 // AdjustUserValuationsToMarketVolume ensures user values match total market volume,
 // distributing rounding delta deterministically. Only users with >0 value are adjusted.
 func AdjustUserValuationsToMarketVolume(
@@ -33,24 +45,26 @@ func AdjustUserValuationsToMarketVolume(
 	earliestBets map[string]time.Time,
 	targetMarketVolume int64,
 ) map[string]UserValuationResult {
-	// Filter out users with zero valuation
+	return defaultUserValuationAdjuster.Adjust(userValuations, earliestBets, targetMarketVolume)
+}
+
+func (deterministicValuationAdjuster) Adjust(
+	userValuations map[string]UserValuationResult,
+	earliestBets map[string]time.Time,
+	targetMarketVolume int64,
+) map[string]UserValuationResult {
 	filtered := filterWinningValuations(userValuations)
 	if len(filtered) == 0 {
 		return userValuations
 	}
 
-	// Create sortable holder list
 	holders, sum := buildUserHolders(filtered, earliestBets)
-
-	// Apply delta correction
-	adjusted := adjustValuations(filtered, holders, sum, targetMarketVolume)
-
-	return adjusted
+	return adjustValuations(filtered, holders, sum, targetMarketVolume)
 }
 
-// filterWinningValuations drops users with zero rounded value
+// filterWinningValuations returns only users eligible for rounding adjustments.
 func filterWinningValuations(all map[string]UserValuationResult) map[string]UserValuationResult {
-	filtered := make(map[string]UserValuationResult)
+	filtered := make(map[string]UserValuationResult, len(all))
 	for username, val := range all {
 		if val.RoundedValue > 0 {
 			filtered[username] = val
@@ -59,7 +73,7 @@ func filterWinningValuations(all map[string]UserValuationResult) map[string]User
 	return filtered
 }
 
-// buildUserHolders prepares sorted holders and computes total value sum
+// buildUserHolders builds the deterministic adjustment order and total adjusted value.
 func buildUserHolders(
 	userVals map[string]UserValuationResult,
 	earliest map[string]time.Time,
@@ -70,33 +84,30 @@ func buildUserHolders(
 	)
 	for username, val := range userVals {
 		sum += val.RoundedValue
-		earliestTime := earliest[username]
-		holders = append(holders, UserHolder{
-			Username:     username,
-			RoundedValue: val.RoundedValue,
-			EarliestBet:  earliestTime,
-		})
+		holders = append(holders, newUserHolder(username, val.RoundedValue, earliest[username]))
 	}
 	sort.Sort(ByValBetTimeUsername(holders))
 	return holders, sum
 }
 
-// adjustValuations spreads rounding delta among holders
+func newUserHolder(username string, roundedValue int64, earliestBet time.Time) UserHolder {
+	return UserHolder{
+		Username:     username,
+		RoundedValue: roundedValue,
+		EarliestBet:  earliestBet,
+	}
+}
+
+// adjustValuations spreads the rounding delta across the sorted holders.
 func adjustValuations(
 	userVals map[string]UserValuationResult,
 	holders []UserHolder,
 	sum int64,
 	target int64,
 ) map[string]UserValuationResult {
-	delta := target - sum
+	delta, adjustment := valuationDelta(sum, target)
 	if delta == 0 {
 		return userVals
-	}
-
-	adjustment := int64(1)
-	if delta < 0 {
-		adjustment = -1
-		delta = -delta
 	}
 
 	holderCount := int64(len(holders))
@@ -107,4 +118,12 @@ func adjustValuations(
 		userVals[holder.Username] = val
 	}
 	return userVals
+}
+
+func valuationDelta(currentSum, target int64) (int64, int64) {
+	delta := target - currentSum
+	if delta < 0 {
+		return -delta, -1
+	}
+	return delta, 1
 }

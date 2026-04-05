@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -43,6 +44,57 @@ type Repository interface {
 	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
 }
 
+// UserReader exposes user lookup operations.
+type UserReader interface {
+	GetByUsername(ctx context.Context, username string) (*User, error)
+}
+
+// UserBalanceRepository exposes balance mutation operations.
+type UserBalanceRepository interface {
+	UpdateBalance(ctx context.Context, username string, newBalance int64) error
+}
+
+// UserWriter exposes create, update, and delete operations.
+type UserWriter interface {
+	Create(ctx context.Context, user *User) error
+	Update(ctx context.Context, user *User) error
+	Delete(ctx context.Context, username string) error
+}
+
+// UserLister exposes list operations.
+type UserLister interface {
+	List(ctx context.Context, filters ListFilters) ([]*User, error)
+}
+
+// UserPortfolioRepository exposes portfolio-related reads.
+type UserPortfolioRepository interface {
+	ListUserBets(ctx context.Context, username string) ([]*UserBet, error)
+	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
+	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
+}
+
+// UserMarketsRepository exposes user-market lookups.
+type UserMarketsRepository interface {
+	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
+}
+
+// CredentialsRepository exposes authentication credential reads and writes.
+type CredentialsRepository interface {
+	GetCredentials(ctx context.Context, username string) (*Credentials, error)
+	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
+}
+
+// ServiceDependencies exposes the storage collaborators required by the users service.
+type ServiceDependencies struct {
+	Reader      UserReader
+	BalanceRepo UserBalanceRepository
+	Writer      UserWriter
+	Lister      UserLister
+	Portfolio   UserPortfolioRepository
+	Markets     UserMarketsRepository
+	Credentials CredentialsRepository
+}
+
 // ListFilters represents filters for listing users
 type ListFilters struct {
 	UserType string
@@ -66,34 +118,149 @@ type AnalyticsService interface {
 
 // Service implements the core user business logic
 type Service struct {
-	repo      Repository
-	analytics AnalyticsService
-	sanitizer Sanitizer
+	reader      UserReader
+	balanceRepo UserBalanceRepository
+	writer      UserWriter
+	lister      UserLister
+	portfolio   UserPortfolioRepository
+	markets     UserMarketsRepository
+	credentials CredentialsRepository
+	analytics   AnalyticsService
+	sanitizer   Sanitizer
 }
 
-// NewService creates a new users service
+type profileMutation func(*User) error
+type profileFieldSpec struct {
+	validate func(string) error
+	sanitize func(*Service, string) (string, error)
+	apply    func(*User, string)
+}
+
+type financialSnapshotField struct {
+	key     string
+	extract func(*analytics.FinancialSnapshot) int64
+}
+
+type passwordChangeValidator func(*Service, string, string, string) error
+
+var profileFieldSpecs = map[string]profileFieldSpec{
+	"description": {
+		validate: validateMaximumLength("description", 2000),
+		sanitize: (*Service).sanitizeDescription,
+		apply: func(user *User, value string) {
+			user.Description = value
+		},
+	},
+	"display_name": {
+		validate: validateRequiredLength("display name", 1, 50),
+		sanitize: (*Service).sanitizeDisplayName,
+		apply: func(user *User, value string) {
+			user.DisplayName = value
+		},
+	},
+	"emoji": {
+		validate: validateRequiredLength("emoji", 1, 20),
+		sanitize: (*Service).sanitizeEmoji,
+		apply: func(user *User, value string) {
+			user.PersonalEmoji = value
+		},
+	},
+}
+
+var financialSnapshotFields = []financialSnapshotField{
+	{key: "accountBalance", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.AccountBalance }},
+	{key: "maximumDebtAllowed", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.MaximumDebtAllowed }},
+	{key: "amountInPlay", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.AmountInPlay }},
+	{key: "amountBorrowed", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.AmountBorrowed }},
+	{key: "retainedEarnings", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.RetainedEarnings }},
+	{key: "equity", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.Equity }},
+	{key: "tradingProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.TradingProfits }},
+	{key: "workProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.WorkProfits }},
+	{key: "totalProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.TotalProfits }},
+	{key: "amountInPlayActive", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.AmountInPlayActive }},
+	{key: "totalSpent", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.TotalSpent }},
+	{key: "totalSpentInPlay", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.TotalSpentInPlay }},
+	{key: "realizedProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.RealizedProfits }},
+	{key: "potentialProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.PotentialProfits }},
+	{key: "realizedValue", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.RealizedValue }},
+	{key: "potentialValue", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.PotentialValue }},
+}
+
+var passwordChangeValidators = []passwordChangeValidator{
+	func(_ *Service, username, _, _ string) error { return validateUsername(username) },
+	func(_ *Service, _, currentPassword, _ string) error {
+		if currentPassword == "" {
+			return fmt.Errorf("current password is required")
+		}
+		return nil
+	},
+	func(_ *Service, _, _, newPassword string) error {
+		if newPassword == "" {
+			return fmt.Errorf("new password is required")
+		}
+		return nil
+	},
+	func(s *Service, _, _, _ string) error {
+		return s.requireSanitizer()
+	},
+}
+
+func validateUsername(username string) error {
+	if username == "" {
+		return ErrInvalidUserData
+	}
+	return nil
+}
+
+func validateUserID(userID int64) error {
+	if userID <= 0 {
+		return ErrInvalidUserData
+	}
+	return nil
+}
+
+// NewService creates a new users service from the legacy repository shape.
 func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
+	return NewServiceWithDependencies(ServiceDependencies{
+		Reader:      repo,
+		BalanceRepo: repo,
+		Writer:      repo,
+		Lister:      repo,
+		Portfolio:   repo,
+		Markets:     repo,
+		Credentials: repo,
+	}, analyticsSvc, sanitizer)
+}
+
+// NewServiceWithDependencies creates a new users service from explicit ports.
+func NewServiceWithDependencies(deps ServiceDependencies, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
 	return &Service{
-		repo:      repo,
-		analytics: analyticsSvc,
-		sanitizer: sanitizer,
+		reader:      deps.Reader,
+		balanceRepo: deps.BalanceRepo,
+		writer:      deps.Writer,
+		lister:      deps.Lister,
+		portfolio:   deps.Portfolio,
+		markets:     deps.Markets,
+		credentials: deps.Credentials,
+		analytics:   analyticsSvc,
+		sanitizer:   sanitizer,
 	}
 }
 
 // ValidateUserExists checks if a user exists
 func (s *Service) ValidateUserExists(ctx context.Context, username string) error {
-	_, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return ErrUserNotFound
+	if err := validateUsername(username); err != nil {
+		return err
 	}
-	return nil
+	_, err := s.requireUser(ctx, username)
+	return err
 }
 
 // ValidateUserBalance validates if a user has sufficient balance for an operation
 func (s *Service) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
-	user, err := s.repo.GetByUsername(ctx, username)
+	user, err := s.requireUser(ctx, username)
 	if err != nil {
-		return ErrUserNotFound
+		return err
 	}
 
 	// Check if user would exceed maximum debt
@@ -106,61 +273,50 @@ func (s *Service) ValidateUserBalance(ctx context.Context, username string, requ
 
 // DeductBalance deducts an amount from a user's balance
 func (s *Service) DeductBalance(ctx context.Context, username string, amount int64) error {
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return ErrUserNotFound
-	}
-
-	newBalance := user.AccountBalance - amount
-	return s.repo.UpdateBalance(ctx, username, newBalance)
+	return s.ApplyTransaction(ctx, username, amount, string(TransactionBuy))
 }
 
 // GetUser retrieves a user by username
 func (s *Service) GetUser(ctx context.Context, username string) (*User, error) {
-	return s.repo.GetByUsername(ctx, username)
+	if err := validateUsername(username); err != nil {
+		return nil, err
+	}
+	return s.requireUser(ctx, username)
 }
 
 // GetPublicUser retrieves the public view of a user
 func (s *Service) GetPublicUser(ctx context.Context, username string) (*PublicUser, error) {
-	user, err := s.repo.GetByUsername(ctx, username)
+	user, err := s.GetUser(ctx, username)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, err
 	}
 
-	return &PublicUser{
-		ID:                    user.ID,
-		Username:              user.Username,
-		DisplayName:           user.DisplayName,
-		UserType:              user.UserType,
-		InitialAccountBalance: user.InitialAccountBalance,
-		AccountBalance:        user.AccountBalance,
-		PersonalEmoji:         user.PersonalEmoji,
-		Description:           user.Description,
-		PersonalLink1:         user.PersonalLink1,
-		PersonalLink2:         user.PersonalLink2,
-		PersonalLink3:         user.PersonalLink3,
-		PersonalLink4:         user.PersonalLink4,
-	}, nil
+	return user.ToPublicUser(), nil
 }
 
 // CreateUser creates a new user
 func (s *Service) CreateUser(ctx context.Context, req UserCreateRequest) (*User, error) {
-	// Check if user already exists
-	if _, err := s.repo.GetByUsername(ctx, req.Username); err == nil {
+	if err := validateUsername(req.Username); err != nil {
+		return nil, err
+	}
+
+	reader, err := s.userReader()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := reader.GetByUsername(ctx, req.Username); err == nil {
 		return nil, ErrUserAlreadyExists
+	} else if !errors.Is(err, ErrUserNotFound) {
+		return nil, err
 	}
 
-	user := &User{
-		Username:              req.Username,
-		DisplayName:           req.DisplayName,
-		Email:                 req.Email,
-		UserType:              req.UserType,
-		InitialAccountBalance: 0,
-		AccountBalance:        0,
-		MustChangePassword:    true,
-	}
+	user := req.NewUser()
 
-	if err := s.repo.Create(ctx, user); err != nil {
+	writer, err := s.userWriter()
+	if err != nil {
+		return nil, err
+	}
+	if err := writer.Create(ctx, user); err != nil {
 		return nil, err
 	}
 
@@ -169,67 +325,61 @@ func (s *Service) CreateUser(ctx context.Context, req UserCreateRequest) (*User,
 
 // UpdateUser updates user information
 func (s *Service) UpdateUser(ctx context.Context, username string, req UserUpdateRequest) (*User, error) {
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, ErrUserNotFound
-	}
-
-	// Update fields
-	user.DisplayName = req.DisplayName
-	user.Description = req.Description
-	user.PersonalEmoji = req.PersonalEmoji
-	user.PersonalLink1 = req.PersonalLink1
-	user.PersonalLink2 = req.PersonalLink2
-	user.PersonalLink3 = req.PersonalLink3
-	user.PersonalLink4 = req.PersonalLink4
-
-	if err := s.repo.Update(ctx, user); err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return s.updateUserProfile(ctx, username, func(user *User) error {
+		user.ApplyUpdate(req)
+		return nil
+	})
 }
 
 // ListUsers returns a list of users with filters
 func (s *Service) ListUsers(ctx context.Context, filters ListFilters) ([]*User, error) {
-	return s.repo.List(ctx, filters)
+	lister, err := s.userLister()
+	if err != nil {
+		return nil, err
+	}
+	users, err := lister.List(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	if users == nil {
+		return []*User{}, nil
+	}
+	return users, nil
 }
 
 // DeleteUser removes a user
 func (s *Service) DeleteUser(ctx context.Context, username string) error {
-	// Check if user exists
 	if err := s.ValidateUserExists(ctx, username); err != nil {
 		return err
 	}
 
-	return s.repo.Delete(ctx, username)
+	writer, err := s.userWriter()
+	if err != nil {
+		return err
+	}
+	return writer.Delete(ctx, username)
 }
 
 // ApplyTransaction adjusts the user's account balance based on the supplied transaction type.
 func (s *Service) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return ErrUserNotFound
-	}
-
-	newBalance := user.AccountBalance
-	switch transactionType {
-	case TransactionWin, TransactionRefund, TransactionSale:
-		newBalance += amount
-	case TransactionBuy, TransactionFee:
-		newBalance -= amount
-	default:
-		return ErrInvalidTransactionType
-	}
-
-	return s.repo.UpdateBalance(ctx, username, newBalance)
+	return s.updateUserBalance(ctx, username, func(user *User) (int64, error) {
+		return applyTransactionBalance(user.AccountBalance, amount, transactionType)
+	})
 }
 
 // GetUserCredit returns the available credit for a user based on their balance and the maximum debt limit.
 func (s *Service) GetUserCredit(ctx context.Context, username string, maximumDebtAllowed int64) (int64, error) {
-	user, err := s.repo.GetByUsername(ctx, username)
+	if err := validateUsername(username); err != nil {
+		return 0, err
+	}
+
+	reader, err := s.userReader()
 	if err != nil {
-		if err == ErrUserNotFound {
+		return 0, err
+	}
+	user, err := reader.GetByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
 			return maximumDebtAllowed, nil
 		}
 		return 0, err
@@ -240,7 +390,15 @@ func (s *Service) GetUserCredit(ctx context.Context, username string, maximumDeb
 
 // GetUserPortfolio returns the user's portfolio across markets.
 func (s *Service) GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error) {
-	bets, err := s.repo.ListUserBets(ctx, username)
+	if err := validateUsername(username); err != nil {
+		return nil, err
+	}
+
+	portfolioRepo, err := s.userPortfolioRepository()
+	if err != nil {
+		return nil, err
+	}
+	bets, err := portfolioRepo.ListUserBets(ctx, username)
 	if err != nil {
 		return nil, err
 	}
@@ -263,14 +421,18 @@ func (s *Service) GetUserPortfolio(ctx context.Context, username string) (*Portf
 	var items []PortfolioItem
 	var totalShares int64
 	for marketID, item := range marketMap {
-		position, err := s.repo.GetUserPositionInMarket(ctx, int64(marketID), username)
+		position, err := portfolioRepo.GetUserPositionInMarket(ctx, int64(marketID), username)
 		if err != nil {
 			return nil, err
 		}
 
-		title, err := s.repo.GetMarketQuestion(ctx, marketID)
+		title, err := portfolioRepo.GetMarketQuestion(ctx, marketID)
 		if err != nil {
 			return nil, err
+		}
+
+		if position == nil {
+			position = &MarketUserPosition{}
 		}
 
 		item.YesSharesOwned = position.YesSharesOwned
@@ -293,10 +455,21 @@ func (s *Service) GetUserPortfolio(ctx context.Context, username string) (*Portf
 
 // ListUserMarkets returns markets the specified user has participated in.
 func (s *Service) ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error) {
-	if userID <= 0 {
-		return nil, ErrInvalidUserData
+	if err := validateUserID(userID); err != nil {
+		return nil, err
 	}
-	return s.repo.ListUserMarkets(ctx, userID)
+	repo, err := s.userMarketsRepository()
+	if err != nil {
+		return nil, err
+	}
+	markets, err := repo.ListUserMarkets(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if markets == nil {
+		return []*UserMarket{}, nil
+	}
+	return markets, nil
 }
 
 // GetUserFinancials returns the user's comprehensive financial snapshot.
@@ -305,9 +478,9 @@ func (s *Service) GetUserFinancials(ctx context.Context, username string) (map[s
 		return nil, ErrInvalidUserData
 	}
 
-	user, err := s.repo.GetByUsername(ctx, username)
+	user, err := s.requireUser(ctx, username)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, err
 	}
 
 	snapshot, err := s.analytics.ComputeUserFinancials(ctx, analytics.FinancialSnapshotRequest{
@@ -326,126 +499,41 @@ func (s *Service) GetUserFinancials(ctx context.Context, username string) (map[s
 
 // UpdateDescription sanitizes and updates a user's description.
 func (s *Service) UpdateDescription(ctx context.Context, username, description string) (*User, error) {
-	if len(description) > 2000 {
-		return nil, fmt.Errorf("description exceeds maximum length of 2000 characters")
-	}
-
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, err
-	}
-
-	if s.sanitizer == nil {
-		return nil, ErrInvalidUserData
-	}
-
-	sanitized, err := s.sanitizer.SanitizeDescription(description)
-	if err != nil {
-		return nil, fmt.Errorf("invalid description: %w", err)
-	}
-
-	user.Description = sanitized
-	if err := s.repo.Update(ctx, user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.updateProfileField(ctx, username, description, profileFieldSpecs["description"])
 }
 
 // UpdateDisplayName sanitizes and updates a user's display name.
 func (s *Service) UpdateDisplayName(ctx context.Context, username, displayName string) (*User, error) {
-	if len(displayName) < 1 || len(displayName) > 50 {
-		return nil, fmt.Errorf("display name must be between 1 and 50 characters")
-	}
-
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, err
-	}
-
-	if s.sanitizer == nil {
-		return nil, ErrInvalidUserData
-	}
-
-	sanitized, err := s.sanitizer.SanitizeDisplayName(displayName)
-	if err != nil {
-		return nil, fmt.Errorf("invalid display name: %w", err)
-	}
-
-	user.DisplayName = sanitized
-	if err := s.repo.Update(ctx, user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.updateProfileField(ctx, username, displayName, profileFieldSpecs["display_name"])
 }
 
 // UpdateEmoji sanitizes and updates a user's personal emoji.
 func (s *Service) UpdateEmoji(ctx context.Context, username, emoji string) (*User, error) {
-	if emoji == "" {
-		return nil, fmt.Errorf("emoji cannot be blank")
-	}
-	if len(emoji) > 20 {
-		return nil, fmt.Errorf("emoji exceeds maximum length of 20 characters")
-	}
-
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, err
-	}
-
-	if s.sanitizer == nil {
-		return nil, ErrInvalidUserData
-	}
-
-	sanitized, err := s.sanitizer.SanitizeEmoji(emoji)
-	if err != nil {
-		return nil, fmt.Errorf("invalid emoji: %w", err)
-	}
-
-	user.PersonalEmoji = sanitized
-	if err := s.repo.Update(ctx, user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.updateProfileField(ctx, username, emoji, profileFieldSpecs["emoji"])
 }
 
 // UpdatePersonalLinks sanitizes and updates a user's personal links.
 func (s *Service) UpdatePersonalLinks(ctx context.Context, username string, links PersonalLinks) (*User, error) {
-	if s.sanitizer == nil {
-		return nil, ErrInvalidUserData
-	}
-
 	sanitized, err := s.sanitizePersonalLinks(links)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := s.repo.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, err
-	}
-
-	user.PersonalLink1 = sanitized[0]
-	user.PersonalLink2 = sanitized[1]
-	user.PersonalLink3 = sanitized[2]
-	user.PersonalLink4 = sanitized[3]
-
-	if err := s.repo.Update(ctx, user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.updateUserProfile(ctx, username, func(user *User) error {
+		sanitized.ApplyTo(user)
+		return nil
+	})
 }
 
-func (s *Service) sanitizePersonalLinks(links PersonalLinks) ([]string, error) {
-	values := []string{
-		links.PersonalLink1,
-		links.PersonalLink2,
-		links.PersonalLink3,
-		links.PersonalLink4,
+func (s *Service) sanitizePersonalLinks(links PersonalLinks) (PersonalLinks, error) {
+	if err := s.requireSanitizer(); err != nil {
+		return PersonalLinks{}, err
 	}
 
+	values := links.Values()
 	for _, link := range values {
 		if len(link) > 200 {
-			return nil, fmt.Errorf("personal link exceeds maximum length of 200 characters")
+			return PersonalLinks{}, fmt.Errorf("personal link exceeds maximum length of 200 characters")
 		}
 	}
 
@@ -457,64 +545,33 @@ func (s *Service) sanitizePersonalLinks(links PersonalLinks) ([]string, error) {
 		}
 		clean, err := s.sanitizer.SanitizePersonalLink(link)
 		if err != nil {
-			return nil, fmt.Errorf("invalid personal link: %w", err)
+			return PersonalLinks{}, fmt.Errorf("invalid personal link: %w", err)
 		}
 		sanitized[i] = clean
 	}
-	return sanitized, nil
+	return NewPersonalLinks(sanitized), nil
 }
 
 func financialSnapshotToMap(snapshot *analytics.FinancialSnapshot) map[string]int64 {
-	return map[string]int64{
-		"accountBalance":     snapshot.AccountBalance,
-		"maximumDebtAllowed": snapshot.MaximumDebtAllowed,
-		"amountInPlay":       snapshot.AmountInPlay,
-		"amountBorrowed":     snapshot.AmountBorrowed,
-		"retainedEarnings":   snapshot.RetainedEarnings,
-		"equity":             snapshot.Equity,
-		"tradingProfits":     snapshot.TradingProfits,
-		"workProfits":        snapshot.WorkProfits,
-		"totalProfits":       snapshot.TotalProfits,
-		"amountInPlayActive": snapshot.AmountInPlayActive,
-		"totalSpent":         snapshot.TotalSpent,
-		"totalSpentInPlay":   snapshot.TotalSpentInPlay,
-		"realizedProfits":    snapshot.RealizedProfits,
-		"potentialProfits":   snapshot.PotentialProfits,
-		"realizedValue":      snapshot.RealizedValue,
-		"potentialValue":     snapshot.PotentialValue,
+	if snapshot == nil {
+		return map[string]int64{}
 	}
+
+	values := make(map[string]int64, len(financialSnapshotFields))
+	for _, field := range financialSnapshotFields {
+		values[field.key] = field.extract(snapshot)
+	}
+	return values
 }
 
 // GetPrivateProfile returns the combined private and public user information for the specified username.
 func (s *Service) GetPrivateProfile(ctx context.Context, username string) (*PrivateProfile, error) {
-	if username == "" {
-		return nil, ErrInvalidUserData
-	}
-
-	user, err := s.repo.GetByUsername(ctx, username)
+	user, err := s.GetUser(ctx, username)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PrivateProfile{
-		ID:                    user.ID,
-		Username:              user.Username,
-		DisplayName:           user.DisplayName,
-		UserType:              user.UserType,
-		InitialAccountBalance: user.InitialAccountBalance,
-		AccountBalance:        user.AccountBalance,
-		PersonalEmoji:         user.PersonalEmoji,
-		Description:           user.Description,
-		PersonalLink1:         user.PersonalLink1,
-		PersonalLink2:         user.PersonalLink2,
-		PersonalLink3:         user.PersonalLink3,
-		PersonalLink4:         user.PersonalLink4,
-		Email:                 user.Email,
-		APIKey:                user.APIKey,
-		MustChangePassword:    user.MustChangePassword,
-		CreatedAt:             user.CreatedAt,
-		UpdatedAt:             user.UpdatedAt,
-	}, nil
+	return user.ToPrivateProfile(), nil
 }
 
 const passwordHashCost = 14
@@ -525,19 +582,192 @@ func PasswordHashCost() int {
 }
 
 func (s *Service) validatePasswordChangeInputs(username, currentPassword, newPassword string) error {
-	if username == "" {
-		return ErrInvalidUserData
+	for _, validate := range passwordChangeValidators {
+		if err := validate(s, username, currentPassword, newPassword); err != nil {
+			return err
+		}
 	}
-	if currentPassword == "" {
-		return fmt.Errorf("current password is required")
+	return nil
+}
+
+func (s *Service) requireUser(ctx context.Context, username string) (*User, error) {
+	reader, err := s.userReader()
+	if err != nil {
+		return nil, err
 	}
-	if newPassword == "" {
-		return fmt.Errorf("new password is required")
+	user, err := reader.GetByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
 	}
+	return user, nil
+}
+
+func (s *Service) updateUserBalance(ctx context.Context, username string, compute func(*User) (int64, error)) error {
+	user, err := s.requireUser(ctx, username)
+	if err != nil {
+		return err
+	}
+
+	newBalance, err := compute(user)
+	if err != nil {
+		return err
+	}
+	repo, err := s.userBalanceRepository()
+	if err != nil {
+		return err
+	}
+	return repo.UpdateBalance(ctx, username, newBalance)
+}
+
+func (s *Service) updateUserProfile(ctx context.Context, username string, mutate profileMutation) (*User, error) {
+	user, err := s.requireUser(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := mutate(user); err != nil {
+		return nil, err
+	}
+	writer, err := s.userWriter()
+	if err != nil {
+		return nil, err
+	}
+	if err := writer.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *Service) updateProfileField(ctx context.Context, username, value string, spec profileFieldSpec) (*User, error) {
+	if spec.validate != nil {
+		if err := spec.validate(value); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.updateUserProfile(ctx, username, func(user *User) error {
+		sanitized, err := spec.sanitize(s, value)
+		if err != nil {
+			return err
+		}
+		spec.apply(user, sanitized)
+		return nil
+	})
+}
+
+func (s *Service) requireSanitizer() error {
 	if s.sanitizer == nil {
 		return ErrInvalidUserData
 	}
 	return nil
+}
+
+func (s *Service) sanitizeDescription(description string) (string, error) {
+	if err := s.requireSanitizer(); err != nil {
+		return "", err
+	}
+
+	sanitized, err := s.sanitizer.SanitizeDescription(description)
+	if err != nil {
+		return "", fmt.Errorf("invalid description: %w", err)
+	}
+	return sanitized, nil
+}
+
+func (s *Service) sanitizeDisplayName(displayName string) (string, error) {
+	if err := s.requireSanitizer(); err != nil {
+		return "", err
+	}
+
+	sanitized, err := s.sanitizer.SanitizeDisplayName(displayName)
+	if err != nil {
+		return "", fmt.Errorf("invalid display name: %w", err)
+	}
+	return sanitized, nil
+}
+
+func (s *Service) sanitizeEmoji(emoji string) (string, error) {
+	if err := s.requireSanitizer(); err != nil {
+		return "", err
+	}
+
+	sanitized, err := s.sanitizer.SanitizeEmoji(emoji)
+	if err != nil {
+		return "", fmt.Errorf("invalid emoji: %w", err)
+	}
+	return sanitized, nil
+}
+
+func validateMaximumLength(fieldName string, max int) func(string) error {
+	return func(value string) error {
+		if len(value) > max {
+			return fmt.Errorf("%s exceeds maximum length of %d characters", fieldName, max)
+		}
+		return nil
+	}
+}
+
+func validateRequiredLength(fieldName string, min int, max int) func(string) error {
+	return func(value string) error {
+		if len(value) < min {
+			if fieldName == "emoji" {
+				return fmt.Errorf("%s cannot be blank", fieldName)
+			}
+			return fmt.Errorf("%s must be between %d and %d characters", fieldName, min, max)
+		}
+		if len(value) > max {
+			return fmt.Errorf("%s exceeds maximum length of %d characters", fieldName, max)
+		}
+		return nil
+	}
+}
+
+func (s *Service) getCredentials(ctx context.Context, username string) (*Credentials, error) {
+	if err := validateUsername(username); err != nil {
+		return nil, err
+	}
+	repo, err := s.credentialsRepository()
+	if err != nil {
+		return nil, err
+	}
+	return repo.GetCredentials(ctx, username)
+}
+
+func (s *Service) verifyCurrentPassword(creds *Credentials, currentPassword string) error {
+	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+	return nil
+}
+
+func (s *Service) sanitizeNewPassword(newPassword string) (string, error) {
+	if err := s.requireSanitizer(); err != nil {
+		return "", err
+	}
+
+	sanitized, err := s.sanitizer.SanitizePassword(newPassword)
+	if err != nil {
+		return "", fmt.Errorf("new password does not meet security requirements: %w", err)
+	}
+	return sanitized, nil
+}
+
+func ensurePasswordChanged(currentHash string, newPassword string) error {
+	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(newPassword)); err == nil {
+		return fmt.Errorf("new password must differ from the current password")
+	}
+	return nil
+}
+
+func hashPassword(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), passwordHashCost)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash new password: %w", err)
+	}
+	return string(hashed), nil
 }
 
 // ChangePassword validates credentials and persists a new hashed password.
@@ -546,30 +776,83 @@ func (s *Service) ChangePassword(ctx context.Context, username, currentPassword,
 		return err
 	}
 
-	creds, err := s.repo.GetCredentials(ctx, username)
+	creds, err := s.getCredentials(ctx, username)
 	if err != nil {
 		return err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(currentPassword)); err != nil {
-		return ErrInvalidCredentials
+	if err := s.verifyCurrentPassword(creds, currentPassword); err != nil {
+		return err
 	}
 
-	sanitized, err := s.sanitizer.SanitizePassword(newPassword)
+	sanitized, err := s.sanitizeNewPassword(newPassword)
 	if err != nil {
-		return fmt.Errorf("new password does not meet security requirements: %w", err)
+		return err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(creds.PasswordHash), []byte(sanitized)); err == nil {
-		return fmt.Errorf("new password must differ from the current password")
+	if err := ensurePasswordChanged(creds.PasswordHash, sanitized); err != nil {
+		return err
 	}
 
-	hashed, err := bcrypt.GenerateFromPassword([]byte(sanitized), passwordHashCost)
+	hashed, err := hashPassword(sanitized)
 	if err != nil {
-		return fmt.Errorf("failed to hash new password: %w", err)
+		return err
 	}
 
-	return s.repo.UpdatePassword(ctx, username, string(hashed), false)
+	repo, err := s.credentialsRepository()
+	if err != nil {
+		return err
+	}
+	return repo.UpdatePassword(ctx, username, hashed, false)
+}
+
+func (s *Service) userReader() (UserReader, error) {
+	if s == nil || s.reader == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.reader, nil
+}
+
+func (s *Service) userBalanceRepository() (UserBalanceRepository, error) {
+	if s == nil || s.balanceRepo == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.balanceRepo, nil
+}
+
+func (s *Service) userWriter() (UserWriter, error) {
+	if s == nil || s.writer == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.writer, nil
+}
+
+func (s *Service) userLister() (UserLister, error) {
+	if s == nil || s.lister == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.lister, nil
+}
+
+func (s *Service) userPortfolioRepository() (UserPortfolioRepository, error) {
+	if s == nil || s.portfolio == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.portfolio, nil
+}
+
+func (s *Service) userMarketsRepository() (UserMarketsRepository, error) {
+	if s == nil || s.markets == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.markets, nil
+}
+
+func (s *Service) credentialsRepository() (CredentialsRepository, error) {
+	if s == nil || s.credentials == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.credentials, nil
 }
 
 var _ ServiceInterface = (*Service)(nil)

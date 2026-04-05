@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"socialpredict/models/modelstesting"
+	"socialpredict/util"
 	"testing"
 	"time"
 
@@ -206,8 +207,22 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 }
 
 func TestLoginHandler_InvalidJSON(t *testing.T) {
+	util.DB = modelstesting.NewFakeDB(t)
 	invalidJSON := "{ invalid json }"
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(invalidJSON))
+	w := httptest.NewRecorder()
+
+	LoginHandler(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
+	util.DB = modelstesting.NewFakeDB(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123","extra":"nope"}`))
 	w := httptest.NewRecorder()
 
 	LoginHandler(w, req)
@@ -242,6 +257,7 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			util.DB = modelstesting.NewFakeDB(t)
 			loginReq := map[string]string{
 				"username": tt.username,
 				"password": tt.password,
@@ -257,6 +273,27 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 				t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
 			}
 		})
+	}
+}
+
+func TestLoginHandler_MissingDB(t *testing.T) {
+	originalDB := util.GetDB()
+	util.DB = nil
+	defer func() { util.DB = originalDB }()
+
+	loginReq := map[string]string{
+		"username": "testuser",
+		"password": "password123",
+	}
+	jsonData, _ := json.Marshal(loginReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
+	w := httptest.NewRecorder()
+
+	LoginHandler(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
 	}
 }
 
@@ -395,15 +432,7 @@ func TestValidateUserAndEnforcePasswordChangeGetUser_MissingToken(t *testing.T) 
 
 // Helper function to create a valid JWT token for testing
 func createTestToken(username string, userType string) (string, error) {
-	claims := &UserClaims{
-		Username: username,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(getJWTKey())
+	return generateJWT(username, getJWTKey())
 }
 
 func TestCreateTestToken(t *testing.T) {
@@ -436,6 +465,20 @@ func TestJWTKeyExists(t *testing.T) {
 	jwtKey := getJWTKey()
 	if len(jwtKey) == 0 {
 		t.Error("Expected JWT key to be non-empty")
+	}
+}
+
+func TestGenerateJWT_RequiresSigningKey(t *testing.T) {
+	originalKey := os.Getenv("JWT_SIGNING_KEY")
+	os.Setenv("JWT_SIGNING_KEY", "   ")
+	defer func() { os.Setenv("JWT_SIGNING_KEY", originalKey) }()
+
+	token, err := generateJWT("testuser", getJWTKey())
+	if err == nil {
+		t.Fatal("expected error when JWT key is empty")
+	}
+	if token != "" {
+		t.Fatalf("expected empty token, got %q", token)
 	}
 }
 

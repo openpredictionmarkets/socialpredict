@@ -64,6 +64,10 @@ docker-compose.override.yml
 /frontend/node_modules/
 node_modules/
 
+# Codex stuff
+.codex-tmp
+
 # Go cache
 .gocache
 .gomodcache
+.cache

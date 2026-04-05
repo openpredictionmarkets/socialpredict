@@ -1,10 +1,8 @@
 package marketshandlers
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -13,40 +11,7 @@ import (
 // ListMarketsHandlerFactory creates an HTTP handler for listing markets with service injection
 func ListMarketsHandlerFactory(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("ListMarketsHandler: Request received")
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
-			return
-		}
-
-		params, parseErr := parseListMarketsParams(r)
-		if parseErr != nil {
-			http.Error(w, parseErr.Error(), http.StatusBadRequest)
-			return
-		}
-
-		markets, err := fetchMarkets(r, svc, params)
-		if err != nil {
-			writeListMarketsError(w, err)
-			return
-		}
-
-		overviews, err := buildMarketOverviewResponses(r.Context(), svc, markets)
-		if err != nil {
-			log.Printf("Error building market overviews: %v", err)
-			http.Error(w, "Error fetching markets", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(dto.ListMarketsResponse{
-			Markets: overviews,
-			Total:   len(overviews),
-		}); err != nil {
-			log.Printf("Error encoding response: %v", err)
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
-		}
+		handleListMarkets(w, r, svc)
 	}
 }
 
@@ -64,62 +29,112 @@ func parseListMarketsParams(r *http.Request) (listMarketsParams, error) {
 		return listMarketsParams{}, statusErr
 	}
 
-	limit := parseListLimit(r.URL.Query().Get("limit"))
-	offset := parseListOffset(r.URL.Query().Get("offset"))
+	page := parseListPage(r)
 
 	return listMarketsParams{
 		status: status,
-		limit:  limit,
-		offset: offset,
+		limit:  page.Limit,
+		offset: page.Offset,
 		filters: dmarkets.ListFilters{
 			Status: status,
-			Limit:  limit,
-			Offset: offset,
+			Limit:  page.Limit,
+			Offset: page.Offset,
 		},
-		page: dmarkets.Page{
-			Limit:  limit,
-			Offset: offset,
-		},
+		page: page,
 	}, nil
 }
 
 func parseListLimit(rawLimit string) int {
-	limit := 50
-	if rawLimit == "" {
-		return limit
-	}
-
-	if parsedLimit, err := strconv.Atoi(rawLimit); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
-		return parsedLimit
-	}
-	return limit
+	return parseBoundedInt(rawLimit, 50, 1, 100)
 }
 
 func parseListOffset(rawOffset string) int {
-	if rawOffset == "" {
-		return 0
-	}
-	if parsedOffset, err := strconv.Atoi(rawOffset); err == nil && parsedOffset >= 0 {
-		return parsedOffset
-	}
-	return 0
+	return parseBoundedInt(rawOffset, 0, 0, int(^uint(0)>>1))
 }
 
 func fetchMarkets(r *http.Request, svc dmarkets.ServiceInterface, params listMarketsParams) ([]*dmarkets.Market, error) {
-	if params.status != "" {
-		return svc.ListByStatus(r.Context(), params.status, params.page)
+	if params.filters.Status != "" {
+		return fetchMarketsByStatus(r, svc, params)
 	}
-	return svc.ListMarkets(r.Context(), params.filters)
+	return fetchAllMarkets(r, svc, params)
 }
 
 func writeListMarketsError(w http.ResponseWriter, err error) {
+	message, statusCode := listMarketsErrorResponse(err)
+	if statusCode == http.StatusInternalServerError {
+		log.Printf("Error fetching markets: %v", err)
+	}
+	http.Error(w, message, statusCode)
+}
+
+func parseListPage(r *http.Request) dmarkets.Page {
+	return dmarkets.Page{
+		Limit:  parseListLimit(r.URL.Query().Get("limit")),
+		Offset: parseListOffset(r.URL.Query().Get("offset")),
+	}
+}
+
+func fetchMarketsByStatus(r *http.Request, svc dmarkets.ServiceInterface, params listMarketsParams) ([]*dmarkets.Market, error) {
+	return svc.ListByStatus(r.Context(), params.filters.Status, params.page)
+}
+
+func fetchAllMarkets(r *http.Request, svc dmarkets.ServiceInterface, params listMarketsParams) ([]*dmarkets.Market, error) {
+	return svc.ListMarkets(r.Context(), params.filters)
+}
+
+func writeListMarketsResponse(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface, markets []*dmarkets.Market) error {
+	response, err := buildListMarketsResponse(r, svc, markets)
+	if err != nil {
+		return err
+	}
+	return writeJSON(w, http.StatusOK, response)
+}
+
+func buildListMarketsResponse(r *http.Request, svc dmarkets.ServiceInterface, markets []*dmarkets.Market) (dto.ListMarketsResponse, error) {
+	overviews, err := buildMarketOverviewResponses(r.Context(), svc, markets)
+	if err != nil {
+		log.Printf("Error building market overviews: %v", err)
+		return dto.ListMarketsResponse{}, err
+	}
+
+	return dto.ListMarketsResponse{
+		Markets: overviews,
+		Total:   len(overviews),
+	}, nil
+}
+
+func listMarketsErrorResponse(err error) (string, int) {
 	switch err {
 	case dmarkets.ErrInvalidInput:
-		http.Error(w, "Invalid input parameters", http.StatusBadRequest)
+		return "Invalid input parameters", http.StatusBadRequest
 	case dmarkets.ErrUnauthorized:
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return "Unauthorized", http.StatusUnauthorized
 	default:
-		log.Printf("Error fetching markets: %v", err)
-		http.Error(w, "Error fetching markets", http.StatusInternalServerError)
+		return "Error fetching markets", http.StatusInternalServerError
+	}
+}
+
+func handleListMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface) {
+	log.Println("ListMarketsHandler: Request received")
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	params, parseErr := parseListMarketsParams(r)
+	if parseErr != nil {
+		http.Error(w, parseErr.Error(), http.StatusBadRequest)
+		return
+	}
+
+	markets, err := fetchMarkets(r, svc, params)
+	if err != nil {
+		writeListMarketsError(w, err)
+		return
+	}
+
+	if err := writeListMarketsResponse(w, r, svc, markets); err != nil {
+		log.Printf("Error encoding list markets response: %v", err)
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
 }

@@ -11,15 +11,35 @@ import (
 )
 
 // Repository exposes the persistence layer needed by the bets domain service.
-type Repository interface {
+type BetWriter interface {
 	Create(ctx context.Context, bet *models.Bet) error
+}
+
+// BetHistoryReader exposes prior-participation lookups used for buy fee rules.
+type BetHistoryReader interface {
 	UserHasBet(ctx context.Context, marketID uint, username string) (bool, error)
+}
+
+// Repository exposes the persistence layer needed by the bets domain service.
+type Repository interface {
+	BetWriter
+	BetHistoryReader
+}
+
+// MarketService exposes the subset of market operations required by bets.
+type MarketReader interface {
+	GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error)
+}
+
+// PositionReader exposes the position reads needed by share-sale flows.
+type PositionReader interface {
+	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
 // MarketService exposes the subset of market operations required by bets.
 type MarketService interface {
-	GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error)
-	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	MarketReader
+	PositionReader
 }
 
 // MarketGate ensures market openness before betting operations.
@@ -28,9 +48,19 @@ type MarketGate interface {
 }
 
 // UserService exposes the subset of user operations required by bets.
-type UserService interface {
+type UserReader interface {
 	GetUser(ctx context.Context, username string) (*dusers.User, error)
+}
+
+// TransactionRecorder exposes account mutations used by the betting ledger.
+type TransactionRecorder interface {
 	ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error
+}
+
+// UserService exposes the subset of user operations required by bets.
+type UserService interface {
+	UserReader
+	TransactionRecorder
 }
 
 // PlaceValidator allows validation rules to be extended without changing the service.
@@ -105,11 +135,108 @@ var (
 // ServiceOption configures bets Service collaborators.
 type ServiceOption func(*Service)
 
+func defaultClock() Clock {
+	return serviceClock{}
+}
+
+func defaultPlaceValidatorStrategy() PlaceValidator {
+	return defaultPlaceValidator{}
+}
+
+func defaultSellValidatorStrategy() SellValidator {
+	return defaultSellValidator{}
+}
+
+func defaultMarketGateStrategy(markets MarketReader, clock Clock) MarketGate {
+	return marketGate{markets: markets, clock: clock}
+}
+
+func defaultFeeCalculatorStrategy(econ *setup.EconomicConfig) FeeCalculator {
+	return feeCalculator{econ: econOrDefault(econ)}
+}
+
+func defaultBalanceGuardStrategy(econ *setup.EconomicConfig) BalanceGuard {
+	econ = econOrDefault(econ)
+	return balanceGuard{maxDebtAllowed: int64(econ.Economics.User.MaximumDebtAllowed)}
+}
+
+func defaultBetLedgerStrategy(repo BetWriter, users TransactionRecorder) BetLedger {
+	return betLedger{repo: repo, users: users}
+}
+
+func defaultSaleCalculatorStrategy(econ *setup.EconomicConfig) SaleCalculator {
+	econ = econOrDefault(econ)
+	return saleCalculator{maxDustPerSale: int64(econ.Economics.Betting.MaxDustPerSale)}
+}
+
+func clockOrDefault(clock Clock) Clock {
+	if clock == nil {
+		return defaultClock()
+	}
+	return clock
+}
+
+func econOrDefault(econ *setup.EconomicConfig) *setup.EconomicConfig {
+	if econ == nil {
+		return &setup.EconomicConfig{}
+	}
+	return econ
+}
+
+func placeValidatorOrDefault(v PlaceValidator) PlaceValidator {
+	if v == nil {
+		return defaultPlaceValidatorStrategy()
+	}
+	return v
+}
+
+func sellValidatorOrDefault(v SellValidator) SellValidator {
+	if v == nil {
+		return defaultSellValidatorStrategy()
+	}
+	return v
+}
+
+func marketGateOrDefault(g MarketGate, markets MarketReader, clock Clock) MarketGate {
+	if g == nil {
+		return defaultMarketGateStrategy(markets, clock)
+	}
+	return g
+}
+
+func feeCalculatorOrDefault(c FeeCalculator, econ *setup.EconomicConfig) FeeCalculator {
+	if c == nil {
+		return defaultFeeCalculatorStrategy(econ)
+	}
+	return c
+}
+
+func balanceGuardOrDefault(g BalanceGuard, econ *setup.EconomicConfig) BalanceGuard {
+	if g == nil {
+		return defaultBalanceGuardStrategy(econ)
+	}
+	return g
+}
+
+func betLedgerOrDefault(l BetLedger, repo BetWriter, users TransactionRecorder) BetLedger {
+	if l == nil {
+		return defaultBetLedgerStrategy(repo, users)
+	}
+	return l
+}
+
+func saleCalculatorOrDefault(c SaleCalculator, econ *setup.EconomicConfig) SaleCalculator {
+	if c == nil {
+		return defaultSaleCalculatorStrategy(econ)
+	}
+	return c
+}
+
 // WithPlaceValidator overrides the place validator.
 func WithPlaceValidator(v PlaceValidator) ServiceOption {
 	return func(s *Service) {
-		if v != nil {
-			s.placeValidator = v
+		if s != nil {
+			s.placeValidator = placeValidatorOrDefault(v)
 		}
 	}
 }
@@ -117,8 +244,8 @@ func WithPlaceValidator(v PlaceValidator) ServiceOption {
 // WithSellValidator overrides the sell validator.
 func WithSellValidator(v SellValidator) ServiceOption {
 	return func(s *Service) {
-		if v != nil {
-			s.sellValidator = v
+		if s != nil {
+			s.sellValidator = sellValidatorOrDefault(v)
 		}
 	}
 }
@@ -126,8 +253,8 @@ func WithSellValidator(v SellValidator) ServiceOption {
 // WithMarketGate overrides the market gate.
 func WithMarketGate(g MarketGate) ServiceOption {
 	return func(s *Service) {
-		if g != nil {
-			s.marketGate = g
+		if s != nil {
+			s.marketGate = marketGateOrDefault(g, s.markets, clockOrDefault(s.clock))
 		}
 	}
 }
@@ -135,8 +262,8 @@ func WithMarketGate(g MarketGate) ServiceOption {
 // WithFeeCalculator overrides the fee calculator.
 func WithFeeCalculator(c FeeCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.fees = c
+		if s != nil {
+			s.fees = feeCalculatorOrDefault(c, s.econ)
 		}
 	}
 }
@@ -144,8 +271,8 @@ func WithFeeCalculator(c FeeCalculator) ServiceOption {
 // WithBalanceGuard overrides the balance guard.
 func WithBalanceGuard(g BalanceGuard) ServiceOption {
 	return func(s *Service) {
-		if g != nil {
-			s.balances = g
+		if s != nil {
+			s.balances = balanceGuardOrDefault(g, s.econ)
 		}
 	}
 }
@@ -153,8 +280,8 @@ func WithBalanceGuard(g BalanceGuard) ServiceOption {
 // WithBetLedger overrides the bet ledger.
 func WithBetLedger(l BetLedger) ServiceOption {
 	return func(s *Service) {
-		if l != nil {
-			s.ledger = l
+		if s != nil {
+			s.ledger = betLedgerOrDefault(l, s.repo, s.users)
 		}
 	}
 }
@@ -162,8 +289,8 @@ func WithBetLedger(l BetLedger) ServiceOption {
 // WithSaleCalculator overrides the sale calculator.
 func WithSaleCalculator(c SaleCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.saleCalculator = c
+		if s != nil {
+			s.saleCalculator = saleCalculatorOrDefault(c, s.econ)
 		}
 	}
 }
@@ -171,8 +298,8 @@ func WithSaleCalculator(c SaleCalculator) ServiceOption {
 // WithClock overrides the service clock.
 func WithClock(clock Clock) ServiceOption {
 	return func(s *Service) {
-		if clock != nil {
-			s.clock = clock
+		if s != nil {
+			s.clock = clockOrDefault(clock)
 		}
 	}
 }
@@ -183,8 +310,8 @@ func NewService(repo Repository, markets MarketService, users UserService, econ 
 		repo:    repo,
 		markets: markets,
 		users:   users,
-		econ:    econ,
-		clock:   clock,
+		econ:    econOrDefault(econ),
+		clock:   clockOrDefault(clock),
 	}
 
 	for _, opt := range opts {
@@ -196,28 +323,16 @@ func NewService(repo Repository, markets MarketService, users UserService, econ 
 }
 
 func (s *Service) ensureDefaults() {
-	if s.clock == nil {
-		s.clock = serviceClock{}
+	if s == nil {
+		return
 	}
-	if s.placeValidator == nil {
-		s.placeValidator = defaultPlaceValidator{}
-	}
-	if s.sellValidator == nil {
-		s.sellValidator = defaultSellValidator{}
-	}
-	if s.marketGate == nil {
-		s.marketGate = marketGate{markets: s.markets, clock: s.clock}
-	}
-	if s.fees == nil {
-		s.fees = feeCalculator{econ: s.econ}
-	}
-	if s.balances == nil {
-		s.balances = balanceGuard{maxDebtAllowed: int64(s.econ.Economics.User.MaximumDebtAllowed)}
-	}
-	if s.ledger == nil {
-		s.ledger = betLedger{repo: s.repo, users: s.users}
-	}
-	if s.saleCalculator == nil {
-		s.saleCalculator = saleCalculator{maxDustPerSale: int64(s.econ.Economics.Betting.MaxDustPerSale)}
-	}
+
+	s.clock = clockOrDefault(s.clock)
+	s.placeValidator = placeValidatorOrDefault(s.placeValidator)
+	s.sellValidator = sellValidatorOrDefault(s.sellValidator)
+	s.marketGate = marketGateOrDefault(s.marketGate, s.markets, s.clock)
+	s.fees = feeCalculatorOrDefault(s.fees, s.econ)
+	s.balances = balanceGuardOrDefault(s.balances, s.econ)
+	s.ledger = betLedgerOrDefault(s.ledger, s.repo, s.users)
+	s.saleCalculator = saleCalculatorOrDefault(s.saleCalculator, s.econ)
 }

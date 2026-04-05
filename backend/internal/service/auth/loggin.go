@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"socialpredict/models"
 	"socialpredict/security"
 	"socialpredict/util"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -18,7 +20,7 @@ import (
 // login and validation stuff
 // getJWTKey returns the JWT signing key, checking environment variable at runtime
 func getJWTKey() []byte {
-	return []byte(os.Getenv("JWT_SIGNING_KEY"))
+	return []byte(strings.TrimSpace(os.Getenv("JWT_SIGNING_KEY")))
 }
 
 // UserClaims represents the expected structure of the JWT claims
@@ -47,13 +49,25 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, loginErr := authenticateUser(req)
+	db := util.GetDB()
+	if db == nil {
+		http.Error(w, "Error accessing database", http.StatusInternalServerError)
+		return
+	}
+
+	user, loginErr := authenticateUser(db, req)
 	if loginErr != nil {
 		http.Error(w, loginErr.message, loginErr.statusCode)
 		return
 	}
 
-	tokenString, err := generateJWT(user.Username)
+	jwtKey := getJWTKey()
+	if len(jwtKey) == 0 {
+		http.Error(w, "Error creating token", http.StatusInternalServerError)
+		return
+	}
+
+	tokenString, err := generateJWT(user.Username, jwtKey)
 	if err != nil {
 		http.Error(w, "Error creating token", http.StatusInternalServerError)
 		return
@@ -69,22 +83,28 @@ type loginRequest struct {
 
 func decodeLoginRequest(r *http.Request) (loginRequest, error) {
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return loginRequest{}, fmt.Errorf("Error reading request body")
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		return loginRequest{}, fmt.Errorf("error reading request body")
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return loginRequest{}, fmt.Errorf("error reading request body")
 	}
 	return req, nil
 }
 
 func validateAndSanitizeLogin(securityService *security.SecurityService, req loginRequest) (loginRequest, error) {
-	if err := securityService.Validator.ValidateStruct(req); err != nil {
-		return req, fmt.Errorf("Invalid input: %w", err)
-	}
-
 	sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
 	if err != nil {
-		return req, fmt.Errorf("Invalid username format")
+		return req, fmt.Errorf("invalid input")
 	}
 	req.Username = sanitizedUsername
+
+	if err := securityService.Validator.ValidateStruct(req); err != nil {
+		return req, fmt.Errorf("invalid input")
+	}
+
 	return req, nil
 }
 
@@ -93,8 +113,12 @@ type loginError struct {
 	statusCode int
 }
 
-func authenticateUser(req loginRequest) (models.User, *loginError) {
-	user, err := findUserByUsername(req.Username)
+func authenticateUser(db *gorm.DB, req loginRequest) (models.User, *loginError) {
+	if db == nil {
+		return models.User{}, &loginError{message: "Error accessing database", statusCode: http.StatusInternalServerError}
+	}
+
+	user, err := findUserByUsername(db, req.Username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.User{}, &loginError{message: "Invalid Credentials", statusCode: http.StatusUnauthorized}
@@ -109,27 +133,35 @@ func authenticateUser(req loginRequest) (models.User, *loginError) {
 	return user, nil
 }
 
-func findUserByUsername(username string) (models.User, error) {
-	db := util.GetDB()
+func findUserByUsername(db *gorm.DB, username string) (models.User, error) {
+	if db == nil {
+		return models.User{}, fmt.Errorf("database connection is not initialized")
+	}
+
 	var user models.User
 	result := db.Where("username = ?", username).First(&user)
 	return user, result.Error
 }
 
-func generateJWT(username string) (string, error) {
+func generateJWT(username string, jwtKey []byte) (string, error) {
+	if len(jwtKey) == 0 {
+		return "", fmt.Errorf("missing JWT signing key")
+	}
+
 	claims := &UserClaims{
 		Username: username,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+			ExpiresAt: time.Now().UTC().Add(24 * time.Hour).Unix(),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(getJWTKey())
+	return token.SignedString(jwtKey)
 }
 
 func writeLoginResponse(w http.ResponseWriter, user models.User, tokenString string) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 
 	responseData := map[string]interface{}{
 		"token":              tokenString,

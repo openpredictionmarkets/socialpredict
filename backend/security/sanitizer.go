@@ -2,13 +2,18 @@ package security
 
 import (
 	"fmt"
+	"net"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/microcosm-cc/bluemonday"
 )
+
+var usernamePattern = regexp.MustCompile("^[a-z0-9]+$")
 
 // Sanitizer holds the bluemonday policies for different content types
 type Sanitizer struct {
@@ -27,26 +32,24 @@ func NewSanitizer() *Sanitizer {
 // createBasicPolicy creates a policy that allows basic text formatting but removes scripts
 func createBasicPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
-	// Allow basic text formatting
-	p.AllowElements("b", "i", "em", "strong")
-	// Ensure no scripts, iframes, or dangerous elements
-	p.AllowAttrs("href").OnElements("a")
+	p.AllowStandardURLs()
+	p.RequireParseableURLs(true)
+	p.AllowURLSchemes("http", "https")
+	p.AllowElements("a", "b", "i", "em", "strong")
+	p.AllowAttrs("href").Matching(regexp.MustCompile(`^https?://`)).OnElements("a")
 	p.RequireNoReferrerOnLinks(true)
 	return p
 }
 
 // SanitizeUsername removes any characters that are not lowercase letters or numbers
 func (s *Sanitizer) SanitizeUsername(username string) (string, error) {
-	// Remove any whitespace
 	username = strings.TrimSpace(username)
 
-	// Check if username matches expected pattern
-	if match, _ := regexp.MatchString("^[a-z0-9]+$", username); !match {
+	if !usernamePattern.MatchString(username) {
 		return "", fmt.Errorf("username must only contain lowercase letters and numbers")
 	}
 
-	// Additional length check
-	if len(username) < 3 || len(username) > 30 {
+	if utf8.RuneCountInString(username) < 3 || utf8.RuneCountInString(username) > 30 {
 		return "", fmt.Errorf("username must be between 3 and 30 characters")
 	}
 
@@ -55,10 +58,8 @@ func (s *Sanitizer) SanitizeUsername(username string) (string, error) {
 
 // SanitizeDisplayName removes HTML/script content but allows basic formatting
 func (s *Sanitizer) SanitizeDisplayName(displayName string) (string, error) {
-	// Remove leading/trailing whitespace
 	displayName = strings.TrimSpace(displayName)
 
-	// Check length
 	if len(displayName) == 0 {
 		return "", fmt.Errorf("display name cannot be empty")
 	}
@@ -66,44 +67,39 @@ func (s *Sanitizer) SanitizeDisplayName(displayName string) (string, error) {
 		return "", fmt.Errorf("display name cannot exceed 50 characters")
 	}
 
-	// Check for potentially dangerous patterns before sanitizing
 	if containsSuspiciousPatterns(displayName) {
 		return "", fmt.Errorf("display name contains potentially dangerous content")
 	}
 
-	// Sanitize HTML/script content
-	sanitized := s.strictPolicy.Sanitize(displayName)
+	sanitized := strings.TrimSpace(s.strictPolicy.Sanitize(displayName))
+	if sanitized == "" {
+		return "", fmt.Errorf("display name cannot be empty")
+	}
 
 	return sanitized, nil
 }
 
 // SanitizeDescription removes dangerous HTML while allowing basic formatting
 func (s *Sanitizer) SanitizeDescription(description string) (string, error) {
-	// Remove leading/trailing whitespace
 	description = strings.TrimSpace(description)
 
-	// Check length
 	if len(description) > 2000 {
 		return "", fmt.Errorf("description cannot exceed 2000 characters")
 	}
 
-	// Check for suspicious patterns before sanitizing
 	if containsSuspiciousPatterns(description) {
 		return "", fmt.Errorf("description contains potentially dangerous content")
 	}
 
-	// Sanitize with basic policy (allows some formatting)
-	sanitized := s.basicPolicy.Sanitize(description)
+	sanitized := strings.TrimSpace(s.basicPolicy.Sanitize(description))
 
 	return sanitized, nil
 }
 
 // SanitizeMarketTitle sanitizes market question titles
 func (s *Sanitizer) SanitizeMarketTitle(title string) (string, error) {
-	// Remove leading/trailing whitespace
 	title = strings.TrimSpace(title)
 
-	// Check length constraints
 	if len(title) == 0 {
 		return "", fmt.Errorf("market title cannot be empty")
 	}
@@ -111,13 +107,14 @@ func (s *Sanitizer) SanitizeMarketTitle(title string) (string, error) {
 		return "", fmt.Errorf("market title cannot exceed 160 characters")
 	}
 
-	// Check for suspicious patterns before sanitizing
 	if containsSuspiciousPatterns(title) {
 		return "", fmt.Errorf("market title contains potentially dangerous content")
 	}
 
-	// Sanitize HTML/script content
-	sanitized := s.strictPolicy.Sanitize(title)
+	sanitized := strings.TrimSpace(s.strictPolicy.Sanitize(title))
+	if sanitized == "" {
+		return "", fmt.Errorf("market title cannot be empty")
+	}
 
 	return sanitized, nil
 }
@@ -141,8 +138,14 @@ func (s *Sanitizer) SanitizePersonalLink(link string) (string, error) {
 	if err := validateAllowedScheme(parsedURL.Scheme); err != nil {
 		return "", err
 	}
+	if parsedURL.User != nil {
+		return "", fmt.Errorf("personal link cannot include credentials")
+	}
+	if parsedURL.Hostname() == "" {
+		return "", fmt.Errorf("personal link must include a valid host")
+	}
 
-	if containsMaliciousDomain(parsedURL.Host) {
+	if containsMaliciousDomain(parsedURL.Hostname()) {
 		return "", fmt.Errorf("potentially malicious domain detected")
 	}
 
@@ -150,19 +153,26 @@ func (s *Sanitizer) SanitizePersonalLink(link string) (string, error) {
 }
 
 func validatePersonalLinkLength(link string) error {
-	if len(link) > 200 {
+	if utf8.RuneCountInString(link) > 200 {
 		return fmt.Errorf("personal link cannot exceed 200 characters")
 	}
 	return nil
 }
 
 func parseURLWithScheme(link string) (*url.URL, error) {
+	if strings.ContainsAny(link, " \t\r\n") {
+		return nil, fmt.Errorf("invalid URL format")
+	}
+
 	parsedURL, err := url.Parse(link)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL format: %v", err)
 	}
 
 	if parsedURL.Scheme != "" {
+		if parsedURL.Host == "" {
+			return nil, fmt.Errorf("invalid URL format")
+		}
 		return parsedURL, nil
 	}
 
@@ -171,10 +181,14 @@ func parseURLWithScheme(link string) (*url.URL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL format after adding scheme: %v", err)
 	}
+	if parsedURL.Host == "" {
+		return nil, fmt.Errorf("invalid URL format")
+	}
 	return parsedURL, nil
 }
 
 func validateAllowedScheme(scheme string) error {
+	scheme = strings.ToLower(strings.TrimSpace(scheme))
 	if scheme != "http" && scheme != "https" {
 		return fmt.Errorf("only http and https URLs are allowed")
 	}
@@ -183,16 +197,13 @@ func validateAllowedScheme(scheme string) error {
 
 // SanitizeEmoji validates that the emoji is from an allowed set
 func (s *Sanitizer) SanitizeEmoji(emoji string) (string, error) {
-	// Remove leading/trailing whitespace
 	emoji = strings.TrimSpace(emoji)
 
-	// Check if it's a valid emoji (basic check for unicode emoji ranges)
 	if !isValidEmoji(emoji) {
 		return "", fmt.Errorf("invalid emoji format")
 	}
 
-	// Check length (emojis should be short)
-	if len(emoji) > 20 {
+	if utf8.RuneCountInString(emoji) > 20 {
 		return "", fmt.Errorf("emoji too long")
 	}
 
@@ -201,8 +212,10 @@ func (s *Sanitizer) SanitizeEmoji(emoji string) (string, error) {
 
 // SanitizePassword validates password strength
 func (s *Sanitizer) SanitizePassword(password string) (string, error) {
+	if password != strings.TrimSpace(password) {
+		return "", fmt.Errorf("password cannot start or end with whitespace")
+	}
 
-	// Basic length checks
 	password, err := s.CheckPasswordLength(password)
 	if err != nil {
 		return "", err
@@ -220,17 +233,21 @@ func (s *Sanitizer) CheckPasswordLength(password string) (string, error) {
 	const minLength = 8
 	const maxLength = 128
 
-	// Check length constraints
-	len := len(password)
-	if len < minLength || len > maxLength {
+	length := utf8.RuneCountInString(password)
+	if length < minLength || length > maxLength {
 		return "", fmt.Errorf("password must be between %d and %d characters long", minLength, maxLength)
 	}
 
 	return password, nil
 }
 
-// CheckChars checks for the presence of uppercase, lowercase, and digit characters
 func (s *Sanitizer) CheckPasswordChars(password string) (string, error) {
+	for _, char := range password {
+		if unicode.IsSpace(char) || unicode.IsControl(char) {
+			return "", fmt.Errorf("password cannot contain whitespace or control characters")
+		}
+	}
+
 	if !(hasUppercase(password) && hasLowercase(password) && hasDigit(password)) {
 		return "", fmt.Errorf("password must contain at least one uppercase letter, one lowercase letter, and one digit")
 	}
@@ -280,44 +297,53 @@ func containsSuspiciousPatterns(input string) bool {
 
 // containsMaliciousDomain checks against known malicious domain patterns
 func containsMaliciousDomain(domain string) bool {
-	// This is a basic implementation - in production, you'd use a more comprehensive list
-	maliciousPatterns := []string{
-		"bit.ly", // URL shorteners can be used maliciously
-		"tinyurl.com",
-		"t.co",
-		"localhost", // Prevent internal network access
-		"127.0.0.1",
-		"0.0.0.0",
-		"::1",
-		"169.254.", // Link-local addresses
-		"10.",      // Private network ranges
-		"192.168.",
-		"172.16.",
+	domainLower := strings.ToLower(strings.TrimSpace(domain))
+	if domainLower == "" {
+		return true
 	}
 
-	domainLower := strings.ToLower(domain)
-	for _, pattern := range maliciousPatterns {
-		if strings.Contains(domainLower, pattern) {
+	if ip, err := netip.ParseAddr(domainLower); err == nil {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
 			return true
 		}
+		return false
+	}
+
+	blockedDomains := []string{"bit.ly", "tinyurl.com", "t.co", "localhost"}
+	for _, blocked := range blockedDomains {
+		if domainLower == blocked || strings.HasSuffix(domainLower, "."+blocked) {
+			return true
+		}
+	}
+
+	if host, _, err := net.SplitHostPort(domainLower); err == nil {
+		return containsMaliciousDomain(host)
 	}
 
 	return false
 }
 
-// isValidEmoji performs basic emoji validation
 func isValidEmoji(emoji string) bool {
 	if emoji == "" {
 		return false
 	}
 
+	hasUnicodeEmoji := false
+	hasASCIIEmoji := false
 	for _, r := range emoji {
-		if isEmojiRune(r) || isASCIIEmojiRune(r) {
-			continue
+		switch {
+		case isEmojiRune(r):
+			hasUnicodeEmoji = true
+		case isASCIIEmojiRune(r):
+			hasASCIIEmoji = true
+			if hasUnicodeEmoji {
+				return false
+			}
+		default:
+			return false
 		}
-		return false
 	}
-	return true
+	return hasUnicodeEmoji || hasASCIIEmoji
 }
 
 type runeRange struct {
@@ -325,7 +351,6 @@ type runeRange struct {
 	end   rune
 }
 
-// Common emoji ranges (simplified)
 var emojiRanges = []runeRange{
 	{start: 0x1F600, end: 0x1F64F}, // Emoticons
 	{start: 0x1F300, end: 0x1F5FF}, // Misc Symbols
@@ -347,8 +372,7 @@ func isEmojiRune(r rune) bool {
 }
 
 func isASCIIEmojiRune(r rune) bool {
-	// Allow basic ASCII characters for simple emojis like :)
-	return r >= 32 && r <= 126
+	return strings.ContainsRune(":;=8xX()-[]{}\\/|^'\",.<>*oOPpD", r)
 }
 
 func hasUppercase(s string) bool {

@@ -13,15 +13,61 @@ import (
 	"gorm.io/gorm"
 )
 
-func newAnalyticsService(t *testing.T, db *gorm.DB, econ *setup.EconomicConfig) *Service {
+type analyticsServiceTestConfig struct {
+	repoOptions    []RepositoryOption
+	serviceOptions []ServiceOption
+}
+
+type analyticsServiceTestOption func(*analyticsServiceTestConfig)
+
+type financialSnapshotComputer interface {
+	ComputeUserFinancials(context.Context, FinancialSnapshotRequest) (*FinancialSnapshot, error)
+}
+
+func withAnalyticsRepositoryOption(opt RepositoryOption) analyticsServiceTestOption {
+	return func(cfg *analyticsServiceTestConfig) {
+		cfg.repoOptions = append(cfg.repoOptions, opt)
+	}
+}
+
+func withAnalyticsServiceOption(opt ServiceOption) analyticsServiceTestOption {
+	return func(cfg *analyticsServiceTestConfig) {
+		cfg.serviceOptions = append(cfg.serviceOptions, opt)
+	}
+}
+
+func newAnalyticsService(t *testing.T, db *gorm.DB, econ *setup.EconomicConfig, opts ...analyticsServiceTestOption) *Service {
 	t.Helper()
+
+	cfg := analyticsServiceTestConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	wpamCalculator := modelstesting.SeedWPAMFromConfig(econ)
 	positionCalculator := positionsmath.NewPositionCalculator(
 		positionsmath.WithProbabilityProvider(positionsmath.NewWPAMProbabilityProvider(wpamCalculator)),
 	)
-	repo := NewGormRepository(db, WithRepositoryPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
+	cfg.repoOptions = append(cfg.repoOptions, WithRepositoryPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
+	repo := NewGormRepository(db, cfg.repoOptions...)
 	loader := func() *setup.EconomicConfig { return econ }
-	return NewService(repo, loader, WithPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
+	cfg.serviceOptions = append(cfg.serviceOptions, WithPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
+
+	return NewService(repo, loader, cfg.serviceOptions...)
+}
+
+func requireFinancialSnapshot(t *testing.T, svc financialSnapshotComputer, user models.User) *FinancialSnapshot {
+	t.Helper()
+
+	snapshot, err := svc.ComputeUserFinancials(context.Background(), FinancialSnapshotRequest{
+		Username:       user.Username,
+		AccountBalance: user.AccountBalance,
+	})
+	if err != nil {
+		t.Fatalf("ComputeUserFinancials returned error: %v", err)
+	}
+
+	return snapshot
 }
 
 func TestComputeUserFinancials_NewUser_NoPositions(t *testing.T) {
@@ -34,13 +80,7 @@ func TestComputeUserFinancials_NewUser_NoPositions(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
 	svc := newAnalyticsService(t, db, econ)
 
-	snapshot, err := svc.ComputeUserFinancials(context.Background(), FinancialSnapshotRequest{
-		Username:       user.Username,
-		AccountBalance: user.AccountBalance,
-	})
-	if err != nil {
-		t.Fatalf("ComputeUserFinancials returned error: %v", err)
-	}
+	snapshot := requireFinancialSnapshot(t, svc, user)
 
 	if snapshot.AccountBalance != 1000 {
 		t.Errorf("expected account balance 1000, got %d", snapshot.AccountBalance)
@@ -63,13 +103,7 @@ func TestComputeUserFinancials_NegativeBalance(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
 	svc := newAnalyticsService(t, db, econ)
 
-	snapshot, err := svc.ComputeUserFinancials(context.Background(), FinancialSnapshotRequest{
-		Username:       user.Username,
-		AccountBalance: user.AccountBalance,
-	})
-	if err != nil {
-		t.Fatalf("ComputeUserFinancials returned error: %v", err)
-	}
+	snapshot := requireFinancialSnapshot(t, svc, user)
 
 	if snapshot.AmountBorrowed != 50 {
 		t.Errorf("expected amountBorrowed 50, got %d", snapshot.AmountBorrowed)
@@ -106,13 +140,7 @@ func TestComputeUserFinancials_WithActivePositions(t *testing.T) {
 	econ := modelstesting.GenerateEconomicConfig()
 	svc := newAnalyticsService(t, db, econ)
 
-	snapshot, err := svc.ComputeUserFinancials(context.Background(), FinancialSnapshotRequest{
-		Username:       user.Username,
-		AccountBalance: user.AccountBalance,
-	})
-	if err != nil {
-		t.Fatalf("ComputeUserFinancials returned error: %v", err)
-	}
+	snapshot := requireFinancialSnapshot(t, svc, user)
 
 	if snapshot.AmountInPlay == 0 {
 		t.Errorf("expected non-zero amount in play, got %d", snapshot.AmountInPlay)

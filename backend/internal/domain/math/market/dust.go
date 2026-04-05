@@ -24,24 +24,26 @@ func (c ConstantSellDustCalculator) DustForSell(sellBet models.Bet, allBets []mo
 
 var defaultSellDustCalculator = ConstantSellDustCalculator{DustPerSell: 1}
 
+type marketDustCalculator struct {
+	volumeCalculator VolumeCalculator
+	sellCalculator   SellDustCalculator
+}
+
+var defaultMarketDustCalculator = marketDustCalculator{
+	volumeCalculator: defaultVolumeCalculator,
+	sellCalculator:   defaultSellDustCalculator,
+}
+
 // GetMarketVolumeWithDust returns the market volume including accumulated dust from selling
 // This ensures currency conservation by accounting for dust that remains in the market
 func GetMarketVolumeWithDust(bets []models.Bet) int64 {
-	baseVolume := GetMarketVolume(bets)
-	dustVolume := calculateDustStack(bets)
-	return baseVolume + dustVolume
+	return defaultMarketDustCalculator.VolumeWithDust(bets)
 }
 
 // calculateDustStack computes total dust accumulated from all sell transactions
 // Uses O(n) single-pass algorithm with chronological processing
 func calculateDustStack(bets []models.Bet) int64 {
-	if len(bets) == 0 {
-		return 0
-	}
-
-	sortedBets := sortBetsChronologically(bets)
-
-	return calculateDustStackWithCalculator(sortedBets, defaultSellDustCalculator)
+	return defaultMarketDustCalculator.Dust(bets)
 }
 
 // GetMarketDustWithCalculator allows callers to supply a custom dust calculator.
@@ -50,7 +52,10 @@ func GetMarketDustWithCalculator(bets []models.Bet, calculator SellDustCalculato
 	if calculator == nil {
 		calculator = defaultSellDustCalculator
 	}
-	return calculateDustStackWithCalculator(sortBetsChronologically(bets), calculator)
+	return marketDustCalculator{
+		volumeCalculator: defaultVolumeCalculator,
+		sellCalculator:   calculator,
+	}.Dust(bets)
 }
 
 func calculateDustStackWithCalculator(bets []models.Bet, calculator SellDustCalculator) int64 {
@@ -72,13 +77,13 @@ func calculateDustStackWithCalculator(bets []models.Bet, calculator SellDustCalc
 // This is a placeholder implementation - actual dust calculation will depend on
 // the selling mechanism and how shares are valued at the time of sale
 func calculateDustForSell(sellBet models.Bet, allBets []models.Bet) int64 {
-	return defaultSellDustCalculator.DustForSell(sellBet, allBets)
+	return defaultMarketDustCalculator.DustForSell(sellBet, allBets)
 }
 
 // GetMarketDust calculates accumulated dust for a market
 // This is a utility function for dust-related calculations
 func GetMarketDust(bets []models.Bet) int64 {
-	return calculateDustStack(bets)
+	return defaultMarketDustCalculator.Dust(bets)
 }
 
 func sortBetsChronologically(bets []models.Bet) []models.Bet {
@@ -88,4 +93,22 @@ func sortBetsChronologically(bets []models.Bet) []models.Bet {
 		return sortedBets[i].PlacedAt.Before(sortedBets[j].PlacedAt)
 	})
 	return sortedBets
+}
+
+func (c marketDustCalculator) VolumeWithDust(bets []models.Bet) int64 {
+	return c.volumeCalculator.Volume(bets) + c.Dust(bets)
+}
+
+func (c marketDustCalculator) Dust(bets []models.Bet) int64 {
+	if len(bets) == 0 {
+		return 0
+	}
+	return calculateDustStackWithCalculator(sortBetsChronologically(bets), c.sellCalculator)
+}
+
+func (c marketDustCalculator) DustForSell(sellBet models.Bet, allBets []models.Bet) int64 {
+	if c.sellCalculator == nil {
+		return 0
+	}
+	return c.sellCalculator.DustForSell(sellBet, allBets)
 }

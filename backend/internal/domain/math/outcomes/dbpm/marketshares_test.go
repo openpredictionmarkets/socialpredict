@@ -11,15 +11,84 @@ import (
 	"time"
 )
 
-var now = time.Now()
+type stubProbabilitySelector struct{ probability float64 }
 
-// helper function to create course payouts succinctly
+func (s stubProbabilitySelector) Current([]wpam.ProbabilityChange) float64 { return s.probability }
+
+type stubMarketVolumeCalculator struct{ volume int64 }
+
+func (s stubMarketVolumeCalculator) Volume([]models.Bet) int64 { return s.volume }
+
+type stubCoursePayoutCalculator struct{ payouts []CourseBetPayout }
+
+func (s stubCoursePayoutCalculator) CoursePayouts([]models.Bet, []wpam.ProbabilityChange) []CourseBetPayout {
+	return append([]CourseBetPayout(nil), s.payouts...)
+}
+
+type stubNormalizationFactorCalculator struct {
+	yes float64
+	no  float64
+}
+
+func (s stubNormalizationFactorCalculator) NormalizationFactors(int64, int64, []CourseBetPayout) (float64, float64) {
+	return s.yes, s.no
+}
+
+type stubScaledPayoutCalculator struct{ payouts []int64 }
+
+func (s stubScaledPayoutCalculator) ScaledPayouts([]models.Bet, []CourseBetPayout, float64, float64) []int64 {
+	return append([]int64(nil), s.payouts...)
+}
+
+type stubExcessCalculator struct{ excess int64 }
+
+func (s stubExcessCalculator) Excess([]models.Bet, []int64) int64 { return s.excess }
+
+type stubPayoutAdjuster struct {
+	positive []int64
+	negative []int64
+	adjusted []int64
+}
+
+func (s stubPayoutAdjuster) AdjustPositive([]int64, int64) []int64 {
+	return append([]int64(nil), s.positive...)
+}
+
+func (s stubPayoutAdjuster) AdjustNegative([]int64, int64) []int64 {
+	return append([]int64(nil), s.negative...)
+}
+
+func (s stubPayoutAdjuster) Adjust([]models.Bet, []int64) []int64 {
+	return append([]int64(nil), s.adjusted...)
+}
+
+type stubUserPayoutAggregator struct{ positions []DBPMMarketPosition }
+
+func (s stubUserPayoutAggregator) Aggregate([]models.Bet, []int64) []DBPMMarketPosition {
+	return append([]DBPMMarketPosition(nil), s.positions...)
+}
+
+type stubMarketPositionNetter struct{ positions []DBPMMarketPosition }
+
+func (s stubMarketPositionNetter) Net([]DBPMMarketPosition) []DBPMMarketPosition {
+	return append([]DBPMMarketPosition(nil), s.positions...)
+}
+
+type stubSingleCreditAllocator struct {
+	yes int64
+	no  int64
+}
+
+func (s stubSingleCreditAllocator) Allocate([]models.Bet) (int64, int64) { return s.yes, s.no }
+
+var marketSharesBaseTime = time.Date(2025, 1, 1, 8, 0, 0, 0, time.UTC)
+
 func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayout {
 	if len(payouts) != len(outcomes) {
 		panic("payouts and outcomes slices must have the same length")
 	}
 
-	var coursePayouts []CourseBetPayout
+	coursePayouts := make([]CourseBetPayout, 0, len(payouts))
 	for i, payout := range payouts {
 		coursePayouts = append(coursePayouts, CourseBetPayout{
 			Payout:  payout,
@@ -27,6 +96,57 @@ func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayo
 		})
 	}
 	return coursePayouts
+}
+
+func makeDBPMBet(amount int64, outcome, username string, minutes int) models.Bet {
+	return modelstesting.GenerateBet(amount, outcome, username, 1, marketSharesBaseTime.Add(time.Duration(minutes)*time.Minute).Sub(marketSharesBaseTime))
+}
+
+func assertCoursePayoutsEqual(t *testing.T, name string, actual, expected []CourseBetPayout) {
+	t.Helper()
+	if len(actual) != len(expected) {
+		t.Fatalf("%s: expected %d payouts, got %d", name, len(expected), len(actual))
+	}
+	for i, payout := range actual {
+		want := expected[i]
+		if payout.Payout != want.Payout || payout.Outcome != want.Outcome {
+			t.Fatalf(
+				"%s: payout %d mismatch. expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
+				name, i, want.Payout, want.Outcome, payout.Payout, payout.Outcome,
+			)
+		}
+	}
+}
+
+func assertInt64SliceEqual(t *testing.T, name string, actual, expected []int64) {
+	t.Helper()
+	if len(actual) != len(expected) {
+		t.Fatalf("%s: expected %d values, got %d", name, len(expected), len(actual))
+	}
+	for i, got := range actual {
+		if got != expected[i] {
+			t.Fatalf("%s: index %d expected %d, got %d", name, i, expected[i], got)
+		}
+	}
+}
+
+func assertDBPMPositionsEqual(t *testing.T, name string, actual, expected []DBPMMarketPosition) {
+	t.Helper()
+	if actual == nil {
+		actual = []DBPMMarketPosition{}
+	}
+	if expected == nil {
+		expected = []DBPMMarketPosition{}
+	}
+	sort.Slice(expected, func(i, j int) bool {
+		return expected[i].Username < expected[j].Username
+	})
+	sort.Slice(actual, func(i, j int) bool {
+		return actual[i].Username < actual[j].Username
+	})
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("%s: expected %+v, got %+v", name, expected, actual)
+	}
 }
 
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
@@ -47,7 +167,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "FirstBetNoDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
+				makeDBPMBet(20, "NO", "one", 0),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167),
 			yesShares:          3,
@@ -56,8 +176,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "SecondBetYesDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375),
 			yesShares:          11,
@@ -66,9 +186,9 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "ThirdBetYesDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
+				makeDBPMBet(10, "YES", "three", 2),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500),
 			yesShares:          20,
@@ -77,10 +197,10 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "FourthBetNegativeNoDirection",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
-				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
+				makeDBPMBet(10, "YES", "three", 2),
+				makeDBPMBet(-10, "NO", "one", 3),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			yesShares:          19,
@@ -89,8 +209,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "NOResolution",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.0), // Final resolution R = 0
 			yesShares:          0,
@@ -99,8 +219,8 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		{
 			Name: "YESResolution",
 			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+				makeDBPMBet(20, "NO", "one", 0),
+				makeDBPMBet(10, "YES", "two", 1),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 1.0), // Final resolution R = 1
 			yesShares:          30,                                                   // All shares go to YES
@@ -121,6 +241,18 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 				t.Errorf("%s: expected (%d, %d), got (%d, %d)", tc.Name, tc.yesShares, tc.noShares, yes, no)
 			}
 		})
+	}
+}
+
+func TestDivideUpMarketPoolSharesDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		probabilities: stubProbabilitySelector{probability: 0.25},
+		volumes:       stubMarketVolumeCalculator{volume: 8},
+	}
+
+	yesShares, noShares := calculator.DivideShares(nil, []wpam.ProbabilityChange{{Probability: 0.5}})
+	if yesShares != 2 || noShares != 6 {
+		t.Fatalf("expected injected shares (2,6), got (%d,%d)", yesShares, noShares)
 	}
 }
 
@@ -192,33 +324,19 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateCoursePayoutsDBPM(tc.Bets, tc.ProbabilityChanges)
-
-			// Debug output: Actual payouts
-			if t.Failed() {
-				t.Logf(
-					"[DEBUG] %s: Actual payouts: %+v",
-					tc.Name, actualPayouts,
-				)
-			}
-
-			// Ensure payout counts match
-			if len(actualPayouts) != len(tc.ExpectedPayouts) {
-				t.Fatalf("%s: Expected %d payouts, got %d", tc.Name, len(tc.ExpectedPayouts), len(actualPayouts))
-			}
-
-			// Check each payout
-			for i, payout := range actualPayouts {
-				expected := tc.ExpectedPayouts[i]
-				if payout.Payout != expected.Payout || payout.Outcome != expected.Outcome {
-					t.Errorf(
-						"%s: Payout %d mismatch. Expected {Payout: %.17g, Outcome: %s}, got {Payout: %.17g, Outcome: %s}",
-						tc.Name, i, expected.Payout, expected.Outcome, payout.Payout, payout.Outcome,
-					)
-				}
-			}
+			assertCoursePayoutsEqual(t, tc.Name, actualPayouts, tc.ExpectedPayouts)
 		})
 	}
 
+}
+
+func TestCalculateCoursePayoutsDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		coursePayouts: stubCoursePayoutCalculator{payouts: []CourseBetPayout{{Payout: 12.5, Outcome: "YES"}}},
+	}
+
+	actual := calculator.CoursePayouts(nil, nil)
+	assertCoursePayoutsEqual(t, "injected", actual, []CourseBetPayout{{Payout: 12.5, Outcome: "YES"}})
 }
 
 func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
@@ -303,6 +421,17 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 
 }
 
+func TestCalculateNormalizationFactorsDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		normalizers: stubNormalizationFactorCalculator{yes: 1.5, no: 2.5},
+	}
+
+	yes, no := calculator.NormalizationFactors(0, 0, nil)
+	if yes != 1.5 || no != 2.5 {
+		t.Fatalf("expected injected normalization factors (1.5, 2.5), got (%f, %f)", yes, no)
+	}
+}
+
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	testcases := []struct {
 		Name                   string
@@ -383,19 +512,19 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPayouts := CalculateScaledPayoutsDBPM(tc.Bets, tc.CoursePayouts, tc.yesNormalizationFactor, tc.noNormalizationFactor)
-
-			// Ensure payouts match exactly
-			for i, payout := range actualPayouts {
-				if payout != tc.ExpectedScaledPayouts[i] {
-					t.Errorf(
-						"at index %d: expected payout %d, got %d",
-						i, tc.ExpectedScaledPayouts[i], payout,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualPayouts, tc.ExpectedScaledPayouts)
 		})
 	}
 
+}
+
+func TestCalculateScaledPayoutsDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		scalers: stubScaledPayoutCalculator{payouts: []int64{7, 8}},
+	}
+
+	actual := calculator.ScaledPayouts(nil, nil, 0, 0)
+	assertInt64SliceEqual(t, "injected", actual, []int64{7, 8})
 }
 
 func TestCalculateExcess(t *testing.T) {
@@ -464,6 +593,16 @@ func TestCalculateExcess(t *testing.T) {
 	}
 }
 
+func TestCalculateExcess_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		excesses: stubExcessCalculator{excess: 9},
+	}
+
+	if actual := calculator.Excess(nil, nil); actual != 9 {
+		t.Fatalf("expected injected excess 9, got %d", actual)
+	}
+}
+
 // theoretically this test case should never occur.
 // that being said, we're testing deducting from newest to oldest
 func TestAdjustForPositiveExcess(t *testing.T) {
@@ -490,16 +629,18 @@ func TestAdjustForPositiveExcess(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := adjustForPositiveExcess(tc.ScaledPayouts, tc.Excess)
-			for i, result := range actualResult {
-				if result != tc.ExpectedResult[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedResult[i], result,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedResult)
 		})
 	}
+}
+
+func TestAdjustForPositiveExcess_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		adjustments: stubPayoutAdjuster{positive: []int64{4, 5}},
+	}
+
+	actual := calculator.AdjustPositiveExcess([]int64{1, 2}, 3)
+	assertInt64SliceEqual(t, "injected", actual, []int64{4, 5})
 }
 
 func TestAdjustForNegativeExcess(t *testing.T) {
@@ -531,17 +672,19 @@ func TestAdjustForNegativeExcess(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := adjustForNegativeExcess(tc.ScaledPayouts, tc.Excess)
-			for i, result := range actualResult {
-				if result != tc.ExpectedResult[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedResult[i], result,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedResult)
 		})
 	}
 
+}
+
+func TestAdjustForNegativeExcess_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		adjustments: stubPayoutAdjuster{negative: []int64{6, 7}},
+	}
+
+	actual := calculator.AdjustNegativeExcess([]int64{1, 2}, -3)
+	assertInt64SliceEqual(t, "injected", actual, []int64{6, 7})
 }
 
 func TestAdjustPayouts(t *testing.T) {
@@ -599,16 +742,18 @@ func TestAdjustPayouts(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualResult := AdjustPayouts(tc.Bets, tc.ScaledPayouts)
-			for i, result := range actualResult {
-				if result != tc.ExpectedAdjustedPayouts[i] {
-					t.Errorf(
-						"Test %s failed at index %d: expected payout %d, got %d",
-						tc.Name, i, tc.ExpectedAdjustedPayouts[i], result,
-					)
-				}
-			}
+			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedAdjustedPayouts)
 		})
 	}
+}
+
+func TestAdjustPayouts_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		adjustments: stubPayoutAdjuster{adjusted: []int64{3, 2, 1}},
+	}
+
+	actual := calculator.AdjustPayouts(nil, []int64{1, 2, 3})
+	assertInt64SliceEqual(t, "injected", actual, []int64{3, 2, 1})
 }
 
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
@@ -680,34 +825,19 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actualPositions := AggregateUserPayoutsDBPM(tc.Bets, tc.FinalPayouts)
-
-			// Sort both expected and actual results by Username for comparison
-			sort.Slice(tc.ExpectedPositions, func(i, j int) bool {
-				return tc.ExpectedPositions[i].Username < tc.ExpectedPositions[j].Username
-			})
-			sort.Slice(actualPositions, func(i, j int) bool {
-				return actualPositions[i].Username < actualPositions[j].Username
-			})
-
-			// Ensure lengths match
-			if len(actualPositions) != len(tc.ExpectedPositions) {
-				t.Fatalf("Test %s failed: expected %d positions, got %d", tc.Name, len(tc.ExpectedPositions), len(actualPositions))
-			}
-
-			// Ensure positions match exactly
-			for i, position := range actualPositions {
-				expected := tc.ExpectedPositions[i]
-				if position.Username != expected.Username ||
-					position.NoSharesOwned != expected.NoSharesOwned ||
-					position.YesSharesOwned != expected.YesSharesOwned {
-					t.Errorf(
-						"Test %s failed at index %d: expected %+v, got %+v",
-						tc.Name, i, expected, position,
-					)
-				}
-			}
+			assertDBPMPositionsEqual(t, tc.Name, actualPositions, tc.ExpectedPositions)
 		})
 	}
+}
+
+func TestAggregateUserPayoutsDBPM_UsesInjectedCalculator(t *testing.T) {
+	expected := []DBPMMarketPosition{{Username: "alice", YesSharesOwned: 9}}
+	calculator := MarketShareCalculator{
+		aggregators: stubUserPayoutAggregator{positions: expected},
+	}
+
+	actual := calculator.AggregateUserPayouts(nil, nil)
+	assertDBPMPositionsEqual(t, "injected", actual, expected)
 }
 
 func TestNetAggregateMarketPositions(t *testing.T) {
@@ -729,13 +859,21 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
 			actual := NetAggregateMarketPositions(tc.AggregatedPositions)
-			expected := tc.NetPositions
-
-			if !reflect.DeepEqual(actual, expected) {
-				t.Errorf("Failed %s: expected %+v, got %+v", tc.Name, expected, actual)
+			if !reflect.DeepEqual(actual, tc.NetPositions) {
+				t.Fatalf("failed %s: expected %+v, got %+v", tc.Name, tc.NetPositions, actual)
 			}
 		})
 	}
+}
+
+func TestNetAggregateMarketPositions_UsesInjectedCalculator(t *testing.T) {
+	expected := []DBPMMarketPosition{{Username: "alice", NoSharesOwned: 4}}
+	calculator := MarketShareCalculator{
+		netter: stubMarketPositionNetter{positions: expected},
+	}
+
+	actual := calculator.NetPositions(nil)
+	assertDBPMPositionsEqual(t, "injected", actual, expected)
 }
 
 func TestSingleCreditYesNoAllocator(t *testing.T) {
@@ -747,21 +885,21 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 	}{
 		{
 			name:    "Net YES",
-			bets:    []models.Bet{modelstesting.GenerateBet(1, "YES", "one", 1, 0)},
+			bets:    []models.Bet{makeDBPMBet(1, "YES", "one", 0)},
 			wantYes: 1,
 			wantNo:  0,
 		},
 		{
 			name:    "Net NO",
-			bets:    []models.Bet{modelstesting.GenerateBet(1, "NO", "one", 1, 0)},
+			bets:    []models.Bet{makeDBPMBet(1, "NO", "one", 0)},
 			wantYes: 0,
 			wantNo:  1,
 		},
 		{
 			name: "Net YES after mix",
 			bets: []models.Bet{
-				modelstesting.GenerateBet(2, "YES", "one", 1, 0),
-				modelstesting.GenerateBet(1, "NO", "two", 1, 1),
+				makeDBPMBet(2, "YES", "one", 0),
+				makeDBPMBet(1, "NO", "two", 1),
 			},
 			wantYes: 1,
 			wantNo:  0,
@@ -769,8 +907,8 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		{
 			name: "Net NO after mix",
 			bets: []models.Bet{
-				modelstesting.GenerateBet(1, "YES", "one", 1, 0),
-				modelstesting.GenerateBet(2, "NO", "two", 1, 1),
+				makeDBPMBet(1, "YES", "one", 0),
+				makeDBPMBet(2, "NO", "two", 1),
 			},
 			wantYes: 0,
 			wantNo:  1,
@@ -784,8 +922,8 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		{
 			name: "Ambiguous (net 0)",
 			bets: []models.Bet{
-				modelstesting.GenerateBet(1, "YES", "one", 1, 0),
-				modelstesting.GenerateBet(1, "NO", "two", 1, 1),
+				makeDBPMBet(1, "YES", "one", 0),
+				makeDBPMBet(1, "NO", "two", 1),
 			},
 			wantYes: 0,
 			wantNo:  0,
@@ -796,9 +934,20 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gotYes, gotNo := singleCreditYesNoAllocator(tc.bets)
 			if gotYes != tc.wantYes || gotNo != tc.wantNo {
-				t.Errorf("%s: expected (YES=%d, NO=%d), got (YES=%d, NO=%d)",
+				t.Fatalf("%s: expected (YES=%d, NO=%d), got (YES=%d, NO=%d)",
 					tc.name, tc.wantYes, tc.wantNo, gotYes, gotNo)
 			}
 		})
+	}
+}
+
+func TestSingleCreditYesNoAllocator_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		allocator: stubSingleCreditAllocator{yes: 1, no: 2},
+	}
+
+	gotYes, gotNo := calculator.AllocateSingleCredit(nil)
+	if gotYes != 1 || gotNo != 2 {
+		t.Fatalf("expected injected allocator result (1,2), got (%d,%d)", gotYes, gotNo)
 	}
 }

@@ -6,25 +6,40 @@ import (
 
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 )
 
-func TestComputeSystemMetrics_EmptyDatabase(t *testing.T) {
-	db := modelstesting.NewFakeDB(t)
-	econ := modelstesting.GenerateEconomicConfig()
+type systemMetricsComputer interface {
+	ComputeSystemMetrics(context.Context) (*SystemMetrics, error)
+}
 
-	svc := NewService(NewGormRepository(db), func() *setup.EconomicConfig { return econ })
+func requireMetricInt64(t *testing.T, metric Int64MetricReader) int64 {
+	t.Helper()
+	return metric.Int64Value()
+}
+
+func requireSystemMetrics(t *testing.T, svc systemMetricsComputer) *SystemMetrics {
+	t.Helper()
 
 	metrics, err := svc.ComputeSystemMetrics(context.Background())
 	if err != nil {
 		t.Fatalf("ComputeSystemMetrics returned error: %v", err)
 	}
 
-	if val, ok := metrics.MoneyCreated.UserDebtCapacity.Value.(int64); !ok || val != 0 {
-		t.Fatalf("expected user debt capacity 0, got %v", metrics.MoneyCreated.UserDebtCapacity.Value)
+	return metrics
+}
+
+func TestComputeSystemMetrics_EmptyDatabase(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+
+	svc := newAnalyticsService(t, db, econ)
+	metrics := requireSystemMetrics(t, svc)
+
+	if val := metrics.MoneyCreated.UserDebtCapacityValue(); val != 0 {
+		t.Fatalf("expected user debt capacity 0, got %d", val)
 	}
-	if val, ok := metrics.MoneyUtilized.TotalUtilized.Value.(int64); !ok || val != 0 {
-		t.Fatalf("expected total utilized 0, got %v", metrics.MoneyUtilized.TotalUtilized.Value)
+	if val := metrics.MoneyUtilized.TotalUtilizedValue(); val != 0 {
+		t.Fatalf("expected total utilized 0, got %d", val)
 	}
 }
 
@@ -61,23 +76,19 @@ func TestComputeSystemMetrics_WithData(t *testing.T) {
 		}
 	}
 
-	svc := NewService(NewGormRepository(db), func() *setup.EconomicConfig { return econ })
+	svc := newAnalyticsService(t, db, econ)
+	metrics := requireSystemMetrics(t, svc)
 
-	metrics, err := svc.ComputeSystemMetrics(context.Background())
-	if err != nil {
-		t.Fatalf("ComputeSystemMetrics returned error: %v", err)
-	}
-
-	if val, _ := metrics.MoneyCreated.UserDebtCapacity.Value.(int64); val != 1000 {
+	if val := requireMetricInt64(t, metrics.MoneyCreated.UserDebtCapacity); val != 1000 {
 		t.Errorf("expected user debt capacity 1000, got %d", val)
 	}
-	if val, _ := metrics.MoneyUtilized.UnusedDebt.Value.(int64); val != 900 {
+	if val := requireMetricInt64(t, metrics.MoneyUtilized.UnusedDebt); val != 900 {
 		t.Errorf("expected unused debt 900, got %d", val)
 	}
-	if val, _ := metrics.MoneyUtilized.MarketCreationFees.Value.(int64); val != 50 {
+	if val := requireMetricInt64(t, metrics.MoneyUtilized.MarketCreationFees); val != 50 {
 		t.Errorf("expected market creation fees 50, got %d", val)
 	}
-	if val, _ := metrics.MoneyUtilized.ParticipationFees.Value.(int64); val != 10 {
+	if val := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); val != 10 {
 		t.Errorf("expected participation fees 10, got %d", val)
 	}
 }

@@ -9,7 +9,35 @@ import (
 	dbets "socialpredict/internal/domain/bets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
+	"socialpredict/setup"
+
+	"gorm.io/gorm"
 )
+
+func newAnalyticsMetricsService(db *gorm.DB, loadEcon setup.EconConfigLoader, opts ...analytics.ServiceOption) *analytics.Service {
+	repo := analytics.NewGormRepository(db)
+	return analytics.NewService(repo, loadEcon, opts...)
+}
+
+type analyticsSystemMetricsComputer interface {
+	ComputeSystemMetrics(context.Context) (*analytics.SystemMetrics, error)
+}
+
+func requireAnalyticsMetricInt64(t *testing.T, metric analytics.Int64MetricReader) int64 {
+	t.Helper()
+	return metric.Int64Value()
+}
+
+func requireAnalyticsSystemMetrics(t *testing.T, svc analyticsSystemMetricsComputer) *analytics.SystemMetrics {
+	t.Helper()
+
+	metrics, err := svc.ComputeSystemMetrics(context.Background())
+	if err != nil {
+		t.Fatalf("compute metrics: %v", err)
+	}
+
+	return metrics
+}
 
 func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
@@ -57,11 +85,8 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	placeBet("bob", 10, "NO")
 	placeBet("carol", 30, "YES")
 
-	svc := analytics.NewService(analytics.NewGormRepository(db), loadEcon)
-	metrics, err := svc.ComputeSystemMetrics(context.Background())
-	if err != nil {
-		t.Fatalf("compute metrics: %v", err)
-	}
+	svc := newAnalyticsMetricsService(db, loadEcon)
+	metrics := requireAnalyticsSystemMetrics(t, svc)
 
 	maxDebt := econConfig.Economics.User.MaximumDebtAllowed
 
@@ -93,25 +118,25 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	totalUtilized := expectedUnusedDebt + expectedActiveVolume + creationFee + participationFees
 	totalCapacity := maxDebt * int64(len(usersAfter))
 
-	if got := metrics.MoneyUtilized.ActiveBetVolume.Value.(int64); got != expectedActiveVolume {
+	if got := requireAnalyticsMetricInt64(t, metrics.MoneyUtilized.ActiveBetVolume); got != expectedActiveVolume {
 		t.Fatalf("active volume mismatch: want %d got %d", expectedActiveVolume, got)
 	}
-	if got := metrics.MoneyUtilized.UnusedDebt.Value.(int64); got != expectedUnusedDebt {
+	if got := requireAnalyticsMetricInt64(t, metrics.MoneyUtilized.UnusedDebt); got != expectedUnusedDebt {
 		t.Fatalf("unused debt mismatch: want %d got %d", expectedUnusedDebt, got)
 	}
-	if got := metrics.MoneyUtilized.MarketCreationFees.Value.(int64); got != creationFee {
+	if got := requireAnalyticsMetricInt64(t, metrics.MoneyUtilized.MarketCreationFees); got != creationFee {
 		t.Fatalf("creation fee mismatch: want %d got %d", creationFee, got)
 	}
-	if got := metrics.MoneyUtilized.ParticipationFees.Value.(int64); got != participationFees {
+	if got := requireAnalyticsMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != participationFees {
 		t.Fatalf("participation fees mismatch: want %d got %d", participationFees, got)
 	}
-	if got := metrics.MoneyUtilized.TotalUtilized.Value.(int64); got != totalUtilized {
+	if got := requireAnalyticsMetricInt64(t, metrics.MoneyUtilized.TotalUtilized); got != totalUtilized {
 		t.Fatalf("total utilized mismatch: want %d got %d", totalUtilized, got)
 	}
-	if got := metrics.MoneyCreated.UserDebtCapacity.Value.(int64); got != totalCapacity {
+	if got := requireAnalyticsMetricInt64(t, metrics.MoneyCreated.UserDebtCapacity); got != totalCapacity {
 		t.Fatalf("debt capacity mismatch: want %d got %d", totalCapacity, got)
 	}
-	if got := metrics.Verification.Surplus.Value.(int64); got != 0 {
+	if got := requireAnalyticsMetricInt64(t, metrics.Verification.Surplus); got != 0 {
 		t.Fatalf("expected zero surplus, got %d", got)
 	}
 }
@@ -167,13 +192,10 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 	}
 
 	repo := analytics.NewGormRepository(db)
-	metricsSvc := analytics.NewService(repo, loadEcon)
-	metrics, err := metricsSvc.ComputeSystemMetrics(context.Background())
-	if err != nil {
-		t.Fatalf("metrics after resolve: %v", err)
-	}
+	metricsSvc := newAnalyticsMetricsService(db, loadEcon)
+	metrics := requireAnalyticsSystemMetrics(t, metricsSvc)
 
-	if surplus, _ := metrics.Verification.Surplus.Value.(int64); surplus != 0 {
+	if surplus := metrics.Verification.SurplusValue(); surplus != 0 {
 		t.Fatalf("expected zero surplus after resolution, got %d", surplus)
 	}
 

@@ -151,57 +151,20 @@ func (a DefaultMetricsAssembler) Assemble(econ *setup.EconomicConfig, debt *Debt
 
 	return &SystemMetrics{
 		MoneyCreated: MoneyCreated{
-			UserDebtCapacity: MetricWithExplanation{
-				Value:       debt.TotalDebtCapacity,
-				Formula:     "numUsers × maxDebtPerUser",
-				Explanation: "Total credit capacity made available to all users",
-			},
-			NumUsers: MetricWithExplanation{
-				Value:       debt.UserCount,
-				Explanation: "Total number of registered users",
-			},
+			UserDebtCapacity: NewInt64Metric(debt.TotalDebtCapacity, "numUsers × maxDebtPerUser", "Total credit capacity made available to all users"),
+			NumUsers:         NewInt64Metric(debt.UserCount, "", "Total number of registered users"),
 		},
 		MoneyUtilized: MoneyUtilized{
-			UnusedDebt: MetricWithExplanation{
-				Value:       debt.UnusedDebt,
-				Formula:     "Σ(maxDebtPerUser - max(0, -balance))",
-				Explanation: "Remaining borrowing capacity available to users",
-			},
-			ActiveBetVolume: MetricWithExplanation{
-				Value:       volume.ActiveBetVolume,
-				Formula:     "Σ(unresolved_market_volumes)",
-				Explanation: "Total value of bets currently active in unresolved markets (excludes fees and subsidies)",
-			},
-			MarketCreationFees: MetricWithExplanation{
-				Value:       volume.MarketCreationFees,
-				Formula:     "number_of_markets × creation_fee_per_market",
-				Explanation: "Fees collected from users creating new markets",
-			},
-			ParticipationFees: MetricWithExplanation{
-				Value:       participationFees,
-				Formula:     "Σ(first_bet_per_user_per_market × participation_fee)",
-				Explanation: "Fees collected from first-time participation in each market",
-			},
-			BonusesPaid: MetricWithExplanation{
-				Value:       bonusesPaid,
-				Explanation: "System bonuses paid to users and realized profits currently held in user balances",
-			},
-			TotalUtilized: MetricWithExplanation{
-				Value:       totalUtilized,
-				Formula:     "unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid",
-				Explanation: "Total debt capacity that has been utilized across all categories",
-			},
+			UnusedDebt:         NewInt64Metric(debt.UnusedDebt, "Σ(maxDebtPerUser - max(0, -balance))", "Remaining borrowing capacity available to users"),
+			ActiveBetVolume:    NewInt64Metric(volume.ActiveBetVolume, "Σ(unresolved_market_volumes)", "Total value of bets currently active in unresolved markets (excludes fees and subsidies)"),
+			MarketCreationFees: NewInt64Metric(volume.MarketCreationFees, "number_of_markets × creation_fee_per_market", "Fees collected from users creating new markets"),
+			ParticipationFees:  NewInt64Metric(participationFees, "Σ(first_bet_per_user_per_market × participation_fee)", "Fees collected from first-time participation in each market"),
+			BonusesPaid:        NewInt64Metric(bonusesPaid, "", "System bonuses paid to users and realized profits currently held in user balances"),
+			TotalUtilized:      NewInt64Metric(totalUtilized, "unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid", "Total debt capacity that has been utilized across all categories"),
 		},
 		Verification: Verification{
-			Balanced: MetricWithExplanation{
-				Value:       balanced,
-				Explanation: "Whether total created equals total utilized (perfect accounting balance)",
-			},
-			Surplus: MetricWithExplanation{
-				Value:       surplus,
-				Formula:     "userDebtCapacity - totalUtilized",
-				Explanation: "Positive = unused capacity, Negative = over-utilization (indicates accounting error)",
-			},
+			Balanced: NewBoolMetric(balanced, "Whether total created equals total utilized (perfect accounting balance)"),
+			Surplus:  NewInt64Metric(surplus, "userDebtCapacity - totalUtilized", "Positive = unused capacity, Negative = over-utilization (indicates accounting error)"),
 		},
 	}
 }

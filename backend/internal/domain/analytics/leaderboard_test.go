@@ -8,22 +8,58 @@ import (
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 )
+
+type globalLeaderboardComputer interface {
+	ComputeGlobalLeaderboard(context.Context) ([]GlobalUserProfitability, error)
+}
+
+func leaderboardMarketDataFixture(positions []positionsmath.MarketPosition, bets []models.Bet) leaderboardMarketData {
+	return leaderboardMarketData{
+		positions: positions,
+		bets:      bets,
+	}
+}
+
+func requireLeaderboardOrder(t *testing.T, entries []GlobalUserProfitability, usernames ...string) {
+	t.Helper()
+
+	if len(entries) < len(usernames) {
+		t.Fatalf("expected at least %d entries, got %d", len(usernames), len(entries))
+	}
+	for i, username := range usernames {
+		if entries[i].Username != username {
+			t.Fatalf("entry %d username = %s, want %s", i, entries[i].Username, username)
+		}
+	}
+}
+
+func requireGlobalLeaderboard(t *testing.T, svc globalLeaderboardComputer) []GlobalUserProfitability {
+	t.Helper()
+
+	results, err := svc.ComputeGlobalLeaderboard(context.Background())
+	if err != nil {
+		t.Fatalf("ComputeGlobalLeaderboard returned error: %v", err)
+	}
+
+	return results
+}
 
 func TestAggregateLeaderboardUserStats(t *testing.T) {
 	markets := []leaderboardMarketData{
-		{
-			positions: []positionsmath.MarketPosition{
+		leaderboardMarketDataFixture(
+			[]positionsmath.MarketPosition{
 				{Username: "u1", Value: 200, TotalSpent: 100, IsResolved: true},
 				{Username: "u2", Value: 50, TotalSpent: 80, IsResolved: false},
 			},
-		},
-		{
-			positions: []positionsmath.MarketPosition{
+			nil,
+		),
+		leaderboardMarketDataFixture(
+			[]positionsmath.MarketPosition{
 				{Username: "u1", Value: 120, TotalSpent: 60, IsResolved: false},
 			},
-		},
+			nil,
+		),
 	}
 
 	aggregates := aggregateLeaderboardUserStats(markets)
@@ -42,13 +78,14 @@ func TestAggregateLeaderboardUserStats(t *testing.T) {
 func TestFindEarliestBetsPerUser(t *testing.T) {
 	now := time.Now()
 	markets := []leaderboardMarketData{
-		{
-			bets: []models.Bet{
+		leaderboardMarketDataFixture(
+			nil,
+			[]models.Bet{
 				{Username: "u1", PlacedAt: now.Add(2 * time.Hour)},
 				{Username: "u1", PlacedAt: now.Add(-time.Hour)},
 				{Username: "u2", PlacedAt: now.Add(30 * time.Minute)},
 			},
-		},
+		),
 	}
 
 	aggregates := map[string]*leaderboardAggregate{
@@ -75,8 +112,9 @@ func TestRankLeaderboardEntries_TieBreaksByEarliestBet(t *testing.T) {
 
 	ranked := rankLeaderboardEntries(entries)
 
-	if ranked[0].Username != "early" || ranked[0].Rank != 1 {
-		t.Fatalf("expected early user ranked first, got %+v", ranked[0])
+	requireLeaderboardOrder(t, ranked, "early", "late")
+	if ranked[0].Rank != 1 {
+		t.Fatalf("expected early user rank 1, got %d", ranked[0].Rank)
 	}
 	if ranked[1].Rank != 2 {
 		t.Fatalf("expected second rank to be 2, got %d", ranked[1].Rank)
@@ -116,18 +154,12 @@ func TestComputeGlobalLeaderboard_OrdersByProfit(t *testing.T) {
 		}
 	}
 
-	svc := NewService(NewGormRepository(db), func() *setup.EconomicConfig { return econ })
-
-	results, err := svc.ComputeGlobalLeaderboard(context.Background())
-	if err != nil {
-		t.Fatalf("ComputeGlobalLeaderboard returned error: %v", err)
-	}
+	svc := newAnalyticsService(t, db, econ)
+	results := requireGlobalLeaderboard(t, svc)
 	if len(results) != 2 {
 		t.Fatalf("expected 2 leaderboard entries, got %d", len(results))
 	}
-	if results[0].Username != "alice" {
-		t.Fatalf("expected alice to rank first, got %s", results[0].Username)
-	}
+	requireLeaderboardOrder(t, results, "alice", "bob")
 	if results[0].Rank != 1 || results[1].Rank != 2 {
 		t.Fatalf("expected ranks 1 and 2, got %d and %d", results[0].Rank, results[1].Rank)
 	}
