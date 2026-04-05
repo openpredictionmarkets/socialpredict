@@ -58,7 +58,7 @@ func (defaultSellValidator) Validate(ctx context.Context, req SellRequest) (stri
 
 // marketGate ensures markets are open before interacting with them.
 type marketGate struct {
-	markets MarketService
+	markets MarketReader
 	clock   Clock
 }
 
@@ -111,8 +111,8 @@ func (g balanceGuard) EnsureSufficient(balance, totalCost int64) error {
 }
 
 type betLedger struct {
-	repo  Repository
-	users UserService
+	repo  BetWriter
+	users TransactionRecorder
 }
 
 func (l betLedger) ChargeAndRecord(ctx context.Context, bet *models.Bet, totalCost int64) error {

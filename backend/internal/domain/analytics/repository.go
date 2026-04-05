@@ -152,8 +152,9 @@ func (r *GormRepository) UserMarketPositions(ctx context.Context, username strin
 	}
 
 	betsByMarket := groupBetsByMarket(allBets)
+	calculator := r.ensurePositionCalculator()
 
-	positions, err := r.calculateUserPositions(username, marketIDs, snapshots, betsByMarket)
+	positions, err := r.calculateUserPositions(calculator, username, marketIDs, snapshots, betsByMarket)
 	if err != nil {
 		return nil, err
 	}
@@ -238,8 +239,7 @@ func (r *GormRepository) ensurePositionCalculator() MarketPositionCalculator {
 	return r.positionCalculator
 }
 
-func (r *GormRepository) calculateUserPositions(username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]models.Bet) ([]positionsmath.MarketPosition, error) {
-	calculator := r.ensurePositionCalculator()
+func (r *GormRepository) calculateUserPositions(calculator MarketPositionCalculator, username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]models.Bet) ([]positionsmath.MarketPosition, error) {
 	var positions []positionsmath.MarketPosition
 	for _, marketID := range marketIDs {
 		snapshot, ok := snapshots[int64(marketID)]

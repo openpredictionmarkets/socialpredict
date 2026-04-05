@@ -7,14 +7,6 @@ import (
 	"socialpredict/models"
 )
 
-type modelBetAssembler interface {
-	Assemble() models.Bet
-}
-
-type publicMarketAssembler interface {
-	Assemble() *PublicMarket
-}
-
 // Market represents the core market domain model
 type Market struct {
 	ID                      int64
@@ -100,27 +92,23 @@ type Bet struct {
 	CreatedAt time.Time
 }
 
-type domainBetAssembler struct {
-	bet *Bet
-}
-
-func (a domainBetAssembler) Assemble() models.Bet {
-	if a.bet == nil {
+func modelBetFromDomain(bet *Bet) models.Bet {
+	if bet == nil {
 		return models.Bet{}
 	}
 
 	return models.Bet{
-		Username: a.bet.Username,
-		MarketID: a.bet.MarketID,
-		Amount:   a.bet.Amount,
-		Outcome:  a.bet.Outcome,
-		PlacedAt: a.bet.PlacedAt,
+		Username: bet.Username,
+		MarketID: bet.MarketID,
+		Amount:   bet.Amount,
+		Outcome:  bet.Outcome,
+		PlacedAt: bet.PlacedAt,
 	}
 }
 
 // ToModelBet converts the domain bet into the shared model shape used by math services.
 func (b Bet) ToModelBet() models.Bet {
-	return domainBetAssembler{bet: &b}.Assemble()
+	return modelBetFromDomain(&b)
 }
 
 // ToModelBets converts a domain bet slice into the shared model representation.
@@ -131,7 +119,7 @@ func ToModelBets(bets []*Bet) []models.Bet {
 
 	modelBets := make([]models.Bet, len(bets))
 	for i, bet := range bets {
-		modelBets[i] = domainBetAssembler{bet: bet}.Assemble()
+		modelBets[i] = modelBetFromDomain(bet)
 	}
 
 	return modelBets
@@ -171,36 +159,30 @@ func (m *PublicMarket) Resolved() bool {
 	return m != nil && m.IsResolved
 }
 
-type marketPublicAssembler struct {
-	target *PublicMarket
-	market *Market
-}
-
-func (a marketPublicAssembler) Assemble() *PublicMarket {
-	if a.market == nil {
+func copyPublicMarket(target *PublicMarket, market *Market) *PublicMarket {
+	if market == nil {
 		return nil
 	}
 
-	target := a.target
 	if target == nil {
 		target = &PublicMarket{}
 	}
 
 	*target = PublicMarket{
-		ID:                      a.market.ID,
-		QuestionTitle:           a.market.QuestionTitle,
-		Description:             a.market.Description,
-		OutcomeType:             a.market.OutcomeType,
-		ResolutionDateTime:      a.market.ResolutionDateTime,
-		FinalResolutionDateTime: a.market.FinalResolutionDateTime,
-		UTCOffset:               a.market.UTCOffset,
-		IsResolved:              a.market.IsResolved(),
-		ResolutionResult:        a.market.ResolutionResult,
-		InitialProbability:      a.market.InitialProbability,
-		CreatorUsername:         a.market.CreatorUsername,
-		CreatedAt:               a.market.CreatedAt,
-		YesLabel:                a.market.YesLabel,
-		NoLabel:                 a.market.NoLabel,
+		ID:                      market.ID,
+		QuestionTitle:           market.QuestionTitle,
+		Description:             market.Description,
+		OutcomeType:             market.OutcomeType,
+		ResolutionDateTime:      market.ResolutionDateTime,
+		FinalResolutionDateTime: market.FinalResolutionDateTime,
+		UTCOffset:               market.UTCOffset,
+		IsResolved:              market.IsResolved(),
+		ResolutionResult:        market.ResolutionResult,
+		InitialProbability:      market.InitialProbability,
+		CreatorUsername:         market.CreatorUsername,
+		CreatedAt:               market.CreatedAt,
+		YesLabel:                market.YesLabel,
+		NoLabel:                 market.NoLabel,
 	}
 
 	return target
@@ -208,5 +190,5 @@ func (a marketPublicAssembler) Assemble() *PublicMarket {
 
 // FromMarket copies the public fields from a domain market into the public view model.
 func (m *PublicMarket) FromMarket(market *Market) *PublicMarket {
-	return marketPublicAssembler{target: m, market: market}.Assemble()
+	return copyPublicMarket(m, market)
 }

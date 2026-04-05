@@ -70,6 +70,11 @@ type Repository interface {
 // Service implements analytics calculations.
 type Service struct {
 	repo             Repository
+	debtRepo         DebtRepository
+	volumeRepo       VolumeRepository
+	feeRepo          FeeRepository
+	leaderboardRepo  LeaderboardRepository
+	financialsRepo   FinancialsRepository
 	econLoader       setup.EconConfigLoader
 	debtCalculator   DebtCalculator
 	volumeCalculator VolumeCalculator
@@ -136,6 +141,18 @@ func positionCalculatorOrDefaultStrategy(calculator MarketPositionCalculator) Ma
 	return calculator
 }
 
+func (s *Service) setRepository(repo Repository) {
+	if s == nil {
+		return
+	}
+	s.repo = repo
+	s.debtRepo = repo
+	s.volumeRepo = repo
+	s.feeRepo = repo
+	s.leaderboardRepo = repo
+	s.financialsRepo = repo
+}
+
 // WithDebtCalculator overrides the default debt calculator.
 func WithDebtCalculator(c DebtCalculator) ServiceOption {
 	return func(s *Service) {
@@ -184,9 +201,9 @@ func WithPositionCalculator(c MarketPositionCalculator) ServiceOption {
 // NewService constructs an analytics service with optional strategy overrides.
 func NewService(repo Repository, econLoader setup.EconConfigLoader, opts ...ServiceOption) *Service {
 	service := &Service{
-		repo:       repo,
 		econLoader: econLoader,
 	}
+	service.setRepository(repo)
 
 	for _, opt := range opts {
 		opt(service)

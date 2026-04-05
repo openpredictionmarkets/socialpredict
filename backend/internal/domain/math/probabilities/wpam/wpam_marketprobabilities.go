@@ -23,6 +23,8 @@ type ProbabilityFormula interface {
 	Calculate(seeds Seeds, totalYes, totalNo int64) float64
 }
 
+type ContributionAccumulator func(*marketContributions, int64)
+
 // Seeds captures the initial market parameters needed for WPAM calculations.
 type Seeds struct {
 	InitialProbability     float64
@@ -48,8 +50,6 @@ type marketContributions struct {
 	no  int64
 }
 
-type contributionAccumulator func(*marketContributions, int64)
-
 type weightedAverageProbabilityFormula struct{}
 
 var defaultSeedProvider = StaticSeedProvider{
@@ -59,7 +59,7 @@ var defaultSeedProvider = StaticSeedProvider{
 	},
 }
 
-var defaultContributionAccumulators = map[string]contributionAccumulator{
+var defaultContributionAccumulators = map[string]ContributionAccumulator{
 	wpamOutcomeYes: func(contributions *marketContributions, amount int64) { contributions.yes += amount },
 	wpamOutcomeNo:  func(contributions *marketContributions, amount int64) { contributions.no += amount },
 }
@@ -68,20 +68,50 @@ var defaultContributionAccumulators = map[string]contributionAccumulator{
 type ProbabilityCalculator struct {
 	seeds        SeedProvider
 	formula      ProbabilityFormula
-	accumulators map[string]contributionAccumulator
+	accumulators map[string]ContributionAccumulator
+}
+
+type ProbabilityCalculatorOption func(*ProbabilityCalculator)
+
+// WithProbabilityFormula overrides the formula used for probability calculations.
+func WithProbabilityFormula(formula ProbabilityFormula) ProbabilityCalculatorOption {
+	return func(c *ProbabilityCalculator) {
+		if formula != nil {
+			c.formula = formula
+		}
+	}
+}
+
+// WithContributionAccumulators overrides outcome contribution handling.
+func WithContributionAccumulators(accumulators map[string]ContributionAccumulator) ProbabilityCalculatorOption {
+	return func(c *ProbabilityCalculator) {
+		if accumulators == nil {
+			return
+		}
+		c.accumulators = accumulators
+	}
 }
 
 // NewProbabilityCalculator constructs a calculator with the provided seed source.
 // If provider is nil, sensible defaults are used.
 func NewProbabilityCalculator(provider SeedProvider) ProbabilityCalculator {
+	return NewProbabilityCalculatorWithOptions(provider)
+}
+
+// NewProbabilityCalculatorWithOptions constructs a calculator with substitutable probability behavior.
+func NewProbabilityCalculatorWithOptions(provider SeedProvider, opts ...ProbabilityCalculatorOption) ProbabilityCalculator {
 	if provider == nil {
 		provider = defaultSeedProvider
 	}
-	return ProbabilityCalculator{
+	calculator := ProbabilityCalculator{
 		seeds:        provider,
 		formula:      weightedAverageProbabilityFormula{},
 		accumulators: defaultContributionAccumulators,
 	}
+	for _, opt := range opts {
+		opt(&calculator)
+	}
+	return calculator
 }
 
 // Seeds returns the configured seeds for the calculator.

@@ -23,23 +23,25 @@ func (staticUserErrorFactory) New(message string) UserError {
 	return staticUserError{message: message}
 }
 
-func newDomainError(message string) error {
-	return staticUserErrorFactory{}.New(message)
+var defaultUserErrorFactory userErrorFactory = staticUserErrorFactory{}
+
+func newDomainError(message string) UserError {
+	return defaultUserErrorFactory.New(message)
 }
 
 var (
 	// ErrUserNotFound indicates that the requested user does not exist.
-	ErrUserNotFound = newDomainError("user not found")
+	ErrUserNotFound UserError = newDomainError("user not found")
 	// ErrUserAlreadyExists indicates that a create request conflicts with an existing user.
-	ErrUserAlreadyExists = newDomainError("user already exists")
+	ErrUserAlreadyExists UserError = newDomainError("user already exists")
 	// ErrInvalidCredentials indicates that password verification failed.
-	ErrInvalidCredentials = newDomainError("invalid credentials")
+	ErrInvalidCredentials UserError = newDomainError("invalid credentials")
 	// ErrInsufficientBalance indicates that the user would exceed allowed debt.
-	ErrInsufficientBalance = newDomainError("insufficient balance")
+	ErrInsufficientBalance UserError = newDomainError("insufficient balance")
 	// ErrInvalidUserData indicates that caller-supplied user data is invalid.
-	ErrInvalidUserData = newDomainError("invalid user data")
+	ErrInvalidUserData UserError = newDomainError("invalid user data")
 	// ErrUnauthorized indicates that the caller is not allowed to perform the action.
-	ErrUnauthorized = newDomainError("unauthorized")
+	ErrUnauthorized UserError = newDomainError("unauthorized")
 	// ErrInvalidTransactionType indicates that no balance rule exists for the supplied transaction type.
-	ErrInvalidTransactionType = newDomainError("invalid transaction type")
+	ErrInvalidTransactionType UserError = newDomainError("invalid transaction type")
 )

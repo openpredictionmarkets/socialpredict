@@ -92,6 +92,11 @@ func TestServiceGetMarketDetailsCalculatesMetrics(t *testing.T) {
 	}
 
 	assertMarketDetailMetrics(t, overview, fixture.market, fixture.bets, fixture.calculator)
+
+	fallback := markets.NewService(nil, newNoopUserService(), nil, markets.Config{}, markets.WithMetricsCalculator(nil), markets.WithClock(nil))
+	if fallback == nil {
+		t.Fatalf("expected fallback service")
+	}
 }
 
 func TestServiceGetMarketDetails_InvalidAndMissing(t *testing.T) {
@@ -102,4 +107,8 @@ func TestServiceGetMarketDetails_InvalidAndMissing(t *testing.T) {
 
 	_, err = service.GetMarketDetails(context.Background(), 999)
 	requireMarketNotFound(t, err)
+
+	if err := (noopUserService{}).DeductBalance(context.Background(), "alice", 1); err == nil {
+		t.Fatalf("expected zero-value user service to fail predictably")
+	}
 }

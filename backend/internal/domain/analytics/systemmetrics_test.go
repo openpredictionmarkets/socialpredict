@@ -8,12 +8,16 @@ import (
 	"socialpredict/models/modelstesting"
 )
 
-func requireMetricInt64(t *testing.T, metric Int64Metric) int64 {
+type systemMetricsComputer interface {
+	ComputeSystemMetrics(context.Context) (*SystemMetrics, error)
+}
+
+func requireMetricInt64(t *testing.T, metric Int64MetricReader) int64 {
 	t.Helper()
 	return metric.Int64Value()
 }
 
-func requireSystemMetrics(t *testing.T, svc *Service) *SystemMetrics {
+func requireSystemMetrics(t *testing.T, svc systemMetricsComputer) *SystemMetrics {
 	t.Helper()
 
 	metrics, err := svc.ComputeSystemMetrics(context.Background())

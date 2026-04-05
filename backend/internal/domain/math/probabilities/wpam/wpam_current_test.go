@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+type fixedSelector struct{ value float64 }
+
+func (s fixedSelector) Select([]ProbabilityChange) float64 { return s.value }
+
 var currentProbabilityBaseTime = time.Date(2025, 1, 1, 13, 0, 0, 0, time.UTC)
 
 func makeProbabilityChanges(values ...float64) []ProbabilityChange {
@@ -47,5 +51,11 @@ func TestGetCurrentProbability(t *testing.T) {
 				t.Fatalf("expected %f, got %f", test.want, got)
 			}
 		})
+	}
+}
+
+func TestGetCurrentProbabilityWithSelector(t *testing.T) {
+	if got := GetCurrentProbabilityWithSelector(nil, fixedSelector{value: 0.91}); got != 0.91 {
+		t.Fatalf("expected injected probability 0.91, got %f", got)
 	}
 }

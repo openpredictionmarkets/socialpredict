@@ -8,6 +8,34 @@ import (
 	"time"
 )
 
+type reverseBetSorter struct{}
+
+func (reverseBetSorter) Sort(bets []models.Bet) []models.Bet {
+	sorted := make([]models.Bet, len(bets))
+	copy(sorted, bets)
+	for i, j := 0, len(sorted)-1; i < j; i, j = i+1, j-1 {
+		sorted[i], sorted[j] = sorted[j], sorted[i]
+	}
+	return sorted
+}
+
+type fixedValuationCalculator struct{}
+
+func (fixedValuationCalculator) Calculate(
+	userPositions map[string]UserMarketPosition,
+	currentProbability float64,
+	totalVolume int64,
+	isResolved bool,
+	resolutionResult string,
+	earliestBets map[string]time.Time,
+) (map[string]UserValuationResult, error) {
+	result := make(map[string]UserValuationResult, len(userPositions))
+	for username := range userPositions {
+		result[username] = UserValuationResult{Username: username, RoundedValue: 77}
+	}
+	return result, nil
+}
+
 var positionsMathBaseTime = time.Date(2025, 1, 1, 15, 0, 0, 0, time.UTC)
 
 func newTestPositionCalculator() PositionCalculator {
@@ -163,5 +191,33 @@ func TestCalculateMarketPositions_IncludesZeroPositionUsers(t *testing.T) {
 
 	if lockedUser.YesSharesOwned != 0 || lockedUser.NoSharesOwned != 0 || lockedUser.Value != 0 {
 		t.Fatalf("expected zero shares/value for locked user, got %+v", lockedUser)
+	}
+}
+
+func TestCalculateMarketPositions_UsesInjectedValuationCalculator(t *testing.T) {
+	calculator := newTestPositionCalculator()
+	calculator = NewPositionCalculator(
+		WithProbabilityProvider(calculator.probabilities),
+		WithPayoutModel(calculator.netPositions),
+		WithBetSorter(reverseBetSorter{}),
+		WithValuationCalculator(fixedValuationCalculator{}),
+	)
+
+	snapshot := MarketSnapshot{ID: 1, CreatedAt: positionsMathBaseTime}
+	bets := buildPositionBets(1, []struct {
+		Amount   int64
+		Outcome  string
+		Username string
+		Offset   time.Duration
+	}{
+		{Amount: 10, Outcome: "YES", Username: "alice", Offset: 0},
+	})
+
+	positions, err := calculator.CalculateMarketPositions(snapshot, bets)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(positions) != 1 || positions[0].Value != 77 {
+		t.Fatalf("expected injected valuation value 77, got %+v", positions)
 	}
 }

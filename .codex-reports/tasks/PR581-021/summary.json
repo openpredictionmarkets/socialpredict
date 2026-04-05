@@ -1,15 +1,38 @@
 {
   "task_id": "PR581-021",
-  "status": "pending",
-  "updated_at": "2026-04-04T15:11:39.378034+00:00",
+  "status": "completed",
+  "updated_at": "2026-04-05T01:42:00.011146+00:00",
   "owner": "dispatcher_agent",
-  "headline": "",
-  "current_focus": "",
-  "files_changed": [],
-  "checks_run": [],
+  "headline": "Scoped backend math LSP seams aligned and validated",
+  "current_focus": "Completed the queued LSP refactor across market, DBPM, positions, and WPAM math packages with focused substitution tests.",
+  "files_changed": [
+    "backend/internal/domain/math/market/dust.go",
+    "backend/internal/domain/math/market/marketvolume.go",
+    "backend/internal/domain/math/market/dust_test.go",
+    "backend/internal/domain/math/market/marketvolume_test.go",
+    "backend/internal/domain/math/outcomes/dbpm/marketshares.go",
+    "backend/internal/domain/math/outcomes/dbpm/marketshares_test.go",
+    "backend/internal/domain/math/positions/adjust_valuation.go",
+    "backend/internal/domain/math/positions/positionsmath.go",
+    "backend/internal/domain/math/positions/positionsmath_test.go",
+    "backend/internal/domain/math/positions/profitability.go",
+    "backend/internal/domain/math/positions/profitability_test.go",
+    "backend/internal/domain/math/positions/valuation.go",
+    "backend/internal/domain/math/positions/valuation_test.go",
+    "backend/internal/domain/math/probabilities/wpam/wpam_current.go",
+    "backend/internal/domain/math/probabilities/wpam/wpam_current_test.go",
+    "backend/internal/domain/math/probabilities/wpam/wpam_marketprobabilities.go",
+    "backend/internal/domain/math/probabilities/wpam/wpam_marketprobabilities_test.go"
+  ],
+  "checks_run": [
+    "GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go test ./internal/domain/math/... -count=1",
+    "gofmt -w scoped internal/domain/math files"
+  ],
   "open_questions": [],
-  "follow_ups": [],
-  "last_event_seq": 1,
+  "follow_ups": [
+    "Dispatcher agent was spawned as requested but did not emit a final coordination summary before local convergence."
+  ],
+  "last_event_seq": 2,
   "context": {
     "handoff_requested": false
   }

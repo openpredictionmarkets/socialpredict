@@ -17,6 +17,47 @@ type normalizationAccumulator func(*normalizationSums, float64)
 type normalizationFactorSelector func(normalizationFactors) float64
 type payoutAggregator func(*DBPMMarketPosition, int64)
 type exposureAccumulator func(*sideExposure, int64)
+type probabilitySelector interface {
+	Current([]wpam.ProbabilityChange) float64
+}
+
+type volumeCalculator interface {
+	Volume([]models.Bet) int64
+}
+
+type coursePayoutCalculator interface {
+	CoursePayouts([]models.Bet, []wpam.ProbabilityChange) []CourseBetPayout
+}
+
+type normalizationFactorCalculator interface {
+	NormalizationFactors(int64, int64, []CourseBetPayout) (float64, float64)
+}
+
+type scaledPayoutCalculator interface {
+	ScaledPayouts([]models.Bet, []CourseBetPayout, float64, float64) []int64
+}
+
+type excessCalculator interface {
+	Excess([]models.Bet, []int64) int64
+}
+
+type payoutAdjuster interface {
+	AdjustPositive([]int64, int64) []int64
+	AdjustNegative([]int64, int64) []int64
+	Adjust([]models.Bet, []int64) []int64
+}
+
+type userPayoutAggregator interface {
+	Aggregate([]models.Bet, []int64) []DBPMMarketPosition
+}
+
+type marketPositionNetter interface {
+	Net([]DBPMMarketPosition) []DBPMMarketPosition
+}
+
+type singleCreditAllocator interface {
+	Allocate([]models.Bet) (int64, int64)
+}
 
 type normalizationSums struct {
 	yes float64
@@ -58,6 +99,57 @@ var dbpmExposureAccumulators = map[string]exposureAccumulator{
 	dbpmOutcomeNo:  func(exposure *sideExposure, amount int64) { exposure.no += amount },
 }
 
+type wpamProbabilitySelector struct{}
+
+func (wpamProbabilitySelector) Current(changes []wpam.ProbabilityChange) float64 {
+	return wpam.GetCurrentProbability(changes)
+}
+
+type marketVolumeCalculator struct{}
+
+func (marketVolumeCalculator) Volume(bets []models.Bet) int64 {
+	return marketmath.GetMarketVolume(bets)
+}
+
+type MarketShareCalculator struct {
+	probabilities probabilitySelector
+	volumes       volumeCalculator
+	coursePayouts coursePayoutCalculator
+	normalizers   normalizationFactorCalculator
+	scalers       scaledPayoutCalculator
+	excesses      excessCalculator
+	adjustments   payoutAdjuster
+	aggregators   userPayoutAggregator
+	netter        marketPositionNetter
+	allocator     singleCreditAllocator
+}
+
+var defaultMarketShareCalculator = MarketShareCalculator{
+	probabilities: wpamProbabilitySelector{},
+	volumes:       marketVolumeCalculator{},
+	coursePayouts: defaultCoursePayoutCalculator{},
+	normalizers:   defaultNormalizationFactorCalculator{},
+	scalers:       defaultScaledPayoutCalculator{},
+	excesses:      defaultExcessCalculator{volumes: marketVolumeCalculator{}},
+	adjustments:   defaultPayoutAdjuster{excesses: defaultExcessCalculator{volumes: marketVolumeCalculator{}}},
+	aggregators:   defaultUserPayoutAggregator{},
+	netter:        defaultMarketPositionNetter{},
+	allocator:     defaultSingleCreditAllocator{},
+}
+
+type defaultCoursePayoutCalculator struct{}
+type defaultNormalizationFactorCalculator struct{}
+type defaultScaledPayoutCalculator struct{}
+type defaultExcessCalculator struct {
+	volumes volumeCalculator
+}
+type defaultPayoutAdjuster struct {
+	excesses excessCalculator
+}
+type defaultUserPayoutAggregator struct{}
+type defaultMarketPositionNetter struct{}
+type defaultSingleCreditAllocator struct{}
+
 // holds betting payout information
 type CourseBetPayout struct {
 	Payout  float64
@@ -73,30 +165,69 @@ type DBPMMarketPosition struct {
 // DivideUpMarketPoolSharesDBPM divides the market pool into YES and NO pools based on the resolution probability.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
 func DivideUpMarketPoolSharesDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64) {
+	return defaultMarketShareCalculator.DivideShares(bets, probabilityChanges)
+}
+
+func (c MarketShareCalculator) DivideShares(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) (int64, int64) {
 	if len(probabilityChanges) == 0 {
 		return 0, 0
 	}
+	c = c.withDefaults()
 
 	// Get the last probability change, which is the resolution probability
-	currentProbability := wpam.GetCurrentProbability(probabilityChanges)
+	currentProbability := c.probabilities.Current(probabilityChanges)
 
 	// Get the total share pool as a float for precision
 	// Do not include the initial market subsidization in volume until market hits final resolution
-	totalSharePool := float64(marketmath.GetMarketVolume(bets))
+	totalSharePool := float64(c.volumes.Volume(bets))
 
 	// Initial condition, shares set to zero
 	yesShares := int64(0)
 	noShares := int64(0)
 
 	// Check case where there is only one bet
-	if marketmath.GetMarketVolume(bets) == 1 {
-		yesShares, noShares = singleCreditYesNoAllocator(bets)
+	if c.volumes.Volume(bets) == 1 {
+		yesShares, noShares = c.allocator.Allocate(bets)
 	} else {
 		yesShares, noShares = dividePoolShares(totalSharePool, currentProbability)
 	}
 
 	// Return calculated shares
 	return yesShares, noShares
+}
+
+func (c MarketShareCalculator) withDefaults() MarketShareCalculator {
+	if c.probabilities == nil {
+		c.probabilities = wpamProbabilitySelector{}
+	}
+	if c.volumes == nil {
+		c.volumes = marketVolumeCalculator{}
+	}
+	if c.coursePayouts == nil {
+		c.coursePayouts = defaultCoursePayoutCalculator{}
+	}
+	if c.normalizers == nil {
+		c.normalizers = defaultNormalizationFactorCalculator{}
+	}
+	if c.scalers == nil {
+		c.scalers = defaultScaledPayoutCalculator{}
+	}
+	if c.excesses == nil {
+		c.excesses = defaultExcessCalculator{volumes: c.volumes}
+	}
+	if c.adjustments == nil {
+		c.adjustments = defaultPayoutAdjuster{excesses: c.excesses}
+	}
+	if c.aggregators == nil {
+		c.aggregators = defaultUserPayoutAggregator{}
+	}
+	if c.netter == nil {
+		c.netter = defaultMarketPositionNetter{}
+	}
+	if c.allocator == nil {
+		c.allocator = defaultSingleCreditAllocator{}
+	}
+	return c
 }
 
 func dividePoolShares(totalSharePool, probability float64) (int64, int64) {
@@ -111,6 +242,14 @@ func dividePoolShares(totalSharePool, probability float64) (int64, int64) {
 // separating the payouts for YES and NO outcomes.
 // See README/README-MATH-PROB-AND-PAYOUT.md#market-outcome-update-formulae---divergence-based-payout-model-dbpm
 func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []CourseBetPayout {
+	return defaultMarketShareCalculator.CoursePayouts(bets, probabilityChanges)
+}
+
+func (c MarketShareCalculator) CoursePayouts(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []CourseBetPayout {
+	return c.withDefaults().coursePayouts.CoursePayouts(bets, probabilityChanges)
+}
+
+func (defaultCoursePayoutCalculator) CoursePayouts(bets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []CourseBetPayout {
 	if len(probabilityChanges) == 0 {
 		return nil
 	}
@@ -139,6 +278,14 @@ func CalculateCoursePayoutsDBPM(bets []models.Bet, probabilityChanges []wpam.Pro
 // F_NO calculates the normalization factor for "NO" by dividing the total stake by the cumulative payout for "NO".
 // Return absolute values of normalization factors to ensure non-negative values for further calculations.
 func CalculateNormalizationFactorsDBPM(yesShares int64, noShares int64, coursePayouts []CourseBetPayout) (float64, float64) {
+	return defaultMarketShareCalculator.NormalizationFactors(yesShares, noShares, coursePayouts)
+}
+
+func (c MarketShareCalculator) NormalizationFactors(yesShares int64, noShares int64, coursePayouts []CourseBetPayout) (float64, float64) {
+	return c.withDefaults().normalizers.NormalizationFactors(yesShares, noShares, coursePayouts)
+}
+
+func (defaultNormalizationFactorCalculator) NormalizationFactors(yesShares int64, noShares int64, coursePayouts []CourseBetPayout) (float64, float64) {
 	var payoutSums normalizationSums
 	for _, payout := range coursePayouts {
 		accumulateNormalizationPayout(&payoutSums, payout)
@@ -149,6 +296,14 @@ func CalculateNormalizationFactorsDBPM(yesShares int64, noShares int64, coursePa
 
 // CalculateFinalPayouts calculates the final payouts for each bet, adjusted by normalization factors.
 func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, yesNormalizationFactor, noNormalizationFactor float64) []int64 {
+	return defaultMarketShareCalculator.ScaledPayouts(allBetsOnMarket, coursePayouts, yesNormalizationFactor, noNormalizationFactor)
+}
+
+func (c MarketShareCalculator) ScaledPayouts(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, yesNormalizationFactor, noNormalizationFactor float64) []int64 {
+	return c.withDefaults().scalers.ScaledPayouts(allBetsOnMarket, coursePayouts, yesNormalizationFactor, noNormalizationFactor)
+}
+
+func (defaultScaledPayoutCalculator) ScaledPayouts(allBetsOnMarket []models.Bet, coursePayouts []CourseBetPayout, yesNormalizationFactor, noNormalizationFactor float64) []int64 {
 	scaledPayouts := make([]int64, len(allBetsOnMarket))
 	factors := normalizationFactors{yes: yesNormalizationFactor, no: noNormalizationFactor}
 
@@ -161,17 +316,36 @@ func CalculateScaledPayoutsDBPM(allBetsOnMarket []models.Bet, coursePayouts []Co
 
 // calculateExcess determines the amount of credits unaccounted for by comparing calculated scaledPayouts to availablePool
 func calculateExcess(bets []models.Bet, scaledPayouts []int64) int64 {
+	return defaultMarketShareCalculator.Excess(bets, scaledPayouts)
+}
+
+func (c MarketShareCalculator) Excess(bets []models.Bet, scaledPayouts []int64) int64 {
+	return c.withDefaults().excesses.Excess(bets, scaledPayouts)
+}
+
+func (c defaultExcessCalculator) Excess(bets []models.Bet, scaledPayouts []int64) int64 {
+	if c.volumes == nil {
+		c.volumes = marketVolumeCalculator{}
+	}
 	var sumScaledPayouts int64
 	for _, payout := range scaledPayouts {
 		sumScaledPayouts += payout
 	}
-	availablePool := marketmath.GetMarketVolume(bets)
+	availablePool := c.volumes.Volume(bets)
 	return sumScaledPayouts - availablePool
 }
 
 // Adjust scaled payouts if excess is greater than 0
 // This  should not be possible given how the preceeding pipeline works, but we adjust for it anyway.
 func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
+	return defaultMarketShareCalculator.AdjustPositiveExcess(scaledPayouts, excess)
+}
+
+func (c MarketShareCalculator) AdjustPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
+	return c.withDefaults().adjustments.AdjustPositive(scaledPayouts, excess)
+}
+
+func (defaultPayoutAdjuster) AdjustPositive(scaledPayouts []int64, excess int64) []int64 {
 	// No adjustment needed if no payouts or excess is non-positive
 	if excess <= 0 || len(scaledPayouts) == 0 {
 		return scaledPayouts
@@ -200,6 +374,14 @@ func adjustForPositiveExcess(scaledPayouts []int64, excess int64) []int64 {
 }
 
 func adjustForNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
+	return defaultMarketShareCalculator.AdjustNegativeExcess(scaledPayouts, excess)
+}
+
+func (c MarketShareCalculator) AdjustNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
+	return c.withDefaults().adjustments.AdjustNegative(scaledPayouts, excess)
+}
+
+func (defaultPayoutAdjuster) AdjustNegative(scaledPayouts []int64, excess int64) []int64 {
 	// No adjustment needed if no payouts or excess is non-negative
 	if excess >= 0 || len(scaledPayouts) == 0 {
 		return scaledPayouts
@@ -229,12 +411,22 @@ func adjustForNegativeExcess(scaledPayouts []int64, excess int64) []int64 {
 
 // AdjustPayouts reconciles the additional or lacking funds from the betting pool by adjusting the payouts to past bets
 func AdjustPayouts(bets []models.Bet, scaledPayouts []int64) []int64 {
-	excess := calculateExcess(bets, scaledPayouts)
+	return defaultMarketShareCalculator.AdjustPayouts(bets, scaledPayouts)
+}
 
+func (c MarketShareCalculator) AdjustPayouts(bets []models.Bet, scaledPayouts []int64) []int64 {
+	return c.withDefaults().adjustments.Adjust(bets, scaledPayouts)
+}
+
+func (a defaultPayoutAdjuster) Adjust(bets []models.Bet, scaledPayouts []int64) []int64 {
+	if a.excesses == nil {
+		a.excesses = defaultExcessCalculator{volumes: marketVolumeCalculator{}}
+	}
+	excess := a.excesses.Excess(bets, scaledPayouts)
 	if excess > 0 {
-		scaledPayouts = adjustForPositiveExcess(scaledPayouts, excess)
+		scaledPayouts = a.AdjustPositive(scaledPayouts, excess)
 	} else if excess < 0 {
-		scaledPayouts = adjustForNegativeExcess(scaledPayouts, excess)
+		scaledPayouts = a.AdjustNegative(scaledPayouts, excess)
 	}
 
 	return scaledPayouts
@@ -242,6 +434,14 @@ func AdjustPayouts(bets []models.Bet, scaledPayouts []int64) []int64 {
 
 // AggregateUserPayouts aggregates YES and NO payouts for each user.
 func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []int64) []DBPMMarketPosition {
+	return defaultMarketShareCalculator.AggregateUserPayouts(bets, finalPayouts)
+}
+
+func (c MarketShareCalculator) AggregateUserPayouts(bets []models.Bet, finalPayouts []int64) []DBPMMarketPosition {
+	return c.withDefaults().aggregators.Aggregate(bets, finalPayouts)
+}
+
+func (defaultUserPayoutAggregator) Aggregate(bets []models.Bet, finalPayouts []int64) []DBPMMarketPosition {
 	userPayouts := make(map[string]*DBPMMarketPosition)
 
 	for i, bet := range bets {
@@ -275,6 +475,14 @@ func AggregateUserPayoutsDBPM(bets []models.Bet, finalPayouts []int64) []DBPMMar
 // only one of YesSharesOwned or NoSharesOwned is greater than 0,
 // with the other being 0, and the value is the net difference.
 func NetAggregateMarketPositions(positions []DBPMMarketPosition) []DBPMMarketPosition {
+	return defaultMarketShareCalculator.NetPositions(positions)
+}
+
+func (c MarketShareCalculator) NetPositions(positions []DBPMMarketPosition) []DBPMMarketPosition {
+	return c.withDefaults().netter.Net(positions)
+}
+
+func (defaultMarketPositionNetter) Net(positions []DBPMMarketPosition) []DBPMMarketPosition {
 	var normalizedPositions []DBPMMarketPosition
 
 	for _, position := range positions {
@@ -297,6 +505,14 @@ func NetAggregateMarketPositions(positions []DBPMMarketPosition) []DBPMMarketPos
 
 // SingleCreditYesNoAllocator assigns the remaining credit/share to YES or NO, based on net position.
 func singleCreditYesNoAllocator(bets []models.Bet) (yesShares int64, noShares int64) {
+	return defaultMarketShareCalculator.AllocateSingleCredit(bets)
+}
+
+func (c MarketShareCalculator) AllocateSingleCredit(bets []models.Bet) (yesShares int64, noShares int64) {
+	return c.withDefaults().allocator.Allocate(bets)
+}
+
+func (defaultSingleCreditAllocator) Allocate(bets []models.Bet) (yesShares int64, noShares int64) {
 	var exposure sideExposure
 	for _, bet := range bets {
 		allocateExposure(&exposure, bet.Outcome, bet.Amount)

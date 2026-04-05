@@ -44,6 +44,57 @@ type Repository interface {
 	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
 }
 
+// UserReader exposes user lookup operations.
+type UserReader interface {
+	GetByUsername(ctx context.Context, username string) (*User, error)
+}
+
+// UserBalanceRepository exposes balance mutation operations.
+type UserBalanceRepository interface {
+	UpdateBalance(ctx context.Context, username string, newBalance int64) error
+}
+
+// UserWriter exposes create, update, and delete operations.
+type UserWriter interface {
+	Create(ctx context.Context, user *User) error
+	Update(ctx context.Context, user *User) error
+	Delete(ctx context.Context, username string) error
+}
+
+// UserLister exposes list operations.
+type UserLister interface {
+	List(ctx context.Context, filters ListFilters) ([]*User, error)
+}
+
+// UserPortfolioRepository exposes portfolio-related reads.
+type UserPortfolioRepository interface {
+	ListUserBets(ctx context.Context, username string) ([]*UserBet, error)
+	GetMarketQuestion(ctx context.Context, marketID uint) (string, error)
+	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*MarketUserPosition, error)
+}
+
+// UserMarketsRepository exposes user-market lookups.
+type UserMarketsRepository interface {
+	ListUserMarkets(ctx context.Context, userID int64) ([]*UserMarket, error)
+}
+
+// CredentialsRepository exposes authentication credential reads and writes.
+type CredentialsRepository interface {
+	GetCredentials(ctx context.Context, username string) (*Credentials, error)
+	UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error
+}
+
+// ServiceDependencies exposes the storage collaborators required by the users service.
+type ServiceDependencies struct {
+	Reader      UserReader
+	BalanceRepo UserBalanceRepository
+	Writer      UserWriter
+	Lister      UserLister
+	Portfolio   UserPortfolioRepository
+	Markets     UserMarketsRepository
+	Credentials CredentialsRepository
+}
+
 // ListFilters represents filters for listing users
 type ListFilters struct {
 	UserType string
@@ -67,9 +118,15 @@ type AnalyticsService interface {
 
 // Service implements the core user business logic
 type Service struct {
-	repo      Repository
-	analytics AnalyticsService
-	sanitizer Sanitizer
+	reader      UserReader
+	balanceRepo UserBalanceRepository
+	writer      UserWriter
+	lister      UserLister
+	portfolio   UserPortfolioRepository
+	markets     UserMarketsRepository
+	credentials CredentialsRepository
+	analytics   AnalyticsService
+	sanitizer   Sanitizer
 }
 
 type profileMutation func(*User) error
@@ -162,14 +219,32 @@ func validateUserID(userID int64) error {
 	return nil
 }
 
-// NewService creates a new users service
+// NewService creates a new users service from the legacy repository shape.
 func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
-	service := &Service{
-		repo:      repo,
-		analytics: analyticsSvc,
-		sanitizer: sanitizer,
+	return NewServiceWithDependencies(ServiceDependencies{
+		Reader:      repo,
+		BalanceRepo: repo,
+		Writer:      repo,
+		Lister:      repo,
+		Portfolio:   repo,
+		Markets:     repo,
+		Credentials: repo,
+	}, analyticsSvc, sanitizer)
+}
+
+// NewServiceWithDependencies creates a new users service from explicit ports.
+func NewServiceWithDependencies(deps ServiceDependencies, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
+	return &Service{
+		reader:      deps.Reader,
+		balanceRepo: deps.BalanceRepo,
+		writer:      deps.Writer,
+		lister:      deps.Lister,
+		portfolio:   deps.Portfolio,
+		markets:     deps.Markets,
+		credentials: deps.Credentials,
+		analytics:   analyticsSvc,
+		sanitizer:   sanitizer,
 	}
-	return service
 }
 
 // ValidateUserExists checks if a user exists
@@ -198,7 +273,7 @@ func (s *Service) ValidateUserBalance(ctx context.Context, username string, requ
 
 // DeductBalance deducts an amount from a user's balance
 func (s *Service) DeductBalance(ctx context.Context, username string, amount int64) error {
-	return s.ApplyTransaction(ctx, username, amount, TransactionBuy)
+	return s.ApplyTransaction(ctx, username, amount, string(TransactionBuy))
 }
 
 // GetUser retrieves a user by username
@@ -225,7 +300,11 @@ func (s *Service) CreateUser(ctx context.Context, req UserCreateRequest) (*User,
 		return nil, err
 	}
 
-	if _, err := s.repo.GetByUsername(ctx, req.Username); err == nil {
+	reader, err := s.userReader()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := reader.GetByUsername(ctx, req.Username); err == nil {
 		return nil, ErrUserAlreadyExists
 	} else if !errors.Is(err, ErrUserNotFound) {
 		return nil, err
@@ -233,7 +312,11 @@ func (s *Service) CreateUser(ctx context.Context, req UserCreateRequest) (*User,
 
 	user := req.NewUser()
 
-	if err := s.repo.Create(ctx, user); err != nil {
+	writer, err := s.userWriter()
+	if err != nil {
+		return nil, err
+	}
+	if err := writer.Create(ctx, user); err != nil {
 		return nil, err
 	}
 
@@ -250,7 +333,18 @@ func (s *Service) UpdateUser(ctx context.Context, username string, req UserUpdat
 
 // ListUsers returns a list of users with filters
 func (s *Service) ListUsers(ctx context.Context, filters ListFilters) ([]*User, error) {
-	return s.repo.List(ctx, filters)
+	lister, err := s.userLister()
+	if err != nil {
+		return nil, err
+	}
+	users, err := lister.List(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	if users == nil {
+		return []*User{}, nil
+	}
+	return users, nil
 }
 
 // DeleteUser removes a user
@@ -259,7 +353,11 @@ func (s *Service) DeleteUser(ctx context.Context, username string) error {
 		return err
 	}
 
-	return s.repo.Delete(ctx, username)
+	writer, err := s.userWriter()
+	if err != nil {
+		return err
+	}
+	return writer.Delete(ctx, username)
 }
 
 // ApplyTransaction adjusts the user's account balance based on the supplied transaction type.
@@ -275,7 +373,11 @@ func (s *Service) GetUserCredit(ctx context.Context, username string, maximumDeb
 		return 0, err
 	}
 
-	user, err := s.repo.GetByUsername(ctx, username)
+	reader, err := s.userReader()
+	if err != nil {
+		return 0, err
+	}
+	user, err := reader.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			return maximumDebtAllowed, nil
@@ -288,7 +390,15 @@ func (s *Service) GetUserCredit(ctx context.Context, username string, maximumDeb
 
 // GetUserPortfolio returns the user's portfolio across markets.
 func (s *Service) GetUserPortfolio(ctx context.Context, username string) (*Portfolio, error) {
-	bets, err := s.repo.ListUserBets(ctx, username)
+	if err := validateUsername(username); err != nil {
+		return nil, err
+	}
+
+	portfolioRepo, err := s.userPortfolioRepository()
+	if err != nil {
+		return nil, err
+	}
+	bets, err := portfolioRepo.ListUserBets(ctx, username)
 	if err != nil {
 		return nil, err
 	}
@@ -311,14 +421,18 @@ func (s *Service) GetUserPortfolio(ctx context.Context, username string) (*Portf
 	var items []PortfolioItem
 	var totalShares int64
 	for marketID, item := range marketMap {
-		position, err := s.repo.GetUserPositionInMarket(ctx, int64(marketID), username)
+		position, err := portfolioRepo.GetUserPositionInMarket(ctx, int64(marketID), username)
 		if err != nil {
 			return nil, err
 		}
 
-		title, err := s.repo.GetMarketQuestion(ctx, marketID)
+		title, err := portfolioRepo.GetMarketQuestion(ctx, marketID)
 		if err != nil {
 			return nil, err
+		}
+
+		if position == nil {
+			position = &MarketUserPosition{}
 		}
 
 		item.YesSharesOwned = position.YesSharesOwned
@@ -344,7 +458,18 @@ func (s *Service) ListUserMarkets(ctx context.Context, userID int64) ([]*UserMar
 	if err := validateUserID(userID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListUserMarkets(ctx, userID)
+	repo, err := s.userMarketsRepository()
+	if err != nil {
+		return nil, err
+	}
+	markets, err := repo.ListUserMarkets(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if markets == nil {
+		return []*UserMarket{}, nil
+	}
+	return markets, nil
 }
 
 // GetUserFinancials returns the user's comprehensive financial snapshot.
@@ -428,6 +553,10 @@ func (s *Service) sanitizePersonalLinks(links PersonalLinks) (PersonalLinks, err
 }
 
 func financialSnapshotToMap(snapshot *analytics.FinancialSnapshot) map[string]int64 {
+	if snapshot == nil {
+		return map[string]int64{}
+	}
+
 	values := make(map[string]int64, len(financialSnapshotFields))
 	for _, field := range financialSnapshotFields {
 		values[field.key] = field.extract(snapshot)
@@ -462,7 +591,11 @@ func (s *Service) validatePasswordChangeInputs(username, currentPassword, newPas
 }
 
 func (s *Service) requireUser(ctx context.Context, username string) (*User, error) {
-	user, err := s.repo.GetByUsername(ctx, username)
+	reader, err := s.userReader()
+	if err != nil {
+		return nil, err
+	}
+	user, err := reader.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			return nil, ErrUserNotFound
@@ -482,7 +615,11 @@ func (s *Service) updateUserBalance(ctx context.Context, username string, comput
 	if err != nil {
 		return err
 	}
-	return s.repo.UpdateBalance(ctx, username, newBalance)
+	repo, err := s.userBalanceRepository()
+	if err != nil {
+		return err
+	}
+	return repo.UpdateBalance(ctx, username, newBalance)
 }
 
 func (s *Service) updateUserProfile(ctx context.Context, username string, mutate profileMutation) (*User, error) {
@@ -494,7 +631,11 @@ func (s *Service) updateUserProfile(ctx context.Context, username string, mutate
 	if err := mutate(user); err != nil {
 		return nil, err
 	}
-	if err := s.repo.Update(ctx, user); err != nil {
+	writer, err := s.userWriter()
+	if err != nil {
+		return nil, err
+	}
+	if err := writer.Update(ctx, user); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -588,7 +729,11 @@ func (s *Service) getCredentials(ctx context.Context, username string) (*Credent
 	if err := validateUsername(username); err != nil {
 		return nil, err
 	}
-	return s.repo.GetCredentials(ctx, username)
+	repo, err := s.credentialsRepository()
+	if err != nil {
+		return nil, err
+	}
+	return repo.GetCredentials(ctx, username)
 }
 
 func (s *Service) verifyCurrentPassword(creds *Credentials, currentPassword string) error {
@@ -654,7 +799,60 @@ func (s *Service) ChangePassword(ctx context.Context, username, currentPassword,
 		return err
 	}
 
-	return s.repo.UpdatePassword(ctx, username, hashed, false)
+	repo, err := s.credentialsRepository()
+	if err != nil {
+		return err
+	}
+	return repo.UpdatePassword(ctx, username, hashed, false)
+}
+
+func (s *Service) userReader() (UserReader, error) {
+	if s == nil || s.reader == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.reader, nil
+}
+
+func (s *Service) userBalanceRepository() (UserBalanceRepository, error) {
+	if s == nil || s.balanceRepo == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.balanceRepo, nil
+}
+
+func (s *Service) userWriter() (UserWriter, error) {
+	if s == nil || s.writer == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.writer, nil
+}
+
+func (s *Service) userLister() (UserLister, error) {
+	if s == nil || s.lister == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.lister, nil
+}
+
+func (s *Service) userPortfolioRepository() (UserPortfolioRepository, error) {
+	if s == nil || s.portfolio == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.portfolio, nil
+}
+
+func (s *Service) userMarketsRepository() (UserMarketsRepository, error) {
+	if s == nil || s.markets == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.markets, nil
+}
+
+func (s *Service) credentialsRepository() (CredentialsRepository, error) {
+	if s == nil || s.credentials == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.credentials, nil
 }
 
 var _ ServiceInterface = (*Service)(nil)

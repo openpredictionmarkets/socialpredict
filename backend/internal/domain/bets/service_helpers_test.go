@@ -15,17 +15,21 @@ import (
 var errUnexpectedHelperCall = errors.New("unexpected call")
 
 type stubMarketService struct {
-	getMarketFunc             func(ctx context.Context, id int64) (*dmarkets.Market, error)
-	getUserPositionInMarketFn func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	marketGetter   stubMarketGetter
+	positionGetter stubPositionGetter
 }
 
 func newStubMarketService(opts ...func(*stubMarketService)) stubMarketService {
 	stub := stubMarketService{
-		getMarketFunc: func(context.Context, int64) (*dmarkets.Market, error) {
-			return nil, errUnexpectedHelperCall
+		marketGetter: stubMarketGetter{
+			getMarketFunc: func(context.Context, int64) (*dmarkets.Market, error) {
+				return nil, errUnexpectedHelperCall
+			},
 		},
-		getUserPositionInMarketFn: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
-			return nil, errUnexpectedHelperCall
+		positionGetter: stubPositionGetter{
+			getUserPositionInMarketFn: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
+				return nil, errUnexpectedHelperCall
+			},
 		},
 	}
 	for _, opt := range opts {
@@ -36,21 +40,43 @@ func newStubMarketService(opts ...func(*stubMarketService)) stubMarketService {
 
 func withStubMarket(getMarket func(ctx context.Context, id int64) (*dmarkets.Market, error)) func(*stubMarketService) {
 	return func(stub *stubMarketService) {
-		stub.getMarketFunc = getMarket
+		stub.marketGetter.getMarketFunc = getMarket
 	}
 }
 
 func withStubPosition(getPosition func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)) func(*stubMarketService) {
 	return func(stub *stubMarketService) {
-		stub.getUserPositionInMarketFn = getPosition
+		stub.positionGetter.getUserPositionInMarketFn = getPosition
 	}
 }
 
+type stubMarketGetter struct {
+	getMarketFunc func(ctx context.Context, id int64) (*dmarkets.Market, error)
+}
+
 func (s stubMarketService) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
-	return s.getMarketFunc(ctx, id)
+	return s.marketGetter.GetMarket(ctx, id)
+}
+
+type stubPositionGetter struct {
+	getUserPositionInMarketFn func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
 func (s stubMarketService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
+	return s.positionGetter.GetUserPositionInMarket(ctx, marketID, username)
+}
+
+func (s stubMarketGetter) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	if s.getMarketFunc == nil {
+		return nil, errUnexpectedHelperCall
+	}
+	return s.getMarketFunc(ctx, id)
+}
+
+func (s stubPositionGetter) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
+	if s.getUserPositionInMarketFn == nil {
+		return nil, errUnexpectedHelperCall
+	}
 	return s.getUserPositionInMarketFn(ctx, marketID, username)
 }
 
@@ -66,7 +92,7 @@ func newGateClock(now time.Time) gateClock {
 
 func (c gateClock) Now() time.Time {
 	if c.nowFunc == nil {
-		return time.Time{}
+		return helperTestTime()
 	}
 	return c.nowFunc()
 }
@@ -123,6 +149,18 @@ func TestMarketGate_Open(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("zero value clock remains substitutable", func(t *testing.T) {
+		gate := marketGate{
+			markets: newStubMarketService(withStubMarket(func(context.Context, int64) (*dmarkets.Market, error) {
+				return &dmarkets.Market{Status: "active", ResolutionDateTime: helperTestTime().Add(time.Hour)}, nil
+			})),
+			clock: gateClock{},
+		}
+		if _, err := gate.Open(context.Background(), 1); err != nil {
+			t.Fatalf("expected zero-value clock to remain usable, got %v", err)
+		}
+	})
 }
 
 func TestFeeCalculator_Calculate(t *testing.T) {
@@ -160,6 +198,10 @@ func TestFeeCalculator_Calculate(t *testing.T) {
 			}
 		})
 	}
+
+	if zeroFees := (feeCalculator{econ: &setup.EconomicConfig{}}).Calculate(false, 0); zeroFees.totalCost != 0 {
+		t.Fatalf("expected zero-value config to remain usable, got %+v", zeroFees)
+	}
 }
 
 func TestBalanceGuard_EnsureSufficient(t *testing.T) {
@@ -186,19 +228,27 @@ func TestBalanceGuard_EnsureSufficient(t *testing.T) {
 			}
 		})
 	}
+
+	if err := (balanceGuard{}).EnsureSufficient(0, 0); err != nil {
+		t.Fatalf("expected zero-value guard to allow no-op cost, got %v", err)
+	}
 }
 
 type ledgerRepo struct {
-	bet        *models.Bet
-	createFunc func(ctx context.Context, bet *models.Bet) error
-	hasBetFunc func(ctx context.Context, marketID uint, username string) (bool, error)
+	bet     *models.Bet
+	creator ledgerBetCreator
+	checker ledgerBetChecker
 }
 
 func newLedgerRepo(opts ...func(*ledgerRepo)) *ledgerRepo {
 	repo := &ledgerRepo{
-		createFunc: func(context.Context, *models.Bet) error { return nil },
-		hasBetFunc: func(context.Context, uint, string) (bool, error) {
-			return false, errUnexpectedHelperCall
+		creator: ledgerBetCreator{
+			createFunc: func(context.Context, *models.Bet) error { return nil },
+		},
+		checker: ledgerBetChecker{
+			hasBetFunc: func(context.Context, uint, string) (bool, error) {
+				return false, errUnexpectedHelperCall
+			},
 		},
 	}
 	for _, opt := range opts {
@@ -209,27 +259,53 @@ func newLedgerRepo(opts ...func(*ledgerRepo)) *ledgerRepo {
 
 func withLedgerCreate(fn func(ctx context.Context, bet *models.Bet) error) func(*ledgerRepo) {
 	return func(repo *ledgerRepo) {
-		repo.createFunc = fn
+		repo.creator.createFunc = fn
 	}
 }
 
 func withLedgerHasBet(fn func(ctx context.Context, marketID uint, username string) (bool, error)) func(*ledgerRepo) {
 	return func(repo *ledgerRepo) {
-		repo.hasBetFunc = fn
+		repo.checker.hasBetFunc = fn
 	}
+}
+
+type ledgerBetCreator struct {
+	createFunc func(ctx context.Context, bet *models.Bet) error
 }
 
 func (l *ledgerRepo) Create(ctx context.Context, bet *models.Bet) error {
-	if err := l.createFunc(ctx, bet); err != nil {
-		return err
-	}
-	copyBet := *bet
-	l.bet = &copyBet
-	return nil
+	return l.creator.Create(ctx, bet, l)
+}
+
+type ledgerBetChecker struct {
+	hasBetFunc func(ctx context.Context, marketID uint, username string) (bool, error)
 }
 
 func (l *ledgerRepo) UserHasBet(ctx context.Context, marketID uint, username string) (bool, error) {
-	return l.hasBetFunc(ctx, marketID, username)
+	return l.checker.UserHasBet(ctx, marketID, username)
+}
+
+func (c ledgerBetCreator) Create(ctx context.Context, bet *models.Bet, repo *ledgerRepo) error {
+	if c.createFunc == nil {
+		return errUnexpectedHelperCall
+	}
+	if err := c.createFunc(ctx, bet); err != nil {
+		return err
+	}
+	if bet == nil {
+		repo.bet = nil
+		return nil
+	}
+	copyBet := *bet
+	repo.bet = &copyBet
+	return nil
+}
+
+func (c ledgerBetChecker) UserHasBet(ctx context.Context, marketID uint, username string) (bool, error) {
+	if c.hasBetFunc == nil {
+		return false, errUnexpectedHelperCall
+	}
+	return c.hasBetFunc(ctx, marketID, username)
 }
 
 type ledgerCall struct {
@@ -239,18 +315,22 @@ type ledgerCall struct {
 }
 
 type ledgerUsers struct {
-	calls                []ledgerCall
-	getUserFunc          func(ctx context.Context, username string) (*dusers.User, error)
-	applyTransactionFunc func(ctx context.Context, username string, amount int64, transactionType string) error
+	calls   []ledgerCall
+	reader  ledgerUserReader
+	applier ledgerTransactionApplier
 }
 
 func newLedgerUsers(opts ...func(*ledgerUsers)) *ledgerUsers {
 	users := &ledgerUsers{
-		getUserFunc: func(context.Context, string) (*dusers.User, error) {
-			return nil, errUnexpectedHelperCall
+		reader: ledgerUserReader{
+			getUserFunc: func(context.Context, string) (*dusers.User, error) {
+				return nil, errUnexpectedHelperCall
+			},
 		},
-		applyTransactionFunc: func(context.Context, string, int64, string) error {
-			return nil
+		applier: ledgerTransactionApplier{
+			applyTransactionFunc: func(context.Context, string, int64, string) error {
+				return nil
+			},
 		},
 	}
 	for _, opt := range opts {
@@ -261,25 +341,47 @@ func newLedgerUsers(opts ...func(*ledgerUsers)) *ledgerUsers {
 
 func withLedgerUserLookup(fn func(ctx context.Context, username string) (*dusers.User, error)) func(*ledgerUsers) {
 	return func(users *ledgerUsers) {
-		users.getUserFunc = fn
+		users.reader.getUserFunc = fn
 	}
 }
 
 func withLedgerApplyTransaction(fn func(ctx context.Context, username string, amount int64, transactionType string) error) func(*ledgerUsers) {
 	return func(users *ledgerUsers) {
-		users.applyTransactionFunc = fn
+		users.applier.applyTransactionFunc = fn
 	}
+}
+
+type ledgerUserReader struct {
+	getUserFunc func(ctx context.Context, username string) (*dusers.User, error)
 }
 
 func (u *ledgerUsers) GetUser(ctx context.Context, username string) (*dusers.User, error) {
-	return u.getUserFunc(ctx, username)
+	return u.reader.GetUser(ctx, username)
+}
+
+type ledgerTransactionApplier struct {
+	applyTransactionFunc func(ctx context.Context, username string, amount int64, transactionType string) error
 }
 
 func (u *ledgerUsers) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+	return u.applier.ApplyTransaction(ctx, username, amount, transactionType, &u.calls)
+}
+
+func (u ledgerUserReader) GetUser(ctx context.Context, username string) (*dusers.User, error) {
+	if u.getUserFunc == nil {
+		return nil, errUnexpectedHelperCall
+	}
+	return u.getUserFunc(ctx, username)
+}
+
+func (u ledgerTransactionApplier) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string, calls *[]ledgerCall) error {
+	if u.applyTransactionFunc == nil {
+		return errUnexpectedHelperCall
+	}
 	if err := u.applyTransactionFunc(ctx, username, amount, transactionType); err != nil {
 		return err
 	}
-	u.calls = append(u.calls, ledgerCall{username: username, amount: amount, transaction: transactionType})
+	*calls = append(*calls, ledgerCall{username: username, amount: amount, transaction: transactionType})
 	return nil
 }
 
@@ -297,6 +399,10 @@ func TestBetLedger_ChargeAndRecord(t *testing.T) {
 	}
 	if repo.bet == nil || repo.bet.Username != bet.Username || repo.bet.Amount != bet.Amount {
 		t.Fatalf("expected copied bet persisted, got %+v", repo.bet)
+	}
+
+	if _, err := (&ledgerRepo{}).UserHasBet(context.Background(), 1, "bob"); !errors.Is(err, errUnexpectedHelperCall) {
+		t.Fatalf("expected zero-value repo to fail predictably, got %v", err)
 	}
 }
 
@@ -326,6 +432,10 @@ func TestBetLedger_CreditSale(t *testing.T) {
 	}
 	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionSale || users.calls[0].amount != 15 {
 		t.Fatalf("unexpected user calls: %+v", users.calls)
+	}
+
+	if _, err := (&ledgerUsers{}).GetUser(context.Background(), "alice"); !errors.Is(err, errUnexpectedHelperCall) {
+		t.Fatalf("expected zero-value users to fail predictably, got %v", err)
 	}
 }
 
@@ -386,5 +496,9 @@ func TestSaleCalculator_Calculate(t *testing.T) {
 				}
 			}
 		})
+	}
+
+	if _, err := (saleCalculator{}).Calculate(nil, 0, 1); !errors.Is(err, ErrNoPosition) {
+		t.Fatalf("expected zero-value calculator to keep base contract, got %v", err)
 	}
 }

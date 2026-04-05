@@ -1,22 +1,32 @@
 package users
 
-type balanceAdjustment func(balance int64, amount int64) int64
+type balanceAdjustment interface {
+	Apply(balance int64, amount int64) int64
+}
+
+type balanceAdjustmentFunc func(balance int64, amount int64) int64
+
+func (f balanceAdjustmentFunc) Apply(balance int64, amount int64) int64 {
+	return f(balance, amount)
+}
+
+type TransactionType = string
 
 // Transaction types supported when adjusting user balances.
 const (
-	TransactionWin    = "WIN"
-	TransactionRefund = "REFUND"
-	TransactionSale   = "SALE"
-	TransactionBuy    = "BUY"
-	TransactionFee    = "FEE"
+	TransactionWin    TransactionType = "WIN"
+	TransactionRefund TransactionType = "REFUND"
+	TransactionSale   TransactionType = "SALE"
+	TransactionBuy    TransactionType = "BUY"
+	TransactionFee    TransactionType = "FEE"
 )
 
-var transactionBalanceAdjustments = map[string]balanceAdjustment{
-	TransactionWin:    creditBalance,
-	TransactionRefund: creditBalance,
-	TransactionSale:   creditBalance,
-	TransactionBuy:    debitBalance,
-	TransactionFee:    debitBalance,
+var transactionBalanceAdjustments = map[TransactionType]balanceAdjustment{
+	TransactionWin:    balanceAdjustmentFunc(creditBalance),
+	TransactionRefund: balanceAdjustmentFunc(creditBalance),
+	TransactionSale:   balanceAdjustmentFunc(creditBalance),
+	TransactionBuy:    balanceAdjustmentFunc(debitBalance),
+	TransactionFee:    balanceAdjustmentFunc(debitBalance),
 }
 
 func creditBalance(balance int64, amount int64) int64 {
@@ -28,9 +38,9 @@ func debitBalance(balance int64, amount int64) int64 {
 }
 
 func applyTransactionBalance(balance int64, amount int64, transactionType string) (int64, error) {
-	adjust, ok := transactionBalanceAdjustments[transactionType]
+	adjust, ok := transactionBalanceAdjustments[TransactionType(transactionType)]
 	if !ok {
 		return 0, ErrInvalidTransactionType
 	}
-	return adjust(balance, amount), nil
+	return adjust.Apply(balance, amount), nil
 }

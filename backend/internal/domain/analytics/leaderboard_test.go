@@ -10,6 +10,10 @@ import (
 	"socialpredict/models/modelstesting"
 )
 
+type globalLeaderboardComputer interface {
+	ComputeGlobalLeaderboard(context.Context) ([]GlobalUserProfitability, error)
+}
+
 func leaderboardMarketDataFixture(positions []positionsmath.MarketPosition, bets []models.Bet) leaderboardMarketData {
 	return leaderboardMarketData{
 		positions: positions,
@@ -30,7 +34,7 @@ func requireLeaderboardOrder(t *testing.T, entries []GlobalUserProfitability, us
 	}
 }
 
-func requireGlobalLeaderboard(t *testing.T, svc *Service) []GlobalUserProfitability {
+func requireGlobalLeaderboard(t *testing.T, svc globalLeaderboardComputer) []GlobalUserProfitability {
 	t.Helper()
 
 	results, err := svc.ComputeGlobalLeaderboard(context.Background())

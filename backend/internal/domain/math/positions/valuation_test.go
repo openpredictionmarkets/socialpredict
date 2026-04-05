@@ -5,6 +5,24 @@ import (
 	"time"
 )
 
+type stubValuationModel struct {
+	finalProbability float64
+	value            float64
+}
+
+func (s stubValuationModel) FinalProbability(float64, bool, string) float64 {
+	return s.finalProbability
+}
+func (s stubValuationModel) PositionValue(UserMarketPosition, float64, bool, string) float64 {
+	return s.value
+}
+
+type passthroughAdjuster struct{}
+
+func (passthroughAdjuster) Adjust(vals map[string]UserValuationResult, _ map[string]time.Time, _ int64) map[string]UserValuationResult {
+	return vals
+}
+
 type valuationPositionInput struct {
 	Username       string
 	YesSharesOwned int64
@@ -130,5 +148,27 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 
 			assertValuations(t, actual, tc.Expected)
 		})
+	}
+}
+
+func TestCalculateRoundedUserValuationsFromUserMarketPositions_UsesInjectedCalculator(t *testing.T) {
+	calculator := ValuationCalculator{
+		model:    stubValuationModel{finalProbability: 0.9, value: 7.6},
+		adjuster: passthroughAdjuster{},
+	}
+
+	actual, err := calculator.Calculate(
+		makeUserPositions([]valuationPositionInput{{Username: "alice", YesSharesOwned: 10}}),
+		0.1,
+		100,
+		false,
+		"",
+		makeEarliestValuationBets([]valuationPositionInput{{Username: "alice"}}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if actual["alice"].RoundedValue != 8 {
+		t.Fatalf("expected injected rounded value 8, got %d", actual["alice"].RoundedValue)
 	}
 }

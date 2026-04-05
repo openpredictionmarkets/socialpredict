@@ -17,7 +17,8 @@ import (
 func seedSearchMarkets(t *testing.T, db *gorm.DB, username string) {
 	t.Helper()
 
-	for _, market := range buildSearchMarkets(username, time.Now()) {
+	now := time.Now()
+	for _, market := range buildSearchMarkets(username, now) {
 		if err := db.Create(&market).Error; err != nil {
 			t.Fatalf("seed market %d: %v", market.ID, err)
 		}
@@ -164,5 +165,10 @@ func TestServiceSearchMarketsInvalidInput(t *testing.T) {
 	_, err := service.SearchMarkets(context.Background(), "   ", markets.SearchFilters{})
 	if !errors.Is(err, markets.ErrInvalidInput) {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+
+	fallback := markets.NewService(nil, nil, nil, markets.Config{}, markets.WithSearchPolicy(nil))
+	if fallback == nil {
+		t.Fatalf("expected fallback service")
 	}
 }

@@ -2,21 +2,39 @@ package marketmath
 
 import "socialpredict/models"
 
-// getMarketVolume returns the total volume of trades for a given market
-func GetMarketVolume(bets []models.Bet) int64 {
+// VolumeCalculator abstracts market volume aggregation so alternate volume models can be substituted.
+type VolumeCalculator interface {
+	Volume(bets []models.Bet) int64
+}
 
+// EndVolumeCalculator abstracts final pool volume calculations that include subsidization.
+type EndVolumeCalculator interface {
+	EndVolume(bets []models.Bet, initialMarketSubsidization int64) int64
+}
+
+type summingVolumeCalculator struct{}
+
+var defaultVolumeCalculator VolumeCalculator = summingVolumeCalculator{}
+var defaultEndVolumeCalculator EndVolumeCalculator = summingVolumeCalculator{}
+
+// GetMarketVolume returns the total volume of trades for a given market.
+func GetMarketVolume(bets []models.Bet) int64 {
+	return defaultVolumeCalculator.Volume(bets)
+}
+
+// GetEndMarketVolume returns market volume plus subsidization added into the pool.
+func GetEndMarketVolume(bets []models.Bet, initialMarketSubsidization int64) int64 {
+	return defaultEndVolumeCalculator.EndVolume(bets, initialMarketSubsidization)
+}
+
+func (summingVolumeCalculator) Volume(bets []models.Bet) int64 {
 	var totalVolume int64
 	for _, bet := range bets {
 		totalVolume += bet.Amount
 	}
-
-	totalVolumeUint := int64(totalVolume)
-
-	return totalVolumeUint
+	return totalVolume
 }
 
-// returns the market volume + subsidization added into pool,
-// subsidzation in pool could be paid out after resolution but not sold mid-market
-func GetEndMarketVolume(bets []models.Bet, initialMarketSubsidization int64) int64 {
-	return GetMarketVolume(bets) + initialMarketSubsidization
+func (calculator summingVolumeCalculator) EndVolume(bets []models.Bet, initialMarketSubsidization int64) int64 {
+	return calculator.Volume(bets) + initialMarketSubsidization
 }

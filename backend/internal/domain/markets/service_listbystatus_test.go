@@ -27,6 +27,10 @@ type noopUserService struct {
 	getPublicUserFunc       func(context.Context, string) (*dusers.PublicUser, error)
 }
 
+func marketsTestTime() time.Time {
+	return time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
+}
+
 func newNoopUserService(opts ...func(*noopUserService)) noopUserService {
 	service := noopUserService{
 		validateUserExistsFunc:  func(context.Context, string) error { return nil },
@@ -42,22 +46,37 @@ func newNoopUserService(opts ...func(*noopUserService)) noopUserService {
 }
 
 func (s noopUserService) ValidateUserExists(ctx context.Context, username string) error {
+	if s.validateUserExistsFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.validateUserExistsFunc(ctx, username)
 }
 
 func (s noopUserService) ValidateUserBalance(ctx context.Context, username string, requiredAmount int64, maxDebt int64) error {
+	if s.validateUserBalanceFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.validateUserBalanceFunc(ctx, username, requiredAmount, maxDebt)
 }
 
 func (s noopUserService) DeductBalance(ctx context.Context, username string, amount int64) error {
+	if s.deductBalanceFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.deductBalanceFunc(ctx, username, amount)
 }
 
 func (s noopUserService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+	if s.applyTransactionFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.applyTransactionFunc(ctx, username, amount, transactionType)
 }
 
 func (s noopUserService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
+	if s.getPublicUserFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return s.getPublicUserFunc(ctx, username)
 }
 
@@ -73,7 +92,7 @@ func newFixedClock(now time.Time) fixedClock {
 
 func (f fixedClock) Now() time.Time {
 	if f.nowFunc == nil {
-		return time.Time{}
+		return marketsTestTime()
 	}
 	return f.nowFunc()
 }
@@ -91,7 +110,7 @@ func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB, wpam.Probabil
 
 	db := modelstesting.NewFakeDB(t)
 	repo := rmarkets.NewGormRepository(db)
-	clock := newFixedClock(time.Now())
+	clock := newFixedClock(marketsTestTime())
 	cfg := markets.Config{}
 
 	service := markets.NewService(
@@ -211,6 +230,10 @@ func TestServiceListByStatusFiltersMarkets(t *testing.T) {
 			assertSortedIDs(t, ids, tt.expectedIDs)
 		})
 	}
+
+	if got := (fixedClock{}).Now(); !got.Equal(marketsTestTime()) {
+		t.Fatalf("expected zero-value clock fallback, got %v", got)
+	}
 }
 
 func TestServiceListByStatusInvalidStatus(t *testing.T) {
@@ -219,5 +242,9 @@ func TestServiceListByStatusInvalidStatus(t *testing.T) {
 	_, err := service.ListByStatus(context.Background(), "unknown", markets.Page{})
 	if !errors.Is(err, markets.ErrInvalidInput) {
 		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+
+	if err := (noopUserService{}).ValidateUserExists(context.Background(), "alice"); !errors.Is(err, errUnexpectedMarketsTestCall) {
+		t.Fatalf("expected zero-value user service to fail predictably, got %v", err)
 	}
 }

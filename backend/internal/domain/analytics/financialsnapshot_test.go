@@ -20,6 +20,10 @@ type analyticsServiceTestConfig struct {
 
 type analyticsServiceTestOption func(*analyticsServiceTestConfig)
 
+type financialSnapshotComputer interface {
+	ComputeUserFinancials(context.Context, FinancialSnapshotRequest) (*FinancialSnapshot, error)
+}
+
 func withAnalyticsRepositoryOption(opt RepositoryOption) analyticsServiceTestOption {
 	return func(cfg *analyticsServiceTestConfig) {
 		cfg.repoOptions = append(cfg.repoOptions, opt)
@@ -52,7 +56,7 @@ func newAnalyticsService(t *testing.T, db *gorm.DB, econ *setup.EconomicConfig, 
 	return NewService(repo, loader, cfg.serviceOptions...)
 }
 
-func requireFinancialSnapshot(t *testing.T, svc *Service, user models.User) *FinancialSnapshot {
+func requireFinancialSnapshot(t *testing.T, svc financialSnapshotComputer, user models.User) *FinancialSnapshot {
 	t.Helper()
 
 	snapshot, err := svc.ComputeUserFinancials(context.Background(), FinancialSnapshotRequest{

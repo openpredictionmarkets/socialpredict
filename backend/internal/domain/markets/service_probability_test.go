@@ -2,6 +2,7 @@ package markets_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -86,41 +87,82 @@ func withProjectionRepoBets(bets []*markets.Bet) func(*projectionRepo) {
 }
 
 func (r *projectionRepo) Create(ctx context.Context, market *markets.Market) error {
+	if r.createFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return r.createFunc(ctx, market)
 }
 func (r *projectionRepo) UpdateLabels(ctx context.Context, id int64, yesLabel string, noLabel string) error {
+	if r.updateLabelsFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return r.updateLabelsFunc(ctx, id, yesLabel, noLabel)
 }
 func (r *projectionRepo) List(ctx context.Context, filters markets.ListFilters) ([]*markets.Market, error) {
+	if r.listFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listFunc(ctx, filters)
 }
 func (r *projectionRepo) ListByStatus(ctx context.Context, status string, page markets.Page) ([]*markets.Market, error) {
+	if r.listByStatusFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listByStatusFunc(ctx, status, page)
 }
 func (r *projectionRepo) Search(ctx context.Context, query string, filters markets.SearchFilters) ([]*markets.Market, error) {
+	if r.searchFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.searchFunc(ctx, query, filters)
 }
-func (r *projectionRepo) Delete(ctx context.Context, id int64) error { return r.deleteFunc(ctx, id) }
+func (r *projectionRepo) Delete(ctx context.Context, id int64) error {
+	if r.deleteFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.deleteFunc(ctx, id)
+}
 func (r *projectionRepo) ResolveMarket(ctx context.Context, id int64, outcome string) error {
+	if r.resolveMarketFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return r.resolveMarketFunc(ctx, id, outcome)
 }
 func (r *projectionRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {
+	if r.getUserPositionFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.getUserPositionFunc(ctx, marketID, username)
 }
 func (r *projectionRepo) ListMarketPositions(ctx context.Context, marketID int64) (markets.MarketPositions, error) {
+	if r.listMarketPositionsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listMarketPositionsFunc(ctx, marketID)
 }
 func (r *projectionRepo) ListBetsForMarket(ctx context.Context, marketID int64) ([]*markets.Bet, error) {
+	if r.listBetsForMarketFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listBetsForMarketFunc(ctx, marketID)
 }
 func (r *projectionRepo) GetByID(ctx context.Context, id int64) (*markets.Market, error) {
+	if r.getByIDFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.getByIDFunc(ctx, id)
 }
 func (r *projectionRepo) CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*markets.PayoutPosition, error) {
+	if r.calculatePayoutPositionsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.calculatePayoutPositionsFunc(ctx, marketID)
 }
 
 func (r *projectionRepo) GetPublicMarket(ctx context.Context, marketID int64) (*markets.PublicMarket, error) {
+	if r.getPublicMarketFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.getPublicMarketFunc(ctx, marketID)
 }
 
@@ -132,7 +174,7 @@ func newProjectionClock(now time.Time) projectionClock {
 
 func (c projectionClock) Now() time.Time {
 	if c.nowFunc == nil {
-		return time.Time{}
+		return marketsTestTime()
 	}
 	return c.nowFunc()
 }
@@ -172,14 +214,23 @@ func TestProjectProbability_ComputesProjection(t *testing.T) {
 	if absDiff(projection.ProjectedProbability, expected.Probability) > 1e-6 {
 		t.Fatalf("expected projected %v got %v", expected.Probability, projection.ProjectedProbability)
 	}
+
+	if err := (&projectionRepo{}).Create(context.Background(), nil); !errors.Is(err, errUnexpectedMarketsTestCall) {
+		t.Fatalf("expected zero-value repo to fail predictably, got %v", err)
+	}
 }
 
 func TestProjectProbability_InvalidOutcome(t *testing.T) {
-	repo := newProjectionRepo(withProjectionRepoMarket(&markets.Market{ID: 1, Status: "active", CreatedAt: time.Now(), ResolutionDateTime: time.Now().Add(time.Hour)}))
-	svc := markets.NewService(repo, nil, newProjectionClock(time.Now()), markets.Config{})
+	now := marketsTestTime()
+	repo := newProjectionRepo(withProjectionRepoMarket(&markets.Market{ID: 1, Status: "active", CreatedAt: now, ResolutionDateTime: now.Add(time.Hour)}))
+	svc := markets.NewService(repo, nil, newProjectionClock(now), markets.Config{})
 
 	_, err := svc.ProjectProbability(context.Background(), markets.ProbabilityProjectionRequest{MarketID: 1, Amount: 10, Outcome: "MAYBE"})
 	requireInvalidInput(t, err)
+
+	if got := (projectionClock{}).Now(); !got.Equal(marketsTestTime()) {
+		t.Fatalf("expected zero-value clock fallback, got %v", got)
+	}
 }
 
 // helpers for tests
@@ -193,8 +244,9 @@ func modelsBet(placed time.Time, marketID int64, amount int64, outcome string) m
 }
 
 func absDiff(a, b float64) float64 {
-	if a > b {
-		return a - b
+	diff := a - b
+	if diff < 0 {
+		return -diff
 	}
-	return b - a
+	return diff
 }

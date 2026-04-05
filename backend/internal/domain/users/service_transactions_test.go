@@ -15,6 +15,8 @@ type fakeAnalyticsService struct {
 	computeUserFinancialsFn func(context.Context, analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error)
 }
 
+var _ users.AnalyticsService = fakeAnalyticsService{}
+
 func (f fakeAnalyticsService) ComputeUserFinancials(ctx context.Context, req analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error) {
 	if f.computeUserFinancialsFn != nil {
 		return f.computeUserFinancialsFn(ctx, req)
@@ -22,10 +24,22 @@ func (f fakeAnalyticsService) ComputeUserFinancials(ctx context.Context, req ana
 	return &analytics.FinancialSnapshot{}, nil
 }
 
+func serviceDependencies(repo users.Repository) users.ServiceDependencies {
+	return users.ServiceDependencies{
+		Reader:      repo,
+		BalanceRepo: repo,
+		Writer:      repo,
+		Lister:      repo,
+		Portfolio:   repo,
+		Markets:     repo,
+		Credentials: repo,
+	}
+}
+
 func TestServiceApplyTransaction(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := rusers.NewGormRepository(db)
-	service := users.NewService(repo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	service := users.NewServiceWithDependencies(serviceDependencies(repo), fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("tx_user", 0)
 	user.AccountBalance = 100
@@ -35,7 +49,7 @@ func TestServiceApplyTransaction(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		txType      string
+		txType      users.TransactionType
 		amount      int64
 		wantBalance int64
 		wantErr     bool
@@ -77,7 +91,7 @@ func TestServiceApplyTransaction(t *testing.T) {
 func TestServiceGetUserCredit(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := rusers.NewGormRepository(db)
-	service := users.NewService(repo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	service := users.NewServiceWithDependencies(serviceDependencies(repo), fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("credit_user", 0)
 	user.AccountBalance = 200
@@ -109,7 +123,7 @@ func TestServiceGetUserPortfolio(t *testing.T) {
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 	_ = modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
 	repo := rusers.NewGormRepository(db)
-	service := users.NewService(repo, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+	service := users.NewServiceWithDependencies(serviceDependencies(repo), fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("portfolio_user", 0)
 	if err := db.Create(&user).Error; err != nil {
@@ -186,7 +200,7 @@ func TestServiceGetUserFinancials(t *testing.T) {
 			}, nil
 		},
 	}
-	service := users.NewService(repo, analyticsSvc, security.NewSecurityService().Sanitizer)
+	service := users.NewServiceWithDependencies(serviceDependencies(repo), analyticsSvc, security.NewSecurityService().Sanitizer)
 
 	user := modelstesting.GenerateUser("financial_user", 0)
 	user.AccountBalance = 300

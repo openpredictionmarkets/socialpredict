@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+type stubVolumeCalculator struct {
+	volume    int64
+	endVolume int64
+}
+
+func (s stubVolumeCalculator) Volume([]models.Bet) int64 { return s.volume }
+func (s stubVolumeCalculator) EndVolume([]models.Bet, int64) int64 {
+	return s.endVolume
+}
+
 func assertMarketVolume(t *testing.T, bets []models.Bet, want int64) {
 	t.Helper()
 	if got := GetMarketVolume(bets); got != want {
@@ -77,5 +87,23 @@ func TestGetMarketVolume(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			assertMarketVolume(t, test.Bets, test.ExpectedVolume)
 		})
+	}
+}
+
+func TestGetMarketVolume_UsesInjectedCalculator(t *testing.T) {
+	originalVolumeCalculator := defaultVolumeCalculator
+	originalEndVolumeCalculator := defaultEndVolumeCalculator
+	defaultVolumeCalculator = stubVolumeCalculator{volume: 41, endVolume: 99}
+	defaultEndVolumeCalculator = stubVolumeCalculator{volume: 41, endVolume: 99}
+	defer func() {
+		defaultVolumeCalculator = originalVolumeCalculator
+		defaultEndVolumeCalculator = originalEndVolumeCalculator
+	}()
+
+	if got := GetMarketVolume(nil); got != 41 {
+		t.Fatalf("expected injected volume 41, got %d", got)
+	}
+	if got := GetEndMarketVolume(nil, 12); got != 99 {
+		t.Fatalf("expected injected end volume 99, got %d", got)
 	}
 }

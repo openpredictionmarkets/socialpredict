@@ -11,6 +11,76 @@ import (
 	"time"
 )
 
+type stubProbabilitySelector struct{ probability float64 }
+
+func (s stubProbabilitySelector) Current([]wpam.ProbabilityChange) float64 { return s.probability }
+
+type stubMarketVolumeCalculator struct{ volume int64 }
+
+func (s stubMarketVolumeCalculator) Volume([]models.Bet) int64 { return s.volume }
+
+type stubCoursePayoutCalculator struct{ payouts []CourseBetPayout }
+
+func (s stubCoursePayoutCalculator) CoursePayouts([]models.Bet, []wpam.ProbabilityChange) []CourseBetPayout {
+	return append([]CourseBetPayout(nil), s.payouts...)
+}
+
+type stubNormalizationFactorCalculator struct {
+	yes float64
+	no  float64
+}
+
+func (s stubNormalizationFactorCalculator) NormalizationFactors(int64, int64, []CourseBetPayout) (float64, float64) {
+	return s.yes, s.no
+}
+
+type stubScaledPayoutCalculator struct{ payouts []int64 }
+
+func (s stubScaledPayoutCalculator) ScaledPayouts([]models.Bet, []CourseBetPayout, float64, float64) []int64 {
+	return append([]int64(nil), s.payouts...)
+}
+
+type stubExcessCalculator struct{ excess int64 }
+
+func (s stubExcessCalculator) Excess([]models.Bet, []int64) int64 { return s.excess }
+
+type stubPayoutAdjuster struct {
+	positive []int64
+	negative []int64
+	adjusted []int64
+}
+
+func (s stubPayoutAdjuster) AdjustPositive([]int64, int64) []int64 {
+	return append([]int64(nil), s.positive...)
+}
+
+func (s stubPayoutAdjuster) AdjustNegative([]int64, int64) []int64 {
+	return append([]int64(nil), s.negative...)
+}
+
+func (s stubPayoutAdjuster) Adjust([]models.Bet, []int64) []int64 {
+	return append([]int64(nil), s.adjusted...)
+}
+
+type stubUserPayoutAggregator struct{ positions []DBPMMarketPosition }
+
+func (s stubUserPayoutAggregator) Aggregate([]models.Bet, []int64) []DBPMMarketPosition {
+	return append([]DBPMMarketPosition(nil), s.positions...)
+}
+
+type stubMarketPositionNetter struct{ positions []DBPMMarketPosition }
+
+func (s stubMarketPositionNetter) Net([]DBPMMarketPosition) []DBPMMarketPosition {
+	return append([]DBPMMarketPosition(nil), s.positions...)
+}
+
+type stubSingleCreditAllocator struct {
+	yes int64
+	no  int64
+}
+
+func (s stubSingleCreditAllocator) Allocate([]models.Bet) (int64, int64) { return s.yes, s.no }
+
 var marketSharesBaseTime = time.Date(2025, 1, 1, 8, 0, 0, 0, time.UTC)
 
 func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayout {
@@ -174,6 +244,18 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 	}
 }
 
+func TestDivideUpMarketPoolSharesDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		probabilities: stubProbabilitySelector{probability: 0.25},
+		volumes:       stubMarketVolumeCalculator{volume: 8},
+	}
+
+	yesShares, noShares := calculator.DivideShares(nil, []wpam.ProbabilityChange{{Probability: 0.5}})
+	if yesShares != 2 || noShares != 6 {
+		t.Fatalf("expected injected shares (2,6), got (%d,%d)", yesShares, noShares)
+	}
+}
+
 func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 	testcases := []struct {
 		Name               string
@@ -246,6 +328,15 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCalculateCoursePayoutsDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		coursePayouts: stubCoursePayoutCalculator{payouts: []CourseBetPayout{{Payout: 12.5, Outcome: "YES"}}},
+	}
+
+	actual := calculator.CoursePayouts(nil, nil)
+	assertCoursePayoutsEqual(t, "injected", actual, []CourseBetPayout{{Payout: 12.5, Outcome: "YES"}})
 }
 
 func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
@@ -328,6 +419,17 @@ func TestCalculateNormalizationFactorsDBPM(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCalculateNormalizationFactorsDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		normalizers: stubNormalizationFactorCalculator{yes: 1.5, no: 2.5},
+	}
+
+	yes, no := calculator.NormalizationFactors(0, 0, nil)
+	if yes != 1.5 || no != 2.5 {
+		t.Fatalf("expected injected normalization factors (1.5, 2.5), got (%f, %f)", yes, no)
+	}
 }
 
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {
@@ -416,6 +518,15 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 
 }
 
+func TestCalculateScaledPayoutsDBPM_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		scalers: stubScaledPayoutCalculator{payouts: []int64{7, 8}},
+	}
+
+	actual := calculator.ScaledPayouts(nil, nil, 0, 0)
+	assertInt64SliceEqual(t, "injected", actual, []int64{7, 8})
+}
+
 func TestCalculateExcess(t *testing.T) {
 	testcases := []struct {
 		Name           string
@@ -482,6 +593,16 @@ func TestCalculateExcess(t *testing.T) {
 	}
 }
 
+func TestCalculateExcess_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		excesses: stubExcessCalculator{excess: 9},
+	}
+
+	if actual := calculator.Excess(nil, nil); actual != 9 {
+		t.Fatalf("expected injected excess 9, got %d", actual)
+	}
+}
+
 // theoretically this test case should never occur.
 // that being said, we're testing deducting from newest to oldest
 func TestAdjustForPositiveExcess(t *testing.T) {
@@ -511,6 +632,15 @@ func TestAdjustForPositiveExcess(t *testing.T) {
 			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedResult)
 		})
 	}
+}
+
+func TestAdjustForPositiveExcess_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		adjustments: stubPayoutAdjuster{positive: []int64{4, 5}},
+	}
+
+	actual := calculator.AdjustPositiveExcess([]int64{1, 2}, 3)
+	assertInt64SliceEqual(t, "injected", actual, []int64{4, 5})
 }
 
 func TestAdjustForNegativeExcess(t *testing.T) {
@@ -546,6 +676,15 @@ func TestAdjustForNegativeExcess(t *testing.T) {
 		})
 	}
 
+}
+
+func TestAdjustForNegativeExcess_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		adjustments: stubPayoutAdjuster{negative: []int64{6, 7}},
+	}
+
+	actual := calculator.AdjustNegativeExcess([]int64{1, 2}, -3)
+	assertInt64SliceEqual(t, "injected", actual, []int64{6, 7})
 }
 
 func TestAdjustPayouts(t *testing.T) {
@@ -606,6 +745,15 @@ func TestAdjustPayouts(t *testing.T) {
 			assertInt64SliceEqual(t, tc.Name, actualResult, tc.ExpectedAdjustedPayouts)
 		})
 	}
+}
+
+func TestAdjustPayouts_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		adjustments: stubPayoutAdjuster{adjusted: []int64{3, 2, 1}},
+	}
+
+	actual := calculator.AdjustPayouts(nil, []int64{1, 2, 3})
+	assertInt64SliceEqual(t, "injected", actual, []int64{3, 2, 1})
 }
 
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
@@ -682,6 +830,16 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 	}
 }
 
+func TestAggregateUserPayoutsDBPM_UsesInjectedCalculator(t *testing.T) {
+	expected := []DBPMMarketPosition{{Username: "alice", YesSharesOwned: 9}}
+	calculator := MarketShareCalculator{
+		aggregators: stubUserPayoutAggregator{positions: expected},
+	}
+
+	actual := calculator.AggregateUserPayouts(nil, nil)
+	assertDBPMPositionsEqual(t, "injected", actual, expected)
+}
+
 func TestNetAggregateMarketPositions(t *testing.T) {
 	testcases := []struct {
 		Name                string
@@ -706,6 +864,16 @@ func TestNetAggregateMarketPositions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNetAggregateMarketPositions_UsesInjectedCalculator(t *testing.T) {
+	expected := []DBPMMarketPosition{{Username: "alice", NoSharesOwned: 4}}
+	calculator := MarketShareCalculator{
+		netter: stubMarketPositionNetter{positions: expected},
+	}
+
+	actual := calculator.NetPositions(nil)
+	assertDBPMPositionsEqual(t, "injected", actual, expected)
 }
 
 func TestSingleCreditYesNoAllocator(t *testing.T) {
@@ -770,5 +938,16 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 					tc.name, tc.wantYes, tc.wantNo, gotYes, gotNo)
 			}
 		})
+	}
+}
+
+func TestSingleCreditYesNoAllocator_UsesInjectedCalculator(t *testing.T) {
+	calculator := MarketShareCalculator{
+		allocator: stubSingleCreditAllocator{yes: 1, no: 2},
+	}
+
+	gotYes, gotNo := calculator.AllocateSingleCredit(nil)
+	if gotYes != 1 || gotNo != 2 {
+		t.Fatalf("expected injected allocator result (1,2), got (%d,%d)", gotYes, gotNo)
 	}
 }

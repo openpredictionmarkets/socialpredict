@@ -1,15 +1,28 @@
 {
   "task_id": "PR581-023",
-  "status": "pending",
-  "updated_at": "2026-04-04T15:11:51.085463+00:00",
+  "status": "completed",
+  "updated_at": "2026-04-05T14:16:31.252431+00:00",
   "owner": "dispatcher_agent",
-  "headline": "",
-  "current_focus": "",
-  "files_changed": [],
-  "checks_run": [],
+  "headline": "Completed ISP refactor for scoped analytics files only",
+  "current_focus": "Task complete; final diff is restricted to the seven inventory-listed analytics files and fully verified",
+  "files_changed": [
+    "/workspace/socialpredict/backend/internal/domain/analytics/models.go",
+    "/workspace/socialpredict/backend/internal/domain/analytics/service.go",
+    "/workspace/socialpredict/backend/internal/domain/analytics/repository.go",
+    "/workspace/socialpredict/backend/internal/domain/analytics/financialsnapshot_test.go",
+    "/workspace/socialpredict/backend/internal/domain/analytics/leaderboard_test.go",
+    "/workspace/socialpredict/backend/internal/domain/analytics/systemmetrics_test.go",
+    "/workspace/socialpredict/backend/internal/domain/analytics/systemmetrics_integration_test.go"
+  ],
+  "checks_run": [
+    "bash /workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-architecture-governance/scripts/run_boundary_checks.sh /workspace/socialpredict => PASS",
+    "gofmt -l backend/internal/domain/analytics/{models.go,service.go,repository.go,financialsnapshot_test.go,leaderboard_test.go,systemmetrics_test.go,systemmetrics_integration_test.go} => PASS",
+    "env GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go test ./internal/domain/analytics => PASS",
+    "env GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go vet ./... => PASS"
+  ],
   "open_questions": [],
   "follow_ups": [],
-  "last_event_seq": 1,
+  "last_event_seq": 4,
   "context": {
     "handoff_requested": false
   }

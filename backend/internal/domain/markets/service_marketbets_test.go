@@ -2,6 +2,7 @@ package markets_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -103,46 +104,87 @@ func withBetsRepoPositions(positions markets.MarketPositions) func(*betsRepo) {
 }
 
 func (r *betsRepo) Create(ctx context.Context, market *markets.Market) error {
+	if r.createFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return r.createFunc(ctx, market)
 }
 func (r *betsRepo) UpdateLabels(ctx context.Context, id int64, yesLabel string, noLabel string) error {
+	if r.updateLabelsFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return r.updateLabelsFunc(ctx, id, yesLabel, noLabel)
 }
 func (r *betsRepo) List(ctx context.Context, filters markets.ListFilters) ([]*markets.Market, error) {
+	if r.listFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listFunc(ctx, filters)
 }
 func (r *betsRepo) ListByStatus(ctx context.Context, status string, page markets.Page) ([]*markets.Market, error) {
+	if r.listByStatusFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listByStatusFunc(ctx, status, page)
 }
 func (r *betsRepo) Search(ctx context.Context, query string, filters markets.SearchFilters) ([]*markets.Market, error) {
+	if r.searchFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.searchFunc(ctx, query, filters)
 }
-func (r *betsRepo) Delete(ctx context.Context, id int64) error { return r.deleteFunc(ctx, id) }
+func (r *betsRepo) Delete(ctx context.Context, id int64) error {
+	if r.deleteFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.deleteFunc(ctx, id)
+}
 
 func (r *betsRepo) GetByID(ctx context.Context, id int64) (*markets.Market, error) {
+	if r.getByIDFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.getByIDFunc(ctx, id)
 }
 
 func (r *betsRepo) ResolveMarket(ctx context.Context, id int64, outcome string) error {
+	if r.resolveMarketFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return r.resolveMarketFunc(ctx, id, outcome)
 }
 func (r *betsRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {
+	if r.getUserPositionFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.getUserPositionFunc(ctx, marketID, username)
 }
 
 func (r *betsRepo) ListMarketPositions(ctx context.Context, marketID int64) (markets.MarketPositions, error) {
+	if r.listMarketPositionsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listMarketPositionsFunc(ctx, marketID)
 }
 
 func (r *betsRepo) ListBetsForMarket(ctx context.Context, marketID int64) ([]*markets.Bet, error) {
+	if r.listBetsForMarketFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.listBetsForMarketFunc(ctx, marketID)
 }
 
 func (r *betsRepo) CalculatePayoutPositions(ctx context.Context, marketID int64) ([]*markets.PayoutPosition, error) {
+	if r.calculatePayoutPositionsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.calculatePayoutPositionsFunc(ctx, marketID)
 }
 
 func (r *betsRepo) GetPublicMarket(ctx context.Context, marketID int64) (*markets.PublicMarket, error) {
+	if r.getPublicMarketFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return r.getPublicMarketFunc(ctx, marketID)
 }
 
@@ -169,18 +211,33 @@ func newNopUserService(opts ...func(*nopUserService)) nopUserService {
 }
 
 func (s nopUserService) ValidateUserExists(ctx context.Context, username string) error {
+	if s.validateUserExistsFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.validateUserExistsFunc(ctx, username)
 }
 func (s nopUserService) ValidateUserBalance(ctx context.Context, username string, amount int64, maxDebt int64) error {
+	if s.validateUserBalanceFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.validateUserBalanceFunc(ctx, username, amount, maxDebt)
 }
 func (s nopUserService) DeductBalance(ctx context.Context, username string, amount int64) error {
+	if s.deductBalanceFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.deductBalanceFunc(ctx, username, amount)
 }
 func (s nopUserService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+	if s.applyTransactionFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
 	return s.applyTransactionFunc(ctx, username, amount, transactionType)
 }
 func (s nopUserService) GetPublicUser(ctx context.Context, username string) (*dusers.PublicUser, error) {
+	if s.getPublicUserFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
 	return s.getPublicUserFunc(ctx, username)
 }
 
@@ -192,7 +249,7 @@ func newBetsClock(now time.Time) betsClock {
 
 func (c betsClock) Now() time.Time {
 	if c.nowFunc == nil {
-		return time.Time{}
+		return marketsTestTime()
 	}
 	return c.nowFunc()
 }
@@ -281,10 +338,14 @@ func TestGetMarketBets_ReturnsProbabilities(t *testing.T) {
 		wantProb := matchProbability(bet)
 		requireBetDisplay(t, results[i], bet, wantProb)
 	}
+
+	if err := (&betsRepo{}).Create(context.Background(), nil); !errors.Is(err, errUnexpectedMarketsTestCall) {
+		t.Fatalf("expected zero-value repo to fail predictably, got %v", err)
+	}
 }
 
 func TestGetMarketBets_EmptyWhenNoBets(t *testing.T) {
-	createdAt := time.Now()
+	createdAt := marketsTestTime()
 	repo := newBetsRepo(
 		withBetsRepoMarket(&markets.Market{
 			ID:        7,
@@ -302,17 +363,25 @@ func TestGetMarketBets_EmptyWhenNoBets(t *testing.T) {
 	if len(results) != 0 {
 		t.Fatalf("expected empty result, got %d items", len(results))
 	}
+
+	if got := (betsClock{}).Now(); !got.Equal(marketsTestTime()) {
+		t.Fatalf("expected zero-value clock fallback, got %v", got)
+	}
 }
 
 func TestGetMarketBets_ValidatesInputAndMarket(t *testing.T) {
 	repo := newBetsRepo()
-	service := markets.NewService(repo, newNopUserService(), newBetsClock(time.Now()), markets.Config{})
+	service := markets.NewService(repo, newNopUserService(), newBetsClock(marketsTestTime()), markets.Config{})
 
 	_, err := service.GetMarketBets(context.Background(), 0)
 	requireInvalidInput(t, err)
 
 	_, err = service.GetMarketBets(context.Background(), 99)
 	requireMarketNotFound(t, err)
+
+	if _, err := (nopUserService{}).GetPublicUser(context.Background(), "alice"); !errors.Is(err, errUnexpectedMarketsTestCall) {
+		t.Fatalf("expected zero-value user service to fail predictably, got %v", err)
+	}
 }
 
 func TestGetMarketPositions_ReturnsRepositoryData(t *testing.T) {
@@ -343,7 +412,7 @@ func TestGetMarketPositions_ReturnsRepositoryData(t *testing.T) {
 			},
 		}),
 	)
-	svc := markets.NewService(repo, newNopUserService(), newBetsClock(time.Now()), markets.Config{})
+	svc := markets.NewService(repo, newNopUserService(), newBetsClock(marketsTestTime()), markets.Config{})
 
 	out, err := svc.GetMarketPositions(context.Background(), 101)
 	if err != nil {
@@ -359,15 +428,23 @@ func TestGetMarketPositions_ReturnsRepositoryData(t *testing.T) {
 	if out[1].Username != "bob" || out[1].NoSharesOwned != 3 {
 		t.Fatalf("unexpected second position: %+v", out[1])
 	}
+
+	if _, err := (&betsRepo{}).ListMarketPositions(context.Background(), 1); !errors.Is(err, errUnexpectedMarketsTestCall) {
+		t.Fatalf("expected zero-value positions repo to fail predictably, got %v", err)
+	}
 }
 
 func TestGetMarketPositions_ValidatesInputAndMarket(t *testing.T) {
 	repo := newBetsRepo()
-	svc := markets.NewService(repo, newNopUserService(), newBetsClock(time.Now()), markets.Config{})
+	svc := markets.NewService(repo, newNopUserService(), newBetsClock(marketsTestTime()), markets.Config{})
 
 	_, err := svc.GetMarketPositions(context.Background(), 0)
 	requireInvalidInput(t, err)
 
 	_, err = svc.GetMarketPositions(context.Background(), 99)
 	requireMarketNotFound(t, err)
+
+	if err := (nopUserService{}).ApplyTransaction(context.Background(), "alice", 10, "test"); !errors.Is(err, errUnexpectedMarketsTestCall) {
+		t.Fatalf("expected zero-value user service to fail predictably, got %v", err)
+	}
 }

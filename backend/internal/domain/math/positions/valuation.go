@@ -15,6 +15,11 @@ type resolutionRule struct {
 	resolvedValue    func(UserMarketPosition) float64
 }
 
+type ValuationModel interface {
+	FinalProbability(currentProbability float64, isResolved bool, resolutionResult string) float64
+	PositionValue(position UserMarketPosition, finalProbability float64, isResolved bool, resolutionResult string) float64
+}
+
 var unresolvedValuationRules = []valuationRule{
 	{
 		matches: func(position UserMarketPosition) bool { return position.YesSharesOwned > 0 },
@@ -50,6 +55,18 @@ type UserValuationResult struct {
 	RoundedValue int64
 }
 
+type valuationModel struct{}
+
+type ValuationCalculator struct {
+	model    ValuationModel
+	adjuster UserValuationAdjuster
+}
+
+var defaultValuationCalculator = ValuationCalculator{
+	model:    valuationModel{},
+	adjuster: defaultUserValuationAdjuster,
+}
+
 func CalculateRoundedUserValuationsFromUserMarketPositions(
 	userPositions map[string]UserMarketPosition,
 	currentProbability float64,
@@ -58,13 +75,30 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 	resolutionResult string,
 	earliestBets map[string]time.Time,
 ) (map[string]UserValuationResult, error) {
-	result := make(map[string]UserValuationResult)
-	var finalProb float64
+	return defaultValuationCalculator.Calculate(
+		userPositions,
+		currentProbability,
+		totalVolume,
+		isResolved,
+		resolutionResult,
+		earliestBets,
+	)
+}
 
-	finalProb = getFinalProbabilityFromMarketModel(currentProbability, isResolved, resolutionResult)
+func (c ValuationCalculator) Calculate(
+	userPositions map[string]UserMarketPosition,
+	currentProbability float64,
+	totalVolume int64,
+	isResolved bool,
+	resolutionResult string,
+	earliestBets map[string]time.Time,
+) (map[string]UserValuationResult, error) {
+	c = c.withDefaults()
+	result := make(map[string]UserValuationResult)
+	finalProb := c.model.FinalProbability(currentProbability, isResolved, resolutionResult)
 
 	for username, pos := range userPositions {
-		roundedVal := int64(math.Round(calculatePositionValue(pos, finalProb, isResolved, resolutionResult)))
+		roundedVal := int64(math.Round(c.model.PositionValue(pos, finalProb, isResolved, resolutionResult)))
 
 		result[username] = UserValuationResult{
 			Username:     username,
@@ -72,8 +106,18 @@ func CalculateRoundedUserValuationsFromUserMarketPositions(
 		}
 	}
 
-	adjusted := AdjustUserValuationsToMarketVolume(result, earliestBets, totalVolume)
+	adjusted := c.adjuster.Adjust(result, earliestBets, totalVolume)
 	return adjusted, nil
+}
+
+func (c ValuationCalculator) withDefaults() ValuationCalculator {
+	if c.model == nil {
+		c.model = valuationModel{}
+	}
+	if c.adjuster == nil {
+		c.adjuster = defaultUserValuationAdjuster
+	}
+	return c
 }
 
 func getFinalProbabilityFromMarketModel(
@@ -81,6 +125,10 @@ func getFinalProbabilityFromMarketModel(
 	isResolved bool,
 	resolutionResult string,
 ) float64 {
+	return valuationModel{}.FinalProbability(currentProbability, isResolved, resolutionResult)
+}
+
+func (valuationModel) FinalProbability(currentProbability float64, isResolved bool, resolutionResult string) float64 {
 	if !isResolved {
 		return currentProbability
 	}
@@ -92,6 +140,15 @@ func getFinalProbabilityFromMarketModel(
 }
 
 func calculatePositionValue(
+	position UserMarketPosition,
+	finalProbability float64,
+	isResolved bool,
+	resolutionResult string,
+) float64 {
+	return valuationModel{}.PositionValue(position, finalProbability, isResolved, resolutionResult)
+}
+
+func (valuationModel) PositionValue(
 	position UserMarketPosition,
 	finalProbability float64,
 	isResolved bool,

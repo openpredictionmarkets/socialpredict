@@ -6,6 +6,11 @@ import (
 
 const personalLinkFieldCount = 4
 
+// PersonalLinksTarget exposes the minimal contract needed to receive personal links.
+type PersonalLinksTarget interface {
+	ApplyPersonalLinks(PersonalLinks)
+}
+
 // User represents the core user domain model
 type User struct {
 	ID                    int64
@@ -29,47 +34,73 @@ type User struct {
 
 // ToPublicUser returns the public-safe projection of the user model.
 func (u *User) ToPublicUser() *PublicUser {
-	if u == nil {
-		return nil
-	}
-
-	publicUser := &PublicUser{
-		ID:                    u.ID,
-		Username:              u.Username,
-		DisplayName:           u.DisplayName,
-		UserType:              u.UserType,
-		InitialAccountBalance: u.InitialAccountBalance,
-		AccountBalance:        u.AccountBalance,
-		PersonalEmoji:         u.PersonalEmoji,
-		Description:           u.Description,
-	}
-	u.PersonalLinks().ApplyToPublicUser(publicUser)
-	return publicUser
+	return new(PublicUser).FromUser(u)
 }
 
 // ToPrivateProfile returns the authenticated private projection of the user model.
 func (u *User) ToPrivateProfile() *PrivateProfile {
-	if u == nil {
+	return new(PrivateProfile).FromUser(u)
+}
+
+func copyPublicUser(target *PublicUser, user *User) *PublicUser {
+	if user == nil {
 		return nil
 	}
 
-	privateProfile := &PrivateProfile{
-		ID:                    u.ID,
-		Username:              u.Username,
-		DisplayName:           u.DisplayName,
-		UserType:              u.UserType,
-		InitialAccountBalance: u.InitialAccountBalance,
-		AccountBalance:        u.AccountBalance,
-		PersonalEmoji:         u.PersonalEmoji,
-		Description:           u.Description,
-		Email:                 u.Email,
-		APIKey:                u.APIKey,
-		MustChangePassword:    u.MustChangePassword,
-		CreatedAt:             u.CreatedAt,
-		UpdatedAt:             u.UpdatedAt,
+	if target == nil {
+		target = &PublicUser{}
 	}
-	u.PersonalLinks().ApplyToPrivateProfile(privateProfile)
-	return privateProfile
+
+	*target = PublicUser{
+		ID:                    user.ID,
+		Username:              user.Username,
+		DisplayName:           user.DisplayName,
+		UserType:              user.UserType,
+		InitialAccountBalance: user.InitialAccountBalance,
+		AccountBalance:        user.AccountBalance,
+		PersonalEmoji:         user.PersonalEmoji,
+		Description:           user.Description,
+	}
+	user.PersonalLinks().ApplyTo(target)
+	return target
+}
+
+// FromUser copies the public-safe projection of the user model.
+func (u *PublicUser) FromUser(user *User) *PublicUser {
+	return copyPublicUser(u, user)
+}
+
+func copyPrivateProfile(target *PrivateProfile, user *User) *PrivateProfile {
+	if user == nil {
+		return nil
+	}
+
+	if target == nil {
+		target = &PrivateProfile{}
+	}
+
+	*target = PrivateProfile{
+		ID:                    user.ID,
+		Username:              user.Username,
+		DisplayName:           user.DisplayName,
+		UserType:              user.UserType,
+		InitialAccountBalance: user.InitialAccountBalance,
+		AccountBalance:        user.AccountBalance,
+		PersonalEmoji:         user.PersonalEmoji,
+		Description:           user.Description,
+		Email:                 user.Email,
+		APIKey:                user.APIKey,
+		MustChangePassword:    user.MustChangePassword,
+		CreatedAt:             user.CreatedAt,
+		UpdatedAt:             user.UpdatedAt,
+	}
+	user.PersonalLinks().ApplyTo(target)
+	return target
+}
+
+// FromUser copies the authenticated private projection of the user model.
+func (p *PrivateProfile) FromUser(user *User) *PrivateProfile {
+	return copyPrivateProfile(p, user)
 }
 
 // ApplyUpdate mutates the user with the fields supported by UserUpdateRequest.
@@ -243,40 +274,48 @@ func NewPersonalLinks(values []string) PersonalLinks {
 	return links
 }
 
-// ApplyTo updates the mutable personal-link fields on the user.
-func (p PersonalLinks) ApplyTo(user *User) {
-	if user == nil {
+// ApplyPersonalLinks updates the mutable personal-link fields on the user.
+func (u *User) ApplyPersonalLinks(p PersonalLinks) {
+	if u == nil {
 		return
 	}
 
-	user.PersonalLink1 = p.PersonalLink1
-	user.PersonalLink2 = p.PersonalLink2
-	user.PersonalLink3 = p.PersonalLink3
-	user.PersonalLink4 = p.PersonalLink4
+	u.PersonalLink1 = p.PersonalLink1
+	u.PersonalLink2 = p.PersonalLink2
+	u.PersonalLink3 = p.PersonalLink3
+	u.PersonalLink4 = p.PersonalLink4
 }
 
-// ApplyToPublicUser updates the public personal-link fields.
-func (p PersonalLinks) ApplyToPublicUser(user *PublicUser) {
-	if user == nil {
+// ApplyPersonalLinks updates the public personal-link fields.
+func (u *PublicUser) ApplyPersonalLinks(p PersonalLinks) {
+	if u == nil {
 		return
 	}
 
-	user.PersonalLink1 = p.PersonalLink1
-	user.PersonalLink2 = p.PersonalLink2
-	user.PersonalLink3 = p.PersonalLink3
-	user.PersonalLink4 = p.PersonalLink4
+	u.PersonalLink1 = p.PersonalLink1
+	u.PersonalLink2 = p.PersonalLink2
+	u.PersonalLink3 = p.PersonalLink3
+	u.PersonalLink4 = p.PersonalLink4
 }
 
-// ApplyToPrivateProfile updates the private-profile personal-link fields.
-func (p PersonalLinks) ApplyToPrivateProfile(profile *PrivateProfile) {
-	if profile == nil {
+// ApplyPersonalLinks updates the private-profile personal-link fields.
+func (p *PrivateProfile) ApplyPersonalLinks(links PersonalLinks) {
+	if p == nil {
 		return
 	}
 
-	profile.PersonalLink1 = p.PersonalLink1
-	profile.PersonalLink2 = p.PersonalLink2
-	profile.PersonalLink3 = p.PersonalLink3
-	profile.PersonalLink4 = p.PersonalLink4
+	p.PersonalLink1 = links.PersonalLink1
+	p.PersonalLink2 = links.PersonalLink2
+	p.PersonalLink3 = links.PersonalLink3
+	p.PersonalLink4 = links.PersonalLink4
+}
+
+// ApplyTo updates any compatible personal-links target.
+func (p PersonalLinks) ApplyTo(target PersonalLinksTarget) {
+	if target == nil {
+		return
+	}
+	target.ApplyPersonalLinks(p)
 }
 
 // Credentials represents the sensitive authentication fields associated with a user.

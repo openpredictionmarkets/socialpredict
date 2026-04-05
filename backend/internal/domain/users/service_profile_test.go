@@ -32,6 +32,16 @@ type fakeRepository struct {
 	updatePasswordFn    func(context.Context, string, string, bool) error
 }
 
+var (
+	_ users.UserReader              = (*fakeRepository)(nil)
+	_ users.UserBalanceRepository   = (*fakeRepository)(nil)
+	_ users.UserWriter              = (*fakeRepository)(nil)
+	_ users.UserLister              = (*fakeRepository)(nil)
+	_ users.UserPortfolioRepository = (*fakeRepository)(nil)
+	_ users.UserMarketsRepository   = (*fakeRepository)(nil)
+	_ users.CredentialsRepository   = (*fakeRepository)(nil)
+)
+
 const initialTestPassword = "CurrentPass123!"
 
 func newFakeRepository(username string) *fakeRepository {
@@ -40,6 +50,18 @@ func newFakeRepository(username string) *fakeRepository {
 		user:         seededUser(username),
 		passwordHash: string(hash),
 		mustChange:   true,
+	}
+}
+
+func newServiceDependencies(repo *fakeRepository) users.ServiceDependencies {
+	return users.ServiceDependencies{
+		Reader:      repo,
+		BalanceRepo: repo,
+		Writer:      repo,
+		Lister:      repo,
+		Portfolio:   repo,
+		Markets:     repo,
+		Credentials: repo,
 	}
 }
 
@@ -130,21 +152,21 @@ func (f *fakeRepository) List(ctx context.Context, filters users.ListFilters) ([
 	if f.listFn != nil {
 		return f.listFn(ctx, filters)
 	}
-	return nil, nil
+	return []*users.User{}, nil
 }
 
 func (f *fakeRepository) ListUserBets(ctx context.Context, username string) ([]*users.UserBet, error) {
 	if f.listUserBetsFn != nil {
 		return f.listUserBetsFn(ctx, username)
 	}
-	return nil, nil
+	return []*users.UserBet{}, nil
 }
 
 func (f *fakeRepository) GetMarketQuestion(ctx context.Context, marketID uint) (string, error) {
 	if f.getMarketQuestionFn != nil {
 		return f.getMarketQuestionFn(ctx, marketID)
 	}
-	return "", nil
+	return fmt.Sprintf("market-%d", marketID), nil
 }
 
 func (f *fakeRepository) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*users.MarketUserPosition, error) {
@@ -158,7 +180,7 @@ func (f *fakeRepository) ListUserMarkets(ctx context.Context, userID int64) ([]*
 	if f.listUserMarketsFn != nil {
 		return f.listUserMarketsFn(ctx, userID)
 	}
-	return nil, nil
+	return []*users.UserMarket{}, nil
 }
 
 func (f *fakeRepository) GetCredentials(ctx context.Context, username string) (*users.Credentials, error) {
@@ -194,7 +216,7 @@ func newServiceWithUser(t *testing.T) (string, users.ServiceInterface, *fakeRepo
 
 	username := fmt.Sprintf("profile_%s", strings.ToLower(t.Name()))
 	repo := newFakeRepository(username)
-	service := users.NewService(repo, nil, security.NewSecurityService().Sanitizer)
+	var service users.ServiceInterface = users.NewServiceWithDependencies(newServiceDependencies(repo), nil, security.NewSecurityService().Sanitizer)
 
 	return username, service, repo, context.Background()
 }

@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+type fixedSellDustCalculator struct{ dust int64 }
+
+func (c fixedSellDustCalculator) DustForSell(sellBet models.Bet, allBets []models.Bet) int64 {
+	if sellBet.Amount >= 0 {
+		return 0
+	}
+	return c.dust
+}
+
 var dustTestBaseTime = time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
 func makeDustTestBet(amount int64, outcome, username string, minutes int) models.Bet {
@@ -132,6 +141,16 @@ func TestGetMarketDust(t *testing.T) {
 	}
 
 	assertInt64Equal(t, "dust", 2, GetMarketDust(bets))
+}
+
+func TestGetMarketDustWithCalculator(t *testing.T) {
+	bets := []models.Bet{
+		makeDustTestBet(100, "YES", "user1", 0),
+		makeDustTestBet(-50, "YES", "user1", 1),
+		makeDustTestBet(-25, "NO", "user2", 2),
+	}
+
+	assertInt64Equal(t, "dust", 6, GetMarketDustWithCalculator(bets, fixedSellDustCalculator{dust: 3}))
 }
 
 func TestCalculateDustForSell_Placeholder(t *testing.T) {

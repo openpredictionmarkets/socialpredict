@@ -15,43 +15,33 @@ type staticMarketError struct {
 func (e staticMarketError) Error() string   { return e.message }
 func (e staticMarketError) Message() string { return e.message }
 
-type marketErrorFactory interface {
-	New(message string) MarketError
-}
-
-type staticMarketErrorFactory struct{}
-
-func (staticMarketErrorFactory) New(message string) MarketError {
+func newDomainError(message string) MarketError {
 	return staticMarketError{message: message}
-}
-
-func newDomainError(message string) error {
-	return staticMarketErrorFactory{}.New(message)
 }
 
 var (
 	// ErrMarketNotFound indicates that the requested market does not exist.
-	ErrMarketNotFound = newDomainError("market not found")
+	ErrMarketNotFound MarketError = newDomainError("market not found")
 	// ErrInvalidQuestionTitle indicates that the market question title is invalid.
-	ErrInvalidQuestionTitle = newDomainError("invalid question title")
+	ErrInvalidQuestionTitle MarketError = newDomainError("invalid question title")
 	// ErrInvalidQuestionLength indicates that the market question title is blank or too long.
-	ErrInvalidQuestionLength = newDomainError("question title exceeds maximum length or is blank")
+	ErrInvalidQuestionLength MarketError = newDomainError("question title exceeds maximum length or is blank")
 	// ErrInvalidDescriptionLength indicates that the market description is too long.
-	ErrInvalidDescriptionLength = newDomainError("question description exceeds maximum length")
+	ErrInvalidDescriptionLength MarketError = newDomainError("question description exceeds maximum length")
 	// ErrInvalidLabel indicates that one or more custom labels are invalid.
-	ErrInvalidLabel = newDomainError("invalid label")
+	ErrInvalidLabel MarketError = newDomainError("invalid label")
 	// ErrInvalidResolutionTime indicates that the supplied resolution time is invalid.
-	ErrInvalidResolutionTime = newDomainError("invalid market resolution time")
+	ErrInvalidResolutionTime MarketError = newDomainError("invalid market resolution time")
 	// ErrUserNotFound indicates that the referenced creator user does not exist.
-	ErrUserNotFound = newDomainError("creator user not found")
+	ErrUserNotFound MarketError = newDomainError("creator user not found")
 	// ErrInsufficientBalance indicates that the actor does not have enough balance.
-	ErrInsufficientBalance = newDomainError("insufficient balance")
+	ErrInsufficientBalance MarketError = newDomainError("insufficient balance")
 	// ErrUnauthorized indicates that the actor is not allowed to perform the action.
-	ErrUnauthorized = newDomainError("unauthorized")
+	ErrUnauthorized MarketError = newDomainError("unauthorized")
 	// ErrInvalidInput indicates that one or more request inputs are invalid.
-	ErrInvalidInput = newDomainError("invalid input")
+	ErrInvalidInput MarketError = newDomainError("invalid input")
 	// ErrInvalidState indicates that the market state does not allow the requested action.
-	ErrInvalidState = newDomainError("invalid state")
+	ErrInvalidState MarketError = newDomainError("invalid state")
 )
 
 // IsMarketNotFound reports whether err represents a missing market.

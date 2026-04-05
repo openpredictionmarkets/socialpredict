@@ -12,6 +12,14 @@ type UserHolder struct {
 	EarliestBet  time.Time
 }
 
+type UserValuationAdjuster interface {
+	Adjust(
+		userValuations map[string]UserValuationResult,
+		earliestBets map[string]time.Time,
+		targetMarketVolume int64,
+	) map[string]UserValuationResult
+}
+
 type ByValBetTimeUsername []UserHolder
 
 func (s ByValBetTimeUsername) Len() int      { return len(s) }
@@ -26,9 +34,21 @@ func (s ByValBetTimeUsername) Less(i, j int) bool {
 	return s[i].Username < s[j].Username
 }
 
+type deterministicValuationAdjuster struct{}
+
+var defaultUserValuationAdjuster UserValuationAdjuster = deterministicValuationAdjuster{}
+
 // AdjustUserValuationsToMarketVolume ensures user values match total market volume,
 // distributing rounding delta deterministically. Only users with >0 value are adjusted.
 func AdjustUserValuationsToMarketVolume(
+	userValuations map[string]UserValuationResult,
+	earliestBets map[string]time.Time,
+	targetMarketVolume int64,
+) map[string]UserValuationResult {
+	return defaultUserValuationAdjuster.Adjust(userValuations, earliestBets, targetMarketVolume)
+}
+
+func (deterministicValuationAdjuster) Adjust(
 	userValuations map[string]UserValuationResult,
 	earliestBets map[string]time.Time,
 	targetMarketVolume int64,

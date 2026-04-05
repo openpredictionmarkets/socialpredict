@@ -18,6 +18,22 @@ type positionTypeRule struct {
 	matches  func(yesShares, noShares int64) bool
 }
 
+type MarketPositionSource interface {
+	CalculateMarketPositions(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error)
+}
+
+type UserSpendCalculator interface {
+	Spend(bets []models.Bet, username string) int64
+}
+
+type EarliestBetTimeFinder interface {
+	EarliestBetTime(bets []models.Bet, username string) time.Time
+}
+
+type PositionTypeResolver interface {
+	Resolve(yesShares, noShares int64) string
+}
+
 var defaultPositionTypeRules = []positionTypeRule{
 	{
 		position: positionTypeYes,
@@ -52,30 +68,75 @@ type UserProfitability struct {
 	Rank           int       `json:"rank"`
 }
 
+type LeaderboardCalculator struct {
+	positions     MarketPositionSource
+	spend         UserSpendCalculator
+	earliest      EarliestBetTimeFinder
+	positionTypes PositionTypeResolver
+}
+
+type defaultSpendCalculator struct{}
+type defaultEarliestBetTimeFinder struct{}
+type defaultPositionTypeResolver struct{}
+
+var defaultLeaderboardCalculator = LeaderboardCalculator{
+	positions:     NewPositionCalculator(),
+	spend:         defaultSpendCalculator{},
+	earliest:      defaultEarliestBetTimeFinder{},
+	positionTypes: defaultPositionTypeResolver{},
+}
+
 // CalculateMarketLeaderboard ranks users in a market by profitability.
 func CalculateMarketLeaderboard(snapshot MarketSnapshot, bets []models.Bet) ([]UserProfitability, error) {
+	return defaultLeaderboardCalculator.Calculate(snapshot, bets)
+}
+
+func (c LeaderboardCalculator) Calculate(snapshot MarketSnapshot, bets []models.Bet) ([]UserProfitability, error) {
 	if len(bets) == 0 {
 		return []UserProfitability{}, nil
 	}
+	c = c.withDefaults()
 
-	positions, err := CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
+	positions, err := c.positions.CalculateMarketPositions(snapshot, bets)
 	if err != nil {
 		return nil, err
 	}
 
-	leaderboard := buildLeaderboard(positions, bets)
+	leaderboard := buildLeaderboard(positions, bets, c.spend, c.earliest, c.positionTypes)
 	sortLeaderboard(leaderboard)
 	assignLeaderboardRanks(leaderboard)
 	return leaderboard, nil
 }
 
-func buildLeaderboard(positions []MarketPosition, bets []models.Bet) []UserProfitability {
+func (c LeaderboardCalculator) withDefaults() LeaderboardCalculator {
+	if c.positions == nil {
+		c.positions = NewPositionCalculator()
+	}
+	if c.spend == nil {
+		c.spend = defaultSpendCalculator{}
+	}
+	if c.earliest == nil {
+		c.earliest = defaultEarliestBetTimeFinder{}
+	}
+	if c.positionTypes == nil {
+		c.positionTypes = defaultPositionTypeResolver{}
+	}
+	return c
+}
+
+func buildLeaderboard(
+	positions []MarketPosition,
+	bets []models.Bet,
+	spend UserSpendCalculator,
+	earliest EarliestBetTimeFinder,
+	positionTypes PositionTypeResolver,
+) []UserProfitability {
 	leaderboard := make([]UserProfitability, 0, len(positions))
 	for _, position := range positions {
 		if hasNoOpenPosition(position) {
 			continue
 		}
-		leaderboard = append(leaderboard, newUserProfitability(position, bets))
+		leaderboard = append(leaderboard, newUserProfitability(position, bets, spend, earliest, positionTypes))
 	}
 	return leaderboard
 }
@@ -84,17 +145,23 @@ func hasNoOpenPosition(position MarketPosition) bool {
 	return position.YesSharesOwned == 0 && position.NoSharesOwned == 0
 }
 
-func newUserProfitability(position MarketPosition, bets []models.Bet) UserProfitability {
-	totalSpent := CalculateUserSpend(bets, position.Username)
+func newUserProfitability(
+	position MarketPosition,
+	bets []models.Bet,
+	spend UserSpendCalculator,
+	earliest EarliestBetTimeFinder,
+	positionTypes PositionTypeResolver,
+) UserProfitability {
+	totalSpent := spend.Spend(bets, position.Username)
 	return UserProfitability{
 		Username:       position.Username,
 		CurrentValue:   position.Value,
 		TotalSpent:     totalSpent,
 		Profit:         position.Value - totalSpent,
-		Position:       DeterminePositionType(position.YesSharesOwned, position.NoSharesOwned),
+		Position:       positionTypes.Resolve(position.YesSharesOwned, position.NoSharesOwned),
 		YesSharesOwned: position.YesSharesOwned,
 		NoSharesOwned:  position.NoSharesOwned,
-		EarliestBet:    GetEarliestBetTime(bets, position.Username),
+		EarliestBet:    earliest.EarliestBetTime(bets, position.Username),
 	}
 }
 
@@ -115,6 +182,10 @@ func assignLeaderboardRanks(leaderboard []UserProfitability) {
 
 // CalculateUserSpend sums a user's total spend (positive buys, negative sells).
 func CalculateUserSpend(bets []models.Bet, username string) int64 {
+	return defaultSpendCalculator{}.Spend(bets, username)
+}
+
+func (defaultSpendCalculator) Spend(bets []models.Bet, username string) int64 {
 	var total int64
 	forEachUserBet(bets, username, func(bet models.Bet) {
 		total += bet.Amount
@@ -124,6 +195,10 @@ func CalculateUserSpend(bets []models.Bet, username string) int64 {
 
 // GetEarliestBetTime returns the earliest bet timestamp for the user.
 func GetEarliestBetTime(bets []models.Bet, username string) time.Time {
+	return defaultEarliestBetTimeFinder{}.EarliestBetTime(bets, username)
+}
+
+func (defaultEarliestBetTimeFinder) EarliestBetTime(bets []models.Bet, username string) time.Time {
 	var earliest time.Time
 	first := true
 
@@ -139,6 +214,10 @@ func GetEarliestBetTime(bets []models.Bet, username string) time.Time {
 
 // DeterminePositionType identifies whether the user holds YES, NO, or both.
 func DeterminePositionType(yesShares, noShares int64) string {
+	return defaultPositionTypeResolver{}.Resolve(yesShares, noShares)
+}
+
+func (defaultPositionTypeResolver) Resolve(yesShares, noShares int64) string {
 	for _, rule := range defaultPositionTypeRules {
 		if rule.matches(yesShares, noShares) {
 			return rule.position

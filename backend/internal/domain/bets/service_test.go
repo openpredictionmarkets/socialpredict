@@ -17,15 +17,19 @@ import (
 var errUnexpectedServiceCall = errors.New("unexpected call")
 
 type fakeRepo struct {
-	created    *models.Bet
-	createFunc func(ctx context.Context, bet *models.Bet) error
-	hasBetFunc func(ctx context.Context, marketID uint, username string) (bool, error)
+	created *models.Bet
+	writer  fakeBetWriter
+	history fakeBetHistoryReader
 }
 
 func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
 	repo := &fakeRepo{
-		createFunc: func(context.Context, *models.Bet) error { return nil },
-		hasBetFunc: func(context.Context, uint, string) (bool, error) { return false, nil },
+		writer: fakeBetWriter{
+			createFunc: func(context.Context, *models.Bet) error { return nil },
+		},
+		history: fakeBetHistoryReader{
+			hasBetFunc: func(context.Context, uint, string) (bool, error) { return false, nil },
+		},
 	}
 	for _, opt := range opts {
 		opt(repo)
@@ -35,41 +39,71 @@ func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
 
 func withFakeRepoCreate(fn func(ctx context.Context, bet *models.Bet) error) func(*fakeRepo) {
 	return func(repo *fakeRepo) {
-		repo.createFunc = fn
+		repo.writer.createFunc = fn
 	}
 }
 
 func withFakeRepoHasBet(fn func(ctx context.Context, marketID uint, username string) (bool, error)) func(*fakeRepo) {
 	return func(repo *fakeRepo) {
-		repo.hasBetFunc = fn
+		repo.history.hasBetFunc = fn
 	}
+}
+
+type fakeBetWriter struct {
+	createFunc func(ctx context.Context, bet *models.Bet) error
 }
 
 func (f *fakeRepo) Create(ctx context.Context, bet *models.Bet) error {
-	if err := f.createFunc(ctx, bet); err != nil {
-		return err
-	}
-	copied := *bet
-	f.created = &copied
-	return nil
+	return f.writer.Create(ctx, bet, f)
+}
+
+type fakeBetHistoryReader struct {
+	hasBetFunc func(ctx context.Context, marketID uint, username string) (bool, error)
 }
 
 func (f *fakeRepo) UserHasBet(ctx context.Context, marketID uint, username string) (bool, error) {
+	return f.history.UserHasBet(ctx, marketID, username)
+}
+
+func (f fakeBetWriter) Create(ctx context.Context, bet *models.Bet, repo *fakeRepo) error {
+	if f.createFunc == nil {
+		return errUnexpectedServiceCall
+	}
+	if err := f.createFunc(ctx, bet); err != nil {
+		return err
+	}
+	if bet == nil {
+		repo.created = nil
+		return nil
+	}
+	copied := *bet
+	repo.created = &copied
+	return nil
+}
+
+func (f fakeBetHistoryReader) UserHasBet(ctx context.Context, marketID uint, username string) (bool, error) {
+	if f.hasBetFunc == nil {
+		return false, errUnexpectedServiceCall
+	}
 	return f.hasBetFunc(ctx, marketID, username)
 }
 
 type fakeMarkets struct {
-	getMarketFunc           func(ctx context.Context, id int64) (*dmarkets.Market, error)
-	getUserPositionInMarket func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	reader    fakeMarketReader
+	positions fakePositionReader
 }
 
 func newFakeMarkets(opts ...func(*fakeMarkets)) *fakeMarkets {
 	markets := &fakeMarkets{
-		getMarketFunc: func(context.Context, int64) (*dmarkets.Market, error) {
-			return nil, errUnexpectedServiceCall
+		reader: fakeMarketReader{
+			getMarketFunc: func(context.Context, int64) (*dmarkets.Market, error) {
+				return nil, errUnexpectedServiceCall
+			},
 		},
-		getUserPositionInMarket: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
-			return nil, errUnexpectedServiceCall
+		positions: fakePositionReader{
+			getUserPositionInMarketFunc: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
+				return nil, errUnexpectedServiceCall
+			},
 		},
 	}
 	for _, opt := range opts {
@@ -80,22 +114,44 @@ func newFakeMarkets(opts ...func(*fakeMarkets)) *fakeMarkets {
 
 func withFakeMarket(fn func(ctx context.Context, id int64) (*dmarkets.Market, error)) func(*fakeMarkets) {
 	return func(markets *fakeMarkets) {
-		markets.getMarketFunc = fn
+		markets.reader.getMarketFunc = fn
 	}
 }
 
 func withFakePosition(fn func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)) func(*fakeMarkets) {
 	return func(markets *fakeMarkets) {
-		markets.getUserPositionInMarket = fn
+		markets.positions.getUserPositionInMarketFunc = fn
 	}
 }
 
+type fakeMarketReader struct {
+	getMarketFunc func(ctx context.Context, id int64) (*dmarkets.Market, error)
+}
+
 func (f *fakeMarkets) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
-	return f.getMarketFunc(ctx, id)
+	return f.reader.GetMarket(ctx, id)
+}
+
+type fakePositionReader struct {
+	getUserPositionInMarketFunc func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
 func (f *fakeMarkets) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
-	return f.getUserPositionInMarket(ctx, marketID, username)
+	return f.positions.GetUserPositionInMarket(ctx, marketID, username)
+}
+
+func (f fakeMarketReader) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	if f.getMarketFunc == nil {
+		return nil, errUnexpectedServiceCall
+	}
+	return f.getMarketFunc(ctx, id)
+}
+
+func (f fakePositionReader) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
+	if f.getUserPositionInMarketFunc == nil {
+		return nil, errUnexpectedServiceCall
+	}
+	return f.getUserPositionInMarketFunc(ctx, marketID, username)
 }
 
 type applyCall struct {
@@ -105,17 +161,21 @@ type applyCall struct {
 }
 
 type fakeUsers struct {
-	calls                []applyCall
-	getUserFunc          func(ctx context.Context, username string) (*dusers.User, error)
-	applyTransactionFunc func(ctx context.Context, username string, amount int64, transactionType string) error
+	calls  []applyCall
+	reader fakeUserReader
+	writer fakeTransactionRecorder
 }
 
 func newFakeUsers(opts ...func(*fakeUsers)) *fakeUsers {
 	users := &fakeUsers{
-		getUserFunc: func(context.Context, string) (*dusers.User, error) {
-			return nil, errUnexpectedServiceCall
+		reader: fakeUserReader{
+			getUserFunc: func(context.Context, string) (*dusers.User, error) {
+				return nil, errUnexpectedServiceCall
+			},
 		},
-		applyTransactionFunc: func(context.Context, string, int64, string) error { return nil },
+		writer: fakeTransactionRecorder{
+			applyTransactionFunc: func(context.Context, string, int64, string) error { return nil },
+		},
 	}
 	for _, opt := range opts {
 		opt(users)
@@ -125,25 +185,47 @@ func newFakeUsers(opts ...func(*fakeUsers)) *fakeUsers {
 
 func withFakeUserLookup(fn func(ctx context.Context, username string) (*dusers.User, error)) func(*fakeUsers) {
 	return func(users *fakeUsers) {
-		users.getUserFunc = fn
+		users.reader.getUserFunc = fn
 	}
 }
 
 func withFakeApplyTransaction(fn func(ctx context.Context, username string, amount int64, transactionType string) error) func(*fakeUsers) {
 	return func(users *fakeUsers) {
-		users.applyTransactionFunc = fn
+		users.writer.applyTransactionFunc = fn
 	}
+}
+
+type fakeUserReader struct {
+	getUserFunc func(ctx context.Context, username string) (*dusers.User, error)
 }
 
 func (f *fakeUsers) GetUser(ctx context.Context, username string) (*dusers.User, error) {
-	return f.getUserFunc(ctx, username)
+	return f.reader.GetUser(ctx, username)
+}
+
+type fakeTransactionRecorder struct {
+	applyTransactionFunc func(ctx context.Context, username string, amount int64, transactionType string) error
 }
 
 func (f *fakeUsers) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
+	return f.writer.ApplyTransaction(ctx, username, amount, transactionType, &f.calls)
+}
+
+func (f fakeUserReader) GetUser(ctx context.Context, username string) (*dusers.User, error) {
+	if f.getUserFunc == nil {
+		return nil, errUnexpectedServiceCall
+	}
+	return f.getUserFunc(ctx, username)
+}
+
+func (f fakeTransactionRecorder) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string, calls *[]applyCall) error {
+	if f.applyTransactionFunc == nil {
+		return errUnexpectedServiceCall
+	}
 	if err := f.applyTransactionFunc(ctx, username, amount, transactionType); err != nil {
 		return err
 	}
-	f.calls = append(f.calls, applyCall{username: username, amount: amount, transaction: transactionType})
+	*calls = append(*calls, applyCall{username: username, amount: amount, transaction: transactionType})
 	return nil
 }
 
@@ -159,7 +241,7 @@ func newFixedClock(now time.Time) fixedClock {
 
 func (c fixedClock) Now() time.Time {
 	if c.nowFunc == nil {
-		return time.Time{}
+		return serviceTestTime()
 	}
 	return c.nowFunc()
 }
@@ -187,7 +269,7 @@ func withFixturePosition(position *dmarkets.UserPosition) serviceFixtureOption {
 		if f.markets == nil {
 			f.markets = newFakeMarkets()
 		}
-		current := f.markets.getMarketFunc
+		current := f.markets.reader.getMarketFunc
 		f.markets = newFakeMarkets(
 			withFakeMarket(current),
 			withFakePosition(func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
@@ -265,6 +347,11 @@ func TestServicePlace_Succeeds(t *testing.T) {
 	if fixture.users.calls[0].amount != totalCost {
 		t.Fatalf("unexpected transaction amount: %d", fixture.users.calls[0].amount)
 	}
+
+	fallbackService := bets.NewService(fixture.repo, fixture.markets, fixture.users, nil, nil, bets.WithClock(nil))
+	if fallbackService == nil {
+		t.Fatalf("expected fallback service")
+	}
 }
 
 func TestServicePlace_InsufficientBalance(t *testing.T) {
@@ -278,6 +365,10 @@ func TestServicePlace_InsufficientBalance(t *testing.T) {
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 9999, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrInsufficientBalance) {
 		t.Fatalf("expected ErrInsufficientBalance, got %v", err)
+	}
+
+	if _, err := (&fakeRepo{}).UserHasBet(context.Background(), 1, "alice"); !errors.Is(err, errUnexpectedServiceCall) {
+		t.Fatalf("expected zero-value repo to fail predictably, got %v", err)
 	}
 }
 
@@ -293,6 +384,10 @@ func TestServicePlace_InvalidOutcome(t *testing.T) {
 	if !errors.Is(err, bets.ErrInvalidOutcome) {
 		t.Fatalf("expected ErrInvalidOutcome, got %v", err)
 	}
+
+	if _, err := (&fakeUsers{}).GetUser(context.Background(), "alice"); !errors.Is(err, errUnexpectedServiceCall) {
+		t.Fatalf("expected zero-value users to fail predictably, got %v", err)
+	}
 }
 
 func TestServicePlace_MarketClosed(t *testing.T) {
@@ -306,6 +401,10 @@ func TestServicePlace_MarketClosed(t *testing.T) {
 	_, err := svc.Place(context.Background(), bets.PlaceRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrMarketClosed) {
 		t.Fatalf("expected ErrMarketClosed, got %v", err)
+	}
+
+	if _, err := (&fakeMarkets{}).GetMarket(context.Background(), 1); !errors.Is(err, errUnexpectedServiceCall) {
+		t.Fatalf("expected zero-value markets to fail predictably, got %v", err)
 	}
 }
 
@@ -335,6 +434,10 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != 20 {
 		t.Fatalf("unexpected user transaction: %+v", fixture.users.calls)
 	}
+
+	if got := (fixedClock{}).Now(); got != serviceTestTime() {
+		t.Fatalf("expected zero-value clock fallback, got %v", got)
+	}
 }
 
 func TestServiceSell_NoPosition(t *testing.T) {
@@ -349,6 +452,10 @@ func TestServiceSell_NoPosition(t *testing.T) {
 	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES"})
 	if !errors.Is(err, bets.ErrNoPosition) {
 		t.Fatalf("expected ErrNoPosition, got %v", err)
+	}
+
+	if _, err := (&fakeMarkets{}).GetUserPositionInMarket(context.Background(), 1, "alice"); !errors.Is(err, errUnexpectedServiceCall) {
+		t.Fatalf("expected zero-value position lookup to fail predictably, got %v", err)
 	}
 }
 

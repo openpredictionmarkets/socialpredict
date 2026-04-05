@@ -220,11 +220,110 @@ type Service struct {
 // ServiceOption configures the markets service strategies.
 type ServiceOption func(*Service)
 
+func defaultClock() Clock {
+	return serviceClock{}
+}
+
+func defaultCreationPolicyStrategy(config Config) CreationPolicy {
+	return defaultCreationPolicy{config: config}
+}
+
+func defaultResolutionPolicyStrategy() ResolutionPolicy {
+	return defaultResolutionPolicy{}
+}
+
+func defaultProbabilityEngineStrategy() ProbabilityEngine {
+	return defaultProbabilityEngine{}
+}
+
+func defaultProbabilityValidatorStrategy() ProbabilityValidator {
+	return defaultProbabilityValidator{}
+}
+
+func defaultSearchPolicyStrategy() SearchPolicy {
+	return defaultSearchPolicy{}
+}
+
+func defaultMetricsCalculatorStrategy() MetricsCalculator {
+	return defaultMetricsCalculator{}
+}
+
+func defaultLeaderboardCalculatorStrategy() LeaderboardCalculator {
+	return defaultLeaderboardCalculator{}
+}
+
+func defaultStatusPolicyStrategy() StatusPolicy {
+	return defaultStatusPolicy{}
+}
+
+func clockOrDefault(clock Clock) Clock {
+	if clock == nil {
+		return defaultClock()
+	}
+	return clock
+}
+
+func creationPolicyOrDefault(policy CreationPolicy, config Config) CreationPolicy {
+	if policy == nil {
+		return defaultCreationPolicyStrategy(config)
+	}
+	return policy
+}
+
+func resolutionPolicyOrDefault(policy ResolutionPolicy) ResolutionPolicy {
+	if policy == nil {
+		return defaultResolutionPolicyStrategy()
+	}
+	return policy
+}
+
+func probabilityEngineOrDefault(engine ProbabilityEngine) ProbabilityEngine {
+	if engine == nil {
+		return defaultProbabilityEngineStrategy()
+	}
+	return engine
+}
+
+func probabilityValidatorOrDefault(validator ProbabilityValidator) ProbabilityValidator {
+	if validator == nil {
+		return defaultProbabilityValidatorStrategy()
+	}
+	return validator
+}
+
+func searchPolicyOrDefault(policy SearchPolicy) SearchPolicy {
+	if policy == nil {
+		return defaultSearchPolicyStrategy()
+	}
+	return policy
+}
+
+func metricsCalculatorOrDefault(calculator MetricsCalculator) MetricsCalculator {
+	if calculator == nil {
+		return defaultMetricsCalculatorStrategy()
+	}
+	return calculator
+}
+
+func leaderboardCalculatorOrDefault(calculator LeaderboardCalculator) LeaderboardCalculator {
+	if calculator == nil {
+		return defaultLeaderboardCalculatorStrategy()
+	}
+	return calculator
+}
+
+func statusPolicyOrDefault(policy StatusPolicy) StatusPolicy {
+	if policy == nil {
+		return defaultStatusPolicyStrategy()
+	}
+	return policy
+}
+
 // WithCreationPolicy overrides the market creation policy.
 func WithCreationPolicy(p CreationPolicy) ServiceOption {
 	return func(s *Service) {
-		if p != nil {
-			s.creationPolicy = p
+		if s != nil {
+			s.creationPolicy = creationPolicyOrDefault(p, s.config)
 		}
 	}
 }
@@ -232,8 +331,8 @@ func WithCreationPolicy(p CreationPolicy) ServiceOption {
 // WithResolutionPolicy overrides the resolution policy.
 func WithResolutionPolicy(p ResolutionPolicy) ServiceOption {
 	return func(s *Service) {
-		if p != nil {
-			s.resolutionPolicy = p
+		if s != nil {
+			s.resolutionPolicy = resolutionPolicyOrDefault(p)
 		}
 	}
 }
@@ -241,8 +340,8 @@ func WithResolutionPolicy(p ResolutionPolicy) ServiceOption {
 // WithProbabilityEngine overrides the probability engine.
 func WithProbabilityEngine(e ProbabilityEngine) ServiceOption {
 	return func(s *Service) {
-		if e != nil {
-			s.probabilityEngine = e
+		if s != nil {
+			s.probabilityEngine = probabilityEngineOrDefault(e)
 		}
 	}
 }
@@ -250,8 +349,8 @@ func WithProbabilityEngine(e ProbabilityEngine) ServiceOption {
 // WithProbabilityValidator overrides the probability validator.
 func WithProbabilityValidator(v ProbabilityValidator) ServiceOption {
 	return func(s *Service) {
-		if v != nil {
-			s.probabilityValidator = v
+		if s != nil {
+			s.probabilityValidator = probabilityValidatorOrDefault(v)
 		}
 	}
 }
@@ -259,8 +358,8 @@ func WithProbabilityValidator(v ProbabilityValidator) ServiceOption {
 // WithSearchPolicy overrides the search policy.
 func WithSearchPolicy(p SearchPolicy) ServiceOption {
 	return func(s *Service) {
-		if p != nil {
-			s.searchPolicy = p
+		if s != nil {
+			s.searchPolicy = searchPolicyOrDefault(p)
 		}
 	}
 }
@@ -268,8 +367,8 @@ func WithSearchPolicy(p SearchPolicy) ServiceOption {
 // WithMetricsCalculator overrides the metrics calculator.
 func WithMetricsCalculator(c MetricsCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.metricsCalculator = c
+		if s != nil {
+			s.metricsCalculator = metricsCalculatorOrDefault(c)
 		}
 	}
 }
@@ -277,8 +376,8 @@ func WithMetricsCalculator(c MetricsCalculator) ServiceOption {
 // WithLeaderboardCalculator overrides the leaderboard calculator.
 func WithLeaderboardCalculator(c LeaderboardCalculator) ServiceOption {
 	return func(s *Service) {
-		if c != nil {
-			s.leaderboardCalculator = c
+		if s != nil {
+			s.leaderboardCalculator = leaderboardCalculatorOrDefault(c)
 		}
 	}
 }
@@ -286,8 +385,8 @@ func WithLeaderboardCalculator(c LeaderboardCalculator) ServiceOption {
 // WithStatusPolicy overrides the status policy.
 func WithStatusPolicy(p StatusPolicy) ServiceOption {
 	return func(s *Service) {
-		if p != nil {
-			s.statusPolicy = p
+		if s != nil {
+			s.statusPolicy = statusPolicyOrDefault(p)
 		}
 	}
 }
@@ -295,8 +394,8 @@ func WithStatusPolicy(p StatusPolicy) ServiceOption {
 // WithClock overrides the clock used by the service.
 func WithClock(clock Clock) ServiceOption {
 	return func(s *Service) {
-		if clock != nil {
-			s.clock = clock
+		if s != nil {
+			s.clock = clockOrDefault(clock)
 		}
 	}
 }
@@ -306,7 +405,7 @@ func NewService(repo Repository, userService UserService, clock Clock, config Co
 	s := &Service{
 		repo:        repo,
 		userService: userService,
-		clock:       clock,
+		clock:       clockOrDefault(clock),
 		config:      config,
 	}
 
@@ -320,33 +419,19 @@ func NewService(repo Repository, userService UserService, clock Clock, config Co
 }
 
 func (s *Service) ensureDefaults() {
-	if s.clock == nil {
-		s.clock = serviceClock{}
+	if s == nil {
+		return
 	}
-	if s.creationPolicy == nil {
-		s.creationPolicy = defaultCreationPolicy{config: s.config}
-	}
-	if s.resolutionPolicy == nil {
-		s.resolutionPolicy = defaultResolutionPolicy{}
-	}
-	if s.probabilityEngine == nil {
-		s.probabilityEngine = defaultProbabilityEngine{}
-	}
-	if s.probabilityValidator == nil {
-		s.probabilityValidator = defaultProbabilityValidator{}
-	}
-	if s.searchPolicy == nil {
-		s.searchPolicy = defaultSearchPolicy{}
-	}
-	if s.metricsCalculator == nil {
-		s.metricsCalculator = defaultMetricsCalculator{}
-	}
-	if s.leaderboardCalculator == nil {
-		s.leaderboardCalculator = defaultLeaderboardCalculator{}
-	}
-	if s.statusPolicy == nil {
-		s.statusPolicy = defaultStatusPolicy{}
-	}
+
+	s.clock = clockOrDefault(s.clock)
+	s.creationPolicy = creationPolicyOrDefault(s.creationPolicy, s.config)
+	s.resolutionPolicy = resolutionPolicyOrDefault(s.resolutionPolicy)
+	s.probabilityEngine = probabilityEngineOrDefault(s.probabilityEngine)
+	s.probabilityValidator = probabilityValidatorOrDefault(s.probabilityValidator)
+	s.searchPolicy = searchPolicyOrDefault(s.searchPolicy)
+	s.metricsCalculator = metricsCalculatorOrDefault(s.metricsCalculator)
+	s.leaderboardCalculator = leaderboardCalculatorOrDefault(s.leaderboardCalculator)
+	s.statusPolicy = statusPolicyOrDefault(s.statusPolicy)
 }
 
 var (

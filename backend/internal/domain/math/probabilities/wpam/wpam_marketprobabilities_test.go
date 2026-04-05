@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+type fixedFormula struct{ probability float64 }
+
+func (f fixedFormula) Calculate(wpam.Seeds, int64, int64) float64 { return f.probability }
+
 type TestCase struct {
 	Name                  string
 	Bets                  []models.Bet
@@ -175,5 +179,22 @@ func TestCalculateMarketProbabilitiesWPAM(t *testing.T) {
 			probChanges := calculator.CalculateMarketProbabilitiesWPAM(tc.Bets[0].PlacedAt, tc.Bets)
 			assertProbabilityChangesEqual(t, probChanges, tc.ProbabilityChanges)
 		})
+	}
+}
+
+func TestNewProbabilityCalculatorWithOptions(t *testing.T) {
+	calculator := wpam.NewProbabilityCalculatorWithOptions(
+		wpam.StaticSeedProvider{Value: wpam.Seeds{InitialProbability: 0.2}},
+		wpam.WithProbabilityFormula(fixedFormula{probability: 0.8}),
+	)
+
+	bets := []models.Bet{{Amount: 5, Outcome: "YES", PlacedAt: wpamProbabilityBaseTime}}
+	changes := calculator.CalculateMarketProbabilitiesWPAM(wpamProbabilityBaseTime, bets)
+
+	if len(changes) != 2 {
+		t.Fatalf("expected 2 probability changes, got %d", len(changes))
+	}
+	if changes[1].Probability != 0.8 {
+		t.Fatalf("expected injected formula probability 0.8, got %f", changes[1].Probability)
 	}
 }

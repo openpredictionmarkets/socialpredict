@@ -19,12 +19,16 @@ func newAnalyticsMetricsService(db *gorm.DB, loadEcon setup.EconConfigLoader, op
 	return analytics.NewService(repo, loadEcon, opts...)
 }
 
-func requireAnalyticsMetricInt64(t *testing.T, metric analytics.Int64Metric) int64 {
+type analyticsSystemMetricsComputer interface {
+	ComputeSystemMetrics(context.Context) (*analytics.SystemMetrics, error)
+}
+
+func requireAnalyticsMetricInt64(t *testing.T, metric analytics.Int64MetricReader) int64 {
 	t.Helper()
 	return metric.Int64Value()
 }
 
-func requireAnalyticsSystemMetrics(t *testing.T, svc *analytics.Service) *analytics.SystemMetrics {
+func requireAnalyticsSystemMetrics(t *testing.T, svc analyticsSystemMetricsComputer) *analytics.SystemMetrics {
 	t.Helper()
 
 	metrics, err := svc.ComputeSystemMetrics(context.Background())
