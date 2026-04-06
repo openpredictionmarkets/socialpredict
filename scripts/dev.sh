@@ -7,6 +7,8 @@ __SP_ROOT_DIR="${SOCIALPREDICT_ROOT:-$(cd "${__SP_DEV_DIR}/.." && pwd)}"
 source "${__SP_ROOT_DIR}/scripts/lib/arch.sh"
 echo "== dev build platform: ${FORCE_PLATFORM:-default} =="
 
+source "${__SP_ROOT_DIR}/scripts/lib/jwt_key.sh"
+
 # Cross-platform "sed -i" (GNU vs BSD/macOS)
 if sed --version >/dev/null 2>&1; then
   # GNU sed
@@ -54,6 +56,8 @@ init_env() {
   # Update Image Names
   "${SED_INPLACE[@]}" "s|^BACKEND_IMAGE_NAME=.*|BACKEND_IMAGE_NAME=${BACKEND_IMAGE_NAME}|" "${__SP_ROOT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^FRONTEND_IMAGE_NAME=.*|FRONTEND_IMAGE_NAME=${FRONTEND_IMAGE_NAME}|" "${__SP_ROOT_DIR}/.env"
+
+  _=$(apply_jwt_signing_key "${__SP_ROOT_DIR}/.env")
 }
 
 if [[ ! -f "${__SP_ROOT_DIR}/.env" ]]; then
