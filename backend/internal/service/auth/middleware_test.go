@@ -253,6 +253,11 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 			username: "Test@User",
 			password: "password123",
 		},
+		{
+			name:     "Username with only whitespace",
+			username: "   ",
+			password: "password123",
+		},
 	}
 
 	for _, tt := range tests {
@@ -294,6 +299,61 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+}
+
+func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	util.DB = db
+
+	testUser := modelstesting.GenerateUser("testuser", 1000)
+	if err := testUser.HashPassword("password123"); err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+	if err := db.Create(&testUser).Error; err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Test that usernames with leading/trailing spaces are trimmed before DB lookup
+	tests := []struct {
+		name     string
+		username string
+		password string
+	}{
+		{
+			name:     "Username with leading space",
+			username: " testuser",
+			password: "password123",
+		},
+		{
+			name:     "Username with trailing space",
+			username: "testuser ",
+			password: "password123",
+		},
+		{
+			name:     "Username with both leading and trailing spaces",
+			username: " testuser ",
+			password: "password123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loginReq := map[string]string{
+				"username": tt.username,
+				"password": tt.password,
+			}
+			jsonData, _ := json.Marshal(loginReq)
+
+			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
+			w := httptest.NewRecorder()
+
+			LoginHandler(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Errorf("Usernames should be trimmed before DB lookup. Expected status code %d, got %d (body: %s)", http.StatusOK, w.Code, w.Body.String())
+			}
+		})
 	}
 }
 

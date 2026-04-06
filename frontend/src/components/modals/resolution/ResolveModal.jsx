@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { ResolveButton, SelectNoButton, SelectYesButton, ConfirmResolveButton } from '../../buttons/marketDetails/ResolveButtons';
 import { resolveMarket } from './ResolveUtils';
+import { useMarketLabels } from '../../../hooks/useMarketLabels';
 
-const ResolveModalButton = ({ marketId, token }) => {
+const ResolveModalButton = ({ marketId, token, market }) => {
     const [showResolveModal, setShowResolveModal] = useState(false);
     const [selectedResolution, setSelectedResolution] = useState(null);
+    
+    // Get custom labels for this market
+    const { yesLabel, noLabel } = useMarketLabels(market);
 
     const toggleResolveModal = () => setShowResolveModal(prev => !prev);
 
@@ -40,17 +44,17 @@ const ResolveModalButton = ({ marketId, token }) => {
 
                         <div className="flex justify-center space-x-4 mb-4">
                             <div>
-                                <SelectYesButton onClick={handleSelectYes} isSelected={selectedResolution === 'YES'} />
+                                <SelectYesButton onClick={handleSelectYes} isSelected={selectedResolution === 'YES'} label={yesLabel} />
                             </div>
                             <div>
-                                <SelectNoButton onClick={handleSelectNo} isSelected={selectedResolution === 'NO'} />
+                                <SelectNoButton onClick={handleSelectNo} isSelected={selectedResolution === 'NO'} label={noLabel} />
                             </div>
                         </div>
 
                         <div className="border-t border-gray-200 my-2"></div>
 
                         <div className="mt-4">
-                            <ConfirmResolveButton onClick={handleConfirm} selectedResolution={selectedResolution} />
+                            <ConfirmResolveButton onClick={handleConfirm} selectedResolution={selectedResolution} yesLabel={yesLabel} noLabel={noLabel} />
                         </div>
 
                         <button onClick={toggleResolveModal} className="absolute top-0 right-0 mt-4 mr-4 text-gray-400 hover:text-white">

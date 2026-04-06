@@ -6,7 +6,6 @@ const ResolveButton = ({ onClick }) => {
     const [isSelected, setIsSelected] = useState(false);
     const initialButtonStyle = "bg-custom-gray-light";
     const selectedButtonStyle = "bg-neutral-btn";
-    const buttonBaseStyle = "w-full px-4 py-2 text-white border rounded focus:outline-none";
 
     const handleClick = () => {
         setIsSelected(!isSelected);
@@ -23,30 +22,30 @@ const ResolveButton = ({ onClick }) => {
     );
 };
 
-const SelectNoButton = ({ onClick }) => {
+const SelectNoButton = ({ onClick, label = "NO" }) => {
     return (
         <button
             className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-red-btn`}
             onClick={onClick}
         >
-            RESOLVE NO
+            RESOLVE {label}
         </button>
     );
 };
 
-const SelectYesButton = ({ onClick }) => {
+const SelectYesButton = ({ onClick, label = "YES" }) => {
     return (
         <button
             className={`${buttonBaseStyle} bg-custom-gray-light hover:bg-green-btn`}
             onClick={onClick}
         >
-            RESOLVE YES
+            RESOLVE {label}
         </button>
     );
 };
 
 
-const ConfirmResolveButton = ({ onClick, selectedResolution }) => {
+const ConfirmResolveButton = ({ onClick, selectedResolution, yesLabel = "YES", noLabel = "NO" }) => {
     const getButtonStyle = () => {
         switch (selectedResolution) {
             case 'NO':
@@ -61,9 +60,9 @@ const ConfirmResolveButton = ({ onClick, selectedResolution }) => {
     const buttonText = () => {
         switch (selectedResolution) {
             case 'NO':
-                return "CONFIRM RESOLVE NO";
+                return `CONFIRM RESOLVE ${noLabel}`;
             case 'YES':
-                return "CONFIRM RESOLVE YES";
+                return `CONFIRM RESOLVE ${yesLabel}`;
             default:
                 return "CONFIRM";
         }

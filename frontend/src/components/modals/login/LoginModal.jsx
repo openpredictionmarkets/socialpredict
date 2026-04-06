@@ -17,7 +17,7 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
         setError('');
 
         try {
-            const loginSuccess = await onLogin(username, password);
+            const loginSuccess = await onLogin(username.trim(), password);
             if (loginSuccess) {
                 onClose();
                 history.push(redirectAfterLogin);
