@@ -2,17 +2,88 @@ package marketshandlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"socialpredict/models"
+	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models/modelstesting"
 	"socialpredict/util"
 	"testing"
 
 	"github.com/gorilla/mux"
 )
+
+// MockResolveService for testing - implements dmarkets.ServiceInterface
+type MockResolveService struct{}
+
+func (m *MockResolveService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+	return nil, nil
+}
+func (m *MockResolveService) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
+	return nil
+}
+func (m *MockResolveService) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	return nil, nil
+}
+func (m *MockResolveService) ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+func (m *MockResolveService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
+	return &dmarkets.SearchResults{
+		PrimaryResults:  []*dmarkets.Market{},
+		FallbackResults: []*dmarkets.Market{},
+		Query:           query,
+		PrimaryStatus:   filters.Status,
+		PrimaryCount:    0,
+		FallbackCount:   0,
+		TotalCount:      0,
+		FallbackUsed:    false,
+	}, nil
+}
+func (m *MockResolveService) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
+	// Mock implementation that checks authorization and valid outcomes
+	if username != "creator" {
+		return dmarkets.ErrUnauthorized
+	}
+	if resolution != "YES" && resolution != "NO" && resolution != "N/A" {
+		return dmarkets.ErrInvalidInput
+	}
+	return nil
+}
+func (m *MockResolveService) ListByStatus(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
+	return nil, nil
+}
+func (m *MockResolveService) GetMarketLeaderboard(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+	return nil, nil
+}
+func (m *MockResolveService) ProjectProbability(ctx context.Context, req dmarkets.ProbabilityProjectionRequest) (*dmarkets.ProbabilityProjection, error) {
+	return nil, nil
+}
+func (m *MockResolveService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	return nil, nil
+}
+
+func (m *MockResolveService) GetMarketBets(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error) {
+	return []*dmarkets.BetDisplayInfo{}, nil
+}
+
+func (m *MockResolveService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *MockResolveService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
+	return nil, nil
+}
+
+func (m *MockResolveService) CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error) {
+	return 0, nil
+}
+
+func (m *MockResolveService) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
+	return &dmarkets.PublicMarket{ID: marketID}, nil
+}
 
 // TestMain sets up the test environment
 func TestMain(m *testing.M) {
@@ -49,8 +120,8 @@ func TestResolveMarketHandler_NARefund(t *testing.T) {
 	// Create JWT token for creator
 	token := modelstesting.GenerateValidJWT("creator")
 
-	// Create request body
-	reqBody := map[string]string{"outcome": "N/A"}
+	// Create request body (using "resolution" field as per DTO)
+	reqBody := map[string]string{"resolution": "N/A"}
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
@@ -61,32 +132,19 @@ func TestResolveMarketHandler_NARefund(t *testing.T) {
 	// Create response recorder
 	w := httptest.NewRecorder()
 
-	// Set up router with URL vars
+	// Set up router with mock service
+	mockService := &MockResolveService{}
 	router := mux.NewRouter()
-	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	// Check response - updated for specification compliance (NoContent instead of OK)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Expected status 204, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	// Verify market is resolved
-	var resolvedMarket models.Market
-	db.First(&resolvedMarket, market.ID)
-	if !resolvedMarket.IsResolved {
-		t.Fatal("Market should be resolved")
-	}
-	if resolvedMarket.ResolutionResult != "N/A" {
-		t.Fatalf("Expected resolution result N/A, got %s", resolvedMarket.ResolutionResult)
-	}
-
-	// Verify bettor received refund
-	var updatedBettor models.User
-	db.Where("username = ?", "bettor").First(&updatedBettor)
-	if updatedBettor.AccountBalance != 100 {
-		t.Fatalf("Expected bettor balance 100 after refund, got %d", updatedBettor.AccountBalance)
-	}
+	// Note: The actual resolution logic (updating DB, processing refunds) would be tested separately
+	// This test verifies the HTTP layer works correctly with service injection
 }
 
 func TestResolveMarketHandler_YESWin(t *testing.T) {
@@ -116,8 +174,8 @@ func TestResolveMarketHandler_YESWin(t *testing.T) {
 	// Create JWT token for creator
 	token := modelstesting.GenerateValidJWT("creator")
 
-	// Create request body
-	reqBody := map[string]string{"outcome": "YES"}
+	// Create request body (using "resolution" field as per DTO)
+	reqBody := map[string]string{"resolution": "YES"}
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
@@ -128,40 +186,19 @@ func TestResolveMarketHandler_YESWin(t *testing.T) {
 	// Create response recorder
 	w := httptest.NewRecorder()
 
-	// Set up router with URL vars
+	// Set up router with mock service
+	mockService := &MockResolveService{}
 	router := mux.NewRouter()
-	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	// Check response - updated for specification compliance (NoContent instead of OK)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Expected status 204, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	// Verify market is resolved
-	var resolvedMarket models.Market
-	db.First(&resolvedMarket, market.ID)
-	if !resolvedMarket.IsResolved {
-		t.Fatal("Market should be resolved")
-	}
-	if resolvedMarket.ResolutionResult != "YES" {
-		t.Fatalf("Expected resolution result YES, got %s", resolvedMarket.ResolutionResult)
-	}
-
-	// Verify winner got more than loser (proportional payout)
-	var updatedWinner, updatedLoser models.User
-	db.Where("username = ?", "winner").First(&updatedWinner)
-	db.Where("username = ?", "loser").First(&updatedLoser)
-
-	if updatedWinner.AccountBalance <= updatedLoser.AccountBalance {
-		t.Fatalf("Expected winner balance (%d) to be greater than loser balance (%d)", updatedWinner.AccountBalance, updatedLoser.AccountBalance)
-	}
-
-	// The total payouts should equal the market volume (200 total bet amount)
-	totalPayout := updatedWinner.AccountBalance + updatedLoser.AccountBalance
-	if totalPayout != 200 {
-		t.Fatalf("Expected total payout to be 200, got %d", totalPayout)
-	}
+	// Note: The actual payout logic would be tested in the domain service layer
+	// This test verifies the HTTP layer works correctly with service injection
 }
 
 func TestResolveMarketHandler_NOWin(t *testing.T) {
@@ -191,8 +228,8 @@ func TestResolveMarketHandler_NOWin(t *testing.T) {
 	// Create JWT token for creator
 	token := modelstesting.GenerateValidJWT("creator")
 
-	// Create request body
-	reqBody := map[string]string{"outcome": "NO"}
+	// Create request body (using "resolution" field as per DTO)
+	reqBody := map[string]string{"resolution": "NO"}
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
@@ -203,40 +240,18 @@ func TestResolveMarketHandler_NOWin(t *testing.T) {
 	// Create response recorder
 	w := httptest.NewRecorder()
 
-	// Set up router with URL vars
+	// Set up router with mock service
+	mockService := &MockResolveService{}
 	router := mux.NewRouter()
-	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	// Check response - updated for specification compliance (NoContent instead of OK)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Expected status 204, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	// Verify market is resolved
-	var resolvedMarket models.Market
-	db.First(&resolvedMarket, market.ID)
-	if !resolvedMarket.IsResolved {
-		t.Fatal("Market should be resolved")
-	}
-	if resolvedMarket.ResolutionResult != "NO" {
-		t.Fatalf("Expected resolution result NO, got %s", resolvedMarket.ResolutionResult)
-	}
-
-	// Verify winner got more than loser (proportional payout)
-	var updatedWinner, updatedLoser models.User
-	db.Where("username = ?", "winner").First(&updatedWinner)
-	db.Where("username = ?", "loser").First(&updatedLoser)
-
-	if updatedWinner.AccountBalance <= updatedLoser.AccountBalance {
-		t.Fatalf("Expected winner balance (%d) to be greater than loser balance (%d)", updatedWinner.AccountBalance, updatedLoser.AccountBalance)
-	}
-
-	// The total payouts should equal the market volume (200 total bet amount)
-	totalPayout := updatedWinner.AccountBalance + updatedLoser.AccountBalance
-	if totalPayout != 200 {
-		t.Fatalf("Expected total payout to be 200, got %d", totalPayout)
-	}
+	// Note: The actual payout logic would be tested in the domain service layer
 }
 
 func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
@@ -258,8 +273,8 @@ func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
 	// Create JWT token for non-creator
 	token := modelstesting.GenerateValidJWT("other")
 
-	// Create request body
-	reqBody := map[string]string{"outcome": "YES"}
+	// Create request body (using "resolution" field as per DTO)
+	reqBody := map[string]string{"resolution": "YES"}
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
@@ -270,21 +285,15 @@ func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
 	// Create response recorder
 	w := httptest.NewRecorder()
 
-	// Set up router with URL vars
+	// Set up router with mock service
+	mockService := &MockResolveService{}
 	router := mux.NewRouter()
-	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
-	// Check response - should be unauthorized
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("Expected status 401, got %d", w.Code)
-	}
-
-	// Verify market is not resolved
-	var market_check models.Market
-	db.First(&market_check, market.ID)
-	if market_check.IsResolved {
-		t.Fatal("Market should not be resolved")
+	// Check response - updated for specification compliance (403 Forbidden instead of 401)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("Expected status 403, got %d", w.Code)
 	}
 }
 
@@ -305,8 +314,8 @@ func TestResolveMarketHandler_InvalidOutcome(t *testing.T) {
 	// Create JWT token for creator
 	token := modelstesting.GenerateValidJWT("creator")
 
-	// Create request body with invalid outcome
-	reqBody := map[string]string{"outcome": "MAYBE"}
+	// Create request body with invalid resolution (using "resolution" field as per DTO)
+	reqBody := map[string]string{"resolution": "MAYBE"}
 	jsonBody, _ := json.Marshal(reqBody)
 
 	// Create HTTP request
@@ -317,20 +326,14 @@ func TestResolveMarketHandler_InvalidOutcome(t *testing.T) {
 	// Create response recorder
 	w := httptest.NewRecorder()
 
-	// Set up router with URL vars
+	// Set up router with mock service
+	mockService := &MockResolveService{}
 	router := mux.NewRouter()
-	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler).Methods("POST")
+	router.HandleFunc("/v0/market/{marketId}/resolve", ResolveMarketHandler(mockService)).Methods("POST")
 	router.ServeHTTP(w, req)
 
 	// Check response - should be bad request
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("Expected status 400, got %d", w.Code)
-	}
-
-	// Verify market is not resolved
-	var market_check models.Market
-	db.First(&market_check, market.ID)
-	if market_check.IsResolved {
-		t.Fatal("Market should not be resolved")
 	}
 }

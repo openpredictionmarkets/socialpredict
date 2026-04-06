@@ -36,44 +36,64 @@ func ClearRegistry() { // used by tests
 
 // Run applies registered migrations in ID order and records them.
 func Run(db *gorm.DB) error {
-	// Ensure tracking table exists
+	if err := ensureSchemaTable(db); err != nil {
+		return err
+	}
+
+	applied, err := loadAppliedMigrations(db)
+	if err != nil {
+		return err
+	}
+
+	for _, id := range sortedRegistryIDs() {
+		if applied[id] {
+			continue
+		}
+		if err := applyMigration(db, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureSchemaTable(db *gorm.DB) error {
 	if err := db.AutoMigrate(&SchemaMigration{}); err != nil {
 		return fmt.Errorf("auto-migrate SchemaMigration: %w", err)
 	}
+	return nil
+}
 
-	// Load already-applied
+func loadAppliedMigrations(db *gorm.DB) (map[string]bool, error) {
 	applied := map[string]bool{}
 	var rows []SchemaMigration
 	if err := db.Find(&rows).Error; err != nil {
-		return fmt.Errorf("load SchemaMigration: %w", err)
+		return nil, fmt.Errorf("load SchemaMigration: %w", err)
 	}
 	for _, r := range rows {
 		applied[r.ID] = true
 	}
+	return applied, nil
+}
 
-	// Sort and apply
+func sortedRegistryIDs() []string {
 	ids := make([]string, 0, len(registry))
 	for id := range registry {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
+	return ids
+}
 
-	for _, id := range ids {
-		if applied[id] {
-			continue
-		}
-		up := registry[id]
-		if up == nil {
-			// <-- Fix: return a proper error instead of panic
-			return fmt.Errorf("migration %s has nil Up()", id)
-		}
-		if err := up(db); err != nil {
-			return fmt.Errorf("migration %s failed: %w", id, err)
-		}
-		if err := db.Create(&SchemaMigration{ID: id, AppliedAt: time.Now()}).Error; err != nil {
-			return fmt.Errorf("record SchemaMigration %s: %w", id, err)
-		}
-		// optional: log.Printf("migration - applied %s", id)
+func applyMigration(db *gorm.DB, id string) error {
+	up := registry[id]
+	if up == nil {
+		return fmt.Errorf("migration %s has nil Up()", id)
+	}
+	if err := up(db); err != nil {
+		return fmt.Errorf("migration %s failed: %w", id, err)
+	}
+	if err := db.Create(&SchemaMigration{ID: id, AppliedAt: time.Now()}).Error; err != nil {
+		return fmt.Errorf("record SchemaMigration %s: %w", id, err)
 	}
 	return nil
 }

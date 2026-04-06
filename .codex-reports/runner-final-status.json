@@ -1,0 +1,242 @@
+{
+  "status": "completed",
+  "generated_at": "2026-04-05T21:19:23.325111+00:00",
+  "task_count": 33,
+  "tasks": [
+    {
+      "id": "PR581-000",
+      "status": "done",
+      "attempts": 0,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "PR581-001",
+      "status": "done",
+      "attempts": 0,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "PR581-002",
+      "status": "done",
+      "attempts": 0,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "PR581-003",
+      "status": "done",
+      "attempts": 0,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "PR581-004",
+      "status": "done",
+      "attempts": 0,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "PR581-005",
+      "status": "done",
+      "attempts": 0,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "id": "PR581-006",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T12:56:17.307395+00:00",
+      "finished_at": "2026-04-04T13:01:45.960919+00:00"
+    },
+    {
+      "id": "PR581-007",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T13:14:09.813929+00:00",
+      "finished_at": "2026-04-04T13:21:03.461701+00:00"
+    },
+    {
+      "id": "PR581-008",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T13:21:03.525373+00:00",
+      "finished_at": "2026-04-04T13:28:12.340922+00:00"
+    },
+    {
+      "id": "PR581-009",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T13:28:12.407202+00:00",
+      "finished_at": "2026-04-04T13:37:58.492550+00:00"
+    },
+    {
+      "id": "PR581-010",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T13:37:58.560113+00:00",
+      "finished_at": "2026-04-04T13:47:40.905756+00:00"
+    },
+    {
+      "id": "PR581-011",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T13:47:40.967687+00:00",
+      "finished_at": "2026-04-04T13:59:25.848922+00:00"
+    },
+    {
+      "id": "PR581-012",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T13:59:25.920771+00:00",
+      "finished_at": "2026-04-04T14:06:27.876433+00:00"
+    },
+    {
+      "id": "PR581-013",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T14:06:27.942629+00:00",
+      "finished_at": "2026-04-04T14:14:07.598548+00:00"
+    },
+    {
+      "id": "PR581-014",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T14:14:07.665210+00:00",
+      "finished_at": "2026-04-04T14:21:51.237243+00:00"
+    },
+    {
+      "id": "PR581-015",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T14:21:51.311150+00:00",
+      "finished_at": "2026-04-04T14:31:44.418601+00:00"
+    },
+    {
+      "id": "PR581-016",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T14:31:44.482025+00:00",
+      "finished_at": "2026-04-04T14:39:05.764371+00:00"
+    },
+    {
+      "id": "PR581-017",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T14:39:05.834047+00:00",
+      "finished_at": "2026-04-04T14:50:59.237534+00:00"
+    },
+    {
+      "id": "PR581-018",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-04T14:50:59.315004+00:00",
+      "finished_at": "2026-04-04T15:01:41.026862+00:00"
+    },
+    {
+      "id": "PR581-019",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T01:20:22.542403+00:00",
+      "finished_at": "2026-04-05T01:27:00.746885+00:00"
+    },
+    {
+      "id": "PR581-020",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T01:27:00.810592+00:00",
+      "finished_at": "2026-04-05T01:34:18.451183+00:00"
+    },
+    {
+      "id": "PR581-021",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T01:34:18.514861+00:00",
+      "finished_at": "2026-04-05T01:42:14.234479+00:00"
+    },
+    {
+      "id": "PR581-022",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T01:42:14.297922+00:00",
+      "finished_at": "2026-04-05T01:49:59.898204+00:00"
+    },
+    {
+      "id": "PR581-023",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T01:49:59.970267+00:00",
+      "finished_at": "2026-04-05T14:18:25.366559+00:00"
+    },
+    {
+      "id": "PR581-024",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T14:18:25.448717+00:00",
+      "finished_at": "2026-04-05T14:25:42.404127+00:00"
+    },
+    {
+      "id": "PR581-025",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T14:25:42.467257+00:00",
+      "finished_at": "2026-04-05T14:28:14.588724+00:00"
+    },
+    {
+      "id": "PR581-026",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T14:28:14.652305+00:00",
+      "finished_at": "2026-04-05T14:34:08.300434+00:00"
+    },
+    {
+      "id": "PR581-027",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T14:34:08.364176+00:00",
+      "finished_at": "2026-04-05T14:47:34.172865+00:00"
+    },
+    {
+      "id": "PR581-028",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T14:47:34.246918+00:00",
+      "finished_at": "2026-04-05T14:52:23.690651+00:00"
+    },
+    {
+      "id": "PR581-029",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T14:52:23.755418+00:00",
+      "finished_at": "2026-04-05T14:55:26.973646+00:00"
+    },
+    {
+      "id": "PR581-030",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T14:55:27.037245+00:00",
+      "finished_at": "2026-04-05T15:02:52.615644+00:00"
+    },
+    {
+      "id": "PR581-031",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T15:02:52.680189+00:00",
+      "finished_at": "2026-04-05T15:10:07.313976+00:00"
+    },
+    {
+      "id": "PR581-032",
+      "status": "done",
+      "attempts": 1,
+      "started_at": "2026-04-05T15:10:07.377963+00:00",
+      "finished_at": "2026-04-05T15:24:03.958457+00:00"
+    }
+  ],
+  "target_repo": "/workspace/socialpredict",
+  "control_repo": "/workspace/spec-socialpredict-tasks",
+  "message": "All queued tasks completed.",
+  "runlog": "/workspace/spec-socialpredict-tasks/.codex-runs/RUNLOG.ndjson"
+}

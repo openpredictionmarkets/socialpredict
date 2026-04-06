@@ -10,14 +10,14 @@ const PublicUserPortfolioLayout = ({ username, userData }) => {
 
     useEffect(() => {
         const fetchPortfolio = async () => {
-            console.log(`Fetching portfolio for user: ${username} from ${API_URL}/v0/portfolio/${username}`);
-            const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Portfolio data:', data);
-                setPortfolioTotal(data);
-            } else {
-                console.error('Error fetching portfolio:', response.statusText);
+            try {
+                const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setPortfolioTotal(data);
+                }
+            } catch (err) {
+                // swallow
             }
         };
 

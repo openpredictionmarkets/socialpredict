@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task": {
+    "id": "PR581-016",
+    "title": "Align unchecked math files with OCP",
+    "working_dir": "../socialpredict/backend"
+  },
+  "dispatcher_agent": "dispatcher_agent",
+  "control_repo": "/workspace/spec-socialpredict-tasks",
+  "target_repo": "/workspace/socialpredict",
+  "report_dir": "/workspace/socialpredict/.codex-reports/tasks/PR581-016",
+  "created_at": "2026-04-04T14:31:44.573180+00:00",
+  "updated_at": "2026-04-04T14:31:44.573180+00:00",
+  "files": {
+    "summary": "/workspace/socialpredict/.codex-reports/tasks/PR581-016/summary.json",
+    "conversation": "/workspace/socialpredict/.codex-reports/tasks/PR581-016/conversation.ndjson",
+    "decisions": "/workspace/socialpredict/.codex-reports/tasks/PR581-016/decisions.ndjson"
+  }
+}

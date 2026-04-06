@@ -34,6 +34,11 @@ fi
 ENV_PATH="$( readlink -f "$SCRIPT_DIR/.env" )"
 ENV_FILE="--env-file $ENV_PATH"
 
+if [ -f "$SCRIPT_DIR/scripts/lib/jwt_key.sh" ]; then
+  source "$SCRIPT_DIR/scripts/lib/jwt_key.sh"
+  _=$(apply_jwt_signing_key "$ENV_PATH")
+fi
+
 # Function to check if a command exists
 command_exists() {
         command -v "$1" &> /dev/null 2>&1

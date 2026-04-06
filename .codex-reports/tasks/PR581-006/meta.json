@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task": {
+    "id": "PR581-006",
+    "title": "Align unchecked analytics files with SRP",
+    "working_dir": "../socialpredict/backend"
+  },
+  "dispatcher_agent": "dispatcher_agent",
+  "control_repo": "/workspace/spec-socialpredict-tasks",
+  "target_repo": "/workspace/socialpredict",
+  "report_dir": "/workspace/socialpredict/.codex-reports/tasks/PR581-006",
+  "created_at": "2026-04-04T12:56:17.412375+00:00",
+  "updated_at": "2026-04-04T12:56:17.412375+00:00",
+  "files": {
+    "summary": "/workspace/socialpredict/.codex-reports/tasks/PR581-006/summary.json",
+    "conversation": "/workspace/socialpredict/.codex-reports/tasks/PR581-006/conversation.ndjson",
+    "decisions": "/workspace/socialpredict/.codex-reports/tasks/PR581-006/decisions.ndjson"
+  }
+}

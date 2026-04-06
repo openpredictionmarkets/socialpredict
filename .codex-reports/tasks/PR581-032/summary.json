@@ -1,0 +1,24 @@
+{
+  "task_id": "PR581-032",
+  "status": "completed",
+  "updated_at": "2026-04-05T15:23:43.795342+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Users package DIP alignment completed and verified.",
+  "current_focus": "Completed users-domain DIP refactor and verification for PR581-032.",
+  "files_changed": [
+    "[\"/workspace/socialpredict/backend/internal/domain/users/service.go\",\"/workspace/socialpredict/backend/internal/domain/users/errors.go\",\"/workspace/socialpredict/backend/internal/domain/users/models.go\",\"/workspace/socialpredict/backend/internal/domain/users/transactions.go\",\"/workspace/socialpredict/backend/internal/domain/users/service_profile_test.go\",\"/workspace/socialpredict/backend/internal/domain/users/service_transactions_test.go\"]"
+  ],
+  "checks_run": [
+    "[\"bash /workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-architecture-governance/scripts/run_boundary_checks.sh /workspace/socialpredict\",\"gofmt -w /workspace/socialpredict/backend/internal/domain/users/service.go /workspace/socialpredict/backend/internal/domain/users/errors.go /workspace/socialpredict/backend/internal/domain/users/models.go /workspace/socialpredict/backend/internal/domain/users/transactions.go /workspace/socialpredict/backend/internal/domain/users/service_profile_test.go /workspace/socialpredict/backend/internal/domain/users/service_transactions_test.go\",\"cd /workspace/socialpredict/backend && GOTMPDIR=/workspace/socialpredict/.cache/gotmp GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/gomod go test ./internal/domain/users -count=1\",\"cd /workspace/socialpredict/backend && GOTMPDIR=/workspace/socialpredict/.cache/gotmp GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/gomod go test ./internal/domain/users -count=1\",\"cd /workspace/socialpredict/backend && GOMAXPROCS=1 GOTMPDIR=/workspace/socialpredict/.cache/gotmp GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/gomod go vet ./internal/domain/users\"]"
+  ],
+  "open_questions": [
+    "[]"
+  ],
+  "follow_ups": [
+    "[]"
+  ],
+  "last_event_seq": 2,
+  "context": {
+    "handoff_requested": false
+  }
+}

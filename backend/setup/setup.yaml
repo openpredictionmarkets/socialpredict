@@ -21,4 +21,4 @@ economics:
 
 frontend:
   charts:
-    sigFigs: 4
+    sigFigs: 2
