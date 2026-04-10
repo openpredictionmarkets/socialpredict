@@ -46,8 +46,7 @@ func formatValidationErrors(err error) error {
 
 	if validationErrors, ok := err.(validator.ValidationErrors); ok {
 		for _, fieldError := range validationErrors {
-			message := getFieldErrorMessage(fieldError)
-			messages = append(messages, message)
+			messages = append(messages, getFieldErrorMessage(fieldError))
 		}
 	}
 
@@ -58,28 +57,27 @@ func formatValidationErrors(err error) error {
 func getFieldErrorMessage(fe validator.FieldError) string {
 	field := strings.ToLower(fe.Field())
 
-	switch fe.Tag() {
-	case "required":
-		return fmt.Sprintf("%s is required", field)
-	case "min":
-		return fmt.Sprintf("%s must be at least %s characters", field, fe.Param())
-	case "max":
-		return fmt.Sprintf("%s cannot exceed %s characters", field, fe.Param())
-	case "username":
-		return "username must only contain lowercase letters and numbers"
-	case "strong_password":
-		return "password must be at least 8 characters with uppercase, lowercase, and digit"
-	case "safe_string":
-		return fmt.Sprintf("%s contains potentially dangerous content", field)
-	case "market_outcome":
-		return "outcome must be either 'YES' or 'NO'"
-	case "positive_amount":
-		return "amount must be a positive number"
-	case "market_id":
-		return "invalid market ID format"
-	default:
-		return fmt.Sprintf("%s is invalid", field)
+	if msg := messageForTag(fe.Tag(), field, fe.Param()); msg != "" {
+		return msg
 	}
+
+	return fmt.Sprintf("%s is invalid", field)
+}
+
+func messageForTag(tag string, field string, param string) string {
+	lookup := map[string]string{
+		"required":        fmt.Sprintf("%s is required", field),
+		"min":             fmt.Sprintf("%s must be at least %s characters", field, param),
+		"max":             fmt.Sprintf("%s cannot exceed %s characters", field, param),
+		"username":        "username must only contain lowercase letters and numbers",
+		"strong_password": "password must be at least 8 characters with uppercase, lowercase, and digit",
+		"safe_string":     fmt.Sprintf("%s contains potentially dangerous content", field),
+		"market_outcome":  "outcome must be either 'YES' or 'NO'",
+		"positive_amount": "amount must be a positive number",
+		"market_id":       "invalid market ID format",
+	}
+
+	return lookup[tag]
 }
 
 // Custom validation functions
@@ -103,23 +101,37 @@ func validateUsername(fl validator.FieldLevel) bool {
 func validateStrongPassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
 
-	if len(password) < 8 || len(password) > 128 {
+	if !isPasswordLengthValid(password) {
 		return false
 	}
 
-	var hasUpper, hasLower, hasDigit bool
+	requirements := passwordRequirements(password)
+	return requirements.hasUpper && requirements.hasLower && requirements.hasDigit
+}
+
+func isPasswordLengthValid(password string) bool {
+	return len(password) >= 8 && len(password) <= 128
+}
+
+type passwordFlags struct {
+	hasUpper bool
+	hasLower bool
+	hasDigit bool
+}
+
+func passwordRequirements(password string) passwordFlags {
+	var flags passwordFlags
 	for _, char := range password {
 		switch {
 		case char >= 'A' && char <= 'Z':
-			hasUpper = true
+			flags.hasUpper = true
 		case char >= 'a' && char <= 'z':
-			hasLower = true
+			flags.hasLower = true
 		case char >= '0' && char <= '9':
-			hasDigit = true
+			flags.hasDigit = true
 		}
 	}
-
-	return hasUpper && hasLower && hasDigit
+	return flags
 }
 
 // validateSafeString checks for potentially dangerous content

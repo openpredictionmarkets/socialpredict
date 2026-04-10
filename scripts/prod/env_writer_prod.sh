@@ -3,6 +3,8 @@
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
+source "$SCRIPT_DIR/scripts/lib/jwt_key.sh"
+
 # Check to see if this file is being run or sources from another script
 _is_sourced() {
   # https://unix.stackexchange.com/a/215279
@@ -78,6 +80,19 @@ init_env() {
 	ADMIN_PASS=$(generate_password)
 	sed -i -e "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD='${ADMIN_PASS}'/g" .env
 	echo "Setting Admin Password"
+
+	read -r -p "Enter JWT signing key (leave blank to auto-generate): " jwt_input
+	if [[ -n "${jwt_input//[[:space:]]/}" ]]; then
+		jwt_override="$jwt_input"
+	else
+		jwt_override=""
+	fi
+	_=$(apply_jwt_signing_key "$SCRIPT_DIR/.env" "$jwt_override")
+	if [[ -n "$jwt_override" ]]; then
+		echo "Stored provided JWT signing key in .env. Keep this value secret."
+	else
+		echo "Ensured a JWT signing key is present in .env (auto-generated if it was missing)."
+	fi
 }
 
 _main() {

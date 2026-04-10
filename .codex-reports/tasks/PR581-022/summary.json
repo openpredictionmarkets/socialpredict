@@ -1,0 +1,28 @@
+{
+  "task_id": "PR581-022",
+  "status": "completed",
+  "updated_at": "2026-04-05T01:49:43.457534+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Aligned scoped users-domain files with LSP",
+  "current_focus": "Completed scoped users-domain LSP refactor and verification.",
+  "files_changed": [
+    "/workspace/socialpredict/backend/internal/domain/users/errors.go",
+    "/workspace/socialpredict/backend/internal/domain/users/models.go",
+    "/workspace/socialpredict/backend/internal/domain/users/service.go",
+    "/workspace/socialpredict/backend/internal/domain/users/transactions.go",
+    "/workspace/socialpredict/backend/internal/domain/users/service_profile_test.go",
+    "/workspace/socialpredict/backend/internal/domain/users/service_transactions_test.go"
+  ],
+  "checks_run": [
+    "GOCACHE=/workspace/socialpredict/.gocache GOMODCACHE=/workspace/socialpredict/.gomodcache go test ./internal/domain/users/...",
+    "GOCACHE=/workspace/socialpredict/.gocache GOMODCACHE=/workspace/socialpredict/.gomodcache go test ./handlers/users/..."
+  ],
+  "open_questions": [],
+  "follow_ups": [
+    "handlers/users package has pre-existing failing tests unrelated to this refactor: TestEmojiValidation/Text_with_HTML and a ListUserMarkets path that hits a missing bets table in sqlite test setup."
+  ],
+  "last_event_seq": 2,
+  "context": {
+    "handoff_requested": false
+  }
+}

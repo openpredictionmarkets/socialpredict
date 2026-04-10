@@ -3,56 +3,42 @@ package usershandlers
 import (
 	"encoding/json"
 	"net/http"
-	"socialpredict/middleware"
-	"socialpredict/security"
-	"socialpredict/util"
+
+	"socialpredict/handlers/users/dto"
+	dusers "socialpredict/internal/domain/users"
+	authsvc "socialpredict/internal/service/auth"
 )
 
-type ChangeDescriptionRequest struct {
-	Description string `json:"description"`
-}
+// ChangeDescriptionHandler returns an HTTP handler that delegates description updates to the users service.
+func ChangeDescriptionHandler(svc dusers.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeProfileJSONError(w, http.StatusMethodNotAllowed, "Method is not supported.")
+			return
+		}
 
-func ChangeDescription(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
-		return
+		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
+		if httperr != nil {
+			writeProfileJSONError(w, httperr.StatusCode, "Invalid token: "+httperr.Error())
+			return
+		}
+
+		var request dto.ChangeDescriptionRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			writeProfileJSONError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+			return
+		}
+
+		updated, err := svc.UpdateDescription(r.Context(), user.Username, request.Description)
+		if err != nil {
+			writeProfileError(w, err, "description")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(toPrivateUserResponse(updated)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
-
-	// Initialize security service
-	securityService := security.NewSecurityService()
-
-	db := util.GetDB()
-	user, httperr := middleware.ValidateTokenAndGetUser(r, db)
-	if httperr != nil {
-		http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	var request ChangeDescriptionRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Validate description length and content
-	if len(request.Description) > 2000 {
-		http.Error(w, "Description exceeds maximum length of 2000 characters", http.StatusBadRequest)
-		return
-	}
-
-	// Sanitize the description to prevent XSS
-	sanitizedDescription, err := securityService.Sanitizer.SanitizeDescription(request.Description)
-	if err != nil {
-		http.Error(w, "Invalid description: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	user.Description = sanitizedDescription
-	if err := db.Save(&user).Error; err != nil {
-		http.Error(w, "Failed to update description: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(user)
 }

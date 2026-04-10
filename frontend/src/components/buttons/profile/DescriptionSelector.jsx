@@ -22,7 +22,6 @@ const DescriptionSelector = ({ onSave }) => {
             });
             const responseData = await response.json();
             if (response.ok) {
-                console.log('Description updated successfully:', responseData);
                 onSave(description);
             } else {
                 throw new Error('Failed to update description');

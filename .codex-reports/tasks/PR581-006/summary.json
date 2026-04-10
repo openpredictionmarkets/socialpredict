@@ -1,0 +1,24 @@
+{
+  "task_id": "PR581-006",
+  "status": "completed",
+  "updated_at": "2026-04-04T13:00:57.251789+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Scoped analytics SRP alignment completed",
+  "current_focus": "Completed refactor of analytics DTO/repository helpers and validation for the unchecked analytics scope",
+  "files_changed": [
+    "backend/internal/domain/analytics/models.go,backend/internal/domain/analytics/repository.go,backend/internal/domain/analytics/systemmetrics_test.go,backend/internal/domain/analytics/systemmetrics_integration_test.go"
+  ],
+  "checks_run": [
+    "./scripts/run_boundary_checks.sh /workspace/socialpredict,GOPATH=/workspace/.gopath GOCACHE=/workspace/.gocache GOMODCACHE=/workspace/.gomodcache go vet ./internal/domain/analytics,GOPATH=/workspace/.gopath GOCACHE=/workspace/.gocache GOMODCACHE=/workspace/.gomodcache go test -count=1 ./internal/domain/analytics (pass 1),GOPATH=/workspace/.gopath GOCACHE=/workspace/.gocache GOMODCACHE=/workspace/.gomodcache go test -count=1 ./internal/domain/analytics (pass 2)"
+  ],
+  "open_questions": [
+    ""
+  ],
+  "follow_ups": [
+    "None"
+  ],
+  "last_event_seq": 2,
+  "context": {
+    "handoff_requested": false
+  }
+}

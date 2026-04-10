@@ -2,16 +2,133 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom/cjs/react-router-dom';
 import { API_URL } from '../config';
 
+const DEFAULT_CREATOR_EMOJI = '👤';
+
+const toNumber = (value, fallback = 0) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : fallback;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+};
+
+const normalizeProbabilityChange = (change) => {
+  if (!change || typeof change !== 'object') {
+    return null;
+  }
+
+  return {
+    probability: toNumber(change.probability ?? change.Probability),
+    timestamp: change.timestamp ?? change.Timestamp ?? change.createdAt ?? change.CreatedAt ?? null,
+    createdAt: change.createdAt ?? change.CreatedAt ?? null,
+    updatedAt: change.updatedAt ?? change.UpdatedAt ?? null,
+    txId: change.txId ?? change.TxId,
+  };
+};
+
+const normalizeProbabilityChanges = (raw) => {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map(normalizeProbabilityChange)
+    .filter((item) => item !== null);
+};
+
+const normalizeMarket = (market) => {
+  if (!market || typeof market !== 'object') {
+    return {
+      id: null,
+      questionTitle: 'Untitled market',
+      description: '',
+      outcomeType: '',
+      resolutionDateTime: null,
+      creatorUsername: 'unknown',
+      yesLabel: '',
+      noLabel: '',
+      status: '',
+      createdAt: null,
+      updatedAt: null,
+      initialProbability: 0,
+      isResolved: false,
+      resolutionResult: null,
+    };
+  }
+
+  return {
+    id: market.id ?? market.ID ?? null,
+    questionTitle: market.questionTitle ?? market.QuestionTitle ?? 'Untitled market',
+    description: market.description ?? market.Description ?? '',
+    outcomeType: market.outcomeType ?? market.OutcomeType ?? '',
+    resolutionDateTime: market.resolutionDateTime ?? market.ResolutionDateTime ?? null,
+    creatorUsername: market.creatorUsername ?? market.CreatorUsername ?? 'unknown',
+    yesLabel: market.yesLabel ?? market.YesLabel ?? '',
+    noLabel: market.noLabel ?? market.NoLabel ?? '',
+    status: market.status ?? market.Status ?? '',
+    createdAt: market.createdAt ?? market.CreatedAt ?? null,
+    updatedAt: market.updatedAt ?? market.UpdatedAt ?? null,
+    initialProbability: toNumber(market.initialProbability ?? market.InitialProbability),
+    isResolved: market.isResolved ?? market.IsResolved ?? false,
+    resolutionResult: market.resolutionResult ?? market.ResolutionResult ?? null,
+  };
+};
+
+const normalizeCreator = (creator, fallbackUsername) => {
+  if (!creator || typeof creator !== 'object') {
+    return {
+      username: fallbackUsername ?? 'unknown',
+      personalEmoji: DEFAULT_CREATOR_EMOJI,
+    };
+  }
+
+  return {
+    username: creator.username ?? creator.Username ?? fallbackUsername ?? 'unknown',
+    personalEmoji: creator.personalEmoji ?? creator.PersonalEmoji ?? DEFAULT_CREATOR_EMOJI,
+    displayName: creator.displayName ?? creator.DisplayName,
+  };
+};
+
+const normalizeMarketDetails = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const normalizedMarket = normalizeMarket(raw.market ?? raw.Market);
+  const normalizedCreator = normalizeCreator(raw.creator ?? raw.Creator, normalizedMarket.creatorUsername);
+
+  return {
+    market: normalizedMarket,
+    creator: normalizedCreator,
+    probabilityChanges: normalizeProbabilityChanges(raw.probabilityChanges ?? raw.ProbabilityChanges),
+    numUsers: toNumber(raw.numUsers ?? raw.NumUsers),
+    totalVolume: toNumber(raw.totalVolume ?? raw.TotalVolume),
+    marketDust: toNumber(raw.marketDust ?? raw.MarketDust),
+    lastProbability: toNumber(raw.lastProbability ?? raw.LastProbability),
+  };
+};
+
 const calculateCurrentProbability = (details) => {
-  if (!details || !details.probabilityChanges) return 0;
+  if (!details) return 0;
 
-  const currentProbability =
-    details.probabilityChanges.length > 0
-      ? details.probabilityChanges[details.probabilityChanges.length - 1]
-          .probability
-      : details.market.initialProbability;
+  const changes = Array.isArray(details.probabilityChanges)
+    ? details.probabilityChanges
+    : [];
 
-  return parseFloat(currentProbability.toFixed(2));
+  if (changes.length > 0) {
+    const last = changes[changes.length - 1];
+    const probability = toNumber(last.probability, details.lastProbability);
+    return parseFloat(probability.toFixed(2));
+  }
+
+  const baseProbability = toNumber(
+    details.lastProbability ?? details.market?.initialProbability,
+  );
+
+  return parseFloat(baseProbability.toFixed(2));
 };
 
 export const useMarketDetails = () => {
@@ -36,8 +153,9 @@ export const useMarketDetails = () => {
           throw new Error('Failed to fetch market data');
         }
         const data = await response.json();
-        setDetails(data);
-        setCurrentProbability(calculateCurrentProbability(data));
+        const normalized = normalizeMarketDetails(data);
+        setDetails(normalized);
+        setCurrentProbability(calculateCurrentProbability(normalized));
       } catch (error) {
         console.error('Error fetching market data:', error);
       }
