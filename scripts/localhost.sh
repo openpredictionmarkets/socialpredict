@@ -10,6 +10,8 @@ __SP_ROOT_DIR="${SOCIALPREDICT_ROOT:-$(cd "${__SP_LOCAL_DIR}/.." && pwd)}"
 source "${__SP_ROOT_DIR}/scripts/lib/arch.sh"
 echo "== localhost platform: ${FORCE_PLATFORM:-default} =="
 
+source "${__SP_ROOT_DIR}/scripts/lib/jwt_key.sh"
+
 # Cross-platform sed -i
 if sed --version >/dev/null 2>&1; then
   SED_INPLACE=(sed -i -e)     # GNU
@@ -64,6 +66,8 @@ init_env() {
   "${SED_INPLACE[@]}" "/^EMAIL=.*/d" "${__SP_ROOT_DIR}/.env"
 
   echo "localhost .env prepared for GHCR images."
+
+  _=$(apply_jwt_signing_key "${__SP_ROOT_DIR}/.env")
 }
 
 # Pin platform per-service (helpful on Apple Silicon)

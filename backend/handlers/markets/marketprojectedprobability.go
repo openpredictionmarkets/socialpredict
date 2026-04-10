@@ -3,69 +3,69 @@ package marketshandlers
 import (
 	"encoding/json"
 	"net/http"
-	"socialpredict/handlers/marketpublicresponse"
-	"socialpredict/handlers/math/probabilities/wpam"
-	"socialpredict/handlers/tradingdata"
-	"socialpredict/models"
-	"socialpredict/util"
 	"strconv"
-	"time"
+
+	"socialpredict/handlers/markets/dto"
+	dmarkets "socialpredict/internal/domain/markets"
 
 	"github.com/gorilla/mux"
 )
 
 // ProjectNewProbabilityHandler handles the projection of a new probability based on a new bet.
-func ProjectNewProbabilityHandler(w http.ResponseWriter, r *http.Request) {
+func ProjectNewProbabilityHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// 1. Parse HTTP parameters
+		vars := mux.Vars(r)
+		marketIdStr := vars["marketId"]
+		amountStr := vars["amount"]
+		outcome := vars["outcome"]
 
-	// Parse market ID, amount, and outcome from the URL
-	vars := mux.Vars(r)
-	marketId := vars["marketId"]
-	amountStr := vars["amount"]
-	outcome := vars["outcome"]
+		// Parse marketId
+		marketId, err := strconv.ParseInt(marketIdStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid market ID", http.StatusBadRequest)
+			return
+		}
 
-	// Parse marketId string directly into a uint
-	marketIDUint64, err := strconv.ParseUint(marketId, 10, strconv.IntSize)
-	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
-		return
+		// Parse amount
+		amount, err := strconv.ParseInt(amountStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid amount value", http.StatusBadRequest)
+			return
+		}
+
+		// 2. Build domain request
+		projectionReq := dmarkets.ProbabilityProjectionRequest{
+			MarketID: marketId,
+			Amount:   amount,
+			Outcome:  outcome,
+		}
+
+		// 3. Call domain service
+		projection, err := svc.ProjectProbability(r.Context(), projectionReq)
+		if err != nil {
+			// 4. Map domain errors to HTTP status codes
+			switch err {
+			case dmarkets.ErrMarketNotFound:
+				http.Error(w, "Market not found", http.StatusNotFound)
+			case dmarkets.ErrInvalidInput:
+				http.Error(w, "Invalid input parameters", http.StatusBadRequest)
+			default:
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// 5. Return response DTO
+		response := dto.ProbabilityProjectionResponse{
+			MarketID:             marketId,
+			CurrentProbability:   projection.CurrentProbability,
+			ProjectedProbability: projection.ProjectedProbability,
+			Amount:               amount,
+			Outcome:              outcome,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
 	}
-
-	// Convert to uint (will be either uint32 or uint64 depending on platform)
-	marketIDUint := uint(marketIDUint64)
-
-	// Convert amount to int64
-	amount, err := strconv.ParseInt(amountStr, 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid amount value", http.StatusBadRequest)
-		return
-	}
-
-	// Create a new Bet object without a username
-	newBet := models.Bet{
-		Amount:   amount,
-		Outcome:  outcome,
-		PlacedAt: time.Now(), // Assuming the bet is placed now
-		MarketID: marketIDUint,
-	}
-
-	// Open up database to utilize connection pooling
-	db := util.GetDB()
-
-	// Fetch all bets for the market
-	currentBets := tradingdata.GetBetsForMarket(db, marketIDUint)
-
-	// Fetch the market creation time using utility function
-	publicResponseMarket, err := marketpublicresponse.GetPublicResponseMarketByID(db, marketId)
-	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
-		return
-	}
-	marketCreatedAt := publicResponseMarket.CreatedAt
-
-	// Project the new probability
-	projectedProbability := wpam.ProjectNewProbabilityWPAM(marketCreatedAt, currentBets, newBet)
-
-	// Set the content type to JSON and encode the response
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(projectedProbability)
 }

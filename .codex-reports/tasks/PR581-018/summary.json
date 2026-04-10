@@ -1,0 +1,24 @@
+{
+  "task_id": "PR581-018",
+  "status": "completed",
+  "updated_at": "2026-04-04T15:01:25.597217+00:00",
+  "owner": "dispatcher_agent",
+  "headline": "Analytics LSP alignment complete",
+  "current_focus": "Completed typed analytics metrics, normalized repository/service collaborator defaults, and updated targeted analytics tests.",
+  "files_changed": [
+    "[\"backend/internal/domain/analytics/financialsnapshot_test.go\",\"backend/internal/domain/analytics/leaderboard_test.go\",\"backend/internal/domain/analytics/models.go\",\"backend/internal/domain/analytics/repository.go\",\"backend/internal/domain/analytics/service.go\",\"backend/internal/domain/analytics/systemmetrics_integration_test.go\",\"backend/internal/domain/analytics/systemmetrics_test.go\"]"
+  ],
+  "checks_run": [
+    "[\"gofmt -w backend/internal/domain/analytics/{models.go,repository.go,service.go,financialsnapshot_test.go,leaderboard_test.go,systemmetrics_test.go,systemmetrics_integration_test.go}\",\"GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go test ./internal/domain/analytics/...\",\"GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go vet ./internal/domain/analytics/...\",\"bash /workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-architecture-governance/scripts/run_boundary_checks.sh /workspace/socialpredict\"]"
+  ],
+  "open_questions": [
+    "[]"
+  ],
+  "follow_ups": [
+    "[]"
+  ],
+  "last_event_seq": 2,
+  "context": {
+    "handoff_requested": false
+  }
+}

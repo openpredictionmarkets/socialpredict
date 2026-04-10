@@ -3,6 +3,8 @@
 # Make sure the script can only be run via SocialPredict Script
 [ -z "$CALLED_FROM_SOCIALPREDICT" ] && { echo "Not called from SocialPredict"; exit 42; }
 
+source "$SCRIPT_DIR/scripts/lib/jwt_key.sh"
+
 # Function to create and update .env file
 # Updated to be compatible with MacOS Sonoma.
 # Uses POSTGRES_VOLUME to deal with MacOS xattrs provenence.
@@ -21,6 +23,8 @@ init_env() {
 	else
 		echo "POSTGRES_VOLUME=../data/postgres:/var/lib/postgresql/data" >> "$SCRIPT_DIR/.env"
 	fi
+
+	_=$(apply_jwt_signing_key "$SCRIPT_DIR/.env")
 }
 
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then

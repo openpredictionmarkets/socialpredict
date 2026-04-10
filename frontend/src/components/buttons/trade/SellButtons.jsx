@@ -57,17 +57,18 @@ const SharesBadge = ({ type, count, label }) => {
     );
 };
 
-const SaleInputAmount = ({ value, onChange, max }) => {
+const SaleInputAmount = ({ value, onChange, max, disabled }) => {
     return (
         <NumberInput
             value={value}
             onChange={onChange}
             max={max}
+            disabled={disabled}
         />
     );
 };
 
-const ConfirmSaleButton = ({ onClick, selectedDirection }) => {
+const ConfirmSaleButton = ({ onClick, selectedDirection, disabled }) => {
     const getButtonStyle = () => {
         switch (selectedDirection) {
             case 'NO':
@@ -92,8 +93,9 @@ const ConfirmSaleButton = ({ onClick, selectedDirection }) => {
 
     return (
         <button
-            className={`w-full px-4 py-2 text-white border rounded focus:outline-none ${getButtonStyle()}`}
+            className={`w-full px-4 py-2 text-white border rounded focus:outline-none ${getButtonStyle()} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={onClick}
+            disabled={disabled}
         >
             {buttonText()}
         </button>
