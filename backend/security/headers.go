@@ -76,7 +76,7 @@ func SecurityHeadersMiddleware(headers SecurityHeaders) func(http.Handler) http.
 			w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
 			w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
 			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
-			w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
+			w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
 
 			// Remove server information
 			w.Header().Set("Server", "")
