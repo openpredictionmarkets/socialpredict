@@ -43,7 +43,8 @@ const UserFinancialStatementsLayout = ({ username }) => {
             <h4 className={`text-lg font-semibold text-white mb-4 p-3 ${bgColor} rounded-t-lg`}>
                 {title}
             </h4>
-            <table className="w-full divide-y divide-gray-200 bg-primary-background rounded-b-lg overflow-hidden">
+            <div className="overflow-x-auto rounded-b-lg">
+            <table className="w-full divide-y divide-gray-200 bg-primary-background">
                 <thead className="bg-gray-50">
                     <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -79,6 +80,7 @@ const UserFinancialStatementsLayout = ({ username }) => {
                     ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 
