@@ -1,4 +1,4 @@
-package util
+package runtime
 
 import (
 	"fmt"
@@ -10,8 +10,10 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-var dbMu sync.RWMutex
+var (
+	db   *gorm.DB
+	dbMu sync.RWMutex
+)
 
 // DBConfig holds the normalized database configuration.
 type DBConfig struct {
@@ -116,31 +118,36 @@ func (f PostgresFactory) Open(cfg DBConfig) (*gorm.DB, error) {
 	return gorm.Open(postgres.Open(dsn), gormCfg)
 }
 
-// InitDB initializes the global DB with the provided factory and config.
+// InitDB initializes the shared DB handle with the provided factory and config.
 func InitDB(cfg DBConfig, factory DBFactory) (*gorm.DB, error) {
 	if factory == nil {
 		factory = PostgresFactory{}
 	}
 
-	db, err := factory.Open(cfg)
+	conn, err := factory.Open(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
-	if db == nil {
+	if conn == nil {
 		return nil, fmt.Errorf("open db: factory returned nil db")
 	}
 
-	dbMu.Lock()
-	DB = db
-	dbMu.Unlock()
-	return db, nil
+	SetDB(conn)
+	return conn, nil
 }
 
-// GetDB returns the database connection.
+// SetDB stores the shared DB handle used by legacy callers and tests.
+func SetDB(conn *gorm.DB) {
+	dbMu.Lock()
+	db = conn
+	dbMu.Unlock()
+}
+
+// GetDB returns the shared database connection.
 func GetDB() *gorm.DB {
 	dbMu.RLock()
 	defer dbMu.RUnlock()
-	return DB
+	return db
 }
 
 func firstNonEmpty(values ...string) string {

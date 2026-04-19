@@ -24,14 +24,14 @@ import (
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
 	authsvc "socialpredict/internal/service/auth"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/security"
-	"socialpredict/setup"
-	"socialpredict/util"
 	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"gorm.io/gorm"
 )
 
 // CORS helpers configured via environment variables
@@ -95,7 +95,7 @@ func buildCORSFromEnv() *cors.Cors {
 	})
 }
 
-func Start(openAPISpec []byte, swaggerUIFS embed.FS) {
+func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service) {
 	// Initialize security service
 	securityService := security.NewSecurityService()
 
@@ -132,9 +132,11 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS) {
 	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler))
 
 	// Initialize domain services
-	db := util.GetDB()
-	econConfig := setup.EconomicsConfig()
-	container := app.BuildApplication(db, econConfig)
+	if configService == nil {
+		log.Fatal("config init: configuration service unavailable")
+	}
+
+	container := app.BuildApplicationWithConfigService(db, configService)
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
 	analyticsService := container.GetAnalyticsService()
@@ -151,12 +153,12 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS) {
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
-	router.Handle("/v0/login", loginSecurityMiddleware(http.HandlerFunc(authsvc.LoginHandler))).Methods("POST")
+	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(db))).Methods("POST")
 
 	// application setup and stats information
-	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)))).Methods("GET")
-	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(setup.LoadEconomicsConfig)))).Methods("GET")
-	router.Handle("/v0/stats", securityMiddleware(http.HandlerFunc(statshandlers.StatsHandler()))).Methods("GET")
+	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
+	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
+	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(db, container.GetConfigService()))).Methods("GET")
 	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(analyticsService))).Methods("GET")
 	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(analyticsService))).Methods("GET")
 
@@ -203,7 +205,7 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS) {
 
 	// handle public user stuff
 	router.Handle("/v0/userinfo/{username}", securityMiddleware(usershandlers.GetPublicUserHandler(usersService))).Methods("GET")
-	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, econConfig.Economics.User.MaximumDebtAllowed))).Methods("GET")
+	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, configService.Economics().User.MaximumDebtAllowed))).Methods("GET")
 	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(usershandlers.GetUserFinancialHandler(usersService))).Methods("GET")
 
@@ -223,7 +225,7 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS) {
 	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 
 	// admin stuff - apply security middleware
-	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig, authService)))).Methods("POST")
+	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(db, container.GetConfigService(), authService)))).Methods("POST")
 
 	// homepage content routes
 	homepageRepo := homepage.NewGormRepository(db)

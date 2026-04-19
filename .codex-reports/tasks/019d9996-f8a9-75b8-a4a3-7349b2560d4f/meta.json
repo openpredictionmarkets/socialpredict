@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task": {
+    "uid": "019d9996-f8a9-75b8-a4a3-7349b2560d4f",
+    "id": "W02-002",
+    "title": "WAVE02: Migrate setup consumers and setup endpoints to the configuration service",
+    "working_dir": "../socialpredict/backend"
+  },
+  "dispatcher_agent": "software-action-dispatcher-agent",
+  "control_repo": "/workspace/spec-socialpredict-tasks",
+  "target_repo": "/workspace/socialpredict",
+  "report_dir": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-75b8-a4a3-7349b2560d4f",
+  "created_at": "2026-04-18T12:30:31.635492+00:00",
+  "updated_at": "2026-04-18T12:30:31.635492+00:00",
+  "files": {
+    "summary": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-75b8-a4a3-7349b2560d4f/summary.json",
+    "conversation": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-75b8-a4a3-7349b2560d4f/conversation.ndjson",
+    "decisions": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-75b8-a4a3-7349b2560d4f/decisions.ndjson"
+  }
+}

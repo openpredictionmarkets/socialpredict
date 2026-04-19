@@ -3,8 +3,6 @@ package app
 import (
 	"time"
 
-	"socialpredict/setup"
-
 	"gorm.io/gorm"
 
 	// Domain services
@@ -23,6 +21,7 @@ import (
 	// Handlers
 	hmarkets "socialpredict/handlers/markets"
 	authsvc "socialpredict/internal/service/auth"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/security"
 )
 
@@ -40,9 +39,10 @@ func (SystemClock) Now() time.Time {
 
 // Container holds all the application dependencies
 type Container struct {
-	db     *gorm.DB
-	config *setup.EconomicConfig
-	clock  Clock
+	db            *gorm.DB
+	configService configsvc.Service
+	config        *configsvc.AppConfig
+	clock         Clock
 
 	// Repositories
 	marketsRepo   rmarkets.GormRepository
@@ -62,11 +62,16 @@ type Container struct {
 }
 
 // NewContainer creates a new dependency injection container
-func NewContainer(db *gorm.DB, config *setup.EconomicConfig) *Container {
+func NewContainer(db *gorm.DB, configService configsvc.Service) *Container {
+	if configService == nil {
+		configService = configsvc.NewStaticService(nil)
+	}
+
 	return &Container{
-		db:     db,
-		config: config,
-		clock:  SystemClock{},
+		db:            db,
+		configService: configService,
+		config:        configService.Current(),
+		clock:         SystemClock{},
 	}
 }
 
@@ -81,7 +86,7 @@ func (c *Container) InitializeRepositories() {
 func (c *Container) InitializeServices() {
 	// Users service depends on users repository and configuration
 	securityService := security.NewSecurityService()
-	configLoader := func() *setup.EconomicConfig { return c.config }
+	configLoader := func() *configsvc.AppConfig { return c.config }
 
 	wpamSeeds := wpam.Seeds{
 		InitialProbability:     c.config.Economics.MarketCreation.InitialMarketProbability,
@@ -162,9 +167,19 @@ func (c *Container) GetAuthService() *authsvc.AuthService {
 	return c.authService
 }
 
-// BuildApplication creates a fully wired application container
-func BuildApplication(db *gorm.DB, config *setup.EconomicConfig) *Container {
-	container := NewContainer(db, config)
+// GetConfigService returns the runtime configuration service.
+func (c *Container) GetConfigService() configsvc.Service {
+	return c.configService
+}
+
+// BuildApplicationWithConfigService creates a fully wired application container using the runtime config service.
+func BuildApplicationWithConfigService(db *gorm.DB, configService configsvc.Service) *Container {
+	container := NewContainer(db, configService)
 	container.Initialize()
 	return container
+}
+
+// BuildApplication preserves older call sites that still provide a raw config snapshot.
+func BuildApplication(db *gorm.DB, config *configsvc.AppConfig) *Container {
+	return BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 }

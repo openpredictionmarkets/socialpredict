@@ -1,11 +1,13 @@
-package util
+package users
 
 import (
 	"errors"
 	"fmt"
+
 	"socialpredict/models"
 
 	"github.com/brianvoe/gofakeit"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -28,7 +30,6 @@ func CountByField(db *gorm.DB, field, value string) int64 {
 }
 
 func UniqueDisplayName(db *gorm.DB) string {
-	// Generate display name and check for uniqueness
 	for {
 		name := gofakeit.Name()
 		if count := CountByField(db, "display_name", name); count == 0 {
@@ -38,11 +39,19 @@ func UniqueDisplayName(db *gorm.DB) string {
 }
 
 func UniqueEmail(db *gorm.DB) string {
-	// Generate email and check for uniqueness
 	for {
 		email := gofakeit.Email()
 		if count := CountByField(db, "email", email); count == 0 {
 			return email
+		}
+	}
+}
+
+func GenerateUniqueAPIKey(db *gorm.DB) string {
+	for {
+		apiKey := uuid.NewString()
+		if count := CountByField(db, "api_key", apiKey); count == 0 {
+			return apiKey
 		}
 	}
 }

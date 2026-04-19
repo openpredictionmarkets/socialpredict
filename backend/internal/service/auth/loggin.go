@@ -9,7 +9,6 @@ import (
 	"os"
 	"socialpredict/models"
 	"socialpredict/security"
-	"socialpredict/util"
 	"strings"
 	"time"
 
@@ -29,51 +28,52 @@ type UserClaims struct {
 	jwt.StandardClaims
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
+func LoginHandler(db *gorm.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method is not supported.", http.StatusNotFound)
+			return
+		}
+
+		securityService := security.NewSecurityService()
+
+		req, err := decodeLoginRequest(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		req, err = validateAndSanitizeLogin(securityService, req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if db == nil {
+			http.Error(w, "Error accessing database", http.StatusInternalServerError)
+			return
+		}
+
+		user, loginErr := authenticateUser(db, req)
+		if loginErr != nil {
+			http.Error(w, loginErr.message, loginErr.statusCode)
+			return
+		}
+
+		jwtKey := getJWTKey()
+		if len(jwtKey) == 0 {
+			http.Error(w, "Error creating token", http.StatusInternalServerError)
+			return
+		}
+
+		tokenString, err := generateJWT(user.Username, jwtKey)
+		if err != nil {
+			http.Error(w, "Error creating token", http.StatusInternalServerError)
+			return
+		}
+
+		writeLoginResponse(w, user, tokenString)
 	}
-
-	securityService := security.NewSecurityService()
-
-	req, err := decodeLoginRequest(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	req, err = validateAndSanitizeLogin(securityService, req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	db := util.GetDB()
-	if db == nil {
-		http.Error(w, "Error accessing database", http.StatusInternalServerError)
-		return
-	}
-
-	user, loginErr := authenticateUser(db, req)
-	if loginErr != nil {
-		http.Error(w, loginErr.message, loginErr.statusCode)
-		return
-	}
-
-	jwtKey := getJWTKey()
-	if len(jwtKey) == 0 {
-		http.Error(w, "Error creating token", http.StatusInternalServerError)
-		return
-	}
-
-	tokenString, err := generateJWT(user.Username, jwtKey)
-	if err != nil {
-		http.Error(w, "Error creating token", http.StatusInternalServerError)
-		return
-	}
-
-	writeLoginResponse(w, user, tokenString)
 }
 
 type loginRequest struct {

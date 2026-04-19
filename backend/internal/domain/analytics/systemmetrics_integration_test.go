@@ -7,6 +7,7 @@ import (
 	"socialpredict/internal/app"
 	"socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
@@ -65,7 +66,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		t.Fatalf("apply creation fee: %v", err)
 	}
 
-	container := app.BuildApplication(db, econConfig)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(econConfig))
 	betsService := container.GetBetsService()
 
 	placeBet := func(username string, amount int64, outcome string) {
@@ -168,7 +169,7 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 		t.Fatalf("apply creation fee: %v", err)
 	}
 
-	container := app.BuildApplication(db, econConfig)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(econConfig))
 	betsService := container.GetBetsService()
 	placeBet := func(username string, amount int64, outcome string) {
 		if _, err := betsService.Place(context.Background(), dbets.PlaceRequest{

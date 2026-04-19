@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task": {
+    "uid": "019d99d7-3d71-70aa-9f0b-d0f553db0d37",
+    "id": "W01-002",
+    "title": "WAVE01: Remove hidden util runtime boundaries from touched code paths",
+    "working_dir": "../socialpredict/backend"
+  },
+  "dispatcher_agent": "software-action-dispatcher-agent",
+  "control_repo": "/workspace/spec-socialpredict-tasks",
+  "target_repo": "/workspace/socialpredict",
+  "report_dir": "/workspace/socialpredict/.codex-reports/tasks/019d99d7-3d71-70aa-9f0b-d0f553db0d37",
+  "created_at": "2026-04-18T12:14:08.713892+00:00",
+  "updated_at": "2026-04-18T12:14:08.713892+00:00",
+  "files": {
+    "summary": "/workspace/socialpredict/.codex-reports/tasks/019d99d7-3d71-70aa-9f0b-d0f553db0d37/summary.json",
+    "conversation": "/workspace/socialpredict/.codex-reports/tasks/019d99d7-3d71-70aa-9f0b-d0f553db0d37/conversation.ndjson",
+    "decisions": "/workspace/socialpredict/.codex-reports/tasks/019d99d7-3d71-70aa-9f0b-d0f553db0d37/decisions.ndjson"
+  }
+}

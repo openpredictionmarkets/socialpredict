@@ -15,6 +15,7 @@ import (
 	"socialpredict/internal/app"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	authsvc "socialpredict/internal/service/auth"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models/modelstesting"
 )
 
@@ -22,7 +23,7 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 	config := modelstesting.GenerateEconomicConfig()
-	container := app.BuildApplication(db, config)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
@@ -102,7 +103,7 @@ func TestUserMarketPositionHandlerUnauthorizedWithoutToken(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	_, _ = modelstesting.UseStandardTestEconomics(t)
 	config := modelstesting.GenerateEconomicConfig()
-	container := app.BuildApplication(db, config)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/user/markets/1", nil)
 	req = mux.SetURLVars(req, map[string]string{"marketId": "1"})

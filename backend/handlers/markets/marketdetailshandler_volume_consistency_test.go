@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"socialpredict/handlers/markets/dto"
+	appruntime "socialpredict/internal/app/runtime"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
 	"strconv"
 	"testing"
 	"time"
@@ -17,7 +17,7 @@ import (
 func TestMarketDetailsHandler_VolumeConsistency_OnlyBuys(t *testing.T) {
 	// Create a fake database for testing
 	db := modelstesting.NewFakeDB(t)
-	util.DB = db
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("testcreator", 0)
@@ -73,7 +73,7 @@ func TestMarketDetailsHandler_VolumeConsistency_OnlyBuys(t *testing.T) {
 func TestMarketDetailsHandler_VolumeConsistency_WithSells(t *testing.T) {
 	// Create a fake database for testing
 	db := modelstesting.NewFakeDB(t)
-	util.DB = db
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("testcreator", 0)

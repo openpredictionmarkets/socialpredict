@@ -1,17 +1,17 @@
-package util
+package users
 
 import (
-	"os"
 	"testing"
 
 	"github.com/brianvoe/gofakeit"
+
 	"socialpredict/models/modelstesting"
 )
 
-func TestGenerateUniqueApiKey(t *testing.T) {
+func TestGenerateUniqueAPIKey(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	firstKey := GenerateUniqueApiKey(db)
+	firstKey := GenerateUniqueAPIKey(db)
 	if firstKey == "" {
 		t.Fatalf("expected non-empty api key")
 	}
@@ -22,7 +22,7 @@ func TestGenerateUniqueApiKey(t *testing.T) {
 		t.Fatalf("failed to insert user: %v", err)
 	}
 
-	secondKey := GenerateUniqueApiKey(db)
+	secondKey := GenerateUniqueAPIKey(db)
 	if secondKey == "" || secondKey == firstKey {
 		t.Fatalf("expected a distinct api key, got %q", secondKey)
 	}
@@ -82,80 +82,5 @@ func TestUniqueDisplayNameAndEmail(t *testing.T) {
 	}
 	if CountByField(db, "email", email) != 0 {
 		t.Fatalf("expected generated email to be unique")
-	}
-}
-
-func TestGetEnvLoadsFile(t *testing.T) {
-	tempDir := t.TempDir()
-	origWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	defer os.Chdir(origWD)
-
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-
-	content := []byte("FOO=bar\n")
-	if err := os.WriteFile(".env.dev", content, 0o644); err != nil {
-		t.Fatalf("write env file: %v", err)
-	}
-
-	origVal, had := os.LookupEnv("FOO")
-	if had {
-		t.Cleanup(func() {
-			os.Setenv("FOO", origVal)
-		})
-	} else {
-		t.Cleanup(func() {
-			os.Unsetenv("FOO")
-		})
-	}
-	if err := os.Unsetenv("FOO"); err != nil {
-		t.Fatalf("unsetenv: %v", err)
-	}
-
-	if err := GetEnv(); err != nil {
-		t.Fatalf("GetEnv returned error: %v", err)
-	}
-
-	if got := os.Getenv("FOO"); got != "bar" {
-		t.Fatalf("expected env var to be loaded, got %q", got)
-	}
-}
-
-func TestGetEnvMissingFile(t *testing.T) {
-	tempDir := t.TempDir()
-	origWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	defer os.Chdir(origWD)
-
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-
-	origVal, had := os.LookupEnv("FOO")
-	if had {
-		t.Cleanup(func() {
-			os.Setenv("FOO", origVal)
-		})
-	} else {
-		t.Cleanup(func() {
-			os.Unsetenv("FOO")
-		})
-	}
-	if err := os.Unsetenv("FOO"); err != nil {
-		t.Fatalf("unsetenv: %v", err)
-	}
-
-	if err := GetEnv(); err != nil {
-		t.Fatalf("GetEnv should not fail when file missing: %v", err)
-	}
-
-	if got := os.Getenv("FOO"); got != "" {
-		t.Fatalf("expected env var to remain empty, got %q", got)
 	}
 }

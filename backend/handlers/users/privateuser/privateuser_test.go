@@ -7,6 +7,7 @@ import (
 
 	"socialpredict/handlers/users/dto"
 	"socialpredict/internal/app"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models/modelstesting"
 )
 
@@ -26,7 +27,7 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	config := modelstesting.GenerateEconomicConfig()
-	container := app.BuildApplication(db, config)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 
 	handler := GetPrivateProfileHandler(container.GetUsersService())
 	handler.ServeHTTP(rec, req)
@@ -56,7 +57,7 @@ func TestGetPrivateProfileUserResponse_Unauthorized(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	config := modelstesting.GenerateEconomicConfig()
-	container := app.BuildApplication(db, config)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 
 	handler := GetPrivateProfileHandler(container.GetUsersService())
 	handler.ServeHTTP(rec, req)

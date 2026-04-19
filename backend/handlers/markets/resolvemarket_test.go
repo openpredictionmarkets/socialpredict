@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	appruntime "socialpredict/internal/app/runtime"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -100,8 +100,8 @@ func TestMain(m *testing.M) {
 func TestResolveMarketHandler_NARefund(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	// Set the global DB for util.GetDB()
-	util.DB = db
+	// Set the shared DB used by legacy request-path callers.
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("creator", 0)
@@ -150,8 +150,8 @@ func TestResolveMarketHandler_NARefund(t *testing.T) {
 func TestResolveMarketHandler_YESWin(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	// Set the global DB for util.GetDB()
-	util.DB = db
+	// Set the shared DB used by legacy request-path callers.
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("creator", 0)
@@ -204,8 +204,8 @@ func TestResolveMarketHandler_YESWin(t *testing.T) {
 func TestResolveMarketHandler_NOWin(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	// Set the global DB for util.GetDB()
-	util.DB = db
+	// Set the shared DB used by legacy request-path callers.
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("creator", 0)
@@ -257,8 +257,8 @@ func TestResolveMarketHandler_NOWin(t *testing.T) {
 func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	// Set the global DB for util.GetDB()
-	util.DB = db
+	// Set the shared DB used by legacy request-path callers.
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("creator", 0)
@@ -300,8 +300,8 @@ func TestResolveMarketHandler_UnauthorizedUser(t *testing.T) {
 func TestResolveMarketHandler_InvalidOutcome(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 
-	// Set the global DB for util.GetDB()
-	util.DB = db
+	// Set the shared DB used by legacy request-path callers.
+	appruntime.SetDB(db)
 
 	// Create user
 	creator := modelstesting.GenerateUser("creator", 0)

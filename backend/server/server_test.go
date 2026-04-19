@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,16 +24,15 @@ import (
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
 	authsvc "socialpredict/internal/service/auth"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models/modelstesting"
 	"socialpredict/security"
-	"socialpredict/setup"
-	"socialpredict/util"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
-func buildTestHandler(t *testing.T) http.Handler {
+func buildTestHandler(t *testing.T, db *gorm.DB) http.Handler {
 	t.Helper()
 
 	securityService := security.NewSecurityService()
@@ -45,9 +45,9 @@ func buildTestHandler(t *testing.T) http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	}).Methods("GET")
 
-	db := util.GetDB()
-	econConfig := setup.EconomicsConfig()
-	container := app.BuildApplication(db, econConfig)
+	econConfig := modelstesting.GenerateEconomicConfig()
+	configService := configsvc.NewStaticService(econConfig)
+	container := app.BuildApplicationWithConfigService(db, configService)
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
 	analyticsService := container.GetAnalyticsService()
@@ -60,10 +60,11 @@ func buildTestHandler(t *testing.T) http.Handler {
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
-	router.Handle("/v0/login", loginSecurityMiddleware(http.HandlerFunc(authsvc.LoginHandler))).Methods("POST")
+	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(db))).Methods("POST")
 
-	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(setup.LoadEconomicsConfig)))).Methods("GET")
-	router.Handle("/v0/stats", securityMiddleware(http.HandlerFunc(statshandlers.StatsHandler()))).Methods("GET")
+	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
+	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
+	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(db, container.GetConfigService()))).Methods("GET")
 	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(analyticsService))).Methods("GET")
 	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(analyticsService))).Methods("GET")
 
@@ -102,7 +103,7 @@ func buildTestHandler(t *testing.T) http.Handler {
 	router.Handle("/v0/markets/positions/{marketId}/{username}", securityMiddleware(positionshandlers.MarketUserPositionHandlerWithService(marketsService))).Methods("GET")
 
 	router.Handle("/v0/userinfo/{username}", securityMiddleware(usershandlers.GetPublicUserHandler(usersService))).Methods("GET")
-	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, econConfig.Economics.User.MaximumDebtAllowed))).Methods("GET")
+	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, configService.Economics().User.MaximumDebtAllowed))).Methods("GET")
 	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(usershandlers.GetUserFinancialHandler(usersService))).Methods("GET")
 
@@ -118,7 +119,7 @@ func buildTestHandler(t *testing.T) http.Handler {
 	router.Handle("/v0/userposition/{marketId}", securityMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
 	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(betsService, usersService))).Methods("POST")
 
-	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(setup.EconomicsConfig, authService)))).Methods("POST")
+	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(db, container.GetConfigService(), authService)))).Methods("POST")
 
 	homepageRepo := homepage.NewGormRepository(db)
 	homepageRenderer := homepage.NewDefaultRenderer()
@@ -153,10 +154,9 @@ func TestServerRegistersAndServesCoreRoutes(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
 	db := modelstesting.NewFakeDB(t)
-	util.DB = db
 	seedServerTestData(t, db)
 
-	handler := buildTestHandler(t)
+	handler := buildTestHandler(t, db)
 
 	tests := []struct {
 		name       string
@@ -165,6 +165,7 @@ func TestServerRegistersAndServesCoreRoutes(t *testing.T) {
 	}{
 		{"health", "/health", http.StatusOK},
 		{"home", "/v0/home", http.StatusOK},
+		{"setup frontend", "/v0/setup/frontend", http.StatusOK},
 		{"markets", "/v0/markets?status=ACTIVE", http.StatusOK},
 		{"userinfo", "/v0/userinfo/creator", http.StatusOK},
 	}
@@ -179,4 +180,156 @@ func TestServerRegistersAndServesCoreRoutes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServerSetupRoutesUseInjectedConfigService(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	config := modelstesting.GenerateEconomicConfig()
+	config.Economics.MarketIncentives.CreateMarketCost = 77
+	config.Frontend.Charts.SigFigs = 1
+
+	handler := buildTestHandlerWithConfig(t, db, config)
+
+	setupReq := httptest.NewRequest(http.MethodGet, "/v0/setup", nil)
+	setupRec := httptest.NewRecorder()
+	handler.ServeHTTP(setupRec, setupReq)
+	if setupRec.Code != http.StatusOK {
+		t.Fatalf("expected setup status 200, got %d with body %s", setupRec.Code, setupRec.Body.String())
+	}
+
+	var economics struct {
+		MarketIncentives struct {
+			CreateMarketCost int64 `json:"CreateMarketCost"`
+		} `json:"MarketIncentives"`
+	}
+	if err := json.Unmarshal(setupRec.Body.Bytes(), &economics); err != nil {
+		t.Fatalf("decode /v0/setup response: %v", err)
+	}
+	if economics.MarketIncentives.CreateMarketCost != 77 {
+		t.Fatalf("expected injected setup createMarketCost 77, got %d", economics.MarketIncentives.CreateMarketCost)
+	}
+
+	frontendReq := httptest.NewRequest(http.MethodGet, "/v0/setup/frontend", nil)
+	frontendRec := httptest.NewRecorder()
+	handler.ServeHTTP(frontendRec, frontendReq)
+	if frontendRec.Code != http.StatusOK {
+		t.Fatalf("expected frontend setup status 200, got %d with body %s", frontendRec.Code, frontendRec.Body.String())
+	}
+
+	var frontend struct {
+		Charts struct {
+			SigFigs int `json:"sigFigs"`
+		} `json:"charts"`
+	}
+	if err := json.Unmarshal(frontendRec.Body.Bytes(), &frontend); err != nil {
+		t.Fatalf("decode /v0/setup/frontend response: %v", err)
+	}
+	if frontend.Charts.SigFigs != 2 {
+		t.Fatalf("expected clamped frontend sig figs 2, got %d", frontend.Charts.SigFigs)
+	}
+}
+
+func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig *configsvc.AppConfig) http.Handler {
+	t.Helper()
+
+	securityService := security.NewSecurityService()
+	c := buildCORSFromEnv()
+	router := mux.NewRouter()
+
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}).Methods("GET")
+
+	configService := configsvc.NewStaticService(econConfig)
+	container := app.BuildApplicationWithConfigService(db, configService)
+	marketsService := container.GetMarketsService()
+	usersService := container.GetUsersService()
+	analyticsService := container.GetAnalyticsService()
+	authService := container.GetAuthService()
+	betsService := container.GetBetsService()
+
+	marketsHandler := marketshandlers.NewHandler(marketsService, authService)
+
+	securityMiddleware := securityService.SecurityMiddleware()
+	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
+
+	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
+	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(db))).Methods("POST")
+
+	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
+	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
+	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(db, container.GetConfigService()))).Methods("GET")
+	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(analyticsService))).Methods("GET")
+	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(analyticsService))).Methods("GET")
+
+	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
+	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
+	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
+	router.Handle("/v0/markets/status/{status}", securityMiddleware(http.HandlerFunc(marketsHandler.ListByStatus))).Methods("GET")
+	router.Handle("/v0/markets/{id}", securityMiddleware(http.HandlerFunc(marketsHandler.GetDetails))).Methods("GET")
+	router.Handle("/v0/markets/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarket))).Methods("POST")
+	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
+	router.Handle("/v0/markets/{id}/projection", securityMiddleware(http.HandlerFunc(marketsHandler.ProjectProbability))).Methods("GET")
+
+	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Set("status", "active")
+		r.URL.RawQuery = q.Encode()
+		marketsHandler.ListMarkets(w, r)
+	}))).Methods("GET")
+	router.Handle("/v0/markets/closed", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Set("status", "closed")
+		r.URL.RawQuery = q.Encode()
+		marketsHandler.ListMarkets(w, r)
+	}))).Methods("GET")
+	router.Handle("/v0/markets/resolved", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Set("status", "resolved")
+		r.URL.RawQuery = q.Encode()
+		marketsHandler.ListMarkets(w, r)
+	}))).Methods("GET")
+	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
+	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
+
+	router.Handle("/v0/markets/bets/{marketId}", securityMiddleware(betshandlers.MarketBetsHandlerWithService(marketsService))).Methods("GET")
+	router.Handle("/v0/markets/positions/{marketId}", securityMiddleware(positionshandlers.MarketPositionsHandlerWithService(marketsService))).Methods("GET")
+	router.Handle("/v0/markets/positions/{marketId}/{username}", securityMiddleware(positionshandlers.MarketUserPositionHandlerWithService(marketsService))).Methods("GET")
+
+	router.Handle("/v0/userinfo/{username}", securityMiddleware(usershandlers.GetPublicUserHandler(usersService))).Methods("GET")
+	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, configService.Economics().User.MaximumDebtAllowed))).Methods("GET")
+	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
+	router.Handle("/v0/users/{username}/financial", securityMiddleware(usershandlers.GetUserFinancialHandler(usersService))).Methods("GET")
+
+	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")
+
+	router.Handle("/v0/changepassword", securityMiddleware(usershandlers.ChangePasswordHandler(usersService))).Methods("POST")
+	router.Handle("/v0/profilechange/displayname", securityMiddleware(usershandlers.ChangeDisplayNameHandler(usersService))).Methods("POST")
+	router.Handle("/v0/profilechange/emoji", securityMiddleware(usershandlers.ChangeEmojiHandler(usersService))).Methods("POST")
+	router.Handle("/v0/profilechange/description", securityMiddleware(usershandlers.ChangeDescriptionHandler(usersService))).Methods("POST")
+	router.Handle("/v0/profilechange/links", securityMiddleware(usershandlers.ChangePersonalLinksHandler(usersService))).Methods("POST")
+
+	router.Handle("/v0/bet", securityMiddleware(buybetshandlers.PlaceBetHandler(betsService, usersService))).Methods("POST")
+	router.Handle("/v0/userposition/{marketId}", securityMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
+	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(betsService, usersService))).Methods("POST")
+
+	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(db, container.GetConfigService(), authService)))).Methods("POST")
+
+	homepageRepo := homepage.NewGormRepository(db)
+	homepageRenderer := homepage.NewDefaultRenderer()
+	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
+	homepageHandler := cmshomehttp.NewHandler(homepageSvc, authService)
+
+	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
+	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
+
+	handler := http.Handler(router)
+	if c != nil {
+		handler = c.Handler(handler)
+	}
+	return handler
 }

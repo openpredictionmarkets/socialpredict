@@ -1,0 +1,33 @@
+{
+  "task_uid": "019d99d7-3d71-70aa-9f0b-d0f553db0d37",
+  "task_id": "W01-002",
+  "status": "completed",
+  "updated_at": "2026-04-18T12:18:50.090038+00:00",
+  "owner": "software-action-dispatcher-agent",
+  "headline": "Removed hidden DB access from touched startup/server/auth/handler paths",
+  "current_focus": "Explicit DB wiring now flows from main into server route construction and the remaining legacy handlers.",
+  "files_changed": [
+    "backend/main.go",
+    "backend/server/server.go",
+    "backend/server/server_test.go",
+    "backend/handlers/stats/statshandler.go",
+    "backend/handlers/admin/adduser.go",
+    "backend/internal/service/auth/loggin.go",
+    "backend/internal/service/auth/middleware_test.go"
+  ],
+  "checks_run": [
+    "boundary_checks: /workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-architecture-governance/scripts/run_boundary_checks.sh /workspace/socialpredict",
+    "go_test_run1: env GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go test ./server ./handlers/stats ./handlers/admin ./internal/service/auth -count=1",
+    "go_test_run2: env GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go test ./server ./handlers/stats ./handlers/admin ./internal/service/auth -count=1",
+    "openapi_validation: env GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go test ./... -run TestOpenAPISpecValidates -count=1",
+    "go_vet: env GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/go-mod go vet ./server ./handlers/stats ./handlers/admin ./internal/service/auth"
+  ],
+  "open_questions": [],
+  "follow_ups": [
+    "None"
+  ],
+  "last_event_seq": 1,
+  "context": {
+    "handoff_requested": false
+  }
+}

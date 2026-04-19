@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
 	"testing"
 	"time"
 
@@ -197,7 +196,7 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/login", nil)
 			w := httptest.NewRecorder()
 
-			LoginHandler(w, req)
+			LoginHandler(nil)(w, req)
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, w.Code)
@@ -207,12 +206,11 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 }
 
 func TestLoginHandler_InvalidJSON(t *testing.T) {
-	util.DB = modelstesting.NewFakeDB(t)
 	invalidJSON := "{ invalid json }"
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(invalidJSON))
 	w := httptest.NewRecorder()
 
-	LoginHandler(w, req)
+	LoginHandler(modelstesting.NewFakeDB(t))(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -220,12 +218,10 @@ func TestLoginHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
-	util.DB = modelstesting.NewFakeDB(t)
-
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123","extra":"nope"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(w, req)
+	LoginHandler(modelstesting.NewFakeDB(t))(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -262,7 +258,7 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			util.DB = modelstesting.NewFakeDB(t)
+			db := modelstesting.NewFakeDB(t)
 			loginReq := map[string]string{
 				"username": tt.username,
 				"password": tt.password,
@@ -272,7 +268,7 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(w, req)
+			LoginHandler(db)(w, req)
 
 			if w.Code != http.StatusBadRequest {
 				t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -282,10 +278,6 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 }
 
 func TestLoginHandler_MissingDB(t *testing.T) {
-	originalDB := util.GetDB()
-	util.DB = nil
-	defer func() { util.DB = originalDB }()
-
 	loginReq := map[string]string{
 		"username": "testuser",
 		"password": "password123",
@@ -295,7 +287,7 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 	w := httptest.NewRecorder()
 
-	LoginHandler(w, req)
+	LoginHandler(nil)(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -304,7 +296,6 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 
 func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	util.DB = db
 
 	testUser := modelstesting.GenerateUser("testuser", 1000)
 	if err := testUser.HashPassword("password123"); err != nil {
@@ -348,7 +339,7 @@ func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(w, req)
+			LoginHandler(db)(w, req)
 
 			if w.Code != http.StatusOK {
 				t.Errorf("Usernames should be trimmed before DB lookup. Expected status code %d, got %d (body: %s)", http.StatusOK, w.Code, w.Body.String())
