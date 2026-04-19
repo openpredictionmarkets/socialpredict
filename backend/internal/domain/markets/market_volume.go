@@ -23,6 +23,6 @@ func (s *Service) CalculateMarketVolume(ctx context.Context, marketID int64) (in
 		return 0, err
 	}
 
-	modelBets := convertToModelBets(bets)
-	return s.metricsCalculator.Volume(modelBets), nil
+	boundaryBets := convertToBoundaryBets(bets)
+	return s.metricsCalculator.Volume(boundaryBets), nil
 }

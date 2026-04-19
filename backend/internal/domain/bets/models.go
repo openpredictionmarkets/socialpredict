@@ -3,11 +3,11 @@ package bets
 import (
 	"time"
 
-	"socialpredict/models"
+	"socialpredict/internal/domain/boundary"
 )
 
-func newPlacedModelBet(req PlaceRequest, outcome string, placedAt time.Time) *models.Bet {
-	return &models.Bet{
+func newPlacedBoundaryBet(req PlaceRequest, outcome string, placedAt time.Time) *boundary.Bet {
+	return &boundary.Bet{
 		Username: req.Username,
 		MarketID: req.MarketID,
 		Amount:   req.Amount,
@@ -16,8 +16,8 @@ func newPlacedModelBet(req PlaceRequest, outcome string, placedAt time.Time) *mo
 	}
 }
 
-func newSoldModelBet(req SellRequest, outcome string, sharesSold int64, placedAt time.Time) *models.Bet {
-	return &models.Bet{
+func newSoldBoundaryBet(req SellRequest, outcome string, sharesSold int64, placedAt time.Time) *boundary.Bet {
+	return &boundary.Bet{
 		Username: req.Username,
 		MarketID: req.MarketID,
 		Amount:   -sharesSold,
@@ -35,8 +35,8 @@ type PlaceRequest struct {
 }
 
 // NewBet builds the persisted bet record for a place request.
-func (r PlaceRequest) NewBet(outcome string, placedAt time.Time) *models.Bet {
-	return newPlacedModelBet(r, outcome, placedAt)
+func (r PlaceRequest) NewBet(outcome string, placedAt time.Time) *boundary.Bet {
+	return newPlacedBoundaryBet(r, outcome, placedAt)
 }
 
 // PlacedBet represents the bet that was successfully recorded.
@@ -48,7 +48,7 @@ type PlacedBet struct {
 	PlacedAt time.Time
 }
 
-func copyPlacedBet(target *PlacedBet, bet *models.Bet) *PlacedBet {
+func copyPlacedBet(target *PlacedBet, bet *boundary.Bet) *PlacedBet {
 	if bet == nil {
 		return nil
 	}
@@ -66,9 +66,14 @@ func copyPlacedBet(target *PlacedBet, bet *models.Bet) *PlacedBet {
 	return target
 }
 
-// FromModel copies the persisted bet fields into the domain result shape.
-func (p *PlacedBet) FromModel(bet *models.Bet) *PlacedBet {
+// FromBoundary copies the persisted bet fields into the domain result shape.
+func (p *PlacedBet) FromBoundary(bet *boundary.Bet) *PlacedBet {
 	return copyPlacedBet(p, bet)
+}
+
+// FromModel preserves the legacy naming while reading from the boundary record.
+func (p *PlacedBet) FromModel(bet *boundary.Bet) *PlacedBet {
+	return p.FromBoundary(bet)
 }
 
 // SellRequest represents a request to sell shares for credits.
@@ -80,8 +85,8 @@ type SellRequest struct {
 }
 
 // NewSaleBet builds the persisted ledger entry for a share sale.
-func (r SellRequest) NewSaleBet(outcome string, sharesSold int64, placedAt time.Time) *models.Bet {
-	return newSoldModelBet(r, outcome, sharesSold, placedAt)
+func (r SellRequest) NewSaleBet(outcome string, sharesSold int64, placedAt time.Time) *boundary.Bet {
+	return newSoldBoundaryBet(r, outcome, sharesSold, placedAt)
 }
 
 // SellResult summarises the sale that occurred.

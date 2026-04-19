@@ -7,9 +7,9 @@ import (
 	"time"
 
 	bets "socialpredict/internal/domain/bets"
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
 )
@@ -17,7 +17,7 @@ import (
 var errUnexpectedServiceCall = errors.New("unexpected call")
 
 type fakeRepo struct {
-	created *models.Bet
+	created *boundary.Bet
 	writer  fakeBetWriter
 	history fakeBetHistoryReader
 }
@@ -25,7 +25,7 @@ type fakeRepo struct {
 func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
 	repo := &fakeRepo{
 		writer: fakeBetWriter{
-			createFunc: func(context.Context, *models.Bet) error { return nil },
+			createFunc: func(context.Context, *boundary.Bet) error { return nil },
 		},
 		history: fakeBetHistoryReader{
 			hasBetFunc: func(context.Context, uint, string) (bool, error) { return false, nil },
@@ -37,7 +37,7 @@ func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
 	return repo
 }
 
-func withFakeRepoCreate(fn func(ctx context.Context, bet *models.Bet) error) func(*fakeRepo) {
+func withFakeRepoCreate(fn func(ctx context.Context, bet *boundary.Bet) error) func(*fakeRepo) {
 	return func(repo *fakeRepo) {
 		repo.writer.createFunc = fn
 	}
@@ -50,10 +50,10 @@ func withFakeRepoHasBet(fn func(ctx context.Context, marketID uint, username str
 }
 
 type fakeBetWriter struct {
-	createFunc func(ctx context.Context, bet *models.Bet) error
+	createFunc func(ctx context.Context, bet *boundary.Bet) error
 }
 
-func (f *fakeRepo) Create(ctx context.Context, bet *models.Bet) error {
+func (f *fakeRepo) Create(ctx context.Context, bet *boundary.Bet) error {
 	return f.writer.Create(ctx, bet, f)
 }
 
@@ -65,7 +65,7 @@ func (f *fakeRepo) UserHasBet(ctx context.Context, marketID uint, username strin
 	return f.history.UserHasBet(ctx, marketID, username)
 }
 
-func (f fakeBetWriter) Create(ctx context.Context, bet *models.Bet, repo *fakeRepo) error {
+func (f fakeBetWriter) Create(ctx context.Context, bet *boundary.Bet, repo *fakeRepo) error {
 	if f.createFunc == nil {
 		return errUnexpectedServiceCall
 	}

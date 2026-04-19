@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
@@ -20,6 +21,22 @@ import (
 type mockPositionsService struct {
 	positions dmarkets.MarketPositions
 	err       error
+}
+
+func boundaryBetsFromModels(dbBets []models.Bet) []boundary.Bet {
+	bets := make([]boundary.Bet, len(dbBets))
+	for i, bet := range dbBets {
+		bets[i] = boundary.Bet{
+			ID:        uint(bet.ID),
+			Username:  bet.Username,
+			MarketID:  bet.MarketID,
+			Amount:    bet.Amount,
+			Outcome:   bet.Outcome,
+			PlacedAt:  bet.PlacedAt,
+			CreatedAt: bet.CreatedAt,
+		}
+	}
+	return bets
 }
 
 func toDomainPositions(input []positionsmath.MarketPosition) dmarkets.MarketPositions {
@@ -164,7 +181,7 @@ func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.
 		ResolutionResult: marketModel.ResolutionResult,
 	}
 
-	positionSnapshot, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, betsRecords)
+	positionSnapshot, err := positionsmath.CalculateMarketPositions_WPAM_DBPM(snapshot, boundaryBetsFromModels(betsRecords))
 	if err != nil {
 		t.Fatalf("calculate positions: %v", err)
 	}

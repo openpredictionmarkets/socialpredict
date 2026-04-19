@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
@@ -362,7 +363,7 @@ func (r *GormRepository) CalculatePayoutPositions(ctx context.Context, marketID 
 	return result, nil
 }
 
-func (r *GormRepository) loadMarketData(ctx context.Context, marketID int64) (positionsmath.MarketSnapshot, []models.Bet, error) {
+func (r *GormRepository) loadMarketData(ctx context.Context, marketID int64) (positionsmath.MarketSnapshot, []boundary.Bet, error) {
 	var market models.Market
 	if err := r.db.WithContext(ctx).First(&market, marketID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -386,7 +387,23 @@ func (r *GormRepository) loadMarketData(ctx context.Context, marketID int64) (po
 		ResolutionResult: market.ResolutionResult,
 	}
 
-	return snapshot, bets, nil
+	return snapshot, mapModelBetsToBoundary(bets), nil
+}
+
+func mapModelBetsToBoundary(dbBets []models.Bet) []boundary.Bet {
+	bets := make([]boundary.Bet, len(dbBets))
+	for i, bet := range dbBets {
+		bets[i] = boundary.Bet{
+			ID:        uint(bet.ID),
+			Username:  bet.Username,
+			MarketID:  bet.MarketID,
+			Amount:    bet.Amount,
+			Outcome:   bet.Outcome,
+			PlacedAt:  bet.PlacedAt,
+			CreatedAt: bet.CreatedAt,
+		}
+	}
+	return bets
 }
 
 // domainToModel converts a domain market to a GORM model

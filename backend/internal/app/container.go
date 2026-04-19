@@ -147,6 +147,11 @@ func (c *Container) GetUsersService() *dusers.Service {
 	return c.usersService
 }
 
+// GetUsersRepository returns the users repository edge for boundary-contained consumers such as login.
+func (c *Container) GetUsersRepository() *rusers.GormRepository {
+	return &c.usersRepo
+}
+
 // GetAnalyticsService returns the analytics domain service
 func (c *Container) GetAnalyticsService() *analytics.Service {
 	return c.analyticsService

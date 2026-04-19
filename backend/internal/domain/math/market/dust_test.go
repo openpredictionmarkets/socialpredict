@@ -2,15 +2,15 @@ package marketmath
 
 import (
 	"fmt"
-	"socialpredict/models"
-	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
+
+	"socialpredict/internal/domain/boundary"
 )
 
 type fixedSellDustCalculator struct{ dust int64 }
 
-func (c fixedSellDustCalculator) DustForSell(sellBet models.Bet, allBets []models.Bet) int64 {
+func (c fixedSellDustCalculator) DustForSell(sellBet boundary.Bet, allBets []boundary.Bet) int64 {
 	if sellBet.Amount >= 0 {
 		return 0
 	}
@@ -19,8 +19,16 @@ func (c fixedSellDustCalculator) DustForSell(sellBet models.Bet, allBets []model
 
 var dustTestBaseTime = time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
-func makeDustTestBet(amount int64, outcome, username string, minutes int) models.Bet {
-	return modelstesting.GenerateBet(amount, outcome, username, 1, time.Duration(minutes)*time.Minute)
+func makeDustTestBet(amount int64, outcome, username string, minutes int) boundary.Bet {
+	placedAt := dustTestBaseTime.Add(time.Duration(minutes) * time.Minute)
+	return boundary.Bet{
+		Username:  username,
+		MarketID:  1,
+		Amount:    amount,
+		Outcome:   outcome,
+		PlacedAt:  placedAt,
+		CreatedAt: placedAt,
+	}
 }
 
 func assertInt64Equal(t *testing.T, label string, want, got int64) {
@@ -30,7 +38,7 @@ func assertInt64Equal(t *testing.T, label string, want, got int64) {
 	}
 }
 
-func assertDustInvariant(t *testing.T, bets []models.Bet) {
+func assertDustInvariant(t *testing.T, bets []boundary.Bet) {
 	t.Helper()
 	baseVolume := GetMarketVolume(bets)
 	volumeWithDust := GetMarketVolumeWithDust(bets)
@@ -47,19 +55,19 @@ func assertDustInvariant(t *testing.T, bets []models.Bet) {
 func TestGetMarketVolumeWithDust(t *testing.T) {
 	tests := []struct {
 		name             string
-		bets             []models.Bet
+		bets             []boundary.Bet
 		expectedBase     int64
 		expectedWithDust int64
 	}{
 		{
 			name:             "empty market",
-			bets:             []models.Bet{},
+			bets:             []boundary.Bet{},
 			expectedBase:     0,
 			expectedWithDust: 0,
 		},
 		{
 			name: "only buy bets - no dust",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDustTestBet(100, "YES", "user1", 0),
 				makeDustTestBet(200, "NO", "user2", 1),
 			},
@@ -68,7 +76,7 @@ func TestGetMarketVolumeWithDust(t *testing.T) {
 		},
 		{
 			name: "mixed buys and sells - with dust",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDustTestBet(100, "YES", "user1", 0),
 				makeDustTestBet(200, "NO", "user2", 1),
 				makeDustTestBet(-50, "YES", "user1", 2), // Sell
@@ -90,17 +98,17 @@ func TestGetMarketVolumeWithDust(t *testing.T) {
 func TestCalculateDustStack(t *testing.T) {
 	tests := []struct {
 		name         string
-		bets         []models.Bet
+		bets         []boundary.Bet
 		expectedDust int64
 	}{
 		{
 			name:         "no bets",
-			bets:         []models.Bet{},
+			bets:         []boundary.Bet{},
 			expectedDust: 0,
 		},
 		{
 			name: "only buy bets",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDustTestBet(100, "YES", "user1", 0),
 				makeDustTestBet(200, "NO", "user2", 1),
 			},
@@ -108,7 +116,7 @@ func TestCalculateDustStack(t *testing.T) {
 		},
 		{
 			name: "only sell bets",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDustTestBet(-50, "YES", "user1", 0),
 				makeDustTestBet(-75, "NO", "user2", 1),
 			},
@@ -116,7 +124,7 @@ func TestCalculateDustStack(t *testing.T) {
 		},
 		{
 			name: "mixed bets - chronological order matters",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDustTestBet(100, "YES", "user1", 0), // Buy first
 				makeDustTestBet(-50, "YES", "user1", 1), // Sell second
 				makeDustTestBet(200, "NO", "user2", 2),  // Buy third
@@ -134,7 +142,7 @@ func TestCalculateDustStack(t *testing.T) {
 }
 
 func TestGetMarketDust(t *testing.T) {
-	bets := []models.Bet{
+	bets := []boundary.Bet{
 		makeDustTestBet(100, "YES", "user1", 0),
 		makeDustTestBet(-50, "YES", "user1", 1),
 		makeDustTestBet(-25, "NO", "user2", 2),
@@ -144,7 +152,7 @@ func TestGetMarketDust(t *testing.T) {
 }
 
 func TestGetMarketDustWithCalculator(t *testing.T) {
-	bets := []models.Bet{
+	bets := []boundary.Bet{
 		makeDustTestBet(100, "YES", "user1", 0),
 		makeDustTestBet(-50, "YES", "user1", 1),
 		makeDustTestBet(-25, "NO", "user2", 2),
@@ -154,17 +162,17 @@ func TestGetMarketDustWithCalculator(t *testing.T) {
 }
 
 func TestCalculateDustForSell_Placeholder(t *testing.T) {
-	sellBet := models.Bet{Amount: -50, Outcome: "YES", Username: "user1", MarketID: 1, PlacedAt: dustTestBaseTime}
-	buyBet := models.Bet{Amount: 100, Outcome: "YES", Username: "user1", MarketID: 1, PlacedAt: dustTestBaseTime}
+	sellBet := boundary.Bet{Amount: -50, Outcome: "YES", Username: "user1", MarketID: 1, PlacedAt: dustTestBaseTime}
+	buyBet := boundary.Bet{Amount: 100, Outcome: "YES", Username: "user1", MarketID: 1, PlacedAt: dustTestBaseTime}
 
-	allBets := []models.Bet{buyBet, sellBet}
+	allBets := []boundary.Bet{buyBet, sellBet}
 
 	assertInt64Equal(t, "sell dust", 1, calculateDustForSell(sellBet, allBets))
 	assertInt64Equal(t, "buy dust", 0, calculateDustForSell(buyBet, allBets))
 }
 
 func TestCurrencyConservationInvariant(t *testing.T) {
-	testCases := [][]models.Bet{
+	testCases := [][]boundary.Bet{
 		{}, // Empty
 		{makeDustTestBet(100, "YES", "user1", 0)}, // Only buys
 		{makeDustTestBet(-50, "YES", "user1", 0)}, // Only sells

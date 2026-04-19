@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"socialpredict/models"
+	"socialpredict/internal/domain/boundary"
 )
 
 // ProjectProbability projects what the probability would be after a hypothetical bet.
@@ -30,15 +30,15 @@ func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProject
 		return nil, err
 	}
 
-	modelBets := convertToModelBets(bets)
-	probabilityTrack := s.probabilityEngine.Calculate(market.CreatedAt, modelBets)
+	boundaryBets := convertToBoundaryBets(bets)
+	probabilityTrack := s.probabilityEngine.Calculate(market.CreatedAt, boundaryBets)
 
 	currentProbability := 0.5
 	if len(probabilityTrack) > 0 {
 		currentProbability = probabilityTrack[len(probabilityTrack)-1].Probability
 	}
 
-	newBet := models.Bet{
+	newBet := boundary.Bet{
 		Username: "preview",
 		MarketID: uint(market.ID),
 		Amount:   req.Amount,
@@ -46,7 +46,7 @@ func (s *Service) ProjectProbability(ctx context.Context, req ProbabilityProject
 		PlacedAt: s.clock.Now(),
 	}
 
-	projection := s.probabilityEngine.Project(market.CreatedAt, modelBets, newBet)
+	projection := s.probabilityEngine.Project(market.CreatedAt, boundaryBets, newBet)
 
 	result := &ProbabilityProjection{
 		CurrentProbability: currentProbability,

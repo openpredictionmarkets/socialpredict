@@ -210,7 +210,7 @@ func TestLoginHandler_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(invalidJSON))
 	w := httptest.NewRecorder()
 
-	LoginHandler(modelstesting.NewFakeDB(t))(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)))(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -221,7 +221,7 @@ func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123","extra":"nope"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(modelstesting.NewFakeDB(t))(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)))(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -259,6 +259,7 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := modelstesting.NewFakeDB(t)
+			repo := rusers.NewGormRepository(db)
 			loginReq := map[string]string{
 				"username": tt.username,
 				"password": tt.password,
@@ -268,7 +269,7 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(db)(w, req)
+			LoginHandler(repo)(w, req)
 
 			if w.Code != http.StatusBadRequest {
 				t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -296,6 +297,7 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 
 func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
+	repo := rusers.NewGormRepository(db)
 
 	testUser := modelstesting.GenerateUser("testuser", 1000)
 	if err := testUser.HashPassword("password123"); err != nil {
@@ -339,7 +341,7 @@ func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(db)(w, req)
+			LoginHandler(repo)(w, req)
 
 			if w.Code != http.StatusOK {
 				t.Errorf("Usernames should be trimmed before DB lookup. Expected status code %d, got %d (body: %s)", http.StatusOK, w.Code, w.Body.String())

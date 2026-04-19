@@ -7,6 +7,7 @@ import (
 	"socialpredict/internal/app"
 	"socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
+	"socialpredict/internal/domain/boundary"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -38,6 +39,30 @@ func requireAnalyticsSystemMetrics(t *testing.T, svc analyticsSystemMetricsCompu
 	}
 
 	return metrics
+}
+
+func calculateParticipationFees(cfg *setup.EconomicConfig, bets []boundary.Bet) int64 {
+	var total int64
+	type betKey struct {
+		username string
+		marketID uint
+	}
+	seen := make(map[betKey]bool)
+	initialFee := cfg.Economics.Betting.BetFees.InitialBetFee
+
+	for _, bet := range bets {
+		if bet.Amount <= 0 {
+			continue
+		}
+
+		key := betKey{username: bet.Username, marketID: bet.MarketID}
+		if !seen[key] {
+			seen[key] = true
+			total += initialFee
+		}
+	}
+
+	return total
 }
 
 func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
@@ -115,7 +140,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		expectedActiveVolume += b.Amount
 	}
 
-	participationFees := modelstesting.CalculateParticipationFees(econConfig, bets)
+	participationFees := calculateParticipationFees(econConfig, bets)
 	totalUtilized := expectedUnusedDebt + expectedActiveVolume + creationFee + participationFees
 	totalCapacity := maxDebt * int64(len(usersAfter))
 

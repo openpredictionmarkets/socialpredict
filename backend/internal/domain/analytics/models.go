@@ -1,5 +1,35 @@
 package analytics
 
+import (
+	"time"
+
+	positionsmath "socialpredict/internal/domain/math/positions"
+)
+
+// UserAccount captures the user fields needed by analytics calculations.
+type UserAccount struct {
+	Username       string
+	AccountBalance int64
+}
+
+// MarketRecord captures the market fields needed by analytics calculations.
+type MarketRecord struct {
+	ID               uint
+	CreatedAt        time.Time
+	IsResolved       bool
+	ResolutionResult string
+}
+
+// Snapshot converts the record into the shared math snapshot.
+func (m MarketRecord) Snapshot() positionsmath.MarketSnapshot {
+	return positionsmath.MarketSnapshot{
+		ID:               int64(m.ID),
+		CreatedAt:        m.CreatedAt,
+		IsResolved:       m.IsResolved,
+		ResolutionResult: m.ResolutionResult,
+	}
+}
+
 // FinancialSnapshotBalanceReader exposes balance-oriented financial snapshot fields.
 type FinancialSnapshotBalanceReader interface {
 	AccountBalanceValue() int64

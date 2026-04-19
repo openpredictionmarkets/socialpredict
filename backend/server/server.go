@@ -139,6 +139,7 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 	container := app.BuildApplicationWithConfigService(db, configService)
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
+	usersRepo := container.GetUsersRepository()
 	analyticsService := container.GetAnalyticsService()
 	authService := container.GetAuthService()
 
@@ -153,7 +154,7 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
-	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(db))).Methods("POST")
+	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(usersRepo))).Methods("POST")
 
 	// application setup and stats information
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")

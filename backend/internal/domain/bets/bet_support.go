@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
 	"socialpredict/setup"
 )
 
@@ -115,7 +115,7 @@ type betLedger struct {
 	users TransactionRecorder
 }
 
-func (l betLedger) ChargeAndRecord(ctx context.Context, bet *models.Bet, totalCost int64) error {
+func (l betLedger) ChargeAndRecord(ctx context.Context, bet *boundary.Bet, totalCost int64) error {
 	if err := l.users.ApplyTransaction(ctx, bet.Username, totalCost, dusers.TransactionBuy); err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (l betLedger) ChargeAndRecord(ctx context.Context, bet *models.Bet, totalCo
 	return nil
 }
 
-func (l betLedger) CreditSale(ctx context.Context, bet *models.Bet, saleValue int64) error {
+func (l betLedger) CreditSale(ctx context.Context, bet *boundary.Bet, saleValue int64) error {
 	if err := l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionSale); err != nil {
 		return err
 	}

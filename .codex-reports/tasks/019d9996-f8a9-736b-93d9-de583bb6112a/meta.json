@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task": {
+    "uid": "019d9996-f8a9-736b-93d9-de583bb6112a",
+    "id": "W03-001",
+    "title": "WAVE03: Establish domain-model boundary types and legacy-model adapters",
+    "working_dir": "../socialpredict/backend"
+  },
+  "dispatcher_agent": "software-action-dispatcher-agent",
+  "control_repo": "/workspace/spec-socialpredict-tasks",
+  "target_repo": "/workspace/socialpredict",
+  "report_dir": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-736b-93d9-de583bb6112a",
+  "created_at": "2026-04-19T03:45:12.386946+00:00",
+  "updated_at": "2026-04-19T11:21:27.181152+00:00",
+  "files": {
+    "summary": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-736b-93d9-de583bb6112a/summary.json",
+    "conversation": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-736b-93d9-de583bb6112a/conversation.ndjson",
+    "decisions": "/workspace/socialpredict/.codex-reports/tasks/019d9996-f8a9-736b-93d9-de583bb6112a/decisions.ndjson"
+  }
+}

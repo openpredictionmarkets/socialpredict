@@ -50,6 +50,7 @@ func buildTestHandler(t *testing.T, db *gorm.DB) http.Handler {
 	container := app.BuildApplicationWithConfigService(db, configService)
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
+	usersRepo := container.GetUsersRepository()
 	analyticsService := container.GetAnalyticsService()
 	authService := container.GetAuthService()
 	betsService := container.GetBetsService()
@@ -60,7 +61,7 @@ func buildTestHandler(t *testing.T, db *gorm.DB) http.Handler {
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
-	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(db))).Methods("POST")
+	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(usersRepo))).Methods("POST")
 
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
 	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
@@ -248,6 +249,7 @@ func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig *configsvc
 	container := app.BuildApplicationWithConfigService(db, configService)
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
+	usersRepo := container.GetUsersRepository()
 	analyticsService := container.GetAnalyticsService()
 	authService := container.GetAuthService()
 	betsService := container.GetBetsService()
@@ -258,7 +260,7 @@ func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig *configsvc
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
-	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(db))).Methods("POST")
+	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(usersRepo))).Methods("POST")
 
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
 	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")

@@ -32,10 +32,10 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 		return []*LeaderboardRow{}, nil
 	}
 
-	modelBets := convertToModelBets(bets)
+	boundaryBets := convertToBoundaryBets(bets)
 	snapshot := marketSnapshotFromModel(market)
 
-	profitability, err := s.leaderboardCalculator.Calculate(snapshot, modelBets)
+	profitability, err := s.leaderboardCalculator.Calculate(snapshot, boundaryBets)
 	if err != nil {
 		return nil, err
 	}

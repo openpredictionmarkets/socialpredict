@@ -2,21 +2,31 @@
   "task_uid": "019d9996-f8a9-75b8-a4a3-7349b2560d4f",
   "task_id": "W02-002",
   "status": "completed",
-  "updated_at": "2026-04-18T12:35:10.932659+00:00",
+  "updated_at": "2026-04-19T03:44:51.189877+00:00",
   "owner": "software-action-dispatcher-agent",
   "headline": "Config consumers and setup routes now use the runtime configuration service.",
-  "current_focus": "Completed migration of startup/server seeding flow to a shared config service boundary and locked setup/frontend semantics with targeted tests.",
+  "current_focus": "Completed migration of startup/server seeding flow to a shared config service boundary and verified setup/frontend route semantics with targeted checks.",
   "files_changed": [
-    "/workspace/socialpredict/backend/main.go,/workspace/socialpredict/backend/server/server.go,/workspace/socialpredict/backend/server/server_test.go,/workspace/socialpredict/backend/seed/seed.go,/workspace/socialpredict/backend/seed/seed_test.go,/workspace/socialpredict/backend/handlers/setup/setuphandler_test.go"
+    "/workspace/socialpredict/backend/main.go",
+    "/workspace/socialpredict/backend/server/server.go",
+    "/workspace/socialpredict/backend/server/server_test.go",
+    "/workspace/socialpredict/backend/seed/seed.go",
+    "/workspace/socialpredict/backend/seed/seed_users_test.go",
+    "/workspace/socialpredict/backend/internal/app/runtime/config.go",
+    "/workspace/socialpredict/backend/internal/app/runtime/config_test.go",
+    "/workspace/socialpredict/backend/handlers/setup/setuphandler_test.go"
   ],
   "checks_run": [
-    "go test -count=1 ./handlers/setup ./handlers/stats ./seed ./server ./internal/app (run 1),go test -count=1 ./handlers/setup ./handlers/stats ./seed ./server ./internal/app (run 2),go test ./... -run TestOpenAPISpecValidates -count=1,go vet ./handlers/setup ./handlers/stats ./seed ./server ./internal/app,/workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-architecture-governance/scripts/run_boundary_checks.sh /workspace/socialpredict"
+    "/workspace/spec-socialpredict-tasks/.codex/skills/socialpredict-go-architecture-governance/scripts/run_boundary_checks.sh /workspace/socialpredict",
+    "GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/gomod go test -p 1 -vet=off -count=1 ./handlers/setup ./handlers/stats ./seed ./server ./internal/app",
+    "GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/gomod go vet -p 1 ./handlers/setup ./handlers/stats ./seed ./server ./internal/app",
+    "GOCACHE=/workspace/socialpredict/.cache/go-build GOMODCACHE=/workspace/socialpredict/.cache/gomod go test ./... -run TestOpenAPISpecValidates -count=1"
   ],
   "open_questions": [],
   "follow_ups": [
     "None."
   ],
-  "last_event_seq": 3,
+  "last_event_seq": 4,
   "context": {
     "handoff_requested": false
   }

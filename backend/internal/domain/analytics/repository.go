@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"time"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 
 	"gorm.io/gorm"
 )
@@ -70,57 +71,63 @@ func (r *GormRepository) dbWithContext(ctx context.Context) (*gorm.DB, error) {
 	return db, nil
 }
 
-func (r *GormRepository) ListUsers(ctx context.Context) ([]models.User, error) {
+func (r *GormRepository) ListUsers(ctx context.Context) ([]UserAccount, error) {
 	db, err := r.dbWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var users []models.User
-	if err := db.Find(&users).Error; err != nil {
+	var users []analyticsUserRow
+	if err := db.Table("users").
+		Select("username", "account_balance").
+		Find(&users).Error; err != nil {
 		return nil, err
 	}
-	return users, nil
+	return mapUsers(users), nil
 }
 
-func (r *GormRepository) ListMarkets(ctx context.Context) ([]models.Market, error) {
+func (r *GormRepository) ListMarkets(ctx context.Context) ([]MarketRecord, error) {
 	db, err := r.dbWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var markets []models.Market
-	if err := db.Find(&markets).Error; err != nil {
+	var markets []analyticsMarketRow
+	if err := db.Table("markets").
+		Select("id", "created_at", "is_resolved", "resolution_result").
+		Find(&markets).Error; err != nil {
 		return nil, err
 	}
-	return markets, nil
+	return mapMarkets(markets), nil
 }
 
-func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error) {
+func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error) {
 	db, err := r.dbWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var bets []models.Bet
-	if err := db.
+	var bets []analyticsBetRow
+	if err := db.Table("bets").
+		Select("id", "username", "market_id", "amount", "outcome", "placed_at", "created_at").
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
 	}
-	return bets, nil
+	return mapBets(bets), nil
 }
 
-func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]models.Bet, error) {
+func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]boundary.Bet, error) {
 	db, err := r.dbWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var bets []models.Bet
-	if err := db.
+	var bets []analyticsBetRow
+	if err := db.Table("bets").
+		Select("id", "username", "market_id", "amount", "outcome", "placed_at", "created_at").
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
 	}
-	return bets, nil
+	return mapBets(bets), nil
 }
 
 func (r *GormRepository) UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error) {
@@ -162,17 +169,19 @@ func (r *GormRepository) UserMarketPositions(ctx context.Context, username strin
 	return positions, nil
 }
 
-func (r *GormRepository) listUserBets(db *gorm.DB, username string) ([]models.Bet, error) {
-	var userBets []models.Bet
-	if err := db.Where("username = ?", username).
+func (r *GormRepository) listUserBets(db *gorm.DB, username string) ([]boundary.Bet, error) {
+	var userBets []analyticsBetRow
+	if err := db.Table("bets").
+		Select("id", "username", "market_id", "amount", "outcome", "placed_at", "created_at").
+		Where("username = ?", username).
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&userBets).Error; err != nil {
 		return nil, err
 	}
-	return userBets, nil
+	return mapBets(userBets), nil
 }
 
-func collectMarketIDs(bets []models.Bet) []uint {
+func collectMarketIDs(bets []boundary.Bet) []uint {
 	marketIDSet := make(map[uint]struct{}, len(bets))
 	for _, bet := range bets {
 		marketIDSet[bet.MarketID] = struct{}{}
@@ -186,45 +195,45 @@ func collectMarketIDs(bets []models.Bet) []uint {
 	return marketIDs
 }
 
-func (r *GormRepository) listMarketsByIDs(db *gorm.DB, marketIDs []uint) ([]models.Market, error) {
+func (r *GormRepository) listMarketsByIDs(db *gorm.DB, marketIDs []uint) ([]MarketRecord, error) {
 	if len(marketIDs) == 0 {
-		return []models.Market{}, nil
+		return []MarketRecord{}, nil
 	}
-	var markets []models.Market
-	if err := db.Where("id IN ?", marketIDs).Find(&markets).Error; err != nil {
+	var markets []analyticsMarketRow
+	if err := db.Table("markets").
+		Select("id", "created_at", "is_resolved", "resolution_result").
+		Where("id IN ?", marketIDs).
+		Find(&markets).Error; err != nil {
 		return nil, err
 	}
-	return markets, nil
+	return mapMarkets(markets), nil
 }
 
-func buildMarketSnapshots(markets []models.Market) map[int64]positionsmath.MarketSnapshot {
+func buildMarketSnapshots(markets []MarketRecord) map[int64]positionsmath.MarketSnapshot {
 	marketSnapshots := make(map[int64]positionsmath.MarketSnapshot, len(markets))
 	for _, market := range markets {
-		marketSnapshots[int64(market.ID)] = positionsmath.MarketSnapshot{
-			ID:               int64(market.ID),
-			CreatedAt:        market.CreatedAt,
-			IsResolved:       market.IsResolved,
-			ResolutionResult: market.ResolutionResult,
-		}
+		marketSnapshots[int64(market.ID)] = market.Snapshot()
 	}
 	return marketSnapshots
 }
 
-func (r *GormRepository) listBetsByMarketIDs(db *gorm.DB, marketIDs []uint) ([]models.Bet, error) {
+func (r *GormRepository) listBetsByMarketIDs(db *gorm.DB, marketIDs []uint) ([]boundary.Bet, error) {
 	if len(marketIDs) == 0 {
-		return []models.Bet{}, nil
+		return []boundary.Bet{}, nil
 	}
-	var allBets []models.Bet
-	if err := db.Where("market_id IN ?", marketIDs).
+	var allBets []analyticsBetRow
+	if err := db.Table("bets").
+		Select("id", "username", "market_id", "amount", "outcome", "placed_at", "created_at").
+		Where("market_id IN ?", marketIDs).
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&allBets).Error; err != nil {
 		return nil, err
 	}
-	return allBets, nil
+	return mapBets(allBets), nil
 }
 
-func groupBetsByMarket(bets []models.Bet) map[int64][]models.Bet {
-	betsByMarket := make(map[int64][]models.Bet, len(bets))
+func groupBetsByMarket(bets []boundary.Bet) map[int64][]boundary.Bet {
+	betsByMarket := make(map[int64][]boundary.Bet, len(bets))
 	for _, bet := range bets {
 		betsByMarket[int64(bet.MarketID)] = append(betsByMarket[int64(bet.MarketID)], bet)
 	}
@@ -239,7 +248,7 @@ func (r *GormRepository) ensurePositionCalculator() MarketPositionCalculator {
 	return r.positionCalculator
 }
 
-func (r *GormRepository) calculateUserPositions(calculator MarketPositionCalculator, username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]models.Bet) ([]positionsmath.MarketPosition, error) {
+func (r *GormRepository) calculateUserPositions(calculator MarketPositionCalculator, username string, marketIDs []uint, snapshots map[int64]positionsmath.MarketSnapshot, betsByMarket map[int64][]boundary.Bet) ([]positionsmath.MarketPosition, error) {
 	var positions []positionsmath.MarketPosition
 	for _, marketID := range marketIDs {
 		snapshot, ok := snapshots[int64(marketID)]
@@ -266,6 +275,68 @@ func (r *GormRepository) calculateUserPositions(calculator MarketPositionCalcula
 	}
 
 	return positions, nil
+}
+
+type analyticsUserRow struct {
+	Username       string
+	AccountBalance int64
+}
+
+type analyticsMarketRow struct {
+	ID               uint
+	CreatedAt        time.Time
+	IsResolved       bool
+	ResolutionResult string
+}
+
+type analyticsBetRow struct {
+	ID        uint
+	Username  string
+	MarketID  uint
+	Amount    int64
+	Outcome   string
+	PlacedAt  time.Time
+	CreatedAt time.Time
+}
+
+func mapUsers(dbUsers []analyticsUserRow) []UserAccount {
+	users := make([]UserAccount, len(dbUsers))
+	for i, user := range dbUsers {
+		users[i] = UserAccount{
+			Username:       user.Username,
+			AccountBalance: user.AccountBalance,
+		}
+	}
+	return users
+}
+
+func mapMarkets(dbMarkets []analyticsMarketRow) []MarketRecord {
+	markets := make([]MarketRecord, len(dbMarkets))
+	for i, market := range dbMarkets {
+		markets[i] = MarketRecord{
+			ID:               market.ID,
+			CreatedAt:        market.CreatedAt,
+			IsResolved:       market.IsResolved,
+			ResolutionResult: market.ResolutionResult,
+		}
+	}
+	return markets
+}
+
+func mapBets(dbBets []analyticsBetRow) []boundary.Bet {
+	bets := make([]boundary.Bet, len(dbBets))
+	for i, bet := range dbBets {
+		bets[i] = boundary.Bet{
+			ID:        bet.ID,
+			Username:  bet.Username,
+			MarketID:  bet.MarketID,
+			Amount:    bet.Amount,
+			Outcome:   bet.Outcome,
+			PlacedAt:  bet.PlacedAt,
+			CreatedAt: bet.CreatedAt,
+		}
+	}
+	return bets
 }
 
 var (
