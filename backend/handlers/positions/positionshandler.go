@@ -1,28 +1,33 @@
 package positions
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"strconv"
 
+	"socialpredict/handlers"
 	dmarkets "socialpredict/internal/domain/markets"
 
 	"github.com/gorilla/mux"
+)
+
+const (
+	reasonPositionsMarketNotFound handlers.FailureReason = "MARKET_NOT_FOUND"
+	reasonPositionsUserNotFound   handlers.FailureReason = "USER_NOT_FOUND"
 )
 
 // MarketPositionsHandlerWithService creates a service-injected positions handler for all users
 func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
 		marketID, err := parseMarketID(mux.Vars(r)["marketId"])
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -34,11 +39,9 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 
 		responses := mapPositionsToResponses(positions)
 
-		// Respond with the positions information
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(responses); err != nil {
+		if err := handlers.WriteResult(w, http.StatusOK, responses); err != nil {
 			log.Printf("Error encoding positions response: %v", err)
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }
@@ -47,13 +50,13 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 func MarketUserPositionHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
 		marketID, username, err := parseMarketUserParams(mux.Vars(r))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -63,11 +66,9 @@ func MarketUserPositionHandlerWithService(svc dmarkets.ServiceInterface) http.Ha
 			return
 		}
 
-		// Respond with the user position information
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(newUserPositionResponse(position)); err != nil {
+		if err := handlers.WriteResult(w, http.StatusOK, newUserPositionResponse(position)); err != nil {
 			log.Printf("Error encoding user position response: %v", err)
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }
@@ -87,12 +88,12 @@ func parseMarketID(marketIDStr string) (int64, error) {
 func writePositionsError(w http.ResponseWriter, marketID int64, err error) {
 	switch err {
 	case dmarkets.ErrMarketNotFound:
-		http.Error(w, "Market not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonPositionsMarketNotFound)
 	case dmarkets.ErrInvalidInput:
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	default:
 		log.Printf("Error getting market positions for market %d: %v", marketID, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }
 
@@ -124,13 +125,13 @@ func parseMarketUserParams(vars map[string]string) (int64, string, error) {
 func writeUserPositionError(w http.ResponseWriter, marketID int64, username string, err error) {
 	switch err {
 	case dmarkets.ErrMarketNotFound:
-		http.Error(w, "Market not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonPositionsMarketNotFound)
 	case dmarkets.ErrUserNotFound:
-		http.Error(w, "User not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonPositionsUserNotFound)
 	case dmarkets.ErrInvalidInput:
-		http.Error(w, "Invalid request parameters", http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	default:
 		log.Printf("Error getting user position for market %d, user %s: %v", marketID, username, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }

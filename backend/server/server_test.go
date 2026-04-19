@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -229,6 +230,50 @@ func TestServerSetupRoutesUseInjectedConfigService(t *testing.T) {
 	}
 	if frontend.Charts.SigFigs != 2 {
 		t.Fatalf("expected clamped frontend sig figs 2, got %d", frontend.Charts.SigFigs)
+	}
+}
+
+func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	user := modelstesting.GenerateUser("mustchange", 1000)
+	user.MustChangePassword = true
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	handler := buildTestHandler(t, db)
+	token := modelstesting.GenerateValidJWT(user.Username)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "private profile", method: http.MethodGet, path: "/v0/privateprofile"},
+		{name: "change display name", method: http.MethodPost, path: "/v0/profilechange/displayname", body: `{"displayName":"New Name"}`},
+		{name: "change emoji", method: http.MethodPost, path: "/v0/profilechange/emoji", body: `{"emoji":":)"}`},
+		{name: "change description", method: http.MethodPost, path: "/v0/profilechange/description", body: `{"description":"updated description"}`},
+		{name: "change links", method: http.MethodPost, path: "/v0/profilechange/links", body: `{"personalLink1":"https://example.com"}`},
+		{name: "user position", method: http.MethodGet, path: "/v0/userposition/1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, bytes.NewBufferString(tt.body))
+			req.Header.Set("Authorization", "Bearer "+token)
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusForbidden {
+				t.Fatalf("expected status 403, got %d (body: %s)", rr.Code, rr.Body.String())
+			}
+		})
 	}
 }
 

@@ -3,12 +3,14 @@ package positions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	positionsmath "socialpredict/internal/domain/math/positions"
@@ -201,12 +203,17 @@ func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.
 		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
 
-	var positions []positionsmath.MarketPosition
-	if err := json.Unmarshal(rec.Body.Bytes(), &positions); err != nil {
+	var envelope handlers.SuccessEnvelope[[]userPositionResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
+	if !envelope.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
 
-	var locked *positionsmath.MarketPosition
+	positions := envelope.Result
+
+	var locked *userPositionResponse
 	for i := range positions {
 		if positions[i].Username == "testuser03" {
 			locked = &positions[i]
@@ -226,4 +233,65 @@ func TestMarketPositionsHandlerWithService_IncludesZeroPositionUsers(t *testing.
 	if err := db.Where("username = ? AND market_id = ?", "testuser03", market.ID).First(&totals).Error; err != nil {
 		t.Fatalf("verify bets: %v", err)
 	}
+}
+
+func TestMarketPositionsHandlerWithService_FailureEnvelope(t *testing.T) {
+	handler := MarketPositionsHandlerWithService(&mockPositionsService{err: dmarkets.ErrMarketNotFound})
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/positions/77", nil)
+	req = mux.SetURLVars(req, map[string]string{"marketId": "77"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != "MARKET_NOT_FOUND" {
+		t.Fatalf("expected reason MARKET_NOT_FOUND, got %q", resp.Reason)
+	}
+}
+
+func TestMarketUserPositionHandlerWithService_FailureEnvelope(t *testing.T) {
+	handler := MarketUserPositionHandlerWithService(&mockUserPositionService{
+		mockPositionsService: mockPositionsService{err: errors.New("boom")},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/positions/77/alice", nil)
+	req = mux.SetURLVars(req, map[string]string{
+		"marketId": "77",
+		"username": "alice",
+	})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInternalError) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, resp.Reason)
+	}
+}
+
+type mockUserPositionService struct {
+	mockPositionsService
+	position *dmarkets.UserPosition
+}
+
+func (m *mockUserPositionService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.position, nil
 }

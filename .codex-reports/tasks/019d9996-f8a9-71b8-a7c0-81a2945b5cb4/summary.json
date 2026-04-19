@@ -1,0 +1,17 @@
+{
+  "task_uid": "019d9996-f8a9-71b8-a7c0-81a2945b5cb4",
+  "task_id": "W04-003",
+  "status": "pending",
+  "updated_at": "2026-04-19T20:37:09.330757+00:00",
+  "owner": "software-action-dispatcher-agent",
+  "headline": "",
+  "current_focus": "",
+  "files_changed": [],
+  "checks_run": [],
+  "open_questions": [],
+  "follow_ups": [],
+  "last_event_seq": 1,
+  "context": {
+    "handoff_requested": false
+  }
+}

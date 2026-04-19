@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"socialpredict/handlers"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -40,21 +41,25 @@ func TestStatsHandlerReturnsServiceBackedConfiguration(t *testing.T) {
 		t.Fatalf("expected status 200, got %d with body %s", rr.Code, rr.Body.String())
 	}
 
-	var response StatsResponse
+	var response handlers.SuccessEnvelope[StatsResponse]
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if response.FinancialStats.TotalMoney != 250 {
-		t.Fatalf("expected total money 250, got %d", response.FinancialStats.TotalMoney)
+	if !response.OK {
+		t.Fatalf("expected ok=true, got false")
 	}
 
-	if response.SetupConfiguration.MaximumDebtAllowed != 900 {
-		t.Fatalf("expected max debt 900, got %d", response.SetupConfiguration.MaximumDebtAllowed)
+	if response.Result.FinancialStats.TotalMoney != 250 {
+		t.Fatalf("expected total money 250, got %d", response.Result.FinancialStats.TotalMoney)
 	}
 
-	if response.SetupConfiguration.BuySharesFee != 2 || response.SetupConfiguration.SellSharesFee != 3 {
-		t.Fatalf("expected setup fees 2/3, got %d/%d", response.SetupConfiguration.BuySharesFee, response.SetupConfiguration.SellSharesFee)
+	if response.Result.SetupConfiguration.MaximumDebtAllowed != 900 {
+		t.Fatalf("expected max debt 900, got %d", response.Result.SetupConfiguration.MaximumDebtAllowed)
+	}
+
+	if response.Result.SetupConfiguration.BuySharesFee != 2 || response.Result.SetupConfiguration.SellSharesFee != 3 {
+		t.Fatalf("expected setup fees 2/3, got %d/%d", response.Result.SetupConfiguration.BuySharesFee, response.Result.SetupConfiguration.SellSharesFee)
 	}
 }
 
@@ -67,4 +72,41 @@ func TestStatsHandlerRequiresConfigService(t *testing.T) {
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rr.Code)
 	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if response.OK {
+		t.Fatalf("expected ok=false, got true")
+	}
+
+	if response.Reason != string(reasonStatsUnavailable) {
+		t.Fatalf("expected reason %q, got %q", reasonStatsUnavailable, response.Reason)
+	}
+}
+
+func TestStatsHandlerSanitizesDatabaseErrors(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/v0/stats", nil)
+	rr := httptest.NewRecorder()
+
+	StatsHandler(nil, configsvc.NewStaticService(modelstesting.GenerateEconomicConfig())).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rr.Code)
+	}
+
+	if rr.Body.String() == "" {
+		t.Fatalf("expected non-empty response body")
+	}
+
+	if containsRawErrorDetails(rr.Body.String()) {
+		t.Fatalf("expected sanitized response, got %s", rr.Body.String())
+	}
+}
+
+func containsRawErrorDetails(body string) bool {
+	return body == "Failed to calculate financial stats: database connection is not initialized\n" ||
+		body == "Failed to load setup configuration: configuration service unavailable\n"
 }

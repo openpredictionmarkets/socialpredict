@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"socialpredict/handlers"
 
 	"socialpredict/internal/domain/boundary"
 	dusers "socialpredict/internal/domain/users"
@@ -35,10 +36,17 @@ type UserClaims struct {
 	jwt.StandardClaims
 }
 
+type loginResponse struct {
+	Token              string `json:"token"`
+	Username           string `json:"username"`
+	UserType           string `json:"usertype"`
+	MustChangePassword bool   `json:"mustChangePassword"`
+}
+
 func LoginHandler(users LoginUserRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method is not supported.", http.StatusNotFound)
+			_ = writeLoginFailure(w, http.StatusNotFound, handlers.FailureReason("METHOD_NOT_ALLOWED"))
 			return
 		}
 
@@ -46,40 +54,40 @@ func LoginHandler(users LoginUserRepository) http.HandlerFunc {
 
 		req, err := decodeLoginRequest(r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			_ = writeLoginFailure(w, http.StatusBadRequest, handlers.FailureReason("INVALID_REQUEST"))
 			return
 		}
 
 		req, err = validateAndSanitizeLogin(securityService, req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			_ = writeLoginFailure(w, http.StatusBadRequest, handlers.FailureReason("INVALID_REQUEST"))
 			return
 		}
 
 		if users == nil {
-			http.Error(w, "Error accessing database", http.StatusInternalServerError)
+			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
 		user, loginErr := authenticateUser(r.Context(), users, req)
 		if loginErr != nil {
-			http.Error(w, loginErr.message, loginErr.statusCode)
+			_ = writeLoginFailure(w, loginErr.statusCode, loginFailureReason(loginErr.statusCode))
 			return
 		}
 
 		jwtKey := getJWTKey()
 		if len(jwtKey) == 0 {
-			http.Error(w, "Error creating token", http.StatusInternalServerError)
+			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
 		tokenString, err := generateJWT(user.Username, jwtKey)
 		if err != nil {
-			http.Error(w, "Error creating token", http.StatusInternalServerError)
+			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
-		writeLoginResponse(w, user, tokenString)
+		_ = writeLoginResponse(w, user, tokenString)
 	}
 }
 
@@ -116,25 +124,24 @@ func validateAndSanitizeLogin(securityService *security.SecurityService, req log
 }
 
 type loginError struct {
-	message    string
 	statusCode int
 }
 
 func authenticateUser(ctx context.Context, users LoginUserRepository, req loginRequest) (boundary.AuthenticatedUser, *loginError) {
 	if users == nil {
-		return boundary.AuthenticatedUser{}, &loginError{message: "Error accessing database", statusCode: http.StatusInternalServerError}
+		return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusInternalServerError}
 	}
 
 	user, err := findUserByUsername(ctx, users, req.Username)
 	if err != nil {
 		if errors.Is(err, dusers.ErrUserNotFound) {
-			return boundary.AuthenticatedUser{}, &loginError{message: "Invalid Credentials", statusCode: http.StatusUnauthorized}
+			return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusUnauthorized}
 		}
-		return boundary.AuthenticatedUser{}, &loginError{message: "Error accessing database", statusCode: http.StatusInternalServerError}
+		return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusInternalServerError}
 	}
 
 	if !user.CheckPasswordHash(req.Password) {
-		return boundary.AuthenticatedUser{}, &loginError{message: "Invalid Credentials", statusCode: http.StatusUnauthorized}
+		return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusUnauthorized}
 	}
 
 	return user, nil
@@ -171,15 +178,26 @@ func generateJWT(username string, jwtKey []byte) (string, error) {
 	return token.SignedString(jwtKey)
 }
 
-func writeLoginResponse(w http.ResponseWriter, user boundary.AuthenticatedUser, tokenString string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+func writeLoginResponse(w http.ResponseWriter, user boundary.AuthenticatedUser, tokenString string) error {
+	return handlers.WriteResult(w, http.StatusOK, loginResponse{
+		Token:              tokenString,
+		Username:           user.Username,
+		UserType:           user.UserType,
+		MustChangePassword: user.MustChangePassword,
+	})
+}
 
-	responseData := map[string]interface{}{
-		"token":              tokenString,
-		"username":           user.Username,
-		"usertype":           user.UserType,
-		"mustChangePassword": user.MustChangePassword,
+func writeLoginFailure(w http.ResponseWriter, statusCode int, reason handlers.FailureReason) error {
+	return handlers.WriteFailure(w, statusCode, reason)
+}
+
+func loginFailureReason(statusCode int) handlers.FailureReason {
+	switch statusCode {
+	case http.StatusBadRequest:
+		return handlers.FailureReason("INVALID_REQUEST")
+	case http.StatusUnauthorized:
+		return handlers.FailureReason("INVALID_CREDENTIALS")
+	default:
+		return handlers.FailureReason("AUTH_INTERNAL_ERROR")
 	}
-	_ = json.NewEncoder(w).Encode(responseData)
 }

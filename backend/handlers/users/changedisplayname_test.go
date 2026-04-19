@@ -1,9 +1,20 @@
 package usershandlers
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"socialpredict/security"
 	"strings"
 	"testing"
+
+	"socialpredict/handlers"
+	"socialpredict/handlers/users/dto"
+	dusers "socialpredict/internal/domain/users"
+	"socialpredict/models/modelstesting"
 )
 
 func TestDisplayNameValidation(t *testing.T) {
@@ -114,5 +125,117 @@ func TestDisplayNameXSSPrevention(t *testing.T) {
 				t.Errorf("JavaScript protocol remained after sanitization: %s -> %s", payload, sanitized)
 			}
 		})
+	}
+}
+
+type displayNameServiceMock struct {
+	user    *dusers.User
+	updated *dusers.User
+	err     error
+}
+
+func (m *displayNameServiceMock) GetPublicUser(context.Context, string) (*dusers.PublicUser, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) GetUser(context.Context, string) (*dusers.User, error) {
+	return m.user, nil
+}
+
+func (m *displayNameServiceMock) GetPrivateProfile(context.Context, string) (*dusers.PrivateProfile, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) ApplyTransaction(context.Context, string, int64, string) error {
+	return nil
+}
+
+func (m *displayNameServiceMock) GetUserCredit(context.Context, string, int64) (int64, error) {
+	return 0, nil
+}
+
+func (m *displayNameServiceMock) GetUserPortfolio(context.Context, string) (*dusers.Portfolio, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) GetUserFinancials(context.Context, string) (map[string]int64, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) ListUserMarkets(context.Context, int64) ([]*dusers.UserMarket, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) UpdateDescription(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) UpdateDisplayName(context.Context, string, string) (*dusers.User, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.updated, nil
+}
+
+func (m *displayNameServiceMock) UpdateEmoji(context.Context, string, string) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) UpdatePersonalLinks(context.Context, string, dusers.PersonalLinks) (*dusers.User, error) {
+	return nil, nil
+}
+
+func (m *displayNameServiceMock) ChangePassword(context.Context, string, string, string) error {
+	return nil
+}
+
+func TestChangeDisplayNameHandler_SuccessEnvelope(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	svc := &displayNameServiceMock{
+		user: &dusers.User{Username: "alice"},
+		updated: &dusers.User{
+			ID: 1, Username: "alice", DisplayName: "Alice New", UserType: "REGULAR",
+		},
+	}
+	payload, _ := json.Marshal(dto.ChangeDisplayNameRequest{DisplayName: "Alice New"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/profilechange/displayname", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ChangeDisplayNameHandler(svc).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var resp handlers.SuccessEnvelope[dto.PrivateUserResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if !resp.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if resp.Result.DisplayName != "Alice New" {
+		t.Fatalf("expected display name Alice New, got %q", resp.Result.DisplayName)
+	}
+}
+
+func TestWriteProfileError_SanitizesValidationFailure(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	writeProfileError(rec, errors.New("display name must be between 1 and 50 characters"), "display name")
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rec.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonValidationFailed) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonValidationFailed, resp.Reason)
 	}
 }

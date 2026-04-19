@@ -1,12 +1,12 @@
 package usershandlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"socialpredict/handlers"
 
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
@@ -18,19 +18,19 @@ import (
 func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, usersSvc)
+		user, httperr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
 		if httperr != nil {
-			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
+			_ = handlers.WriteFailure(w, httperr.StatusCode, profileAuthFailureReason(httperr))
 			return
 		}
 
 		marketID, err := parseMarketID(mux.Vars(r)["marketId"])
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -40,9 +40,8 @@ func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, u
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(position); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := handlers.WriteResult(w, http.StatusOK, position); err != nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }
@@ -62,12 +61,12 @@ func parseMarketID(marketIDStr string) (int64, error) {
 func writeUserPositionError(w http.ResponseWriter, marketID int64, username string, err error) {
 	switch err {
 	case dmarkets.ErrMarketNotFound:
-		http.Error(w, "Market not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, "MARKET_NOT_FOUND")
 	case dmarkets.ErrUserNotFound:
-		http.Error(w, "User not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, "USER_NOT_FOUND")
 	case dmarkets.ErrInvalidInput:
-		http.Error(w, "Invalid request parameters", http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	default:
-		http.Error(w, "Failed to fetch user position", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }

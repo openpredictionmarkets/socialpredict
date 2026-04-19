@@ -11,9 +11,9 @@ import (
 
 func GetPrivateProfileHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
+		user, httperr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, svc)
 		if httperr != nil {
-			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
+			http.Error(w, httperr.Error(), httperr.StatusCode)
 			return
 		}
 
