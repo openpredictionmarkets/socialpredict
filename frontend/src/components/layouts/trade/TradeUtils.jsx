@@ -2,6 +2,20 @@
 import { API_URL } from '../../../config';
 import React, { useState, useEffect } from 'react';
 
+const unwrapApiResponse = (payload) => {
+    if (payload && typeof payload === 'object' && 'ok' in payload) {
+        if (payload.ok === false) {
+            throw new Error(payload.reason || 'Request failed');
+        }
+
+        if (payload.ok === true && 'result' in payload) {
+            return payload.result;
+        }
+    }
+
+    return payload;
+};
+
 export const submitBet = (betData, token, onSuccess, onError) => {
 
     if (!token) {
@@ -40,7 +54,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
                 let errorMessage;
                 try {
                     const errorData = JSON.parse(text);
-                    errorMessage = errorData.message || errorData.error || text;
+                    errorMessage = errorData.reason || errorData.message || errorData.error || text;
                 } catch {
                     errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
                 }
@@ -49,7 +63,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
         }
         return response.json();
     })
-    .then(onSuccess)
+    .then(data => onSuccess(unwrapApiResponse(data)))
     .catch(error => {
         onError(error);
     });
@@ -65,7 +79,8 @@ export const fetchUserShares = async (marketId, token) => {
     if (!response.ok) {
         throw new Error('Failed to fetch user shares');
     }
-    return response.json();
+    const data = await response.json();
+    return unwrapApiResponse(data);
     };
 
 
@@ -106,7 +121,7 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
                 let errorMessage;
                 try {
                     const errorData = JSON.parse(text);
-                    errorMessage = errorData.message || errorData.error || text;
+                    errorMessage = errorData.reason || errorData.message || errorData.error || text;
                 } catch {
                     errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
                 }
@@ -115,7 +130,7 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
         }
         return response.json();
     })
-    .then(onSuccess)
+    .then(data => onSuccess(unwrapApiResponse(data)))
     .catch(error => {
         onError(error);
     });

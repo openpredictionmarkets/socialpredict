@@ -1,6 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {API_URL} from "../../config";
 
+const unwrapApiResponse = (payload) => {
+  if (payload && typeof payload === 'object' && 'ok' in payload) {
+    if (payload.ok === false) {
+      throw new Error(payload.reason || 'Request failed');
+    }
+
+    if (payload.ok === true && 'result' in payload) {
+      return payload.result;
+    }
+  }
+
+  return payload;
+};
+
 function HomeEditor() {
   const [content, setContent] = useState({
     title: '',
@@ -21,10 +35,11 @@ function HomeEditor() {
       const response = await fetch(`${API_URL}/v0/content/home`);
       if (response.ok) {
         const data = await response.json();
+        const homeContent = unwrapApiResponse(data);
         setContent({
-          title: data.title || '',
-          html: data.html || '',
-          version: data.version || 0
+          title: homeContent.title || '',
+          html: homeContent.html || '',
+          version: homeContent.version || 0
         });
       } else {
         setError('Failed to load content');
@@ -59,10 +74,11 @@ function HomeEditor() {
 
       if (response.ok) {
         const data = await response.json();
+        const homeContent = unwrapApiResponse(data);
         setContent(prev => ({
           ...prev,
-          version: data.version,
-          html: data.html
+          version: homeContent.version,
+          html: homeContent.html
         }));
         setMessage('Content saved successfully!');
       } else {

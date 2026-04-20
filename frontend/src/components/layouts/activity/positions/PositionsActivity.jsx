@@ -2,25 +2,55 @@ import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getMarketLabels } from '../../../../utils/labelMapping';
+import { useAuth } from '../../../../helpers/AuthContent';
+
+const unwrapApiResponse = (payload) => {
+  if (payload && typeof payload === 'object' && 'ok' in payload) {
+    if (payload.ok === false) {
+      throw new Error(payload.reason || 'Request failed');
+    }
+
+    if (payload.ok === true && 'result' in payload) {
+      return payload.result;
+    }
+  }
+
+  return payload;
+};
 
 const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
   const [positions, setPositions] = useState([]);
+  const { token } = useAuth();
 
   useEffect(() => {
     const fetchPositions = async () => {
-      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}`);
-      if (response.ok) {
-        const rawData = await response.json();
-
-        const filteredSorted = rawData
-          .filter(user => user.noSharesOwned > 0 || user.yesSharesOwned > 0)
-          .sort((a, b) => (b.noSharesOwned + b.yesSharesOwned) - (a.noSharesOwned + a.yesSharesOwned));
-
-        setPositions(filteredSorted);
+      if (!token) {
+        setPositions([]);
+        return;
       }
+
+      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        setPositions([]);
+        return;
+      }
+
+      const rawData = unwrapApiResponse(await response.json());
+      const filteredSorted = rawData
+        .filter(user => user.noSharesOwned > 0 || user.yesSharesOwned > 0)
+        .sort((a, b) => (b.noSharesOwned + b.yesSharesOwned) - (a.noSharesOwned + a.yesSharesOwned));
+
+      setPositions(filteredSorted);
     };
+
     fetchPositions();
-  }, [marketId, refreshTrigger]);
+  }, [marketId, refreshTrigger, token]);
 
   const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
 

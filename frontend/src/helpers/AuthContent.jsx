@@ -1,6 +1,53 @@
 import { API_URL } from './../config';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+const unwrapApiResponse = (payload) => {
+    if (payload && typeof payload === 'object' && 'ok' in payload) {
+        if (payload.ok === false) {
+            throw new Error(payload.reason || 'Request failed');
+        }
+
+        if (payload.ok === true && 'result' in payload) {
+            return payload.result;
+        }
+    }
+
+    return payload;
+};
+
+const decodeJwtPayload = (token) => {
+    if (!token) return null;
+
+    try {
+        const [, payload] = token.split('.');
+        if (!payload) return null;
+
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+        return JSON.parse(window.atob(padded));
+    } catch (error) {
+        console.error('Failed to decode JWT payload:', error);
+        return null;
+    }
+};
+
+const getStoredAuthState = () => {
+    const token = localStorage.getItem('token');
+    const tokenPayload = decodeJwtPayload(token);
+    const storedUsername = localStorage.getItem('username');
+    const normalizedUsername = storedUsername && storedUsername !== 'undefined'
+        ? storedUsername
+        : tokenPayload?.username || null;
+
+    return {
+        isLoggedIn: Boolean(token),
+        token,
+        username: normalizedUsername,
+        usertype: localStorage.getItem('usertype'),
+        changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
+    };
+};
+
 const AuthContext = createContext({
     username: null,
     setUsername: () => {},
@@ -16,13 +63,7 @@ const useAuth = () => useContext(
 );
 
 const AuthProvider = ({ children }) => {
-    const [authState, setAuthState] = useState({
-        isLoggedIn: false,
-        token: localStorage.getItem('token'),
-        username: localStorage.getItem('username'),
-        usertype: localStorage.getItem('usertype'),
-        changePasswordNeeded: null  // Initialized as null
-    });
+    const [authState, setAuthState] = useState(getStoredAuthState);
 
     useEffect(() => {
         if (authState.isLoggedIn && authState.usertype) {
@@ -31,17 +72,12 @@ const AuthProvider = ({ children }) => {
     }, [authState.isLoggedIn, authState.usertype]);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            setAuthState(prevState => ({
-                ...prevState,
-                isLoggedIn: true,
-                token: token,
-                username: localStorage.getItem('username'),
-                usertype: localStorage.getItem('usertype'),
-                // assume password change needed until shown not
-                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
-            }));
+        const storedState = getStoredAuthState();
+        if (storedState.token) {
+            if (storedState.username) {
+                localStorage.setItem('username', storedState.username);
+            }
+            setAuthState(storedState);
         }
     }, []);
 
@@ -68,16 +104,18 @@ const AuthProvider = ({ children }) => {
             }
 
             if (response.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username);
-                localStorage.setItem('usertype', data.usertype);
-                localStorage.setItem('changePasswordNeeded', data.mustChangePassword);
+                const authData = unwrapApiResponse(data);
+
+                localStorage.setItem('token', authData.token);
+                localStorage.setItem('username', authData.username);
+                localStorage.setItem('usertype', authData.usertype);
+                localStorage.setItem('changePasswordNeeded', authData.mustChangePassword);
                 setAuthState({
                     isLoggedIn: true,
-                    token: data.token,
-                    username: data.username,
-                    usertype: data.usertype,
-                    changePasswordNeeded: data.mustChangePassword,
+                    token: authData.token,
+                    username: authData.username,
+                    usertype: authData.usertype,
+                    changePasswordNeeded: authData.mustChangePassword,
                 });
                 return true;
             } else {

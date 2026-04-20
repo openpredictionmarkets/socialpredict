@@ -4,6 +4,7 @@ import MarketProjectionLayout from '../marketprojection/MarketProjectionLayout';
 import { submitBet } from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
 import { API_URL } from '../../../config';
+import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
 
 
 const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
@@ -14,6 +15,7 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
+    const showFeeSection = !isLoading && feeData;
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -31,7 +33,7 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
                     throw new Error(`Failed to load setup: ${response.status}`);
                 }
                 const data = await response.json();
-                setFeeData(data.Betting.BetFees);
+                setFeeData(data.betting?.betFees || null);
             } catch {
                 setFeeData(null);
             } finally {
@@ -62,6 +64,7 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
 
         submitBet(betData, token, (data) => {
             alert(`Bet placed successfully! ${data.amount} on ${data.outcome}`);
+            window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
             onTransactionSuccess();
         }, (error) => {
             alert(`Error placing bet: ${error.message}`);
@@ -88,32 +91,31 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
             </div>
             <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} yesLabel={yesLabel} noLabel={noLabel} />
             <div>
-            <div className="border-t border-gray-200 my-2"></div>
-
-            {!isLoading && feeData && (
+            {showFeeSection && (
+                <>
+                <div className="border-t border-gray-200 my-2"></div>
                 <div className="mb-4">
-                    {feeData.InitialBetFee === 0 && feeData.BuySharesFee === 0 ? (
+                    {feeData.initialBetFee === 0 && feeData.buySharesFee === 0 ? (
                         <p className="text-sm text-gray-300">No fees</p>
                     ) : (
                         <>
-                            {feeData.InitialBetFee > 0 && (
+                            {feeData.initialBetFee > 0 && (
                                 <p className="text-sm text-gray-300">
-                                    Initial Trade Fee: {feeData.InitialBetFee}
+                                    Initial Trade Fee: {feeData.initialBetFee}
                                     <span className="block">Does not apply if already traded on this market.</span>
                                 </p>
                             )}
-                            {feeData.BuySharesFee > 0 && (
+                            {feeData.buySharesFee > 0 && (
                                 <p className="text-sm text-gray-300">
-                                    Trading Fee (Buying Share): {feeData.BuySharesFee}
+                                    Trading Fee (Buying Share): {feeData.buySharesFee}
                                 </p>
                             )}
                         </>
                     )}
                 </div>
+                <div className="border-t border-gray-200 my-2"></div>
+                </>
             )}
-
-
-            <div className="border-t border-gray-200 my-2"></div>
             <MarketProjectionLayout
                 marketId={marketId}
                 amount={betAmount}

@@ -59,7 +59,7 @@ function ChangePasswordLayout() {
             // Logout user and redirect to login page after a short delay
             setTimeout(() => {
                 logout();
-                history.push('/login'); // Redirect to login page
+                history.push('/'); // Return to a real route with the login modal available
             }, 2000);  // Delay of 2000 milliseconds (2 seconds)
         } catch (err) {
             console.error('Failed to change password:', err);
