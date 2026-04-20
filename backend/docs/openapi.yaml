@@ -696,7 +696,7 @@ paths:
 
   /v0/markets/positions/{marketId}:
     get:
-      tags: [Markets, Users]
+      tags: [Markets]
       summary: List user positions for a market
       description: Returns all user positions (YES/NO shares) in a specific market.
       security:
@@ -737,7 +737,7 @@ paths:
 
   /v0/markets/positions/{marketId}/{username}:
     get:
-      tags: [Markets, Users]
+      tags: [Markets]
       summary: Get a user's position in a market
       description: Returns the holdings for a specific user in the given market.
       security:
@@ -809,7 +809,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '401':
-          description: Authentication failed or password change required.
+          description: Invalid or missing token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before placing a bet.
           content:
             application/json:
               schema:
@@ -866,7 +872,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '401':
-          description: Authentication failed or password change required.
+          description: Invalid or missing token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before selling shares.
           content:
             application/json:
               schema:
@@ -896,53 +908,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
-  /v0/user/markets/{marketId}:
-    get:
-      tags: [Users, Markets]
-      summary: Get the authenticated user's position in a market
-      description: Returns the authenticated user's holdings for the specified market.
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: marketId
-          required: true
-          description: Numeric identifier of the market.
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: User position returned successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserPositionEnvelopeResponse'
-        '400':
-          description: Invalid market ID.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-        '401':
-          description: Authentication failed or password change is required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-        '404':
-          description: Market or user not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-        '500':
-          description: Unexpected server error while fetching the user position.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-
   /v0/privateprofile:
     get:
       tags: [Users]
@@ -960,21 +925,27 @@ paths:
         '401':
           description: Invalid or missing token.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            text/plain:
+              schema:
+                type: string
         '404':
           description: User not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
         '500':
           description: Unexpected server error while fetching profile.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: string
 
   /v0/profilechange/description:
     post:
@@ -1003,6 +974,12 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
           content:
             application/json:
               schema:
@@ -1051,6 +1028,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
@@ -1095,6 +1078,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
@@ -1135,6 +1124,12 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
           content:
             application/json:
               schema:
@@ -1237,7 +1232,7 @@ paths:
 
   /v0/userposition/{marketId}:
     get:
-      tags: [Users, Markets]
+      tags: [Users]
       summary: Get authenticated user's position in a market
       security:
         - bearerAuth: []
@@ -1255,31 +1250,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserPosition'
+                $ref: '#/components/schemas/UserPositionEnvelopeResponse'
         '400':
           description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market or user not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching user position.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/usercredit/{username}:
     get:

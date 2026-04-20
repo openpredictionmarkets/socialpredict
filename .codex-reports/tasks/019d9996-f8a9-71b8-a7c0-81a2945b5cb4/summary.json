@@ -1,16 +1,22 @@
 {
   "task_uid": "019d9996-f8a9-71b8-a7c0-81a2945b5cb4",
   "task_id": "W04-003",
-  "status": "pending",
-  "updated_at": "2026-04-19T20:37:09.330757+00:00",
+  "status": "completed",
+  "updated_at": "2026-04-20T03:18:15.421221+00:00",
   "owner": "software-action-dispatcher-agent",
-  "headline": "",
-  "current_focus": "",
-  "files_changed": [],
-  "checks_run": [],
+  "headline": "Aligned WAVE04 OpenAPI auth/envelope docs with current handlers and route ownership.",
+  "current_focus": "Completed OpenAPI contract alignment for the touched WAVE04 auth and envelope-migrated routes; route structure remains unchanged.",
+  "files_changed": [
+    "backend/docs/openapi.yaml"
+  ],
+  "checks_run": [
+    "go test . -run TestOpenAPISpecValidates -count=1; rg route/auth/response cross-checks against backend/server/server.go and touched handlers"
+  ],
   "open_questions": [],
-  "follow_ups": [],
-  "last_event_seq": 1,
+  "follow_ups": [
+    "Full-module go test ./... verification remains environment-limited by workspace disk exhaustion (about 78 MB free on /workspace and /tmp full during the broader attempt)."
+  ],
+  "last_event_seq": 5,
   "context": {
     "handoff_requested": false
   }
