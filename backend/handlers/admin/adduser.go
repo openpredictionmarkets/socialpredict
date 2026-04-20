@@ -6,24 +6,24 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/security"
-	"socialpredict/setup"
-	"socialpredict/util"
 
 	"github.com/brianvoe/gofakeit"
 	"gorm.io/gorm"
 )
 
-func AddUserHandler(loadEconConfig setup.EconConfigLoader, auth authsvc.Authenticator) func(http.ResponseWriter, *http.Request) {
+func AddUserHandler(db *gorm.DB, configService configsvc.Service, auth authsvc.Authenticator) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
 			return
 		}
 
-		responseData, handlerErr := processAddUser(r, loadEconConfig, auth)
+		responseData, handlerErr := processAddUser(r, db, configService, auth)
 		if handlerErr != nil {
 			http.Error(w, handlerErr.message, handlerErr.statusCode)
 			if handlerErr.logErr != nil {
@@ -42,7 +42,7 @@ type handlerError struct {
 	logErr     error
 }
 
-func processAddUser(r *http.Request, loadEconConfig setup.EconConfigLoader, auth authsvc.Authenticator) (map[string]interface{}, *handlerError) {
+func processAddUser(r *http.Request, db *gorm.DB, configService configsvc.Service, auth authsvc.Authenticator) (map[string]interface{}, *handlerError) {
 	securityService := security.NewSecurityService()
 	req, decodeErr := decodeAddUserRequest(r)
 	if decodeErr != nil {
@@ -54,7 +54,9 @@ func processAddUser(r *http.Request, loadEconConfig setup.EconConfigLoader, auth
 	}
 	req.Username, _ = securityService.Sanitizer.SanitizeUsername(req.Username)
 
-	db := util.GetDB()
+	if db == nil {
+		return nil, &handlerError{message: "database unavailable", statusCode: http.StatusInternalServerError}
+	}
 
 	if auth == nil {
 		return nil, &handlerError{message: "authentication service unavailable", statusCode: http.StatusInternalServerError}
@@ -63,7 +65,11 @@ func processAddUser(r *http.Request, loadEconConfig setup.EconConfigLoader, auth
 		return nil, &handlerError{message: httpErr.Message, statusCode: httpErr.StatusCode}
 	}
 
-	appConfig := loadEconConfig()
+	if configService == nil {
+		return nil, &handlerError{message: "configuration service unavailable", statusCode: http.StatusInternalServerError}
+	}
+
+	appConfig := configService.Current()
 	user := buildNewUser(db, req.Username, appConfig)
 
 	if err := checkUniqueFields(db, &user); err != nil {
@@ -108,19 +114,19 @@ func validateAddUserUsername(securityService *security.SecurityService, username
 	return err
 }
 
-func buildNewUser(db *gorm.DB, username string, appConfig *setup.EconomicConfig) models.User {
+func buildNewUser(db *gorm.DB, username string, appConfig *configsvc.AppConfig) models.User {
 	return models.User{
 		PublicUser: models.PublicUser{
 			Username:              username,
-			DisplayName:           util.UniqueDisplayName(db),
+			DisplayName:           dusers.UniqueDisplayName(db),
 			UserType:              "REGULAR",
 			InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
 			AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
 			PersonalEmoji:         randomEmoji(),
 		},
 		PrivateUser: models.PrivateUser{
-			Email:  util.UniqueEmail(db),
-			APIKey: util.GenerateUniqueApiKey(db),
+			Email:  dusers.UniqueEmail(db),
+			APIKey: dusers.GenerateUniqueAPIKey(db),
 		},
 		MustChangePassword: true,
 	}

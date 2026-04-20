@@ -3,6 +3,7 @@ import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/t
 import { fetchUserShares, submitSale } from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
 import { API_URL } from '../../../config';
+import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
 
 const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
     const [shares, setShares] = useState({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
@@ -15,6 +16,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
+    const showFeeSection = !isLoading && feeData;
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -33,7 +35,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     throw new Error(`Failed to load setup: ${response.status}`);
                 }
                 const data = await response.json();
-                setFeeData(data.Betting.BetFees);
+                setFeeData(data.betting?.betFees || null);
             } catch {
                 setFeeData(null);
             } finally {
@@ -121,6 +123,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 setSelectedOutcome(null);
                 setSellAmount(1);
                 setIsSubmitting(false);
+                window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
                 onTransactionSuccess();
             },
             (error) => {
@@ -190,28 +193,29 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 </>
             )}
 
-            <div className="border-t border-gray-200 my-2"></div>
-
-            {!isLoading && feeData && (
+            {showFeeSection && (
+                <>
+                <div className="border-t border-gray-200 my-2"></div>
                 <div className="mb-4">
-                    {feeData.InitialBetFee === 0 && feeData.SellSharesFee === 0 ? (
+                    {feeData.initialBetFee === 0 && feeData.sellSharesFee === 0 ? (
                         <p className="text-sm text-gray-300">No fees</p>
                     ) : (
                         <>
-                            {feeData.InitialBetFee > 0 && (
+                            {feeData.initialBetFee > 0 && (
                                 <p className="text-sm text-gray-300">
-                                    Initial Trade Fee: {feeData.InitialBetFee}
+                                    Initial Trade Fee: {feeData.initialBetFee}
                                     <span className="block">Does not apply if already traded on this market.</span>
                                 </p>
                             )}
-                            {feeData.SellSharesFee > 0 && (
+                            {feeData.sellSharesFee > 0 && (
                                 <p className="text-sm text-gray-300">
-                                    Trading Fee (Selling Share): {feeData.SellSharesFee}
+                                    Trading Fee (Selling Share): {feeData.sellSharesFee}
                                 </p>
                             )}
                         </>
                     )}
                 </div>
+                </>
             )}
         </div>
     );

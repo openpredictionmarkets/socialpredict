@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"socialpredict/handlers/markets/dto"
+	appruntime "socialpredict/internal/app/runtime"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
 	"strconv"
 	"testing"
 	"time"
@@ -17,7 +17,7 @@ import (
 func TestMarketDetailsHandler_IncludesMarketDust(t *testing.T) {
 	// Create a fake database for testing
 	db := modelstesting.NewFakeDB(t)
-	util.DB = db // Set global DB for util.GetDB()
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("testcreator", 0)
@@ -78,7 +78,7 @@ func TestMarketDetailsHandler_IncludesMarketDust(t *testing.T) {
 func TestMarketDetailsHandler_MarketDustZeroWithNoBets(t *testing.T) {
 	// Create a fake database for testing
 	db := modelstesting.NewFakeDB(t)
-	util.DB = db // Set global DB for util.GetDB()
+	appruntime.SetDB(db)
 
 	// Create users
 	creator := modelstesting.GenerateUser("testcreator", 0)

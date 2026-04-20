@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/cms/homepage"
 	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/models"
@@ -48,13 +49,16 @@ func TestPublicGet_ReturnsHomepageContent(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp handlers.SuccessEnvelope[map[string]interface{}]
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp["title"] != item.Title {
-		t.Fatalf("expected title %q, got %q", item.Title, resp["title"])
+	if !resp.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if resp.Result["title"] != item.Title {
+		t.Fatalf("expected title %q, got %q", item.Title, resp.Result["title"])
 	}
 }
 
@@ -106,13 +110,16 @@ func TestAdminUpdate_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp map[string]interface{}
+	var resp handlers.SuccessEnvelope[map[string]interface{}]
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if resp["title"] != payload.Title {
-		t.Fatalf("expected updated title %q, got %q", payload.Title, resp["title"])
+	if !resp.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if resp.Result["title"] != payload.Title {
+		t.Fatalf("expected updated title %q, got %q", payload.Title, resp.Result["title"])
 	}
 
 	var stored models.HomepageContent
@@ -145,5 +152,13 @@ func TestAdminUpdate_Unauthorized(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInvalidToken) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInvalidToken, resp.Reason)
 	}
 }

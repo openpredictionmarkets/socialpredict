@@ -5,6 +5,20 @@ import SiteButton from '../../components/buttons/SiteButtons';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import SiteTabs from '../../components/tabs/SiteTabs';
 
+const unwrapApiResponse = (payload) => {
+  if (payload && typeof payload === 'object' && 'ok' in payload) {
+    if (payload.ok === false) {
+      throw new Error(payload.reason || 'Request failed');
+    }
+
+    if (payload.ok === true && 'result' in payload) {
+      return payload.result;
+    }
+  }
+
+  return payload;
+};
+
 // MetricCard Component
 const MetricCard = ({
   title,
@@ -88,7 +102,7 @@ const Stats = () => {
         }
 
         const data = await response.json();
-        setStatsData(data);
+        setStatsData(unwrapApiResponse(data));
       } catch (err) {
         setError(err.message);
       } finally {

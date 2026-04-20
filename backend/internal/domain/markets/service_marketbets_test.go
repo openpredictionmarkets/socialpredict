@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	markets "socialpredict/internal/domain/markets"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
 )
 
 type betsRepo struct {
@@ -275,15 +275,11 @@ func requireUnauthorized(t *testing.T, err error) {
 	}
 }
 
-func marketBetModel(bet *markets.Bet) models.Bet {
-	return bet.ToModelBet()
+func marketBetsToBoundary(bets []*markets.Bet) []boundary.Bet {
+	return markets.ToBoundaryBets(bets)
 }
 
-func marketBetsToModels(bets []*markets.Bet) []models.Bet {
-	return markets.ToModelBets(bets)
-}
-
-func requireBetDisplay(t *testing.T, got *markets.BetDisplayInfo, want models.Bet, wantProbability float64) {
+func requireBetDisplay(t *testing.T, got *markets.BetDisplayInfo, want boundary.Bet, wantProbability float64) {
 	t.Helper()
 	if got.Username != want.Username || got.Amount != want.Amount || !got.PlacedAt.Equal(want.PlacedAt) {
 		t.Fatalf("unexpected bet display info: %+v", got)
@@ -320,10 +316,10 @@ func TestGetMarketBets_ReturnsProbabilities(t *testing.T) {
 		t.Fatalf("expected %d bets, got %d", len(bets), len(results))
 	}
 
-	modelBets := marketBetsToModels(bets)
-	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(createdAt, modelBets)
+	boundaryBets := marketBetsToBoundary(bets)
+	probabilityChanges := wpam.CalculateMarketProbabilitiesWPAM(createdAt, boundaryBets)
 
-	matchProbability := func(bet models.Bet) float64 {
+	matchProbability := func(bet boundary.Bet) float64 {
 		prob := probabilityChanges[0].Probability
 		for _, change := range probabilityChanges {
 			if change.Timestamp.After(bet.PlacedAt) {
@@ -334,7 +330,7 @@ func TestGetMarketBets_ReturnsProbabilities(t *testing.T) {
 		return prob
 	}
 
-	for i, bet := range modelBets {
+	for i, bet := range boundaryBets {
 		wantProb := matchProbability(bet)
 		requireBetDisplay(t, results[i], bet, wantProb)
 	}

@@ -3,7 +3,7 @@ package markets
 import (
 	"context"
 
-	"socialpredict/models"
+	"socialpredict/internal/domain/boundary"
 )
 
 // GetPublicMarket returns a public representation of a market.
@@ -60,8 +60,8 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 		return nil, err
 	}
 
-	modelBets := convertToModelBets(bets)
-	probabilityChanges := s.probabilityEngine.Calculate(market.CreatedAt, modelBets)
+	boundaryBets := convertToBoundaryBets(bets)
+	probabilityChanges := s.probabilityEngine.Calculate(market.CreatedAt, boundaryBets)
 	probabilityPoints := make([]ProbabilityPoint, len(probabilityChanges))
 	for i, change := range probabilityChanges {
 		probabilityPoints[i] = ProbabilityPoint{
@@ -75,9 +75,9 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 		lastProbability = probabilityPoints[len(probabilityPoints)-1].Probability
 	}
 
-	totalVolumeWithDust := s.metricsCalculator.VolumeWithDust(modelBets)
-	marketDust := s.metricsCalculator.Dust(modelBets)
-	numUsers := countUniqueUsers(modelBets)
+	totalVolumeWithDust := s.metricsCalculator.VolumeWithDust(boundaryBets)
+	marketDust := s.metricsCalculator.Dust(boundaryBets)
+	numUsers := countUniqueUsers(boundaryBets)
 
 	return &MarketOverview{
 		Market:             market,
@@ -104,13 +104,13 @@ func (s *Service) buildCreatorSummary(ctx context.Context, username string) *Cre
 	return summary
 }
 
-func convertToModelBets(bets []*Bet) []models.Bet {
+func convertToBoundaryBets(bets []*Bet) []boundary.Bet {
 	if len(bets) == 0 {
-		return []models.Bet{}
+		return []boundary.Bet{}
 	}
-	out := make([]models.Bet, len(bets))
+	out := make([]boundary.Bet, len(bets))
 	for i, bet := range bets {
-		out[i] = models.Bet{
+		out[i] = boundary.Bet{
 			Username: bet.Username,
 			MarketID: bet.MarketID,
 			Amount:   bet.Amount,
@@ -121,7 +121,7 @@ func convertToModelBets(bets []*Bet) []models.Bet {
 	return out
 }
 
-func countUniqueUsers(bets []models.Bet) int {
+func countUniqueUsers(bets []boundary.Bet) int {
 	if len(bets) == 0 {
 		return 0
 	}

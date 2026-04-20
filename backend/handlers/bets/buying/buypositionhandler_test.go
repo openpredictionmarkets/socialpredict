@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -135,11 +136,14 @@ func TestPlaceBetHandler_Success(t *testing.T) {
 		t.Fatalf("unexpected service request: %+v", betsSvc.req)
 	}
 
-	var resp dto.PlaceBetResponse
+	var resp handlers.SuccessEnvelope[dto.PlaceBetResponse]
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if resp.Username != "alice" || resp.Amount != 120 || resp.MarketID != 5 {
+	if !resp.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if resp.Result.Username != "alice" || resp.Result.Amount != 120 || resp.Result.MarketID != 5 {
 		t.Fatalf("unexpected response body: %+v", resp)
 	}
 }
@@ -152,11 +156,12 @@ func TestPlaceBetHandler_ErrorMapping(t *testing.T) {
 		name       string
 		err        error
 		wantStatus int
+		wantReason string
 	}{
-		{"invalid outcome", bets.ErrInvalidOutcome, http.StatusBadRequest},
-		{"insufficient", bets.ErrInsufficientBalance, http.StatusUnprocessableEntity},
-		{"market closed", bets.ErrMarketClosed, http.StatusConflict},
-		{"not found", dmarkets.ErrMarketNotFound, http.StatusNotFound},
+		{"invalid outcome", bets.ErrInvalidOutcome, http.StatusBadRequest, "BET_VALIDATION_FAILED"},
+		{"insufficient", bets.ErrInsufficientBalance, http.StatusUnprocessableEntity, "INSUFFICIENT_BALANCE"},
+		{"market closed", bets.ErrMarketClosed, http.StatusConflict, "MARKET_CLOSED"},
+		{"not found", dmarkets.ErrMarketNotFound, http.StatusNotFound, "MARKET_NOT_FOUND"},
 	}
 
 	for _, tc := range cases {
@@ -175,6 +180,17 @@ func TestPlaceBetHandler_ErrorMapping(t *testing.T) {
 
 			if rr.Code != tc.wantStatus {
 				t.Fatalf("expected status %d, got %d", tc.wantStatus, rr.Code)
+			}
+
+			var resp handlers.FailureEnvelope
+			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("decode failure envelope: %v", err)
+			}
+			if resp.OK {
+				t.Fatalf("expected ok=false, got true")
+			}
+			if resp.Reason != tc.wantReason {
+				t.Fatalf("expected reason %q, got %q", tc.wantReason, resp.Reason)
 			}
 		})
 	}
@@ -195,5 +211,13 @@ func TestPlaceBetHandler_InvalidJSON(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInvalidRequest) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInvalidRequest, resp.Reason)
 	}
 }

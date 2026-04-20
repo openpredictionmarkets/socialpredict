@@ -1,9 +1,10 @@
 package positionsmath
 
 import (
-	"socialpredict/models"
 	"sort"
 	"time"
+
+	"socialpredict/internal/domain/boundary"
 )
 
 const (
@@ -19,15 +20,15 @@ type positionTypeRule struct {
 }
 
 type MarketPositionSource interface {
-	CalculateMarketPositions(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error)
+	CalculateMarketPositions(snapshot MarketSnapshot, bets []boundary.Bet) ([]MarketPosition, error)
 }
 
 type UserSpendCalculator interface {
-	Spend(bets []models.Bet, username string) int64
+	Spend(bets []boundary.Bet, username string) int64
 }
 
 type EarliestBetTimeFinder interface {
-	EarliestBetTime(bets []models.Bet, username string) time.Time
+	EarliestBetTime(bets []boundary.Bet, username string) time.Time
 }
 
 type PositionTypeResolver interface {
@@ -87,11 +88,11 @@ var defaultLeaderboardCalculator = LeaderboardCalculator{
 }
 
 // CalculateMarketLeaderboard ranks users in a market by profitability.
-func CalculateMarketLeaderboard(snapshot MarketSnapshot, bets []models.Bet) ([]UserProfitability, error) {
+func CalculateMarketLeaderboard(snapshot MarketSnapshot, bets []boundary.Bet) ([]UserProfitability, error) {
 	return defaultLeaderboardCalculator.Calculate(snapshot, bets)
 }
 
-func (c LeaderboardCalculator) Calculate(snapshot MarketSnapshot, bets []models.Bet) ([]UserProfitability, error) {
+func (c LeaderboardCalculator) Calculate(snapshot MarketSnapshot, bets []boundary.Bet) ([]UserProfitability, error) {
 	if len(bets) == 0 {
 		return []UserProfitability{}, nil
 	}
@@ -126,7 +127,7 @@ func (c LeaderboardCalculator) withDefaults() LeaderboardCalculator {
 
 func buildLeaderboard(
 	positions []MarketPosition,
-	bets []models.Bet,
+	bets []boundary.Bet,
 	spend UserSpendCalculator,
 	earliest EarliestBetTimeFinder,
 	positionTypes PositionTypeResolver,
@@ -147,7 +148,7 @@ func hasNoOpenPosition(position MarketPosition) bool {
 
 func newUserProfitability(
 	position MarketPosition,
-	bets []models.Bet,
+	bets []boundary.Bet,
 	spend UserSpendCalculator,
 	earliest EarliestBetTimeFinder,
 	positionTypes PositionTypeResolver,
@@ -181,28 +182,28 @@ func assignLeaderboardRanks(leaderboard []UserProfitability) {
 }
 
 // CalculateUserSpend sums a user's total spend (positive buys, negative sells).
-func CalculateUserSpend(bets []models.Bet, username string) int64 {
+func CalculateUserSpend(bets []boundary.Bet, username string) int64 {
 	return defaultSpendCalculator{}.Spend(bets, username)
 }
 
-func (defaultSpendCalculator) Spend(bets []models.Bet, username string) int64 {
+func (defaultSpendCalculator) Spend(bets []boundary.Bet, username string) int64 {
 	var total int64
-	forEachUserBet(bets, username, func(bet models.Bet) {
+	forEachUserBet(bets, username, func(bet boundary.Bet) {
 		total += bet.Amount
 	})
 	return total
 }
 
 // GetEarliestBetTime returns the earliest bet timestamp for the user.
-func GetEarliestBetTime(bets []models.Bet, username string) time.Time {
+func GetEarliestBetTime(bets []boundary.Bet, username string) time.Time {
 	return defaultEarliestBetTimeFinder{}.EarliestBetTime(bets, username)
 }
 
-func (defaultEarliestBetTimeFinder) EarliestBetTime(bets []models.Bet, username string) time.Time {
+func (defaultEarliestBetTimeFinder) EarliestBetTime(bets []boundary.Bet, username string) time.Time {
 	var earliest time.Time
 	first := true
 
-	forEachUserBet(bets, username, func(bet models.Bet) {
+	forEachUserBet(bets, username, func(bet boundary.Bet) {
 		if first || bet.PlacedAt.Before(earliest) {
 			earliest = bet.PlacedAt
 			first = false
@@ -226,7 +227,7 @@ func (defaultPositionTypeResolver) Resolve(yesShares, noShares int64) string {
 	return positionTypeNone
 }
 
-func forEachUserBet(bets []models.Bet, username string, visit func(models.Bet)) {
+func forEachUserBet(bets []boundary.Bet, username string, visit func(boundary.Bet)) {
 	for _, bet := range bets {
 		if bet.Username != username {
 			continue

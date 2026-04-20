@@ -1,9 +1,10 @@
 package positionsmath
 
 import (
-	"socialpredict/models"
 	"testing"
 	"time"
+
+	"socialpredict/internal/domain/boundary"
 )
 
 type stubMarketPositionSource struct {
@@ -11,17 +12,17 @@ type stubMarketPositionSource struct {
 	err       error
 }
 
-func (s stubMarketPositionSource) CalculateMarketPositions(MarketSnapshot, []models.Bet) ([]MarketPosition, error) {
+func (s stubMarketPositionSource) CalculateMarketPositions(MarketSnapshot, []boundary.Bet) ([]MarketPosition, error) {
 	return s.positions, s.err
 }
 
 type stubSpendCalculator struct{ total int64 }
 
-func (s stubSpendCalculator) Spend([]models.Bet, string) int64 { return s.total }
+func (s stubSpendCalculator) Spend([]boundary.Bet, string) int64 { return s.total }
 
 type stubEarliestBetFinder struct{ when time.Time }
 
-func (s stubEarliestBetFinder) EarliestBetTime([]models.Bet, string) time.Time { return s.when }
+func (s stubEarliestBetFinder) EarliestBetTime([]boundary.Bet, string) time.Time { return s.when }
 
 type stubPositionTypeResolver struct{ value string }
 
@@ -33,10 +34,10 @@ func makeUserBets(entries []struct {
 	Username string
 	Amount   int64
 	Offset   time.Duration
-}) []models.Bet {
-	bets := make([]models.Bet, 0, len(entries))
+}) []boundary.Bet {
+	bets := make([]boundary.Bet, 0, len(entries))
 	for _, entry := range entries {
-		bets = append(bets, models.Bet{
+		bets = append(bets, boundary.Bet{
 			Username: entry.Username,
 			Amount:   entry.Amount,
 			PlacedAt: profitabilityTestTime.Add(entry.Offset),
@@ -156,7 +157,7 @@ func TestCalculateMarketLeaderboard_UsesInjectedDependencies(t *testing.T) {
 		positionTypes: stubPositionTypeResolver{value: "CUSTOM"},
 	}
 
-	leaderboard, err := calc.Calculate(MarketSnapshot{ID: 1, CreatedAt: profitabilityTestTime}, []models.Bet{{Username: "alice", Amount: 1}})
+	leaderboard, err := calc.Calculate(MarketSnapshot{ID: 1, CreatedAt: profitabilityTestTime}, []boundary.Bet{{Username: "alice", Amount: 1}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

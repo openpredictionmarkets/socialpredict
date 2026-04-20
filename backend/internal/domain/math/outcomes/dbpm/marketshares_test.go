@@ -2,8 +2,8 @@ package dbpm
 
 import (
 	"reflect"
+	"socialpredict/internal/domain/boundary"
 	"socialpredict/internal/domain/math/probabilities/wpam"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
 	"sort"
@@ -17,11 +17,11 @@ func (s stubProbabilitySelector) Current([]wpam.ProbabilityChange) float64 { ret
 
 type stubMarketVolumeCalculator struct{ volume int64 }
 
-func (s stubMarketVolumeCalculator) Volume([]models.Bet) int64 { return s.volume }
+func (s stubMarketVolumeCalculator) Volume([]boundary.Bet) int64 { return s.volume }
 
 type stubCoursePayoutCalculator struct{ payouts []CourseBetPayout }
 
-func (s stubCoursePayoutCalculator) CoursePayouts([]models.Bet, []wpam.ProbabilityChange) []CourseBetPayout {
+func (s stubCoursePayoutCalculator) CoursePayouts([]boundary.Bet, []wpam.ProbabilityChange) []CourseBetPayout {
 	return append([]CourseBetPayout(nil), s.payouts...)
 }
 
@@ -36,13 +36,13 @@ func (s stubNormalizationFactorCalculator) NormalizationFactors(int64, int64, []
 
 type stubScaledPayoutCalculator struct{ payouts []int64 }
 
-func (s stubScaledPayoutCalculator) ScaledPayouts([]models.Bet, []CourseBetPayout, float64, float64) []int64 {
+func (s stubScaledPayoutCalculator) ScaledPayouts([]boundary.Bet, []CourseBetPayout, float64, float64) []int64 {
 	return append([]int64(nil), s.payouts...)
 }
 
 type stubExcessCalculator struct{ excess int64 }
 
-func (s stubExcessCalculator) Excess([]models.Bet, []int64) int64 { return s.excess }
+func (s stubExcessCalculator) Excess([]boundary.Bet, []int64) int64 { return s.excess }
 
 type stubPayoutAdjuster struct {
 	positive []int64
@@ -58,13 +58,13 @@ func (s stubPayoutAdjuster) AdjustNegative([]int64, int64) []int64 {
 	return append([]int64(nil), s.negative...)
 }
 
-func (s stubPayoutAdjuster) Adjust([]models.Bet, []int64) []int64 {
+func (s stubPayoutAdjuster) Adjust([]boundary.Bet, []int64) []int64 {
 	return append([]int64(nil), s.adjusted...)
 }
 
 type stubUserPayoutAggregator struct{ positions []DBPMMarketPosition }
 
-func (s stubUserPayoutAggregator) Aggregate([]models.Bet, []int64) []DBPMMarketPosition {
+func (s stubUserPayoutAggregator) Aggregate([]boundary.Bet, []int64) []DBPMMarketPosition {
 	return append([]DBPMMarketPosition(nil), s.positions...)
 }
 
@@ -79,7 +79,7 @@ type stubSingleCreditAllocator struct {
 	no  int64
 }
 
-func (s stubSingleCreditAllocator) Allocate([]models.Bet) (int64, int64) { return s.yes, s.no }
+func (s stubSingleCreditAllocator) Allocate([]boundary.Bet) (int64, int64) { return s.yes, s.no }
 
 var marketSharesBaseTime = time.Date(2025, 1, 1, 8, 0, 0, 0, time.UTC)
 
@@ -98,8 +98,33 @@ func generateCoursePayouts(payouts []float64, outcomes []string) []CourseBetPayo
 	return coursePayouts
 }
 
-func makeDBPMBet(amount int64, outcome, username string, minutes int) models.Bet {
-	return modelstesting.GenerateBet(amount, outcome, username, 1, marketSharesBaseTime.Add(time.Duration(minutes)*time.Minute).Sub(marketSharesBaseTime))
+func makeDBPMBet(amount int64, outcome, username string, minutes int) boundary.Bet {
+	return makeBoundaryBet(amount, outcome, username, 1, time.Duration(minutes)*time.Minute)
+}
+
+func makeBoundaryBet(amount int64, outcome, username string, marketID uint, offset time.Duration) boundary.Bet {
+	placedAt := marketSharesBaseTime.Add(offset)
+	return boundary.Bet{
+		Username:  username,
+		MarketID:  marketID,
+		Amount:    amount,
+		Outcome:   outcome,
+		PlacedAt:  placedAt,
+		CreatedAt: placedAt,
+	}
+}
+
+func makeDBPMFixtureBet(amount int64, outcome, username string, offset time.Duration) boundary.Bet {
+	bet := makeBoundaryBet(amount, outcome, username, 1, offset)
+	return boundary.Bet{
+		ID:        uint(bet.ID),
+		Username:  bet.Username,
+		MarketID:  bet.MarketID,
+		Amount:    bet.Amount,
+		Outcome:   bet.Outcome,
+		PlacedAt:  bet.PlacedAt,
+		CreatedAt: bet.CreatedAt,
+	}
 }
 
 func assertCoursePayoutsEqual(t *testing.T, name string, actual, expected []CourseBetPayout) {
@@ -152,21 +177,21 @@ func assertDBPMPositionsEqual(t *testing.T, name string, actual, expected []DBPM
 func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 	testcases := []struct {
 		Name               string
-		Bets               []models.Bet
+		Bets               []boundary.Bet
 		ProbabilityChanges []wpam.ProbabilityChange
 		yesShares          int64
 		noShares           int64
 	}{
 		{
 			Name:               "InitialMarketState",
-			Bets:               []models.Bet{},
+			Bets:               []boundary.Bet{},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500),
 			yesShares:          0,
 			noShares:           0,
 		},
 		{
 			Name: "FirstBetNoDirection",
-			Bets: []models.Bet{
+			Bets: []boundary.Bet{
 				makeDBPMBet(20, "NO", "one", 0),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167),
@@ -175,7 +200,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		},
 		{
 			Name: "SecondBetYesDirection",
-			Bets: []models.Bet{
+			Bets: []boundary.Bet{
 				makeDBPMBet(20, "NO", "one", 0),
 				makeDBPMBet(10, "YES", "two", 1),
 			},
@@ -185,7 +210,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		},
 		{
 			Name: "ThirdBetYesDirection",
-			Bets: []models.Bet{
+			Bets: []boundary.Bet{
 				makeDBPMBet(20, "NO", "one", 0),
 				makeDBPMBet(10, "YES", "two", 1),
 				makeDBPMBet(10, "YES", "three", 2),
@@ -196,7 +221,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
-			Bets: []models.Bet{
+			Bets: []boundary.Bet{
 				makeDBPMBet(20, "NO", "one", 0),
 				makeDBPMBet(10, "YES", "two", 1),
 				makeDBPMBet(10, "YES", "three", 2),
@@ -208,7 +233,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		},
 		{
 			Name: "NOResolution",
-			Bets: []models.Bet{
+			Bets: []boundary.Bet{
 				makeDBPMBet(20, "NO", "one", 0),
 				makeDBPMBet(10, "YES", "two", 1),
 			},
@@ -218,7 +243,7 @@ func TestDivideUpMarketPoolSharesDBPM(t *testing.T) {
 		},
 		{
 			Name: "YESResolution",
-			Bets: []models.Bet{
+			Bets: []boundary.Bet{
 				makeDBPMBet(20, "NO", "one", 0),
 				makeDBPMBet(10, "YES", "two", 1),
 			},
@@ -259,20 +284,20 @@ func TestDivideUpMarketPoolSharesDBPM_UsesInjectedCalculator(t *testing.T) {
 func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 	testcases := []struct {
 		Name               string
-		Bets               []models.Bet
+		Bets               []boundary.Bet
 		ProbabilityChanges []wpam.ProbabilityChange
 		ExpectedPayouts    []CourseBetPayout
 	}{
 		{
 			Name:               "InitialMarketState",
-			Bets:               []models.Bet{},
+			Bets:               []boundary.Bet{},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500),
 			ExpectedPayouts:    nil, // No bets -> No payouts
 		},
 		{
 			Name: "FirstBetNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167),
 			ExpectedPayouts: generateCoursePayouts(
@@ -282,9 +307,9 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "SecondBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375),
 			ExpectedPayouts: generateCoursePayouts(
@@ -294,10 +319,10 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "ThirdBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500),
 			ExpectedPayouts: generateCoursePayouts(
@@ -307,11 +332,11 @@ func TestCalculateCoursePayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
-				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
+				makeDBPMFixtureBet(-10, "NO", "one", 3*time.Minute),
 			},
 			ProbabilityChanges: modelstesting.GenerateProbability(0.500, 0.167, 0.375, 0.500, 0.625),
 			ExpectedPayouts: generateCoursePayouts(
@@ -435,7 +460,7 @@ func TestCalculateNormalizationFactorsDBPM_UsesInjectedCalculator(t *testing.T) 
 func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	testcases := []struct {
 		Name                   string
-		Bets                   []models.Bet
+		Bets                   []boundary.Bet
 		CoursePayouts          []CourseBetPayout
 		yesNormalizationFactor float64
 		noNormalizationFactor  float64
@@ -443,7 +468,7 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 	}{
 		{
 			Name:                   "InitialMarketState",
-			Bets:                   []models.Bet{},
+			Bets:                   []boundary.Bet{},
 			CoursePayouts:          nil,
 			yesNormalizationFactor: 0,
 			noNormalizationFactor:  0,
@@ -451,8 +476,8 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "FirstBetNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{0},
@@ -464,9 +489,9 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "SecondBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{4.1600000000000001, 0},
@@ -478,10 +503,10 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "ThirdBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{6.6599999999999993, 1.25, 0},
@@ -493,11 +518,11 @@ func TestCalculateScaledPayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
-				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
+				makeDBPMFixtureBet(-10, "NO", "one", 3*time.Minute),
 			},
 			CoursePayouts: generateCoursePayouts(
 				[]float64{9.1600000000000001, 2.5, 1.25, 0},
@@ -530,50 +555,50 @@ func TestCalculateScaledPayoutsDBPM_UsesInjectedCalculator(t *testing.T) {
 func TestCalculateExcess(t *testing.T) {
 	testcases := []struct {
 		Name           string
-		Bets           []models.Bet
+		Bets           []boundary.Bet
 		ScaledPayouts  []int64
 		ExpectedExcess int64
 	}{
 		{
 			Name:           "InitialMarketState",
-			Bets:           []models.Bet{},
+			Bets:           []boundary.Bet{},
 			ScaledPayouts:  []int64{},
 			ExpectedExcess: 0, // No bets, no excess
 		},
 		{
 			Name: "FirstBetNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
 			},
 			ScaledPayouts:  []int64{0},
 			ExpectedExcess: -20,
 		},
 		{
 			Name: "SecondBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
 			},
 			ScaledPayouts:  []int64{19, 0}, // Scaled payouts < market volume
 			ExpectedExcess: -11,            // marketVolume = 30, scaledPayouts = 19
 		},
 		{
 			Name: "ThirdBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
 			},
 			ScaledPayouts:  []int64{20, 20, 0},
 			ExpectedExcess: 0, // marketVolume = 40, scaledPayouts = 40
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
-				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
+				makeDBPMFixtureBet(-10, "NO", "one", 3*time.Minute),
 			},
 			ScaledPayouts:  []int64{11, 13, 6, 0},
 			ExpectedExcess: 0, // marketVolume = 30, scaledPayouts = 30
@@ -690,50 +715,50 @@ func TestAdjustForNegativeExcess_UsesInjectedCalculator(t *testing.T) {
 func TestAdjustPayouts(t *testing.T) {
 	testcases := []struct {
 		Name                    string
-		Bets                    []models.Bet
+		Bets                    []boundary.Bet
 		ScaledPayouts           []int64
 		ExpectedAdjustedPayouts []int64
 	}{
 		{
 			Name:                    "InitialMarketState",
-			Bets:                    []models.Bet{},
+			Bets:                    []boundary.Bet{},
 			ScaledPayouts:           []int64{},
 			ExpectedAdjustedPayouts: []int64{},
 		},
 		{
 			Name: "FirstBetNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
 			},
 			ScaledPayouts:           []int64{0},
 			ExpectedAdjustedPayouts: []int64{20},
 		},
 		{
 			Name: "SecondBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
 			},
 			ScaledPayouts:           []int64{19, 0},
 			ExpectedAdjustedPayouts: []int64{25, 5},
 		},
 		{
 			Name: "ThirdBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
 			},
 			ScaledPayouts:           []int64{20, 20, 0},
 			ExpectedAdjustedPayouts: []int64{20, 20, 0},
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
-				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
+				makeDBPMFixtureBet(-10, "NO", "one", 3*time.Minute),
 			},
 			ScaledPayouts:           []int64{11, 13, 6, 0},
 			ExpectedAdjustedPayouts: []int64{11, 13, 6, 0},
@@ -759,20 +784,20 @@ func TestAdjustPayouts_UsesInjectedCalculator(t *testing.T) {
 func TestAggregateUserPayoutsDBPM(t *testing.T) {
 	testcases := []struct {
 		Name              string
-		Bets              []models.Bet
+		Bets              []boundary.Bet
 		FinalPayouts      []int64
 		ExpectedPositions []DBPMMarketPosition
 	}{
 		{
 			Name:              "InitialMarketState",
-			Bets:              []models.Bet{},
+			Bets:              []boundary.Bet{},
 			FinalPayouts:      []int64{},
 			ExpectedPositions: []DBPMMarketPosition{},
 		},
 		{
 			Name: "FirstBetNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
 			},
 			FinalPayouts: []int64{20},
 			ExpectedPositions: []DBPMMarketPosition{
@@ -781,9 +806,9 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "SecondBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
 			},
 			FinalPayouts: []int64{25, 5},
 			ExpectedPositions: []DBPMMarketPosition{
@@ -793,10 +818,10 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "ThirdBetYesDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
 			},
 			FinalPayouts: []int64{20, 20, 0},
 			ExpectedPositions: []DBPMMarketPosition{
@@ -807,11 +832,11 @@ func TestAggregateUserPayoutsDBPM(t *testing.T) {
 		},
 		{
 			Name: "FourthBetNegativeNoDirection",
-			Bets: []models.Bet{
-				modelstesting.GenerateBet(20, "NO", "one", 1, 0),
-				modelstesting.GenerateBet(10, "YES", "two", 1, time.Minute),
-				modelstesting.GenerateBet(10, "YES", "three", 1, 2*time.Minute),
-				modelstesting.GenerateBet(-10, "NO", "one", 1, 3*time.Minute),
+			Bets: []boundary.Bet{
+				makeDBPMFixtureBet(20, "NO", "one", 0),
+				makeDBPMFixtureBet(10, "YES", "two", time.Minute),
+				makeDBPMFixtureBet(10, "YES", "three", 2*time.Minute),
+				makeDBPMFixtureBet(-10, "NO", "one", 3*time.Minute),
 			},
 			FinalPayouts: []int64{11, 13, 6, 0},
 			ExpectedPositions: []DBPMMarketPosition{
@@ -879,25 +904,25 @@ func TestNetAggregateMarketPositions_UsesInjectedCalculator(t *testing.T) {
 func TestSingleCreditYesNoAllocator(t *testing.T) {
 	tests := []struct {
 		name    string
-		bets    []models.Bet
+		bets    []boundary.Bet
 		wantYes int64
 		wantNo  int64
 	}{
 		{
 			name:    "Net YES",
-			bets:    []models.Bet{makeDBPMBet(1, "YES", "one", 0)},
+			bets:    []boundary.Bet{makeDBPMBet(1, "YES", "one", 0)},
 			wantYes: 1,
 			wantNo:  0,
 		},
 		{
 			name:    "Net NO",
-			bets:    []models.Bet{makeDBPMBet(1, "NO", "one", 0)},
+			bets:    []boundary.Bet{makeDBPMBet(1, "NO", "one", 0)},
 			wantYes: 0,
 			wantNo:  1,
 		},
 		{
 			name: "Net YES after mix",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDBPMBet(2, "YES", "one", 0),
 				makeDBPMBet(1, "NO", "two", 1),
 			},
@@ -906,7 +931,7 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		},
 		{
 			name: "Net NO after mix",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDBPMBet(1, "YES", "one", 0),
 				makeDBPMBet(2, "NO", "two", 1),
 			},
@@ -915,13 +940,13 @@ func TestSingleCreditYesNoAllocator(t *testing.T) {
 		},
 		{
 			name:    "No bets",
-			bets:    []models.Bet{},
+			bets:    []boundary.Bet{},
 			wantYes: 0,
 			wantNo:  0,
 		},
 		{
 			name: "Ambiguous (net 0)",
-			bets: []models.Bet{
+			bets: []boundary.Bet{
 				makeDBPMBet(1, "YES", "one", 0),
 				makeDBPMBet(1, "NO", "two", 1),
 			},

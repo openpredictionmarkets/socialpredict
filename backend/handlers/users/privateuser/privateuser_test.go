@@ -2,11 +2,14 @@ package privateuser
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"socialpredict/handlers/users/dto"
 	"socialpredict/internal/app"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models/modelstesting"
 )
 
@@ -18,6 +21,9 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
+	if err := db.Model(&user).Update("must_change_password", false).Error; err != nil {
+		t.Fatalf("clear must_change_password: %v", err)
+	}
 
 	token := modelstesting.GenerateValidJWT(user.Username)
 
@@ -26,7 +32,7 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	config := modelstesting.GenerateEconomicConfig()
-	container := app.BuildApplication(db, config)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 
 	handler := GetPrivateProfileHandler(container.GetUsersService())
 	handler.ServeHTTP(rec, req)
@@ -56,12 +62,40 @@ func TestGetPrivateProfileUserResponse_Unauthorized(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	config := modelstesting.GenerateEconomicConfig()
-	container := app.BuildApplication(db, config)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 
 	handler := GetPrivateProfileHandler(container.GetUsersService())
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != 401 {
 		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestGetPrivateProfileUserResponse_RequiresPasswordChange(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	user := modelstesting.GenerateUser("needsreset", 0)
+	user.MustChangePassword = true
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/privateprofile", nil)
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT(user.Username))
+	rec := httptest.NewRecorder()
+
+	config := modelstesting.GenerateEconomicConfig()
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
+
+	handler := GetPrivateProfileHandler(container.GetUsersService())
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Password change required") {
+		t.Fatalf("expected password change message, got %q", rec.Body.String())
 	}
 }

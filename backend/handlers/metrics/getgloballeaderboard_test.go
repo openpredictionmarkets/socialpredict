@@ -9,31 +9,31 @@ import (
 	"time"
 
 	analytics "socialpredict/internal/domain/analytics"
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
 
 type leaderboardRepo struct {
-	users    []models.User
-	markets  []models.Market
-	betsByID map[uint][]models.Bet
+	users    []analytics.UserAccount
+	markets  []analytics.MarketRecord
+	betsByID map[uint][]boundary.Bet
 }
 
-func (r *leaderboardRepo) ListUsers(ctx context.Context) ([]models.User, error) {
-	return append([]models.User(nil), r.users...), nil
+func (r *leaderboardRepo) ListUsers(ctx context.Context) ([]analytics.UserAccount, error) {
+	return append([]analytics.UserAccount(nil), r.users...), nil
 }
 
-func (r *leaderboardRepo) ListMarkets(ctx context.Context) ([]models.Market, error) {
-	return append([]models.Market(nil), r.markets...), nil
+func (r *leaderboardRepo) ListMarkets(ctx context.Context) ([]analytics.MarketRecord, error) {
+	return append([]analytics.MarketRecord(nil), r.markets...), nil
 }
 
-func (r *leaderboardRepo) ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error) {
-	return append([]models.Bet(nil), r.betsByID[marketID]...), nil
+func (r *leaderboardRepo) ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error) {
+	return append([]boundary.Bet(nil), r.betsByID[marketID]...), nil
 }
 
-func (r *leaderboardRepo) ListBetsOrdered(context.Context) ([]models.Bet, error) {
-	return []models.Bet{}, nil
+func (r *leaderboardRepo) ListBetsOrdered(context.Context) ([]boundary.Bet, error) {
+	return []boundary.Bet{}, nil
 }
 
 func (r *leaderboardRepo) UserMarketPositions(context.Context, string) ([]positionsmath.MarketPosition, error) {
@@ -45,20 +45,19 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 
 	now := time.Now()
 	repo := &leaderboardRepo{
-		users: []models.User{
-			{PublicUser: models.PublicUser{Username: "alice"}},
-			{PublicUser: models.PublicUser{Username: "bob"}},
+		users: []analytics.UserAccount{
+			{Username: "alice"},
+			{Username: "bob"},
 		},
-		markets: []models.Market{
+		markets: []analytics.MarketRecord{
 			{
-				ID:                 1,
-				CreatorUsername:    "alice",
-				IsResolved:         true,
-				ResolutionResult:   "YES",
-				ResolutionDateTime: now.Add(24 * time.Hour),
+				ID:               1,
+				CreatedAt:        now.Add(-24 * time.Hour),
+				IsResolved:       true,
+				ResolutionResult: "YES",
 			},
 		},
-		betsByID: map[uint][]models.Bet{
+		betsByID: map[uint][]boundary.Bet{
 			1: {
 				{Username: "alice", Outcome: "YES", Amount: 100, MarketID: 1, PlacedAt: now.Add(-2 * time.Hour)},
 				{Username: "bob", Outcome: "NO", Amount: 50, MarketID: 1, PlacedAt: now.Add(-1 * time.Hour)},
@@ -90,19 +89,19 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 
 type failingRepo struct{}
 
-func (f failingRepo) ListUsers(context.Context) ([]models.User, error) {
+func (f failingRepo) ListUsers(context.Context) ([]analytics.UserAccount, error) {
 	return nil, assertError("boom")
 }
 
-func (f failingRepo) ListMarkets(context.Context) ([]models.Market, error) {
+func (f failingRepo) ListMarkets(context.Context) ([]analytics.MarketRecord, error) {
 	return nil, nil
 }
 
-func (f failingRepo) ListBetsForMarket(context.Context, uint) ([]models.Bet, error) {
+func (f failingRepo) ListBetsForMarket(context.Context, uint) ([]boundary.Bet, error) {
 	return nil, nil
 }
 
-func (f failingRepo) ListBetsOrdered(context.Context) ([]models.Bet, error) {
+func (f failingRepo) ListBetsOrdered(context.Context) ([]boundary.Bet, error) {
 	return nil, nil
 }
 

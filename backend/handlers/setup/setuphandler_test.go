@@ -4,24 +4,25 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"socialpredict/setup"
 	"strings"
 	"testing"
+
+	configsvc "socialpredict/internal/service/config"
+	"socialpredict/models/modelstesting"
+	"socialpredict/setup"
 )
 
 func TestGetSetupHandler(t *testing.T) {
 	tests := []struct {
 		Name             string
-		MockConfigLoader func() (*setup.EconomicConfig, error)
+		ConfigService    configsvc.Service
 		ExpectedStatus   int
 		ExpectedResponse string
 		IsJSONResponse   bool
 	}{
 		{
-			Name: "successful load",
-			MockConfigLoader: func() (*setup.EconomicConfig, error) {
-				return setup.LoadEconomicsConfig()
-			},
+			Name:           "successful load",
+			ConfigService:  configsvc.NewStaticService(loadSetupConfig(t)),
 			ExpectedStatus: http.StatusOK,
 			ExpectedResponse: `{
 				"MarketCreation":{"InitialMarketProbability":0.5,"InitialMarketSubsidization":10,"InitialMarketYes":0,"InitialMarketNo":0,"MinimumFutureHours":1},
@@ -30,10 +31,8 @@ func TestGetSetupHandler(t *testing.T) {
 				"Betting":{"MinimumBet":1,"MaxDustPerSale":2,"BetFees":{"InitialBetFee":1,"BuySharesFee":0,"SellSharesFee":0}}}`,
 			IsJSONResponse: true,
 		}, {
-			Name: "failed to load config",
-			MockConfigLoader: func() (*setup.EconomicConfig, error) {
-				return nil, http.ErrBodyNotAllowed
-			},
+			Name:             "missing config service",
+			ConfigService:    nil,
 			ExpectedStatus:   http.StatusInternalServerError,
 			ExpectedResponse: "Failed to load economic config",
 			IsJSONResponse:   false,
@@ -42,16 +41,13 @@ func TestGetSetupHandler(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			// Replace the actual loader function with the mock
-			loadEconomicsConfig := test.MockConfigLoader
-
 			req, err := http.NewRequest("GET", "/setup", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(GetSetupHandler(loadEconomicsConfig))
+			handler := http.HandlerFunc(GetSetupHandler(test.ConfigService))
 
 			handler.ServeHTTP(rr, req)
 
@@ -81,6 +77,38 @@ func TestGetSetupHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetFrontendSetupHandler(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/setup/frontend", nil)
+	rr := httptest.NewRecorder()
+
+	config := modelstesting.GenerateEconomicConfig()
+	config.Frontend.Charts.SigFigs = 1
+
+	handler := http.HandlerFunc(GetFrontendSetupHandler(configsvc.NewStaticService(config)))
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	var response map[string]map[string]int
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if got := response["charts"]["sigFigs"]; got != 2 {
+		t.Fatalf("expected clamped sig figs 2, got %d", got)
+	}
+}
+
+func loadSetupConfig(t *testing.T) *setup.EconomicConfig {
+	t.Helper()
+
+	config := modelstesting.GenerateEconomicConfig()
+	config.Economics.MarketCreation.MinimumFutureHours = 1
+	return config
 }
 
 // jsonEqual compares two JSON objects for equality

@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../../../../config';
 import LoadingSpinner from '../../../loaders/LoadingSpinner';
+import { useAuth } from '../../../../helpers/AuthContent';
 
 const UserFinancialStatementsLayout = ({ username }) => {
     const [financialData, setFinancialData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { token } = useAuth();
 
     useEffect(() => {
         const fetchFinancialData = async () => {
             try {
-                const response = await fetch(`${API_URL}/v0/users/${username}/financial`);
+                const headers = token
+                    ? {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                    : {};
+
+                const response = await fetch(`${API_URL}/v0/users/${username}/financial`, { headers });
                 if (response.ok) {
                     const data = await response.json();
                     setFinancialData(data.financial);
@@ -24,10 +33,12 @@ const UserFinancialStatementsLayout = ({ username }) => {
             }
         };
 
-        if (username) {
+        if (username && token) {
             fetchFinancialData();
+        } else {
+            setLoading(false);
         }
-    }, [username]);
+    }, [username, token]);
 
     const formatValue = (value, isAmount = true) => {
         if (value === null || value === undefined) return 'N/A';

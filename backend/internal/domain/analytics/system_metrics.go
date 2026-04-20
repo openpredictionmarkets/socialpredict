@@ -99,7 +99,7 @@ func (c DefaultVolumeCalculator) Calculate(ctx context.Context, repo VolumeRepos
 			continue
 		}
 
-		bets, err := repo.ListBetsForMarket(ctx, uint(market.ID))
+		bets, err := repo.ListBetsForMarket(ctx, market.ID)
 		if err != nil {
 			return nil, err
 		}

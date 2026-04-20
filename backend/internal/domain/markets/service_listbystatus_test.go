@@ -11,7 +11,6 @@ import (
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	dusers "socialpredict/internal/domain/users"
 	rmarkets "socialpredict/internal/repository/markets"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 
 	"gorm.io/gorm"
@@ -123,40 +122,33 @@ func setupServiceWithDB(t *testing.T) (*markets.Service, *gorm.DB, wpam.Probabil
 	return service, db, calculator
 }
 
-func buildStatusMarkets(username string, now time.Time) []models.Market {
-	return []models.Market{
-		{
-			ID:                 1,
-			QuestionTitle:      "Active Market",
-			Description:        "Active",
-			OutcomeType:        "BINARY",
-			ResolutionDateTime: now.Add(24 * time.Hour),
-			IsResolved:         false,
-			InitialProbability: 0.5,
-			CreatorUsername:    username,
-		},
-		{
-			ID:                 2,
-			QuestionTitle:      "Closed Market",
-			Description:        "Closed",
-			OutcomeType:        "BINARY",
-			ResolutionDateTime: now.Add(-24 * time.Hour),
-			IsResolved:         false,
-			InitialProbability: 0.5,
-			CreatorUsername:    username,
-		},
-		{
-			ID:                      3,
-			QuestionTitle:           "Resolved Market",
-			Description:             "Resolved",
-			OutcomeType:             "BINARY",
-			ResolutionDateTime:      now.Add(-48 * time.Hour),
-			FinalResolutionDateTime: now.Add(-24 * time.Hour),
-			IsResolved:              true,
-			ResolutionResult:        "YES",
-			InitialProbability:      0.5,
-			CreatorUsername:         username,
-		},
+func seedStatusMarkets(t *testing.T, db *gorm.DB, username string, now time.Time) {
+	t.Helper()
+
+	active := modelstesting.GenerateMarket(1, username)
+	active.QuestionTitle = "Active Market"
+	active.Description = "Active"
+	active.ResolutionDateTime = now.Add(24 * time.Hour)
+	active.IsResolved = false
+
+	closed := modelstesting.GenerateMarket(2, username)
+	closed.QuestionTitle = "Closed Market"
+	closed.Description = "Closed"
+	closed.ResolutionDateTime = now.Add(-24 * time.Hour)
+	closed.IsResolved = false
+
+	resolved := modelstesting.GenerateMarket(3, username)
+	resolved.QuestionTitle = "Resolved Market"
+	resolved.Description = "Resolved"
+	resolved.ResolutionDateTime = now.Add(-48 * time.Hour)
+	resolved.FinalResolutionDateTime = now.Add(-24 * time.Hour)
+	resolved.IsResolved = true
+	resolved.ResolutionResult = "YES"
+
+	for _, market := range []any{&active, &closed, &resolved} {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("create market: %v", err)
+		}
 	}
 }
 
@@ -183,11 +175,7 @@ func TestServiceListByStatusFiltersMarkets(t *testing.T) {
 		t.Fatalf("create user: %v", err)
 	}
 
-	for _, market := range buildStatusMarkets(user.Username, now) {
-		if err := db.Create(&market).Error; err != nil {
-			t.Fatalf("create market %s: %v", market.QuestionTitle, err)
-		}
-	}
+	seedStatusMarkets(t, db, user.Username, now)
 
 	tests := []struct {
 		name        string

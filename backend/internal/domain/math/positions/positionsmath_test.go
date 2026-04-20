@@ -1,17 +1,18 @@
 package positionsmath
 
 import (
-	"socialpredict/internal/domain/math/probabilities/wpam"
-	"socialpredict/models"
-	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
+
+	"socialpredict/internal/domain/boundary"
+	"socialpredict/internal/domain/math/probabilities/wpam"
+	"socialpredict/models/modelstesting"
 )
 
 type reverseBetSorter struct{}
 
-func (reverseBetSorter) Sort(bets []models.Bet) []models.Bet {
-	sorted := make([]models.Bet, len(bets))
+func (reverseBetSorter) Sort(bets []boundary.Bet) []boundary.Bet {
+	sorted := make([]boundary.Bet, len(bets))
 	copy(sorted, bets)
 	for i, j := 0, len(sorted)-1; i < j; i, j = i+1, j-1 {
 		sorted[i], sorted[j] = sorted[j], sorted[i]
@@ -56,10 +57,17 @@ func buildPositionBets(marketID uint, entries []struct {
 	Outcome  string
 	Username string
 	Offset   time.Duration
-}) []models.Bet {
-	bets := make([]models.Bet, 0, len(entries))
+}) []boundary.Bet {
+	bets := make([]boundary.Bet, 0, len(entries))
 	for _, entry := range entries {
-		bets = append(bets, modelstesting.GenerateBet(entry.Amount, entry.Outcome, entry.Username, marketID, entry.Offset))
+		bets = append(bets, boundary.Bet{
+			Username:  entry.Username,
+			MarketID:  marketID,
+			Amount:    entry.Amount,
+			Outcome:   entry.Outcome,
+			PlacedAt:  positionsMathBaseTime.Add(entry.Offset),
+			CreatedAt: positionsMathBaseTime.Add(entry.Offset),
+		})
 	}
 	return bets
 }

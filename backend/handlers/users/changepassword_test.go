@@ -1,9 +1,17 @@
 package usershandlers
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"socialpredict/security"
 	"strings"
 	"testing"
+
+	"socialpredict/internal/app"
+	configsvc "socialpredict/internal/service/config"
+	"socialpredict/models/modelstesting"
 )
 
 func TestPasswordValidation(t *testing.T) {
@@ -300,5 +308,80 @@ func TestPasswordComplexityPatterns(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestChangePasswordHandler_InvalidTokenReturnsFailureEnvelope(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	config := modelstesting.GenerateEconomicConfig()
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
+
+	req := httptest.NewRequest(http.MethodPost, "/v0/changepassword", bytes.NewBufferString(`{"currentPassword":"OldPassword123","newPassword":"NewPassword123"}`))
+	req.Header.Set("Authorization", "Bearer invalid.token")
+	rec := httptest.NewRecorder()
+
+	ChangePasswordHandler(container.GetUsersService()).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var response struct {
+		OK     bool   `json:"ok"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if response.OK {
+		t.Fatalf("expected ok=false")
+	}
+	if response.Reason != "INVALID_TOKEN" {
+		t.Fatalf("expected reason INVALID_TOKEN, got %q", response.Reason)
+	}
+}
+
+func TestChangePasswordHandler_SuccessResponseEnvelope(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	user := modelstesting.GenerateUser("alice", 0)
+	if err := user.HashPassword("OldPassword123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	user.MustChangePassword = true
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	config := modelstesting.GenerateEconomicConfig()
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
+
+	req := httptest.NewRequest(http.MethodPost, "/v0/changepassword", bytes.NewBufferString(`{"currentPassword":"OldPassword123","newPassword":"NewPassword123"}`))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT(user.Username))
+	rec := httptest.NewRecorder()
+
+	ChangePasswordHandler(container.GetUsersService()).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var response struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			Message string `json:"message"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !response.OK {
+		t.Fatalf("expected ok=true")
+	}
+	if response.Result.Message != "Password changed successfully" {
+		t.Fatalf("expected success message, got %q", response.Result.Message)
 	}
 }

@@ -4,12 +4,13 @@ import (
 	"log"
 	"net/http"
 
+	appenv "socialpredict/internal/app/env"
+	appruntime "socialpredict/internal/app/runtime"
 	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/migration"
 	_ "socialpredict/migration/migrations" // <-- side-effect import: registers migrations via init()
 	"socialpredict/seed"
 	"socialpredict/server"
-	"socialpredict/util"
 )
 
 func main() {
@@ -17,16 +18,16 @@ func main() {
 	http.Handle("/secure", authsvc.Authenticate(http.HandlerFunc(secureEndpoint)))
 
 	// Load env (.env, .env.dev)
-	if err := util.GetEnv(); err != nil {
+	if err := appenv.LoadDevFile(); err != nil {
 		log.Printf("env: warning loading environment: %v", err)
 	}
 
-	dbCfg, err := util.LoadDBConfigFromEnv()
+	dbCfg, err := appruntime.LoadDBConfigFromEnv()
 	if err != nil {
 		log.Fatalf("db config: %v", err)
 	}
 
-	db, err := util.InitDB(dbCfg, util.PostgresFactory{})
+	db, err := appruntime.InitDB(dbCfg, appruntime.PostgresFactory{})
 	if err != nil {
 		log.Fatalf("db init: %v", err)
 	}
@@ -40,12 +41,19 @@ func main() {
 		log.Printf("migration: warning: %v", err)
 	}
 
-	seed.SeedUsers(db)
+	configService, err := appruntime.LoadConfigService()
+	if err != nil {
+		log.Fatalf("config init: %v", err)
+	}
+
+	if err := seed.SeedUsers(db, configService); err != nil {
+		log.Fatalf("seed users: %v", err)
+	}
 	if err := seed.SeedHomepage(db, "."); err != nil {
 		log.Printf("seed homepage: warning: %v", err)
 	}
 
-	server.Start(openAPISpec, swaggerUIFS)
+	server.Start(openAPISpec, swaggerUIFS, db, configService)
 }
 
 func secureEndpoint(w http.ResponseWriter, r *http.Request) {

@@ -45,6 +45,11 @@ const useUserData = (username, usePrivateProfile = false) => {
       }
     };
 
+    if (!token) {
+      setUserLoading(false);
+      return;
+    }
+
     if (username || usePrivateProfile) {
       fetchUserData();
     }

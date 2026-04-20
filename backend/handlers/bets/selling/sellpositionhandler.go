@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -12,23 +13,32 @@ import (
 	authsvc "socialpredict/internal/service/auth"
 )
 
+const (
+	reasonSellValidationFailed handlers.FailureReason = "SELL_VALIDATION_FAILED"
+	reasonSellMarketClosed     handlers.FailureReason = "MARKET_CLOSED"
+	reasonNoPosition           handlers.FailureReason = "NO_POSITION"
+	reasonInsufficientShares   handlers.FailureReason = "INSUFFICIENT_SHARES"
+	reasonDustCapExceeded      handlers.FailureReason = "DUST_CAP_EXCEEDED"
+	reasonSellMarketNotFound   handlers.FailureReason = "MARKET_NOT_FOUND"
+)
+
 // SellPositionHandler returns an HTTP handler that delegates sales to the bets service.
 func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
 		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
 		if httpErr != nil {
-			http.Error(w, httpErr.Error(), httpErr.StatusCode)
+			_ = handlers.WriteFailure(w, httpErr.StatusCode, reasonFromAuthError(httpErr))
 			return
 		}
 
 		req, decodeErr := decodeSellRequest(r)
 		if decodeErr != nil {
-			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -60,22 +70,26 @@ func toSellRequest(req dto.SellBetRequest, username string) bets.SellRequest {
 }
 
 func handleSellError(w http.ResponseWriter, err error) {
-	if dustErr, ok := err.(bets.ErrDustCapExceeded); ok {
-		http.Error(w, dustErr.Error(), http.StatusUnprocessableEntity)
+	if _, ok := err.(bets.ErrDustCapExceeded); ok {
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, reasonDustCapExceeded)
 		return
 	}
 
 	switch {
 	case errors.Is(err, bets.ErrInvalidOutcome), errors.Is(err, bets.ErrInvalidAmount):
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, reasonSellValidationFailed)
 	case errors.Is(err, bets.ErrMarketClosed):
-		http.Error(w, err.Error(), http.StatusConflict)
+		_ = handlers.WriteFailure(w, http.StatusConflict, reasonSellMarketClosed)
 	case errors.Is(err, bets.ErrNoPosition), errors.Is(err, bets.ErrInsufficientShares):
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		reason := reasonNoPosition
+		if errors.Is(err, bets.ErrInsufficientShares) {
+			reason = reasonInsufficientShares
+		}
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, reason)
 	case errors.Is(err, dmarkets.ErrMarketNotFound):
-		http.Error(w, "Market not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonSellMarketNotFound)
 	default:
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }
 
@@ -90,7 +104,25 @@ func writeSellResponse(w http.ResponseWriter, result *bets.SellResult) {
 		TransactionAt: result.TransactionAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	_ = handlers.WriteResult(w, http.StatusCreated, response)
+}
+
+func reasonFromAuthError(err *authsvc.HTTPError) handlers.FailureReason {
+	if err == nil {
+		return handlers.ReasonInternalError
+	}
+
+	switch err.Message {
+	case "Authorization header is required", "Invalid token":
+		return handlers.ReasonInvalidToken
+	case "Password change required":
+		return handlers.ReasonPasswordChangeRequired
+	case "User not found":
+		return handlers.ReasonUserNotFound
+	default:
+		if err.StatusCode >= http.StatusInternalServerError {
+			return handlers.ReasonInternalError
+		}
+		return handlers.ReasonInvalidToken
+	}
 }

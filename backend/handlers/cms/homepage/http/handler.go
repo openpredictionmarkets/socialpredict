@@ -4,8 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"socialpredict/handlers"
 	"socialpredict/handlers/cms/homepage"
 	authsvc "socialpredict/internal/service/auth"
+)
+
+const (
+	reasonHomepageAuthUnavailable handlers.FailureReason = "AUTH_SERVICE_UNAVAILABLE"
+	reasonHomepageAdminRequired   handlers.FailureReason = "ADMIN_REQUIRED"
+	reasonHomepageUpdateFailed    handlers.FailureReason = "HOMEPAGE_UPDATE_FAILED"
+	reasonHomepageNotFound        handlers.FailureReason = "HOME_CONTENT_NOT_FOUND"
 )
 
 type Handler struct {
@@ -20,12 +28,11 @@ func NewHandler(svc *homepage.Service, auth authsvc.Authenticator) *Handler {
 func (h *Handler) PublicGet(w http.ResponseWriter, r *http.Request) {
 	item, err := h.svc.GetHome()
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonHomepageNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = handlers.WriteResult(w, http.StatusOK, map[string]interface{}{
 		"title":     item.Title,
 		"format":    item.Format,
 		"html":      item.HTML,
@@ -46,18 +53,18 @@ type updateReq struct {
 func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	// Validate admin access
 	if h.auth == nil {
-		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, reasonHomepageAuthUnavailable)
 		return
 	}
 	admin, httpErr := h.auth.RequireAdmin(r)
 	if httpErr != nil {
-		http.Error(w, httpErr.Message, httpErr.StatusCode)
+		_ = handlers.WriteFailure(w, httpErr.StatusCode, reasonFromAdminAuthError(httpErr))
 		return
 	}
 
 	var in updateReq
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 		return
 	}
 
@@ -70,12 +77,11 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		UpdatedBy: admin.Username,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, reasonHomepageUpdateFailed)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = handlers.WriteResult(w, http.StatusOK, map[string]interface{}{
 		"title":   item.Title,
 		"format":  item.Format,
 		"html":    item.HTML,
@@ -87,11 +93,11 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 func RequireAdmin(auth authsvc.Authenticator, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if auth == nil {
-			http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, reasonHomepageAuthUnavailable)
 			return
 		}
 		if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
-			http.Error(w, httpErr.Message, httpErr.StatusCode)
+			_ = handlers.WriteFailure(w, httpErr.StatusCode, reasonFromAdminAuthError(httpErr))
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -103,4 +109,24 @@ func UsernameFromContext(ctx context.Context) string {
 	// This is a placeholder - in practice you might store username in context
 	// during authentication middleware
 	return "admin" // fallback for now
+}
+
+func reasonFromAdminAuthError(err *authsvc.HTTPError) handlers.FailureReason {
+	if err == nil {
+		return handlers.ReasonInternalError
+	}
+
+	switch err.Message {
+	case "Authorization header is required", "Invalid token":
+		return handlers.ReasonInvalidToken
+	case "admin privileges required":
+		return reasonHomepageAdminRequired
+	case "User not found":
+		return handlers.ReasonUserNotFound
+	default:
+		if err.StatusCode >= http.StatusInternalServerError {
+			return handlers.ReasonInternalError
+		}
+		return handlers.ReasonInvalidToken
+	}
 }

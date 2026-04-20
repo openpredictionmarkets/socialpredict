@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
@@ -13,19 +14,19 @@ import (
 func ChangeDescriptionHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			writeProfileJSONError(w, http.StatusMethodNotAllowed, "Method is not supported.")
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
+		user, httperr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, svc)
 		if httperr != nil {
-			writeProfileJSONError(w, httperr.StatusCode, "Invalid token: "+httperr.Error())
+			_ = handlers.WriteFailure(w, httperr.StatusCode, profileAuthFailureReason(httperr))
 			return
 		}
 
 		var request dto.ChangeDescriptionRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			writeProfileJSONError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -35,10 +36,8 @@ func ChangeDescriptionHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(toPrivateUserResponse(updated)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := handlers.WriteResult(w, http.StatusOK, toPrivateUserResponse(updated)); err != nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }

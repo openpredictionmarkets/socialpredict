@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
-	"socialpredict/setup"
 	"time"
 
 	"socialpredict/handlers/cms/homepage"
@@ -21,49 +22,51 @@ func getEnv(key string) (string, error) {
 	return value, nil
 }
 
-func SeedUsers(db *gorm.DB) {
-
-	config, err := setup.LoadEconomicsConfig()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+func SeedUsers(db *gorm.DB, configService configsvc.Service) error {
+	if configService == nil {
+		return fmt.Errorf("configuration service unavailable")
 	}
+	config := configService.Current()
 
 	adminPassword, err := getEnv("ADMIN_PASSWORD")
 	if err != nil {
-		log.Fatalf("Error retrieving ADMIN_PASSWORD: %v", err)
+		return fmt.Errorf("retrieving ADMIN_PASSWORD: %w", err)
 	}
 	if adminPassword == "" {
-		log.Fatalf("ADMIN_PASSWORD is set but empty")
-	} else {
-		// Check if the admin user already exists
-		var count int64
-		db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
-		if count == 0 {
-			// No admin user found, create one
-			adminUser := models.User{
-				PublicUser: models.PublicUser{
-					Username:              "admin",
-					DisplayName:           "Administrator",
-					UserType:              "ADMIN",
-					InitialAccountBalance: config.Economics.User.InitialAccountBalance,
-					AccountBalance:        config.Economics.User.InitialAccountBalance,
-					PersonalEmoji:         "NONE",
-					Description:           "Administrator",
-				},
-				PrivateUser: models.PrivateUser{
-					Email:  "admin@example.com",
-					APIKey: "NONE",
-				},
-				MustChangePassword: true,
-			}
+		return fmt.Errorf("ADMIN_PASSWORD is set but empty")
+	}
 
-			adminUser.HashPassword(adminPassword)
+	// Check if the admin user already exists.
+	var count int64
+	db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
+	if count == 0 {
+		adminUser := models.User{
+			PublicUser: models.PublicUser{
+				Username:              "admin",
+				DisplayName:           "Administrator",
+				UserType:              "ADMIN",
+				InitialAccountBalance: config.Economics.User.InitialAccountBalance,
+				AccountBalance:        config.Economics.User.InitialAccountBalance,
+				PersonalEmoji:         "NONE",
+				Description:           "Administrator",
+			},
+			PrivateUser: models.PrivateUser{
+				Email:  "admin@example.com",
+				APIKey: "NONE",
+			},
+			MustChangePassword: true,
+		}
 
-			db.Create(&adminUser)
+		if err := adminUser.HashPassword(adminPassword); err != nil {
+			return fmt.Errorf("hash admin password: %w", err)
+		}
 
+		if err := db.Create(&adminUser).Error; err != nil {
+			return fmt.Errorf("create admin user: %w", err)
 		}
 	}
 
+	return nil
 }
 
 func EnsureDBReady(db *gorm.DB, maxAttempts int) error {
