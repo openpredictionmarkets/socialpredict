@@ -1,0 +1,25 @@
+{
+  "task_uid": "019d9996-f8a9-71b8-a7c0-81a3c332d436",
+  "task_id": "W04-004",
+  "status": "completed",
+  "updated_at": "2026-04-20T03:40:34.396160+00:00",
+  "owner": "software-action-dispatcher-agent",
+  "headline": "API-ISSUES.md refreshed to current Wave 1-4 state with verifier approval.",
+  "current_focus": "Completed documentation cleanup; API-ISSUES.md now records closed wave work separately from the three intentionally deferred API decisions.",
+  "files_changed": [
+    "../socialpredict/backend/docs/API-ISSUES.md"
+  ],
+  "checks_run": [
+    "git diff --check -- backend/docs/API-ISSUES.md,GOMODCACHE=/workspace/.gomodcache GOCACHE=/workspace/.gocache go test ./... -run TestOpenAPISpecValidates -count=1,git status --short -- backend/docs/API-ISSUES.md backend/docs/openapi.yaml backend/server/server.go"
+  ],
+  "open_questions": [
+    "none"
+  ],
+  "follow_ups": [
+    "none"
+  ],
+  "last_event_seq": 11,
+  "context": {
+    "handoff_requested": false
+  }
+}

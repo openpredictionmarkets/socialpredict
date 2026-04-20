@@ -71,3 +71,7 @@ node_modules/
 .gocache
 .gomodcache
 .cache
+.tmp/go-build/
+.tmp/go-cache/
+.tmp/go-mod/
+.config/go/
