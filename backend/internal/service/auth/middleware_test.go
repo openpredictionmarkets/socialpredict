@@ -508,6 +508,42 @@ func TestValidateAdminToken_InvalidToken(t *testing.T) {
 	}
 }
 
+func TestAuthServiceRequireAdmin_EnforcesPasswordChange(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	admin := modelstesting.GenerateUser("admin-needs-reset", 1000)
+	admin.UserType = "ADMIN"
+	admin.MustChangePassword = true
+	if err := admin.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := db.Create(&admin).Error; err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	auth := NewAuthService(svc)
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	token, err := generateJWT(admin.Username, getJWTKey())
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	user, httpErr := auth.RequireAdmin(req)
+
+	if user != nil {
+		t.Fatalf("expected nil user when password change is required")
+	}
+	if httpErr == nil {
+		t.Fatalf("expected password-change enforcement error")
+	}
+	if httpErr.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", httpErr.StatusCode)
+	}
+}
+
 func TestUserClaims(t *testing.T) {
 	// Test UserClaims struct creation
 	claims := &UserClaims{

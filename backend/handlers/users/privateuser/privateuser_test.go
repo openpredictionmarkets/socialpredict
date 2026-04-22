@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/users/dto"
 	"socialpredict/internal/app"
 	configsvc "socialpredict/internal/service/config"
@@ -41,10 +41,11 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp dto.PrivateUserResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+	var envelope handlers.SuccessEnvelope[dto.PrivateUserResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
+	resp := envelope.Result
 
 	if resp.Username != user.Username {
 		t.Fatalf("expected username %q, got %q", user.Username, resp.Username)
@@ -69,6 +70,13 @@ func TestGetPrivateProfileUserResponse_Unauthorized(t *testing.T) {
 
 	if rec.Code != 401 {
 		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+	var envelope handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("failed to decode failure envelope: %v", err)
+	}
+	if envelope.OK || envelope.Reason != string(handlers.ReasonInvalidToken) {
+		t.Fatalf("expected invalid token envelope, got %+v", envelope)
 	}
 }
 
@@ -95,7 +103,11 @@ func TestGetPrivateProfileUserResponse_RequiresPasswordChange(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected status 403, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "Password change required") {
-		t.Fatalf("expected password change message, got %q", rec.Body.String())
+	var envelope handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("failed to decode failure envelope: %v", err)
+	}
+	if envelope.OK || envelope.Reason != string(handlers.ReasonPasswordChangeRequired) {
+		t.Fatalf("expected password change envelope, got %+v", envelope)
 	}
 }

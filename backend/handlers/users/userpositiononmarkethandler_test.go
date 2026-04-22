@@ -79,7 +79,7 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 		t.Fatalf("sign token: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v0/user/markets/"+strconv.FormatInt(market.ID, 10), nil)
+	req := httptest.NewRequest(http.MethodGet, "/v0/userposition/"+strconv.FormatInt(market.ID, 10), nil)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
 	req = mux.SetURLVars(req, map[string]string{
 		"marketId": strconv.FormatInt(market.ID, 10),
@@ -110,7 +110,7 @@ func TestUserMarketPositionHandlerUnauthorizedWithoutToken(t *testing.T) {
 	config := modelstesting.GenerateEconomicConfig()
 	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 
-	req := httptest.NewRequest(http.MethodGet, "/v0/user/markets/1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v0/userposition/1", nil)
 	req = mux.SetURLVars(req, map[string]string{"marketId": "1"})
 	rec := httptest.NewRecorder()
 

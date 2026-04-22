@@ -40,7 +40,7 @@ func (a *AuthService) RequireUser(r *http.Request) (*dusers.User, *HTTPError) {
 
 // RequireAdmin ensures the current user is authenticated and has admin privileges.
 func (a *AuthService) RequireAdmin(r *http.Request) (*dusers.User, *HTTPError) {
-	user, err := a.RequireUser(r)
+	user, err := a.CurrentUser(r)
 	if err != nil {
 		return nil, err
 	}

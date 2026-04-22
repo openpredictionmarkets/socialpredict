@@ -5,6 +5,11 @@ info:
   description: >
     HTTP contract for the SocialPredict backend service. This spec is generated
     from the Go handlers and DTOs under backend/server and backend/handlers.
+    Routes wrapped by the shared security middleware can return a shared
+    transport-level `429 text/plain` response before reaching handler-specific
+    JSON envelope logic when the rate limit is exceeded. This middleware
+    exception applies across protected routes even when a path omits a repeated
+    path-level `429` entry.
 servers:
   - url: http://localhost:8080
     description: Local dev server
@@ -77,6 +82,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Login rate limit exceeded by middleware. Other protected routes can also return middleware-level 429 responses as described in the API description.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/home:
     get:
@@ -113,7 +124,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/setup/frontend:
     get:
@@ -134,7 +145,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets:
     get:
@@ -672,27 +683,25 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MarketBet'
+                $ref: '#/components/schemas/MarketBetsEnvelopeResponse'
         '400':
           description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching bets.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/positions/{marketId}:
     get:
@@ -921,31 +930,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PrivateUserResponse'
+                $ref: '#/components/schemas/PrivateUserEnvelopeResponse'
         '401':
           description: Invalid or missing token.
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ReasonResponse'
         '403':
           description: Password change is required before this route can be used.
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching profile.
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/profilechange/description:
     post:
@@ -1595,6 +1604,10 @@ components:
           type: string
       required: [ok, reason]
 
+    PlainTextErrorResponse:
+      type: string
+      description: Plain text error emitted by shared middleware before request-specific handlers run.
+
     StatsEnvelopeResponse:
       type: object
       properties:
@@ -1645,6 +1658,18 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/SellBetResponse'
+      required: [ok, result]
+
+    MarketBetsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketBet'
       required: [ok, result]
 
     PrivateUserEnvelopeResponse:

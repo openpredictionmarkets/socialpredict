@@ -13,6 +13,7 @@ const (
 	ReasonInvalidToken           FailureReason = "INVALID_TOKEN"
 	ReasonPasswordChangeRequired FailureReason = "PASSWORD_CHANGE_REQUIRED"
 	ReasonUserNotFound           FailureReason = "USER_NOT_FOUND"
+	ReasonMarketNotFound         FailureReason = "MARKET_NOT_FOUND"
 
 	ReasonValidationFailed FailureReason = "VALIDATION_FAILED"
 	ReasonInternalError    FailureReason = "INTERNAL_ERROR"

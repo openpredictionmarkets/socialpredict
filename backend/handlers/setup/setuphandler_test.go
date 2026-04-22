@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"socialpredict/handlers"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
@@ -25,16 +25,16 @@ func TestGetSetupHandler(t *testing.T) {
 			ConfigService:  configsvc.NewStaticService(loadSetupConfig(t)),
 			ExpectedStatus: http.StatusOK,
 			ExpectedResponse: `{
-				"MarketCreation":{"InitialMarketProbability":0.5,"InitialMarketSubsidization":10,"InitialMarketYes":0,"InitialMarketNo":0,"MinimumFutureHours":1},
-				"MarketIncentives":{"CreateMarketCost":10,"TraderBonus":1},
-				"User":{"InitialAccountBalance":0,"MaximumDebtAllowed":500},
-				"Betting":{"MinimumBet":1,"MaxDustPerSale":2,"BetFees":{"InitialBetFee":1,"BuySharesFee":0,"SellSharesFee":0}}}`,
+				"marketcreation":{"initialMarketProbability":0.5,"initialMarketSubsidization":10,"initialMarketYes":0,"initialMarketNo":0,"minimumFutureHours":1},
+				"marketincentives":{"createMarketCost":10,"traderBonus":1},
+				"user":{"initialAccountBalance":0,"maximumDebtAllowed":500},
+				"betting":{"minimumBet":1,"maxDustPerSale":2,"betFees":{"initialBetFee":1,"buySharesFee":0,"sellSharesFee":0}}}`,
 			IsJSONResponse: true,
 		}, {
 			Name:             "missing config service",
 			ConfigService:    nil,
 			ExpectedStatus:   http.StatusInternalServerError,
-			ExpectedResponse: "Failed to load economic config",
+			ExpectedResponse: string(handlers.ReasonInternalError),
 			IsJSONResponse:   false,
 		},
 	}
@@ -70,9 +70,13 @@ func TestGetSetupHandler(t *testing.T) {
 						test.Name, rr.Body.String(), test.ExpectedResponse)
 				}
 			} else {
-				if strings.TrimSpace(rr.Body.String()) != strings.TrimSpace(test.ExpectedResponse) {
-					t.Errorf("%s: handler returned unexpected body: got %v want %v",
-						test.Name, rr.Body.String(), test.ExpectedResponse)
+				var response handlers.FailureEnvelope
+				if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+					t.Fatalf("%s: error parsing failure response JSON: %v", test.Name, err)
+				}
+				if response.OK || response.Reason != test.ExpectedResponse {
+					t.Errorf("%s: handler returned unexpected failure: got %+v want reason %v",
+						test.Name, response, test.ExpectedResponse)
 				}
 			}
 		})

@@ -4,20 +4,21 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"socialpredict/handlers"
 	configsvc "socialpredict/internal/service/config"
 )
 
 func GetSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if configService == nil {
-			http.Error(w, "Failed to load economic config", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		err := json.NewEncoder(w).Encode(configService.Economics())
 		if err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }
@@ -33,7 +34,7 @@ type frontendConfigResponse struct {
 func GetFrontendSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if configService == nil {
-			http.Error(w, "Failed to load frontend config", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
@@ -45,7 +46,7 @@ func GetFrontendSetupHandler(configService configsvc.Service) func(w http.Respon
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, "Failed to encode frontend setup response", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 	}

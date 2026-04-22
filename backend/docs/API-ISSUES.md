@@ -23,9 +23,9 @@ and should now be treated as closed for documentation purposes:
   `backend/docs/openapi.yaml` has been updated around that implementation.
 - The previously tracked error-contract cleanup hotspots were normalized onto
   the current response helpers instead of ad hoc raw error writes. This applies
-  to the stats handler, homepage CMS handler, bets buy/sell handlers, positions
-  handlers, display-name/profile helpers, and the authenticated user-position
-  handler.
+  to the stats handler, setup error paths, homepage CMS handler, bets buy/sell
+  handlers, market-bets handler, positions handlers, private profile handler,
+  display-name/profile helpers, and the authenticated user-position handler.
 - The extracted auth/config/domain wiring introduced in the earlier waves is
   now the implementation baseline used by the current handlers and OpenAPI
   document. `API-ISSUES.md` should no longer describe that work as unresolved.
@@ -44,6 +44,8 @@ Current implementation:
   `AuthService.CurrentUser(...)`.
 - `POST /v0/changepassword` still accepts an authenticated request using the
   current token-validation path.
+- Admin-only routes use `AuthService.RequireAdmin(...)`, which now enforces the
+  same password-change gate before the admin role check.
 
 Why it remains deferred:
 
@@ -107,6 +109,8 @@ The following ideas were discussed historically but are not active issues for
 this task:
 
 - forcing a universal `ok/result/reason` response envelope across the API
+- eliminating the current plaintext middleware errors, including the documented
+  cross-route rate-limit responses emitted before handler-specific envelopes run
 - rewriting the API into a new CRUD path taxonomy
 - bundling implementation changes into this documentation cleanup
 

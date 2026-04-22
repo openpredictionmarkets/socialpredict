@@ -17,7 +17,7 @@ func main() {
 	// Secure endpoint example
 	http.Handle("/secure", authsvc.Authenticate(http.HandlerFunc(secureEndpoint)))
 
-	// Load env (.env, .env.dev)
+	// Load local development env overrides from .env.dev when present.
 	if err := appenv.LoadDevFile(); err != nil {
 		log.Printf("env: warning loading environment: %v", err)
 	}

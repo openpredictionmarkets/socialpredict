@@ -122,10 +122,14 @@ func GetPublicUserInfo(db *gorm.DB, username string) PublicUserType {
 * We should use database connection pooling, e.g. starting likely mostly from a handler, we should set up a database connection such as:
 
 ```
-db := util.GetDB()
+func SomeHandler(db *gorm.DB, svc SomeService) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // use the injected db or service here
+    }
+}
 ```
 
-* Then moving down from there, we should try to pass db into subsequent functions so that each query being done is using the same connection, rather than running `db := util.GetDB()` again and again within each subsequent function.
+* Then moving down from there, we should pass `db` or repository/service dependencies into subsequent functions so that each query uses the intended connection explicitly.
 
 
 ### Usage of Higher Order Functions
