@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -14,10 +15,22 @@ type globalLeaderboardComputer interface {
 	ComputeGlobalLeaderboard(context.Context) ([]GlobalUserProfitability, error)
 }
 
-func leaderboardMarketDataFixture(positions []positionsmath.MarketPosition, bets []models.Bet) leaderboardMarketData {
+func leaderboardMarketDataFixture(positions []positionsmath.MarketPosition, bets []boundary.Bet) leaderboardMarketData {
 	return leaderboardMarketData{
 		positions: positions,
 		bets:      bets,
+	}
+}
+
+func boundaryBetFromModel(bet models.Bet) boundary.Bet {
+	return boundary.Bet{
+		ID:        uint(bet.ID),
+		Username:  bet.Username,
+		MarketID:  bet.MarketID,
+		Amount:    bet.Amount,
+		PlacedAt:  bet.PlacedAt,
+		Outcome:   bet.Outcome,
+		CreatedAt: bet.CreatedAt,
 	}
 }
 
@@ -80,7 +93,7 @@ func TestFindEarliestBetsPerUser(t *testing.T) {
 	markets := []leaderboardMarketData{
 		leaderboardMarketDataFixture(
 			nil,
-			[]models.Bet{
+			[]boundary.Bet{
 				{Username: "u1", PlacedAt: now.Add(2 * time.Hour)},
 				{Username: "u1", PlacedAt: now.Add(-time.Hour)},
 				{Username: "u2", PlacedAt: now.Add(30 * time.Minute)},
@@ -144,9 +157,9 @@ func TestComputeGlobalLeaderboard_OrdersByProfit(t *testing.T) {
 		t.Fatalf("create market: %v", err)
 	}
 
-	bets := []models.Bet{
-		modelstesting.GenerateBet(100, "YES", "alice", uint(market.ID), 0),
-		modelstesting.GenerateBet(100, "NO", "bob", uint(market.ID), time.Minute),
+	bets := []boundary.Bet{
+		boundaryBetFromModel(modelstesting.GenerateBet(100, "YES", "alice", uint(market.ID), 0)),
+		boundaryBetFromModel(modelstesting.GenerateBet(100, "NO", "bob", uint(market.ID), time.Minute)),
 	}
 	for _, bet := range bets {
 		if err := db.Create(&bet).Error; err != nil {

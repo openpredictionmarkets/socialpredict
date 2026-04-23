@@ -66,8 +66,11 @@ node_modules/
 
 # Codex stuff
 .codex-tmp
+.codex-reports/
 
 # Go cache
 .gocache
 .gomodcache
 .cache
+.tmp/
+.config/go/

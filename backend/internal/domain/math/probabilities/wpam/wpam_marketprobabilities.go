@@ -1,8 +1,9 @@
 package wpam
 
 import (
-	"socialpredict/models"
 	"time"
+
+	"socialpredict/internal/domain/boundary"
 )
 
 const (
@@ -120,12 +121,12 @@ func (c ProbabilityCalculator) Seeds() Seeds {
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets.
-func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+func CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []boundary.Bet) []ProbabilityChange {
 	return NewProbabilityCalculator(nil).CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, bets)
 }
 
 // CalculateMarketProbabilitiesWPAM calculates and returns the probability changes based on bets using the calculator seeds.
-func (c ProbabilityCalculator) CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []models.Bet) []ProbabilityChange {
+func (c ProbabilityCalculator) CalculateMarketProbabilitiesWPAM(marketCreatedAtTime time.Time, bets []boundary.Bet) []ProbabilityChange {
 	calculator := c.withDefaults()
 	seeds := calculator.seeds.Seeds()
 	var probabilityChanges []ProbabilityChange
@@ -149,13 +150,13 @@ func (c ProbabilityCalculator) CalculateMarketProbabilitiesWPAM(marketCreatedAtT
 	return probabilityChanges
 }
 
-func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
+func ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []boundary.Bet, newBet boundary.Bet) ProjectedProbability {
 	return NewProbabilityCalculator(nil).ProjectNewProbabilityWPAM(marketCreatedAtTime, currentBets, newBet)
 }
 
 // ProjectNewProbabilityWPAM projects the probability after a new bet using calculator seeds.
-func (c ProbabilityCalculator) ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []models.Bet, newBet models.Bet) ProjectedProbability {
-	updatedBets := append(append([]models.Bet(nil), currentBets...), newBet)
+func (c ProbabilityCalculator) ProjectNewProbabilityWPAM(marketCreatedAtTime time.Time, currentBets []boundary.Bet, newBet boundary.Bet) ProjectedProbability {
+	updatedBets := append(append([]boundary.Bet(nil), currentBets...), newBet)
 	probabilityChanges := c.withDefaults().CalculateMarketProbabilitiesWPAM(marketCreatedAtTime, updatedBets)
 	finalProbability := probabilityChanges[len(probabilityChanges)-1].Probability
 
@@ -175,7 +176,7 @@ func (c ProbabilityCalculator) withDefaults() ProbabilityCalculator {
 	return c
 }
 
-func (c ProbabilityCalculator) applyContribution(contributions *marketContributions, bet models.Bet) {
+func (c ProbabilityCalculator) applyContribution(contributions *marketContributions, bet boundary.Bet) {
 	if accumulate, ok := c.accumulators[bet.Outcome]; ok {
 		accumulate(contributions, bet.Amount)
 	}

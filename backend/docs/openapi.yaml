@@ -5,6 +5,11 @@ info:
   description: >
     HTTP contract for the SocialPredict backend service. This spec is generated
     from the Go handlers and DTOs under backend/server and backend/handlers.
+    Routes wrapped by the shared security middleware can return a shared
+    transport-level `429 text/plain` response before reaching handler-specific
+    JSON envelope logic when the rate limit is exceeded. This middleware
+    exception applies across protected routes even when a path omits a repeated
+    path-level `429` entry.
 servers:
   - url: http://localhost:8080
     description: Local dev server
@@ -64,19 +69,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Invalid username or password.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Database access or token creation failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Login rate limit exceeded by middleware. Other protected routes can also return middleware-level 429 responses as described in the API description.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/home:
     get:
@@ -113,7 +124,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/setup/frontend:
     get:
@@ -134,7 +145,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets:
     get:
@@ -672,31 +683,29 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MarketBet'
+                $ref: '#/components/schemas/MarketBetsEnvelopeResponse'
         '400':
           description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching bets.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/positions/{marketId}:
     get:
-      tags: [Markets, Users]
+      tags: [Markets]
       summary: List user positions for a market
       description: Returns all user positions (YES/NO shares) in a specific market.
       security:
@@ -715,31 +724,29 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MarketPosition'
+                $ref: '#/components/schemas/MarketPositionsEnvelopeResponse'
         '400':
           description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching positions.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/positions/{marketId}/{username}:
     get:
-      tags: [Markets, Users]
+      tags: [Markets]
       summary: Get a user's position in a market
       description: Returns the holdings for a specific user in the given market.
       security:
@@ -764,25 +771,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MarketPosition'
+                $ref: '#/components/schemas/UserPositionEnvelopeResponse'
         '400':
           description: Invalid market ID or username.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market or user not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching position.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/bet:
     post:
@@ -803,43 +810,49 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlaceBetResponse'
+                $ref: '#/components/schemas/PlaceBetEnvelopeResponse'
         '400':
           description: Invalid outcome, amount, or request body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
-          description: Authentication failed or password change required.
+          description: Invalid or missing token.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before placing a bet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Target market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '409':
           description: Market is closed and does not accept new bets.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '422':
           description: Insufficient balance to place the bet.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while placing bet.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/sell:
     post:
@@ -860,43 +873,49 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SellBetResponse'
+                $ref: '#/components/schemas/SellBetEnvelopeResponse'
         '400':
           description: Invalid sale request or amount/outcome.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
-          description: Authentication failed or password change required.
+          description: Invalid or missing token.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before selling shares.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '409':
           description: Market closed; sale not allowed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '422':
           description: No position, insufficient shares, or dust cap exceeded.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while processing sale.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/privateprofile:
     get:
@@ -911,25 +930,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PrivateUserResponse'
+                $ref: '#/components/schemas/PrivateUserEnvelopeResponse'
         '401':
           description: Invalid or missing token.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching profile.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/profilechange/description:
     post:
@@ -949,31 +974,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PrivateUserResponse'
+                $ref: '#/components/schemas/PrivateUserEnvelopeResponse'
         '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating description.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/profilechange/displayname:
     post:
@@ -993,31 +1024,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PrivateUserResponse'
+                $ref: '#/components/schemas/PrivateUserEnvelopeResponse'
         '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating display name.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/profilechange/emoji:
     post:
@@ -1037,31 +1074,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PrivateUserResponse'
+                $ref: '#/components/schemas/PrivateUserEnvelopeResponse'
         '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating emoji.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/profilechange/links:
     post:
@@ -1081,31 +1124,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PrivateUserResponse'
+                $ref: '#/components/schemas/PrivateUserEnvelopeResponse'
         '400':
           description: Invalid request body or validation failure.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating personal links.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/changepassword:
     post:
@@ -1123,34 +1172,33 @@ paths:
         '200':
           description: Password changed successfully.
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: Password changed successfully
+                $ref: '#/components/schemas/ChangePasswordEnvelopeResponse'
         '400':
           description: Invalid request body or password requirements not met.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Invalid or missing token.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while changing password.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/userinfo/{username}:
     get:
@@ -1193,7 +1241,7 @@ paths:
 
   /v0/userposition/{marketId}:
     get:
-      tags: [Users, Markets]
+      tags: [Users]
       summary: Get authenticated user's position in a market
       security:
         - bearerAuth: []
@@ -1211,31 +1259,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserPosition'
+                $ref: '#/components/schemas/UserPositionEnvelopeResponse'
         '400':
           description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before this route can be used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market or user not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching user position.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/usercredit/{username}:
     get:
@@ -1410,13 +1464,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/StatsEnvelopeResponse'
         '500':
           description: Failed to compute stats.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/system/metrics:
     get:
@@ -1473,13 +1527,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HomeContent'
+                $ref: '#/components/schemas/HomeContentEnvelopeResponse'
         '404':
           description: Homepage content not found.
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/admin/content/home:
     put:
@@ -1499,31 +1553,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HomeContent'
+                $ref: '#/components/schemas/HomeContentEnvelopeResponse'
         '400':
           description: Invalid request body or update failure.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed or token invalid.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '403':
           description: Admin privileges required.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating content.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
 components:
   securitySchemes:
@@ -1540,6 +1594,185 @@ components:
           type: string
       required: [error]
 
+    ReasonResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        reason:
+          type: string
+      required: [ok, reason]
+
+    PlainTextErrorResponse:
+      type: string
+      description: Plain text error emitted by shared middleware before request-specific handlers run.
+
+    StatsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/StatsResponse'
+      required: [ok, result]
+
+    MarketPositionsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserPosition'
+      required: [ok, result]
+
+    UserPositionEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/UserPosition'
+      required: [ok, result]
+
+    PlaceBetEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/PlaceBetResponse'
+      required: [ok, result]
+
+    SellBetEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/SellBetResponse'
+      required: [ok, result]
+
+    MarketBetsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketBet'
+      required: [ok, result]
+
+    PrivateUserEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/PrivateUserResponse'
+      required: [ok, result]
+
+    HomeContentEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/HomeContent'
+      required: [ok, result]
+
+    StatsResponse:
+      type: object
+      properties:
+        financialStats:
+          $ref: '#/components/schemas/FinancialStats'
+        setupConfiguration:
+          $ref: '#/components/schemas/SetupConfiguration'
+      required: [financialStats, setupConfiguration]
+
+    FinancialStats:
+      type: object
+      properties:
+        totalMoney:
+          type: integer
+          format: int64
+        totalDebtExtended:
+          type: integer
+          format: int64
+        totalDebtUtilized:
+          type: integer
+          format: int64
+        totalFeesCollected:
+          type: integer
+          format: int64
+        totalBonusesPaid:
+          type: integer
+          format: int64
+        outstandingPayouts:
+          type: integer
+          format: int64
+        totalMoneyInCirculation:
+          type: integer
+          format: int64
+      required:
+        [totalMoney, totalDebtExtended, totalDebtUtilized, totalFeesCollected, totalBonusesPaid, outstandingPayouts, totalMoneyInCirculation]
+
+    SetupConfiguration:
+      type: object
+      properties:
+        initialMarketProbability:
+          type: number
+          format: double
+        initialMarketSubsidization:
+          type: integer
+          format: int64
+        initialMarketYes:
+          type: integer
+          format: int64
+        initialMarketNo:
+          type: integer
+          format: int64
+        createMarketCost:
+          type: integer
+          format: int64
+        traderBonus:
+          type: integer
+          format: int64
+        initialAccountBalance:
+          type: integer
+          format: int64
+        maximumDebtAllowed:
+          type: integer
+          format: int64
+        minimumBet:
+          type: integer
+          format: int64
+        maxDustPerSale:
+          type: integer
+          format: int64
+        initialBetFee:
+          type: integer
+          format: int64
+        buySharesFee:
+          type: integer
+          format: int64
+        sellSharesFee:
+          type: integer
+          format: int64
+      required:
+        [initialMarketProbability, initialMarketSubsidization, initialMarketYes, initialMarketNo, createMarketCost, traderBonus, initialAccountBalance, maximumDebtAllowed, minimumBet, maxDustPerSale, initialBetFee, buySharesFee, sellSharesFee]
+
     LoginRequest:
       type: object
       required: [username, password]
@@ -1549,7 +1782,35 @@ components:
         password:
           type: string
 
+    ChangePasswordEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/ChangePasswordResult'
+      required: [ok, result]
+
+    ChangePasswordResult:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Password changed successfully
+      required: [message]
+
     LoginResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/LoginResult'
+
+    LoginResult:
       type: object
       required: [token, username, usertype, mustChangePassword]
       properties:

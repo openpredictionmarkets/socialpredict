@@ -12,53 +12,53 @@ import (
 var setupYaml []byte
 
 type MarketCreation struct {
-	InitialMarketProbability   float64 `yaml:"initialMarketProbability"`
-	InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization"`
-	InitialMarketYes           int64   `yaml:"initialMarketYes"`
-	InitialMarketNo            int64   `yaml:"initialMarketNo"`
-	MinimumFutureHours         float64 `yaml:"minimumFutureHours"`
+	InitialMarketProbability   float64 `yaml:"initialMarketProbability" json:"initialMarketProbability"`
+	InitialMarketSubsidization int64   `yaml:"initialMarketSubsidization" json:"initialMarketSubsidization"`
+	InitialMarketYes           int64   `yaml:"initialMarketYes" json:"initialMarketYes"`
+	InitialMarketNo            int64   `yaml:"initialMarketNo" json:"initialMarketNo"`
+	MinimumFutureHours         float64 `yaml:"minimumFutureHours" json:"minimumFutureHours"`
 }
 
 type MarketIncentives struct {
-	CreateMarketCost int64 `yaml:"createMarketCost"`
-	TraderBonus      int64 `yaml:"traderBonus"`
+	CreateMarketCost int64 `yaml:"createMarketCost" json:"createMarketCost"`
+	TraderBonus      int64 `yaml:"traderBonus" json:"traderBonus"`
 }
 
 type User struct {
-	InitialAccountBalance int64 `yaml:"initialAccountBalance"`
-	MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed"`
+	InitialAccountBalance int64 `yaml:"initialAccountBalance" json:"initialAccountBalance"`
+	MaximumDebtAllowed    int64 `yaml:"maximumDebtAllowed" json:"maximumDebtAllowed"`
 }
 
 type BetFees struct {
-	InitialBetFee int64 `yaml:"initialBetFee"`
-	BuySharesFee  int64 `yaml:"buySharesFee"`
-	SellSharesFee int64 `yaml:"sellSharesFee"`
+	InitialBetFee int64 `yaml:"initialBetFee" json:"initialBetFee"`
+	BuySharesFee  int64 `yaml:"buySharesFee" json:"buySharesFee"`
+	SellSharesFee int64 `yaml:"sellSharesFee" json:"sellSharesFee"`
 }
 
 type Betting struct {
-	MinimumBet     int64   `yaml:"minimumBet"`
-	MaxDustPerSale int64   `yaml:"maxDustPerSale"`
-	BetFees        BetFees `yaml:"betFees"`
+	MinimumBet     int64   `yaml:"minimumBet" json:"minimumBet"`
+	MaxDustPerSale int64   `yaml:"maxDustPerSale" json:"maxDustPerSale"`
+	BetFees        BetFees `yaml:"betFees" json:"betFees"`
 }
 
 type Economics struct {
-	MarketCreation   MarketCreation   `yaml:"marketcreation"`
-	MarketIncentives MarketIncentives `yaml:"marketincentives"`
-	User             User             `yaml:"user"`
-	Betting          Betting          `yaml:"betting"`
+	MarketCreation   MarketCreation   `yaml:"marketcreation" json:"marketcreation"`
+	MarketIncentives MarketIncentives `yaml:"marketincentives" json:"marketincentives"`
+	User             User             `yaml:"user" json:"user"`
+	Betting          Betting          `yaml:"betting" json:"betting"`
 }
 
 type FrontendCharts struct {
-	SigFigs int `yaml:"sigFigs"`
+	SigFigs int `yaml:"sigFigs" json:"sigFigs"`
 }
 
 type Frontend struct {
-	Charts FrontendCharts `yaml:"charts"`
+	Charts FrontendCharts `yaml:"charts" json:"charts"`
 }
 
 type EconomicConfig struct {
-	Economics Economics `yaml:"economics"`
-	Frontend  Frontend  `yaml:"frontend"`
+	Economics Economics `yaml:"economics" json:"economics"`
+	Frontend  Frontend  `yaml:"frontend" json:"frontend"`
 }
 
 var economicConfig *EconomicConfig

@@ -5,8 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 )
 
 // GlobalUserProfitability summarises a user's profitability across all markets.
@@ -60,7 +60,7 @@ func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserPro
 type leaderboardMarketData struct {
 	snapshot  positionsmath.MarketSnapshot
 	positions []positionsmath.MarketPosition
-	bets      []models.Bet
+	bets      []boundary.Bet
 }
 
 type leaderboardAggregate struct {
@@ -71,7 +71,7 @@ type leaderboardAggregate struct {
 	resolvedMarkets   int
 }
 
-func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []models.Market) ([]leaderboardMarketData, error) {
+func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []MarketRecord) ([]leaderboardMarketData, error) {
 	data := make([]leaderboardMarketData, 0, len(markets))
 
 	for _, market := range markets {
@@ -80,12 +80,7 @@ func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []model
 			return nil, err
 		}
 
-		snapshot := positionsmath.MarketSnapshot{
-			ID:               int64(market.ID),
-			CreatedAt:        market.CreatedAt,
-			IsResolved:       market.IsResolved,
-			ResolutionResult: market.ResolutionResult,
-		}
+		snapshot := market.Snapshot()
 
 		if s.positions == nil {
 			s.ensureStrategyDefaults()

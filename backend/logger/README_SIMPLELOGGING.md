@@ -40,7 +40,7 @@ Log at key points in your function
 logger.LogInfo("ChangePassword", "ChangePassword", "ChangePassword handler called")
 
 securityService := security.NewSecurityService()
-db := util.GetDB()
+usersSvc := appContainer.GetUsersService()
 
 user, httperr := auth.ValidateTokenAndGetUser(r, usersSvc)
 if httperr != nil {

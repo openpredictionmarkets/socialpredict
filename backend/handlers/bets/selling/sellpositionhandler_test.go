@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -134,11 +135,14 @@ func TestSellPositionHandler_Success(t *testing.T) {
 		t.Fatalf("unexpected request payload: %+v", svc.req)
 	}
 
-	var resp dto.SellBetResponse
+	var resp handlers.SuccessEnvelope[dto.SellBetResponse]
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if resp.SharesSold != 3 || resp.SaleValue != 60 || resp.Dust != 5 {
+	if !resp.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if resp.Result.SharesSold != 3 || resp.Result.SaleValue != 60 || resp.Result.Dust != 5 {
 		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
@@ -148,15 +152,16 @@ func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
 
 	cases := []struct {
-		name string
-		err  error
-		want int
+		name   string
+		err    error
+		want   int
+		reason string
 	}{
-		{"bad outcome", bets.ErrInvalidOutcome, http.StatusBadRequest},
-		{"market closed", bets.ErrMarketClosed, http.StatusConflict},
-		{"no position", bets.ErrNoPosition, http.StatusUnprocessableEntity},
-		{"dust cap", bets.ErrDustCapExceeded{Cap: 2, Requested: 3}, http.StatusUnprocessableEntity},
-		{"market not found", dmarkets.ErrMarketNotFound, http.StatusNotFound},
+		{"bad outcome", bets.ErrInvalidOutcome, http.StatusBadRequest, "SELL_VALIDATION_FAILED"},
+		{"market closed", bets.ErrMarketClosed, http.StatusConflict, "MARKET_CLOSED"},
+		{"no position", bets.ErrNoPosition, http.StatusUnprocessableEntity, "NO_POSITION"},
+		{"dust cap", bets.ErrDustCapExceeded{Cap: 2, Requested: 3}, http.StatusUnprocessableEntity, "DUST_CAP_EXCEEDED"},
+		{"market not found", dmarkets.ErrMarketNotFound, http.StatusNotFound, "MARKET_NOT_FOUND"},
 	}
 
 	for _, tc := range cases {
@@ -173,6 +178,14 @@ func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 
 			if rr.Code != tc.want {
 				t.Fatalf("expected status %d, got %d", tc.want, rr.Code)
+			}
+
+			var resp handlers.FailureEnvelope
+			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("decode failure envelope: %v", err)
+			}
+			if resp.Reason != tc.reason {
+				t.Fatalf("expected reason %q, got %q", tc.reason, resp.Reason)
 			}
 		})
 	}
@@ -193,5 +206,13 @@ func TestSellPositionHandler_InvalidJSON(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInvalidRequest) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInvalidRequest, resp.Reason)
 	}
 }

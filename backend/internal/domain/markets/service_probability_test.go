@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	markets "socialpredict/internal/domain/markets"
 	"socialpredict/internal/domain/math/probabilities/wpam"
-	"socialpredict/models"
 )
 
 type projectionRepo struct {
@@ -210,7 +210,7 @@ func TestProjectProbability_ComputesProjection(t *testing.T) {
 		t.Fatalf("unexpected current probability: %v", projection.CurrentProbability)
 	}
 
-	expected := wpam.ProjectNewProbabilityWPAM(createdAt, marketsToModel(bets), modelsBet(createdAt.Add(20*time.Minute), 55, 50, "YES"))
+	expected := wpam.ProjectNewProbabilityWPAM(createdAt, marketsToBoundaryBets(bets), boundaryBet(createdAt.Add(20*time.Minute), 55, 50, "YES"))
 	if absDiff(projection.ProjectedProbability, expected.Probability) > 1e-6 {
 		t.Fatalf("expected projected %v got %v", expected.Probability, projection.ProjectedProbability)
 	}
@@ -235,12 +235,12 @@ func TestProjectProbability_InvalidOutcome(t *testing.T) {
 
 // helpers for tests
 
-func marketsToModel(bets []*markets.Bet) []models.Bet {
-	return markets.ToModelBets(bets)
+func marketsToBoundaryBets(bets []*markets.Bet) []boundary.Bet {
+	return markets.ToBoundaryBets(bets)
 }
 
-func modelsBet(placed time.Time, marketID int64, amount int64, outcome string) models.Bet {
-	return models.Bet{Username: "preview", MarketID: uint(marketID), Amount: amount, Outcome: outcome, PlacedAt: placed}
+func boundaryBet(placed time.Time, marketID int64, amount int64, outcome string) boundary.Bet {
+	return boundary.Bet{Username: "preview", MarketID: uint(marketID), Amount: amount, Outcome: outcome, PlacedAt: placed}
 }
 
 func absDiff(a, b float64) float64 {

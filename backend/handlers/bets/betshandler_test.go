@@ -6,10 +6,10 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	dmarkets "socialpredict/internal/domain/markets"
 
 	"github.com/gorilla/mux"
@@ -78,7 +78,7 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 		vars           map[string]string
 		stub           marketServiceStub
 		wantStatusCode int
-		wantBodySubstr string
+		wantReason     string
 		verifyBody     bool
 	}{
 		{
@@ -87,13 +87,14 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 			vars:           map[string]string{"marketId": "1"},
 			stub:           marketServiceStub{},
 			wantStatusCode: http.StatusMethodNotAllowed,
+			wantReason:     string(handlers.ReasonMethodNotAllowed),
 		},
 		{
 			name:           "missing market id",
 			method:         http.MethodGet,
 			wantStatusCode: http.StatusBadRequest,
 			stub:           marketServiceStub{},
-			wantBodySubstr: "Market ID is required",
+			wantReason:     string(handlers.ReasonInvalidRequest),
 		},
 		{
 			name:           "invalid market id value",
@@ -101,7 +102,7 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 			vars:           map[string]string{"marketId": "abc"},
 			stub:           marketServiceStub{},
 			wantStatusCode: http.StatusBadRequest,
-			wantBodySubstr: "Invalid market ID",
+			wantReason:     string(handlers.ReasonInvalidRequest),
 		},
 		{
 			name:   "market not found",
@@ -113,7 +114,7 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 				},
 			},
 			wantStatusCode: http.StatusNotFound,
-			wantBodySubstr: "Market not found",
+			wantReason:     string(handlers.ReasonMarketNotFound),
 		},
 		{
 			name:   "invalid input from service",
@@ -125,7 +126,7 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 				},
 			},
 			wantStatusCode: http.StatusBadRequest,
-			wantBodySubstr: "Invalid market ID",
+			wantReason:     string(handlers.ReasonInvalidRequest),
 		},
 		{
 			name:   "internal error bubbled up",
@@ -137,7 +138,7 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 				},
 			},
 			wantStatusCode: http.StatusInternalServerError,
-			wantBodySubstr: "Internal server error",
+			wantReason:     string(handlers.ReasonInternalError),
 		},
 		{
 			name:   "successful response",
@@ -167,7 +168,7 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := MarketBetsHandlerWithService(tt.stub)
-			req := httptest.NewRequest(tt.method, "/v0/markets/marketId/bets", nil)
+			req := httptest.NewRequest(tt.method, "/v0/markets/bets/1", nil)
 			if tt.vars != nil {
 				req = mux.SetURLVars(req, tt.vars)
 			}
@@ -180,19 +181,28 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 			}
 
 			if tt.verifyBody {
-				var decoded []dmarkets.BetDisplayInfo
-				if err := json.Unmarshal(rr.Body.Bytes(), &decoded); err != nil {
+				var envelope handlers.SuccessEnvelope[[]dmarkets.BetDisplayInfo]
+				if err := json.Unmarshal(rr.Body.Bytes(), &envelope); err != nil {
 					t.Fatalf("failed to decode response: %v", err)
 				}
-				if len(decoded) != 1 {
-					t.Fatalf("expected 1 bet, got %d", len(decoded))
+				if !envelope.OK {
+					t.Fatalf("expected ok envelope, got %+v", envelope)
 				}
-				got := decoded[0]
+				if len(envelope.Result) != 1 {
+					t.Fatalf("expected 1 bet, got %d", len(envelope.Result))
+				}
+				got := envelope.Result[0]
 				if got.Username != "alice" || got.Outcome != "YES" || got.Amount != 100 || got.Probability != 0.55 || !got.PlacedAt.Equal(now) {
 					t.Fatalf("unexpected bet payload: %+v", got)
 				}
-			} else if tt.wantBodySubstr != "" && !strings.Contains(rr.Body.String(), tt.wantBodySubstr) {
-				t.Fatalf("expected body to contain %q, got %q", tt.wantBodySubstr, rr.Body.String())
+			} else if tt.wantReason != "" {
+				var envelope handlers.FailureEnvelope
+				if err := json.Unmarshal(rr.Body.Bytes(), &envelope); err != nil {
+					t.Fatalf("failed to decode failure envelope: %v", err)
+				}
+				if envelope.OK || envelope.Reason != tt.wantReason {
+					t.Fatalf("expected reason %q, got %+v", tt.wantReason, envelope)
+				}
 			}
 		})
 	}

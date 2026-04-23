@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	marketmath "socialpredict/internal/domain/math/market"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/internal/domain/math/probabilities/wpam"
 	users "socialpredict/internal/domain/users"
-	"socialpredict/models"
 )
 
 type defaultCreationPolicy struct {
@@ -148,7 +148,7 @@ func (e defaultProbabilityEngine) ensureCalculator() wpam.ProbabilityCalculator 
 	return e.calculator
 }
 
-func (e defaultProbabilityEngine) Calculate(createdAt time.Time, bets []models.Bet) []ProbabilityChange {
+func (e defaultProbabilityEngine) Calculate(createdAt time.Time, bets []boundary.Bet) []ProbabilityChange {
 	calculator := e.ensureCalculator()
 	changes := calculator.CalculateMarketProbabilitiesWPAM(createdAt, bets)
 	points := make([]ProbabilityChange, len(changes))
@@ -161,7 +161,7 @@ func (e defaultProbabilityEngine) Calculate(createdAt time.Time, bets []models.B
 	return points
 }
 
-func (e defaultProbabilityEngine) Project(createdAt time.Time, bets []models.Bet, newBet models.Bet) ProbabilityProjection {
+func (e defaultProbabilityEngine) Project(createdAt time.Time, bets []boundary.Bet, newBet boundary.Bet) ProbabilityProjection {
 	calculator := e.ensureCalculator()
 	projection := calculator.ProjectNewProbabilityWPAM(createdAt, bets, newBet)
 	return ProbabilityProjection{
@@ -259,21 +259,21 @@ func (defaultSearchPolicy) SelectFallback(primary []*Market, all []*Market, limi
 
 type defaultMetricsCalculator struct{}
 
-func (defaultMetricsCalculator) Volume(bets []models.Bet) int64 {
+func (defaultMetricsCalculator) Volume(bets []boundary.Bet) int64 {
 	return marketmath.GetMarketVolume(bets)
 }
 
-func (defaultMetricsCalculator) VolumeWithDust(bets []models.Bet) int64 {
+func (defaultMetricsCalculator) VolumeWithDust(bets []boundary.Bet) int64 {
 	return marketmath.GetMarketVolumeWithDust(bets)
 }
 
-func (defaultMetricsCalculator) Dust(bets []models.Bet) int64 {
+func (defaultMetricsCalculator) Dust(bets []boundary.Bet) int64 {
 	return marketmath.GetMarketDust(bets)
 }
 
 type defaultLeaderboardCalculator struct{}
 
-func (defaultLeaderboardCalculator) Calculate(snapshot positionsmath.MarketSnapshot, bets []models.Bet) ([]positionsmath.UserProfitability, error) {
+func (defaultLeaderboardCalculator) Calculate(snapshot positionsmath.MarketSnapshot, bets []boundary.Bet) ([]positionsmath.UserProfitability, error) {
 	return positionsmath.CalculateMarketLeaderboard(snapshot, bets)
 }
 

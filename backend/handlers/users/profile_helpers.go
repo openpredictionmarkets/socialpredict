@@ -1,40 +1,36 @@
 package usershandlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
+	authsvc "socialpredict/internal/service/auth"
 )
 
 func writeProfileError(w http.ResponseWriter, err error, field string) {
 	switch {
 	case errors.Is(err, dusers.ErrUserNotFound):
-		writeProfileJSONError(w, http.StatusNotFound, "User not found")
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 	case errors.Is(err, dusers.ErrInvalidUserData):
-		writeProfileJSONError(w, http.StatusBadRequest, "Invalid user data")
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, "INVALID_USER_DATA")
 	case errors.Is(err, dusers.ErrInvalidCredentials):
-		writeProfileJSONError(w, http.StatusUnauthorized, "Current password is incorrect")
+		_ = handlers.WriteFailure(w, http.StatusUnauthorized, "INVALID_CREDENTIALS")
 	default:
 		message := err.Error()
 		if isValidationError(message) {
-			writeProfileJSONError(w, http.StatusBadRequest, message)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 			return
 		}
-		writeProfileJSONError(w, http.StatusInternalServerError, "Failed to update "+field+": "+message)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, profileFailureReason(field))
 	}
 }
 
 func writeProfileJSONError(w http.ResponseWriter, statusCode int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	if err := json.NewEncoder(w).Encode(dto.ErrorResponse{Error: message}); err != nil {
-		http.Error(w, message, statusCode)
-	}
+	_ = handlers.WriteFailure(w, statusCode, handlers.FailureReason(message))
 }
 
 func isValidationError(message string) bool {
@@ -67,5 +63,40 @@ func toPrivateUserResponse(user *dusers.User) dto.PrivateUserResponse {
 		Email:                 user.Email,
 		APIKey:                user.APIKey,
 		MustChangePassword:    user.MustChangePassword,
+	}
+}
+
+func profileFailureReason(field string) handlers.FailureReason {
+	switch field {
+	case "display name":
+		return "DISPLAY_NAME_UPDATE_FAILED"
+	case "description":
+		return "DESCRIPTION_UPDATE_FAILED"
+	case "emoji":
+		return "EMOJI_UPDATE_FAILED"
+	case "personal links":
+		return "PERSONAL_LINKS_UPDATE_FAILED"
+	default:
+		return handlers.ReasonInternalError
+	}
+}
+
+func profileAuthFailureReason(err *authsvc.HTTPError) handlers.FailureReason {
+	if err == nil {
+		return handlers.ReasonInternalError
+	}
+
+	switch err.Message {
+	case "Authorization header is required", "Invalid token":
+		return handlers.ReasonInvalidToken
+	case "Password change required":
+		return handlers.ReasonPasswordChangeRequired
+	case "User not found":
+		return handlers.ReasonUserNotFound
+	default:
+		if err.StatusCode >= http.StatusInternalServerError {
+			return handlers.ReasonInternalError
+		}
+		return handlers.ReasonInvalidToken
 	}
 }

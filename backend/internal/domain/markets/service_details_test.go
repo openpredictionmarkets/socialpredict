@@ -5,17 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	markets "socialpredict/internal/domain/markets"
 	marketmath "socialpredict/internal/domain/math/market"
 	"socialpredict/internal/domain/math/probabilities/wpam"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
 
 type marketDetailsFixture struct {
 	service    *markets.Service
-	bets       []models.Bet
-	market     models.Market
+	bets       []boundary.Bet
+	market     *markets.Market
 	calculator wpam.ProbabilityCalculator
 }
 
@@ -37,26 +37,39 @@ func seedMarketDetailsFixture(t *testing.T) marketDetailsFixture {
 		t.Fatalf("reload market: %v", err)
 	}
 
-	bets := []models.Bet{
-		modelstesting.GenerateBet(150, "YES", "alice", uint(market.ID), 0),
-		modelstesting.GenerateBet(90, "NO", "bob", uint(market.ID), time.Minute),
-		modelstesting.GenerateBet(-40, "YES", "alice", uint(market.ID), 2*time.Minute),
+	bets := []boundary.Bet{
+		{Username: "alice", MarketID: uint(market.ID), Amount: 150, Outcome: "YES", PlacedAt: market.CreatedAt.Add(1 * time.Minute), CreatedAt: market.CreatedAt.Add(1 * time.Minute)},
+		{Username: "bob", MarketID: uint(market.ID), Amount: 90, Outcome: "NO", PlacedAt: market.CreatedAt.Add(2 * time.Minute), CreatedAt: market.CreatedAt.Add(2 * time.Minute)},
+		{Username: "alice", MarketID: uint(market.ID), Amount: -40, Outcome: "YES", PlacedAt: market.CreatedAt.Add(3 * time.Minute), CreatedAt: market.CreatedAt.Add(3 * time.Minute)},
 	}
-	for i := range bets {
-		if err := db.Create(&bets[i]).Error; err != nil {
+
+	for i, bet := range bets {
+		dbBet := modelstesting.GenerateBet(bet.Amount, bet.Outcome, bet.Username, bet.MarketID, 0)
+		dbBet.PlacedAt = bet.PlacedAt
+		dbBet.CreatedAt = bet.CreatedAt
+		if err := db.Create(&dbBet).Error; err != nil {
 			t.Fatalf("create bet %d: %v", i, err)
 		}
 	}
 
 	return marketDetailsFixture{
-		service:    service,
-		bets:       bets,
-		market:     market,
+		service: service,
+		bets:    bets,
+		market: &markets.Market{
+			ID:                 market.ID,
+			QuestionTitle:      market.QuestionTitle,
+			Description:        market.Description,
+			OutcomeType:        market.OutcomeType,
+			ResolutionDateTime: market.ResolutionDateTime,
+			CreatorUsername:    market.CreatorUsername,
+			CreatedAt:          market.CreatedAt,
+			InitialProbability: market.InitialProbability,
+		},
 		calculator: calculator,
 	}
 }
 
-func assertMarketDetailMetrics(t *testing.T, overview *markets.MarketOverview, market models.Market, bets []models.Bet, calculator wpam.ProbabilityCalculator) {
+func assertMarketDetailMetrics(t *testing.T, overview *markets.MarketOverview, market *markets.Market, bets []boundary.Bet, calculator wpam.ProbabilityCalculator) {
 	t.Helper()
 
 	expectedVolume := marketmath.GetMarketVolumeWithDust(bets)

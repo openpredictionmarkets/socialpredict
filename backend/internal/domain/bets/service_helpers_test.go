@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
 	"socialpredict/setup"
 )
 
@@ -235,7 +235,7 @@ func TestBalanceGuard_EnsureSufficient(t *testing.T) {
 }
 
 type ledgerRepo struct {
-	bet     *models.Bet
+	bet     *boundary.Bet
 	creator ledgerBetCreator
 	checker ledgerBetChecker
 }
@@ -243,7 +243,7 @@ type ledgerRepo struct {
 func newLedgerRepo(opts ...func(*ledgerRepo)) *ledgerRepo {
 	repo := &ledgerRepo{
 		creator: ledgerBetCreator{
-			createFunc: func(context.Context, *models.Bet) error { return nil },
+			createFunc: func(context.Context, *boundary.Bet) error { return nil },
 		},
 		checker: ledgerBetChecker{
 			hasBetFunc: func(context.Context, uint, string) (bool, error) {
@@ -257,7 +257,7 @@ func newLedgerRepo(opts ...func(*ledgerRepo)) *ledgerRepo {
 	return repo
 }
 
-func withLedgerCreate(fn func(ctx context.Context, bet *models.Bet) error) func(*ledgerRepo) {
+func withLedgerCreate(fn func(ctx context.Context, bet *boundary.Bet) error) func(*ledgerRepo) {
 	return func(repo *ledgerRepo) {
 		repo.creator.createFunc = fn
 	}
@@ -270,10 +270,10 @@ func withLedgerHasBet(fn func(ctx context.Context, marketID uint, username strin
 }
 
 type ledgerBetCreator struct {
-	createFunc func(ctx context.Context, bet *models.Bet) error
+	createFunc func(ctx context.Context, bet *boundary.Bet) error
 }
 
-func (l *ledgerRepo) Create(ctx context.Context, bet *models.Bet) error {
+func (l *ledgerRepo) Create(ctx context.Context, bet *boundary.Bet) error {
 	return l.creator.Create(ctx, bet, l)
 }
 
@@ -285,7 +285,7 @@ func (l *ledgerRepo) UserHasBet(ctx context.Context, marketID uint, username str
 	return l.checker.UserHasBet(ctx, marketID, username)
 }
 
-func (c ledgerBetCreator) Create(ctx context.Context, bet *models.Bet, repo *ledgerRepo) error {
+func (c ledgerBetCreator) Create(ctx context.Context, bet *boundary.Bet, repo *ledgerRepo) error {
 	if c.createFunc == nil {
 		return errUnexpectedHelperCall
 	}
@@ -389,7 +389,7 @@ func TestBetLedger_ChargeAndRecord(t *testing.T) {
 	users := newLedgerUsers()
 	repo := newLedgerRepo()
 	ledger := betLedger{repo: repo, users: users}
-	bet := &models.Bet{Username: "bob", Amount: 25}
+	bet := &boundary.Bet{Username: "bob", Amount: 25}
 
 	if err := ledger.ChargeAndRecord(context.Background(), bet, 25); err != nil {
 		t.Fatalf("expected success, got %v", err)
@@ -408,12 +408,12 @@ func TestBetLedger_ChargeAndRecord(t *testing.T) {
 
 func TestBetLedger_ChargeAndRecord_RollsBackOnRepoError(t *testing.T) {
 	users := newLedgerUsers()
-	repo := newLedgerRepo(withLedgerCreate(func(ctx context.Context, bet *models.Bet) error {
+	repo := newLedgerRepo(withLedgerCreate(func(ctx context.Context, bet *boundary.Bet) error {
 		return errors.New("db down")
 	}))
 	ledger := betLedger{repo: repo, users: users}
 
-	err := ledger.ChargeAndRecord(context.Background(), &models.Bet{Username: "alice"}, 10)
+	err := ledger.ChargeAndRecord(context.Background(), &boundary.Bet{Username: "alice"}, 10)
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -427,7 +427,7 @@ func TestBetLedger_CreditSale(t *testing.T) {
 	repo := newLedgerRepo()
 	ledger := betLedger{repo: repo, users: users}
 
-	if err := ledger.CreditSale(context.Background(), &models.Bet{Username: "alice"}, 15); err != nil {
+	if err := ledger.CreditSale(context.Background(), &boundary.Bet{Username: "alice"}, 15); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionSale || users.calls[0].amount != 15 {

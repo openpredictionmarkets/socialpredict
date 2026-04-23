@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
 	"socialpredict/setup"
 )
 
 // Repository exposes the persistence layer needed by the bets domain service.
 type BetWriter interface {
-	Create(ctx context.Context, bet *models.Bet) error
+	Create(ctx context.Context, bet *boundary.Bet) error
 }
 
 // BetHistoryReader exposes prior-participation lookups used for buy fee rules.
@@ -90,8 +90,8 @@ type BalanceGuard interface {
 
 // BetLedger encapsulates persistence and user accounting for bets.
 type BetLedger interface {
-	ChargeAndRecord(ctx context.Context, bet *models.Bet, totalCost int64) error
-	CreditSale(ctx context.Context, bet *models.Bet, saleValue int64) error
+	ChargeAndRecord(ctx context.Context, bet *boundary.Bet, totalCost int64) error
+	CreditSale(ctx context.Context, bet *boundary.Bet, saleValue int64) error
 }
 
 // Clock allows time to be mocked in tests.

@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	users "socialpredict/internal/domain/users"
-	"socialpredict/models"
 )
 
 const (
@@ -116,8 +116,8 @@ type ProbabilityChange struct {
 
 // ProbabilityEngine provides probability calculations and projections.
 type ProbabilityEngine interface {
-	Calculate(createdAt time.Time, bets []models.Bet) []ProbabilityChange
-	Project(createdAt time.Time, bets []models.Bet, newBet models.Bet) ProbabilityProjection
+	Calculate(createdAt time.Time, bets []boundary.Bet) []ProbabilityChange
+	Project(createdAt time.Time, bets []boundary.Bet, newBet boundary.Bet) ProbabilityProjection
 }
 
 // ProbabilityValidator validates projection requests and market eligibility.
@@ -138,14 +138,14 @@ type SearchPolicy interface {
 
 // MetricsCalculator computes volume and dust metrics.
 type MetricsCalculator interface {
-	Volume(bets []models.Bet) int64
-	VolumeWithDust(bets []models.Bet) int64
-	Dust(bets []models.Bet) int64
+	Volume(bets []boundary.Bet) int64
+	VolumeWithDust(bets []boundary.Bet) int64
+	Dust(bets []boundary.Bet) int64
 }
 
 // LeaderboardCalculator computes leaderboard standings.
 type LeaderboardCalculator interface {
-	Calculate(snapshot positionsmath.MarketSnapshot, bets []models.Bet) ([]positionsmath.UserProfitability, error)
+	Calculate(snapshot positionsmath.MarketSnapshot, bets []boundary.Bet) ([]positionsmath.UserProfitability, error)
 }
 
 // StatusPolicy validates status filters and pagination rules.

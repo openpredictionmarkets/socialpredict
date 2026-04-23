@@ -5,9 +5,32 @@ import (
 	"strings"
 	"testing"
 
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
+
+func TestSeedUsersUsesConfigServiceInitialBalance(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	t.Setenv("ADMIN_PASSWORD", "admin-password")
+
+	config := modelstesting.GenerateEconomicConfig()
+	config.Economics.User.InitialAccountBalance = 4321
+
+	SeedUsers(db, configsvc.NewStaticService(config))
+
+	var admin models.User
+	if err := db.Where("username = ?", "admin").First(&admin).Error; err != nil {
+		t.Fatalf("expected admin user to be seeded: %v", err)
+	}
+
+	if admin.InitialAccountBalance != 4321 {
+		t.Fatalf("expected initial balance 4321, got %d", admin.InitialAccountBalance)
+	}
+	if admin.AccountBalance != 4321 {
+		t.Fatalf("expected account balance 4321, got %d", admin.AccountBalance)
+	}
+}
 
 func TestSeedHomepage_RendersHTML(t *testing.T) {
 	// Create fake database for testing

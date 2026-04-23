@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"socialpredict/models"
+	"socialpredict/internal/domain/boundary"
 	"socialpredict/models/modelstesting"
 )
 
@@ -32,7 +32,7 @@ func TestGormRepositoryCreateAndUserHasBet(t *testing.T) {
 		t.Fatalf("seed market: %v", err)
 	}
 
-	bet := &models.Bet{
+	bet := &boundary.Bet{
 		Username: "bettor",
 		MarketID: uint(market.ID),
 		Amount:   250,

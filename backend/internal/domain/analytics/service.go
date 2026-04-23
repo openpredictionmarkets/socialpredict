@@ -3,25 +3,25 @@ package analytics
 import (
 	"context"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 	"socialpredict/setup"
 )
 
 // DebtRepository exposes only the user data needed for debt calculations.
 type DebtRepository interface {
-	ListUsers(ctx context.Context) ([]models.User, error)
+	ListUsers(ctx context.Context) ([]UserAccount, error)
 }
 
 // VolumeRepository exposes the market and bet data needed for volume calculations.
 type VolumeRepository interface {
-	ListMarkets(ctx context.Context) ([]models.Market, error)
-	ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error)
+	ListMarkets(ctx context.Context) ([]MarketRecord, error)
+	ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error)
 }
 
 // FeeRepository exposes the ordered bet data needed for participation fee calculations.
 type FeeRepository interface {
-	ListBetsOrdered(ctx context.Context) ([]models.Bet, error)
+	ListBetsOrdered(ctx context.Context) ([]boundary.Bet, error)
 }
 
 // LeaderboardRepository provides the data required to compute leaderboards.
@@ -57,7 +57,7 @@ type MetricsAssembler interface {
 
 // MarketPositionCalculator calculates market positions for analytics consumers.
 type MarketPositionCalculator interface {
-	Calculate(snapshot positionsmath.MarketSnapshot, bets []models.Bet) ([]positionsmath.MarketPosition, error)
+	Calculate(snapshot positionsmath.MarketSnapshot, bets []boundary.Bet) ([]positionsmath.MarketPosition, error)
 }
 
 // Repository exposes the data access required by the analytics domain service.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
@@ -14,6 +15,13 @@ import (
 // GormRepository implements the users domain repository interface using GORM
 type GormRepository struct {
 	db *gorm.DB
+}
+
+type authenticatedUserRow struct {
+	Username           string
+	UserType           string
+	Password           string
+	MustChangePassword bool
 }
 
 // NewGormRepository creates a new GORM-based users repository
@@ -183,7 +191,20 @@ func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID i
 		ResolutionResult: market.ResolutionResult,
 	}
 
-	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, bets, username)
+	boundaryBets := make([]boundary.Bet, len(bets))
+	for i := range bets {
+		boundaryBets[i] = boundary.Bet{
+			ID:        uint(bets[i].ID),
+			Username:  bets[i].Username,
+			MarketID:  bets[i].MarketID,
+			Amount:    bets[i].Amount,
+			PlacedAt:  bets[i].PlacedAt,
+			Outcome:   bets[i].Outcome,
+			CreatedAt: bets[i].CreatedAt,
+		}
+	}
+
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, boundaryBets, username)
 	if err != nil {
 		return nil, err
 	}
@@ -247,6 +268,28 @@ func (r *GormRepository) GetCredentials(ctx context.Context, username string) (*
 	}
 
 	return &dusers.Credentials{
+		PasswordHash:       user.Password,
+		MustChangePassword: user.MustChangePassword,
+	}, nil
+}
+
+// FindAuthenticatedUser returns the login-facing user fields while containing persistence details in the repository edge.
+func (r *GormRepository) FindAuthenticatedUser(ctx context.Context, username string) (*boundary.AuthenticatedUser, error) {
+	var user authenticatedUserRow
+	if err := r.db.WithContext(ctx).
+		Table("users").
+		Select("username", "user_type", "password", "must_change_password").
+		Where("username = ?", username).
+		Take(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, dusers.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return &boundary.AuthenticatedUser{
+		Username:           user.Username,
+		UserType:           user.UserType,
 		PasswordHash:       user.Password,
 		MustChangePassword: user.MustChangePassword,
 	}, nil

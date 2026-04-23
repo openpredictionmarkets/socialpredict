@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	analytics "socialpredict/internal/domain/analytics"
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
 
@@ -54,19 +54,19 @@ func TestGetSystemMetricsHandler_Success(t *testing.T) {
 
 type failingAnalyticsRepo struct{}
 
-func (failingAnalyticsRepo) ListUsers(context.Context) ([]models.User, error) {
+func (failingAnalyticsRepo) ListUsers(context.Context) ([]analytics.UserAccount, error) {
 	return nil, errors.New("boom")
 }
 
-func (failingAnalyticsRepo) ListMarkets(context.Context) ([]models.Market, error) {
+func (failingAnalyticsRepo) ListMarkets(context.Context) ([]analytics.MarketRecord, error) {
 	return nil, nil
 }
 
-func (failingAnalyticsRepo) ListBetsForMarket(context.Context, uint) ([]models.Bet, error) {
+func (failingAnalyticsRepo) ListBetsForMarket(context.Context, uint) ([]boundary.Bet, error) {
 	return nil, nil
 }
 
-func (failingAnalyticsRepo) ListBetsOrdered(context.Context) ([]models.Bet, error) {
+func (failingAnalyticsRepo) ListBetsOrdered(context.Context) ([]boundary.Bet, error) {
 	return nil, nil
 }
 
