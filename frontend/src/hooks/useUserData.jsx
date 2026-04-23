@@ -2,6 +2,20 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../config';
 import { useAuth } from '../helpers/AuthContent';
 
+const unwrapApiResponse = (payload) => {
+  if (payload && typeof payload === 'object' && 'ok' in payload) {
+    if (payload.ok === false) {
+      throw new Error(payload.reason || 'Request failed');
+    }
+
+    if (payload.ok === true && 'result' in payload) {
+      return payload.result;
+    }
+  }
+
+  return payload;
+};
+
 const useUserData = (username, usePrivateProfile = false) => {
   const [userData, setUserData] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
@@ -35,7 +49,7 @@ const useUserData = (username, usePrivateProfile = false) => {
         if (!response.ok) {
           throw new Error('Failed to fetch user data');
         }
-        const data = await response.json();
+        const data = unwrapApiResponse(await response.json());
         setUserData(data);
       } catch (error) {
         console.error('Error fetching user data:', error);
