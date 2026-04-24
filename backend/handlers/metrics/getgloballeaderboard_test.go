@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	analytics "socialpredict/internal/domain/analytics"
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
@@ -77,12 +78,15 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var payload []analytics.GlobalUserProfitability
+	var payload handlers.SuccessEnvelope[[]analytics.GlobalUserProfitability]
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
-	if len(payload) == 0 {
+	if !payload.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if len(payload.Result) == 0 {
 		t.Fatalf("expected non-empty leaderboard")
 	}
 }
@@ -124,5 +128,13 @@ func TestGetGlobalLeaderboardHandler_Error(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+
+	var payload handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal failure: %v", err)
+	}
+	if payload.Reason != string(handlers.ReasonInternalError) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, payload.Reason)
 	}
 }

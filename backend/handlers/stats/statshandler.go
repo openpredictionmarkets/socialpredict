@@ -40,23 +40,21 @@ type StatsResponse struct {
 	SetupConfiguration SetupConfiguration `json:"setupConfiguration"`
 }
 
-const reasonStatsUnavailable handlers.FailureReason = "STATS_UNAVAILABLE"
-
 // StatsHandler handles requests for both financial stats and setup configuration.
 func StatsHandler(db *gorm.DB, configService configsvc.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if db == nil {
-			_ = handlers.WriteFailure(w, http.StatusInternalServerError, reasonStatsUnavailable)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 		if configService == nil {
-			_ = handlers.WriteFailure(w, http.StatusInternalServerError, reasonStatsUnavailable)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
 		financialStats, err := calculateFinancialStats(db, configService)
 		if err != nil {
-			_ = handlers.WriteFailure(w, http.StatusInternalServerError, reasonStatsUnavailable)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 

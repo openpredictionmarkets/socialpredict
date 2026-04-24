@@ -99,8 +99,8 @@ func TestWriteProfileError_SanitizesFailureReasons(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if response.OK || response.Reason != "DISPLAY_NAME_UPDATE_FAILED" {
-			t.Fatalf("expected sanitized display-name failure, got %+v", response)
+		if response.OK || response.Reason != string(handlers.ReasonInternalError) {
+			t.Fatalf("expected sanitized internal failure, got %+v", response)
 		}
 		if bytes.Contains(rec.Body.Bytes(), []byte("database connection string leaked")) {
 			t.Fatalf("expected raw error details to be removed: %s", rec.Body.String())
