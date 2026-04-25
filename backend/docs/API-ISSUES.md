@@ -1,6 +1,7 @@
 # Backend API Follow-Ups
 
-This file tracks the remaining API-shaping decisions after Waves 1-4.
+This file tracks only intentionally deferred API-shaping decisions after the
+final API sweep.
 
 Source of truth order for the current backend remains:
 
@@ -9,26 +10,10 @@ Source of truth order for the current backend remains:
 3. `backend/docs/openapi.yaml`
 4. this file
 
-This document is intentionally narrow. It should reflect the code that exists
-today, not earlier uncertainty and not aspirational redesign work that has not
-been scheduled.
-
-## Completed In Waves 1-4
-
-The following items were the main concerns in the earlier draft of this file
-and should now be treated as closed for documentation purposes:
-
-- The backend route inventory is no longer being reconstructed from guesswork.
-  `backend/server/server.go` is the route source of truth and
-  `backend/docs/openapi.yaml` has been updated around that implementation.
-- The previously tracked error-contract cleanup hotspots were normalized onto
-  the current response helpers instead of ad hoc raw error writes. This applies
-  to the stats handler, setup error paths, homepage CMS handler, bets buy/sell
-  handlers, market-bets handler, positions handlers, private profile handler,
-  display-name/profile helpers, and the authenticated user-position handler.
-- The extracted auth/config/domain wiring introduced in the earlier waves is
-  now the implementation baseline used by the current handlers and OpenAPI
-  document. `API-ISSUES.md` should no longer describe that work as unresolved.
+The final sweep reconciled the live backend, embedded OpenAPI document, and
+Swagger UI surface for the currently implemented contract. If future work
+introduces route/spec drift, update the code and `backend/docs/openapi.yaml`
+first and only then revise this file if a decision is intentionally deferred.
 
 ## Deferred Decisions
 
@@ -44,32 +29,32 @@ Current implementation:
   `AuthService.CurrentUser(...)`.
 - `POST /v0/changepassword` still accepts an authenticated request using the
   current token-validation path.
-- Admin-only routes use `AuthService.RequireAdmin(...)`, which now enforces the
+- Admin-only routes use `AuthService.RequireAdmin(...)`, which enforces the
   same password-change gate before the admin role check.
 
 Why it remains deferred:
 
-- The backend now documents and enforces the current contract consistently
-  enough to avoid treating this as an unknown.
 - The product/security redesign question is still whether first-login users
   should receive a limited-scope or short-lived token instead of the normal
   bearer token.
+- That redesign would change auth semantics across multiple routes and does not
+  belong in this validation-and-reconciliation task.
 
 Decision for this wave:
 
 - Keep the existing login contract and its current OpenAPI shape.
-- Do not redesign token issuance in this documentation-only task.
+- Do not redesign token issuance in this task.
 
 ### 2. Public Route Reorganization
 
 Current implementation:
 
-- `backend/server/server.go` makes the existing public and protected routes
-  explicit.
-- The OpenAPI document reflects the current monolith route layout rather than a
-  future CRUD-style reorganization.
-- Legacy and service-shaped paths still coexist where the code already exposes
-  them.
+- `backend/server/server.go` remains the route source of truth.
+- The OpenAPI document mirrors the current monolith route layout, including the
+  existing public aliases and legacy service-shaped paths that still exist in
+  code.
+- Swagger UI is served from `/swagger/`, while the live contract document is
+  served from `/openapi.yaml`.
 
 Why it remains deferred:
 
@@ -81,7 +66,7 @@ Why it remains deferred:
 Decision for this wave:
 
 - Keep documenting the live route structure exactly as implemented.
-- Do not revive the earlier CRUD rewrite proposal in this file.
+- Do not revive the earlier CRUD-style rewrite proposal in this file.
 
 ### 3. Bets-To-Trades Rename
 
@@ -112,7 +97,7 @@ this task:
 - eliminating the current plaintext middleware errors, including the documented
   cross-route rate-limit responses emitted before handler-specific envelopes run
 - rewriting the API into a new CRUD path taxonomy
-- bundling implementation changes into this documentation cleanup
+- bundling unrelated implementation changes into this documentation cleanup
 
 If future work changes the backend or OpenAPI contract, update that code/spec
 first and then revise this file to match the new implementation.

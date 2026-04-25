@@ -13,13 +13,6 @@ import (
 	authsvc "socialpredict/internal/service/auth"
 )
 
-const (
-	reasonBetValidationFailed handlers.FailureReason = "BET_VALIDATION_FAILED"
-	reasonMarketClosed        handlers.FailureReason = "MARKET_CLOSED"
-	reasonInsufficientBalance handlers.FailureReason = "INSUFFICIENT_BALANCE"
-	reasonMarketNotFound      handlers.FailureReason = "MARKET_NOT_FOUND"
-)
-
 // PlaceBetHandler returns an HTTP handler that delegates bet placement to the bets domain service.
 func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +23,7 @@ func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInte
 
 		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
 		if httpErr != nil {
-			_ = handlers.WriteFailure(w, httpErr.StatusCode, reasonFromAuthError(httpErr))
+			_ = handlers.WriteFailure(w, httpErr.StatusCode, handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message))
 			return
 		}
 
@@ -70,13 +63,13 @@ func toPlaceRequest(req dto.PlaceBetRequest, username string) dbets.PlaceRequest
 func writePlaceBetError(w http.ResponseWriter, err error) {
 	switch err {
 	case dbets.ErrInvalidOutcome, dbets.ErrInvalidAmount:
-		_ = handlers.WriteFailure(w, http.StatusBadRequest, reasonBetValidationFailed)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	case dbets.ErrMarketClosed:
-		_ = handlers.WriteFailure(w, http.StatusConflict, reasonMarketClosed)
+		_ = handlers.WriteFailure(w, http.StatusConflict, handlers.ReasonMarketClosed)
 	case dbets.ErrInsufficientBalance:
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, reasonInsufficientBalance)
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
 	case dmarkets.ErrMarketNotFound:
-		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonMarketNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
@@ -92,24 +85,4 @@ func writePlaceBetResponse(w http.ResponseWriter, placedBet *dbets.PlacedBet) {
 	}
 
 	_ = handlers.WriteResult(w, http.StatusCreated, response)
-}
-
-func reasonFromAuthError(err *authsvc.HTTPError) handlers.FailureReason {
-	if err == nil {
-		return handlers.ReasonInternalError
-	}
-
-	switch err.Message {
-	case "Authorization header is required", "Invalid token":
-		return handlers.ReasonInvalidToken
-	case "Password change required":
-		return handlers.ReasonPasswordChangeRequired
-	case "User not found":
-		return handlers.ReasonUserNotFound
-	default:
-		if err.StatusCode >= http.StatusInternalServerError {
-			return handlers.ReasonInternalError
-		}
-		return handlers.ReasonInvalidToken
-	}
 }

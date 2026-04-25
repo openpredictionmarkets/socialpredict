@@ -3,6 +3,7 @@ package marketshandlers
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -36,9 +37,10 @@ func parseListMarketsParams(r *http.Request) (listMarketsParams, error) {
 		limit:  page.Limit,
 		offset: page.Offset,
 		filters: dmarkets.ListFilters{
-			Status: status,
-			Limit:  page.Limit,
-			Offset: page.Offset,
+			Status:    status,
+			CreatedBy: strings.TrimSpace(r.URL.Query().Get("created_by")),
+			Limit:     page.Limit,
+			Offset:    page.Offset,
 		},
 		page: page,
 	}, nil

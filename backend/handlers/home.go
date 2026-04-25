@@ -1,20 +1,16 @@
 package handlers
 
-import (
-	"fmt"
-	"net/http"
-)
+import "net/http"
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
+		_ = WriteFailure(w, http.StatusMethodNotAllowed, ReasonMethodNotAllowed)
 		return
 	}
 
-	// Set the Content-Type header to indicate a JSON response
-	w.Header().Set("Content-Type", "application/json")
-
-	// Send a JSON-formatted response
-	fmt.Fprint(w, `{"message": "Data From the Backend!"}`)
-
+	if err := WriteResult(w, http.StatusOK, map[string]string{
+		"message": "Data From the Backend!",
+	}); err != nil {
+		_ = WriteFailure(w, http.StatusInternalServerError, ReasonInternalError)
+	}
 }

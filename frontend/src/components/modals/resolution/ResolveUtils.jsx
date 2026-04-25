@@ -1,4 +1,5 @@
 import { API_URL } from '../../../config';
+import { getApiErrorMessage, parseApiResponseText } from '../../../utils/apiResponse';
 
 export const resolveMarket = (marketId, token, selectedResolution) => {
     const resolutionData = {
@@ -16,9 +17,10 @@ export const resolveMarket = (marketId, token, selectedResolution) => {
 
     // Returning fetch promise to allow handling of the response in the component
     return fetch(`${API_URL}/v0/markets/${marketId}/resolve`, requestOptions)
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                const payload = parseApiResponseText(await response.text());
+                throw new Error(getApiErrorMessage(response, payload, 'Failed to resolve market.'));
             }
             if (response.status === 204) {
                 return {};

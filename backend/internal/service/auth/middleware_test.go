@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"socialpredict/handlers"
 	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
@@ -173,21 +174,25 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 		name           string
 		method         string
 		expectedStatus int
+		expectedReason handlers.FailureReason
 	}{
 		{
 			name:           "Valid POST method",
 			method:         http.MethodPost,
 			expectedStatus: http.StatusBadRequest, // Will fail due to invalid body, but method is accepted
+			expectedReason: handlers.ReasonInvalidRequest,
 		},
 		{
 			name:           "Invalid GET method",
 			method:         http.MethodGet,
-			expectedStatus: http.StatusNotFound,
+			expectedStatus: http.StatusMethodNotAllowed,
+			expectedReason: handlers.ReasonMethodNotAllowed,
 		},
 		{
 			name:           "Invalid PUT method",
 			method:         http.MethodPut,
-			expectedStatus: http.StatusNotFound,
+			expectedStatus: http.StatusMethodNotAllowed,
+			expectedReason: handlers.ReasonMethodNotAllowed,
 		},
 	}
 
@@ -200,6 +205,14 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, w.Code)
+			}
+
+			var response handlers.FailureEnvelope
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatalf("decode failure response: %v", err)
+			}
+			if response.OK || response.Reason != string(tt.expectedReason) {
+				t.Fatalf("expected reason %q, got %+v", tt.expectedReason, response)
 			}
 		})
 	}
@@ -215,6 +228,14 @@ func TestLoginHandler_InvalidJSON(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
 	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure response: %v", err)
+	}
+	if response.OK || response.Reason != string(handlers.ReasonInvalidRequest) {
+		t.Fatalf("expected reason %q, got %+v", handlers.ReasonInvalidRequest, response)
+	}
 }
 
 func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
@@ -225,6 +246,14 @@ func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure response: %v", err)
+	}
+	if response.OK || response.Reason != string(handlers.ReasonInvalidRequest) {
+		t.Fatalf("expected reason %q, got %+v", handlers.ReasonInvalidRequest, response)
 	}
 }
 
@@ -274,6 +303,14 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 			if w.Code != http.StatusBadRequest {
 				t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
 			}
+
+			var response handlers.FailureEnvelope
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatalf("decode failure response: %v", err)
+			}
+			if response.OK || response.Reason != string(handlers.ReasonValidationFailed) {
+				t.Fatalf("expected reason %q, got %+v", handlers.ReasonValidationFailed, response)
+			}
 		})
 	}
 }
@@ -292,6 +329,14 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure response: %v", err)
+	}
+	if response.OK || response.Reason != string(handlers.ReasonInternalError) {
+		t.Fatalf("expected reason %q, got %+v", handlers.ReasonInternalError, response)
 	}
 }
 
@@ -432,8 +477,8 @@ func TestLoginHandler_InvalidCredentialsReturnsFailureEnvelope(t *testing.T) {
 	if response.OK {
 		t.Fatalf("expected ok=false")
 	}
-	if response.Reason != "INVALID_CREDENTIALS" {
-		t.Fatalf("expected reason INVALID_CREDENTIALS, got %q", response.Reason)
+	if response.Reason != string(handlers.ReasonAuthorizationDenied) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonAuthorizationDenied, response.Reason)
 	}
 }
 

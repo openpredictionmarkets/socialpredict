@@ -136,3 +136,87 @@ func TestGormRepositoryListBetsForMarket(t *testing.T) {
 		t.Fatalf("bets not ordered ascending by PlacedAt")
 	}
 }
+
+func TestGormRepositoryListHonorsStatusAndCreatorFilter(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	alice := modelstesting.GenerateUser("alice", 1000)
+	bob := modelstesting.GenerateUser("bob", 1000)
+	if err := db.Create(&alice).Error; err != nil {
+		t.Fatalf("seed alice: %v", err)
+	}
+	if err := db.Create(&bob).Error; err != nil {
+		t.Fatalf("seed bob: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	active := modelstesting.GenerateMarket(300, alice.Username)
+	active.ResolutionDateTime = now.Add(24 * time.Hour)
+	active.IsResolved = false
+
+	closed := modelstesting.GenerateMarket(301, alice.Username)
+	closed.ResolutionDateTime = now.Add(-24 * time.Hour)
+	closed.IsResolved = false
+
+	resolved := modelstesting.GenerateMarket(302, alice.Username)
+	resolved.ResolutionDateTime = now.Add(-48 * time.Hour)
+	resolved.FinalResolutionDateTime = now.Add(-12 * time.Hour)
+	resolved.IsResolved = true
+	resolved.ResolutionResult = "YES"
+
+	bobsClosed := modelstesting.GenerateMarket(303, bob.Username)
+	bobsClosed.ResolutionDateTime = now.Add(-24 * time.Hour)
+	bobsClosed.IsResolved = false
+
+	for _, market := range []any{&active, &closed, &resolved, &bobsClosed} {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("seed market: %v", err)
+		}
+	}
+
+	tests := []struct {
+		name       string
+		filters    dmarkets.ListFilters
+		wantID     int64
+		wantStatus string
+	}{
+		{
+			name:       "active for alice",
+			filters:    dmarkets.ListFilters{Status: "active", CreatedBy: alice.Username, Limit: 10},
+			wantID:     active.ID,
+			wantStatus: "active",
+		},
+		{
+			name:       "closed for alice",
+			filters:    dmarkets.ListFilters{Status: "closed", CreatedBy: alice.Username, Limit: 10},
+			wantID:     closed.ID,
+			wantStatus: "closed",
+		},
+		{
+			name:       "resolved for alice",
+			filters:    dmarkets.ListFilters{Status: "resolved", CreatedBy: alice.Username, Limit: 10},
+			wantID:     resolved.ID,
+			wantStatus: "resolved",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			markets, err := repo.List(ctx, tt.filters)
+			if err != nil {
+				t.Fatalf("List returned error: %v", err)
+			}
+			if len(markets) != 1 {
+				t.Fatalf("expected 1 market, got %d", len(markets))
+			}
+			if markets[0].ID != tt.wantID {
+				t.Fatalf("expected market ID %d, got %d", tt.wantID, markets[0].ID)
+			}
+			if markets[0].Status != tt.wantStatus {
+				t.Fatalf("expected status %q, got %q", tt.wantStatus, markets[0].Status)
+			}
+		})
+	}
+}

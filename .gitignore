@@ -67,6 +67,7 @@ node_modules/
 # Codex stuff
 .codex-tmp
 .codex-reports/
+.bin/
 
 # Go cache
 .gocache

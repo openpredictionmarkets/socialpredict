@@ -20,7 +20,7 @@ type changePasswordResult struct {
 func ChangePasswordHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.FailureReason("METHOD_NOT_ALLOWED"))
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
@@ -28,14 +28,14 @@ func ChangePasswordHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 
 		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
 		if httperr != nil {
-			_ = handlers.WriteFailure(w, httperr.StatusCode, handlers.FailureReason("INVALID_TOKEN"))
+			_ = handlers.WriteFailure(w, httperr.StatusCode, handlers.AuthFailureReason(httperr.StatusCode, httperr.Message))
 			logger.LogError("ChangePassword", "ValidateTokenAndGetUser", httperr)
 			return
 		}
 
 		var req dto.ChangePasswordRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.FailureReason("INVALID_REQUEST"))
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			logger.LogError("ChangePassword", "DecodeRequestBody", err)
 			return
 		}
@@ -56,12 +56,12 @@ func ChangePasswordHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 func writeChangePasswordError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, dusers.ErrUserNotFound):
-		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.FailureReason("USER_NOT_FOUND"))
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 	case errors.Is(err, dusers.ErrInvalidCredentials):
-		_ = handlers.WriteFailure(w, http.StatusUnauthorized, handlers.FailureReason("INVALID_CREDENTIALS"))
+		_ = handlers.WriteFailure(w, http.StatusUnauthorized, handlers.ReasonAuthorizationDenied)
 	default:
-		if isValidationError(err.Error()) {
-			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.FailureReason("VALIDATION_FAILED"))
+		if handlers.IsValidationMessage(err.Error()) {
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 			return
 		}
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)

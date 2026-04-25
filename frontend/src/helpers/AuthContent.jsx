@@ -1,19 +1,10 @@
 import { API_URL } from './../config';
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-const unwrapApiResponse = (payload) => {
-    if (payload && typeof payload === 'object' && 'ok' in payload) {
-        if (payload.ok === false) {
-            throw new Error(payload.reason || 'Request failed');
-        }
-
-        if (payload.ok === true && 'result' in payload) {
-            return payload.result;
-        }
-    }
-
-    return payload;
-};
+import {
+    getApiErrorMessage,
+    parseApiResponseText,
+    unwrapApiResponse,
+} from '../utils/apiResponse';
 
 const decodeJwtPayload = (token) => {
     if (!token) return null;
@@ -65,6 +56,14 @@ const useAuth = () => useContext(
 const AuthProvider = ({ children }) => {
     const [authState, setAuthState] = useState(getStoredAuthState);
 
+    const loginReasonMessages = {
+        AUTHORIZATION_DENIED: 'Invalid username or password.',
+        VALIDATION_FAILED: 'Username must use lowercase letters and numbers, and password cannot be empty.',
+        INVALID_REQUEST: 'Invalid login request.',
+        INVALID_TOKEN: 'Your session is invalid. Please try again.',
+        PASSWORD_CHANGE_REQUIRED: 'Password change required before continuing.',
+    };
+
     useEffect(() => {
         if (authState.isLoggedIn && authState.usertype) {
             // Redirect or perform other actions based on usertype
@@ -93,15 +92,7 @@ const AuthProvider = ({ children }) => {
 
             // Read response as text first to handle both JSON and non-JSON responses
             const text = await response.text();
-            let data = {};
-
-            // Safely attempt to parse JSON
-            try {
-                data = JSON.parse(text);
-            } catch (parseError) {
-                // If JSON parsing fails, create a basic error object
-                data = { error: text || 'Unknown error occurred' };
-            }
+            const data = parseApiResponseText(text);
 
             if (response.ok) {
                 const authData = unwrapApiResponse(data);
@@ -119,8 +110,12 @@ const AuthProvider = ({ children }) => {
                 });
                 return true;
             } else {
-                // Create meaningful error message based on response
-                const errorMessage = data.error || data.message || `HTTP ${response.status}: ${text}`;
+                const errorMessage = getApiErrorMessage(
+                    response,
+                    data,
+                    `Login failed with status ${response.status}.`,
+                    loginReasonMessages,
+                );
                 throw new Error(errorMessage);
             }
         } catch (error) {

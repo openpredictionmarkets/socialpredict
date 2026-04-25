@@ -61,11 +61,11 @@ func parseMarketID(marketIDStr string) (int64, error) {
 func writeUserPositionError(w http.ResponseWriter, marketID int64, username string, err error) {
 	switch err {
 	case dmarkets.ErrMarketNotFound:
-		_ = handlers.WriteFailure(w, http.StatusNotFound, "MARKET_NOT_FOUND")
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	case dmarkets.ErrUserNotFound:
-		_ = handlers.WriteFailure(w, http.StatusNotFound, "USER_NOT_FOUND")
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 	case dmarkets.ErrInvalidInput:
-		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}

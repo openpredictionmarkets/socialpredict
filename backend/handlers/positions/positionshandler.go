@@ -12,11 +12,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	reasonPositionsMarketNotFound handlers.FailureReason = "MARKET_NOT_FOUND"
-	reasonPositionsUserNotFound   handlers.FailureReason = "USER_NOT_FOUND"
-)
-
 // MarketPositionsHandlerWithService creates a service-injected positions handler for all users
 func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -88,9 +83,9 @@ func parseMarketID(marketIDStr string) (int64, error) {
 func writePositionsError(w http.ResponseWriter, marketID int64, err error) {
 	switch err {
 	case dmarkets.ErrMarketNotFound:
-		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonPositionsMarketNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	case dmarkets.ErrInvalidInput:
-		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
 		log.Printf("Error getting market positions for market %d: %v", marketID, err)
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
@@ -125,11 +120,11 @@ func parseMarketUserParams(vars map[string]string) (int64, string, error) {
 func writeUserPositionError(w http.ResponseWriter, marketID int64, username string, err error) {
 	switch err {
 	case dmarkets.ErrMarketNotFound:
-		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonPositionsMarketNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	case dmarkets.ErrUserNotFound:
-		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonPositionsUserNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 	case dmarkets.ErrInvalidInput:
-		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
 		log.Printf("Error getting user position for market %d, user %s: %v", marketID, username, err)
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)

@@ -252,8 +252,8 @@ func TestMarketPositionsHandlerWithService_FailureEnvelope(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode failure envelope: %v", err)
 	}
-	if resp.Reason != "MARKET_NOT_FOUND" {
-		t.Fatalf("expected reason MARKET_NOT_FOUND, got %q", resp.Reason)
+	if resp.Reason != string(handlers.ReasonMarketNotFound) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonMarketNotFound, resp.Reason)
 	}
 }
 

@@ -13,15 +13,6 @@ import (
 	authsvc "socialpredict/internal/service/auth"
 )
 
-const (
-	reasonSellValidationFailed handlers.FailureReason = "SELL_VALIDATION_FAILED"
-	reasonSellMarketClosed     handlers.FailureReason = "MARKET_CLOSED"
-	reasonNoPosition           handlers.FailureReason = "NO_POSITION"
-	reasonInsufficientShares   handlers.FailureReason = "INSUFFICIENT_SHARES"
-	reasonDustCapExceeded      handlers.FailureReason = "DUST_CAP_EXCEEDED"
-	reasonSellMarketNotFound   handlers.FailureReason = "MARKET_NOT_FOUND"
-)
-
 // SellPositionHandler returns an HTTP handler that delegates sales to the bets service.
 func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +23,7 @@ func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceI
 
 		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
 		if httpErr != nil {
-			_ = handlers.WriteFailure(w, httpErr.StatusCode, reasonFromAuthError(httpErr))
+			_ = handlers.WriteFailure(w, httpErr.StatusCode, handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message))
 			return
 		}
 
@@ -71,23 +62,21 @@ func toSellRequest(req dto.SellBetRequest, username string) bets.SellRequest {
 
 func handleSellError(w http.ResponseWriter, err error) {
 	if _, ok := err.(bets.ErrDustCapExceeded); ok {
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, reasonDustCapExceeded)
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonDustCapExceeded)
 		return
 	}
 
 	switch {
 	case errors.Is(err, bets.ErrInvalidOutcome), errors.Is(err, bets.ErrInvalidAmount):
-		_ = handlers.WriteFailure(w, http.StatusBadRequest, reasonSellValidationFailed)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	case errors.Is(err, bets.ErrMarketClosed):
-		_ = handlers.WriteFailure(w, http.StatusConflict, reasonSellMarketClosed)
-	case errors.Is(err, bets.ErrNoPosition), errors.Is(err, bets.ErrInsufficientShares):
-		reason := reasonNoPosition
-		if errors.Is(err, bets.ErrInsufficientShares) {
-			reason = reasonInsufficientShares
-		}
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, reason)
+		_ = handlers.WriteFailure(w, http.StatusConflict, handlers.ReasonMarketClosed)
+	case errors.Is(err, bets.ErrNoPosition):
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonNoPosition)
+	case errors.Is(err, bets.ErrInsufficientShares):
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientShares)
 	case errors.Is(err, dmarkets.ErrMarketNotFound):
-		_ = handlers.WriteFailure(w, http.StatusNotFound, reasonSellMarketNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
@@ -105,24 +94,4 @@ func writeSellResponse(w http.ResponseWriter, result *bets.SellResult) {
 	}
 
 	_ = handlers.WriteResult(w, http.StatusCreated, response)
-}
-
-func reasonFromAuthError(err *authsvc.HTTPError) handlers.FailureReason {
-	if err == nil {
-		return handlers.ReasonInternalError
-	}
-
-	switch err.Message {
-	case "Authorization header is required", "Invalid token":
-		return handlers.ReasonInvalidToken
-	case "Password change required":
-		return handlers.ReasonPasswordChangeRequired
-	case "User not found":
-		return handlers.ReasonUserNotFound
-	default:
-		if err.StatusCode >= http.StatusInternalServerError {
-			return handlers.ReasonInternalError
-		}
-		return handlers.ReasonInvalidToken
-	}
 }
