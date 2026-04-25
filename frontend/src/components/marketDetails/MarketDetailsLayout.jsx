@@ -37,6 +37,13 @@ function MarketDetailsTable({
 
   const toggleBetModal = () => setShowBetModal(prev => !prev);
 
+  const handleMarketResolved = () => {
+    if (refetchData) {
+      refetchData();
+    }
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   const handleTransactionSuccess = () => {
     setShowBetModal(false);  // Close modal
     if (refetchData) {
@@ -173,6 +180,7 @@ function MarketDetailsTable({
             marketId={resolvedMarketId}
             token={token}
             market={market}
+            onResolved={handleMarketResolved}
             disabled={!token}
             className='text-xs px-4 py-2'
           />
