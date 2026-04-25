@@ -3,9 +3,9 @@ title: Error Handling
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-25T19:15:00-05:00
-updated_at_display: "Saturday, April 25, 2026 at 7:15 PM Central (CDT)"
-update_reason: "Replace the greenfield error-framework plan with guidance aligned to the live backend, the active design plan, and the HA/fault-tolerance objective."
+updated_at: 2026-04-25T21:20:00-05:00
+updated_at_display: "Saturday, April 25, 2026 at 9:20 PM Central (CDT)"
+update_reason: "Clarify the OpenTelemetry posture for runtime failure telemetry while keeping the public API failure contract separate."
 status: active
 ---
 
@@ -21,6 +21,7 @@ This note was updated on Saturday, April 25, 2026 to replace an older greenfield
 | Main proposal | Build a new `AppError` hierarchy, handler base classes, and monitoring stack first | Start from the live mixed backend and converge runtime, middleware, auth, and handler failure behavior deliberately |
 | Current-state accuracy | Assumed `backend/errors` was the real backbone | Recognizes that the live contract already centers on `handlers/envelope.go`, while `backend/errors` is only thin legacy overlap |
 | Contract model | Assumed one new public `error.code/message` response model | Recognizes a live split between `ReasonResponse`, legacy plain-text responses, and route-family migration state |
+| Telemetry model | Blurred monitoring and public error-contract concerns | Separates public `reason` responses from OpenTelemetry-aligned runtime failure telemetry |
 | Recovery stance | Proposed generic retries, circuit breakers, and recovery strategies | Rejects generic write-path retry for accounting-sensitive flows and prioritizes server-owned recovery, sanitization, and diagnosis |
 | HA posture | Optimized for framework breadth first | Optimizes for deterministic fault containment, clear operator diagnosis, stable client semantics, and safe migration |
 
@@ -36,6 +37,7 @@ The backend direction is:
 4. Treat raw `http.Error`, status-only failures, and `PlainTextErrorResponse` as explicit migration state, not the target architecture.
 5. Treat `backend/errors` as deletion-only or compatibility-only scope, not as the future error platform.
 6. Do not introduce generic retry or circuit-breaker behavior for market, bet, account, or auth writes without separate idempotency and accounting design.
+7. Use OpenTelemetry-aligned telemetry for unexpected failures and correlation, but keep the public API failure contract separate from telemetry internals.
 
 For a high-availability, fault-tolerant, enterprise-ready system, the backend should prefer:
 
@@ -44,6 +46,7 @@ For a high-availability, fault-tolerant, enterprise-ready system, the backend sh
 - sanitized logs and sanitized client-visible failures
 - stable route-visible failure semantics for migrated API routes
 - fail-fast startup behavior and safe request-path recovery behavior
+- one telemetry story for runtime failures that does not redefine the public HTTP contract
 
 This note explicitly rejects building a large new universal `AppError` hierarchy as the primary design move.
 
@@ -152,6 +155,19 @@ That means unexpected request-path panics currently fall back to the standard li
 
 For HA and fault tolerance, that is too weak to be the long-term design.
 
+### Runtime fault telemetry is not standardized yet
+
+The live backend also lacks a shared OpenTelemetry-aligned runtime failure telemetry story.
+
+Current code does not define one owned approach for:
+
+- attaching request or trace correlation to unexpected failures
+- assigning stable failure classes such as `error.type`
+- deciding which handled negative outcomes should or should not count as telemetry errors
+- avoiding duplicate exception recording across middleware, handlers, and runtime helpers
+
+That gap matters because high availability requires both bounded client-visible behavior and bounded operator-visible diagnosis.
+
 ### OpenAPI already documents a migration state
 
 The OpenAPI document is more current than the old note. At the top of [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml), it already documents shared middleware `429 text/plain` behavior. It also defines `ReasonResponse` and `PlainTextErrorResponse` separately.
@@ -217,6 +233,57 @@ Examples:
 - missing critical runtime dependency
 
 Infrastructure failures must be sanitized for clients and logged for operators with correlation and no secret leakage.
+
+## OpenTelemetry and Errors
+
+OpenTelemetry applies to runtime observability of failures. It should not replace the public HTTP failure contract.
+
+### Public contract versus telemetry
+
+For API clients, the contract remains:
+
+- HTTP status
+- stable public `reason` values for migrated envelope routes
+- explicit legacy plain-text or other route-family exceptions while migration is incomplete
+
+For operators and runtime tooling, the contract should move toward OpenTelemetry-aligned telemetry:
+
+- trace correlation
+- stable failure classification such as `error.type`
+- one-time exception or failure recording
+- metrics and traces that can be correlated with logs
+
+### What should count as a telemetry error
+
+Unexpected runtime failures should be treated as telemetry errors. Examples include:
+
+- panics
+- DB or dependency failures
+- encoding failures
+- unexpected 5xx responses
+- auth or middleware failures when the operation genuinely failed at runtime
+
+Handled business rejections should not automatically be marked as telemetry errors just because the user-visible outcome is negative. Examples include:
+
+- `MARKET_CLOSED`
+- `INSUFFICIENT_BALANCE`
+- `NO_POSITION`
+- `PASSWORD_CHANGE_REQUIRED`
+
+Those outcomes are often expected policy results rather than infrastructure faults. The runtime boundary may still log or count them deliberately, but it should not blindly mark every such case as a failed span.
+
+### Recording rules
+
+When an operation truly fails at runtime, the backend should:
+
+- set error status on the relevant span
+- attach a stable `error.type`
+- record the exception or failure once
+- avoid sensitive data in span status, attributes, or logs
+
+When an error is handled and the operation completes gracefully, the backend should avoid recording it as the final operation error signal.
+
+Telemetry failure must never change application behavior. If tracing, export, or correlation machinery misbehaves, the request path must still preserve the same client-visible semantics.
 
 ## Boundary Direction
 
@@ -330,8 +397,11 @@ The intended direction is:
 - use stable public `reason` values where routes have adopted the envelope
 - keep `PlainTextErrorResponse` explicit and temporary where migration is incomplete
 - recover unexpected request-path panics at the server boundary with sanitized responses and correlated logs
+- align unexpected runtime failure telemetry with OpenTelemetry-compatible trace correlation and stable failure classification
 - make middleware and handler failure behavior coherent for protected JSON routes
 - keep secrets, passwords, tokens, and API keys out of logs and client-visible failures
+- keep public `reason` values separate from internal telemetry fields such as `error.type`
+- avoid recording the same exception or failure at multiple layers unless the signals are intentionally different
 - reject generic retry or circuit-breaker behavior for accounting-sensitive writes unless a separate design proves idempotency and safety
 
 The intended direction is not:
@@ -339,6 +409,8 @@ The intended direction is not:
 - a new framework-first `AppError` platform
 - a mandatory base handler class
 - expanding `backend/errors` into the central architecture
+- treating every negative business outcome as an OpenTelemetry error by default
+- using OpenTelemetry telemetry fields as the public API error contract
 - hidden automatic recovery logic for write-heavy financial flows
 - assuming middleware failures do not matter because they happen before handlers
 
@@ -346,11 +418,12 @@ The intended direction is not:
 
 1. Add application-owned request-correlation and panic-recovery middleware at the server boundary.
 2. Add shared failure writers for runtime-owned `405`, `429`, and sanitized internal `500` behavior.
-3. Decide whether protected `/v0` routes should converge fully on `ReasonResponse` or retain explicit plain-text exceptions in some route families.
-4. Replace `internal/service/auth.HTTPError` with cleaner typed internal auth outcomes before HTTP mapping occurs.
-5. Inventory route families that still emit raw `http.Error`, status-only failures, or ad hoc strings, then migrate them by highest-value groups.
-6. Retire `backend/errors` once no live request path depends on it.
-7. Keep OpenAPI and production notes route-family accurate throughout the migration instead of claiming universal envelope coverage too early.
+3. Define the minimal OpenTelemetry-aligned runtime failure telemetry rules for request correlation, `error.type`, and one-time exception recording.
+4. Decide whether protected `/v0` routes should converge fully on `ReasonResponse` or retain explicit plain-text exceptions in some route families.
+5. Replace `internal/service/auth.HTTPError` with cleaner typed internal auth outcomes before HTTP mapping occurs.
+6. Inventory route families that still emit raw `http.Error`, status-only failures, or ad hoc strings, then migrate them by highest-value groups.
+7. Retire `backend/errors` once no live request path depends on it.
+8. Keep OpenAPI and production notes route-family accurate throughout the migration instead of claiming universal envelope coverage too early.
 
 ## What This Note Replaces
 
@@ -367,4 +440,5 @@ SocialPredict’s immediate need is more pragmatic:
 - one owned runtime recovery path
 - one clear migration away from ad hoc handler and middleware failures
 - one route-visible contract story that matches the actual backend
+- one OpenTelemetry-aligned runtime failure telemetry story that stays separate from public `reason` values
 - one error-handling direction consistent with high availability, fault tolerance, and accounting safety

@@ -3,9 +3,9 @@ title: Logging and Observability
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-25T00:00:00-05:00
-updated_at_display: "Saturday, April 25, 2026 (CDT)"
-update_reason: "Replace the greenfield observability plan with guidance aligned to the current codebase and the decision to standardize on backend/logger."
+updated_at: 2026-04-25T21:05:00-05:00
+updated_at_display: "Saturday, April 25, 2026 at 9:05 PM Central (CDT)"
+update_reason: "Clarify the OpenTelemetry posture while keeping backend/logger as the owned runtime adapter."
 status: active
 ---
 
@@ -19,21 +19,23 @@ This note was updated on Saturday, April 25, 2026 to replace an older greenfield
 | --- | --- | --- |
 | Core framing | Treated logging and observability as a new platform to build from scratch | Treats logging and observability as operational runtime boundaries to harden incrementally |
 | Package direction | Proposed new `logging/` and `observability/` package structure | Standardize on `backend/logger`, deprecate and delete `backend/logging` |
+| Telemetry model | Left the correlation and export model vague | Uses OpenTelemetry as the canonical telemetry model while keeping `backend/logger` as the app-facing adapter |
 | Current-state accuracy | Claimed health and metrics primitives were missing | Acknowledges existing `/health` and `/v0/system/metrics` routes in the live backend |
 | Sequencing | Tried to introduce structured logging, metrics, health, tracing, and aggregation all at once | Unify one logging package first, then improve health/readiness, then add metrics and tracing in controlled slices |
 | HA posture | Optimized for feature breadth first | Optimizes for deterministic runtime behavior, low-risk rollout, safe redaction, and operational clarity |
 
 ## Executive Direction
 
-SocialPredict should treat logging and observability as distinct operational concerns at the runtime boundary, not as one vague platform abstraction.
+SocialPredict should treat logging and observability as distinct operational concerns at the runtime boundary, with OpenTelemetry as the telemetry model and correlation vocabulary rather than as a direct replacement for the backend's owned logger adapter.
 
 The backend direction is:
 
 1. Standardize on one logging package: `backend/logger`
 2. Deprecate and delete `backend/logging`
-3. Keep logging as a runtime/infrastructure adapter, not a domain concern
-4. Harden existing health and metrics surfaces before inventing new subsystems
-5. Add richer metrics and tracing only after package ownership and log vocabulary are stable
+3. Keep `backend/logger` as the application-facing runtime/infrastructure adapter, not a domain concern and not a direct SDK leak
+4. Use OpenTelemetry semantic conventions, trace correlation, and OTLP or Collector export as the target telemetry direction
+5. Harden existing health and metrics surfaces before inventing new subsystems
+6. Add richer metrics and tracing only after package ownership and log vocabulary are stable
 
 For a high-availability, fault-tolerant, enterprise-ready system, the backend should prefer:
 
@@ -43,8 +45,9 @@ For a high-availability, fault-tolerant, enterprise-ready system, the backend sh
 - request/correlation information at middleware and runtime boundaries
 - explicit health/readiness semantics
 - safe redaction and no secret leakage
+- a telemetry path that can evolve toward OTLP and Collector export without rewriting business code
 
-This note explicitly rejects creating a second backend logging dialect or a new top-level `observability/` mega-tree before ownership is unified.
+This note explicitly rejects creating a second backend logging dialect, a new top-level `observability/` mega-tree, or treating any current stdout exporter format as the production contract before ownership is unified.
 
 ## Why This Matters
 
@@ -131,6 +134,26 @@ Current limitations include:
 
 That is acceptable for the current note because the first task is not to build everything. The first task is to unify ownership and make future hardening coherent.
 
+## OpenTelemetry Posture
+
+OpenTelemetry should be the canonical telemetry model for SocialPredict runtime signals, but it should not replace `backend/logger` as the code-facing logging seam.
+
+That means:
+
+- `backend/logger` remains the application-facing adapter used by startup, server, middleware, migration, and other runtime-boundary code
+- log, metric, and tracing vocabulary should converge toward OpenTelemetry semantic conventions over time
+- request correlation should be compatible with OpenTelemetry and W3C trace context so later tracing does not require a second correlation rewrite
+- OTLP and Collector should be the preferred production export path when richer telemetry export is introduced
+- stdout or stderr logging can remain the migration-time emission path, but the backend should not treat the OpenTelemetry stdout exporter format as a stable production wire contract
+
+For migration-time JSON logs outside OTLP, the backend should use top-level correlation fields that match OpenTelemetry compatibility guidance:
+
+- `trace_id`
+- `span_id`
+- `trace_flags`
+
+As of 2026-04-25, this adapter posture is also safer for SocialPredict because the OpenTelemetry logging specification is stable while Go log-signal implementation maturity still lags behind the cross-signal specification posture. The backend should not leak that churn into business code.
+
 ## Logging and Observability Taxonomy
 
 ### 1. Runtime Diagnostic Logging
@@ -185,6 +208,8 @@ This covers cross-cutting request and dependency correlation for deeper producti
 
 Tracing is a later observability phase, not a prerequisite for package standardization.
 
+Tracing should build on the same correlation vocabulary already introduced in logs and metrics rather than inventing a second request-identity shape.
+
 ## Logger Package Direction
 
 The package decision is explicit:
@@ -208,10 +233,14 @@ This note treats package unification as a prerequisite to richer observability w
 For production operation, the backend should follow these rules:
 
 - one owned backend logging package only
+- keep `backend/logger` as the application-facing adapter even if export sinks or telemetry backends change
 - never log secrets, tokens, passwords, or API keys
 - prefer runtime-boundary logging over domain-policy logging
 - keep logs restart-friendly and aggregation-friendly via stdout/stderr-first emission
 - keep field vocabulary stable once request/correlation fields are introduced
+- align new correlation fields and event attributes with OpenTelemetry semantic conventions where practical
+- prefer OTLP and Collector as the long-term production telemetry path instead of binding to a stdout exporter contract
+- if migration-time JSON logs are emitted outside OTLP, use top-level `trace_id`, `span_id`, and `trace_flags`
 - treat health, metrics, and tracing as separate operational signals with separate owners
 - do not rely on arbitrary reflection-based dumping of runtime values in production code
 - do not introduce hot-path logging noise that obscures failures or raises operational cost without diagnostic value
@@ -269,16 +298,19 @@ The intended direction is:
 - standardize on `backend/logger`
 - deprecate and delete `backend/logging`
 - keep logging as a runtime and infrastructure concern
+- treat OpenTelemetry as the canonical telemetry model and correlation vocabulary without coupling business code directly to a language SDK surface
 - improve the current `/health` behavior into explicit health/readiness semantics over time
 - preserve a distinction between logs, metrics, tracing, and health signals
 - add request and correlation context at the runtime boundary in controlled slices
 - harden redaction and sensitive-data handling before expanding log volume
+- prefer OTLP or Collector export as the production target once richer telemetry is introduced
 - evolve observability incrementally from the existing backend shape
 
 The intended direction is not:
 
 - a new top-level `observability/` package tree before ownership is unified
 - a second logging abstraction
+- treating an SDK-specific stdout exporter format as the production logging contract
 - reflection-heavy diagnostic dumping as a durable production strategy
 - forcing metrics, tracing, health, and logs into one generic package family
 - pretending the backend starts with zero health or metrics support
@@ -287,11 +319,12 @@ The intended direction is not:
 
 1. Replace the remaining `socialpredict/logging` imports with `socialpredict/logger`.
 2. Delete `backend/logging` once remaining usage and tests are migrated.
-3. Define the stable backend logging API and message vocabulary for the surviving `backend/logger` package.
+3. Define the stable backend logging API and message or field vocabulary for the surviving `backend/logger` package, including OpenTelemetry-aligned correlation fields.
 4. Add request/correlation logging at the server or middleware boundary rather than scattering it across handlers.
-5. Harden `/health` into clearer liveness/readiness semantics without destabilizing the current runtime surface.
-6. Decide which metrics belong to runtime/infrastructure versus application/business surfaces before adding more endpoints.
-7. Defer tracing until package ownership, request correlation, and health semantics are stable.
+5. Decide the first acceptable OTLP or Collector export path without coupling application code directly to it.
+6. Harden `/health` into clearer liveness/readiness semantics without destabilizing the current runtime surface.
+7. Decide which metrics belong to runtime/infrastructure versus application/business surfaces before adding more endpoints.
+8. Defer tracing until package ownership, request correlation, health semantics, and the logger contract are stable.
 
 ## What This Note Replaces
 
@@ -306,5 +339,6 @@ SocialPredict’s immediate need is operational boundary clarity:
 
 - one backend logging package
 - clear deprecation of `backend/logging`
+- one OpenTelemetry-aligned telemetry direction that does not leak directly into business code
 - accurate documentation of the current runtime surface
 - staged observability hardening consistent with a high-availability, fault-tolerant backend
