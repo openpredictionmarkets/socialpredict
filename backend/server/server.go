@@ -27,6 +27,7 @@ import (
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/security"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -116,12 +117,63 @@ func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServi
 	}
 
 	router := mux.NewRouter()
+	router.MethodNotAllowedHandler = methodNotAllowedHandler(router)
 	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS); err != nil {
 		return nil, err
 	}
 
 	registerApplicationRoutes(router, db, configService, security.NewSecurityService())
 	return router, nil
+}
+
+func methodNotAllowedHandler(router *mux.Router) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if allow := strings.Join(allowedMethodsForRequest(router, r), ", "); allow != "" {
+			w.Header().Set("Allow", allow)
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
+}
+
+func allowedMethodsForRequest(router *mux.Router, r *http.Request) []string {
+	if router == nil || r == nil {
+		return nil
+	}
+
+	methodSet := make(map[string]struct{})
+
+	_ = router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
+		methods, err := route.GetMethods()
+		if err != nil || len(methods) == 0 {
+			return nil
+		}
+
+		for _, method := range methods {
+			candidate := r.Clone(r.Context())
+			candidate.Method = method
+
+			var match mux.RouteMatch
+			if route.Match(candidate, &match) {
+				for _, matchedMethod := range methods {
+					methodSet[matchedMethod] = struct{}{}
+				}
+				break
+			}
+		}
+
+		return nil
+	})
+
+	if len(methodSet) == 0 {
+		return nil
+	}
+
+	allowed := make([]string, 0, len(methodSet))
+	for method := range methodSet {
+		allowed = append(allowed, method)
+	}
+	sort.Strings(allowed)
+	return allowed
 }
 
 func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS) error {
