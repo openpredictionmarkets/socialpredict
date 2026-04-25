@@ -11,7 +11,7 @@ const MarketDetails = () => {
     useMarketDetails();
 
   useDocumentMeta({
-    title: details ? `${details.market.question} — SocialPredict` : 'SocialPredict',
+    title: 'SocialPredict',
     description: details
       ? `${Math.round(currentProbability * 100)}% probability · created by ${details.creator}`
       : undefined,

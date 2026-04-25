@@ -2,6 +2,7 @@ package server
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/security"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -95,16 +97,86 @@ func buildCORSFromEnv() *cors.Cors {
 	})
 }
 
-func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service) {
-	// Initialize security service
-	securityService := security.NewSecurityService()
+func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service) (http.Handler, error) {
+	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService)
+	if err != nil {
+		return nil, err
+	}
 
-	// CORS handler (configurable via env)
-	c := buildCORSFromEnv()
+	handler := http.Handler(router)
+	if c := buildCORSFromEnv(); c != nil {
+		handler = c.Handler(handler)
+	}
 
-	// Initialize mux router
+	return handler, nil
+}
+
+func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service) (*mux.Router, error) {
+	if configService == nil {
+		return nil, fmt.Errorf("config init: configuration service unavailable")
+	}
+
 	router := mux.NewRouter()
+	router.MethodNotAllowedHandler = methodNotAllowedHandler(router)
+	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS); err != nil {
+		return nil, err
+	}
 
+	registerApplicationRoutes(router, db, configService, security.NewSecurityService())
+	return router, nil
+}
+
+func methodNotAllowedHandler(router *mux.Router) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if allow := strings.Join(allowedMethodsForRequest(router, r), ", "); allow != "" {
+			w.Header().Set("Allow", allow)
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
+}
+
+func allowedMethodsForRequest(router *mux.Router, r *http.Request) []string {
+	if router == nil || r == nil {
+		return nil
+	}
+
+	methodSet := make(map[string]struct{})
+
+	_ = router.Walk(func(route *mux.Route, _ *mux.Router, _ []*mux.Route) error {
+		methods, err := route.GetMethods()
+		if err != nil || len(methods) == 0 {
+			return nil
+		}
+
+		for _, method := range methods {
+			candidate := r.Clone(r.Context())
+			candidate.Method = method
+
+			var match mux.RouteMatch
+			if route.Match(candidate, &match) {
+				for _, matchedMethod := range methods {
+					methodSet[matchedMethod] = struct{}{}
+				}
+				break
+			}
+		}
+
+		return nil
+	})
+
+	if len(methodSet) == 0 {
+		return nil
+	}
+
+	allowed := make([]string, 0, len(methodSet))
+	for method := range methodSet {
+		allowed = append(allowed, method)
+	}
+	sort.Strings(allowed)
+	return allowed
+}
+
+func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS) error {
 	// Health endpoint
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -126,16 +198,15 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 	// File server rooted at swagger-ui/
 	uiFS, err := fs.Sub(swaggerUIFS, "swagger-ui")
 	if err != nil {
-		log.Fatalf("failed to set up swagger-ui FS: %v", err)
+		return fmt.Errorf("failed to set up swagger-ui FS: %w", err)
 	}
 	swaggerHandler := http.FileServer(http.FS(uiFS))
 	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler))
 
-	// Initialize domain services
-	if configService == nil {
-		log.Fatal("config init: configuration service unavailable")
-	}
+	return nil
+}
 
+func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, securityService *security.SecurityService) {
 	container := app.BuildApplicationWithConfigService(db, configService)
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
@@ -172,10 +243,6 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 		rWithStatus := mux.SetURLVars(r, map[string]string{"status": "all"})
 		marketsHandler.ListByStatus(w, rWithStatus)
 	}))).Methods("GET")
-	router.Handle("/v0/markets/{id}", securityMiddleware(http.HandlerFunc(marketsHandler.GetDetails))).Methods("GET")
-	router.Handle("/v0/markets/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarket))).Methods("POST")
-	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
-	router.Handle("/v0/markets/{id}/projection", securityMiddleware(http.HandlerFunc(marketsHandler.ProjectProbability))).Methods("GET")
 
 	// Legacy routes for backward compatibility — rewrite to new handler with status query
 	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -196,6 +263,10 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 		r.URL.RawQuery = q.Encode()
 		marketsHandler.ListMarkets(w, r)
 	}))).Methods("GET")
+	router.Handle("/v0/markets/{id}", securityMiddleware(http.HandlerFunc(marketsHandler.GetDetails))).Methods("GET")
+	router.Handle("/v0/markets/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarket))).Methods("POST")
+	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
+	router.Handle("/v0/markets/{id}/projection", securityMiddleware(http.HandlerFunc(marketsHandler.ProjectProbability))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 
@@ -236,11 +307,12 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
+}
 
-	// Apply CORS middleware if enabled
-	handler := http.Handler(router)
-	if c != nil {
-		handler = c.Handler(handler)
+func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service) {
+	handler, err := buildHandler(openAPISpec, swaggerUIFS, db, configService)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// Allow BACKEND_PORT to be configured via environment, default to 8080

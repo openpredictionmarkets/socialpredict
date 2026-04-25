@@ -38,5 +38,5 @@ type SearchMarketsQueryParams struct {
 
 // ResolveMarketRequest represents the HTTP request body for resolving a market
 type ResolveMarketRequest struct {
-	Resolution string `json:"resolution" validate:"required,oneof=yes no"`
+	Resolution string `json:"resolution" validate:"required"`
 }

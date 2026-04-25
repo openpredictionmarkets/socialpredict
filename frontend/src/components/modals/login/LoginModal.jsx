@@ -39,13 +39,10 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
             if (loginSuccess) {
                 onClose();
                 history.push(getPostLoginDestination());
-            } else {
-                console.error('Login failed:', response.status, await response.text());
-                setError('Error logging in.');
             }
         } catch (loginError) {
             console.error('Login error:', loginError);
-            setError('An error occurred during login. Please try again.');
+            setError(loginError.message || 'An error occurred during login. Please try again.');
         }
     };
 

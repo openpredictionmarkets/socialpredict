@@ -33,6 +33,7 @@ paths:
   /health:
     get:
       tags: [Config]
+      operationId: getHealth
       summary: Backend health check
       description: Simple liveness probe that returns "ok" when the backend is running.
       responses:
@@ -47,6 +48,7 @@ paths:
   /v0/login:
     post:
       tags: [Auth]
+      operationId: loginUser
       summary: Authenticate user
       description: >
         Validates username and password and returns a JWT bearer token for subsequent
@@ -92,26 +94,23 @@ paths:
   /v0/home:
     get:
       tags: [Config]
+      operationId: getHome
       summary: Backend home
-      description: Returns a simple JSON message to verify backend availability.
+      description: Returns a shared success envelope with a simple backend-availability message.
       responses:
         '200':
           description: Backend responded successfully.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
+                $ref: '#/components/schemas/HomeEnvelopeResponse'
 
   /v0/setup:
     get:
       tags: [Config]
+      operationId: getEconomicsConfig
       summary: Get economics configuration
       description: Returns the current economic configuration used by the backend.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Economics configuration returned.
@@ -125,14 +124,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/setup/frontend:
     get:
       tags: [Config]
+      operationId: getFrontendConfig
       summary: Get frontend configuration
       description: Returns minimal configuration values needed by the frontend, such as chart precision.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Frontend configuration returned.
@@ -146,16 +150,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+
+  /openapi.yaml:
+    get:
+      tags: [Config]
+      operationId: getOpenAPIDocument
+      summary: Download live OpenAPI document
+      description: Returns the embedded OpenAPI YAML document served by the backend.
+      responses:
+        '200':
+          description: OpenAPI document returned.
+          content:
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: true
 
   /v0/markets:
     get:
       tags: [Markets]
+      operationId: listMarkets
       summary: List markets
       description: >
         Returns markets with optional filtering by status and creator. When status is
         provided, results are backed by a status-specific query.
-      security:
-        - bearerAuth: []
       parameters:
         - in: query
           name: status
@@ -195,19 +219,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListMarketsResponse'
         '400':
-          description: Invalid status or pagination parameters.
+          description: Invalid status filter.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while listing markets.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
     post:
       tags: [Markets]
+      operationId: createMarket
       summary: Create a market
       description: Creates a new prediction market for the authenticated user.
       security:
@@ -226,39 +257,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketResponse'
         '400':
-          description: Validation failed while creating the market.
+          description: Invalid request body or market validation failure.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
-          description: Authentication failed or user not authorized.
+          description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '403':
           description: Password change required before creating markets.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Authenticated user could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '422':
+          description: Creator balance does not allow market creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error during market creation.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/search:
     get:
       tags: [Markets]
+      operationId: searchMarkets
       summary: Search markets
       description: >
         Searches markets by question title with optional status filtering. Supports both
         "query" and legacy "q" parameters.
-      security:
-        - bearerAuth: []
       parameters:
         - in: query
           name: query
@@ -266,12 +308,16 @@ paths:
           description: Search query (preferred parameter name).
           schema:
             type: string
+            minLength: 1
+            maxLength: 100
         - in: query
           name: q
           required: false
-          description: Legacy search query parameter (used if "query" is not provided).
+          description: Legacy search query parameter (used if `query` is not provided).
           schema:
             type: string
+            minLength: 1
+            maxLength: 100
         - in: query
           name: status
           required: false
@@ -286,6 +332,7 @@ paths:
           schema:
             type: integer
             minimum: 1
+            maximum: 50
         - in: query
           name: offset
           required: false
@@ -305,21 +352,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error during search.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/markets/status:
     get:
       tags: [Markets]
+      operationId: listAllMarketStatuses
       summary: List markets across all statuses
       description: Convenience endpoint equivalent to `/v0/markets?status=all`.
-      security:
-        - bearerAuth: []
       parameters:
         - in: query
           name: limit
@@ -343,26 +395,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListMarketsResponse'
-        '400':
-          description: Invalid pagination parameters.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Unexpected server error while listing markets.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/markets/status/{status}:
     get:
       tags: [Markets]
+      operationId: listMarketsByStatus
       summary: List markets by status
       description: Returns markets filtered by a specific lifecycle status.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: status
@@ -399,23 +450,154 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while listing markets.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+
+  /v0/markets/active:
+    get:
+      tags: [Markets]
+      operationId: listActiveMarkets
+      summary: List active markets
+      description: Legacy convenience endpoint equivalent to `/v0/markets?status=active`.
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          description: Maximum number of markets to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          description: Number of markets to skip before collecting results.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '500':
+          description: Unexpected server error while listing markets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+
+  /v0/markets/closed:
+    get:
+      tags: [Markets]
+      operationId: listClosedMarkets
+      summary: List closed markets
+      description: Legacy convenience endpoint equivalent to `/v0/markets?status=closed`.
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          description: Maximum number of markets to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          description: Number of markets to skip before collecting results.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '500':
+          description: Unexpected server error while listing markets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+
+  /v0/markets/resolved:
+    get:
+      tags: [Markets]
+      operationId: listResolvedMarkets
+      summary: List resolved markets
+      description: Legacy convenience endpoint equivalent to `/v0/markets?status=resolved`.
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          description: Maximum number of markets to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          description: Number of markets to skip before collecting results.
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMarketsResponse'
+        '500':
+          description: Unexpected server error while listing markets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/markets/{id}:
     get:
       tags: [Markets]
+      operationId: getMarketDetails
       summary: Get market details
       description: >
         Fetches a single market by its identifier, including probability history and
         aggregate statistics.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: id
@@ -424,6 +606,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       responses:
         '200':
           description: Market returned successfully.
@@ -436,23 +619,24 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching market details.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/{id}/resolve:
     post:
       tags: [Markets]
+      operationId: resolveMarket
       summary: Resolve a market
       description: Sets the final outcome for a market once it has concluded.
       security:
@@ -465,6 +649,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       requestBody:
         required: true
         content:
@@ -475,49 +660,48 @@ paths:
         '204':
           description: Market resolved successfully; no content is returned.
         '400':
-          description: Invalid market ID, resolution value, or market state.
+          description: Invalid market ID, malformed request body, or unsupported resolution value.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
-          description: Authentication failed or user not authorized to resolve the market.
+          description: Authentication failed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '403':
-          description: Password change required before resolving markets.
+          description: Password change required or the caller is not allowed to resolve this market.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market or user not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '409':
           description: Market already resolved or cannot be resolved in its current state.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error during resolution.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/{id}/leaderboard:
     get:
       tags: [Markets]
+      operationId: getMarketLeaderboard
       summary: Get market leaderboard
       description: Ranks participants in a single market by profit and traded volume.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: id
@@ -526,6 +710,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
         - in: query
           name: limit
           required: false
@@ -546,35 +731,40 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MarketLeaderboardResponse'
+                $ref: '#/components/schemas/MarketLeaderboardEnvelopeResponse'
         '400':
-          description: Invalid market ID or pagination parameters.
+          description: Invalid market ID.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while computing leaderboard.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/markets/{id}/projection:
     get:
       tags: [Markets]
+      operationId: projectMarketProbability
       summary: Project market probability
       description: >
         Computes the projected probability for a market after a hypothetical bet,
-        using the market identifier and bet parameters.
-      security:
-        - bearerAuth: []
+        using the market identifier plus hypothetical bet query parameters.
       parameters:
         - in: path
           name: id
@@ -583,6 +773,22 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
+        - in: query
+          name: amount
+          required: true
+          description: Hypothetical integer amount to bet.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: outcome
+          required: true
+          description: Hypothetical outcome to bet on. Accepted case-insensitive values are YES and NO.
+          schema:
+            type: string
+            pattern: '^(?:[Yy][Ee][Ss]|[Nn][Oo])$'
       responses:
         '200':
           description: Projection computed successfully.
@@ -595,29 +801,34 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market is closed for new probability projections.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while computing projection.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/marketprojection/{marketId}/{amount}/{outcome}:
     get:
       tags: [Markets]
+      operationId: projectMarketProbabilityLegacy
       summary: Legacy market projection endpoint
       description: >
         Legacy route for computing a probability projection using path parameters
         instead of query parameters.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -625,17 +836,20 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
         - in: path
           name: amount
           required: true
           schema:
             type: integer
+            minimum: 1
         - in: path
           name: outcome
           required: true
+          description: Hypothetical outcome to bet on. Accepted case-insensitive values are YES and NO.
           schema:
             type: string
-            enum: [YES, NO]
+            pattern: '^(?:[Yy][Ee][Ss]|[Nn][Oo])$'
       responses:
         '200':
           description: Projection computed successfully.
@@ -648,27 +862,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: Market not found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market is closed for new probability projections.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while computing projection.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/bets/{marketId}:
     get:
       tags: [Bets, Markets]
+      operationId: listMarketBets
       summary: List bets for a market
       description: Returns the bet history for a specific market.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -677,6 +896,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       responses:
         '200':
           description: Bets returned successfully.
@@ -702,14 +922,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/markets/positions/{marketId}:
     get:
       tags: [Markets]
+      operationId: listMarketPositions
       summary: List user positions for a market
       description: Returns all user positions (YES/NO shares) in a specific market.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -718,6 +943,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       responses:
         '200':
           description: Positions returned successfully.
@@ -747,10 +973,9 @@ paths:
   /v0/markets/positions/{marketId}/{username}:
     get:
       tags: [Markets]
+      operationId: getMarketUserPosition
       summary: Get a user's position in a market
       description: Returns the holdings for a specific user in the given market.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: marketId
@@ -759,6 +984,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
         - in: path
           name: username
           required: true
@@ -794,6 +1020,7 @@ paths:
   /v0/bet:
     post:
       tags: [Bets]
+      operationId: placeBet
       summary: Place a bet
       description: Places a YES/NO bet on a market for the authenticated user.
       security:
@@ -830,7 +1057,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '404':
-          description: Target market not found.
+          description: Authenticated user or target market not found.
           content:
             application/json:
               schema:
@@ -853,10 +1080,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/sell:
     post:
       tags: [Bets]
+      operationId: sellPosition
       summary: Sell shares
       description: Sells an amount of YES/NO shares for the authenticated user and deposits the proceeds.
       security:
@@ -893,7 +1127,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '404':
-          description: Market not found.
+          description: Authenticated user or market not found.
           content:
             application/json:
               schema:
@@ -916,10 +1150,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/privateprofile:
     get:
       tags: [Users]
+      operationId: getPrivateProfile
       summary: Get private profile
       description: Returns the authenticated user’s private profile data.
       security:
@@ -959,6 +1200,7 @@ paths:
   /v0/profilechange/description:
     post:
       tags: [Users]
+      operationId: updateProfileDescription
       summary: Update profile description
       security:
         - bearerAuth: []
@@ -1009,6 +1251,7 @@ paths:
   /v0/profilechange/displayname:
     post:
       tags: [Users]
+      operationId: updateDisplayName
       summary: Update display name
       security:
         - bearerAuth: []
@@ -1059,6 +1302,7 @@ paths:
   /v0/profilechange/emoji:
     post:
       tags: [Users]
+      operationId: updatePersonalEmoji
       summary: Update personal emoji
       security:
         - bearerAuth: []
@@ -1109,6 +1353,7 @@ paths:
   /v0/profilechange/links:
     post:
       tags: [Users]
+      operationId: updatePersonalLinks
       summary: Update personal links
       security:
         - bearerAuth: []
@@ -1159,6 +1404,7 @@ paths:
   /v0/changepassword:
     post:
       tags: [Users]
+      operationId: changePassword
       summary: Change account password
       security:
         - bearerAuth: []
@@ -1182,7 +1428,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '401':
-          description: Invalid or missing token.
+          description: Invalid or missing token, or the submitted current password does not match.
           content:
             application/json:
               schema:
@@ -1203,9 +1449,8 @@ paths:
   /v0/userinfo/{username}:
     get:
       tags: [Users]
+      operationId: getPublicUserInfo
       summary: Get public user info
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1223,25 +1468,32 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
         '404':
           description: User not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
         '500':
           description: Unexpected server error while fetching public user.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/userposition/{marketId}:
     get:
       tags: [Users]
+      operationId: getAuthenticatedUserPosition
       summary: Get authenticated user's position in a market
       security:
         - bearerAuth: []
@@ -1253,6 +1505,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       responses:
         '200':
           description: Position returned successfully.
@@ -1294,10 +1547,9 @@ paths:
   /v0/usercredit/{username}:
     get:
       tags: [Users]
+      operationId: getUserCredit
       summary: Get user credit
       description: Returns the user's available credit limit, treating missing users as max debt.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1315,19 +1567,26 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
         '500':
           description: Failed to calculate user credit.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/admin/createuser:
     post:
       tags: [Users]
+      operationId: createAdminUser
       summary: Create a new user (admin)
       description: >
         Admin-only endpoint that creates a new REGULAR user with a generated password.
@@ -1351,33 +1610,38 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '401':
           description: Authentication failed or token invalid.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '403':
-          description: Admin privileges required.
+          description: Admin privileges required or password change is still required for the caller.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Authenticated user from the bearer token was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Failed to create user or hash password.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/portfolio/{username}:
     get:
       tags: [Users]
+      operationId: getUserPortfolio
       summary: Get user portfolio
       description: Returns the markets and share counts for a user's portfolio.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1395,29 +1659,28 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: User not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
         '500':
-          description: Unexpected server error while fetching portfolio.
+          description: Failed to fetch user portfolio.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/users/{username}/financial:
     get:
       tags: [Users]
+      operationId: getUserFinancialSnapshot
       summary: Get user financial snapshot
       description: Returns a map of financial metrics (e.g., balances and exposures) by key.
-      security:
-        - bearerAuth: []
       parameters:
         - in: path
           name: username
@@ -1435,29 +1698,34 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
         '404':
           description: User not found.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
         '500':
           description: Failed to generate financial snapshot.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/stats:
     get:
       tags: [Metrics]
+      operationId: getPlatformStats
       summary: Get platform stats
       description: Returns aggregate stats and the current economics configuration.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Stats returned successfully.
@@ -1471,54 +1739,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/system/metrics:
     get:
       tags: [Metrics]
+      operationId: getSystemMetrics
       summary: Get system metrics
       description: Computes money creation/utilization metrics for auditing the economy.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Metrics returned successfully.
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/SystemMetricsEnvelopeResponse'
         '500':
           description: Failed to compute metrics.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/global/leaderboard:
     get:
       tags: [Metrics]
+      operationId: getGlobalLeaderboard
       summary: Get global leaderboard
       description: Returns a leaderboard ranking users by profitability across all markets.
-      security:
-        - bearerAuth: []
       responses:
         '200':
           description: Global leaderboard returned successfully.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/GlobalLeaderboardEntry'
+                $ref: '#/components/schemas/GlobalLeaderboardEnvelopeResponse'
         '500':
           description: Failed to compute global leaderboard.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
   /v0/content/home:
     get:
       tags: [Content]
+      operationId: getHomeContent
       summary: Get public homepage content
       description: Retrieves CMS-configured homepage content.
       responses:
@@ -1538,6 +1821,7 @@ paths:
   /v0/admin/content/home:
     put:
       tags: [Content]
+      operationId: updateHomeContent
       summary: Update homepage content
       security:
         - bearerAuth: []
@@ -1567,17 +1851,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '403':
-          description: Admin privileges required.
+          description: Admin privileges required or password change is still required.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
-        '500':
-          description: Unexpected server error while updating content.
+        '429':
+          description: Rate limit exceeded by shared security middleware.
           content:
-            application/json:
+            text/plain:
               schema:
-                $ref: '#/components/schemas/ReasonResponse'
+                $ref: '#/components/schemas/PlainTextErrorResponse'
 
 components:
   securitySchemes:
@@ -1596,12 +1880,42 @@ components:
 
     ReasonResponse:
       type: object
+      description: |
+        Shared failure envelope for the scoped W04 contract pass.
+
+        Preferred public reasons for touched envelope endpoints:
+        - METHOD_NOT_ALLOWED: a documented handler was called with an unsupported HTTP method.
+        - INVALID_REQUEST: malformed request body, path parameter, or query input.
+        - INVALID_TOKEN: missing or invalid bearer token.
+        - AUTHORIZATION_DENIED: supplied credentials are not accepted for the requested flow, or the authenticated caller lacks the required privileges.
+        - PASSWORD_CHANGE_REQUIRED: request blocked until the caller changes their password.
+        - USER_NOT_FOUND, MARKET_NOT_FOUND, and NOT_FOUND: stable not-found outcomes for user, market, and generic content/resource lookups.
+        - VALIDATION_FAILED: syntactically valid input that fails route or business validation.
+        - MARKET_CLOSED, INSUFFICIENT_BALANCE, NO_POSITION, INSUFFICIENT_SHARES, and DUST_CAP_EXCEEDED: shared market and bet rule failures.
+        - INTERNAL_ERROR: unexpected server-side failure.
       properties:
         ok:
           type: boolean
           enum: [false]
         reason:
           type: string
+          enum:
+            - METHOD_NOT_ALLOWED
+            - INVALID_REQUEST
+            - INVALID_TOKEN
+            - AUTHORIZATION_DENIED
+            - PASSWORD_CHANGE_REQUIRED
+            - NOT_FOUND
+            - USER_NOT_FOUND
+            - MARKET_NOT_FOUND
+            - VALIDATION_FAILED
+            - MARKET_CLOSED
+            - INSUFFICIENT_BALANCE
+            - NO_POSITION
+            - INSUFFICIENT_SHARES
+            - DUST_CAP_EXCEEDED
+            - INTERNAL_ERROR
+          example: VALIDATION_FAILED
       required: [ok, reason]
 
     PlainTextErrorResponse:
@@ -1616,6 +1930,48 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/StatsResponse'
+      required: [ok, result]
+
+    HomeEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/HomeStatus'
+      required: [ok, result]
+
+    SystemMetricsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/SystemMetrics'
+      required: [ok, result]
+
+    GlobalLeaderboardEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/GlobalLeaderboardEntry'
+      required: [ok, result]
+
+    MarketLeaderboardEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketLeaderboardResponse'
       required: [ok, result]
 
     MarketPositionsEnvelopeResponse:
@@ -2015,7 +2371,8 @@ components:
       properties:
         resolution:
           type: string
-          enum: [yes, no]
+          description: Accepted case-insensitive values are YES, NO, and N/A.
+          example: yes
 
     MarketLeaderboardResponse:
       type: object
@@ -2181,14 +2538,14 @@ components:
       properties:
         username:
           type: string
-        marketId:
-          type: integer
-          format: int64
         amount:
           type: integer
           format: int64
         outcome:
           type: string
+        probability:
+          type: number
+          format: float
         placedAt:
           type: string
           format: date-time
@@ -2295,6 +2652,7 @@ components:
 
     AdminCreateUserRequest:
       type: object
+      required: [username]
       properties:
         username:
           type: string
@@ -2302,6 +2660,7 @@ components:
 
     AdminCreateUserResponse:
       type: object
+      required: [message, username, password, usertype]
       properties:
         message:
           type: string
@@ -2353,6 +2712,7 @@ components:
 
     ChangePasswordRequest:
       type: object
+      required: [currentPassword, newPassword]
       properties:
         currentPassword:
           type: string
@@ -2361,6 +2721,7 @@ components:
 
     Economics:
       type: object
+      required: [marketcreation, marketincentives, user, betting]
       properties:
         marketcreation:
           $ref: '#/components/schemas/MarketCreation'
@@ -2437,15 +2798,19 @@ components:
 
     FrontendConfig:
       type: object
+      required: [charts]
       properties:
         charts:
           $ref: '#/components/schemas/FrontendCharts'
 
     FrontendCharts:
       type: object
+      required: [sigFigs]
       properties:
         sigFigs:
           type: integer
+          minimum: 2
+          maximum: 9
 
     GlobalLeaderboardEntry:
       type: object
@@ -2470,6 +2835,89 @@ components:
           format: date-time
         rank:
           type: integer
+
+    HomeStatus:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    MetricExplanation:
+      type: object
+      properties:
+        formula:
+          type: string
+        explanation:
+          type: string
+      required: [explanation]
+
+    Int64Metric:
+      type: object
+      properties:
+        value:
+          type: integer
+          format: int64
+        formula:
+          type: string
+        explanation:
+          type: string
+      required: [value, explanation]
+
+    BoolMetric:
+      type: object
+      properties:
+        value:
+          type: boolean
+        explanation:
+          type: string
+      required: [value, explanation]
+
+    MoneyCreated:
+      type: object
+      properties:
+        userDebtCapacity:
+          $ref: '#/components/schemas/Int64Metric'
+        numUsers:
+          $ref: '#/components/schemas/Int64Metric'
+      required: [userDebtCapacity, numUsers]
+
+    MoneyUtilized:
+      type: object
+      properties:
+        unusedDebt:
+          $ref: '#/components/schemas/Int64Metric'
+        activeBetVolume:
+          $ref: '#/components/schemas/Int64Metric'
+        marketCreationFees:
+          $ref: '#/components/schemas/Int64Metric'
+        participationFees:
+          $ref: '#/components/schemas/Int64Metric'
+        bonusesPaid:
+          $ref: '#/components/schemas/Int64Metric'
+        totalUtilized:
+          $ref: '#/components/schemas/Int64Metric'
+      required: [unusedDebt, activeBetVolume, marketCreationFees, participationFees, bonusesPaid, totalUtilized]
+
+    Verification:
+      type: object
+      properties:
+        balanced:
+          $ref: '#/components/schemas/BoolMetric'
+        surplus:
+          $ref: '#/components/schemas/Int64Metric'
+      required: [balanced, surplus]
+
+    SystemMetrics:
+      type: object
+      properties:
+        moneyCreated:
+          $ref: '#/components/schemas/MoneyCreated'
+        moneyUtilized:
+          $ref: '#/components/schemas/MoneyUtilized'
+        verification:
+          $ref: '#/components/schemas/Verification'
+      required: [moneyCreated, moneyUtilized, verification]
 
     HomeContent:
       type: object

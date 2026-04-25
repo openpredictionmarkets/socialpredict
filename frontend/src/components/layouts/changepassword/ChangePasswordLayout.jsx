@@ -4,6 +4,7 @@ import { useHistory } from 'react-router-dom';
 import SiteButton from '../../buttons/SiteButtons';
 import { RegularInput } from '../../inputs/InputBar';
 import { AuthContext } from '../../../helpers/AuthContent';
+import { getApiErrorMessage, parseApiResponseText } from '../../../utils/apiResponse';
 
 function ChangePasswordLayout() {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -13,6 +14,12 @@ function ChangePasswordLayout() {
     const [success, setSuccess] = useState('');
     const history = useHistory();  // Initialize useHistory hook
     const { logout } = useContext(AuthContext); // Use logout from AuthContext
+    const changePasswordReasonMessages = {
+        AUTHORIZATION_DENIED: 'Current password is incorrect.',
+        VALIDATION_FAILED: 'New password must be 8-128 characters, include uppercase, lowercase, and a digit, contain no spaces, and differ from the current password.',
+        INVALID_TOKEN: 'Your session has expired. Please log in again.',
+        INVALID_REQUEST: 'Invalid password change request.',
+    };
 
     const handleCurrentPasswordChange = (event) => {
         setCurrentPassword(event.target.value);
@@ -46,10 +53,13 @@ function ChangePasswordLayout() {
                 body: JSON.stringify({ currentPassword, newPassword })
             });
             if (!response.ok) {
-                // NOTE: The backend returns error messages in plain text
-                // so we read it as text and capitalize the first character
-                // before displaying it to the user. /RR
-                const errMsg = capitalizeFirstChar(await response.text());
+                const payload = parseApiResponseText(await response.text());
+                const errMsg = capitalizeFirstChar(getApiErrorMessage(
+                    response,
+                    payload,
+                    'Failed to change password',
+                    changePasswordReasonMessages,
+                ));
                 throw new Error(errMsg || 'Failed to change password');
             }
 

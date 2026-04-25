@@ -136,14 +136,7 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 }
 
 func applyListStatusFilter(query *gorm.DB, status string) *gorm.DB {
-	switch status {
-	case "active":
-		return query.Where("is_resolved = ?", false)
-	case "resolved":
-		return query.Where("is_resolved = ?", true)
-	default:
-		return query
-	}
+	return applyStatusByResolution(query, status, time.Now())
 }
 
 func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
@@ -428,8 +421,11 @@ func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 // modelToDomain converts a GORM model to a domain market
 func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market {
 	status := "active"
-	if dbMarket.IsResolved {
+	switch {
+	case dbMarket.IsResolved:
 		status = "resolved"
+	case !dbMarket.ResolutionDateTime.After(time.Now()):
+		status = "closed"
 	}
 
 	return &dmarkets.Market{
