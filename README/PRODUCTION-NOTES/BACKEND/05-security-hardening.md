@@ -1,484 +1,262 @@
-# Security Hardening Implementation Plan
+---
+title: Security Hardening
+document_type: production-notes
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-26T14:07:06Z
+updated_at_display: "Sunday, April 26, 2026 at 2:07 PM UTC"
+update_reason: "Replace the older greenfield security-platform plan with current-state-first security hardening guidance grounded in the live backend."
+status: active
+---
 
-## Overview
-Enhance the existing security middleware and implement comprehensive security measures for production deployment including authentication improvements, authorization controls, input validation, and security monitoring.
+# Security Hardening
 
-## Current State Analysis
-- Basic security middleware in `security/` package
-- JWT authentication in `middleware/auth.go`
-- Rate limiting implementation in `security/ratelimit.go`
-- Input sanitization in `security/sanitizer.go`
-- Basic security headers in `security/headers.go`
-- CORS configuration in server setup
+## Update Summary
 
-## Implementation Steps
+This note was updated on Sunday, April 26, 2026 to replace an older greenfield security-platform plan with guidance that matches the live SocialPredict backend, the active design-plan posture, and the high-availability and fault-tolerance objective.
 
-### Step 1: Enhanced Authentication System
-**Timeline: 3-4 days**
+| Topic | Prior to April 26, 2026 | After April 26, 2026 |
+| --- | --- | --- |
+| Core framing | Treated security hardening as a new platform to build from scratch | Treats security hardening as incremental boundary and runtime hardening of the backend that already exists |
+| Current-state accuracy | Assumed JWT auth lived in `middleware/auth.go` and that major security building blocks were still mostly ahead | Recognizes the live `security` package, auth helpers, request validation, rate limiting, headers, and CORS wiring already in production code |
+| Main proposal | Build refresh tokens, MFA, RBAC, Redis rate limiting, monitoring, and API signing as the primary move | Focus on rate limiting, validation, sanitization, headers, CORS, auth transport cleanup, and password-change enforcement first |
+| Architecture posture | Proposed new `security/auth`, `security/monitoring`, `security/api`, and `middleware/*` trees | Extends the live `backend/security`, `internal/service/auth`, `server`, and handler-boundary seams |
+| Failure posture | Blurred security behavior with generic middleware/platform expansion | Aligns security middleware and auth failures with the existing boundary-owned error-handling direction |
+| HA posture | Optimized for feature breadth first | Optimizes for deterministic request rejection, sanitized failures, explicit proxy and runtime assumptions, and replica-safe behavior |
+| Future ideas | Mixed long-term identity/security-platform ideas into the active note | Defers long-term ideas to [FUTURE/01-long-term-security-hardening.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/01-long-term-security-hardening.md) |
 
-Improve the current JWT authentication with additional security features:
+## Executive Direction
 
-```go
-// security/auth/jwt.go
-type JWTManager struct {
-    signingKey     []byte
-    refreshKey     []byte
-    tokenExpiry    time.Duration
-    refreshExpiry  time.Duration
-    blacklist      TokenBlacklist
-    rateLimiter    *RateLimiter
-}
+SocialPredict should treat security hardening as request-boundary and runtime hardening of the existing backend, not as a greenfield security platform.
 
-type TokenPair struct {
-    AccessToken  string `json:"access_token"`
-    RefreshToken string `json:"refresh_token"`
-    ExpiresIn    int64  `json:"expires_in"`
-    TokenType    string `json:"token_type"`
-}
+The backend direction is:
 
-func (jm *JWTManager) GenerateTokenPair(userID string, roles []string) (*TokenPair, error) {
-    // Generate access token with short expiry
-    accessToken, err := jm.generateAccessToken(userID, roles)
-    if err != nil {
-        return nil, err
-    }
+1. Keep shared security primitives in [backend/security](/workspace/socialpredict/backend/security/security.go) and tighten them incrementally rather than replacing them with a second subsystem.
+2. Treat rate limiting, validation, sanitization, security headers, CORS posture, and request-path auth checks as the current hardening surface.
+3. Keep identity and authorization outcomes close to internal auth and domain seams, while moving route-visible HTTP policy to handlers or middleware boundaries over time.
+4. Align middleware-generated `429`, `405`, auth rejection, and other boundary failures with the shared error-handling direction instead of preserving scattered plain-text `http.Error` behavior.
+5. Keep JWT key ownership and other security-sensitive runtime settings under runtime/bootstrap ownership rather than hiding them in ad hoc helpers or application-policy config.
+6. Preserve the current `mustChangePassword` policy and make its route-boundary behavior explicit before attempting larger auth redesigns.
+7. Defer distributed rate limiting, MFA, RBAC, token/session redesign, request signing, and compliance-program work until the active notes and design-plan waves land.
 
-    // Generate refresh token with longer expiry
-    refreshToken, err := jm.generateRefreshToken(userID)
-    if err != nil {
-        return nil, err
-    }
+For a high-availability, fault-tolerant, enterprise-ready system, the backend should prefer:
 
-    return &TokenPair{
-        AccessToken:  accessToken,
-        RefreshToken: refreshToken,
-        ExpiresIn:    int64(jm.tokenExpiry.Seconds()),
-        TokenType:    "Bearer",
-    }, nil
-}
-```
+- deterministic request acceptance and rejection behavior across replicas
+- sanitized and eventually correlated runtime failures at the request boundary
+- explicit runtime assumptions for CORS, trusted proxy headers, and JWT key presence
+- minimal secret exposure in logs and client responses
+- security features that harden current behavior before adding platform complexity
 
-**Authentication enhancements:**
-- Token refresh mechanism
-- Token blacklisting for logout
-- Multi-factor authentication support
-- Session management
-- Login attempt tracking
-- Account lockout mechanism
+This note explicitly rejects building a large new security subsystem tree as the main design move for the active slice.
 
-### Step 2: Role-Based Access Control (RBAC)
-**Timeline: 2-3 days**
+## Why This Matters
 
-Implement comprehensive authorization system:
+Security hardening in SocialPredict is not only about adding more controls. It is also about making the controls that already exist behave predictably in production.
 
-```go
-// security/auth/rbac.go
-type Permission struct {
-    Resource string `json:"resource"`
-    Action   string `json:"action"`
-}
+For a high-availability and fault-tolerant backend, that means:
 
-type Role struct {
-    Name        string       `json:"name"`
-    Permissions []Permission `json:"permissions"`
-}
+- rate limiting should reject traffic consistently rather than through ad hoc strings
+- auth failures should be boundary-owned and predictable rather than leaking transport policy from internal seams
+- validation and sanitization should be reusable and explicit instead of being copied into handlers
+- headers and CORS should reflect an intentional deployment posture rather than permissive defaults carried forward indefinitely
+- sensitive runtime conditions such as missing JWT keys should fail safely
 
-type AuthorizationManager struct {
-    roles       map[string]Role
-    userRoles   map[string][]string
-    cache       *Cache
-}
+The older note was useful as a wishlist, but it no longer matches the live backend. The current job is not to invent a new security platform. The current job is to make the existing security surface architecturally consistent and safer to operate.
 
-func (am *AuthorizationManager) HasPermission(userID, resource, action string) bool {
-    userRoles := am.getUserRoles(userID)
-    for _, roleName := range userRoles {
-        role := am.roles[roleName]
-        for _, perm := range role.Permissions {
-            if perm.Resource == resource && perm.Action == action {
-                return true
-            }
-        }
-    }
-    return false
-}
+## Current Code Snapshot
 
-// Middleware for authorization
-func (am *AuthorizationManager) RequirePermission(resource, action string) mux.MiddlewareFunc {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            userID := getUserIDFromContext(r.Context())
-            if !am.HasPermission(userID, resource, action) {
-                http.Error(w, "Forbidden", http.StatusForbidden)
-                return
-            }
-            next.ServeHTTP(w, r)
-        })
-    }
-}
-```
+As of 2026-04-26, the backend already has meaningful security structure, but it is split between good direction and transitional behavior.
 
-**RBAC features:**
-- Fine-grained permissions
-- Role hierarchy
-- Dynamic permission checking
-- Permission caching
-- Admin role management
-- Resource-based access control
+### Shared security package already exists
 
-### Step 3: Advanced Rate Limiting
-**Timeline: 2 days**
+The backend already has a concrete security package:
 
-Enhance the existing rate limiting with advanced features:
+- [security.go](/workspace/socialpredict/backend/security/security.go)
+- [ratelimit.go](/workspace/socialpredict/backend/security/ratelimit.go)
+- [headers.go](/workspace/socialpredict/backend/security/headers.go)
+- [validator.go](/workspace/socialpredict/backend/security/validator.go)
+- [sanitizer.go](/workspace/socialpredict/backend/security/sanitizer.go)
+
+This means the active backend is not missing a security layer. It already has one. The work now is to harden and clarify ownership.
+
+### Rate limiting exists, but it is local and transport-rough
+
+Rate limiting already exists in [ratelimit.go](/workspace/socialpredict/backend/security/ratelimit.go).
+
+The live behavior already provides:
+
+- a general in-memory limiter
+- a stricter login limiter
+- per-client-IP bucketing based on request headers
+
+Important current limitations:
+
+- rate limiting is process-local and in-memory
+- `429` responses still use plain-text `http.Error`
+- client-IP extraction trusts forwarded headers without an explicit proxy-trust model
+
+This means the active problem is not “build advanced rate limiting from scratch.” The active problem is to make the current limiter safer and more consistent at the boundary.
+
+### Validation and sanitization already exist and are used directly
+
+Validation and sanitization are already live in:
+
+- [validator.go](/workspace/socialpredict/backend/security/validator.go)
+- [sanitizer.go](/workspace/socialpredict/backend/security/sanitizer.go)
+- [security.go](/workspace/socialpredict/backend/security/security.go)
+
+These helpers already enforce:
+
+- username rules
+- password rules
+- safe-string checks
+- market outcome validation
+- betting amount validation
+- market-title, description, emoji, and personal-link sanitization
+
+They are already used in real request paths, including login in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go), which sanitizes the username and validates the login payload before authentication.
+
+The current opportunity is to keep these helpers as shared request-boundary support, not to rebuild a new schema engine or validation platform for the active slice.
+
+### Auth still leaks transport policy from an internal seam
+
+The current auth helper layer still defines a transport-shaped error in [authutils.go](/workspace/socialpredict/backend/internal/service/auth/authutils.go):
 
 ```go
-// security/ratelimit/advanced.go
-type AdvancedRateLimiter struct {
-    globalLimiter   *TokenBucket
-    userLimiters    map[string]*TokenBucket
-    endpointLimits  map[string]RateLimit
-    ipLimiters      map[string]*TokenBucket
-    redis           *redis.Client
-    metrics         *prometheus.CounterVec
-}
-
-type RateLimit struct {
-    Requests     int           `json:"requests"`
-    Window       time.Duration `json:"window"`
-    BurstAllowed int           `json:"burst_allowed"`
-}
-
-func (arl *AdvancedRateLimiter) CheckRate(r *http.Request) error {
-    // Check global rate limit
-    if !arl.globalLimiter.Allow() {
-        return ErrGlobalRateLimit
-    }
-
-    // Check IP-based rate limit
-    clientIP := getClientIP(r)
-    if !arl.checkIPLimit(clientIP) {
-        return ErrIPRateLimit
-    }
-
-    // Check user-based rate limit
-    userID := getUserID(r)
-    if userID != "" && !arl.checkUserLimit(userID) {
-        return ErrUserRateLimit
-    }
-
-    // Check endpoint-specific rate limit
-    endpoint := getEndpoint(r)
-    if !arl.checkEndpointLimit(endpoint, userID) {
-        return ErrEndpointRateLimit
-    }
-
-    return nil
+type HTTPError struct {
+    StatusCode int
+    Message    string
 }
 ```
 
-**Rate limiting enhancements:**
-- Multiple rate limiting strategies
-- Distributed rate limiting with Redis
-- Endpoint-specific limits
-- User and IP-based limits
-- Burst allowance
-- Rate limit monitoring
-
-### Step 4: Input Validation and Sanitization
-**Timeline: 2-3 days**
-
-Expand input validation beyond the current sanitization:
+And request-path auth helpers still return that type directly from [auth.go](/workspace/socialpredict/backend/internal/service/auth/auth.go):
 
 ```go
-// security/validation/validator.go
-type ValidationEngine struct {
-    validator   *validator.Validate
-    sanitizer   *Sanitizer
-    rules       map[string]ValidationRule
-}
-
-type ValidationRule struct {
-    Required     bool                   `json:"required"`
-    Type         string                 `json:"type"`
-    MinLength    int                    `json:"min_length,omitempty"`
-    MaxLength    int                    `json:"max_length,omitempty"`
-    Pattern      string                 `json:"pattern,omitempty"`
-    Sanitize     []string               `json:"sanitize,omitempty"`
-    CustomRules  []CustomValidationRule `json:"custom_rules,omitempty"`
-}
-
-func (ve *ValidationEngine) ValidateRequest(r *http.Request, rules map[string]ValidationRule) (*ValidationResult, error) {
-    result := &ValidationResult{
-        Valid:  true,
-        Errors: make(map[string][]string),
-    }
-
-    // Parse request body
-    var data map[string]interface{}
-    if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-        return nil, err
-    }
-
-    // Validate each field
-    for field, rule := range rules {
-        if err := ve.validateField(field, data[field], rule); err != nil {
-            result.Valid = false
-            result.Errors[field] = append(result.Errors[field], err.Error())
-        }
-    }
-
-    return result, nil
-}
+func ValidateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface) (*dusers.User, *HTTPError)
 ```
 
-**Validation features:**
-- Schema-based validation
-- Custom validation rules
-- Automatic sanitization
-- File upload validation
-- SQL injection prevention
-- XSS protection
+That keeps route-visible HTTP status and message policy inside an internal seam, which is inconsistent with the current error-handling and design-plan direction.
 
-### Step 5: Security Headers and HTTPS
-**Timeline: 1-2 days**
+At the same time, login already uses the shared envelope path in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go) through `handlers.WriteFailure`, so the live system is mixed rather than empty.
 
-Enhance security headers and HTTPS configuration:
+### Header and CORS posture already exists, but it is only partly owned
 
-```go
-// security/headers/security.go
-type SecurityHeadersMiddleware struct {
-    config SecurityHeadersConfig
-}
+Security headers are already applied by [headers.go](/workspace/socialpredict/backend/security/headers.go), including:
 
-type SecurityHeadersConfig struct {
-    HSTS                HSSTConfig     `yaml:"hsts"`
-    CSP                 CSPConfig      `yaml:"csp"`
-    ReferrerPolicy      string         `yaml:"referrer_policy"`
-    PermissionsPolicy   []string       `yaml:"permissions_policy"`
-    CrossOriginPolicy   COOPConfig     `yaml:"cross_origin_policy"`
-}
+- `Content-Security-Policy`
+- `X-Content-Type-Options`
+- `X-Frame-Options`
+- `Referrer-Policy`
+- `Permissions-Policy`
+- cross-origin embedder/opener/resource policy headers
 
-func (shm *SecurityHeadersMiddleware) Apply(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // HSTS
-        if shm.config.HSTS.Enabled {
-            w.Header().Set("Strict-Transport-Security",
-                fmt.Sprintf("max-age=%d; includeSubDomains; preload",
-                    shm.config.HSTS.MaxAge))
-        }
+But the live header posture is still transitional:
 
-        // Content Security Policy
-        w.Header().Set("Content-Security-Policy", shm.buildCSP())
+- defaults are static and code-defined
+- HSTS is not currently part of the runtime header policy
+- the note should treat TLS termination and HSTS ownership as an explicit deployment question, not assume application-only ownership
 
-        // Other security headers
-        w.Header().Set("X-Content-Type-Options", "nosniff")
-        w.Header().Set("X-Frame-Options", "DENY")
-        w.Header().Set("X-XSS-Protection", "1; mode=block")
-        w.Header().Set("Referrer-Policy", shm.config.ReferrerPolicy)
+CORS is already runtime-configured in [server.go](/workspace/socialpredict/backend/server/server.go) through environment variables, but current defaults remain broad:
 
-        next.ServeHTTP(w, r)
-    })
-}
-```
+- `CORS_ENABLED` defaults to enabled
+- `CORS_ALLOW_ORIGINS` defaults to `*`
+- allowed methods and headers are broad by default
 
-**Security headers:**
-- HTTP Strict Transport Security (HSTS)
-- Content Security Policy (CSP)
-- X-Frame-Options
-- X-Content-Type-Options
-- Referrer Policy
-- Permissions Policy
+That is current production posture, not future theory, and the note should describe it honestly.
 
-### Step 6: Security Monitoring and Alerting
-**Timeline: 2 days**
+### `mustChangePassword` is already part of the live security policy
 
-Implement security event monitoring:
+The backend already enforces a locked password-change policy in [auth.go](/workspace/socialpredict/backend/internal/service/auth/auth.go) through `CheckMustChangePasswordFlag`.
 
-```go
-// security/monitoring/monitor.go
-type SecurityMonitor struct {
-    logger      *logging.Logger
-    alertManager *AlertManager
-    metrics     *SecurityMetrics
-    events      chan SecurityEvent
-}
+The current server behavior is also tested in [server_contract_test.go](/workspace/socialpredict/backend/server/server_contract_test.go):
 
-type SecurityEvent struct {
-    Type        string                 `json:"type"`
-    Severity    string                 `json:"severity"`
-    UserID      string                 `json:"user_id,omitempty"`
-    IP          string                 `json:"ip"`
-    UserAgent   string                 `json:"user_agent"`
-    Details     map[string]interface{} `json:"details"`
-    Timestamp   time.Time              `json:"timestamp"`
-}
+- users flagged with `MustChangePassword` may still use `/v0/changepassword`
+- other authenticated actions are intended to be blocked once the enforcement path is touched
 
-func (sm *SecurityMonitor) LogSecurityEvent(event SecurityEvent) {
-    // Log the event
-    sm.logger.WithFields(map[string]interface{}{
-        "security_event": true,
-        "event_type":     event.Type,
-        "severity":       event.Severity,
-        "user_id":        event.UserID,
-        "ip":            event.IP,
-    }).Warn("Security event detected")
+This means password-change enforcement is not a speculative future feature. It is current security behavior that needs cleaner boundary ownership and clearer route-family consistency.
 
-    // Update metrics
-    sm.metrics.SecurityEvents.WithLabelValues(event.Type, event.Severity).Inc()
+### Wider route-family cleanup is still a boundary-migration problem
 
-    // Send alert for high-severity events
-    if event.Severity == "HIGH" || event.Severity == "CRITICAL" {
-        sm.alertManager.SendAlert(event)
-    }
+Many handlers still emit raw `http.Error` strings across the backend, including security-adjacent request paths such as:
 
-    // Queue for further processing
-    select {
-    case sm.events <- event:
-    default:
-        sm.logger.Error("Security event queue full, dropping event")
-    }
-}
-```
+- [createmarket.go](/workspace/socialpredict/backend/handlers/markets/createmarket.go)
+- [publicuser.go](/workspace/socialpredict/backend/handlers/users/publicuser.go)
+- [portfolio.go](/workspace/socialpredict/backend/handlers/users/publicuser/portfolio.go)
+- [financial.go](/workspace/socialpredict/backend/handlers/users/financial.go)
 
-**Security monitoring:**
-- Failed authentication attempts
-- Suspicious IP activity
-- Rate limit violations
-- Permission violations
-- Malformed requests
-- Security policy violations
+That overlap matters, but this note should not pretend that all route-family response cleanup belongs to a standalone security-platform initiative. It is tied directly to the active error-handling and auth-alignment work.
 
-### Step 7: API Security Best Practices
-**Timeline: 2 days**
+## What Security Hardening Should Own
 
-Implement API-specific security measures:
+### Request-boundary security ownership
 
-```go
-// security/api/protection.go
-type APIProtection struct {
-    requestSigning   *RequestSigning
-    antiReplay      *AntiReplayProtection
-    dataEncryption  *DataEncryption
-}
+Security hardening should own:
 
-func (ap *APIProtection) ValidateRequest(r *http.Request) error {
-    // Validate request signature if required
-    if ap.requestSigning.IsRequired(r.URL.Path) {
-        if err := ap.requestSigning.Validate(r); err != nil {
-            return err
-        }
-    }
+- rate limiting posture
+- trusted-client-IP extraction assumptions
+- security headers
+- CORS posture
+- request-body validation and sanitization at the boundary
+- JWT key presence and basic auth bootstrap expectations
 
-    // Check for replay attacks
-    if err := ap.antiReplay.CheckRequest(r); err != nil {
-        return err
-    }
+### Auth-boundary cleanup direction
 
-    return nil
-}
-```
+This note should also own the direction that:
 
-## Directory Structure
-```
-security/
-├── auth/
-│   ├── jwt.go              # JWT token management
-│   ├── rbac.go             # Role-based access control
-│   ├── mfa.go              # Multi-factor authentication
-│   └── session.go          # Session management
-├── ratelimit/
-│   ├── advanced.go         # Advanced rate limiting
-│   ├── distributed.go      # Redis-based rate limiting
-│   └── metrics.go          # Rate limiting metrics
-├── validation/
-│   ├── validator.go        # Input validation engine
-│   ├── sanitizer.go        # Input sanitization (enhanced)
-│   └── rules.go            # Validation rule definitions
-├── headers/
-│   ├── security.go         # Security headers middleware
-│   └── csp.go              # Content Security Policy
-├── monitoring/
-│   ├── monitor.go          # Security event monitoring
-│   ├── alerts.go           # Security alerting
-│   └── metrics.go          # Security metrics
-├── api/
-│   ├── protection.go       # API-specific protections
-│   ├── signing.go          # Request signing
-│   └── encryption.go       # Data encryption
-└── middleware/
-    ├── auth.go             # Authentication middleware (enhanced)
-    ├── authz.go            # Authorization middleware
-    └── security.go         # Combined security middleware
-```
+- internal auth code should move away from transport-shaped `HTTPError`
+- route-visible auth failures should be translated at handlers or middleware
+- `mustChangePassword` remains a server-side enforcement concern
+- login stays usable while broader token redesign is deferred
 
-## Security Configuration
-```yaml
-security:
-  authentication:
-    jwt:
-      access_token_expiry: "15m"
-      refresh_token_expiry: "7d"
-      signing_method: "RS256"
-      key_rotation_interval: "30d"
+### Deployment-sensitive security posture
 
-    mfa:
-      enabled: true
-      methods: ["totp", "sms"]
+This note should be explicit about the runtime assumptions that affect safe operation:
 
-  authorization:
-    rbac_enabled: true
-    cache_ttl: "5m"
+- whether forwarded IP headers are trusted
+- where TLS termination occurs
+- whether HSTS belongs in app headers, ingress, or both
+- how missing JWT runtime config should fail
 
-  rate_limiting:
-    global:
-      requests: 1000
-      window: "1m"
-    per_user:
-      requests: 100
-      window: "1m"
-    per_ip:
-      requests: 50
-      window: "1m"
+## What This Note Should Not Own
 
-  headers:
-    hsts:
-      enabled: true
-      max_age: 31536000
-    csp:
-      default_src: ["'self'"]
-      script_src: ["'self'", "'unsafe-inline'"]
+This note should not become the home for every long-term security idea.
 
-  monitoring:
-    failed_login_threshold: 5
-    alert_on_suspicious_activity: true
-```
+It should explicitly defer:
 
-## Security Testing
-- Authentication and authorization tests
-- Rate limiting effectiveness tests
-- Input validation and sanitization tests
-- Security header verification tests
-- Penetration testing integration
-- Vulnerability scanning automation
+- MFA
+- refresh-token or revocation or blacklist architecture
+- broader session-management redesign
+- RBAC or fine-grained authorization framework design
+- Redis or distributed rate limiting
+- request signing or anti-replay systems
+- encryption-platform design
+- security-event monitoring platform design
+- compliance-program promises such as SOC 2, GDPR, or PCI mapping
 
-## Compliance and Standards
-- OWASP Top 10 compliance
-- OAuth 2.0 and OpenID Connect standards
-- GDPR compliance for data handling
-- SOC 2 Type II controls
-- PCI DSS for payment data (if applicable)
+Those topics now belong in [FUTURE/01-long-term-security-hardening.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/01-long-term-security-hardening.md), not in the active production note.
 
-## Security Metrics and Monitoring
-- Authentication success/failure rates
-- Authorization denials
-- Rate limiting triggers
-- Security event frequencies
-- Vulnerability scan results
-- Compliance score tracking
+## Near-Term Sequencing
 
-## Benefits
-- Comprehensive security coverage
-- Automated threat detection
-- Compliance with security standards
-- Improved user trust and data protection
-- Reduced security incident response time
-- Scalable security architecture
+The near-term security direction should align with the current design-plan waves rather than invent a separate security-platform track.
+
+1. Keep configuration and runtime ownership explicit so JWT key presence, CORS posture, and runtime-sensitive security settings are not hidden in ad hoc helpers.
+2. Use the active error-handling wave to converge boundary-owned `429`, `405`, and sanitized failure behavior where security middleware currently bypasses the shared contract.
+3. Use the later auth and API alignment wave to retire `internal/service/auth.HTTPError` and clean up route-visible auth failure mapping.
+4. Tighten CORS, proxy-trust, and header posture once deployment assumptions are explicit.
+5. Keep long-term identity and security-platform work deferred until the active production notes and current design-plan waves are complete.
+
+## Open Questions
+
+- Should HSTS be owned in application headers, ingress or proxy policy, or both?
+- What exact proxy-trust model should govern `X-Forwarded-For` and `X-Real-IP` handling in rate limiting?
+- When does SocialPredict actually need distributed rate limiting rather than the current per-process limiter?
+- What is the intended long-term runtime contract for JWT signing key management and rotation?
+- Which middleware-generated security failures should eventually use stable public `reason` values across route families?
+
+## Explicit Do-Not-Do List
+
+- Do not create a new top-level `security/auth`, `security/monitoring`, `security/api`, or `middleware` platform tree as part of the active slice.
+- Do not treat RBAC, MFA, or refresh-token/session redesign as current-wave requirements.
+- Do not add Redis or distributed rate limiting to the active wave queue by default.
+- Do not blur security hardening with the broader error-contract migration by claiming universal envelope coverage before the touched route families actually converge.
+- Do not make compliance claims in the active production note unless SocialPredict has a real program, owner, and implementation path for them.
