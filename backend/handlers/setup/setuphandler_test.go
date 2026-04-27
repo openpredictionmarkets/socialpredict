@@ -13,6 +13,8 @@ import (
 )
 
 func TestGetSetupHandler(t *testing.T) {
+	ownedConfig := configsvc.FromSetup(loadSetupConfig(t))
+
 	tests := []struct {
 		Name             string
 		ConfigService    configsvc.Service
@@ -22,7 +24,7 @@ func TestGetSetupHandler(t *testing.T) {
 	}{
 		{
 			Name:           "successful load",
-			ConfigService:  configsvc.NewStaticService(loadSetupConfig(t)),
+			ConfigService:  economicsOnlyConfigService{economics: ownedConfig.Economics},
 			ExpectedStatus: http.StatusOK,
 			ExpectedResponse: `{
 				"marketcreation":{"initialMarketProbability":0.5,"initialMarketSubsidization":10,"initialMarketYes":0,"initialMarketNo":0,"minimumFutureHours":1},
@@ -107,6 +109,27 @@ func TestGetFrontendSetupHandler(t *testing.T) {
 	}
 }
 
+func TestGetFrontendSetupHandlerUsesChartSigFigsAccessor(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/setup/frontend", nil)
+	rr := httptest.NewRecorder()
+
+	handler := http.HandlerFunc(GetFrontendSetupHandler(chartSigFigsOnlyConfigService{chartSigFigs: 9}))
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	var response map[string]map[string]int
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if got := response["charts"]["sigFigs"]; got != 9 {
+		t.Fatalf("expected sig figs 9, got %d", got)
+	}
+}
+
 func loadSetupConfig(t *testing.T) *setup.EconomicConfig {
 	t.Helper()
 
@@ -124,4 +147,44 @@ func jsonEqual(a, b map[string]interface{}) bool {
 func jsonString(v interface{}) string {
 	bytes, _ := json.Marshal(v)
 	return string(bytes)
+}
+
+type economicsOnlyConfigService struct {
+	economics configsvc.Economics
+}
+
+func (s economicsOnlyConfigService) Current() *configsvc.AppConfig {
+	panic("Current should not be called")
+}
+
+func (s economicsOnlyConfigService) Economics() configsvc.Economics {
+	return s.economics
+}
+
+func (economicsOnlyConfigService) Frontend() configsvc.Frontend {
+	panic("Frontend should not be called")
+}
+
+func (economicsOnlyConfigService) ChartSigFigs() int {
+	panic("ChartSigFigs should not be called")
+}
+
+type chartSigFigsOnlyConfigService struct {
+	chartSigFigs int
+}
+
+func (chartSigFigsOnlyConfigService) Current() *configsvc.AppConfig {
+	panic("Current should not be called")
+}
+
+func (chartSigFigsOnlyConfigService) Economics() configsvc.Economics {
+	panic("Economics should not be called")
+}
+
+func (chartSigFigsOnlyConfigService) Frontend() configsvc.Frontend {
+	panic("Frontend should not be called")
+}
+
+func (s chartSigFigsOnlyConfigService) ChartSigFigs() int {
+	return s.chartSigFigs
 }

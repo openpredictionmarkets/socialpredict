@@ -9,7 +9,6 @@ import (
 	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/setup"
 )
 
 var errUnexpectedHelperCall = errors.New("unexpected call")
@@ -164,11 +163,10 @@ func TestMarketGate_Open(t *testing.T) {
 }
 
 func TestFeeCalculator_Calculate(t *testing.T) {
-	econ := &setup.EconomicConfig{}
-	econ.Economics.Betting.BetFees.InitialBetFee = 5
-	econ.Economics.Betting.BetFees.BuySharesFee = 2
-
-	calc := feeCalculator{econ: econ}
+	calc := feeCalculator{config: Config{
+		InitialBetFee: 5,
+		BuySharesFee:  2,
+	}}
 
 	tests := []struct {
 		name   string
@@ -199,7 +197,7 @@ func TestFeeCalculator_Calculate(t *testing.T) {
 		})
 	}
 
-	if zeroFees := (feeCalculator{econ: &setup.EconomicConfig{}}).Calculate(false, 0); zeroFees.totalCost != 0 {
+	if zeroFees := (feeCalculator{config: Config{}}).Calculate(false, 0); zeroFees.totalCost != 0 {
 		t.Fatalf("expected zero-value config to remain usable, got %+v", zeroFees)
 	}
 }

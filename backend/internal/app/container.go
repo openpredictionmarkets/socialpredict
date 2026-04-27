@@ -86,7 +86,6 @@ func (c *Container) InitializeRepositories() {
 func (c *Container) InitializeServices() {
 	// Users service depends on users repository and configuration
 	securityService := security.NewSecurityService()
-	configLoader := func() *configsvc.AppConfig { return c.config }
 
 	wpamSeeds := wpam.Seeds{
 		InitialProbability:     c.config.Economics.MarketCreation.InitialMarketProbability,
@@ -101,9 +100,20 @@ func (c *Container) InitializeServices() {
 	)
 
 	positionCalcAdapter := analytics.NewMarketPositionCalculator(positionCalculator)
+	analyticsConfig := analytics.Config{
+		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
+		CreateMarketCost:   c.config.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:      c.config.Economics.Betting.BetFees.InitialBetFee,
+	}
+	betsConfig := dbets.Config{
+		InitialBetFee:      c.config.Economics.Betting.BetFees.InitialBetFee,
+		BuySharesFee:       c.config.Economics.Betting.BetFees.BuySharesFee,
+		MaxDustPerSale:     c.config.Economics.Betting.MaxDustPerSale,
+		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
+	}
 
 	c.analyticsRepo = *analytics.NewGormRepository(c.db, analytics.WithRepositoryPositionCalculator(positionCalcAdapter))
-	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader, analytics.WithPositionCalculator(positionCalcAdapter))
+	c.analyticsService = analytics.NewService(&c.analyticsRepo, analyticsConfig, analytics.WithPositionCalculator(positionCalcAdapter))
 	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
 	c.authService = authsvc.NewAuthService(c.usersService)
 
@@ -122,7 +132,7 @@ func (c *Container) InitializeServices() {
 		dmarkets.WithProbabilityEngine(dmarkets.DefaultProbabilityEngine(wpamCalculator)),
 	)
 
-	c.betsService = dbets.NewService(&c.betsRepo, c.marketsService, c.usersService, c.config, c.clock)
+	c.betsService = dbets.NewService(&c.betsRepo, c.marketsService, c.usersService, betsConfig, c.clock)
 }
 
 // InitializeHandlers sets up all HTTP handlers with their service dependencies
@@ -184,7 +194,7 @@ func BuildApplicationWithConfigService(db *gorm.DB, configService configsvc.Serv
 	return container
 }
 
-// BuildApplication preserves older call sites that still provide a raw config snapshot.
-func BuildApplication(db *gorm.DB, config *configsvc.AppConfig) *Container {
+// BuildApplication preserves older call sites that still provide an owned or legacy raw config snapshot.
+func BuildApplication(db *gorm.DB, config any) *Container {
 	return BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 }

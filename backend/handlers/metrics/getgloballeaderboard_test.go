@@ -66,7 +66,7 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 		},
 	}
 
-	svc := analytics.NewService(repo, nil)
+	svc := analytics.NewService(repo, analytics.Config{})
 	handler := GetGlobalLeaderboardHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard", nil)
@@ -118,7 +118,7 @@ type assertError string
 func (e assertError) Error() string { return string(e) }
 
 func TestGetGlobalLeaderboardHandler_Error(t *testing.T) {
-	svc := analytics.NewService(failingRepo{}, nil)
+	svc := analytics.NewService(failingRepo{}, analytics.Config{})
 	handler := GetGlobalLeaderboardHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard", nil)

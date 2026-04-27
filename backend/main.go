@@ -11,6 +11,7 @@ import (
 	_ "socialpredict/migration/migrations" // <-- side-effect import: registers migrations via init()
 	"socialpredict/seed"
 	"socialpredict/server"
+	"socialpredict/setup"
 )
 
 func main() {
@@ -41,7 +42,7 @@ func main() {
 		log.Printf("migration: warning: %v", err)
 	}
 
-	configService, err := appruntime.LoadConfigService()
+	configService, err := appruntime.LoadConfigService(setup.EmbeddedSource{})
 	if err != nil {
 		log.Fatalf("config init: %v", err)
 	}

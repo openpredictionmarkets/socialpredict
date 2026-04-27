@@ -13,7 +13,6 @@ import (
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 
 	"gorm.io/gorm"
 )
@@ -21,8 +20,11 @@ import (
 func newAnalyticsService(t *testing.T, db *gorm.DB) *analytics.Service {
 	t.Helper()
 	cfg := modelstesting.GenerateEconomicConfig()
-	loader := func() *setup.EconomicConfig { return cfg }
-	return analytics.NewService(analytics.NewGormRepository(db), loader)
+	return analytics.NewService(analytics.NewGormRepository(db), analytics.Config{
+		MaximumDebtAllowed: cfg.Economics.User.MaximumDebtAllowed,
+		CreateMarketCost:   cfg.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:      cfg.Economics.Betting.BetFees.InitialBetFee,
+	})
 }
 
 func TestGetSystemMetricsHandler_Success(t *testing.T) {
@@ -81,8 +83,11 @@ func (failingAnalyticsRepo) UserMarketPositions(context.Context, string) ([]posi
 
 func TestGetSystemMetricsHandler_Error(t *testing.T) {
 	cfg := modelstesting.GenerateEconomicConfig()
-	loader := func() *setup.EconomicConfig { return cfg }
-	svc := analytics.NewService(failingAnalyticsRepo{}, loader)
+	svc := analytics.NewService(failingAnalyticsRepo{}, analytics.Config{
+		MaximumDebtAllowed: cfg.Economics.User.MaximumDebtAllowed,
+		CreateMarketCost:   cfg.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:      cfg.Economics.Betting.BetFees.InitialBetFee,
+	})
 
 	handler := GetSystemMetricsHandler(svc)
 	req := httptest.NewRequest("GET", "/v0/system/metrics", nil)

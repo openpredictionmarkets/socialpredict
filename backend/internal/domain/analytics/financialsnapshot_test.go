@@ -36,6 +36,14 @@ func withAnalyticsServiceOption(opt ServiceOption) analyticsServiceTestOption {
 	}
 }
 
+func analyticsConfigFromSetup(econ *setup.EconomicConfig) Config {
+	return Config{
+		MaximumDebtAllowed: econ.Economics.User.MaximumDebtAllowed,
+		CreateMarketCost:   econ.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:      econ.Economics.Betting.BetFees.InitialBetFee,
+	}
+}
+
 func newAnalyticsService(t *testing.T, db *gorm.DB, econ *setup.EconomicConfig, opts ...analyticsServiceTestOption) *Service {
 	t.Helper()
 
@@ -50,10 +58,9 @@ func newAnalyticsService(t *testing.T, db *gorm.DB, econ *setup.EconomicConfig, 
 	)
 	cfg.repoOptions = append(cfg.repoOptions, WithRepositoryPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
 	repo := NewGormRepository(db, cfg.repoOptions...)
-	loader := func() *setup.EconomicConfig { return econ }
 	cfg.serviceOptions = append(cfg.serviceOptions, WithPositionCalculator(NewMarketPositionCalculator(positionCalculator)))
 
-	return NewService(repo, loader, cfg.serviceOptions...)
+	return NewService(repo, analyticsConfigFromSetup(econ), cfg.serviceOptions...)
 }
 
 func requireFinancialSnapshot(t *testing.T, svc financialSnapshotComputer, user models.User) *FinancialSnapshot {

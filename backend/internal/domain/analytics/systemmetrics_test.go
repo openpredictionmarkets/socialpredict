@@ -92,3 +92,54 @@ func TestComputeSystemMetrics_WithData(t *testing.T) {
 		t.Errorf("expected participation fees 10, got %d", val)
 	}
 }
+
+func TestComputeSystemMetrics_UsesInjectedSnapshot(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.MarketIncentives.CreateMarketCost = 50
+	econ.Economics.Betting.BetFees.InitialBetFee = 5
+	econ.Economics.User.MaximumDebtAllowed = 500
+
+	users := []models.User{
+		modelstesting.GenerateUser("user1", 0),
+		modelstesting.GenerateUser("user2", 0),
+	}
+	for i := range users {
+		if err := db.Create(&users[i]).Error; err != nil {
+			t.Fatalf("create user: %v", err)
+		}
+	}
+
+	market := modelstesting.GenerateMarket(1, users[0].Username)
+	market.IsResolved = false
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+
+	bet := modelstesting.GenerateBet(50, "YES", "user1", uint(market.ID), 0)
+	if err := db.Create(&bet).Error; err != nil {
+		t.Fatalf("create bet: %v", err)
+	}
+
+	snapshot := Config{
+		MaximumDebtAllowed: econ.Economics.User.MaximumDebtAllowed,
+		CreateMarketCost:   econ.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:      econ.Economics.Betting.BetFees.InitialBetFee,
+	}
+	svc := NewService(NewGormRepository(db), snapshot)
+
+	econ.Economics.User.MaximumDebtAllowed = 999
+	econ.Economics.MarketIncentives.CreateMarketCost = 999
+	econ.Economics.Betting.BetFees.InitialBetFee = 999
+
+	metrics := requireSystemMetrics(t, svc)
+	if val := requireMetricInt64(t, metrics.MoneyCreated.UserDebtCapacity); val != 1000 {
+		t.Fatalf("expected frozen user debt capacity 1000, got %d", val)
+	}
+	if val := requireMetricInt64(t, metrics.MoneyUtilized.MarketCreationFees); val != 50 {
+		t.Fatalf("expected frozen market creation fees 50, got %d", val)
+	}
+	if val := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); val != 5 {
+		t.Fatalf("expected frozen participation fees 5, got %d", val)
+	}
+}

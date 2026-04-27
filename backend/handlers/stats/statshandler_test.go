@@ -35,7 +35,9 @@ func TestStatsHandlerReturnsServiceBackedConfiguration(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v0/stats", nil)
 	rr := httptest.NewRecorder()
 
-	StatsHandler(db, configsvc.NewStaticService(config)).ServeHTTP(rr, req)
+	StatsHandler(db, economicsOnlyConfigService{
+		economics: configsvc.FromSetup(config).Economics,
+	}).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d with body %s", rr.Code, rr.Body.String())
@@ -104,4 +106,24 @@ func TestStatsHandlerSanitizesDatabaseErrors(t *testing.T) {
 	if response.Reason != string(handlers.ReasonInternalError) {
 		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, response.Reason)
 	}
+}
+
+type economicsOnlyConfigService struct {
+	economics configsvc.Economics
+}
+
+func (s economicsOnlyConfigService) Current() *configsvc.AppConfig {
+	panic("Current should not be called")
+}
+
+func (s economicsOnlyConfigService) Economics() configsvc.Economics {
+	return s.economics
+}
+
+func (economicsOnlyConfigService) Frontend() configsvc.Frontend {
+	panic("Frontend should not be called")
+}
+
+func (economicsOnlyConfigService) ChartSigFigs() int {
+	panic("ChartSigFigs should not be called")
 }
