@@ -1,601 +1,277 @@
-# Testing Strategy Implementation Plan
-
-## Overview
-Implement comprehensive testing strategy including unit tests, integration tests, API tests, and performance tests to ensure code quality and system reliability.
-
-## Current State Analysis
-- Limited testing exists in the codebase
-- Some test files in `models/bets_test.go`, `middleware/middleware_test.go`
-- Basic testing structure but not comprehensive
-- No integration testing framework
-- No API testing suite
-- No performance testing
-
-## Implementation Steps
-
-### Step 1: Testing Infrastructure Setup
-**Timeline: 2-3 days**
-
-Set up comprehensive testing infrastructure:
-
-```go
-// testing/infrastructure.go
-type TestSuite struct {
-    DB          *gorm.DB
-    TestDB      *gorm.DB
-    Server      *httptest.Server
-    Container   *testcontainers.Container
-    Logger      *logging.Logger
-    Config      *config.Config
-}
-
-func NewTestSuite() *TestSuite {
-    // Start test database container
-    container, db := setupTestDatabase()
-
-    // Create test server
-    server := setupTestServer(db)
-
-    return &TestSuite{
-        DB:        db,
-        TestDB:    db,
-        Server:    server,
-        Container: container,
-        Logger:    setupTestLogger(),
-        Config:    setupTestConfig(),
-    }
-}
-
-func (ts *TestSuite) SetupTest() {
-    // Clear database before each test
-    ts.ClearDatabase()
-
-    // Seed test data if needed
-    ts.SeedTestData()
-}
-
-func (ts *TestSuite) TearDownTest() {
-    // Clean up after test
-    ts.ClearDatabase()
-}
-```
-
-**Infrastructure components:**
-- Test database management
-- Test server setup
-- Test containers integration
-- Mock services
-- Test data factories
-- Test utilities
-
-### Step 2: Unit Testing Framework
-**Timeline: 3-4 days**
-
-Implement comprehensive unit tests for all packages:
-
-```go
-// Example: handlers/markets/markets_test.go
-func TestMarketService_CreateMarket(t *testing.T) {
-    tests := []struct {
-        name    string
-        input   models.CreateMarketRequest
-        setup   func(*testing.T, *TestSuite)
-        want    *models.Market
-        wantErr bool
-        errType error
-    }{
-        {
-            name: "successful market creation",
-            input: models.CreateMarketRequest{
-                Title:       "Test Market",
-                Description: "Test Description",
-                EndDate:     time.Now().Add(24 * time.Hour),
-            },
-            setup: func(t *testing.T, ts *TestSuite) {
-                // Setup test user
-                ts.CreateTestUser("testuser")
-            },
-            want: &models.Market{
-                Title:       "Test Market",
-                Description: "Test Description",
-                Status:      "active",
-            },
-            wantErr: false,
-        },
-        {
-            name: "market creation with invalid end date",
-            input: models.CreateMarketRequest{
-                Title:       "Test Market",
-                Description: "Test Description",
-                EndDate:     time.Now().Add(-24 * time.Hour), // Past date
-            },
-            wantErr: true,
-            errType: &ValidationError{},
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            ts := NewTestSuite()
-            defer ts.Cleanup()
-
-            if tt.setup != nil {
-                tt.setup(t, ts)
-            }
-
-            service := NewMarketService(ts.DB, ts.Logger)
-            got, err := service.CreateMarket(context.Background(), tt.input)
-
-            if tt.wantErr {
-                assert.Error(t, err)
-                if tt.errType != nil {
-                    assert.IsType(t, tt.errType, err)
-                }
-                return
-            }
-
-            assert.NoError(t, err)
-            assert.Equal(t, tt.want.Title, got.Title)
-            assert.Equal(t, tt.want.Status, got.Status)
-        })
-    }
-}
-```
-
-**Unit test coverage:**
-- All service layer functions
-- Repository methods
-- Utility functions
-- Validation logic
-- Error handling
-- Business logic
-
-### Step 3: Integration Testing
-**Timeline: 4-5 days**
-
-Implement integration tests for database operations and service interactions:
-
-```go
-// testing/integration/database_test.go
-func TestDatabaseIntegration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration tests in short mode")
-    }
-
-    ts := NewTestSuite()
-    defer ts.Cleanup()
-
-    t.Run("user operations", func(t *testing.T) {
-        // Test user creation, update, deletion
-        user := &models.User{
-            Username: "testuser",
-            Email:    "test@example.com",
-        }
-
-        err := ts.UserRepo.Create(context.Background(), user)
-        assert.NoError(t, err)
-        assert.NotZero(t, user.ID)
-
-        // Test retrieval
-        retrieved, err := ts.UserRepo.GetByUsername(context.Background(), "testuser")
-        assert.NoError(t, err)
-        assert.Equal(t, user.Email, retrieved.Email)
-    })
-
-    t.Run("transaction rollback", func(t *testing.T) {
-        err := ts.TxManager.WithTransaction(context.Background(), func(tx *gorm.DB) error {
-            // Create user
-            user := &models.User{Username: "txuser", Email: "tx@example.com"}
-            if err := tx.Create(user).Error; err != nil {
-                return err
-            }
-
-            // Simulate error to trigger rollback
-            return errors.New("simulated error")
-        })
-
-        assert.Error(t, err)
-
-        // Verify user was not created due to rollback
-        _, err = ts.UserRepo.GetByUsername(context.Background(), "txuser")
-        assert.Error(t, err)
-        assert.True(t, errors.Is(err, gorm.ErrRecordNotFound))
-    })
-}
-```
-
-**Integration test scenarios:**
-- Database CRUD operations
-- Transaction management
-- Service layer interactions
-- External service integrations
-- Authentication flows
-- Business workflow testing
-
-### Step 4: API Testing Suite
-**Timeline: 3-4 days**
-
-Create comprehensive API tests:
-
-```go
-// testing/api/api_test.go
-func TestMarketsAPI(t *testing.T) {
-    ts := NewTestSuite()
-    defer ts.Cleanup()
-
-    // Create test user and get auth token
-    user := ts.CreateTestUser("apiuser")
-    token := ts.GenerateAuthToken(user)
-
-    t.Run("GET /v1/markets", func(t *testing.T) {
-        // Seed test markets
-        ts.SeedTestMarkets(5)
-
-        req := httptest.NewRequest("GET", "/v1/markets", nil)
-        req.Header.Set("Authorization", "Bearer "+token)
-
-        w := httptest.NewRecorder()
-        ts.Server.Handler.ServeHTTP(w, req)
-
-        assert.Equal(t, http.StatusOK, w.Code)
-
-        var response APIResponse
-        err := json.Unmarshal(w.Body.Bytes(), &response)
-        assert.NoError(t, err)
-        assert.True(t, response.Success)
-        assert.NotNil(t, response.Data)
-    })
-
-    t.Run("POST /v1/markets", func(t *testing.T) {
-        marketData := map[string]interface{}{
-            "title":       "API Test Market",
-            "description": "Created via API test",
-            "end_date":    time.Now().Add(24 * time.Hour).Format(time.RFC3339),
-        }
-
-        body, _ := json.Marshal(marketData)
-        req := httptest.NewRequest("POST", "/v1/markets", bytes.NewBuffer(body))
-        req.Header.Set("Authorization", "Bearer "+token)
-        req.Header.Set("Content-Type", "application/json")
-
-        w := httptest.NewRecorder()
-        ts.Server.Handler.ServeHTTP(w, req)
-
-        assert.Equal(t, http.StatusCreated, w.Code)
-
-        // Verify market was created
-        var response APIResponse
-        err := json.Unmarshal(w.Body.Bytes(), &response)
-        assert.NoError(t, err)
-        assert.True(t, response.Success)
-    })
-
-    t.Run("authentication required", func(t *testing.T) {
-        req := httptest.NewRequest("GET", "/v1/markets", nil)
-        // No auth token
-
-        w := httptest.NewRecorder()
-        ts.Server.Handler.ServeHTTP(w, req)
-
-        assert.Equal(t, http.StatusUnauthorized, w.Code)
-    })
-}
-```
-
-**API test coverage:**
-- All endpoint functionality
-- Authentication and authorization
-- Input validation
-- Error responses
-- Rate limiting
-- Content negotiation
-
-### Step 5: Performance Testing
-**Timeline: 2-3 days**
-
-Implement performance and load testing:
-
-```go
-// testing/performance/load_test.go
-func TestAPIPerformance(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping performance tests in short mode")
-    }
-
-    ts := NewTestSuite()
-    defer ts.Cleanup()
-
-    // Setup test data
-    ts.SeedTestData()
-
-    t.Run("concurrent user requests", func(t *testing.T) {
-        const (
-            numUsers    = 100
-            reqPerUser  = 10
-            maxDuration = 5 * time.Second
-        )
-
-        var wg sync.WaitGroup
-        results := make(chan time.Duration, numUsers*reqPerUser)
-
-        start := time.Now()
-
-        for i := 0; i < numUsers; i++ {
-            wg.Add(1)
-            go func(userID int) {
-                defer wg.Done()
-
-                token := ts.GenerateAuthToken(ts.GetTestUser(userID))
-
-                for j := 0; j < reqPerUser; j++ {
-                    reqStart := time.Now()
-
-                    req := httptest.NewRequest("GET", "/v1/markets", nil)
-                    req.Header.Set("Authorization", "Bearer "+token)
-
-                    w := httptest.NewRecorder()
-                    ts.Server.Handler.ServeHTTP(w, req)
-
-                    duration := time.Since(reqStart)
-                    results <- duration
-
-                    assert.Equal(t, http.StatusOK, w.Code)
-                }
-            }(i)
-        }
-
-        wg.Wait()
-        close(results)
-
-        totalDuration := time.Since(start)
-        assert.Less(t, totalDuration, maxDuration)
-
-        // Analyze response times
-        var durations []time.Duration
-        for d := range results {
-            durations = append(durations, d)
-        }
-
-        sort.Slice(durations, func(i, j int) bool {
-            return durations[i] < durations[j]
-        })
-
-        p95 := durations[int(0.95*float64(len(durations)))]
-        assert.Less(t, p95, 200*time.Millisecond, "95th percentile response time too high")
-
-        t.Logf("Performance results: P95: %v, Total time: %v", p95, totalDuration)
-    })
-}
-```
-
-### Step 6: Test Data Management
-**Timeline: 2 days**
-
-Create comprehensive test data factories and fixtures:
-
-```go
-// testing/factories/factories.go
-type UserFactory struct {
-    db *gorm.DB
-}
-
-func (uf *UserFactory) Create(overrides ...func(*models.User)) *models.User {
-    user := &models.User{
-        Username:    faker.Username(),
-        Email:       faker.Email(),
-        DisplayName: faker.Name(),
-        Credits:     1000,
-        CreatedAt:   time.Now(),
-    }
-
-    // Apply overrides
-    for _, override := range overrides {
-        override(user)
-    }
-
-    if err := uf.db.Create(user).Error; err != nil {
-        panic(fmt.Sprintf("Failed to create test user: %v", err))
-    }
-
-    return user
-}
-
-func (uf *UserFactory) CreateMany(count int, overrides ...func(*models.User)) []*models.User {
-    users := make([]*models.User, count)
-    for i := 0; i < count; i++ {
-        users[i] = uf.Create(overrides...)
-    }
-    return users
-}
-
-type MarketFactory struct {
-    db *gorm.DB
-}
-
-func (mf *MarketFactory) Create(overrides ...func(*models.Market)) *models.Market {
-    market := &models.Market{
-        Title:       faker.Sentence(),
-        Description: faker.Paragraph(),
-        CreatorID:   1, // Default creator
-        Status:      "active",
-        EndDate:     time.Now().Add(24 * time.Hour),
-        CreatedAt:   time.Now(),
-    }
-
-    // Apply overrides
-    for _, override := range overrides {
-        override(market)
-    }
-
-    if err := mf.db.Create(market).Error; err != nil {
-        panic(fmt.Sprintf("Failed to create test market: %v", err))
-    }
-
-    return market
-}
-```
-
-### Step 7: Test Automation and CI Integration
-**Timeline: 2 days**
-
-Set up automated testing in CI/CD pipeline:
-
-```yaml
-# .github/workflows/test.yml
-name: Test Suite
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: socialpredict_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.23
-
-    - name: Install dependencies
-      run: go mod download
-
-    - name: Run unit tests
-      run: go test -v -race -coverprofile=coverage.txt ./...
-
-    - name: Run integration tests
-      run: go test -v -tags=integration ./testing/integration/...
-      env:
-        DATABASE_URL: postgres://postgres:postgres@localhost:5432/socialpredict_test?sslmode=disable
-
-    - name: Run API tests
-      run: go test -v -tags=api ./testing/api/...
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.txt
-```
-
-## Directory Structure
-```
-testing/
-├── infrastructure.go      # Test infrastructure setup
-├── factories/
-│   ├── user_factory.go    # User test data factory
-│   ├── market_factory.go  # Market test data factory
-│   └── bet_factory.go     # Bet test data factory
-├── fixtures/
-│   ├── users.json         # Static test data
-│   ├── markets.json       # Static test data
-│   └── scenarios/         # Complex test scenarios
-├── unit/
-│   ├── services/          # Service layer unit tests
-│   ├── repositories/      # Repository layer unit tests
-│   └── utils/             # Utility function tests
-├── integration/
-│   ├── database_test.go   # Database integration tests
-│   ├── services_test.go   # Service integration tests
-│   └── workflows_test.go  # Business workflow tests
-├── api/
-│   ├── auth_test.go       # Authentication API tests
-│   ├── markets_test.go    # Markets API tests
-│   ├── users_test.go      # Users API tests
-│   └── bets_test.go       # Betting API tests
-├── performance/
-│   ├── load_test.go       # Load testing
-│   ├── stress_test.go     # Stress testing
-│   └── benchmark_test.go  # Benchmark tests
-└── mocks/
-    ├── repositories.go    # Mock repository interfaces
-    ├── services.go        # Mock service interfaces
-    └── external.go        # Mock external services
-```
-
-## Test Configuration
-```yaml
-# testing/config.yaml
-database:
-  driver: "postgres"
-  host: "localhost"
-  port: 5432
-  database: "socialpredict_test"
-  username: "postgres"
-  password: "postgres"
-
-test_data:
-  users: 100
-  markets: 50
-  bets: 500
-
-performance:
-  max_response_time: "200ms"
-  concurrent_users: 100
-  requests_per_user: 10
-
-coverage:
-  minimum: 85
-  exclude:
-    - "main.go"
-    - "*/mocks/*"
-    - "testing/*"
-```
-
-## Testing Commands
-```makefile
-# Makefile
-.PHONY: test test-unit test-integration test-api test-performance test-coverage
-
-test: test-unit test-integration test-api
-
-test-unit:
-	go test -v -race ./...
-
-test-integration:
-	go test -v -tags=integration ./testing/integration/...
-
-test-api:
-	go test -v -tags=api ./testing/api/...
-
-test-performance:
-	go test -v -tags=performance ./testing/performance/...
-
-test-coverage:
-	go test -v -race -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-
-test-clean:
-	docker-compose -f docker-compose.test.yml down -v
-```
-
-## Benefits
-- High code quality assurance
-- Regression prevention
-- Faster development cycles
-- Better refactoring confidence
-- Performance monitoring
-- Documentation through tests
-
-## Success Metrics
-- >85% code coverage
-- <200ms API response times (95th percentile)
-- Zero failing tests in CI/CD
-- All critical paths covered by integration tests
-- Performance benchmarks within acceptable limits
+---
+title: Testing Strategy
+document_type: production-notes
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-27T00:13:14Z
+updated_at_display: "Monday, April 27, 2026 at 12:13 AM UTC"
+update_reason: "Replace the older greenfield testing-platform plan with a current-state-first testing strategy grounded in the live backend, package-local Go testing conventions, and the active HA-focused design plan."
+status: active
+---
+
+# Testing Strategy
+
+## Update Summary
+
+This note was updated on Monday, April 27, 2026 to replace an older greenfield test-platform plan with guidance that matches the live SocialPredict backend, idiomatic Go test layout, and the active design-plan posture.
+
+| Topic | Prior to April 27, 2026 | After April 27, 2026 |
+| --- | --- | --- |
+| Core framing | Treated testing as a large new subsystem to build | Treats testing as evidence for the backend that already exists |
+| Current-state accuracy | Claimed testing was limited and that integration/API testing were mostly absent | Recognizes the live suite across handlers, auth, security, runtime, migrations, seed behavior, repositories, domains, OpenAPI, and server contracts |
+| Test layout | Proposed a centralized `testing/` tree and shared `TestSuite` | Follows idiomatic Go posture: tests stay near the package they verify, with only a small number of multi-boundary tests centralized later if needed |
+| Database-testing posture | Leaned toward a testcontainers-first infrastructure rollout | Keeps fast helpers for broad coverage but treats Postgres-backed checks as the source of truth for locking, transaction, and HA-sensitive runtime behavior |
+| CI posture | Assumed a larger new test platform and coverage/performance program | Builds on the live smoke plus `go test ./...` CI path already present in the repo |
+| Main risk model | Optimized for framework breadth | Optimizes for readiness, startup discipline, failure handling, accounting correctness, and contract safety under HA pressure |
+| Future ideas | Mixed long-term containerized and larger test-platform ideas into the active note | Defers broader infrastructure ideas to [FUTURE/03-long-term-test-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/03-long-term-test-infrastructure.md) |
+
+## Executive Direction
+
+SocialPredict should treat testing as a boundary-aware verification strategy for a live backend, not as a greenfield testing platform project.
+
+The active direction is:
+
+1. Keep the default Go posture: tests live beside the code they verify, in `*_test.go` files within the same package directory.
+2. Prefer package-local tests for handlers, services, repositories, runtime helpers, migrations, and security behavior rather than a centralized `testing/` subsystem.
+3. Use small, explicit test helpers where they reduce repetition, but do not turn helpers into a second architecture.
+4. Allow a small number of broader integration tests only when they are genuinely cross-boundary and do not fit cleanly inside one owning package.
+5. Treat SQLite-backed helpers as convenience for broad fast coverage, not as the source of truth for Postgres locking, transaction isolation, migration coordination, or HA-sensitive runtime behavior.
+6. Add Postgres-backed verification only where the behavior under test is meaningfully database-specific.
+7. Keep the current CI posture simple and deterministic, then expand only where the active modernization waves expose real verification gaps.
+8. Defer testcontainers-first rollout, shared `TestSuite` design, performance/load suites, and broad coverage-gating programs until there is a concrete need.
+
+For a high-availability, fault-tolerant backend, testing should prefer:
+
+- fast feedback near the owning package
+- boundary and contract verification where behavior crosses packages
+- source-of-truth verification for DB/runtime behavior that SQLite cannot model credibly
+- deterministic tests over infrastructure-heavy test theater
+- targeted integration coverage for the real architectural risks
+
+This note explicitly rejects building a large new `testing/` subsystem as the main move for the active slice.
+
+## Why This Matters
+
+The active testing problem in SocialPredict is not the absence of tests. The active problem is making the test strategy match the real codebase and the current architectural risks.
+
+For the current backend, that means:
+
+- handlers should be tested as request-boundary translators
+- repositories should be tested as persistence-edge translators
+- runtime/bootstrap should be tested for startup ownership and failure posture
+- OpenAPI and server wiring should be tested as public contract guards
+- accounting-sensitive flows should be tested for correctness under real transaction assumptions
+
+The older note was too greenfield. It assumed the next move was building a generalized framework. The actual next move is to strengthen verification around the modernization seams that matter most for HA and fault tolerance.
+
+## Current Code Snapshot
+
+As of 2026-04-27, the backend already has a meaningful test surface. The issue is not that testing is absent. The issue is that the old note does not describe the testing posture that is already present.
+
+### The backend already has broad package-local coverage
+
+The live backend currently has:
+
+- `94` Go test files
+- `343` `Test*` functions
+- `35` test files using `httptest`
+- `34` test files using `modelstesting.NewFakeDB`
+
+Coverage already exists across:
+
+- handlers
+- auth middleware and login behavior
+- security middleware and validators
+- runtime/bootstrap helpers
+- migrations
+- seed/bootstrap behavior
+- repositories
+- domain services and math
+- OpenAPI validation and route/spec parity
+- server-level contract behavior
+
+This is not a repo with “limited testing.” It is a repo with an existing testing shape that now needs a better architectural description.
+
+### Go-style package-local testing is already the dominant pattern
+
+The current repo already follows the normal Go testing posture:
+
+- tests live in the package directory they verify
+- test files are `*_test.go`
+- many tests use either the same package or package-level black-box seams in the same directory
+
+Examples:
+
+- [openapi_test.go](/workspace/socialpredict/backend/openapi_test.go)
+- [server_contract_test.go](/workspace/socialpredict/backend/server/server_contract_test.go)
+- [migrate_test.go](/workspace/socialpredict/backend/migration/migrate_test.go)
+- [ratelimit_test.go](/workspace/socialpredict/backend/security/ratelimit_test.go)
+- [handler_contract_test.go](/workspace/socialpredict/backend/handlers/markets/handler_contract_test.go)
+
+That package-local posture should remain the default.
+
+### Shared helpers already exist, but they are narrow
+
+The repo already has helper packages such as:
+
+- [modelstesting](/workspace/socialpredict/backend/models/modelstesting/modelstesting.go)
+- [setuptesting](/workspace/socialpredict/backend/setup/setuptesting/setuptesting.go)
+
+These helpers are useful because they reduce repetition without requiring a centralized test framework.
+
+That is the right scale for the active slice:
+
+- narrow helpers are good
+- helper packages are fine
+- a large shared `TestSuite` base architecture is not needed
+
+### Contract and boundary tests already exist
+
+The backend already protects important public seams:
+
+- OpenAPI document validity and route/spec parity in [openapi_test.go](/workspace/socialpredict/backend/openapi_test.go)
+- docs/auth/public-route behavior in [server_contract_test.go](/workspace/socialpredict/backend/server/server_contract_test.go)
+- handler boundary behavior in [handler_contract_test.go](/workspace/socialpredict/backend/handlers/markets/handler_contract_test.go)
+
+This means the current job is not to invent “API testing” from scratch. The current job is to extend these checks where the active modernization waves need stronger proof.
+
+### CI already runs a backend test path
+
+The repo already has backend CI in [backend.yml](/workspace/socialpredict/.github/workflows/backend.yml).
+
+That workflow already runs:
+
+- a smoke startup path
+- `go test ./...`
+
+The current note should build on that reality rather than assuming CI is missing.
+
+### SQLite-backed helpers are useful but limited
+
+Much of the current suite uses [modelstesting.NewFakeDB](/workspace/socialpredict/backend/models/modelstesting/modelstesting.go), which provides:
+
+- in-memory SQLite
+- quick migration setup
+- fast execution
+
+This is useful for broad package-local verification, but it is not the source of truth for:
+
+- Postgres locking behavior
+- transaction-isolation semantics
+- multi-replica startup coordination
+- migration serialization under real deployment conditions
+- runtime readiness against a real Postgres dependency
+
+The active strategy should be explicit: SQLite-backed tests are convenience coverage, not authoritative HA database verification.
+
+### The biggest remaining gaps are architectural, not framework-related
+
+The live backend still has important verification gaps around the same seams the design plan already highlights:
+
+- DB-backed readiness and health semantics
+- migration failure posture
+- single-writer startup behavior
+- proxy-sensitive rate-limiting behavior
+- middleware-owned failure convergence
+- Postgres-specific transaction behavior
+- accounting-sensitive atomicity for place/sell/resolve workflows
+
+Those are the areas where new testing effort should go first.
+
+## What Testing Strategy Should Own
+
+### Default test posture
+
+This note should own the default posture that:
+
+- tests stay near the owning package
+- `*_test.go` is the standard file shape
+- package-local tests are preferred for most work
+- broader cross-package tests are used only where truly justified
+
+### Boundary-aware verification
+
+This note should also own the expectation that tests prove boundaries hold:
+
+- handlers map transport correctly
+- repositories translate persistence correctly
+- runtime/bootstrap owns startup and readiness behavior
+- server and OpenAPI stay aligned
+- security middleware behaves consistently
+- accounting-sensitive flows preserve correctness
+
+### Database-verification posture
+
+This note should state clearly that:
+
+- fast in-memory helpers are acceptable for broad coverage
+- they are not authoritative for Postgres-specific runtime or transaction behavior
+- a small amount of Postgres-backed verification is justified when the behavior truly depends on Postgres semantics
+
+## What This Note Should Not Own
+
+This note should not become the home for every ambitious testing-platform idea.
+
+It should explicitly defer:
+
+- a top-level `testing/` subsystem
+- a shared `TestSuite` base architecture
+- testcontainers-by-default for all integration work
+- dedicated performance/load/stress programs
+- hard coverage quotas as the main active goal
+- benchmark gating
+- broad CI redesign
+- a separate helper repository unless multi-repo sharing becomes a concrete need
+
+Those topics now belong in [FUTURE/03-long-term-test-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/03-long-term-test-infrastructure.md), not in the active production note.
+
+## Near-Term Sequencing
+
+The near-term testing direction should align with the current design-plan waves rather than invent a separate testing platform track.
+
+In practice, that means:
+
+1. Preserve the current package-local test posture and existing helper packages.
+2. Expand verification around runtime and DB ownership:
+   - readiness semantics
+   - migration failure behavior
+   - startup coordination
+3. Expand verification around request-boundary convergence:
+   - auth failure behavior
+   - middleware failure behavior
+   - rate limiting and proxy assumptions
+4. Strengthen accounting-sensitive verification for:
+   - place bet
+   - sell position
+   - resolve market
+5. Add a small number of Postgres-backed checks only where SQLite is a poor proxy.
+6. Revisit broader infrastructure only after the active runtime, DB, security, and API seams are more stable.
+
+## Open Questions
+
+The current production note should keep the following questions visible:
+
+- Which exact runtime and DB behaviors now require real-Postgres verification rather than SQLite-backed convenience coverage?
+- Where should the small number of truly cross-boundary integration tests live if package-local placement becomes awkward?
+- Do we want a clear fast/slow split later, and if so, should it be based on runtime cost rather than a large taxonomy of suite types?
+- Which current helper packages should remain repo-local, and which would only justify a separate shared helper repo if multiple repos genuinely need them?
+
+## Relationship To Future Test Infrastructure
+
+The active note should stay focused on the current backend and current modernization risks.
+
+Longer-term ideas such as:
+
+- `testcontainers-go`
+- centralized Postgres-backed integration suites
+- broader performance/load test programs
+- more elaborate CI/test orchestration
+- multi-repo shared test-helper distribution
+
+are intentionally deferred to [FUTURE/03-long-term-test-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/03-long-term-test-infrastructure.md).
+
+## Bottom Line
+
+SocialPredict does not need a testing platform rebuild first.
+
+It needs a testing strategy that matches idiomatic Go layout, preserves fast package-local verification, treats SQLite as convenience rather than truth, and adds heavier Postgres-backed or broader integration checks only where the active HA-focused architecture actually requires them.
