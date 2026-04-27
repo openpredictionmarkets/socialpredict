@@ -1,139 +1,292 @@
-# Backend Production Readiness Plan
-
-This document outlines the development plan to make the SocialPredict backend server production-ready, following Go best practices and architectural patterns.
-
-## Overview
-
-The current backend is a functional Go application using Gorilla Mux, GORM, and PostgreSQL. To achieve production readiness, we need to address several key areas including configuration management, error handling, observability, security, performance, testing, and deployment concerns.
-
-## Development Plan
-
-### 1. Configuration Management & Environment Setup
-**Priority: High**
-
-The current configuration system uses basic environment variables loaded in `main.go`. A production system requires structured configuration management with validation, defaults, and environment-specific settings.
-
-**Implementation:** [Configuration Management Plan](./01-configuration-management.md)
-
-### 2. Structured Logging & Observability
-**Priority: High**
-
-While there's a basic logging package, production systems need structured logging, metrics collection, distributed tracing, and health checks for proper observability.
-
-**Implementation:** [Logging & Observability Plan](./02-logging-observability.md)
-
-### 3. Error Handling & Recovery
-**Priority: High**
-
-Current error handling is inconsistent. Production systems need standardized error handling, proper HTTP status codes, error tracking, and graceful recovery mechanisms.
-
-**Implementation:** [Error Handling Plan](./03-error-handling.md)
-
-### 4. Database Layer Improvements
-**Priority: High**
-
-The current database layer lacks connection pooling configuration, transaction management, query optimization, and proper migration handling for production environments.
-
-**Implementation:** [Database Layer Plan](./04-database-layer.md)
-
-### 5. Security Hardening
-**Priority: Critical**
-
-Security middleware exists but needs enhancement for production deployment including rate limiting improvements, input validation, HTTPS enforcement, and security headers.
-
-**Implementation:** [Security Hardening Plan](./05-security-hardening.md)
-
-### 6. API Design & Documentation
-**Priority: Medium**
-
-The API structure is functional but needs standardization, versioning strategy, proper OpenAPI documentation, and consistent response formats.
-
-**Implementation:** [API Design Plan](./06-api-design.md)
-
-### 7. Testing Strategy
-**Priority: High**
-
-Limited testing exists. Production systems require comprehensive unit tests, integration tests, API tests, and performance tests with proper test data management.
-
-**Implementation:** [Testing Strategy Plan](./07-testing-strategy.md)
-
-### 8. Performance Optimization
-**Priority: Medium**
-
-The current system needs performance monitoring, caching strategies, database query optimization, and connection pooling for production loads.
-
-**Implementation:** [Performance Optimization Plan](./08-performance-optimization.md)
-
-### 9. Deployment & Infrastructure
-**Priority: High**
-
-While Docker files exist, production deployment requires container optimization, health checks, graceful shutdown, and proper CI/CD integration.
-
-**Implementation:** [Deployment & Infrastructure Plan](./09-deployment-infrastructure.md)
-
-### 10. Monitoring & Alerting
-**Priority: High**
-
-Production systems require comprehensive monitoring, alerting, and operational dashboards to ensure system reliability and quick incident response.
-
-**Implementation:** [Monitoring & Alerting Plan](./10-monitoring-alerting.md)
-
-### 11. Data Validation & Sanitization
-**Priority: High**
-
-While basic sanitization exists, production systems need comprehensive input validation, output sanitization, and data integrity checks.
-
-**Implementation:** [Data Validation Plan](./11-data-validation.md)
-
-### 12. Background Jobs & Task Processing
-**Priority: Medium**
-
-For production scalability, implement background job processing for non-critical tasks, scheduled operations, and async processing.
-
-**Implementation:** [Background Jobs Plan](./12-background-jobs.md)
-
-## Implementation Priority
-
-### Phase 1 (Critical - Week 1-2)
-- Configuration Management (#1)
-- Error Handling & Recovery (#3)
-- Security Hardening (#5)
-- Database Layer Improvements (#4)
-
-### Phase 2 (High Priority - Week 3-4)
-- Structured Logging & Observability (#2)
-- Testing Strategy (#7)
-- Deployment & Infrastructure (#9)
-- Monitoring & Alerting (#10)
-- Data Validation & Sanitization (#11)
-
-### Phase 3 (Medium Priority - Week 5-6)
-- API Design & Documentation (#6)
-- Performance Optimization (#8)
-- Background Jobs & Task Processing (#12)
-
-## Success Criteria
-
-- [ ] Zero-downtime deployments
-- [ ] Comprehensive monitoring and alerting
-- [ ] Sub-200ms API response times (95th percentile)
-- [ ] 99.9% uptime SLA capability
-- [ ] Automated testing pipeline with >85% code coverage
-- [ ] Security audit compliance
-- [ ] Horizontal scaling capability
-- [ ] Disaster recovery procedures
-
-## Architecture Principles
-
-1. **Separation of Concerns**: Clear boundaries between layers
-2. **Dependency Injection**: Testable and maintainable code
-3. **Configuration-driven**: Environment-specific behavior
-4. **Fail-fast**: Early error detection and handling
-5. **Observability**: Comprehensive logging, metrics, and tracing
-6. **Security by Design**: Security considerations at every layer
-7. **Performance Awareness**: Optimized for production loads
-8. **Operational Excellence**: Easy to deploy, monitor, and maintain
-
+---
+title: Backend Production Notes Plan
+document_type: production-notes-index
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-27T02:03:51Z
+updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
+update_reason: "Re-rank the remaining backend production notes so current-state runtime, monitoring, and validation work come before speculative optimization, caching, and background-job infrastructure."
+status: active
 ---
 
-*This plan is designed to transform the current functional backend into a production-ready, scalable, and maintainable system following Go and cloud-native best practices.*
+# Backend Production Notes Plan
+
+## Update Summary
+
+This plan was updated on Monday, April 27, 2026 to reflect the current design-plan posture and the three-agent review of the remaining backend production notes.
+
+The main correction is that file numbering from `08` onward is no longer the same thing as execution priority.
+
+The live backend still needs runtime and operational hardening before it needs platform-heavy optimization work. So the note order for active review and implementation now differs from the numeric file order.
+
+## Current Ordering
+
+The current production-note priority is:
+
+1. [01-configuration-management.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/01-configuration-management.md)
+2. [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md)
+3. [03-error-handling.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/03-error-handling.md)
+4. [04-database-layer.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/04-database-layer.md)
+5. [05-security-hardening.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/05-security-hardening.md)
+6. [06-api-design.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/06-api-design.md)
+7. [07-testing-strategy.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/07-testing-strategy.md)
+8. [09-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-deployment-infrastructure.md)
+9. [10-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/10-monitoring-alerting.md)
+10. [11-data-validation.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/11-data-validation.md)
+11. [08-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-performance-optimization.md)
+12. [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md)
+13. [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md)
+
+The numbering stays stable for historical continuity and cross-reference stability. The priority order reflects the current architecture and production risk profile instead.
+
+## Why The Order Changed
+
+The live backend still has earlier operational concerns:
+
+- startup ownership is still too broad in [main.go](/workspace/socialpredict/backend/main.go)
+- `/health` is still a static stub in [server.go](/workspace/socialpredict/backend/server/server.go)
+- deployment and proxy publishing are real but not yet fully hardened
+- monitoring signals are not yet strong enough to support larger platform layers safely
+- validation already exists and needs consolidation sooner than performance or queue work
+
+That means:
+
+- deployment runtime hardening should come before optimization
+- operational monitoring contract should come before dashboards or alert platforms
+- validation consolidation should come before caching or worker systems
+- caching and background jobs should remain later and more explicitly deferred
+
+## Active Notes Versus Deferred Notes
+
+### Active notes
+
+The active notes are the ones that should drive near-term design-plan and task-planning work:
+
+- `01` through `11`, with the re-ranked order above
+- `08`, but only as a lower-priority evidence-driven optimization note
+
+### Deferred or draft notes
+
+The explicitly deferred or draft notes are:
+
+- [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md)
+- [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md)
+
+These exist so later ideas stay documented without distorting the current execution order.
+
+## FUTURE Companions
+
+The long-term or platform-heavy follow-ups now live in:
+
+- [FUTURE/01-long-term-security-hardening.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/01-long-term-security-hardening.md)
+- [FUTURE/02-long-term-api-design.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/02-long-term-api-design.md)
+- [FUTURE/03-long-term-test-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/03-long-term-test-infrastructure.md)
+- [FUTURE/04-long-term-deployment-platform.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/04-long-term-deployment-platform.md)
+- [FUTURE/05-long-term-monitoring-platform.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/05-long-term-monitoring-platform.md)
+- [FUTURE/06-long-term-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/06-long-term-performance-optimization.md)
+- [FUTURE/07-long-term-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/07-long-term-background-jobs.md)
+
+## Working Rule
+
+The working rule for these notes remains:
+
+1. Rewrite the active production notes so they match the live backend.
+2. Review those notes.
+3. Only then propagate approved changes into the canonical design plan.
+4. Only after that should task waves be updated.
+
+That keeps the written architecture honest before it becomes canonical design or runnable queue state.
+*** Add File: ../socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/04-long-term-deployment-platform.md
+---
+title: Long-Term Deployment Platform
+document_type: production-notes
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-27T02:03:51Z
+updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
+update_reason: "Capture longer-term deployment-platform ideas separately from the active runtime and deployment hardening note."
+status: draft
+---
+
+# Long-Term Deployment Platform
+
+## Purpose
+
+This note holds longer-term deployment-platform ideas that should not drive the active production-hardening sequence.
+
+The active deployment work remains in [09-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-deployment-infrastructure.md).
+
+## Deferred Topics
+
+Deferred deployment-platform ideas include:
+
+- Kubernetes manifests
+- Helm charts
+- Terraform or broader infra-as-code programs
+- autoscaling policies
+- multi-environment cluster standardization
+- service-mesh adoption
+- advanced secret-management systems
+- blue-green or canary deployment orchestration beyond the current stack
+
+## Preconditions
+
+These ideas should stay deferred until the backend has:
+
+- real readiness and liveness behavior
+- clearer startup-writer and migration posture
+- safer graceful shutdown behavior
+- explicit proxy publishing for docs and infra routes
+- enough operational evidence to justify a broader platform migration
+
+## Guardrail
+
+This document is non-binding on the active design plan and task queue until the active runtime and deployment notes are materially landed.
+*** Add File: ../socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/05-long-term-monitoring-platform.md
+---
+title: Long-Term Monitoring Platform
+document_type: production-notes
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-27T02:03:51Z
+updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
+update_reason: "Capture longer-term monitoring-platform ideas separately from the active operational-signal note."
+status: draft
+---
+
+# Long-Term Monitoring Platform
+
+## Purpose
+
+This note holds longer-term monitoring-platform ideas that should not drive the active runtime and observability sequence.
+
+The active operational-monitoring work remains in [10-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/10-monitoring-alerting.md) and the app-facing telemetry model remains in [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).
+
+## Deferred Topics
+
+Deferred monitoring-platform ideas include:
+
+- Prometheus rollout
+- Grafana dashboards
+- Alertmanager or pager routing
+- ELK, Loki, or other centralized log platforms
+- OTel collector topology choices
+- SLO and error-budget programs
+- alert runbook formalization
+- long-term retention and search platform choices
+
+## Preconditions
+
+These ideas should stay deferred until the backend has:
+
+- real readiness and liveness signals
+- a clearer shared failure surface
+- stable request correlation fields
+- a small first operational metrics seam
+- deployment environments that can consume those signals reliably
+
+## Guardrail
+
+This document is non-binding on the active design plan and task queue until the active signal contract is materially stronger.
+*** Add File: ../socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/06-long-term-performance-optimization.md
+---
+title: Long-Term Performance Optimization
+document_type: production-notes
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-27T02:03:51Z
+updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
+update_reason: "Capture broader performance-platform ideas separately from the active evidence-driven optimization note."
+status: draft
+---
+
+# Long-Term Performance Optimization
+
+## Purpose
+
+This note holds broader performance ideas that should not drive the active production-hardening sequence.
+
+The active performance work remains in [08-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-performance-optimization.md), and caching remains separately deferred in [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md).
+
+## Deferred Topics
+
+Deferred optimization ideas include:
+
+- load and stress programs
+- always-on profiling strategy
+- `pprof` exposure policy
+- broad cache hierarchies
+- response caching
+- advanced memory-pooling work
+- CDN or larger edge-acceleration choices
+- wide query-plan programs beyond targeted hotspot fixes
+
+## Preconditions
+
+These ideas should stay deferred until the backend has:
+
+- clearer runtime DB ownership
+- explicit pool and connection-lifecycle tuning
+- stronger operational signals
+- evidence of real hotspots
+- safer correctness and transaction posture for accounting-sensitive flows
+
+## Guardrail
+
+This document is non-binding on the active design plan and task queue until the active runtime, monitoring, and DB notes have landed further.
+*** Add File: ../socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/07-long-term-background-jobs.md
+---
+title: Long-Term Background Jobs
+document_type: production-notes
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-27T02:03:51Z
+updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
+update_reason: "Capture longer-term queue, worker, and scheduler ideas separately from the deferred starter draft for background jobs."
+status: draft
+---
+
+# Long-Term Background Jobs
+
+## Purpose
+
+This note holds longer-term async-processing ideas that should not drive the active production-hardening sequence.
+
+The active deferred posture remains in [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md).
+
+## Deferred Topics
+
+Deferred background-job ideas include:
+
+- Redis-backed queues
+- Postgres-backed queue or outbox patterns
+- worker pool topology
+- scheduled job runners
+- retry and backoff frameworks
+- dead-letter handling
+- job dashboards
+- fan-out notification systems
+
+## Candidate Future Uses
+
+If async work is later justified, likely candidates are:
+
+- email delivery
+- notification delivery
+- periodic derived snapshots
+- export generation
+- cache refresh jobs
+
+## Preconditions
+
+These ideas should stay deferred until the backend has:
+
+- explicit idempotency rules
+- stronger operational monitoring
+- clearer retry ownership
+- safer runtime startup and shutdown behavior
+- stronger transaction boundaries for any flow that remains synchronous and authoritative
+
+## Guardrail
+
+This document is non-binding on the active design plan and task queue until the active runtime, DB, and monitoring notes make the system safer to operate.
