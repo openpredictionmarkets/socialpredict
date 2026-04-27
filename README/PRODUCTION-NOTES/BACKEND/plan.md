@@ -30,14 +30,14 @@ The current production-note priority is:
 5. [05-security-hardening.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/05-security-hardening.md)
 6. [06-api-design.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/06-api-design.md)
 7. [07-testing-strategy.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/07-testing-strategy.md)
-8. [09-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-deployment-infrastructure.md)
-9. [10-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/10-monitoring-alerting.md)
-10. [11-data-validation.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/11-data-validation.md)
-11. [08-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-performance-optimization.md)
-12. [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md)
-13. [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md)
+8. [08-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-deployment-infrastructure.md)
+9. [09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-monitoring-alerting.md)
+10. [10-data-validation.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/10-data-validation.md)
+11. [11-runtime-performance-tuning.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/11-runtime-performance-tuning.md)
+12. [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md)
+13. [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md)
 
-The numbering stays stable for historical continuity and cross-reference stability. The priority order reflects the current architecture and production risk profile instead.
+From `08` onward, the numbering now matches the reprioritized execution order instead of preserving the older sequence.
 
 ## Why The Order Changed
 
@@ -69,8 +69,8 @@ The active notes are the ones that should drive near-term design-plan and task-p
 
 The explicitly deferred or draft notes are:
 
-- [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md)
-- [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md)
+- [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md)
+- [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md)
 
 These exist so later ideas stay documented without distorting the current execution order.
 
@@ -114,7 +114,7 @@ status: draft
 
 This note holds longer-term deployment-platform ideas that should not drive the active production-hardening sequence.
 
-The active deployment work remains in [09-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-deployment-infrastructure.md).
+The active deployment work remains in [08-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-deployment-infrastructure.md).
 
 ## Deferred Topics
 
@@ -160,7 +160,7 @@ status: draft
 
 This note holds longer-term monitoring-platform ideas that should not drive the active runtime and observability sequence.
 
-The active operational-monitoring work remains in [10-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/10-monitoring-alerting.md) and the app-facing telemetry model remains in [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).
+The active operational-monitoring work remains in [09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-monitoring-alerting.md) and the app-facing telemetry model remains in [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).
 
 ## Deferred Topics
 
@@ -206,7 +206,7 @@ status: draft
 
 This note holds broader performance ideas that should not drive the active production-hardening sequence.
 
-The active performance work remains in [08-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-performance-optimization.md), and caching remains separately deferred in [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md).
+The active performance work remains in [11-runtime-performance-tuning.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/11-runtime-performance-tuning.md), and caching remains separately deferred in [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md).
 
 ## Deferred Topics
 
@@ -252,7 +252,7 @@ status: draft
 
 This note holds longer-term async-processing ideas that should not drive the active production-hardening sequence.
 
-The active deferred posture remains in [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md).
+The active deferred posture remains in [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md).
 
 ## Deferred Topics
 

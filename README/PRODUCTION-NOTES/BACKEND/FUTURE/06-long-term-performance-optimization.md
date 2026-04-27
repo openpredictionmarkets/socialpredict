@@ -15,7 +15,7 @@ status: draft
 
 This note holds broader performance ideas that should not drive the active production-hardening sequence.
 
-The active performance work remains in [08-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-performance-optimization.md), and caching remains separately deferred in [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md).
+The active performance work remains in [11-runtime-performance-tuning.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/11-runtime-performance-tuning.md), and caching remains separately deferred in [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md).
 
 ## Deferred Topics
 

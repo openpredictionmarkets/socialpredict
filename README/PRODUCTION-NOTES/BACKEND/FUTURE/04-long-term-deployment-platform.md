@@ -15,7 +15,7 @@ status: draft
 
 This note holds longer-term deployment-platform ideas that should not drive the active production-hardening sequence.
 
-The active deployment work remains in [09-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-deployment-infrastructure.md).
+The active deployment work remains in [08-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-deployment-infrastructure.md).
 
 ## Deferred Topics
 

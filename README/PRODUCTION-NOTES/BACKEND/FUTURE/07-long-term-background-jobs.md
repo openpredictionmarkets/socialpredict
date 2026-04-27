@@ -15,7 +15,7 @@ status: draft
 
 This note holds longer-term async-processing ideas that should not drive the active production-hardening sequence.
 
-The active deferred posture remains in [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md).
+The active deferred posture remains in [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md).
 
 ## Deferred Topics
 

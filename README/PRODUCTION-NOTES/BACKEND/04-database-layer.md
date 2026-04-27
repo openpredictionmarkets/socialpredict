@@ -357,7 +357,7 @@ If Redis is introduced later, it should be treated as a supporting system for co
 
 It should not become the first solution to unresolved correctness or ownership problems.
 
-See the later starter draft note [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md) for the intentionally deferred caching direction.
+See the later starter draft note [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md) for the intentionally deferred caching direction.
 
 ## Near-Term Sequencing
 

@@ -1,5 +1,5 @@
 ---
-title: Performance Optimization
+title: Runtime Performance Tuning
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
@@ -9,7 +9,7 @@ update_reason: "Replace the older greenfield performance-platform plan with an e
 status: active
 ---
 
-# Performance Optimization
+# Runtime Performance Tuning
 
 ## Update Summary
 
@@ -21,13 +21,13 @@ This note was updated on Monday, April 27, 2026 to replace an older performance-
 | Current-state accuracy | Assumed query optimizers, cache layers, compression middleware, and monitoring were all the next move | Recognizes that the live backend still needs stronger runtime ownership, readiness, and observability before most optimization work is credible |
 | Main proposal | Build query-optimizer packages, caching layers, compression middleware, and generalized pool managers | Focus on `sql.DB` pool and lifecycle tuning, targeted query and index changes, and measured bottlenecks only after earlier runtime notes land |
 | Architecture posture | Proposed new performance packages and middleware as the center of the work | Keeps performance work inside the existing runtime, migration, repository, and proxy seams |
-| Cache posture | Mixed caching directly into the active performance note | Defers caching to [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md) |
+| Cache posture | Mixed caching directly into the active performance note | Defers caching to [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md) |
 | HA posture | Optimized for speed features first | Optimizes for making a correct and observable system faster only after it is safer to operate |
 | Future ideas | Mixed larger performance-platform ideas into the active note | Defers longer-term ideas to [FUTURE/06-long-term-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/06-long-term-performance-optimization.md) |
 
 ## Executive Direction
 
-SocialPredict should treat performance optimization as measured hardening of the backend that already exists, not as a greenfield optimization platform.
+SocialPredict should treat runtime performance tuning as measured hardening of the backend that already exists, not as a greenfield optimization platform.
 
 The active direction is:
 
@@ -36,7 +36,7 @@ The active direction is:
 3. Make query and index changes only when a real hotspot is visible, and keep those changes owned by repository or migration seams rather than inventing a runtime "query optimizer" package.
 4. Prefer proxy-edge features that already exist, such as nginx gzip, over adding speculative in-app compression middleware.
 5. Keep business/accounting metrics separate from latency and operational performance signals.
-6. Defer caching to [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md) and defer queue or worker ideas to [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md).
+6. Defer caching to [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md) and defer queue or worker ideas to [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md).
 7. Defer load-testing programs, profiling programs, advanced cache hierarchies, and broader performance infrastructure until earlier production-hardening notes are materially landed.
 
 For a high-availability and fault-tolerant backend, performance work should prefer:
@@ -119,7 +119,7 @@ So if query or index work becomes necessary, the correct direction is:
 
 The correct direction is not to invent a long-lived "query optimizer" service layer.
 
-## What Performance Optimization Should Own
+## What Runtime Performance Tuning Should Own
 
 This note should own:
 
@@ -143,7 +143,7 @@ It should explicitly defer:
 - broad profiling or benchmark programs
 - platform-wide autoscaling plans
 
-Those topics now belong either in [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md), [12-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-background-jobs.md), or [FUTURE/06-long-term-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/06-long-term-performance-optimization.md).
+Those topics now belong either in [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md), [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md), or [FUTURE/06-long-term-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/06-long-term-performance-optimization.md).
 
 ## Near-Term Sequencing
 

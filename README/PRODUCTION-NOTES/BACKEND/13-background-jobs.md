@@ -116,8 +116,8 @@ Before the backend should prioritize background-job infrastructure, it should fi
 This note is intentionally downstream of:
 
 - [04-database-layer.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/04-database-layer.md)
-- [09-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-deployment-infrastructure.md)
-- [10-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/10-monitoring-alerting.md)
-- [13-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-database-caching.md)
+- [08-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-deployment-infrastructure.md)
+- [09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-monitoring-alerting.md)
+- [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md)
 
 Longer-term queue and worker ideas now belong in [FUTURE/07-long-term-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/07-long-term-background-jobs.md).

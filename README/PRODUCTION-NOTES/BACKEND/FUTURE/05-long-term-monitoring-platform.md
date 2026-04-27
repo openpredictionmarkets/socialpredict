@@ -15,7 +15,7 @@ status: draft
 
 This note holds longer-term monitoring-platform ideas that should not drive the active runtime and observability sequence.
 
-The active operational-monitoring work remains in [10-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/10-monitoring-alerting.md) and the app-facing telemetry model remains in [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).
+The active operational-monitoring work remains in [09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/09-monitoring-alerting.md) and the app-facing telemetry model remains in [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).
 
 ## Deferred Topics
 
