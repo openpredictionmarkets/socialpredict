@@ -98,7 +98,6 @@ func TestFrontendReturnsDetachedValue(t *testing.T) {
 		t.Fatalf("ChartSigFigs returned %d after frontend mutation, want frozen 7", got)
 	}
 }
-
 func TestNewServicePropagatesLoaderError(t *testing.T) {
 	wantErr := errors.New("boom")
 
