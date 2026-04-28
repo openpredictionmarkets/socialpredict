@@ -11,7 +11,6 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 )
 
 var errUnexpectedServiceCall = errors.New("unexpected call")
@@ -247,7 +246,7 @@ func (c fixedClock) Now() time.Time {
 }
 
 type serviceFixture struct {
-	econ    *setup.EconomicConfig
+	config  bets.Config
 	repo    *fakeRepo
 	markets *fakeMarkets
 	users   *fakeUsers
@@ -289,14 +288,23 @@ func withFixtureUser(user *dusers.User) serviceFixtureOption {
 
 func withFixtureMaxDust(maxDust int64) serviceFixtureOption {
 	return func(f *serviceFixture) {
-		f.econ.Economics.Betting.MaxDustPerSale = maxDust
+		f.config.MaxDustPerSale = maxDust
+	}
+}
+
+func defaultBetsConfig() bets.Config {
+	econ := modelstesting.GenerateEconomicConfig()
+	return bets.Config{
+		InitialBetFee:      econ.Economics.Betting.BetFees.InitialBetFee,
+		BuySharesFee:       econ.Economics.Betting.BetFees.BuySharesFee,
+		MaxDustPerSale:     econ.Economics.Betting.MaxDustPerSale,
+		MaximumDebtAllowed: econ.Economics.User.MaximumDebtAllowed,
 	}
 }
 
 func newServiceFixture(now time.Time, opts ...serviceFixtureOption) (*serviceFixture, *bets.Service) {
-	econ := modelstesting.GenerateEconomicConfig()
 	fixture := &serviceFixture{
-		econ:    econ,
+		config:  defaultBetsConfig(),
 		repo:    newFakeRepo(),
 		markets: newFakeMarkets(),
 		users:   newFakeUsers(),
@@ -305,7 +313,7 @@ func newServiceFixture(now time.Time, opts ...serviceFixtureOption) (*serviceFix
 	for _, opt := range opts {
 		opt(fixture)
 	}
-	svc := bets.NewService(fixture.repo, fixture.markets, fixture.users, fixture.econ, fixture.clock)
+	svc := bets.NewService(fixture.repo, fixture.markets, fixture.users, fixture.config, fixture.clock)
 	return fixture, svc
 }
 
@@ -343,12 +351,12 @@ func TestServicePlace_Succeeds(t *testing.T) {
 	if len(fixture.users.calls) != 1 {
 		t.Fatalf("expected one ApplyTransaction call, got %d", len(fixture.users.calls))
 	}
-	totalCost := int64(100 + fixture.econ.Economics.Betting.BetFees.InitialBetFee + fixture.econ.Economics.Betting.BetFees.BuySharesFee)
+	totalCost := int64(100 + fixture.config.InitialBetFee + fixture.config.BuySharesFee)
 	if fixture.users.calls[0].amount != totalCost {
 		t.Fatalf("unexpected transaction amount: %d", fixture.users.calls[0].amount)
 	}
 
-	fallbackService := bets.NewService(fixture.repo, fixture.markets, fixture.users, nil, nil, bets.WithClock(nil))
+	fallbackService := bets.NewService(fixture.repo, fixture.markets, fixture.users, bets.Config{}, nil, bets.WithClock(nil))
 	if fallbackService == nil {
 		t.Fatalf("expected fallback service")
 	}

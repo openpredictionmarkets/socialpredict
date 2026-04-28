@@ -8,7 +8,6 @@ import (
 	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/setup"
 )
 
 func normalizeOutcome(outcome string) string {
@@ -84,16 +83,16 @@ func ensureMarketOpen(market *dmarkets.Market, now time.Time) error {
 }
 
 type feeCalculator struct {
-	econ *setup.EconomicConfig
+	config Config
 }
 
 func (f feeCalculator) Calculate(hasBet bool, amount int64) betFees {
 	fees := betFees{
 		initialFee:     0,
-		transactionFee: int64(f.econ.Economics.Betting.BetFees.BuySharesFee),
+		transactionFee: f.config.BuySharesFee,
 	}
 	if !hasBet {
-		fees.initialFee = int64(f.econ.Economics.Betting.BetFees.InitialBetFee)
+		fees.initialFee = f.config.InitialBetFee
 	}
 	fees.totalCost = amount + fees.initialFee + fees.transactionFee
 	return fees

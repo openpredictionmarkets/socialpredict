@@ -5,7 +5,6 @@ import (
 
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/setup"
 )
 
 // DebtRepository exposes only the user data needed for debt calculations.
@@ -35,24 +34,33 @@ type FinancialsRepository interface {
 	UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error)
 }
 
+// Config captures the accounting-relevant policy slice required by analytics.
+// It is a process-start snapshot; historically exact fee or cost reporting across
+// future economics rollouts still requires durable per-market or per-bet policy capture.
+type Config struct {
+	MaximumDebtAllowed int64
+	CreateMarketCost   int64
+	InitialBetFee      int64
+}
+
 // DebtCalculator calculates debt-related metrics.
 type DebtCalculator interface {
-	Calculate(ctx context.Context, repo DebtRepository, econ *setup.EconomicConfig) (*DebtStats, error)
+	Calculate(ctx context.Context, repo DebtRepository, config Config) (*DebtStats, error)
 }
 
 // VolumeCalculator calculates market volume metrics.
 type VolumeCalculator interface {
-	Calculate(ctx context.Context, repo VolumeRepository, econ *setup.EconomicConfig) (*MarketVolumeStats, error)
+	Calculate(ctx context.Context, repo VolumeRepository, config Config) (*MarketVolumeStats, error)
 }
 
 // FeeCalculator calculates betting fee metrics.
 type FeeCalculator interface {
-	CalculateParticipationFees(ctx context.Context, repo FeeRepository, econ *setup.EconomicConfig) (int64, error)
+	CalculateParticipationFees(ctx context.Context, repo FeeRepository, config Config) (int64, error)
 }
 
 // MetricsAssembler combines calculator outputs into the final DTO.
 type MetricsAssembler interface {
-	Assemble(econ *setup.EconomicConfig, debt *DebtStats, volume *MarketVolumeStats, participationFees int64) *SystemMetrics
+	Assemble(debt *DebtStats, volume *MarketVolumeStats, participationFees int64) *SystemMetrics
 }
 
 // MarketPositionCalculator calculates market positions for analytics consumers.
@@ -75,7 +83,7 @@ type Service struct {
 	feeRepo          FeeRepository
 	leaderboardRepo  LeaderboardRepository
 	financialsRepo   FinancialsRepository
-	econLoader       setup.EconConfigLoader
+	config           Config
 	debtCalculator   DebtCalculator
 	volumeCalculator VolumeCalculator
 	feeCalculator    FeeCalculator
@@ -199,9 +207,9 @@ func WithPositionCalculator(c MarketPositionCalculator) ServiceOption {
 }
 
 // NewService constructs an analytics service with optional strategy overrides.
-func NewService(repo Repository, econLoader setup.EconConfigLoader, opts ...ServiceOption) *Service {
+func NewService(repo Repository, config Config, opts ...ServiceOption) *Service {
 	service := &Service{
-		econLoader: econLoader,
+		config: config,
 	}
 	service.setRepository(repo)
 

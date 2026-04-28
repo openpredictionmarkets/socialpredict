@@ -52,13 +52,15 @@ func StatsHandler(db *gorm.DB, configService configsvc.Service) http.HandlerFunc
 			return
 		}
 
-		financialStats, err := calculateFinancialStats(db, configService)
+		economics := configService.Economics()
+
+		financialStats, err := calculateFinancialStats(db, economics)
 		if err != nil {
 			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
-		setupConfig := loadSetupConfiguration(configService.Current())
+		setupConfig := loadSetupConfiguration(economics)
 
 		response := StatsResponse{
 			FinancialStats:     financialStats,
@@ -71,10 +73,10 @@ func StatsHandler(db *gorm.DB, configService configsvc.Service) http.HandlerFunc
 	}
 }
 
-func calculateFinancialStats(db *gorm.DB, configService configsvc.Service) (FinancialStats, error) {
+func calculateFinancialStats(db *gorm.DB, economics configsvc.Economics) (FinancialStats, error) {
 	var result FinancialStats
 
-	totalMoney, err := calculateTotalMoney(db, configService.Current())
+	totalMoney, err := calculateTotalMoney(db, economics.User)
 	if err != nil {
 		return result, err
 	}
@@ -90,32 +92,32 @@ func calculateFinancialStats(db *gorm.DB, configService configsvc.Service) (Fina
 	return result, nil
 }
 
-func calculateTotalMoney(db *gorm.DB, economicConfig *configsvc.AppConfig) (int64, error) {
+func calculateTotalMoney(db *gorm.DB, userConfig configsvc.User) (int64, error) {
 	var userCount int64
 	if err := db.Model(&models.User{}).Where("user_type = ?", "REGULAR").Count(&userCount).Error; err != nil {
 		return 0, err
 	}
 
-	totalMoney := economicConfig.Economics.User.InitialAccountBalance * userCount
+	totalMoney := userConfig.InitialAccountBalance * userCount
 	return totalMoney, nil
 }
 
-func loadSetupConfiguration(economicConfig *configsvc.AppConfig) SetupConfiguration {
+func loadSetupConfiguration(economics configsvc.Economics) SetupConfiguration {
 	var result SetupConfiguration
 
-	result.InitialMarketProbability = economicConfig.Economics.MarketCreation.InitialMarketProbability
-	result.InitialMarketSubsidization = economicConfig.Economics.MarketCreation.InitialMarketSubsidization
-	result.InitialMarketYes = economicConfig.Economics.MarketCreation.InitialMarketYes
-	result.InitialMarketNo = economicConfig.Economics.MarketCreation.InitialMarketNo
-	result.CreateMarketCost = economicConfig.Economics.MarketIncentives.CreateMarketCost
-	result.TraderBonus = economicConfig.Economics.MarketIncentives.TraderBonus
-	result.InitialAccountBalance = economicConfig.Economics.User.InitialAccountBalance
-	result.MaximumDebtAllowed = economicConfig.Economics.User.MaximumDebtAllowed
-	result.MinimumBet = economicConfig.Economics.Betting.MinimumBet
-	result.MaxDustPerSale = economicConfig.Economics.Betting.MaxDustPerSale
-	result.InitialBetFee = economicConfig.Economics.Betting.BetFees.InitialBetFee
-	result.BuySharesFee = economicConfig.Economics.Betting.BetFees.BuySharesFee
-	result.SellSharesFee = economicConfig.Economics.Betting.BetFees.SellSharesFee
+	result.InitialMarketProbability = economics.MarketCreation.InitialMarketProbability
+	result.InitialMarketSubsidization = economics.MarketCreation.InitialMarketSubsidization
+	result.InitialMarketYes = economics.MarketCreation.InitialMarketYes
+	result.InitialMarketNo = economics.MarketCreation.InitialMarketNo
+	result.CreateMarketCost = economics.MarketIncentives.CreateMarketCost
+	result.TraderBonus = economics.MarketIncentives.TraderBonus
+	result.InitialAccountBalance = economics.User.InitialAccountBalance
+	result.MaximumDebtAllowed = economics.User.MaximumDebtAllowed
+	result.MinimumBet = economics.Betting.MinimumBet
+	result.MaxDustPerSale = economics.Betting.MaxDustPerSale
+	result.InitialBetFee = economics.Betting.BetFees.InitialBetFee
+	result.BuySharesFee = economics.Betting.BetFees.BuySharesFee
+	result.SellSharesFee = economics.Betting.BetFees.SellSharesFee
 
 	return result
 }

@@ -2,6 +2,7 @@ import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getMarketLabels } from '../../../../utils/labelMapping';
+import { unwrapApiResponse } from '../../../../utils/apiResponse';
 
 const LeaderboardActivity = ({ marketId, market }) => {
     const [leaderboard, setLeaderboard] = useState([]);
@@ -14,7 +15,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
                 setLoading(true);
                 const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard`);
                 if (response.ok) {
-                    const data = await response.json();
+                    const data = unwrapApiResponse(await response.json());
                     const rows = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
                     setLeaderboard(rows);
                 } else {

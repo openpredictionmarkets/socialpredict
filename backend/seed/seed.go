@@ -26,7 +26,7 @@ func SeedUsers(db *gorm.DB, configService configsvc.Service) error {
 	if configService == nil {
 		return fmt.Errorf("configuration service unavailable")
 	}
-	config := configService.Current()
+	userConfig := configService.Economics().User
 
 	adminPassword, err := getEnv("ADMIN_PASSWORD")
 	if err != nil {
@@ -45,8 +45,8 @@ func SeedUsers(db *gorm.DB, configService configsvc.Service) error {
 				Username:              "admin",
 				DisplayName:           "Administrator",
 				UserType:              "ADMIN",
-				InitialAccountBalance: config.Economics.User.InitialAccountBalance,
-				AccountBalance:        config.Economics.User.InitialAccountBalance,
+				InitialAccountBalance: userConfig.InitialAccountBalance,
+				AccountBalance:        userConfig.InitialAccountBalance,
 				PersonalEmoji:         "NONE",
 				Description:           "Administrator",
 			},
