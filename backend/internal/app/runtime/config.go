@@ -2,10 +2,17 @@ package runtime
 
 import (
 	configsvc "socialpredict/internal/service/config"
-	"socialpredict/setup"
 )
 
-// LoadConfigService initializes runtime configuration from the embedded setup source.
-func LoadConfigService() (configsvc.Service, error) {
-	return configsvc.NewService(configsvc.LoaderFunc(setup.LoadEconomicsConfig))
+// LoadConfigService initializes runtime configuration from an explicit source asset.
+func LoadConfigService(source configsvc.Source) (configsvc.Service, error) {
+	return loadConfigService(configsvc.NewYAMLLoader(source))
+}
+
+func loadConfigService(loader configsvc.Loader) (configsvc.Service, error) {
+	service, err := configsvc.NewService(loader)
+	if err != nil {
+		return nil, err
+	}
+	return service, nil
 }

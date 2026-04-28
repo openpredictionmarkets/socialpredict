@@ -2,6 +2,7 @@ package setup
 
 import (
 	_ "embed"
+	"fmt"
 	"log"
 	"sync"
 
@@ -10,6 +11,18 @@ import (
 
 //go:embed setup.yaml
 var setupYaml []byte
+
+// Source exposes setup asset bytes for explicit configuration seams.
+type Source interface {
+	Bytes() ([]byte, error)
+}
+
+// EmbeddedSource serves the embedded setup asset without exposing package globals to callers.
+type EmbeddedSource struct{}
+
+func (EmbeddedSource) Bytes() ([]byte, error) {
+	return append([]byte(nil), setupYaml...), nil
+}
 
 type MarketCreation struct {
 	InitialMarketProbability   float64 `yaml:"initialMarketProbability" json:"initialMarketProbability"`
@@ -61,6 +74,16 @@ type EconomicConfig struct {
 	Frontend  Frontend  `yaml:"frontend" json:"frontend"`
 }
 
+// Clone returns a defensive copy of the legacy startup snapshot.
+func (cfg *EconomicConfig) Clone() *EconomicConfig {
+	if cfg == nil {
+		return &EconomicConfig{}
+	}
+
+	cfgCopy := *cfg
+	return &cfgCopy
+}
+
 var economicConfig *EconomicConfig
 
 const (
@@ -69,48 +92,65 @@ const (
 	defaultChartSigFigs = 4
 )
 
-// load once as a singleton pattern
-var once sync.Once
+var legacyLoadState struct {
+	once sync.Once
+	err  error
+}
 
+// ParseEconomicConfig decodes the setup asset into the legacy config shape.
+func ParseEconomicConfig(data []byte) (*EconomicConfig, error) {
+	cfg := &EconomicConfig{}
+	if len(data) == 0 {
+		return cfg, nil
+	}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// LoadEconomicConfigFromSource loads the legacy config explicitly from the provided asset source.
+func LoadEconomicConfigFromSource(source Source) (*EconomicConfig, error) {
+	if source == nil {
+		return nil, fmt.Errorf("setup source is nil")
+	}
+
+	data, err := source.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	return ParseEconomicConfig(data)
+}
+
+// LoadEconomicsConfig validates the embedded config once and returns a defensive copy.
 func LoadEconomicsConfig() (*EconomicConfig, error) {
-	once.Do(func() {
-		economicConfig = &EconomicConfig{}
-		err := yaml.Unmarshal(setupYaml, economicConfig)
-		if err != nil {
-			log.Println("Error parsing YAML config:", err) // Log here or just pass the error up
-			return
-		}
+	legacyLoadState.once.Do(func() {
+		economicConfig, legacyLoadState.err = LoadEconomicConfigFromSource(EmbeddedSource{})
 	})
-	return economicConfig, nil
+	if legacyLoadState.err != nil {
+		return nil, legacyLoadState.err
+	}
+	return economicConfig.Clone(), nil
 }
 
 // EconConfigLoader allows functions to use this type as a parameter to load an EconomicConfig Dependency
 type EconConfigLoader func() *EconomicConfig
 
-// EconomicsConfig returns the entire config for the applications economics
+// EconomicsConfig returns a defensive copy of the startup-loaded economics snapshot.
 func EconomicsConfig() *EconomicConfig {
-	return economicConfig
-}
-
-func mustLoadEconomicsConfig() {
-	economicConfig = &EconomicConfig{}
-	err := yaml.Unmarshal(setupYaml, economicConfig)
+	cfg, err := LoadEconomicsConfig()
 	if err != nil {
 		log.Fatal("Error parsing YAML config:", err) // If the config cannot be loaded, the application cannot recover.
 	}
-}
-
-func init() {
-	mustLoadEconomicsConfig()
+	return cfg
 }
 
 // ChartSigFigs returns a clamped significant figures value for chart formatting.
 func ChartSigFigs() int {
-	if economicConfig == nil {
-		mustLoadEconomicsConfig()
-	}
+	cfg := EconomicsConfig()
 
-	sigFigs := economicConfig.Frontend.Charts.SigFigs
+	sigFigs := cfg.Frontend.Charts.SigFigs
 	if sigFigs == 0 {
 		sigFigs = defaultChartSigFigs
 	}

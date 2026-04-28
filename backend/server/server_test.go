@@ -182,7 +182,7 @@ func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing
 	}
 }
 
-func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig *configsvc.AppConfig) http.Handler {
+func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig any) http.Handler {
 	t.Helper()
 
 	handler, err := buildHandler(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig))
