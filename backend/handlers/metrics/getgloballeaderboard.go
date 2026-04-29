@@ -4,11 +4,10 @@ import (
 	"net/http"
 
 	"socialpredict/handlers"
-	analytics "socialpredict/internal/domain/analytics"
 )
 
-// GetGlobalLeaderboardHandler returns an HTTP handler that responds with the global leaderboard.
-func GetGlobalLeaderboardHandler(svc *analytics.Service) http.HandlerFunc {
+// GetGlobalLeaderboardHandler returns an application reporting handler for the global leaderboard.
+func GetGlobalLeaderboardHandler(svc GlobalLeaderboardService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		leaderboard, err := svc.ComputeGlobalLeaderboard(r.Context())
 		if err != nil {

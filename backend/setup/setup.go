@@ -3,10 +3,10 @@ package setup
 import (
 	_ "embed"
 	"fmt"
-	"log"
 	"sync"
 
 	"gopkg.in/yaml.v3"
+	"socialpredict/logger"
 )
 
 //go:embed setup.yaml
@@ -141,7 +141,8 @@ type EconConfigLoader func() *EconomicConfig
 func EconomicsConfig() *EconomicConfig {
 	cfg, err := LoadEconomicsConfig()
 	if err != nil {
-		log.Fatal("Error parsing YAML config:", err) // If the config cannot be loaded, the application cannot recover.
+		logger.LogError("Setup", "EconomicsConfig", err)
+		panic("failed to load economic configuration")
 	}
 	return cfg
 }

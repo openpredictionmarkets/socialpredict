@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"testing"
 
 	"socialpredict/models/modelstesting"
@@ -69,6 +70,37 @@ func TestLoadDBConfigFromEnv(t *testing.T) {
 	if cfg.SSLMode != "disable" || cfg.TimeZone != "UTC" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
+}
+
+func TestCheckDBReadiness(t *testing.T) {
+	t.Run("ready", func(t *testing.T) {
+		db := modelstesting.NewFakeDB(t)
+
+		if err := CheckDBReadiness(context.Background(), db); err != nil {
+			t.Fatalf("CheckDBReadiness returned error: %v", err)
+		}
+	})
+
+	t.Run("nil db", func(t *testing.T) {
+		if err := CheckDBReadiness(context.Background(), nil); err == nil {
+			t.Fatal("expected error for nil db")
+		}
+	})
+
+	t.Run("closed db", func(t *testing.T) {
+		db := modelstesting.NewFakeDB(t)
+		sqlDB, err := db.DB()
+		if err != nil {
+			t.Fatalf("db.DB: %v", err)
+		}
+		if err := sqlDB.Close(); err != nil {
+			t.Fatalf("close sql db: %v", err)
+		}
+
+		if err := CheckDBReadiness(context.Background(), db); err == nil {
+			t.Fatal("expected readiness check to fail for closed db")
+		}
+	})
 }
 
 type stubFactory struct {

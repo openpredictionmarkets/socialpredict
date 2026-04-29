@@ -2,10 +2,10 @@ package seed
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	configsvc "socialpredict/internal/service/config"
+	"socialpredict/logger"
 	"socialpredict/models"
 	"time"
 
@@ -75,19 +75,19 @@ func EnsureDBReady(db *gorm.DB, maxAttempts int) error {
 		// Attempt to perform a simple operation like pinging the database
 		sqlDB, err := db.DB()
 		if err != nil {
-			log.Printf("Unable to get database/sql DB from GORM DB: %v", err)
+			logger.LogWarn("Seed", "EnsureDBReady", "unable to get database/sql DB from GORM DB: "+err.Error())
 			time.Sleep(time.Second * 5)
 			continue
 		}
 
 		err = sqlDB.Ping()
 		if err != nil {
-			log.Printf("Failed to connect to the database, attempt %d/%d: %v", attempts, maxAttempts, err)
+			logger.LogWarn("Seed", "EnsureDBReady", fmt.Sprintf("failed to connect to the database, attempt %d/%d: %v", attempts, maxAttempts, err))
 			time.Sleep(time.Second * 5) // Wait before retrying
 			continue
 		}
 
-		log.Println("Database is ready.")
+		logger.LogInfo("Seed", "EnsureDBReady", "Database is ready.")
 		return nil
 	}
 

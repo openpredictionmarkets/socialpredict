@@ -2,13 +2,16 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"testing/fstest"
 
+	appruntime "socialpredict/internal/app/runtime"
 	configsvc "socialpredict/internal/service/config"
+	"socialpredict/logger"
 	"socialpredict/models/modelstesting"
 
 	"github.com/gorilla/mux"
@@ -29,7 +32,10 @@ func buildTestRouter(t *testing.T, db *gorm.DB) *mux.Router {
 	t.Helper()
 
 	econConfig := modelstesting.GenerateEconomicConfig()
-	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig))
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+
+	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), readiness)
 	if err != nil {
 		t.Fatalf("build test router: %v", err)
 	}
@@ -40,7 +46,9 @@ func buildTestHandler(t *testing.T, db *gorm.DB) http.Handler {
 	t.Helper()
 
 	econConfig := modelstesting.GenerateEconomicConfig()
-	return buildTestHandlerWithConfig(t, db, econConfig)
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+	return buildTestHandlerWithConfig(t, db, econConfig, readiness)
 }
 
 func seedServerTestData(t *testing.T, db *gorm.DB) {
@@ -71,6 +79,7 @@ func TestServerRegistersAndServesCoreRoutes(t *testing.T) {
 		wantStatus int
 	}{
 		{"health", "/health", http.StatusOK},
+		{"readyz", "/readyz", http.StatusOK},
 		{"home", "/v0/home", http.StatusOK},
 		{"setup frontend", "/v0/setup/frontend", http.StatusOK},
 		{"markets", "/v0/markets?status=ACTIVE", http.StatusOK},
@@ -97,7 +106,9 @@ func TestServerSetupRoutesUseInjectedConfigService(t *testing.T) {
 	config.Economics.MarketIncentives.CreateMarketCost = 77
 	config.Frontend.Charts.SigFigs = 1
 
-	handler := buildTestHandlerWithConfig(t, db, config)
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+	handler := buildTestHandlerWithConfig(t, db, config, readiness)
 
 	setupReq := httptest.NewRequest(http.MethodGet, "/v0/setup", nil)
 	setupRec := httptest.NewRecorder()
@@ -135,6 +146,99 @@ func TestServerSetupRoutesUseInjectedConfigService(t *testing.T) {
 	}
 	if frontend.Charts.SigFigs != 2 {
 		t.Fatalf("expected clamped frontend sig figs 2, got %d", frontend.Charts.SigFigs)
+	}
+}
+
+func TestBuildHandlerPropagatesRequestIDToPublicRoutes(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("X-Request-Id", "external-request-id")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("X-Request-Id"); got != "external-request-id" {
+		t.Fatalf("expected propagated request ID header, got %q", got)
+	}
+}
+
+func TestInfraHealthAndReadinessRoutesHaveDistinctSemantics(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	handler := buildTestHandlerWithConfig(t, db, modelstesting.GenerateEconomicConfig(), readiness)
+
+	healthReq := httptest.NewRequest(http.MethodGet, "/health", nil)
+	healthRec := httptest.NewRecorder()
+	handler.ServeHTTP(healthRec, healthReq)
+
+	if healthRec.Code != http.StatusOK {
+		t.Fatalf("expected /health status 200, got %d", healthRec.Code)
+	}
+	if body := healthRec.Body.String(); body != "ok" {
+		t.Fatalf("expected /health body ok, got %q", body)
+	}
+	if got := healthRec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected /health cache-control no-store, got %q", got)
+	}
+
+	readyReq := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	readyRec := httptest.NewRecorder()
+	handler.ServeHTTP(readyRec, readyReq)
+
+	if readyRec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected /readyz status 503, got %d", readyRec.Code)
+	}
+	if body := readyRec.Body.String(); body != "not ready" {
+		t.Fatalf("expected /readyz body not ready, got %q", body)
+	}
+
+	readiness.MarkReady()
+
+	readyRec = httptest.NewRecorder()
+	handler.ServeHTTP(readyRec, readyReq)
+
+	if readyRec.Code != http.StatusOK {
+		t.Fatalf("expected /readyz status 200 after readiness, got %d", readyRec.Code)
+	}
+	if body := readyRec.Body.String(); body != "ready" {
+		t.Fatalf("expected /readyz body ready after readiness, got %q", body)
+	}
+}
+
+func TestReadyzChecksDatabaseAvailabilityAfterReadinessGateOpens(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+	handler := buildTestHandlerWithConfig(t, db, modelstesting.GenerateEconomicConfig(), readiness)
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("db.DB: %v", err)
+	}
+	if err := sqlDB.Close(); err != nil {
+		t.Fatalf("close sql db: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected /readyz status 503 when database is unavailable, got %d", rec.Code)
+	}
+	if body := rec.Body.String(); body != "not ready" {
+		t.Fatalf("expected /readyz body not ready when database is unavailable, got %q", body)
 	}
 }
 
@@ -182,10 +286,72 @@ func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing
 	}
 }
 
-func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig any) http.Handler {
+func TestServerSetsRequestIDHeaderWhenMissing(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	requestID := rec.Header().Get(logger.RequestIDHeader)
+	if requestID == "" {
+		t.Fatalf("expected %s response header to be set", logger.RequestIDHeader)
+	}
+}
+
+func TestServerPreservesIncomingRequestIDHeader(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set(logger.RequestIDHeader, "req-test-123")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get(logger.RequestIDHeader); got != "req-test-123" {
+		t.Fatalf("expected preserved request id %q, got %q", "req-test-123", got)
+	}
+}
+
+func TestRequestLoggingMiddlewareTreatsCanceledRequestsAsClientClosed(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets", nil)
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler := logger.RequestLoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected recorder to remain unwritten with default 200, got %d", rec.Code)
+	}
+}
+
+func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig any, readiness ...*appruntime.Readiness) http.Handler {
 	t.Helper()
 
-	handler, err := buildHandler(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig))
+	var gate *appruntime.Readiness
+	if len(readiness) > 0 {
+		gate = readiness[0]
+	} else {
+		gate = appruntime.NewReadiness()
+		gate.MarkReady()
+	}
+
+	handler, err := buildHandler(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), gate)
 	if err != nil {
 		t.Fatalf("build test handler: %v", err)
 	}

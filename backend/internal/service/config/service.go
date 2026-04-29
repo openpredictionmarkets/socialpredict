@@ -51,11 +51,17 @@ func (s *RuntimeService) Current() *AppConfig {
 }
 
 func (s *RuntimeService) Economics() Economics {
-	return s.Current().Economics
+	if s == nil || s.current == nil {
+		return Economics{}
+	}
+	return s.current.Economics
 }
 
 func (s *RuntimeService) Frontend() Frontend {
-	return s.Current().Frontend
+	if s == nil || s.current == nil {
+		return Frontend{}
+	}
+	return s.current.Frontend
 }
 
 func (s *RuntimeService) ChartSigFigs() int {

@@ -3,9 +3,9 @@ package errors
 import (
 	"bytes"
 	"errors"
-	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -37,18 +37,29 @@ func TestHandleHTTPError(t *testing.T) {
 			err:            errors.New("foo"),
 			statusCode:     http.StatusInternalServerError,
 			userMessage:    "bar",
-			output:         "Error: foo",
+			output:         "HTTPError - HandleHTTPError: foo",
 			wrappedMessage: "{\"error\":\"bar\"}",
 			res:            true,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			currentWriter := log.Writer()
-			var buf bytes.Buffer
-			log.SetOutput(&buf)
+			oldStdout := os.Stdout
+			readPipe, writePipe, err := os.Pipe()
+			if err != nil {
+				t.Fatalf("pipe stdout: %v", err)
+			}
+			os.Stdout = writePipe
 			res := HandleHTTPError(test.w, test.err, test.statusCode, test.userMessage)
-			log.SetOutput(currentWriter)
+			_ = writePipe.Close()
+			os.Stdout = oldStdout
+
+			var buf bytes.Buffer
+			if _, err := buf.ReadFrom(readPipe); err != nil {
+				t.Fatalf("read stdout: %v", err)
+			}
+			_ = readPipe.Close()
+
 			if test.res != res {
 				t.Errorf("got %t, want %t", test.res, res)
 			}

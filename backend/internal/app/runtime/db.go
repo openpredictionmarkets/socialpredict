@@ -1,13 +1,16 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var (
@@ -115,6 +118,16 @@ func (f PostgresFactory) Open(cfg DBConfig) (*gorm.DB, error) {
 		gormCfg = &gorm.Config{}
 	}
 
+	if gormCfg.Logger == nil {
+		gormCfg.Logger = newFilteredGormLogger(gormlogger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			gormlogger.Config{
+				LogLevel:                  gormlogger.Warn,
+				IgnoreRecordNotFoundError: true,
+			},
+		))
+	}
+
 	return gorm.Open(postgres.Open(dsn), gormCfg)
 }
 
@@ -134,6 +147,26 @@ func InitDB(cfg DBConfig, factory DBFactory) (*gorm.DB, error) {
 
 	SetDB(conn)
 	return conn, nil
+}
+
+// CheckDBReadiness verifies that the backing SQL connection is reachable for request handling.
+func CheckDBReadiness(ctx context.Context, db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("database handle unavailable")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("sql db handle unavailable: %w", err)
+	}
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return fmt.Errorf("database ping failed: %w", err)
+	}
+
+	return nil
 }
 
 // SetDB stores the shared DB handle used by legacy callers and tests.
