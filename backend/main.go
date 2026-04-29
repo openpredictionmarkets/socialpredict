@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 
 	appenv "socialpredict/internal/app/env"
 	appruntime "socialpredict/internal/app/runtime"

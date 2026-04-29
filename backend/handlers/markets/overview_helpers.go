@@ -2,6 +2,7 @@ package marketshandlers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"socialpredict/handlers/markets/dto"
@@ -21,7 +22,7 @@ func buildMarketOverviewResponses(ctx context.Context, provider marketOverviewPr
 	for _, market := range markets {
 		details, err := provider.GetMarketDetails(ctx, market.ID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("market_id=%d: %w", market.ID, err)
 		}
 		overviews = append(overviews, marketOverviewToResponse(details))
 	}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 
 	appruntime "socialpredict/internal/app/runtime"
 	configsvc "socialpredict/internal/service/config"
+	"socialpredict/logger"
 	"socialpredict/models/modelstesting"
 
 	"github.com/gorilla/mux"
@@ -281,6 +283,60 @@ func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing
 				t.Fatalf("expected status 403, got %d (body: %s)", rr.Code, rr.Body.String())
 			}
 		})
+	}
+}
+
+func TestServerSetsRequestIDHeaderWhenMissing(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	requestID := rec.Header().Get(logger.RequestIDHeader)
+	if requestID == "" {
+		t.Fatalf("expected %s response header to be set", logger.RequestIDHeader)
+	}
+}
+
+func TestServerPreservesIncomingRequestIDHeader(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set(logger.RequestIDHeader, "req-test-123")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get(logger.RequestIDHeader); got != "req-test-123" {
+		t.Fatalf("expected preserved request id %q, got %q", "req-test-123", got)
+	}
+}
+
+func TestRequestLoggingMiddlewareTreatsCanceledRequestsAsClientClosed(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets", nil)
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler := logger.RequestLoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected recorder to remain unwritten with default 200, got %d", rec.Code)
 	}
 }
 

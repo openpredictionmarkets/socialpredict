@@ -2,11 +2,11 @@ package migration
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"time"
 
 	"gorm.io/gorm"
+	"socialpredict/logger"
 
 	// core models for fallback
 	"socialpredict/models"
@@ -101,10 +101,10 @@ func applyMigration(db *gorm.DB, id string) error {
 // MigrateDB is the public entry; it never crashes the app.
 // If there are zero registered migrations, we WARN and fallback to AutoMigrate core tables.
 func MigrateDB(db *gorm.DB) error {
-	log.Printf("migration - MigrateDB: starting database migrations")
+	logger.LogInfo("Migration", "MigrateDB", "starting database migrations")
 
 	if len(registry) == 0 {
-		log.Printf("migration - WARN: no registered migrations found; falling back to AutoMigrate for baseline schema")
+		logger.LogWarn("Migration", "MigrateDB", "no registered migrations found; falling back to AutoMigrate for baseline schema")
 		// Baseline schema so the app can run:
 		// Keep this list tight (public, stable domain models only).
 		if err := db.AutoMigrate(
@@ -115,7 +115,7 @@ func MigrateDB(db *gorm.DB) error {
 		); err != nil {
 			return fmt.Errorf("fallback AutoMigrate failed: %w", err)
 		}
-		log.Printf("migration - fallback AutoMigrate completed")
+		logger.LogInfo("Migration", "MigrateDB", "fallback AutoMigrate completed")
 		return nil
 	}
 
@@ -123,6 +123,6 @@ func MigrateDB(db *gorm.DB) error {
 		return err
 	}
 
-	log.Printf("migration - MigrateDB: database migrations completed")
+	logger.LogInfo("Migration", "MigrateDB", "database migrations completed")
 	return nil
 }

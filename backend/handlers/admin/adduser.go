@@ -2,16 +2,18 @@ package adminhandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"socialpredict/handlers"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
+	"socialpredict/logger"
 	"socialpredict/models"
 	"socialpredict/security"
+	"strings"
 
 	"github.com/brianvoe/gofakeit"
 	"gorm.io/gorm"
@@ -27,14 +29,15 @@ func AddUserHandler(db *gorm.DB, configService configsvc.Service, auth authsvc.A
 		responseData, handlerErr := processAddUser(r, db, configService, auth)
 		if handlerErr != nil {
 			_ = handlers.WriteFailure(w, handlerErr.statusCode, handlerErr.reason)
-			if handlerErr.logErr != nil {
-				log.Printf("AddUserHandler: %v", handlerErr.logErr)
-			}
+			logAddUserFailure(handlerErr)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(responseData)
+		if username, ok := responseData["username"].(string); ok {
+			logger.LogInfo("AddUser", "ProcessAddUser", "Created user "+username)
+		}
 	}
 }
 
@@ -78,6 +81,7 @@ func processAddUser(r *http.Request, db *gorm.DB, configService configsvc.Servic
 		return nil, &handlerError{
 			message:    httpErr.Message,
 			statusCode: httpErr.StatusCode,
+			logErr:     errors.New(httpErr.Message),
 			reason:     handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message),
 		}
 	}
@@ -190,4 +194,21 @@ func checkUniqueFields(db *gorm.DB, user *models.User) error {
 func randomEmoji() string {
 	emojis := []string{"😀", "😃", "😄", "😁", "😆"}
 	return emojis[rand.Intn(len(emojis))]
+}
+
+func logAddUserFailure(handlerErr *handlerError) {
+	if handlerErr == nil || handlerErr.logErr == nil {
+		return
+	}
+
+	if handlerErr.statusCode >= http.StatusInternalServerError {
+		logger.LogError("AddUser", "ProcessAddUser", handlerErr.logErr)
+		return
+	}
+
+	message := strings.TrimSpace(handlerErr.message)
+	if message == "" {
+		message = handlerErr.logErr.Error()
+	}
+	logger.LogWarn("AddUser", "ProcessAddUser", message)
 }

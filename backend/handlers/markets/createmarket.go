@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
@@ -15,6 +14,7 @@ import (
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/logger"
 )
 
 // Constants for backward compatibility with tests
@@ -77,18 +77,21 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 
 	user, httpErr := h.currentUser(r)
 	if httpErr != nil {
+		logger.LogWarn("CreateMarket", "CurrentUser", httpErr.Message)
 		http.Error(w, httpErr.Error(), httpErr.StatusCode)
 		return
 	}
 
 	req, decodeErr := decodeCreateMarketRequest(r)
 	if decodeErr != nil {
+		logger.LogWarn("CreateMarket", "DecodeRequest", decodeErr.Error())
 		http.Error(w, decodeErr.Error(), http.StatusBadRequest)
 		return
 	}
 
 	sanitized, sanitizeErr := sanitizeMarketRequest(req)
 	if sanitizeErr != nil {
+		logger.LogWarn("CreateMarket", "SanitizeMarketRequest", sanitizeErr.Error())
 		http.Error(w, "Invalid market data: "+sanitizeErr.Error(), http.StatusBadRequest)
 		return
 	}
@@ -98,6 +101,7 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 	market, err := h.svc.CreateMarket(context.Background(), domainReq, user.Username)
 	if err != nil {
 		writeCreateMarketError(w, err)
+		logCreateMarketFailure(user.Username, err)
 		return
 	}
 
@@ -106,6 +110,7 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
+	logger.LogInfo("CreateMarket", "CreateMarket", fmt.Sprintf("Created market %d by user %s", market.ID, user.Username))
 }
 
 // CreateMarketHandlerWithService creates a handler with service injection
@@ -123,12 +128,14 @@ func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.
 
 		req, decodeErr := decodeCreateMarketRequest(r)
 		if decodeErr != nil {
+			logger.LogWarn("CreateMarket", "DecodeRequest", decodeErr.Error())
 			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
 			return
 		}
 
 		sanitized, sanitizeErr := sanitizeMarketRequest(req)
 		if sanitizeErr != nil {
+			logger.LogWarn("CreateMarket", "SanitizeMarketRequest", sanitizeErr.Error())
 			http.Error(w, "Invalid market data: "+sanitizeErr.Error(), http.StatusBadRequest)
 			return
 		}
@@ -138,6 +145,7 @@ func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.
 		market, err := svc.CreateMarket(r.Context(), domainReq, user.Username)
 		if err != nil {
 			writeCreateMarketError(w, err)
+			logCreateMarketFailure(user.Username, err)
 			return
 		}
 
@@ -146,13 +154,13 @@ func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(response)
+		logger.LogInfo("CreateMarket", "CreateMarket", fmt.Sprintf("Created market %d by user %s", market.ID, user.Username))
 	}
 }
 
 func decodeCreateMarketRequest(r *http.Request) (dto.CreateMarketRequest, error) {
 	var req dto.CreateMarketRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("Error reading request body: %v", err)
 		return dto.CreateMarketRequest{}, fmt.Errorf("Error reading request body")
 	}
 	return req, nil
@@ -204,11 +212,13 @@ func toCreateMarketResponse(market *dmarkets.Market) dto.CreateMarketResponse {
 
 func currentUserOrError(w http.ResponseWriter, r *http.Request, auth authsvc.Authenticator) (*dusers.User, *authsvc.HTTPError) {
 	if auth == nil {
+		logger.LogError("CreateMarket", "CurrentUser", errors.New("authentication service unavailable"))
 		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
 		return nil, &authsvc.HTTPError{StatusCode: http.StatusInternalServerError, Message: "authentication service unavailable"}
 	}
 	user, httperr := auth.CurrentUser(r)
 	if httperr != nil {
+		logger.LogWarn("CreateMarket", "CurrentUser", httperr.Message)
 		http.Error(w, httperr.Error(), httperr.StatusCode)
 		return nil, httperr
 	}
@@ -227,8 +237,23 @@ func writeCreateMarketError(w http.ResponseWriter, err error) {
 		dmarkets.ErrInvalidResolutionTime:
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
-		log.Printf("Error creating market: %v", err)
 		http.Error(w, "Error creating market", http.StatusInternalServerError)
+	}
+}
+
+func logCreateMarketFailure(username string, err error) {
+	message := fmt.Sprintf("Create market failed for user %s: %v", username, err)
+
+	switch err {
+	case dmarkets.ErrUserNotFound,
+		dmarkets.ErrInsufficientBalance,
+		dmarkets.ErrInvalidQuestionLength,
+		dmarkets.ErrInvalidDescriptionLength,
+		dmarkets.ErrInvalidLabel,
+		dmarkets.ErrInvalidResolutionTime:
+		logger.LogWarn("CreateMarket", "CreateMarket", message)
+	default:
+		logger.LogError("CreateMarket", "CreateMarket", err)
 	}
 }
 

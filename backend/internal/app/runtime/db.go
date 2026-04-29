@@ -3,12 +3,14 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var (
@@ -114,6 +116,16 @@ func (f PostgresFactory) Open(cfg DBConfig) (*gorm.DB, error) {
 	gormCfg := f.GormConfig
 	if gormCfg == nil {
 		gormCfg = &gorm.Config{}
+	}
+
+	if gormCfg.Logger == nil {
+		gormCfg.Logger = newFilteredGormLogger(gormlogger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			gormlogger.Config{
+				LogLevel:                  gormlogger.Warn,
+				IgnoreRecordNotFoundError: true,
+			},
+		))
 	}
 
 	return gorm.Open(postgres.Open(dsn), gormCfg)

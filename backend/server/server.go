@@ -110,6 +110,7 @@ func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServ
 	}
 
 	handler := http.Handler(router)
+	handler = logger.RequestLoggingMiddleware(handler)
 	if c := buildCORSFromEnv(); c != nil {
 		handler = c.Handler(handler)
 	}

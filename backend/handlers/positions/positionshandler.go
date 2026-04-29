@@ -2,12 +2,12 @@ package positions
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 
 	"socialpredict/handlers"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/logger"
 
 	"github.com/gorilla/mux"
 )
@@ -35,7 +35,7 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 		responses := mapPositionsToResponses(positions)
 
 		if err := handlers.WriteResult(w, http.StatusOK, responses); err != nil {
-			log.Printf("Error encoding positions response: %v", err)
+			logger.LogError("MarketPositions", "WriteResponse", err)
 			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
@@ -62,7 +62,7 @@ func MarketUserPositionHandlerWithService(svc dmarkets.ServiceInterface) http.Ha
 		}
 
 		if err := handlers.WriteResult(w, http.StatusOK, newUserPositionResponse(position)); err != nil {
-			log.Printf("Error encoding user position response: %v", err)
+			logger.LogError("MarketUserPosition", "WriteResponse", err)
 			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
@@ -87,7 +87,7 @@ func writePositionsError(w http.ResponseWriter, marketID int64, err error) {
 	case dmarkets.ErrInvalidInput:
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
-		log.Printf("Error getting market positions for market %d: %v", marketID, err)
+		logger.LogError("MarketPositions", "GetMarketPositions", err)
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }
@@ -126,7 +126,7 @@ func writeUserPositionError(w http.ResponseWriter, marketID int64, username stri
 	case dmarkets.ErrInvalidInput:
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
-		log.Printf("Error getting user position for market %d, user %s: %v", marketID, username, err)
+		logger.LogError("MarketUserPosition", "GetUserPositionInMarket", err)
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }

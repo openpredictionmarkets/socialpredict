@@ -20,25 +20,27 @@ import (
 
 func ResolveMarketHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger.LogInfo("ResolveMarket", "ResolveMarketHandler", "Attempting to use ResolveMarketHandler.")
-
 		marketId, req, err := parseResolveRequest(r)
 		if err != nil {
+			logger.LogWarn("ResolveMarket", "ParseResolveRequest", err.Error())
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		username, err := extractUsernameFromRequest(r)
 		if err != nil {
+			logger.LogWarn("ResolveMarket", "ExtractUsernameFromRequest", err.Error())
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
 		if err := svc.ResolveMarket(r.Context(), marketId, req.Resolution, username); err != nil {
 			writeResolveError(w, err)
+			logResolveMarketFailure(marketId, username, err)
 			return
 		}
 
+		logger.LogInfo("ResolveMarket", "ResolveMarket", fmt.Sprintf("Resolved market %d by user %s", marketId, username))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -71,6 +73,17 @@ func writeResolveError(w http.ResponseWriter, err error) {
 	default:
 		logger.LogError("ResolveMarket", "writeResolveError", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func logResolveMarketFailure(marketID int64, username string, err error) {
+	message := fmt.Sprintf("Market %d for user %s: %v", marketID, username, err)
+
+	switch err {
+	case dmarkets.ErrMarketNotFound, dmarkets.ErrUnauthorized, dmarkets.ErrInvalidState, dmarkets.ErrInvalidInput:
+		logger.LogWarn("ResolveMarket", "ResolveMarket", message)
+	default:
+		logger.LogError("ResolveMarket", "ResolveMarket", err)
 	}
 }
 
