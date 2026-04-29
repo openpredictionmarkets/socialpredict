@@ -16,6 +16,8 @@ func TestIsRequestCanceled(t *testing.T) {
 		{name: "context canceled", err: context.Canceled, want: true},
 		{name: "deadline exceeded", err: context.DeadlineExceeded, want: true},
 		{name: "wrapped canceled", err: errors.Join(errors.New("wrapped"), context.Canceled), want: true},
+		{name: "gorm-style canceled message", err: errors.New("timeout: context already done: context canceled"), want: true},
+		{name: "plain canceled message", err: errors.New("context canceled"), want: true},
 		{name: "other error", err: errors.New("boom"), want: false},
 	}
 
