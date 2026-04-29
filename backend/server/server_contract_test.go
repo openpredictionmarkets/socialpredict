@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"socialpredict/handlers"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
@@ -141,5 +142,50 @@ func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 				t.Fatalf("expected shared success envelope, got %+v", response)
 			}
 		})
+	}
+}
+
+func TestSystemMetricsRouteRemainsApplicationReporting(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	handler := buildTestHandler(t, db)
+
+	healthReq := httptest.NewRequest(http.MethodGet, "/health", nil)
+	healthRec := httptest.NewRecorder()
+	handler.ServeHTTP(healthRec, healthReq)
+
+	if healthRec.Code != http.StatusOK {
+		t.Fatalf("expected /health status 200, got %d", healthRec.Code)
+	}
+	if got := healthRec.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("expected /health plain-text probe response, got %q", got)
+	}
+	if body := healthRec.Body.String(); body != "ok" {
+		t.Fatalf("expected /health body ok, got %q", body)
+	}
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/v0/system/metrics", nil)
+	metricsRec := httptest.NewRecorder()
+	handler.ServeHTTP(metricsRec, metricsReq)
+
+	if metricsRec.Code != http.StatusOK {
+		t.Fatalf("expected /v0/system/metrics status 200, got %d: %s", metricsRec.Code, metricsRec.Body.String())
+	}
+	if got := metricsRec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("expected /v0/system/metrics JSON content type, got %q", got)
+	}
+
+	var response handlers.SuccessEnvelope[map[string]any]
+	if err := json.Unmarshal(metricsRec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode /v0/system/metrics response: %v", err)
+	}
+	if !response.OK {
+		t.Fatalf("expected success envelope from /v0/system/metrics, got %+v", response)
+	}
+	if _, ok := response.Result["moneyCreated"]; !ok {
+		t.Fatalf("expected moneyCreated metrics payload, got %+v", response.Result)
 	}
 }

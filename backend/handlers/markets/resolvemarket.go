@@ -12,7 +12,7 @@ import (
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
-	"socialpredict/logging"
+	"socialpredict/logger"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
@@ -20,7 +20,7 @@ import (
 
 func ResolveMarketHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logging.LogMsg("Attempting to use ResolveMarketHandler.")
+		logger.LogInfo("ResolveMarket", "ResolveMarketHandler", "Attempting to use ResolveMarketHandler.")
 
 		marketId, req, err := parseResolveRequest(r)
 		if err != nil {
@@ -69,7 +69,7 @@ func writeResolveError(w http.ResponseWriter, err error) {
 	case dmarkets.ErrInvalidInput:
 		http.Error(w, "Invalid resolution outcome", http.StatusBadRequest)
 	default:
-		logging.LogMsg("Error resolving market: " + err.Error())
+		logger.LogError("ResolveMarket", "writeResolveError", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

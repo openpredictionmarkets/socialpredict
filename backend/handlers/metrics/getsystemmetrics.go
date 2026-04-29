@@ -4,11 +4,11 @@ import (
 	"net/http"
 
 	"socialpredict/handlers"
-	analytics "socialpredict/internal/domain/analytics"
 )
 
-// GetSystemMetricsHandler returns an HTTP handler that emits system metrics via the analytics service.
-func GetSystemMetricsHandler(svc *analytics.Service) http.HandlerFunc {
+// GetSystemMetricsHandler returns an HTTP handler for application metrics.
+// Runtime health and readiness probes are intentionally owned outside this handler.
+func GetSystemMetricsHandler(svc SystemMetricsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metrics, err := svc.ComputeSystemMetrics(r.Context())
 		if err != nil {

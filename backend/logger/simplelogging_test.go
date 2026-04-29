@@ -1,125 +1,123 @@
 package logger
 
 import (
+	"bytes"
 	"errors"
-	"io"
-	"log"
-	"os"
 	"strings"
 	"testing"
 )
 
-// captureStdout redirects os.Stdout for the duration of fn and returns what was written.
-func captureStdout(fn func()) (string, error) {
-	orig := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		return "", err
-	}
-	os.Stdout = w
-	defer func() {
-		_ = w.Close()
-		os.Stdout = orig
-	}()
+func useStandardForTest(t *testing.T) *bytes.Buffer {
+	t.Helper()
 
-	fn()
+	original := standard
+	buffer := &bytes.Buffer{}
+	standard = newRuntimeLogger(buffer, func(int) {})
 
-	_ = w.Close()
-	out, err := io.ReadAll(r)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
-}
-
-// helper wrappers to simulate the expected call depth for runtime.Caller(3)
-func userLike(l *CustomLogger) {
-	callInfo(l)
-}
-func callInfo(l *CustomLogger) {
-	l.Info("Test - Caller: message")
-}
-
-func TestLogInfo_Convenience_WritesExpectedParts(t *testing.T) {
-	out, err := captureStdout(func() {
-		LogInfo("ChangePassword", "ChangePassword", "ChangePassword handler called")
+	t.Cleanup(func() {
+		standard = original
 	})
-	if err != nil {
-		t.Fatalf("failed capturing stdout: %v", err)
-	}
 
-	if !strings.Contains(out, "INFO") {
-		t.Fatalf("expected INFO level in output, got: %q", out)
+	return buffer
+}
+
+func TestLogInfoCompatibilityWrapperUsesStableRuntimeFields(t *testing.T) {
+	buffer := useStandardForTest(t)
+
+	LogInfo("startup", "LoadConfigService", "configuration loaded")
+
+	output := buffer.String()
+	if !strings.Contains(output, "level=INFO") {
+		t.Fatalf("expected INFO level in output, got %q", output)
 	}
-	if !strings.Contains(out, "ChangePassword - ChangePassword: ChangePassword handler called") {
-		t.Fatalf("expected formatted message in output, got: %q", out)
+	if !strings.Contains(output, `msg="configuration loaded"`) {
+		t.Fatalf("expected message field in output, got %q", output)
 	}
-	// Should include the logger method name per implementation
-	if !strings.Contains(out, "logger.(*CustomLogger).Info()") && !strings.Contains(out, "(*CustomLogger).Info()") {
-		t.Fatalf("expected function name to include Info(), got: %q", out)
+	if !strings.Contains(output, `component="startup"`) {
+		t.Fatalf("expected component field in output, got %q", output)
 	}
-	// Should include a file reference
-	if !strings.Contains(out, ".go:") {
-		t.Fatalf("expected file:line in output, got: %q", out)
+	if !strings.Contains(output, `operation="LoadConfigService"`) {
+		t.Fatalf("expected operation field in output, got %q", output)
+	}
+	if !strings.Contains(output, `source="simplelogging_test.go:`) {
+		t.Fatalf("expected caller source in output, got %q", output)
 	}
 }
 
-func TestLogError_Convenience_IncludesError(t *testing.T) {
-	errExample := errors.New("password must be between 8 and 128 characters long")
-	out, err := captureStdout(func() {
-		LogError("ChangePassword", "ValidateNewPasswordStrength", errExample)
+func TestErrorRuntimeLoggingRedactsSensitiveMessageAndFields(t *testing.T) {
+	var buffer bytes.Buffer
+	logger := newRuntimeLogger(&buffer, func(int) {})
+
+	logger.Error(
+		"auth",
+		"password=swordfish token=abc123",
+		errors.New("token=abc123"),
+		String("api_key", "key-123"),
+		String("username", "alice"),
+	)
+
+	output := buffer.String()
+	if !strings.Contains(output, `component="auth"`) {
+		t.Fatalf("expected component field in output, got %q", output)
+	}
+	if !strings.Contains(output, `msg="password=[REDACTED] token=[REDACTED]"`) {
+		t.Fatalf("expected redacted message in output, got %q", output)
+	}
+	if !strings.Contains(output, `error="token=[REDACTED]"`) {
+		t.Fatalf("expected redacted error field in output, got %q", output)
+	}
+	if !strings.Contains(output, `api_key="[REDACTED]"`) {
+		t.Fatalf("expected redacted api_key field in output, got %q", output)
+	}
+	if !strings.Contains(output, `username="alice"`) {
+		t.Fatalf("expected non-sensitive field in output, got %q", output)
+	}
+}
+
+func TestTraceContextFromTraceparentUsesOTelFieldVocabulary(t *testing.T) {
+	var buffer bytes.Buffer
+	logger := newRuntimeLogger(&buffer, func(int) {})
+
+	traceFields := TraceContextFromTraceparent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+	logger.Info("middleware", "request received", append(traceFields, Operation("AuthMiddleware"))...)
+
+	output := buffer.String()
+	if !strings.Contains(output, `trace_id="4bf92f3577b34da6a3ce929d0e0e4736"`) {
+		t.Fatalf("expected trace_id in output, got %q", output)
+	}
+	if !strings.Contains(output, `span_id="00f067aa0ba902b7"`) {
+		t.Fatalf("expected span_id in output, got %q", output)
+	}
+	if !strings.Contains(output, `trace_flags="01"`) {
+		t.Fatalf("expected trace_flags in output, got %q", output)
+	}
+	if fields := TraceContextFromTraceparent("malformed"); len(fields) != 0 {
+		t.Fatalf("expected malformed traceparent to produce no fields, got %+v", fields)
+	}
+}
+
+func TestFatalLogsAndUsesInjectedExit(t *testing.T) {
+	var (
+		buffer   bytes.Buffer
+		exitCode = -1
+	)
+	logger := newRuntimeLogger(&buffer, func(code int) {
+		exitCode = code
 	})
-	if err != nil {
-		t.Fatalf("failed capturing stdout: %v", err)
-	}
 
-	if !strings.Contains(out, "ERROR") {
-		t.Fatalf("expected ERROR level in output, got: %q", out)
-	}
-	if !strings.Contains(out, "ValidateNewPasswordStrength") {
-		t.Fatalf("expected function context in output, got: %q", out)
-	}
-	if !strings.Contains(out, errExample.Error()) {
-		t.Fatalf("expected error message in output, got: %q", out)
-	}
-	// Should include a file reference
-	if !strings.Contains(out, ".go:") {
-		t.Fatalf("expected file:line in output, got: %q", out)
-	}
-}
+	logger.Fatal("startup", "database initialization failed", errors.New("password=swordfish"), Operation("InitDB"))
 
-func TestCustomLogger_Info_CallerDepth_FileReported(t *testing.T) {
-	// Create a temp file to write logs into (since NewCustomLogger expects *os.File)
-	tmp, err := os.CreateTemp("", "simplelogger-test-*.log")
-	if err != nil {
-		t.Fatalf("failed to create temp file: %v", err)
+	output := buffer.String()
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
-	defer func() {
-		tmp.Close()
-		os.Remove(tmp.Name())
-	}()
-
-	l := NewCustomLogger(tmp, "", log.LstdFlags)
-
-	// Call through two wrappers so that runtime.Caller(3) resolves to userLike (outside logger)
-	userLike(l)
-
-	// Ensure content is written
-	_ = tmp.Sync()
-	data, err := os.ReadFile(tmp.Name())
-	if err != nil {
-		t.Fatalf("failed to read temp log file: %v", err)
+	if !strings.Contains(output, "level=FATAL") {
+		t.Fatalf("expected FATAL level in output, got %q", output)
 	}
-	out := string(data)
-
-	if !strings.Contains(out, "INFO") {
-		t.Fatalf("expected INFO level in output, got: %q", out)
+	if !strings.Contains(output, `operation="InitDB"`) {
+		t.Fatalf("expected operation field in output, got %q", output)
 	}
-	// Caller should reference this test file with a :line suffix
-	if !strings.Contains(out, "simplelogging_test.go:") && !strings.Contains(out, "_test.go:") {
-		t.Fatalf("expected file:line pointing to test file, got: %q", out)
-	}
-	if !strings.Contains(out, "Test - Caller: message") {
-		t.Fatalf("expected emitted message, got: %q", out)
+	if !strings.Contains(output, `error="password=[REDACTED]"`) {
+		t.Fatalf("expected redacted error field in output, got %q", output)
 	}
 }

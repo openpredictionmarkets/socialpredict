@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
 	betshandlers "socialpredict/handlers/bets"
@@ -24,12 +26,16 @@ import (
 	privateuser "socialpredict/handlers/users/privateuser"
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
+	appruntime "socialpredict/internal/app/runtime"
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
+	"socialpredict/logger"
 	"socialpredict/security"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -97,8 +103,8 @@ func buildCORSFromEnv() *cors.Cors {
 	})
 }
 
-func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service) (http.Handler, error) {
-	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService)
+func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness) (http.Handler, error) {
+	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService, readiness)
 	if err != nil {
 		return nil, err
 	}
@@ -107,18 +113,19 @@ func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServ
 	if c := buildCORSFromEnv(); c != nil {
 		handler = c.Handler(handler)
 	}
+	handler = security.RequestBoundaryMiddleware()(handler)
 
 	return handler, nil
 }
 
-func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service) (*mux.Router, error) {
+func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness) (*mux.Router, error) {
 	if configService == nil {
 		return nil, fmt.Errorf("config init: configuration service unavailable")
 	}
 
 	router := mux.NewRouter()
 	router.MethodNotAllowedHandler = methodNotAllowedHandler(router)
-	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS); err != nil {
+	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS, db, readiness); err != nil {
 		return nil, err
 	}
 
@@ -176,13 +183,16 @@ func allowedMethodsForRequest(router *mux.Router, r *http.Request) []string {
 	return allowed
 }
 
-func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS) error {
-	// Health endpoint
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	}).Methods("GET")
+const readinessProbeTimeout = 2 * time.Second
+
+type applicationReportingService interface {
+	metricshandlers.SystemMetricsService
+	metricshandlers.GlobalLeaderboardService
+}
+
+func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, readiness *appruntime.Readiness) error {
+	router.HandleFunc("/health", healthHandler).Methods("GET")
+	router.Handle("/readyz", readinessHandler(db, readiness)).Methods("GET")
 
 	// OpenAPI spec endpoint
 	router.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
@@ -206,6 +216,42 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 	return nil
 }
 
+func healthHandler(w http.ResponseWriter, _ *http.Request) {
+	writeProbeResponse(w, http.StatusOK, "ok")
+}
+
+func readinessHandler(db *gorm.DB, readiness *appruntime.Readiness) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if readiness == nil || !readiness.Ready() {
+			writeProbeResponse(w, http.StatusServiceUnavailable, "not ready")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), readinessProbeTimeout)
+		defer cancel()
+		if err := appruntime.CheckDBReadiness(ctx, db); err != nil {
+			writeProbeResponse(w, http.StatusServiceUnavailable, "not ready")
+			return
+		}
+
+		writeProbeResponse(w, http.StatusOK, "ready")
+	})
+}
+
+func writeProbeResponse(w http.ResponseWriter, status int, body string) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(body))
+}
+
+func registerApplicationReportingRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, reportingService applicationReportingService, securityMiddleware func(http.Handler) http.Handler) {
+	// These /v0/ reporting routes stay application-owned. Future tracing or metrics
+	// export work belongs in request-boundary/runtime wiring, not in health probes.
+	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(db, configService))).Methods("GET")
+	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(reportingService))).Methods("GET")
+	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(reportingService))).Methods("GET")
+}
+
 func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, securityService *security.SecurityService) {
 	container := app.BuildApplicationWithConfigService(db, configService)
 	marketsService := container.GetMarketsService()
@@ -227,12 +273,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
 	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(usersRepo))).Methods("POST")
 
-	// application setup and stats information
+	// application setup information
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
 	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
-	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(db, container.GetConfigService()))).Methods("GET")
-	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(analyticsService))).Methods("GET")
-	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(analyticsService))).Methods("GET")
+	registerApplicationReportingRoutes(router, db, configService, analyticsService, securityMiddleware)
 
 	// Markets routes - using new Handler instance
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
@@ -309,10 +353,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
 }
 
-func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service) {
-	handler, err := buildHandler(openAPISpec, swaggerUIFS, db, configService)
+func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness) {
+	handler, err := buildHandler(openAPISpec, swaggerUIFS, db, configService, readiness)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("server", "http handler initialization failed", err, logger.Operation("buildHandler"))
 	}
 
 	// Allow BACKEND_PORT to be configured via environment, default to 8080
@@ -321,8 +365,46 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 		port = "8080"
 	}
 
-	log.Printf("Starting server on :%s", port)
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
-		log.Fatal(err)
+	address := ":" + port
+	server := &http.Server{
+		Addr:    address,
+		Handler: handler,
+	}
+
+	serveErrs := make(chan error, 1)
+	go func() {
+		serveErrs <- server.ListenAndServe()
+	}()
+
+	logger.Info("server", "HTTP server listening", logger.Operation("Start"), logger.Address(address))
+
+	shutdownSignals := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(shutdownSignals)
+
+	select {
+	case err := <-serveErrs:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatal("server", "http server exited unexpectedly", err, logger.Operation("ListenAndServe"), logger.Address(address))
+		}
+		logger.Info("server", "HTTP server stopped", logger.Operation("ListenAndServe"), logger.Address(address))
+	case shutdownSignal := <-shutdownSignals:
+		if readiness != nil {
+			readiness.MarkNotReady()
+		}
+		logger.Info("server", "shutdown signal received", logger.Operation("Shutdown"), logger.Address(address), logger.String("signal", shutdownSignal.String()))
+
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(shutdownContext); err != nil {
+			logger.Fatal("server", "graceful shutdown failed", err, logger.Operation("Shutdown"), logger.Address(address))
+		}
+
+		if err := <-serveErrs; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatal("server", "http server exited unexpectedly during shutdown", err, logger.Operation("ListenAndServe"), logger.Address(address))
+		}
+
+		logger.Info("server", "HTTP server shutdown complete", logger.Operation("Shutdown"), logger.Address(address))
 	}
 }

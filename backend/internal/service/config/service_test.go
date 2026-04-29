@@ -69,6 +69,36 @@ func TestCurrentReturnsDefensiveCopy(t *testing.T) {
 	}
 }
 
+func TestEconomicsReturnsDetachedValue(t *testing.T) {
+	svc := NewStaticService(&AppConfig{
+		Economics: Economics{
+			User: User{MaximumDebtAllowed: 500},
+		},
+	})
+
+	economics := svc.Economics()
+	economics.User.MaximumDebtAllowed = 999
+
+	if got := svc.Economics().User.MaximumDebtAllowed; got != 500 {
+		t.Fatalf("Economics returned %d after accessor mutation, want frozen 500", got)
+	}
+}
+
+func TestFrontendReturnsDetachedValue(t *testing.T) {
+	svc := NewStaticService(&AppConfig{
+		Frontend: Frontend{
+			Charts: FrontendCharts{SigFigs: 7},
+		},
+	})
+
+	frontend := svc.Frontend()
+	frontend.Charts.SigFigs = 3
+
+	if got := svc.ChartSigFigs(); got != 7 {
+		t.Fatalf("ChartSigFigs returned %d after frontend mutation, want frozen 7", got)
+	}
+}
+
 func TestNewServicePropagatesLoaderError(t *testing.T) {
 	wantErr := errors.New("boom")
 

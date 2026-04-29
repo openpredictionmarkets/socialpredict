@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -134,6 +135,26 @@ func InitDB(cfg DBConfig, factory DBFactory) (*gorm.DB, error) {
 
 	SetDB(conn)
 	return conn, nil
+}
+
+// CheckDBReadiness verifies that the backing SQL connection is reachable for request handling.
+func CheckDBReadiness(ctx context.Context, db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("database handle unavailable")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("sql db handle unavailable: %w", err)
+	}
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return fmt.Errorf("database ping failed: %w", err)
+	}
+
+	return nil
 }
 
 // SetDB stores the shared DB handle used by legacy callers and tests.

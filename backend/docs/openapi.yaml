@@ -35,7 +35,10 @@ paths:
       tags: [Config]
       operationId: getHealth
       summary: Backend health check
-      description: Simple liveness probe that returns "ok" when the backend is running.
+      description: >
+        Simple process liveness probe that returns "ok" while the backend is running.
+        It does not report application metrics, downstream dependency reachability,
+        or telemetry pipeline status.
       responses:
         '200':
           description: Backend is healthy.
@@ -44,6 +47,31 @@ paths:
               schema:
                 type: string
                 example: ok
+
+  /readyz:
+    get:
+      tags: [Config]
+      operationId: getReadiness
+      summary: Backend readiness check
+      description: >
+        Readiness probe that returns "ready" only after startup has completed and
+        while the primary database remains reachable for request handling. It is kept
+        separate from application metrics and does not report telemetry pipeline status.
+      responses:
+        '200':
+          description: Backend is ready to serve traffic.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ready
+        '503':
+          description: Backend is not ready to serve traffic.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: not ready
 
   /v0/login:
     post:
