@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
@@ -22,9 +23,9 @@ func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, u
 			return
 		}
 
-		user, httperr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
-		if httperr != nil {
-			_ = handlers.WriteFailure(w, httperr.StatusCode, profileAuthFailureReason(httperr))
+		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
 			return
 		}
 

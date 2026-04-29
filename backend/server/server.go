@@ -110,7 +110,6 @@ func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServ
 	}
 
 	handler := http.Handler(router)
-	handler = logger.RequestLoggingMiddleware(handler)
 	if c := buildCORSFromEnv(); c != nil {
 		handler = c.Handler(handler)
 	}
@@ -139,7 +138,7 @@ func methodNotAllowedHandler(router *mux.Router) http.Handler {
 		if allow := strings.Join(allowedMethodsForRequest(router, r), ", "); allow != "" {
 			w.Header().Set("Allow", allow)
 		}
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		security.WriteMethodNotAllowed(w)
 	})
 }
 

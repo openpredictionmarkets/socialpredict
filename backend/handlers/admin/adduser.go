@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
@@ -77,12 +78,12 @@ func processAddUser(r *http.Request, db *gorm.DB, configService configsvc.Servic
 	if auth == nil {
 		return nil, &handlerError{message: "authentication service unavailable", statusCode: http.StatusInternalServerError, reason: handlers.ReasonInternalError}
 	}
-	if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
+	if _, authErr := auth.RequireAdmin(r); authErr != nil {
 		return nil, &handlerError{
-			message:    httpErr.Message,
-			statusCode: httpErr.StatusCode,
-			logErr:     errors.New(httpErr.Message),
-			reason:     handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message),
+			message:    authErr.Message,
+			statusCode: authhttp.StatusCode(authErr),
+			logErr:     errors.New(authErr.Message),
+			reason:     authhttp.FailureReason(authErr),
 		}
 	}
 

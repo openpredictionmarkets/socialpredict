@@ -92,7 +92,7 @@ func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 
 			// Check rate limit
 			if !limiter.GetLimiter(ip).Allow() {
-				http.Error(w, "Rate limit exceeded. Please try again later.", http.StatusTooManyRequests)
+				WriteRateLimited(w, RuntimeReasonRateLimited)
 				return
 			}
 
@@ -110,7 +110,7 @@ func LoginRateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Hand
 
 			// Check rate limit
 			if !limiter.GetLimiter(ip).Allow() {
-				http.Error(w, "Too many login attempts. Please try again later.", http.StatusTooManyRequests)
+				WriteRateLimited(w, RuntimeReasonLoginRateLimited)
 				return
 			}
 

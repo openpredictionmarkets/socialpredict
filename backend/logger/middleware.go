@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	RequestIDHeader = "X-Request-Id"
+	RequestIDHeader           = "X-Request-Id"
 	clientClosedRequestStatus = 499
 
 	requestIDContextKey contextKey = "request_id"
@@ -45,6 +45,29 @@ func contextValue(ctx context.Context, key contextKey) string {
 	return value
 }
 
+// ContextWithRequestCorrelation attaches the request-boundary correlation fields
+// used by runtime logging and legacy handler diagnostics.
+func ContextWithRequestCorrelation(ctx context.Context, requestID, traceparent string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	requestID = strings.TrimSpace(requestID)
+	if requestID != "" {
+		ctx = context.WithValue(ctx, requestIDContextKey, requestID)
+	}
+
+	traceID, spanID := parseTraceparent(traceparent)
+	if traceID != "" {
+		ctx = context.WithValue(ctx, traceIDContextKey, traceID)
+	}
+	if spanID != "" {
+		ctx = context.WithValue(ctx, spanIDContextKey, spanID)
+	}
+
+	return ctx
+}
+
 // RequestLoggingMiddleware logs one completion line per request and propagates
 // stable request/correlation identifiers at the runtime boundary.
 func RequestLoggingMiddleware(next http.Handler) http.Handler {
@@ -63,14 +86,7 @@ func RequestLoggingMiddleware(next http.Handler) http.Handler {
 		}
 
 		traceID, spanID := parseTraceparent(r.Header.Get("traceparent"))
-
-		ctx := context.WithValue(r.Context(), requestIDContextKey, requestID)
-		if traceID != "" {
-			ctx = context.WithValue(ctx, traceIDContextKey, traceID)
-		}
-		if spanID != "" {
-			ctx = context.WithValue(ctx, spanIDContextKey, spanID)
-		}
+		ctx := ContextWithRequestCorrelation(r.Context(), requestID, r.Header.Get("traceparent"))
 
 		r = r.WithContext(ctx)
 
@@ -113,7 +129,7 @@ func RequestLoggingMiddleware(next http.Handler) http.Handler {
 
 type statusRecorder struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
 	wroteHeader bool
 }
 

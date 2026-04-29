@@ -12,6 +12,7 @@ import (
 	"socialpredict/setup"
 	"time"
 
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/logger"
@@ -62,9 +63,9 @@ func NewCreateMarketService(svc dmarkets.Service, auth authsvc.Authenticator) *C
 	}
 }
 
-func (h *CreateMarketService) currentUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+func (h *CreateMarketService) currentUser(r *http.Request) (*dusers.User, *authsvc.AuthError) {
 	if h.auth == nil {
-		return nil, &authsvc.HTTPError{StatusCode: http.StatusInternalServerError, Message: "authentication service unavailable"}
+		return nil, &authsvc.AuthError{Kind: authsvc.ErrorKindServiceUnavailable, Message: "authentication service unavailable"}
 	}
 	return h.auth.CurrentUser(r)
 }
@@ -78,7 +79,7 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 	user, httpErr := h.currentUser(r)
 	if httpErr != nil {
 		logger.LogWarn("CreateMarket", "CurrentUser", httpErr.Message)
-		http.Error(w, httpErr.Error(), httpErr.StatusCode)
+		http.Error(w, httpErr.Error(), authhttp.StatusCode(httpErr))
 		return
 	}
 
@@ -210,16 +211,16 @@ func toCreateMarketResponse(market *dmarkets.Market) dto.CreateMarketResponse {
 	}
 }
 
-func currentUserOrError(w http.ResponseWriter, r *http.Request, auth authsvc.Authenticator) (*dusers.User, *authsvc.HTTPError) {
+func currentUserOrError(w http.ResponseWriter, r *http.Request, auth authsvc.Authenticator) (*dusers.User, *authsvc.AuthError) {
 	if auth == nil {
 		logger.LogError("CreateMarket", "CurrentUser", errors.New("authentication service unavailable"))
 		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
-		return nil, &authsvc.HTTPError{StatusCode: http.StatusInternalServerError, Message: "authentication service unavailable"}
+		return nil, &authsvc.AuthError{Kind: authsvc.ErrorKindServiceUnavailable, Message: "authentication service unavailable"}
 	}
 	user, httperr := auth.CurrentUser(r)
 	if httperr != nil {
 		logger.LogWarn("CreateMarket", "CurrentUser", httperr.Message)
-		http.Error(w, httperr.Error(), httperr.StatusCode)
+		http.Error(w, httperr.Error(), authhttp.StatusCode(httperr))
 		return nil, httperr
 	}
 	return user, nil

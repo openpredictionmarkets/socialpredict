@@ -18,6 +18,8 @@ const (
 	FieldComponent  = "component"
 	FieldDurationMS = "duration_ms"
 	FieldError      = "error"
+	FieldErrorType  = "error_type"
+	FieldException  = "exception_recorded"
 	FieldMethod     = "method"
 	FieldOperation  = "operation"
 	FieldPath       = "path"
@@ -119,6 +121,16 @@ func Err(err error) Field {
 	}
 
 	return String(FieldError, err.Error())
+}
+
+// ErrorType records a stable OpenTelemetry-aligned failure classification.
+func ErrorType(value string) Field {
+	return String(FieldErrorType, value)
+}
+
+// ExceptionRecorded marks the single runtime log line that recorded an exception.
+func ExceptionRecorded() Field {
+	return String(FieldException, "true")
 }
 
 // TraceContext adds explicit OpenTelemetry-aligned correlation fields when available.
@@ -279,6 +291,8 @@ func (l *RuntimeLogger) log(skip int, level, component, message string, fields .
 		FieldStatusCode,
 		FieldDurationMS,
 		FieldAddress,
+		FieldErrorType,
+		FieldException,
 		FieldError,
 		FieldSource,
 	}

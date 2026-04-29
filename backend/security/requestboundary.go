@@ -5,6 +5,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/hex"
+	stderrors "errors"
 	"io"
 	"net"
 	"net/http"
@@ -15,7 +16,9 @@ import (
 	"socialpredict/logger"
 )
 
-const requestIDHeader = "X-Request-Id"
+const (
+	requestIDHeader = logger.RequestIDHeader
+)
 
 type requestIDContextKey struct{}
 
@@ -51,27 +54,38 @@ func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func(
 			requestID := incomingRequestID(r, newRequestID)
 
 			w.Header().Set(requestIDHeader, requestID)
-			r = r.WithContext(context.WithValue(r.Context(), requestIDContextKey{}, requestID))
+			ctx := context.WithValue(r.Context(), requestIDContextKey{}, requestID)
+			ctx = logger.ContextWithRequestCorrelation(ctx, requestID, r.Header.Get("Traceparent"))
+			r = r.WithContext(ctx)
 
 			recorder := &requestBoundaryWriter{
 				ResponseWriter: w,
 				statusCode:     http.StatusOK,
 			}
 
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					if !recorder.wroteHeader {
+						writeRecoveredPanicResponse(recorder)
+					} else {
+						recorder.statusCode = http.StatusInternalServerError
+					}
+
+					runtimeLogger.Error(
+						"middleware",
+						"request panic recovered",
+						stderrors.New("panic recovered"),
+						append(
+							requestBoundaryFields(r, requestID, recorder.statusCode, now().Sub(startedAt), RuntimeErrorTypePanic),
+							logger.ExceptionRecorded(),
+						)...,
+					)
+				}
+			}()
+
 			next.ServeHTTP(recorder, r)
 
-			fields := []logger.Field{
-				logger.Operation("RequestBoundary"),
-				logger.RequestID(requestID),
-				logger.Method(requestMethod(r)),
-				logger.Path(requestPath(r)),
-				logger.StatusCode(recorder.statusCode),
-				logger.DurationMS(now().Sub(startedAt)),
-			}
-			if address := strings.TrimSpace(getClientIP(r)); address != "" {
-				fields = append(fields, logger.Address(address))
-			}
-			fields = append(fields, logger.TraceContextFromTraceparent(r.Header.Get("Traceparent"))...)
+			fields := requestBoundaryFields(r, requestID, recorder.statusCode, now().Sub(startedAt), runtimeFailureErrorType(recorder.statusCode))
 
 			switch {
 			case recorder.statusCode >= http.StatusInternalServerError:
@@ -83,6 +97,38 @@ func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func(
 			}
 		})
 	}
+}
+
+func requestBoundaryFields(r *http.Request, requestID string, statusCode int, duration time.Duration, errorType string) []logger.Field {
+	fields := []logger.Field{
+		logger.Operation("RequestBoundary"),
+		logger.RequestID(requestID),
+		logger.Method(requestMethod(r)),
+		logger.Path(requestPath(r)),
+		logger.StatusCode(statusCode),
+		logger.DurationMS(duration),
+	}
+	if address := strings.TrimSpace(getClientIP(r)); address != "" {
+		fields = append(fields, logger.Address(address))
+	}
+	fields = append(fields, logger.TraceContextFromTraceparent(r.Header.Get("Traceparent"))...)
+	if strings.TrimSpace(errorType) != "" {
+		fields = append(fields, logger.ErrorType(errorType))
+	}
+
+	return fields
+}
+
+func writeRecoveredPanicResponse(w http.ResponseWriter) {
+	WriteInternalServerError(w)
+}
+
+func runtimeFailureErrorType(statusCode int) string {
+	errorType, ok := RuntimeFailureErrorType(statusCode)
+	if !ok {
+		return ""
+	}
+	return errorType
 }
 
 func defaultRequestID() string {
@@ -125,7 +171,8 @@ func requestPath(r *http.Request) string {
 
 type requestBoundaryWriter struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
+	wroteHeader bool
 }
 
 func (w *requestBoundaryWriter) Header() http.Header {
@@ -134,10 +181,14 @@ func (w *requestBoundaryWriter) Header() http.Header {
 
 func (w *requestBoundaryWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
+	w.wroteHeader = true
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func (w *requestBoundaryWriter) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		w.wroteHeader = true
+	}
 	return w.ResponseWriter.Write(data)
 }
 

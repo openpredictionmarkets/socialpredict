@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
@@ -26,10 +27,10 @@ func ChangePasswordHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 
 		logger.LogInfo("ChangePassword", "ChangePassword", "ChangePassword handler called")
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
-		if httperr != nil {
-			_ = handlers.WriteFailure(w, httperr.StatusCode, handlers.AuthFailureReason(httperr.StatusCode, httperr.Message))
-			logger.LogError("ChangePassword", "ValidateTokenAndGetUser", httperr)
+		user, authErr := authsvc.ValidateTokenAndGetUser(r, svc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
+			logger.LogError("ChangePassword", "ValidateTokenAndGetUser", authErr)
 			return
 		}
 

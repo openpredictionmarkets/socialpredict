@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/cms/homepage"
 	authsvc "socialpredict/internal/service/auth"
 )
@@ -49,9 +50,9 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		return
 	}
-	admin, httpErr := h.auth.RequireAdmin(r)
-	if httpErr != nil {
-		_ = handlers.WriteFailure(w, httpErr.StatusCode, handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message))
+	admin, authErr := h.auth.RequireAdmin(r)
+	if authErr != nil {
+		_ = authhttp.WriteFailure(w, authErr)
 		return
 	}
 
@@ -91,8 +92,8 @@ func RequireAdmin(auth authsvc.Authenticator, next http.HandlerFunc) http.Handle
 			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
-		if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
-			_ = handlers.WriteFailure(w, httpErr.StatusCode, handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message))
+		if _, authErr := auth.RequireAdmin(r); authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -13,6 +13,7 @@ import (
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/logger"
 	"socialpredict/models/modelstesting"
+	"socialpredict/security"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -166,6 +167,36 @@ func TestBuildHandlerPropagatesRequestIDToPublicRoutes(t *testing.T) {
 	}
 	if got := rec.Header().Get("X-Request-Id"); got != "external-request-id" {
 		t.Fatalf("expected propagated request ID header, got %q", got)
+	}
+}
+
+func TestBuildHandlerUsesSharedMethodNotAllowedWriter(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodPost, "/health", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status 405, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Allow"); got != http.MethodGet {
+		t.Fatalf("expected Allow GET, got %q", got)
+	}
+
+	var response struct {
+		OK     bool   `json:"ok"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode method-not-allowed response: %v", err)
+	}
+	if response.OK || response.Reason != security.RuntimeReasonMethodNotAllowed {
+		t.Fatalf("expected method-not-allowed reason, got %+v", response)
 	}
 }
 

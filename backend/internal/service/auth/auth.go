@@ -19,25 +19,24 @@ func Authenticate(next http.Handler) http.Handler {
 
 // ValidateUserAndEnforcePasswordChange performs user validation and checks if a password change is required.
 // It returns the user and any errors encountered.
-func ValidateUserAndEnforcePasswordChangeGetUser(r *http.Request, svc dusers.ServiceInterface) (*dusers.User, *HTTPError) {
-	user, httpErr := ValidateTokenAndGetUser(r, svc)
-	if httpErr != nil {
-		return nil, httpErr
+func ValidateUserAndEnforcePasswordChangeGetUser(r *http.Request, svc dusers.ServiceInterface) (*dusers.User, *AuthError) {
+	user, authErr := ValidateTokenAndGetUser(r, svc)
+	if authErr != nil {
+		return nil, authErr
 	}
 
-	// Check if a password change is required
-	if httpErr := CheckMustChangePasswordFlag(user); httpErr != nil {
-		return nil, httpErr
+	if authErr := CheckMustChangePasswordFlag(user); authErr != nil {
+		return nil, authErr
 	}
 
 	return user, nil
 }
 
 // ValidateTokenAndGetUser checks that the user is who they claim to be, and returns their information for use
-func ValidateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface) (*dusers.User, *HTTPError) {
+func ValidateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface) (*dusers.User, *AuthError) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Authorization header is required"}
+		return nil, newAuthError(ErrorKindMissingToken)
 	}
 
 	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
@@ -45,29 +44,26 @@ func ValidateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface) (*dus
 		return getJWTKey(), nil
 	})
 	if err != nil {
-		return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
+		return nil, newAuthError(ErrorKindInvalidToken)
 	}
 
 	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
 		user, err := svc.GetUser(r.Context(), claims.Username)
 		if err != nil {
 			if err == dusers.ErrUserNotFound {
-				return nil, &HTTPError{StatusCode: http.StatusNotFound, Message: "User not found"}
+				return nil, newAuthError(ErrorKindUserNotFound)
 			}
-			return nil, &HTTPError{StatusCode: http.StatusInternalServerError, Message: "Failed to load user"}
+			return nil, newAuthError(ErrorKindUserLoadFailed)
 		}
 		return user, nil
 	}
-	return nil, &HTTPError{StatusCode: http.StatusUnauthorized, Message: "Invalid token"}
+	return nil, newAuthError(ErrorKindInvalidToken)
 }
 
 // CheckMustChangePasswordFlag checks if the user needs to change their password
-func CheckMustChangePasswordFlag(user *dusers.User) *HTTPError {
+func CheckMustChangePasswordFlag(user *dusers.User) *AuthError {
 	if user.MustChangePassword {
-		return &HTTPError{
-			StatusCode: http.StatusForbidden,
-			Message:    "Password change required",
-		}
+		return newAuthError(ErrorKindPasswordChangeRequired)
 	}
 	return nil
 }

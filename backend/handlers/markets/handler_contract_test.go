@@ -95,18 +95,18 @@ func (m *contractServiceMock) ProjectProbability(ctx context.Context, req dmarke
 
 type contractAuthMock struct {
 	user *dusers.User
-	err  *authsvc.HTTPError
+	err  *authsvc.AuthError
 }
 
-func (m *contractAuthMock) CurrentUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+func (m *contractAuthMock) CurrentUser(r *http.Request) (*dusers.User, *authsvc.AuthError) {
 	return m.user, m.err
 }
 
-func (m *contractAuthMock) RequireUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+func (m *contractAuthMock) RequireUser(r *http.Request) (*dusers.User, *authsvc.AuthError) {
 	return m.user, m.err
 }
 
-func (m *contractAuthMock) RequireAdmin(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+func (m *contractAuthMock) RequireAdmin(r *http.Request) (*dusers.User, *authsvc.AuthError) {
 	return m.user, m.err
 }
 
@@ -308,7 +308,7 @@ func TestHandlerResolveMarket_MapsAuthAndStateFailures(t *testing.T) {
 	t.Run("password change required uses auth reason", func(t *testing.T) {
 		service := &contractServiceMock{}
 		auth := &contractAuthMock{
-			err: &authsvc.HTTPError{StatusCode: http.StatusForbidden, Message: "Password change required"},
+			err: &authsvc.AuthError{Kind: authsvc.ErrorKindPasswordChangeRequired, Message: "Password change required"},
 		}
 
 		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"yes"}`)), map[string]string{"id": "5"})

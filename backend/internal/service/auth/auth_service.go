@@ -9,9 +9,9 @@ import (
 
 // Authenticator exposes the authentication operations used by HTTP handlers.
 type Authenticator interface {
-	CurrentUser(r *http.Request) (*dusers.User, *HTTPError)
-	RequireUser(r *http.Request) (*dusers.User, *HTTPError)
-	RequireAdmin(r *http.Request) (*dusers.User, *HTTPError)
+	CurrentUser(r *http.Request) (*dusers.User, *AuthError)
+	RequireUser(r *http.Request) (*dusers.User, *AuthError)
+	RequireAdmin(r *http.Request) (*dusers.User, *AuthError)
 }
 
 // AuthService provides a façade over the authentication helpers so callers can
@@ -28,28 +28,25 @@ func NewAuthService(users dusers.ServiceInterface) *AuthService {
 
 // CurrentUser returns the authenticated user, ensuring any password-change
 // requirements are enforced.
-func (a *AuthService) CurrentUser(r *http.Request) (*dusers.User, *HTTPError) {
+func (a *AuthService) CurrentUser(r *http.Request) (*dusers.User, *AuthError) {
 	return ValidateUserAndEnforcePasswordChangeGetUser(r, a.users)
 }
 
 // RequireUser resolves the authenticated user without checking the
 // must-change-password flag.
-func (a *AuthService) RequireUser(r *http.Request) (*dusers.User, *HTTPError) {
+func (a *AuthService) RequireUser(r *http.Request) (*dusers.User, *AuthError) {
 	return ValidateTokenAndGetUser(r, a.users)
 }
 
 // RequireAdmin ensures the current user is authenticated and has admin privileges.
-func (a *AuthService) RequireAdmin(r *http.Request) (*dusers.User, *HTTPError) {
+func (a *AuthService) RequireAdmin(r *http.Request) (*dusers.User, *AuthError) {
 	user, err := a.CurrentUser(r)
 	if err != nil {
 		return nil, err
 	}
 
 	if strings.ToUpper(user.UserType) != "ADMIN" {
-		return nil, &HTTPError{
-			StatusCode: http.StatusForbidden,
-			Message:    "admin privileges required",
-		}
+		return nil, newAuthError(ErrorKindAdminRequired)
 	}
 
 	return user, nil

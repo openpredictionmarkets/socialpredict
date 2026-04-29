@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
 )
@@ -21,13 +22,13 @@ func writeInternalError(w http.ResponseWriter) {
 	_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 }
 
-func writeAuthError(w http.ResponseWriter, httpErr *authsvc.HTTPError) {
-	if httpErr == nil {
+func writeAuthError(w http.ResponseWriter, authErr *authsvc.AuthError) {
+	if authErr == nil {
 		writeInternalError(w)
 		return
 	}
 
-	_ = handlers.WriteFailure(w, httpErr.StatusCode, handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message))
+	_ = authhttp.WriteFailure(w, authErr)
 }
 
 func writeCreateError(w http.ResponseWriter, err error) {

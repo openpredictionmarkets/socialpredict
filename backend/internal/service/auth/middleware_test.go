@@ -18,18 +18,18 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func TestHTTPError(t *testing.T) {
-	err := &HTTPError{
-		StatusCode: 404,
-		Message:    "Not found",
+func TestAuthError(t *testing.T) {
+	err := &AuthError{
+		Kind:    ErrorKindUserNotFound,
+		Message: "Not found",
 	}
 
 	if err.Error() != "Not found" {
 		t.Errorf("Expected 'Not found', got '%s'", err.Error())
 	}
 
-	if err.StatusCode != 404 {
-		t.Errorf("Expected status code 404, got %d", err.StatusCode)
+	if err.Kind != ErrorKindUserNotFound {
+		t.Errorf("Expected kind %q, got %q", ErrorKindUserNotFound, err.Kind)
 	}
 }
 
@@ -152,17 +152,17 @@ func TestCheckMustChangePasswordFlag(t *testing.T) {
 				MustChangePassword: tt.mustChangePassword,
 			}
 
-			httpErr := CheckMustChangePasswordFlag(user)
+			authErr := CheckMustChangePasswordFlag(user)
 
 			if tt.expectError {
-				if httpErr == nil {
+				if authErr == nil {
 					t.Errorf("Expected error but got none")
-				} else if httpErr.StatusCode != http.StatusForbidden {
-					t.Errorf("Expected status code %d, got %d", http.StatusForbidden, httpErr.StatusCode)
+				} else if authErr.Kind != ErrorKindPasswordChangeRequired {
+					t.Errorf("Expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 				}
 			} else {
-				if httpErr != nil {
-					t.Errorf("Expected no error but got: %v", httpErr)
+				if authErr != nil {
+					t.Errorf("Expected no error but got: %v", authErr)
 				}
 			}
 		})
@@ -489,16 +489,16 @@ func TestValidateTokenAndGetUser_MissingHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateTokenAndGetUser(req, svc)
+	user, authErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindMissingToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindMissingToken, authErr.Kind)
 	}
 }
 
@@ -509,16 +509,16 @@ func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 
-	user, httpErr := ValidateTokenAndGetUser(req, svc)
+	user, authErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindInvalidToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindInvalidToken, authErr.Kind)
 	}
 }
 
@@ -576,16 +576,16 @@ func TestAuthServiceRequireAdmin_EnforcesPasswordChange(t *testing.T) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	user, httpErr := auth.RequireAdmin(req)
+	user, authErr := auth.RequireAdmin(req)
 
 	if user != nil {
 		t.Fatalf("expected nil user when password change is required")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Fatalf("expected password-change enforcement error")
 	}
-	if httpErr.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected status 403, got %d", httpErr.StatusCode)
+	if authErr.Kind != ErrorKindPasswordChangeRequired {
+		t.Fatalf("expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 	}
 }
 
@@ -638,16 +638,16 @@ func TestValidateUserAndEnforcePasswordChangeGetUser_MissingToken(t *testing.T) 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
+	user, authErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindMissingToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindMissingToken, authErr.Kind)
 	}
 }
 
@@ -672,19 +672,19 @@ func TestValidateUserAndEnforcePasswordChangeGetUser_PasswordChangeRequired(t *t
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
+	user, authErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
 
 	if user != nil {
 		t.Fatalf("expected nil user when password change is required")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Fatalf("expected password-change enforcement error")
 	}
-	if httpErr.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected status 403, got %d", httpErr.StatusCode)
+	if authErr.Kind != ErrorKindPasswordChangeRequired {
+		t.Fatalf("expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 	}
-	if httpErr.Message != "Password change required" {
-		t.Fatalf("expected password change message, got %q", httpErr.Message)
+	if authErr.Message != "Password change required" {
+		t.Fatalf("expected password change message, got %q", authErr.Message)
 	}
 }
 

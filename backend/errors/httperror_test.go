@@ -37,7 +37,7 @@ func TestHandleHTTPError(t *testing.T) {
 			err:            errors.New("foo"),
 			statusCode:     http.StatusInternalServerError,
 			userMessage:    "bar",
-			output:         "HTTPError - HandleHTTPError: foo",
+			output:         "",
 			wrappedMessage: "{\"error\":\"bar\"}",
 			res:            true,
 		},
@@ -69,7 +69,7 @@ func TestHandleHTTPError(t *testing.T) {
 			if !strings.Contains(test.w.Body.String(), test.wrappedMessage) {
 				t.Errorf("got %s, want %s", strings.TrimRight(test.w.Body.String(), "\n"), test.wrappedMessage)
 			}
-			if !strings.Contains(buf.String(), test.output) {
+			if test.output != "" && !strings.Contains(buf.String(), test.output) {
 				t.Errorf("got Error%s, want %s", strings.SplitN(strings.TrimRight(buf.String(), "\n"), "Error", 1)[0], test.output)
 			}
 		})

@@ -6,7 +6,7 @@ info:
     HTTP contract for the SocialPredict backend service. This spec is generated
     from the Go handlers and DTOs under backend/server and backend/handlers.
     Routes wrapped by the shared security middleware can return a shared
-    transport-level `429 text/plain` response before reaching handler-specific
+    transport-level `429` JSON failure envelope response before reaching handler-specific
     JSON envelope logic when the rate limit is exceeded. This middleware
     exception applies across protected routes even when a path omits a repeated
     path-level `429` entry.
@@ -115,9 +115,9 @@ paths:
         '429':
           description: Login rate limit exceeded by middleware. Other protected routes can also return middleware-level 429 responses as described in the API description.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/home:
     get:
@@ -155,9 +155,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/setup/frontend:
     get:
@@ -181,9 +181,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /openapi.yaml:
     get:
@@ -261,9 +261,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
     post:
       tags: [Markets]
       operationId: createMarket
@@ -390,9 +390,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/status:
     get:
@@ -432,9 +432,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/status/{status}:
     get:
@@ -488,9 +488,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/active:
     get:
@@ -530,9 +530,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/closed:
     get:
@@ -572,9 +572,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/resolved:
     get:
@@ -614,9 +614,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/{id}:
     get:
@@ -781,9 +781,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/{id}/projection:
     get:
@@ -953,9 +953,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/markets/positions/{marketId}:
     get:
@@ -1111,9 +1111,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/sell:
     post:
@@ -1181,16 +1181,19 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/privateprofile:
     get:
       tags: [Users]
       operationId: getPrivateProfile
       summary: Get private profile
-      description: Returns the authenticated user’s private profile data.
+      description: >
+        Returns the authenticated user's private profile data. Handler-owned failures use
+        the shared JSON failure envelope with INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
+        USER_NOT_FOUND, METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
       security:
         - bearerAuth: []
       responses:
@@ -1218,6 +1221,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '405':
+          description: HTTP method is not allowed for this route.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching profile.
           content:
@@ -1230,6 +1239,11 @@ paths:
       tags: [Users]
       operationId: updateProfileDescription
       summary: Update profile description
+      description: >
+        Protected profile update route migrated to the shared JSON failure envelope.
+        Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
+        INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
       security:
         - bearerAuth: []
       requestBody:
@@ -1269,6 +1283,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '405':
+          description: HTTP method is not allowed for this route.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating description.
           content:
@@ -1281,6 +1301,11 @@ paths:
       tags: [Users]
       operationId: updateDisplayName
       summary: Update display name
+      description: >
+        Protected profile update route migrated to the shared JSON failure envelope.
+        Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
+        INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
       security:
         - bearerAuth: []
       requestBody:
@@ -1320,6 +1345,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '405':
+          description: HTTP method is not allowed for this route.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating display name.
           content:
@@ -1332,6 +1363,11 @@ paths:
       tags: [Users]
       operationId: updatePersonalEmoji
       summary: Update personal emoji
+      description: >
+        Protected profile update route migrated to the shared JSON failure envelope.
+        Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
+        INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
       security:
         - bearerAuth: []
       requestBody:
@@ -1371,6 +1407,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '405':
+          description: HTTP method is not allowed for this route.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating emoji.
           content:
@@ -1383,6 +1425,11 @@ paths:
       tags: [Users]
       operationId: updatePersonalLinks
       summary: Update personal links
+      description: >
+        Protected profile update route migrated to the shared JSON failure envelope.
+        Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
+        INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
       security:
         - bearerAuth: []
       requestBody:
@@ -1422,6 +1469,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '405':
+          description: HTTP method is not allowed for this route.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while updating personal links.
           content:
@@ -1434,6 +1487,10 @@ paths:
       tags: [Users]
       operationId: changePassword
       summary: Change account password
+      description: >
+        Protected password-change route migrated to the shared JSON failure envelope.
+        Handler-owned failures use INVALID_TOKEN, INVALID_REQUEST, VALIDATION_FAILED,
+        AUTHORIZATION_DENIED, USER_NOT_FOUND, METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
       security:
         - bearerAuth: []
       requestBody:
@@ -1463,6 +1520,12 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '405':
+          description: HTTP method is not allowed for this route.
           content:
             application/json:
               schema:
@@ -1514,9 +1577,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/userposition/{marketId}:
     get:
@@ -1607,9 +1670,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/admin/createuser:
     post:
@@ -1699,9 +1762,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/users/{username}/financial:
     get:
@@ -1744,9 +1807,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/stats:
     get:
@@ -1770,9 +1833,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/system/metrics:
     get:
@@ -1796,9 +1859,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/global/leaderboard:
     get:
@@ -1822,9 +1885,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
   /v0/content/home:
     get:
@@ -1887,9 +1950,9 @@ paths:
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
 
 components:
   securitySchemes:
@@ -1913,6 +1976,7 @@ components:
 
         Preferred public reasons for touched envelope endpoints:
         - METHOD_NOT_ALLOWED: a documented handler was called with an unsupported HTTP method.
+        - RATE_LIMITED and LOGIN_RATE_LIMITED: shared middleware rejected a request before route-specific handler logic.
         - INVALID_REQUEST: malformed request body, path parameter, or query input.
         - INVALID_TOKEN: missing or invalid bearer token.
         - AUTHORIZATION_DENIED: supplied credentials are not accepted for the requested flow, or the authenticated caller lacks the required privileges.
@@ -1929,6 +1993,8 @@ components:
           type: string
           enum:
             - METHOD_NOT_ALLOWED
+            - RATE_LIMITED
+            - LOGIN_RATE_LIMITED
             - INVALID_REQUEST
             - INVALID_TOKEN
             - AUTHORIZATION_DENIED
@@ -1948,7 +2014,7 @@ components:
 
     PlainTextErrorResponse:
       type: string
-      description: Plain text error emitted by shared middleware before request-specific handlers run.
+      description: Plain text error emitted by legacy handler-owned response paths that have not yet migrated to ReasonResponse.
 
     StatsEnvelopeResponse:
       type: object

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
@@ -18,9 +19,9 @@ func ChangePersonalLinksHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		user, httperr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, svc)
-		if httperr != nil {
-			_ = handlers.WriteFailure(w, httperr.StatusCode, profileAuthFailureReason(httperr))
+		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, svc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
 			return
 		}
 

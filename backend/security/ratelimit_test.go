@@ -1,6 +1,7 @@
 package security
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,6 +75,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		if rr.Code != http.StatusTooManyRequests {
 			t.Errorf("Expected status TooManyRequests, got %d", rr.Code)
 		}
+		assertRuntimeFailureReason(t, rr, RuntimeReasonRateLimited)
 	})
 }
 
@@ -121,11 +123,23 @@ func TestLoginRateLimitMiddleware(t *testing.T) {
 			t.Errorf("Expected status TooManyRequests, got %d", rr.Code)
 		}
 
-		// Check error message is specific to login
-		if !contains(rr.Body.String(), "login attempts") {
-			t.Error("Expected login-specific error message")
-		}
+		assertRuntimeFailureReason(t, rr, RuntimeReasonLoginRateLimited)
 	})
+}
+
+func assertRuntimeFailureReason(t *testing.T, rr *httptest.ResponseRecorder, want string) {
+	t.Helper()
+
+	var response struct {
+		OK     bool   `json:"ok"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode runtime failure response: %v", err)
+	}
+	if response.OK || response.Reason != want {
+		t.Fatalf("expected reason %q, got %+v", want, response)
+	}
 }
 
 func TestGetClientIP(t *testing.T) {
