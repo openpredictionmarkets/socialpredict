@@ -201,7 +201,7 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/login", nil)
 			w := httptest.NewRecorder()
 
-			LoginHandler(nil)(w, req)
+			LoginHandler(nil, security.NewSecurityService())(w, req)
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, w.Code)
@@ -223,7 +223,7 @@ func TestLoginHandler_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(invalidJSON))
 	w := httptest.NewRecorder()
 
-	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)))(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)), security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -242,7 +242,7 @@ func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123","extra":"nope"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)))(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)), security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -298,7 +298,7 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(repo)(w, req)
+			LoginHandler(repo, security.NewSecurityService())(w, req)
 
 			if w.Code != http.StatusBadRequest {
 				t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -325,7 +325,7 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 	w := httptest.NewRecorder()
 
-	LoginHandler(nil)(w, req)
+	LoginHandler(nil, security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -386,7 +386,7 @@ func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(repo)(w, req)
+			LoginHandler(repo, security.NewSecurityService())(w, req)
 
 			if w.Code != http.StatusOK {
 				t.Errorf("Usernames should be trimmed before DB lookup. Expected status code %d, got %d (body: %s)", http.StatusOK, w.Code, w.Body.String())
@@ -412,7 +412,7 @@ func TestLoginHandler_SuccessResponseEnvelope(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(repo)(w, req)
+	LoginHandler(repo, security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -460,7 +460,7 @@ func TestLoginHandler_InvalidCredentialsReturnsFailureEnvelope(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"wrong-password"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(repo)(w, req)
+	LoginHandler(repo, security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d: %s", w.Code, w.Body.String())
@@ -556,6 +556,7 @@ func TestValidateAdminToken_InvalidToken(t *testing.T) {
 func TestAuthServiceRequireAdmin_EnforcesPasswordChange(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	ConfigureJWTSigningKey([]byte("test-secret-key"))
 
 	admin := modelstesting.GenerateUser("admin-needs-reset", 1000)
 	admin.UserType = "ADMIN"
@@ -727,11 +728,7 @@ func TestJWTKeyExists(t *testing.T) {
 }
 
 func TestGenerateJWT_RequiresSigningKey(t *testing.T) {
-	originalKey := os.Getenv("JWT_SIGNING_KEY")
-	os.Setenv("JWT_SIGNING_KEY", "   ")
-	defer func() { os.Setenv("JWT_SIGNING_KEY", originalKey) }()
-
-	token, err := generateJWT("testuser", getJWTKey())
+	token, err := generateJWT("testuser", nil)
 	if err == nil {
 		t.Fatal("expected error when JWT key is empty")
 	}
@@ -744,6 +741,7 @@ func TestGenerateJWT_RequiresSigningKey(t *testing.T) {
 func TestMain(m *testing.M) {
 	// Set up test environment
 	os.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	ConfigureJWTSigningKey([]byte("test-secret-key-for-testing"))
 
 	// Run tests
 	code := m.Run()

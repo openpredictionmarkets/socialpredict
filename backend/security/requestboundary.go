@@ -24,7 +24,12 @@ type requestIDContextKey struct{}
 
 // RequestBoundaryMiddleware attaches stable request correlation and completion logging at the HTTP boundary.
 func RequestBoundaryMiddleware() func(http.Handler) http.Handler {
-	return newRequestBoundaryMiddleware(logger.Standard(), time.Now, defaultRequestID)
+	return RequestBoundaryMiddlewareWithProxyTrust(false)
+}
+
+// RequestBoundaryMiddlewareWithProxyTrust attaches request-boundary behavior with explicit forwarded-header trust.
+func RequestBoundaryMiddlewareWithProxyTrust(trustProxyHeaders bool) func(http.Handler) http.Handler {
+	return newRequestBoundaryMiddleware(logger.Standard(), time.Now, defaultRequestID, NewClientIdentityExtractor(trustProxyHeaders))
 }
 
 // RequestIDFromContext returns the boundary request identifier when middleware has attached one.
@@ -37,7 +42,7 @@ func RequestIDFromContext(ctx context.Context) string {
 	return requestID
 }
 
-func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func() time.Time, newRequestID func() string) func(http.Handler) http.Handler {
+func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func() time.Time, newRequestID func() string, extractors ...ClientIdentityExtractor) func(http.Handler) http.Handler {
 	if runtimeLogger == nil {
 		runtimeLogger = logger.Standard()
 	}
@@ -46,6 +51,10 @@ func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func(
 	}
 	if newRequestID == nil {
 		newRequestID = defaultRequestID
+	}
+	clientIdentity := NewClientIdentityExtractor(false)
+	if len(extractors) > 0 {
+		clientIdentity = extractors[0]
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -76,7 +85,7 @@ func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func(
 						"request panic recovered",
 						stderrors.New("panic recovered"),
 						append(
-							requestBoundaryFields(r, requestID, recorder.statusCode, now().Sub(startedAt), RuntimeErrorTypePanic),
+							requestBoundaryFields(r, requestID, recorder.statusCode, now().Sub(startedAt), RuntimeErrorTypePanic, clientIdentity),
 							logger.ExceptionRecorded(),
 						)...,
 					)
@@ -85,7 +94,7 @@ func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func(
 
 			next.ServeHTTP(recorder, r)
 
-			fields := requestBoundaryFields(r, requestID, recorder.statusCode, now().Sub(startedAt), runtimeFailureErrorType(recorder.statusCode))
+			fields := requestBoundaryFields(r, requestID, recorder.statusCode, now().Sub(startedAt), runtimeFailureErrorType(recorder.statusCode), clientIdentity)
 
 			switch {
 			case recorder.statusCode >= http.StatusInternalServerError:
@@ -99,7 +108,11 @@ func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func(
 	}
 }
 
-func requestBoundaryFields(r *http.Request, requestID string, statusCode int, duration time.Duration, errorType string) []logger.Field {
+func requestBoundaryFields(r *http.Request, requestID string, statusCode int, duration time.Duration, errorType string, extractors ...ClientIdentityExtractor) []logger.Field {
+	clientIdentity := NewClientIdentityExtractor(false)
+	if len(extractors) > 0 {
+		clientIdentity = extractors[0]
+	}
 	fields := []logger.Field{
 		logger.Operation("RequestBoundary"),
 		logger.RequestID(requestID),
@@ -108,7 +121,7 @@ func requestBoundaryFields(r *http.Request, requestID string, statusCode int, du
 		logger.StatusCode(statusCode),
 		logger.DurationMS(duration),
 	}
-	if address := strings.TrimSpace(getClientIP(r)); address != "" {
+	if address := strings.TrimSpace(clientIdentity.Extract(r)); address != "" {
 		fields = append(fields, logger.Address(address))
 	}
 	fields = append(fields, logger.TraceContextFromTraceparent(r.Header.Get("Traceparent"))...)

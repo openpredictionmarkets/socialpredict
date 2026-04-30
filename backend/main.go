@@ -50,6 +50,12 @@ func main() {
 		logger.Fatal("startup", "configuration service initialization failed", err, logger.Operation("LoadConfigService"))
 	}
 
+	securityConfig, err := appruntime.LoadSecurityConfigFromEnv()
+	if err != nil {
+		logger.Fatal("startup", "security configuration unavailable", err, logger.Operation("LoadSecurityConfigFromEnv"))
+	}
+	authsvc.ConfigureJWTSigningKey(securityConfig.JWTSigningKey)
+
 	startupMode, err := appruntime.LoadStartupMutationModeFromEnv()
 	if err != nil {
 		logger.Fatal("startup", "startup mutation mode unavailable", err, logger.Operation("LoadStartupMutationModeFromEnv"))
@@ -71,7 +77,7 @@ func main() {
 
 	readiness.MarkReady()
 
-	server.Start(openAPISpec, swaggerUIFS, db, configService, readiness)
+	server.Start(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
 }
 
 func secureEndpoint(w http.ResponseWriter, r *http.Request) {

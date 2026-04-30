@@ -20,14 +20,14 @@ type adminUserCreator interface {
 	CreateAdminManagedUser(ctx context.Context, req dusers.AdminManagedUserCreateRequest) (*dusers.AdminManagedUserCreateResult, error)
 }
 
-func AddUserHandler(userCreator adminUserCreator, configService configsvc.Service, auth authsvc.Authenticator) func(http.ResponseWriter, *http.Request) {
+func AddUserHandler(userCreator adminUserCreator, configService configsvc.Service, auth authsvc.Authenticator, securityService *security.SecurityService) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
-		responseData, handlerErr := processAddUser(r, userCreator, configService, auth)
+		responseData, handlerErr := processAddUser(r, userCreator, configService, auth, securityService)
 		if handlerErr != nil {
 			_ = handlers.WriteFailure(w, handlerErr.statusCode, handlerErr.reason)
 			logAddUserFailure(handlerErr)
@@ -49,8 +49,7 @@ type handlerError struct {
 	reason     handlers.FailureReason
 }
 
-func processAddUser(r *http.Request, userCreator adminUserCreator, configService configsvc.Service, auth authsvc.Authenticator) (map[string]interface{}, *handlerError) {
-	securityService := security.NewSecurityService()
+func processAddUser(r *http.Request, userCreator adminUserCreator, configService configsvc.Service, auth authsvc.Authenticator, securityService *security.SecurityService) (map[string]interface{}, *handlerError) {
 	req, decodeErr := decodeAddUserRequest(r)
 	if decodeErr != nil {
 		return nil, &handlerError{
@@ -59,6 +58,10 @@ func processAddUser(r *http.Request, userCreator adminUserCreator, configService
 			logErr:     decodeErr,
 			reason:     handlers.ReasonInvalidRequest,
 		}
+	}
+
+	if securityService == nil {
+		return nil, &handlerError{message: "security service unavailable", statusCode: http.StatusInternalServerError, reason: handlers.ReasonInternalError}
 	}
 
 	if err := validateAddUserUsername(securityService, req.Username); err != nil {
