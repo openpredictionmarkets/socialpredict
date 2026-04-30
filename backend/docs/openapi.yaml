@@ -1559,21 +1559,21 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching public user.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
@@ -1658,15 +1658,15 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Failed to calculate user credit.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
@@ -1750,15 +1750,15 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Failed to fetch user portfolio.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
@@ -1789,21 +1789,21 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Failed to generate financial snapshot.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:

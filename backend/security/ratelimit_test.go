@@ -148,36 +148,61 @@ func TestGetClientIP(t *testing.T) {
 		remoteAddr     string
 		forwardedFor   string
 		realIP         string
+		trustProxy     bool
 		expectedPrefix string
 	}{
 		{
 			name:           "direct connection",
 			remoteAddr:     "192.168.1.1:12345",
-			expectedPrefix: "192.168.1.1:12345",
+			expectedPrefix: "192.168.1.1",
 		},
 		{
-			name:           "with X-Forwarded-For",
+			name:           "ignores forwarded headers by default",
 			remoteAddr:     "10.0.0.1:12345",
 			forwardedFor:   "203.0.113.1, 10.0.0.1",
+			realIP:         "203.0.113.2",
+			expectedPrefix: "10.0.0.1",
+		},
+		{
+			name:           "with trusted X-Forwarded-For",
+			remoteAddr:     "10.0.0.1:12345",
+			forwardedFor:   "203.0.113.1, 10.0.0.1",
+			trustProxy:     true,
 			expectedPrefix: "203.0.113.1",
 		},
 		{
-			name:           "with X-Real-IP",
+			name:           "with trusted X-Real-IP",
 			remoteAddr:     "10.0.0.1:12345",
 			realIP:         "203.0.113.2",
+			trustProxy:     true,
 			expectedPrefix: "203.0.113.2",
 		},
 		{
-			name:           "X-Forwarded-For takes precedence over X-Real-IP",
+			name:           "trusted X-Forwarded-For takes precedence over X-Real-IP",
 			remoteAddr:     "10.0.0.1:12345",
 			forwardedFor:   "203.0.113.1",
 			realIP:         "203.0.113.2",
+			trustProxy:     true,
 			expectedPrefix: "203.0.113.1",
+		},
+		{
+			name:           "trusted invalid forwarded header falls back to real IP",
+			remoteAddr:     "10.0.0.1:12345",
+			forwardedFor:   "not-an-ip",
+			realIP:         "203.0.113.2",
+			trustProxy:     true,
+			expectedPrefix: "203.0.113.2",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.trustProxy {
+				t.Setenv(trustProxyHeadersEnv, "true")
+			} else {
+				t.Setenv(trustProxyHeadersEnv, "")
+			}
+
 			req := httptest.NewRequest("GET", "/test", nil)
 			req.RemoteAddr = tt.remoteAddr
 

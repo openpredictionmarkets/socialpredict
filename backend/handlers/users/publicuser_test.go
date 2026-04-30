@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
 )
@@ -116,6 +117,7 @@ func TestGetPublicUserHandlerNotFound(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rec.Code)
 	}
+	requirePublicUserFailureReason(t, rec, handlers.ReasonUserNotFound)
 }
 
 func TestGetPublicUserHandlerInternalError(t *testing.T) {
@@ -129,5 +131,18 @@ func TestGetPublicUserHandlerInternalError(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+	requirePublicUserFailureReason(t, rec, handlers.ReasonInternalError)
+}
+
+func requirePublicUserFailureReason(t *testing.T, rec *httptest.ResponseRecorder, reason handlers.FailureReason) {
+	t.Helper()
+
+	var body handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal failure response: %v", err)
+	}
+	if body.OK || body.Reason != string(reason) {
+		t.Fatalf("expected failure reason %q, got %+v", reason, body)
 	}
 }

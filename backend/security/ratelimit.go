@@ -1,12 +1,17 @@
 package security
 
 import (
+	"net"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
 )
+
+const trustProxyHeadersEnv = "TRUST_PROXY_HEADERS"
 
 // RateLimiter manages rate limiting for different clients/IPs
 type RateLimiter struct {
@@ -119,35 +124,61 @@ func LoginRateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Hand
 	}
 }
 
-// getClientIP extracts the client IP address from the request
+// getClientIP extracts the client IP address from the request.
+// Forwarded headers are only trusted when the deployment explicitly opts in.
 func getClientIP(r *http.Request) string {
-	// Check for forwarded IP first (if behind proxy)
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		// X-Forwarded-For can contain multiple IPs, get the first one
-		if idx := len(forwarded); idx > 0 {
-			if commaIdx := 0; commaIdx < idx {
-				for i, c := range forwarded {
-					if c == ',' {
-						commaIdx = i
-						break
-					}
-				}
-				if commaIdx > 0 {
-					return forwarded[:commaIdx]
-				}
-			}
+	if r == nil {
+		return ""
+	}
+
+	if trustProxyHeaders() {
+		if forwarded := firstForwardedFor(r.Header.Get("X-Forwarded-For")); forwarded != "" {
 			return forwarded
+		}
+
+		if realIP := headerIP(r.Header.Get("X-Real-IP")); realIP != "" {
+			return realIP
 		}
 	}
 
-	// Check for real IP header
-	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-		return realIP
-	}
+	return remoteAddressHost(r.RemoteAddr)
+}
 
-	// Fall back to remote address
-	return r.RemoteAddr
+func trustProxyHeaders() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(trustProxyHeadersEnv))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstForwardedFor(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	parts := strings.Split(value, ",")
+	return headerIP(parts[0])
+}
+
+func headerIP(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || net.ParseIP(value) == nil {
+		return ""
+	}
+	return value
+}
+
+func remoteAddressHost(remoteAddr string) string {
+	remoteAddr = strings.TrimSpace(remoteAddr)
+	if remoteAddr == "" {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil {
+		return host
+	}
+	return remoteAddr
 }
 
 // RateLimitManager manages multiple rate limiters for different endpoints

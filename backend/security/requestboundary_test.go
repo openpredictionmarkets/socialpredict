@@ -13,6 +13,8 @@ import (
 )
 
 func TestRequestBoundaryMiddlewareAddsContextHeaderAndStructuredLog(t *testing.T) {
+	t.Setenv(trustProxyHeadersEnv, "true")
+
 	var buffer bytes.Buffer
 
 	timestamps := []time.Time{

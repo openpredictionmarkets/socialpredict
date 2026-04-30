@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"socialpredict/handlers"
 	dusers "socialpredict/internal/domain/users"
 )
 
@@ -13,13 +14,13 @@ import (
 func GetUserFinancialHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
 		username := mux.Vars(r)["username"]
 		if username == "" {
-			http.Error(w, "username is required", http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -27,9 +28,9 @@ func GetUserFinancialHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 		if err != nil {
 			switch err {
 			case dusers.ErrUserNotFound:
-				http.Error(w, "user not found", http.StatusNotFound)
+				_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 			default:
-				http.Error(w, "failed to generate financial snapshot", http.StatusInternalServerError)
+				_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			}
 			return
 		}
@@ -40,7 +41,7 @@ func GetUserFinancialHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{"financial": snapshot}); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }

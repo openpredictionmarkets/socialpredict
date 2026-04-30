@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
 )
@@ -124,6 +125,7 @@ func TestGetPortfolioHandlerInvalidMethod(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected status 405, got %d", rec.Code)
 	}
+	requirePortfolioFailureReason(t, rec, handlers.ReasonMethodNotAllowed)
 }
 
 func TestGetPortfolioHandlerServiceError(t *testing.T) {
@@ -138,5 +140,18 @@ func TestGetPortfolioHandlerServiceError(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+	requirePortfolioFailureReason(t, rec, handlers.ReasonInternalError)
+}
+
+func requirePortfolioFailureReason(t *testing.T, rec *httptest.ResponseRecorder, reason handlers.FailureReason) {
+	t.Helper()
+
+	var body handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal failure response: %v", err)
+	}
+	if body.OK || body.Reason != string(reason) {
+		t.Fatalf("expected failure reason %q, got %+v", reason, body)
 	}
 }

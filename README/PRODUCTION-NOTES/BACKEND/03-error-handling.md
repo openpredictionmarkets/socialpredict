@@ -3,9 +3,9 @@ title: Error Handling
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-25T21:20:00-05:00
-updated_at_display: "Saturday, April 25, 2026 at 9:20 PM Central (CDT)"
-update_reason: "Clarify the OpenTelemetry posture for runtime failure telemetry while keeping the public API failure contract separate."
+updated_at: 2026-04-30T03:33:18Z
+updated_at_display: "Thursday, April 30, 2026 at 3:33 AM UTC"
+update_reason: "Record migration of public user read failures from PlainTextErrorResponse to ReasonResponse."
 status: active
 ---
 
@@ -191,7 +191,7 @@ The protected user profile family has converged on the shared JSON envelope and 
 | `POST /v0/profilechange/links` | Same protected profile update boundary as description. | `INVALID_TOKEN`, `PASSWORD_CHANGE_REQUIRED`, `INVALID_REQUEST`, `VALIDATION_FAILED`, `USER_NOT_FOUND`, `AUTHORIZATION_DENIED`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
 | `POST /v0/changepassword` | Uses `authhttp.WriteFailure` for token outcomes, `INVALID_REQUEST` for malformed JSON, `METHOD_NOT_ALLOWED` for wrong methods, and `writeChangePasswordError` for password service failures. | `INVALID_TOKEN`, `INVALID_REQUEST`, `VALIDATION_FAILED`, `AUTHORIZATION_DENIED`, `USER_NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
 
-The public user read/credit/portfolio routes remain a documented temporary plain-text exception. Their OpenAPI entries continue to use `PlainTextErrorResponse` for handler-owned legacy failures until those route families are migrated.
+The public user read/credit/portfolio/financial routes have now moved their handler-owned failures to `ReasonResponse`. Their successful payloads remain route-specific legacy JSON shapes.
 
 ### WAVE03 stop-and-review inventory
 
@@ -201,7 +201,6 @@ The remaining live migration surface is explicit:
 
 | Surface | Current live behavior | Examples | Next-wave seam |
 | --- | --- | --- | --- |
-| Public user read projections | Handler-owned raw `http.Error` and OpenAPI `PlainTextErrorResponse` remain. | `/v0/userinfo/{username}`, `/v0/usercredit/{username}`, `/v0/portfolio/{username}`, `/v0/users/{username}/financial` | Migrate the public user read/credit/portfolio/financial family together so OpenAPI can replace those `PlainTextErrorResponse` refs with `ReasonResponse`. |
 | Legacy markets reads and writes | Several handlers still emit raw `http.Error`; some successful delete/resolve paths still intentionally write status-only `204` responses. | `marketdetailshandler.go`, `searchmarkets.go`, `getmarkets.go`, `createmarket.go`, `resolvemarket.go`, `handler.go`, `listmarkets.go` | Split into a markets route-family wave, starting with read-only routes (`list/search/details/status/projection`) before write-sensitive create/update/resolve paths. |
 | Legacy logger fallback | `logger.RequestLoggingMiddleware` still has a raw `http.Error` fallback for a nil handler, but the main server build path now uses `security.RequestBoundaryMiddleware`. | `logger/middleware.go` | Retire or convert this fallback after confirming no live route wiring still wraps requests with the old logger middleware. |
 | `backend/errors` package | No live request-boundary import remains after WAVE03; the package is compatibility-only test-covered code. | `errors/httperror.go`, `errors/normalerror.go` | Package deletion is a separate cleanup after route-family migrations confirm no generated docs, tests, or legacy adapters still depend on it. |
@@ -443,12 +442,11 @@ The intended direction is not:
 
 ## Concrete Next Migration Goals
 
-1. Migrate the public user read/credit/portfolio/financial family next; it is the only OpenAPI surface still advertising `PlainTextErrorResponse`.
-2. Follow with a markets read-route wave for `list/search/details/status/projection` raw `http.Error` handlers before touching write-sensitive create/update/resolve paths.
-3. Keep successful status-only `204` responses separate from failure migration work; only status-only failures should be converted to an explicit failure contract.
-4. Retire or convert the legacy logger middleware fallback after confirming no live server route build still uses it.
-5. Delete `backend/errors` only as a later cleanup after compatibility tests and adapters are removed; do not expand it into the central architecture.
-6. Keep OpenAPI and production notes route-family accurate throughout the migration instead of claiming universal envelope coverage too early.
+1. Follow with a markets read-route wave for `list/search/details/status/projection` raw `http.Error` handlers before touching write-sensitive create/update/resolve paths.
+2. Keep successful status-only `204` responses separate from failure migration work; only status-only failures should be converted to an explicit failure contract.
+3. Retire or convert the legacy logger middleware fallback after confirming no live server route build still uses it.
+4. Delete `backend/errors` only as a later cleanup after compatibility tests and adapters are removed; do not expand it into the central architecture.
+5. Keep OpenAPI and production notes route-family accurate throughout the migration instead of claiming universal envelope coverage too early.
 
 ## What This Note Replaces
 

@@ -3,9 +3,9 @@ title: Security Hardening
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-26T14:07:06Z
-updated_at_display: "Sunday, April 26, 2026 at 2:07 PM UTC"
-update_reason: "Replace the older greenfield security-platform plan with current-state-first security hardening guidance grounded in the live backend."
+updated_at: 2026-04-30T03:45:22Z
+updated_at_display: "Thursday, April 30, 2026 at 3:45 AM UTC"
+update_reason: "Refresh current-state security guidance after shared error envelope and proxy-header hardening work."
 status: active
 ---
 
@@ -92,10 +92,11 @@ The live behavior already provides:
 Important current limitations:
 
 - rate limiting is process-local and in-memory
-- `429` responses still use plain-text `http.Error`
-- client-IP extraction trusts forwarded headers without an explicit proxy-trust model
+- forwarded IP headers are only trusted when `TRUST_PROXY_HEADERS=true`
+- production still needs an explicit ingress contract for forwarded-header scrubbing and any trusted proxy allowlist
+- distributed or proxy-owned rate limiting is still deferred
 
-This means the active problem is not “build advanced rate limiting from scratch.” The active problem is to make the current limiter safer and more consistent at the boundary.
+This means the active problem is not “build advanced rate limiting from scratch.” The active problem is to keep the current limiter safe at the boundary while the future deployment model decides whether rate limiting remains application-local, moves to a proxy, or becomes distributed.
 
 ### Validation and sanitization already exist and are used directly
 
@@ -118,24 +119,22 @@ They are already used in real request paths, including login in [loggin.go](/wor
 
 The current opportunity is to keep these helpers as shared request-boundary support, not to rebuild a new schema engine or validation platform for the active slice.
 
-### Auth still leaks transport policy from an internal seam
-
-The current auth helper layer still defines a transport-shaped error in [authutils.go](/workspace/socialpredict/backend/internal/service/auth/authutils.go):
+### Auth still has request-boundary cleanup seams
 
 ```go
-type HTTPError struct {
-    StatusCode int
-    Message    string
+type AuthError struct {
+    Kind    ErrorKind
+    Message string
 }
 ```
 
-And request-path auth helpers still return that type directly from [auth.go](/workspace/socialpredict/backend/internal/service/auth/auth.go):
+The current auth helper layer now returns `AuthError` values from [auth.go](/workspace/socialpredict/backend/internal/service/auth/auth.go), and migrated handlers translate those through [authhttp.go](/workspace/socialpredict/backend/handlers/authhttp/authhttp.go).
 
-```go
-func ValidateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface) (*dusers.User, *HTTPError)
-```
+That is cleaner than the earlier transport-shaped `HTTPError` seam, but auth is not fully centralized yet:
 
-That keeps route-visible HTTP status and message policy inside an internal seam, which is inconsistent with the current error-handling and design-plan direction.
+- auth helpers still take `*http.Request`
+- some legacy market paths still translate auth failures into raw `http.Error` responses
+- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go) still parses JWTs directly and reads `JWT_SIGNING_KEY` instead of going through the auth service contract
 
 At the same time, login already uses the shared envelope path in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go) through `handlers.WriteFailure`, so the live system is mixed rather than empty.
 
@@ -177,14 +176,17 @@ This means password-change enforcement is not a speculative future feature. It i
 
 ### Wider route-family cleanup is still a boundary-migration problem
 
-Many handlers still emit raw `http.Error` strings across the backend, including security-adjacent request paths such as:
+The remaining non-test raw `http.Error` calls are concentrated in market handlers, including security-adjacent request paths such as:
 
 - [createmarket.go](/workspace/socialpredict/backend/handlers/markets/createmarket.go)
-- [publicuser.go](/workspace/socialpredict/backend/handlers/users/publicuser.go)
-- [portfolio.go](/workspace/socialpredict/backend/handlers/users/publicuser/portfolio.go)
-- [financial.go](/workspace/socialpredict/backend/handlers/users/financial.go)
+- [handler.go](/workspace/socialpredict/backend/handlers/markets/handler.go)
+- [listmarkets.go](/workspace/socialpredict/backend/handlers/markets/listmarkets.go)
+- [getmarkets.go](/workspace/socialpredict/backend/handlers/markets/getmarkets.go)
+- [marketdetailshandler.go](/workspace/socialpredict/backend/handlers/markets/marketdetailshandler.go)
+- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go)
+- [searchmarkets.go](/workspace/socialpredict/backend/handlers/markets/searchmarkets.go)
 
-That overlap matters, but this note should not pretend that all route-family response cleanup belongs to a standalone security-platform initiative. It is tied directly to the active error-handling and auth-alignment work.
+That overlap matters, but this note should not pretend that all route-family response cleanup belongs to a standalone security-platform initiative. It is tied directly to the active error-handling and auth-alignment work. The explicit remaining slice list is carried in [FUTURE/01-long-term-security-hardening.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/01-long-term-security-hardening.md).
 
 ## What Security Hardening Should Own
 
@@ -203,7 +205,7 @@ Security hardening should own:
 
 This note should also own the direction that:
 
-- internal auth code should move away from transport-shaped `HTTPError`
+- internal auth code should keep route-visible status and response shape out of core auth decisions
 - route-visible auth failures should be translated at handlers or middleware
 - `mustChangePassword` remains a server-side enforcement concern
 - login stays usable while broader token redesign is deferred
@@ -240,15 +242,15 @@ Those topics now belong in [FUTURE/01-long-term-security-hardening.md](/workspac
 The near-term security direction should align with the current design-plan waves rather than invent a separate security-platform track.
 
 1. Keep configuration and runtime ownership explicit so JWT key presence, CORS posture, and runtime-sensitive security settings are not hidden in ad hoc helpers.
-2. Use the active error-handling wave to converge boundary-owned `429`, `405`, and sanitized failure behavior where security middleware currently bypasses the shared contract.
-3. Use the later auth and API alignment wave to retire `internal/service/auth.HTTPError` and clean up route-visible auth failure mapping.
+2. Use the active error-handling wave to converge remaining market handler failures, `405`, auth rejection, and other sanitized boundary behavior on shared envelopes.
+3. Use the later auth and API alignment wave to retire direct JWT parsing and clean up route-visible auth failure mapping.
 4. Tighten CORS, proxy-trust, and header posture once deployment assumptions are explicit.
 5. Keep long-term identity and security-platform work deferred until the active production notes and current design-plan waves are complete.
 
 ## Open Questions
 
 - Should HSTS be owned in application headers, ingress or proxy policy, or both?
-- What exact proxy-trust model should govern `X-Forwarded-For` and `X-Real-IP` handling in rate limiting?
+- What exact proxy-trust model should govern `X-Forwarded-For` and `X-Real-IP` handling beyond the current `TRUST_PROXY_HEADERS` opt-in?
 - When does SocialPredict actually need distributed rate limiting rather than the current per-process limiter?
 - What is the intended long-term runtime contract for JWT signing key management and rotation?
 - Which middleware-generated security failures should eventually use stable public `reason` values across route families?
