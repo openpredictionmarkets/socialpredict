@@ -30,6 +30,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DATABASE}
+      STARTUP_WRITER: "${STARTUP_WRITER:-true}"
     env_file:
       - ../.env
     ports:
