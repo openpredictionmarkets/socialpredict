@@ -3,9 +3,9 @@ title: Long-Term Deployment Platform
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Capture longer-term deployment-platform ideas separately from the active runtime and deployment hardening note."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record that the serving-path liveness/readiness prerequisite finished on April 30 while keeping platform migration deferred."
 status: draft
 ---
 
@@ -16,6 +16,10 @@ status: draft
 This note holds longer-term deployment-platform ideas that should not drive the active production-hardening sequence.
 
 The active deployment work remains in [08-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-deployment-infrastructure.md).
+
+## Completed Prerequisite
+
+Real serving-path liveness and readiness behavior finished on April 30, 2026: `/health` now reports liveness, and `/readyz` reports readiness plus database availability. That removes one prerequisite from this future platform note, but it does not activate Kubernetes, Helm, Terraform, autoscaling, or service-mesh work.
 
 ## Deferred Topics
 
@@ -34,7 +38,7 @@ Deferred deployment-platform ideas include:
 
 These ideas should stay deferred until the backend has:
 
-- real readiness and liveness behavior
+- deployment policy that consumes the April 30, 2026 liveness/readiness endpoints intentionally
 - clearer startup-writer and migration posture
 - safer graceful shutdown behavior
 - explicit proxy publishing for docs and infra routes

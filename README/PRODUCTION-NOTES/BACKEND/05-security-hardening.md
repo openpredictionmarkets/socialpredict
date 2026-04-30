@@ -3,9 +3,9 @@ title: Security Hardening
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T05:38:00Z
-updated_at_display: "Thursday, April 30, 2026 at 5:38 AM UTC"
-update_reason: "Close WAVE05 with a security stop-and-review inventory and the next precise auth-boundary seam."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record WAVE05 completion evidence, keep the remaining security future work scoped, and preserve the next precise auth-boundary seam."
 status: active
 ---
 
@@ -14,6 +14,16 @@ status: active
 ## Update Summary
 
 This note was updated on Sunday, April 26, 2026 to replace an older greenfield security-platform plan with guidance that matches the live SocialPredict backend, the active design-plan posture, and the high-availability and fault-tolerance objective.
+
+On Thursday, April 30, 2026, WAVE05 finished the first runtime-security ownership slice. The completed problems are now documented here so they do not remain in the future backlog:
+
+| Finished on April 30, 2026 | Evidence |
+| --- | --- |
+| Runtime/bootstrap owns JWT signing-key presence, CORS posture, trusted proxy-header posture, security headers, and optional app-level HSTS before server construction. | [internal/app/runtime/security.go](/workspace/socialpredict/backend/internal/app/runtime/security.go), [server.go](/workspace/socialpredict/backend/server/server.go), and `go test ./internal/app/runtime ./server`. |
+| Spoofable forwarded headers no longer affect request-boundary logging or rate-limit identity unless `TRUST_PROXY_HEADERS=true`. | [ratelimit.go](/workspace/socialpredict/backend/security/ratelimit.go), [requestboundary.go](/workspace/socialpredict/backend/security/requestboundary.go), `go test ./security`, and a Docker smoke check that reached `LOGIN_RATE_LIMITED` while changing `X-Forwarded-For`. |
+| Runtime-owned `405` and `429` responses now use shared JSON failure envelopes. | [failures.go](/workspace/socialpredict/backend/security/failures.go), [server.go](/workspace/socialpredict/backend/server/server.go), and black-box checks for `METHOD_NOT_ALLOWED` and `LOGIN_RATE_LIMITED`. |
+| Login and admin-user request validation use the shared security service through application wiring. | [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go), [adduser.go](/workspace/socialpredict/backend/handlers/admin/adduser.go), and `go test ./internal/service/auth ./handlers/admin`. |
+| Private action routes now enforce `mustChangePassword` before domain handlers run. | [server.go](/workspace/socialpredict/backend/server/server.go), server tests, and a Docker smoke check showing `/v0/privateprofile` and `/v0/bet` return `PASSWORD_CHANGE_REQUIRED` before password change and succeed after password change. |
 
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
@@ -138,7 +148,7 @@ That is cleaner than the earlier transport-shaped `HTTPError` seam, but auth is 
 
 At the same time, login already uses the shared envelope path in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go) through `handlers.WriteFailure`, so the live system is mixed rather than empty.
 
-### Header and CORS posture already exists, but it is only partly owned
+### Header and CORS posture now has runtime ownership, with broad defaults
 
 Security headers are already applied by [headers.go](/workspace/socialpredict/backend/security/headers.go), including:
 
@@ -149,13 +159,13 @@ Security headers are already applied by [headers.go](/workspace/socialpredict/ba
 - `Permissions-Policy`
 - cross-origin embedder/opener/resource policy headers
 
-But the live header posture is still transitional:
+The live header posture now has runtime ownership for the serving path:
 
-- defaults are static and code-defined
-- HSTS is not currently part of the runtime header policy
-- the note should treat TLS termination and HSTS ownership as an explicit deployment question, not assume application-only ownership
+- defaults still originate in `backend/security`, but server wiring receives them through the runtime security snapshot
+- app-level HSTS is available through `SECURITY_HSTS_ENABLED`, `SECURITY_HSTS_MAX_AGE`, `SECURITY_HSTS_INCLUDE_SUBDOMAINS`, and `SECURITY_HSTS_PRELOAD`
+- HSTS remains disabled by default because TLS termination and HSTS ownership may belong at ingress or proxy
 
-CORS is already runtime-configured in [server.go](/workspace/socialpredict/backend/server/server.go) through environment variables, but current defaults remain broad:
+CORS is now loaded by [internal/app/runtime/security.go](/workspace/socialpredict/backend/internal/app/runtime/security.go) and applied in [server.go](/workspace/socialpredict/backend/server/server.go), but current defaults remain broad:
 
 - `CORS_ENABLED` defaults to enabled
 - `CORS_ALLOW_ORIGINS` defaults to `*`
@@ -183,6 +193,8 @@ WAVE05 hardened the active request-boundary security surface without reopening t
 - rate-limit and method-not-allowed middleware failures now use shared runtime JSON failure envelopes instead of plain-text middleware responses
 - login and admin-user validation receive the shared security service from application wiring instead of constructing ad hoc security helpers inside each request path
 - the auth facade can receive the runtime-owned JWT signing key, and the private action routes `/v0/bet`, `/v0/sell`, and `/v0/userposition/{marketId}` enforce `mustChangePassword` with the shared `PASSWORD_CHANGE_REQUIRED` failure reason before domain handlers run
+
+On April 30, 2026, the running Docker backend at `http://localhost:8080` also passed black-box checks for `/health`, `/readyz`, security headers, request ID propagation, CORS behavior, shared `405`, login validation, login rate limiting with spoofed `X-Forwarded-For`, and the `mustChangePassword` route gate.
 
 The remaining security-specific exceptions after this wave are intentionally narrow:
 
@@ -293,7 +305,7 @@ The near-term security direction should align with the current design-plan waves
 - What exact proxy-trust model should govern `X-Forwarded-For` and `X-Real-IP` handling beyond the current `TRUST_PROXY_HEADERS` opt-in?
 - When does SocialPredict actually need distributed rate limiting rather than the current per-process limiter?
 - What is the intended long-term runtime contract for JWT signing key management and rotation?
-- Which middleware-generated security failures should eventually use stable public `reason` values across route families?
+- Which remaining handler-generated security failures should eventually use stable public `reason` values across route families?
 
 ## Explicit Do-Not-Do List
 

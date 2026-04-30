@@ -3,9 +3,9 @@ title: Monitoring and Alerting
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Replace the older monitoring-platform plan with a current-state-first note that separates app-owned operational signals from deferred external monitoring stack work."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 liveness/readiness completion while keeping larger monitoring-platform work deferred."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Monday, April 27, 2026 to replace an older Prometheus-and-dashboards-first plan with guidance that matches the live backend and the current design-plan recommendation to harden app-owned signals before adopting a larger monitoring platform.
+
+On Thursday, April 30, 2026, the first app-owned operational signal gap was closed for the serving path: `/health` now reports liveness, `/readyz` reports readiness and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. Broader metrics export, dashboarding, and alerting remain deferred.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -54,7 +56,7 @@ The current backend already emits some signals, but the operational contract is 
 
 That matters because:
 
-- `/health` in [server.go](/workspace/socialpredict/backend/server/server.go) is still a placeholder
+- `/health` and `/readyz` in [server.go](/workspace/socialpredict/backend/server/server.go) now provide the first liveness/readiness contract, but the backend still lacks broader operational metrics
 - logging is still mostly stdlib-wrapped in [simplelogging.go](/workspace/socialpredict/backend/logger/simplelogging.go) and [loggingutils.go](/workspace/socialpredict/backend/logging/loggingutils.go)
 - there is no `/metrics` route or Prometheus client usage in the active backend runtime
 - the existing `/v0/system/metrics` route is an economics and accounting surface, not a runtime availability or latency surface
@@ -72,19 +74,19 @@ The backend already has:
 
 That means the repo is not blank on logging, but it is also not yet at a mature operational-monitoring posture. This note should describe the operational outcome expected from that logging direction rather than duplicate the app-internal logging design.
 
-### Health exists, but readiness does not
+### Liveness and readiness now exist, but metrics export does not
 
-The backend currently serves only:
+As of April 30, 2026, the backend serves:
 
 - `GET /health`
+- `GET /readyz`
 
-And that route currently returns plain-text `ok` in [server.go](/workspace/socialpredict/backend/server/server.go). There is no live:
+Those routes are intentionally small text responses in [server.go](/workspace/socialpredict/backend/server/server.go):
 
-- readiness endpoint
-- liveness endpoint distinct from readiness
-- startup probe endpoint
+- `/health` reports liveness as `live`
+- `/readyz` reports readiness as `ready` or `not ready` and checks database availability after the readiness gate opens
 
-That is the first operational signal gap.
+That first operational signal problem was finished on April 30, 2026. The remaining monitoring gap is not basic liveness/readiness; it is operational metrics export, latency/error visibility, and alert-consumption design.
 
 ### Business metrics already exist
 
