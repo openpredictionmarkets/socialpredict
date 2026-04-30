@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"socialpredict/handlers"
 	adminhandlers "socialpredict/handlers/admin"
+	"socialpredict/handlers/authhttp"
 	betshandlers "socialpredict/handlers/bets"
 	buybetshandlers "socialpredict/handlers/bets/buying"
 	sellbetshandlers "socialpredict/handlers/bets/selling"
@@ -32,7 +33,6 @@ import (
 	"socialpredict/logger"
 	"socialpredict/security"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -42,85 +42,43 @@ import (
 	"gorm.io/gorm"
 )
 
-// CORS helpers configured via environment variables
-
-func getListEnv(key, def string) []string { // default empty - allows any string, splits on comma
-	val := strings.TrimSpace(os.Getenv(key))
-	if val == "" {
-		val = def
-	}
-	if val == "" {
+func buildCORS(config appruntime.CORSConfig) *cors.Cors {
+	if !config.Enabled {
 		return nil
 	}
-	parts := strings.Split(val, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-func getBoolEnv(key string, def bool) bool { // default false - allows any string to be false except specific true values
-	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
-	if v == "" {
-		return def
-	}
-	return v == "1" || v == "true" || v == "yes" || v == "on"
-}
-
-func getIntEnv(key string, def int) int { // default 0 - allows any string to be int, otherwise default
-	v := strings.TrimSpace(os.Getenv(key))
-	if v == "" {
-		return def
-	}
-	if n, err := strconv.Atoi(v); err == nil {
-		return n
-	}
-	return def
-}
-
-func buildCORSFromEnv() *cors.Cors {
-	if !getBoolEnv("CORS_ENABLED", true) {
-		return nil
-	}
-	origins := getListEnv("CORS_ALLOW_ORIGINS", "*")
-	methods := getListEnv("CORS_ALLOW_METHODS", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-	headers := getListEnv("CORS_ALLOW_HEADERS", "Content-Type,Authorization")
-	expose := getListEnv("CORS_EXPOSE_HEADERS", "")
-	allowCreds := getBoolEnv("CORS_ALLOW_CREDENTIALS", false)
-	maxAge := getIntEnv("CORS_MAX_AGE", 600)
 
 	return cors.New(cors.Options{
-		AllowedOrigins:   origins,
-		AllowedMethods:   methods,
-		AllowedHeaders:   headers,
-		ExposedHeaders:   expose,
-		AllowCredentials: allowCreds,
-		MaxAge:           maxAge,
+		AllowedOrigins:   config.AllowedOrigins,
+		AllowedMethods:   config.AllowedMethods,
+		AllowedHeaders:   config.AllowedHeaders,
+		ExposedHeaders:   config.ExposedHeaders,
+		AllowCredentials: config.AllowCredentials,
+		MaxAge:           config.MaxAge,
 	})
 }
 
-func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness) (http.Handler, error) {
-	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService, readiness)
+func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) (http.Handler, error) {
+	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	handler := http.Handler(router)
-	if c := buildCORSFromEnv(); c != nil {
+	if c := buildCORS(securityConfig.CORS); c != nil {
 		handler = c.Handler(handler)
 	}
-	handler = security.RequestBoundaryMiddleware()(handler)
+	handler = security.SecurityHeadersMiddleware(securityConfig.Headers)(handler)
+	handler = security.RequestBoundaryMiddlewareWithProxyTrust(securityConfig.TrustProxyHeaders)(handler)
 
 	return handler, nil
 }
 
-func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness) (*mux.Router, error) {
+func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) (*mux.Router, error) {
 	if configService == nil {
 		return nil, fmt.Errorf("config init: configuration service unavailable")
+	}
+	if len(securityConfig.JWTSigningKey) == 0 {
+		return nil, fmt.Errorf("security init: JWT signing key unavailable")
 	}
 
 	router := mux.NewRouter()
@@ -129,7 +87,7 @@ func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServi
 		return nil, err
 	}
 
-	registerApplicationRoutes(router, db, configService, security.NewSecurityService())
+	registerApplicationRoutes(router, db, configService, securityConfig)
 	return router, nil
 }
 
@@ -256,13 +214,29 @@ func registerApplicationReportingRoutes(router *mux.Router, configService config
 	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(reportingService))).Methods("GET")
 }
 
-func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, securityService *security.SecurityService) {
-	container := app.BuildApplicationWithConfigService(db, configService)
+func requirePasswordChangeCleared(auth authsvc.Authenticator, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if auth == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		if _, authErr := auth.CurrentUser(r); authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, securityConfig appruntime.SecurityConfig) {
+	container := app.BuildApplicationWithConfigAndJWTSigningKey(db, configService, securityConfig.JWTSigningKey)
 	marketsService := container.GetMarketsService()
 	usersService := container.GetUsersService()
 	usersRepo := container.GetUsersRepository()
 	analyticsService := container.GetAnalyticsService()
 	authService := container.GetAuthService()
+	requestSecurityService := container.GetSecurityService()
 
 	// Create Handler instances
 	marketsHandler := marketshandlers.NewHandler(marketsService, authService)
@@ -271,11 +245,17 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// This defines all functions starting with /api/
 
 	// Apply security middleware to all routes
+	rateLimitConfig := security.DefaultRateLimitConfig()
+	rateLimitConfig.TrustProxyHeaders = securityConfig.TrustProxyHeaders
+	securityService := security.NewRuntimeSecurityService(rateLimitConfig, securityConfig.Headers)
 	securityMiddleware := securityService.SecurityMiddleware()
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
+	privateActionMiddleware := func(next http.Handler) http.Handler {
+		return securityMiddleware(requirePasswordChangeCleared(authService, next))
+	}
 
 	router.HandleFunc("/v0/home", handlers.HomeHandler).Methods("GET")
-	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(usersRepo))).Methods("POST")
+	router.Handle("/v0/login", loginSecurityMiddleware(authsvc.LoginHandler(usersRepo, requestSecurityService, securityConfig.JWTSigningKey))).Methods("POST")
 
 	// application setup information
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
@@ -340,12 +320,12 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/profilechange/links", securityMiddleware(usershandlers.ChangePersonalLinksHandler(usersService))).Methods("POST")
 
 	// handle private user actions such as make a bet, sell positions, get user position
-	router.Handle("/v0/bet", securityMiddleware(buybetshandlers.PlaceBetHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
-	router.Handle("/v0/userposition/{marketId}", securityMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
-	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
+	router.Handle("/v0/bet", privateActionMiddleware(buybetshandlers.PlaceBetHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
+	router.Handle("/v0/userposition/{marketId}", privateActionMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
+	router.Handle("/v0/sell", privateActionMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 
 	// admin stuff - apply security middleware
-	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(usersService, container.GetConfigService(), authService)))).Methods("POST")
+	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(usersService, container.GetConfigService(), authService, requestSecurityService)))).Methods("POST")
 
 	// homepage content routes
 	homepageRepo := homepage.NewGormRepository(db)
@@ -357,8 +337,9 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
 }
 
-func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness) {
-	handler, err := buildHandler(openAPISpec, swaggerUIFS, db, configService, readiness)
+func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) {
+	authsvc.ConfigureJWTSigningKey(securityConfig.JWTSigningKey)
+	handler, err := buildHandler(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
 	if err != nil {
 		logger.Fatal("server", "http handler initialization failed", err, logger.Operation("buildHandler"))
 	}

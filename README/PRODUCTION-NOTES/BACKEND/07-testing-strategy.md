@@ -3,9 +3,9 @@ title: Testing Strategy
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T00:13:14Z
-updated_at_display: "Monday, April 27, 2026 at 12:13 AM UTC"
-update_reason: "Replace the older greenfield testing-platform plan with a current-state-first testing strategy grounded in the live backend, package-local Go testing conventions, and the active HA-focused design plan."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 WAVE05 backend security smoke evidence while keeping the testing strategy package-local and evidence-driven."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Monday, April 27, 2026 to replace an older greenfield test-platform plan with guidance that matches the live SocialPredict backend, idiomatic Go test layout, and the active design-plan posture.
+
+On Thursday, April 30, 2026, the WAVE05 backend security slice was verified with both package-level Go tests and Docker-backed black-box HTTP checks. That evidence confirms the current testing direction: keep most checks close to the owning packages, then add a small number of black-box smoke checks when runtime wiring, CORS, rate limiting, or auth gates need end-to-end confirmation.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -233,13 +235,13 @@ In practice, that means:
 
 1. Preserve the current package-local test posture and existing helper packages.
 2. Expand verification around runtime and DB ownership:
-   - readiness semantics
+   - readiness semantics, completed for the serving path on April 30, 2026
    - migration failure behavior
    - startup coordination
 3. Expand verification around request-boundary convergence:
    - auth failure behavior
    - middleware failure behavior
-   - rate limiting and proxy assumptions
+   - rate limiting and proxy assumptions, with the first spoofed-forwarded-header smoke check completed on April 30, 2026
 4. Strengthen accounting-sensitive verification for:
    - place bet
    - sell position

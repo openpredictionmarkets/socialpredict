@@ -3,9 +3,9 @@ title: Deployment Infrastructure
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Replace the older greenfield deployment-platform plan with a current-state-first runtime and deployment note grounded in the live Docker, nginx, Traefik, and GitHub workflow topology."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 liveness/readiness completion while keeping the remaining deployment hardening scoped to the current Docker and proxy topology."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Monday, April 27, 2026 to replace an older Kubernetes-heavy deployment plan with guidance that matches the live SocialPredict deployment topology and the current design-plan priority on runtime safety first.
+
+On Thursday, April 30, 2026, the first deployment-facing health problem was finished for the backend serving path: `/health` now reports liveness, `/readyz` checks readiness and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. Deployment work still needs image healthcheck policy, proxy publishing, startup-writer posture, and graceful rollout/shutdown discipline.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -60,7 +62,7 @@ The current backend already has a deployable topology, but it does not yet have 
 That matters because:
 
 - [main.go](/workspace/socialpredict/backend/main.go) still performs DB init, readiness wait, migrations, config load, seeding, and server startup in one process path
-- [server.go](/workspace/socialpredict/backend/server/server.go) still exposes only a static `/health`
+- [server.go](/workspace/socialpredict/backend/server/server.go) now exposes `/health` and `/readyz`, but deployment healthcheck policy is not yet wired into the image or compose topology
 - the production compose stack in [docker-compose-prod.yaml](/workspace/socialpredict/scripts/docker-compose-prod.yaml) uses `depends_on`, not real health-gated orchestration
 - the backend Docker image in [Dockerfile](/workspace/socialpredict/docker/backend/Dockerfile) has no `HEALTHCHECK`
 - the nginx production template in [default.conf.template](/workspace/socialpredict/data/nginx/vhosts/prod/default.conf.template) proxies `/api/` and `/`, but does not explicitly publish `/swagger/` or `/openapi.yaml`
@@ -98,15 +100,20 @@ The current process startup in [main.go](/workspace/socialpredict/backend/main.g
 
 That is operationally simple, but it is not yet a safe long-term multi-replica posture. Deployment hardening has to acknowledge that reality directly.
 
-### Health semantics are still too weak
+### Health semantics now have a serving-path baseline
 
-The current infra route registration in [server.go](/workspace/socialpredict/backend/server/server.go) exposes only:
+The current infra route registration in [server.go](/workspace/socialpredict/backend/server/server.go) exposes:
 
 - `GET /health`
+- `GET /readyz`
 
-And that route currently returns a plain-text `200 ok` regardless of DB availability, migration state, or startup compatibility.
+As of April 30, 2026:
 
-That is fine as a stub, but it is not sufficient as a readiness signal for HA routing.
+- `/health` returns plain-text `live` for liveness
+- `/readyz` returns `ready` only after the readiness gate is open and database availability passes
+- `/readyz` returns `not ready` with `503` when the readiness gate is closed or the database check fails
+
+That problem is finished for the backend serving path. Deployment infrastructure still needs to decide how Docker, compose, nginx, Traefik, and future orchestrators should consume those endpoints.
 
 ### The backend image is simple and production-usable, but not health-aware yet
 

@@ -3,7 +3,6 @@ package security
 import (
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -11,9 +10,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const trustProxyHeadersEnv = "TRUST_PROXY_HEADERS"
+const (
+	// RateLimitScopeInProcess records that this limiter is local to one Go process.
+	// It is not a distributed, replica-wide, or ingress-wide rate limit.
+	RateLimitScopeInProcess = "in_process"
+)
 
-// RateLimiter manages rate limiting for different clients/IPs
+// RateLimiter manages process-local rate limiting for different client identities.
 type RateLimiter struct {
 	limiters map[string]*rate.Limiter
 	mu       sync.RWMutex
@@ -37,7 +40,12 @@ func NewRateLimiter(r rate.Limit, b int, cleanup time.Duration) *RateLimiter {
 	return rl
 }
 
-// GetLimiter returns the rate limiter for a given key (IP address)
+// Scope reports the enforcement scope for this limiter.
+func (rl *RateLimiter) Scope() string {
+	return RateLimitScopeInProcess
+}
+
+// GetLimiter returns the in-process rate limiter for a given client identity.
 func (rl *RateLimiter) GetLimiter(key string) *rate.Limiter {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -70,11 +78,12 @@ func (rl *RateLimiter) cleanupRoutine() {
 
 // RateLimitConfig holds configuration for different rate limits
 type RateLimitConfig struct {
-	LoginRate       rate.Limit // requests per second for login attempts
-	LoginBurst      int        // max burst for login attempts
-	GeneralRate     rate.Limit // requests per second for general API
-	GeneralBurst    int        // max burst for general API
-	CleanupInterval time.Duration
+	LoginRate         rate.Limit // requests per second for login attempts
+	LoginBurst        int        // max burst for login attempts
+	GeneralRate       rate.Limit // requests per second for general API
+	GeneralBurst      int        // max burst for general API
+	CleanupInterval   time.Duration
+	TrustProxyHeaders bool
 }
 
 // DefaultRateLimitConfig returns sensible default rate limits
@@ -90,13 +99,21 @@ func DefaultRateLimitConfig() RateLimitConfig {
 
 // RateLimitMiddleware creates a rate limiting middleware
 func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
+	return RateLimitMiddlewareWithProxyTrust(limiter, false)
+}
+
+// RateLimitMiddlewareWithProxyTrust creates rate limiting middleware with explicit proxy-header posture.
+func RateLimitMiddlewareWithProxyTrust(limiter *RateLimiter, trustProxy bool) func(http.Handler) http.Handler {
+	return RateLimitMiddlewareWithClientIdentity(limiter, NewClientIdentityExtractor(trustProxy))
+}
+
+// RateLimitMiddlewareWithClientIdentity creates rate limiting middleware using an explicit client identity contract.
+func RateLimitMiddlewareWithClientIdentity(limiter *RateLimiter, clientIdentity ClientIdentityExtractor) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Get client IP
-			ip := getClientIP(r)
+			clientID := clientIdentity.Extract(r)
 
-			// Check rate limit
-			if !limiter.GetLimiter(ip).Allow() {
+			if !limiter.GetLimiter(clientID).Allow() {
 				WriteRateLimited(w, RuntimeReasonRateLimited)
 				return
 			}
@@ -108,13 +125,21 @@ func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 
 // LoginRateLimitMiddleware creates a stricter rate limit for login endpoints
 func LoginRateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
+	return LoginRateLimitMiddlewareWithProxyTrust(limiter, false)
+}
+
+// LoginRateLimitMiddlewareWithProxyTrust creates login rate limiting middleware with explicit proxy-header posture.
+func LoginRateLimitMiddlewareWithProxyTrust(limiter *RateLimiter, trustProxy bool) func(http.Handler) http.Handler {
+	return LoginRateLimitMiddlewareWithClientIdentity(limiter, NewClientIdentityExtractor(trustProxy))
+}
+
+// LoginRateLimitMiddlewareWithClientIdentity creates login rate limiting middleware using an explicit client identity contract.
+func LoginRateLimitMiddlewareWithClientIdentity(limiter *RateLimiter, clientIdentity ClientIdentityExtractor) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Get client IP
-			ip := getClientIP(r)
+			clientID := clientIdentity.Extract(r)
 
-			// Check rate limit
-			if !limiter.GetLimiter(ip).Allow() {
+			if !limiter.GetLimiter(clientID).Allow() {
 				WriteRateLimited(w, RuntimeReasonLoginRateLimited)
 				return
 			}
@@ -124,14 +149,23 @@ func LoginRateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Hand
 	}
 }
 
-// getClientIP extracts the client IP address from the request.
-// Forwarded headers are only trusted when the deployment explicitly opts in.
-func getClientIP(r *http.Request) string {
+// ClientIdentityExtractor defines which request attributes may identify a client at the HTTP boundary.
+type ClientIdentityExtractor struct {
+	trustProxyHeaders bool
+}
+
+// NewClientIdentityExtractor returns a client identity extractor bound to the runtime proxy-trust contract.
+func NewClientIdentityExtractor(trustProxyHeaders bool) ClientIdentityExtractor {
+	return ClientIdentityExtractor{trustProxyHeaders: trustProxyHeaders}
+}
+
+// Extract returns the client identity used by request-boundary security controls.
+func (e ClientIdentityExtractor) Extract(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
 
-	if trustProxyHeaders() {
+	if e.trustProxyHeaders {
 		if forwarded := firstForwardedFor(r.Header.Get("X-Forwarded-For")); forwarded != "" {
 			return forwarded
 		}
@@ -144,13 +178,14 @@ func getClientIP(r *http.Request) string {
 	return remoteAddressHost(r.RemoteAddr)
 }
 
-func trustProxyHeaders() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv(trustProxyHeadersEnv))) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
+// getClientIP extracts the client IP address from the request.
+// Forwarded headers are only trusted when the deployment explicitly opts in.
+func getClientIP(r *http.Request) string {
+	return getClientIPWithProxyTrust(r, false)
+}
+
+func getClientIPWithProxyTrust(r *http.Request, trustProxy bool) string {
+	return NewClientIdentityExtractor(trustProxy).Extract(r)
 }
 
 func firstForwardedFor(value string) string {
@@ -185,6 +220,7 @@ func remoteAddressHost(remoteAddr string) string {
 type RateLimitManager struct {
 	loginLimiter   *RateLimiter
 	generalLimiter *RateLimiter
+	clientIdentity ClientIdentityExtractor
 }
 
 // NewRateLimitManager creates a new rate limit manager with default configuration
@@ -202,6 +238,7 @@ func NewRateLimitManager() *RateLimitManager {
 			config.GeneralBurst,
 			config.CleanupInterval,
 		),
+		clientIdentity: NewClientIdentityExtractor(config.TrustProxyHeaders),
 	}
 }
 
@@ -218,15 +255,16 @@ func NewCustomRateLimitManager(config RateLimitConfig) *RateLimitManager {
 			config.GeneralBurst,
 			config.CleanupInterval,
 		),
+		clientIdentity: NewClientIdentityExtractor(config.TrustProxyHeaders),
 	}
 }
 
 // GetLoginMiddleware returns the login rate limiting middleware
 func (rlm *RateLimitManager) GetLoginMiddleware() func(http.Handler) http.Handler {
-	return LoginRateLimitMiddleware(rlm.loginLimiter)
+	return LoginRateLimitMiddlewareWithClientIdentity(rlm.loginLimiter, rlm.clientIdentity)
 }
 
 // GetGeneralMiddleware returns the general rate limiting middleware
 func (rlm *RateLimitManager) GetGeneralMiddleware() func(http.Handler) http.Handler {
-	return RateLimitMiddleware(rlm.generalLimiter)
+	return RateLimitMiddlewareWithClientIdentity(rlm.generalLimiter, rlm.clientIdentity)
 }

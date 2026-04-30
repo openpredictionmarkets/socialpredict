@@ -7,23 +7,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"socialpredict/handlers"
 
 	"socialpredict/internal/domain/boundary"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/security"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
-
-// login and validation stuff
-// getJWTKey returns the JWT signing key, checking environment variable at runtime
-func getJWTKey() []byte {
-	return []byte(strings.TrimSpace(os.Getenv("JWT_SIGNING_KEY")))
-}
 
 // LoginUserRepository exposes only the user lookup required for login.
 type LoginUserRepository interface {
@@ -43,14 +35,17 @@ type loginResponse struct {
 	MustChangePassword bool   `json:"mustChangePassword"`
 }
 
-func LoginHandler(users LoginUserRepository) http.HandlerFunc {
+func LoginHandler(users LoginUserRepository, securityService *security.SecurityService, jwtSigningKey ...[]byte) http.HandlerFunc {
+	key := currentJWTSigningKey()
+	if len(jwtSigningKey) > 0 {
+		key = jwtSigningKey[0]
+	}
+	key = cloneJWTKey(key)
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			_ = writeLoginFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
-
-		securityService := security.NewSecurityService()
 
 		req, err := decodeLoginRequest(r)
 		if err != nil {
@@ -75,13 +70,12 @@ func LoginHandler(users LoginUserRepository) http.HandlerFunc {
 			return
 		}
 
-		jwtKey := getJWTKey()
-		if len(jwtKey) == 0 {
+		if len(key) == 0 {
 			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
-		tokenString, err := generateJWT(user.Username, jwtKey)
+		tokenString, err := generateJWT(user.Username, key)
 		if err != nil {
 			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
@@ -89,6 +83,13 @@ func LoginHandler(users LoginUserRepository) http.HandlerFunc {
 
 		_ = writeLoginResponse(w, user, tokenString)
 	}
+}
+
+func cloneJWTKey(jwtSigningKey []byte) []byte {
+	if len(jwtSigningKey) == 0 {
+		return nil
+	}
+	return append([]byte(nil), jwtSigningKey...)
 }
 
 type loginRequest struct {
@@ -110,6 +111,10 @@ func decodeLoginRequest(r *http.Request) (loginRequest, error) {
 }
 
 func validateAndSanitizeLogin(securityService *security.SecurityService, req loginRequest) (loginRequest, error) {
+	if securityService == nil {
+		return req, fmt.Errorf("security service unavailable")
+	}
+
 	sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
 	if err != nil {
 		return req, fmt.Errorf("invalid input")

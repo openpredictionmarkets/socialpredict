@@ -94,8 +94,9 @@ The following ideas were discussed historically but are not active issues for
 this task:
 
 - forcing a universal `ok/result/reason` response envelope across the API
-- eliminating the current plaintext middleware errors, including the documented
-  cross-route rate-limit responses emitted before handler-specific envelopes run
+- treating security-boundary cleanup as an API-design backlog after WAVE05; the
+  remaining raw auth and validation failures are tracked as backend auth or
+  market-handler boundary migration seams
 - rewriting the API into a new CRUD path taxonomy
 - bundling unrelated implementation changes into this documentation cleanup
 

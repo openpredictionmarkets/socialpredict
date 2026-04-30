@@ -6,12 +6,13 @@ import (
 
 // SecurityHeaders holds configuration for security headers
 type SecurityHeaders struct {
-	CSP                string
-	XSSProtection      string
-	ContentTypeOptions string
-	FrameOptions       string
-	ReferrerPolicy     string
-	PermissionsPolicy  string
+	CSP                     string
+	XSSProtection           string
+	ContentTypeOptions      string
+	FrameOptions            string
+	ReferrerPolicy          string
+	PermissionsPolicy       string
+	StrictTransportSecurity string
 }
 
 // DefaultSecurityHeaders returns default security header values
@@ -70,6 +71,9 @@ func SecurityHeadersMiddleware(headers SecurityHeaders) func(http.Handler) http.
 			// Set Permissions Policy
 			if headers.PermissionsPolicy != "" {
 				w.Header().Set("Permissions-Policy", headers.PermissionsPolicy)
+			}
+			if headers.StrictTransportSecurity != "" {
+				w.Header().Set("Strict-Transport-Security", headers.StrictTransportSecurity)
 			}
 
 			// Set additional security headers
