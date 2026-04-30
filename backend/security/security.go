@@ -32,6 +32,16 @@ func NewCustomSecurityService(rateLimitConfig RateLimitConfig) *SecurityService 
 	}
 }
 
+// NewRuntimeSecurityService creates a security service from runtime-owned posture settings.
+func NewRuntimeSecurityService(rateLimitConfig RateLimitConfig, headers SecurityHeaders) *SecurityService {
+	return &SecurityService{
+		Sanitizer:   NewSanitizer(),
+		Validator:   NewValidator(),
+		RateManager: NewCustomRateLimitManager(rateLimitConfig),
+		Headers:     headers,
+	}
+}
+
 // SecurityMiddleware combines all security middleware into a single middleware stack
 func (s *SecurityService) SecurityMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

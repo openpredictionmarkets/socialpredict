@@ -7,9 +7,12 @@ info:
     from the Go handlers and DTOs under backend/server and backend/handlers.
     Routes wrapped by the shared security middleware can return a shared
     transport-level `429` JSON failure envelope response before reaching handler-specific
-    JSON envelope logic when the rate limit is exceeded. This middleware
-    exception applies across protected routes even when a path omits a repeated
-    path-level `429` entry.
+    JSON envelope logic when the process-local in-memory rate limit is exceeded.
+    This middleware exception applies across protected routes even when a path
+    omits a repeated path-level `429` entry. Runtime bootstrap owns JWT
+    signing-key presence, trusted proxy header posture, CORS defaults, and
+    security header/HSTS posture before route registration. Forwarded client
+    identity headers are ignored unless the runtime proxy-trust contract opts in.
 servers:
   - url: http://localhost:8080
     description: Local dev server
@@ -1050,7 +1053,10 @@ paths:
       tags: [Bets]
       operationId: placeBet
       summary: Place a bet
-      description: Places a YES/NO bet on a market for the authenticated user.
+      description: >
+        Places a YES/NO bet on a market for the authenticated user. This private
+        action route is explicitly blocked at the route boundary with
+        PASSWORD_CHANGE_REQUIRED when the caller must change their password.
       security:
         - bearerAuth: []
       requestBody:
@@ -1120,7 +1126,11 @@ paths:
       tags: [Bets]
       operationId: sellPosition
       summary: Sell shares
-      description: Sells an amount of YES/NO shares for the authenticated user and deposits the proceeds.
+      description: >
+        Sells an amount of YES/NO shares for the authenticated user and deposits
+        the proceeds. This private action route is explicitly blocked at the
+        route boundary with PASSWORD_CHANGE_REQUIRED when the caller must change
+        their password.
       security:
         - bearerAuth: []
       requestBody:
@@ -1559,21 +1569,21 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching public user.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
@@ -1586,6 +1596,10 @@ paths:
       tags: [Users]
       operationId: getAuthenticatedUserPosition
       summary: Get authenticated user's position in a market
+      description: >
+        Returns the authenticated caller's position for one market. This private
+        action route is explicitly blocked at the route boundary with
+        PASSWORD_CHANGE_REQUIRED when the caller must change their password.
       security:
         - bearerAuth: []
       parameters:
@@ -1658,15 +1672,15 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Failed to calculate user credit.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
@@ -1750,15 +1764,15 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Failed to fetch user portfolio.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:
@@ -1789,21 +1803,21 @@ paths:
         '400':
           description: Username missing or invalid.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '404':
           description: User not found.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Failed to generate financial snapshot.
           content:
-            text/plain:
+            application/json:
               schema:
-                $ref: '#/components/schemas/PlainTextErrorResponse'
+                $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
           content:

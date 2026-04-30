@@ -3,9 +3,9 @@ title: API Design
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-26T16:54:12Z
-updated_at_display: "Sunday, April 26, 2026 at 4:54 PM UTC"
-update_reason: "Keep the current-state-first API note aligned with the live backend by adding the staging/production docs-publishing caveat for Swagger and OpenAPI behind the current nginx proxy topology."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Align the API note with the April 30 runtime-boundary completion for health, readiness, 405, 429, and auth-gate behavior."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Sunday, April 26, 2026 to replace an older API standardization plan with guidance that matches the live SocialPredict backend, the current OpenAPI contract, and the active design-plan posture.
+
+On Thursday, April 30, 2026, the runtime-boundary API behavior changed in a few important ways: `/health` now returns `live`, `/readyz` returns readiness state, runtime-owned `405` and `429` failures use JSON `reason` envelopes, and the private action routes enforce `PASSWORD_CHANGE_REQUIRED` before their domain handlers run.
 
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
@@ -189,11 +191,12 @@ Examples include:
 
 Some failures and infra routes intentionally remain outside application envelopes today:
 
-- `/health` returns plain text `ok`
+- `/health` returns plain text `live`
+- `/readyz` returns plain text `ready` or `not ready`
 - `/openapi.yaml` returns YAML
 - `/swagger/*` serves static assets
-- shared security middleware still emits plain-text `429`
-- router-level method handling still owns some `405` behavior
+- shared security middleware emits JSON `429` envelopes with stable `RATE_LIMITED` or `LOGIN_RATE_LIMITED` reasons
+- router-level method handling emits JSON `405` envelopes and sets `Allow`
 
 This mixed state is real and should be documented honestly rather than hidden behind a universal response-wrapper proposal.
 

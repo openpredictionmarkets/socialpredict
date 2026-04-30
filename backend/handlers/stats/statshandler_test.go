@@ -1,12 +1,15 @@
 package statshandlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"socialpredict/handlers"
+	analytics "socialpredict/internal/domain/analytics"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -31,11 +34,13 @@ func TestStatsHandlerReturnsServiceBackedConfiguration(t *testing.T) {
 	config.Economics.User.MaximumDebtAllowed = 900
 	config.Economics.Betting.BetFees.BuySharesFee = 2
 	config.Economics.Betting.BetFees.SellSharesFee = 3
+	repo := analytics.NewGormRepository(db)
+	statsService := analytics.NewService(repo, analytics.Config{})
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/stats", nil)
 	rr := httptest.NewRecorder()
 
-	StatsHandler(db, economicsOnlyConfigService{
+	StatsHandler(statsService, economicsOnlyConfigService{
 		economics: configsvc.FromSetup(config).Economics,
 	}).ServeHTTP(rr, req)
 
@@ -69,7 +74,7 @@ func TestStatsHandlerRequiresConfigService(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v0/stats", nil)
 	rr := httptest.NewRecorder()
 
-	StatsHandler(modelstesting.NewFakeDB(t), nil).ServeHTTP(rr, req)
+	StatsHandler(&stubStatsService{}, nil).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rr.Code)
@@ -89,11 +94,11 @@ func TestStatsHandlerRequiresConfigService(t *testing.T) {
 	}
 }
 
-func TestStatsHandlerSanitizesDatabaseErrors(t *testing.T) {
+func TestStatsHandlerSanitizesStatsServiceErrors(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v0/stats", nil)
 	rr := httptest.NewRecorder()
 
-	StatsHandler(nil, configsvc.NewStaticService(modelstesting.GenerateEconomicConfig())).ServeHTTP(rr, req)
+	StatsHandler(&stubStatsService{err: errors.New("database unavailable")}, configsvc.NewStaticService(modelstesting.GenerateEconomicConfig())).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rr.Code)
@@ -106,6 +111,14 @@ func TestStatsHandlerSanitizesDatabaseErrors(t *testing.T) {
 	if response.Reason != string(handlers.ReasonInternalError) {
 		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, response.Reason)
 	}
+}
+
+type stubStatsService struct {
+	err error
+}
+
+func (s *stubStatsService) ComputeFinancialStats(_ context.Context, _ analytics.StatsConfig) (analytics.FinancialStats, error) {
+	return analytics.FinancialStats{}, s.err
 }
 
 type economicsOnlyConfigService struct {

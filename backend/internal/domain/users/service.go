@@ -61,6 +61,15 @@ type UserWriter interface {
 	Delete(ctx context.Context, username string) error
 }
 
+// UserUniquenessRepository exposes uniqueness checks for generated user fields.
+type UserUniquenessRepository interface {
+	UsernameExists(ctx context.Context, username string) (bool, error)
+	DisplayNameExists(ctx context.Context, displayName string) (bool, error)
+	EmailExists(ctx context.Context, email string) (bool, error)
+	APIKeyExists(ctx context.Context, apiKey string) (bool, error)
+	AnyUserIdentityExists(ctx context.Context, username, displayName, email, apiKey string) (bool, error)
+}
+
 // UserLister exposes list operations.
 type UserLister interface {
 	List(ctx context.Context, filters ListFilters) ([]*User, error)
@@ -89,6 +98,7 @@ type ServiceDependencies struct {
 	Reader      UserReader
 	BalanceRepo UserBalanceRepository
 	Writer      UserWriter
+	Uniqueness  UserUniquenessRepository
 	Lister      UserLister
 	Portfolio   UserPortfolioRepository
 	Markets     UserMarketsRepository
@@ -121,6 +131,7 @@ type Service struct {
 	reader      UserReader
 	balanceRepo UserBalanceRepository
 	writer      UserWriter
+	uniqueness  UserUniquenessRepository
 	lister      UserLister
 	portfolio   UserPortfolioRepository
 	markets     UserMarketsRepository
@@ -221,7 +232,7 @@ func validateUserID(userID int64) error {
 
 // NewService creates a new users service from the legacy repository shape.
 func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
-	return NewServiceWithDependencies(ServiceDependencies{
+	deps := ServiceDependencies{
 		Reader:      repo,
 		BalanceRepo: repo,
 		Writer:      repo,
@@ -229,7 +240,11 @@ func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Saniti
 		Portfolio:   repo,
 		Markets:     repo,
 		Credentials: repo,
-	}, analyticsSvc, sanitizer)
+	}
+	if uniqueness, ok := repo.(UserUniquenessRepository); ok {
+		deps.Uniqueness = uniqueness
+	}
+	return NewServiceWithDependencies(deps, analyticsSvc, sanitizer)
 }
 
 // NewServiceWithDependencies creates a new users service from explicit ports.
@@ -238,6 +253,7 @@ func NewServiceWithDependencies(deps ServiceDependencies, analyticsSvc Analytics
 		reader:      deps.Reader,
 		balanceRepo: deps.BalanceRepo,
 		writer:      deps.Writer,
+		uniqueness:  deps.Uniqueness,
 		lister:      deps.Lister,
 		portfolio:   deps.Portfolio,
 		markets:     deps.Markets,
@@ -825,6 +841,13 @@ func (s *Service) userWriter() (UserWriter, error) {
 		return nil, ErrInvalidUserData
 	}
 	return s.writer, nil
+}
+
+func (s *Service) userUniquenessRepository() (UserUniquenessRepository, error) {
+	if s == nil || s.uniqueness == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.uniqueness, nil
 }
 
 func (s *Service) userLister() (UserLister, error) {

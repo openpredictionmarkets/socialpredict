@@ -113,7 +113,7 @@ const PrivateUserInfoLayout = ({ userData }) => {
             </div>
             {isModalOpen && (
                 <ProfileModal isOpen={isModalOpen} onClose={handleCloseModal} title={`${getModalTitle(modalType)}`}>
-                    {modalType === 'emoji' && <EmojiSelector onSave={handleSaveEmoji} />}
+                    {modalType === 'emoji' && <EmojiSelector currentEmoji={personalEmoji} onSave={handleSaveEmoji} />}
                     {modalType === 'displayname' && <DisplayNameSelector onSave={handleSaveDisplayName} />}
                     {modalType === 'description' && <DescriptionSelector onSave={handleSaveDescription} />}
                     {modalType === 'links' && <PersonalLinksSelector onSave={handleSavePersonalLinks} initialLinks={personalLinks} />}

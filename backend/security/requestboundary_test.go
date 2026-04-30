@@ -30,7 +30,7 @@ func TestRequestBoundaryMiddlewareAddsContextHeaderAndStructuredLog(t *testing.T
 	var seenLoggerRequestID string
 	middleware := newRequestBoundaryMiddleware(logger.New(&buffer), now, func() string {
 		return "req-123"
-	})
+	}, NewClientIdentityExtractor(true))
 
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenRequestID = RequestIDFromContext(r.Context())

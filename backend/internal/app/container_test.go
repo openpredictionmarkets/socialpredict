@@ -45,6 +45,10 @@ func TestBuildApplicationWiresMarketsDependencies(t *testing.T) {
 		t.Fatalf("expected config service to be initialized")
 	}
 
+	if container.GetSecurityService() == nil {
+		t.Fatalf("expected security service to be initialized")
+	}
+
 	if _, err := marketsService.ListMarkets(context.Background(), dmarkets.ListFilters{}); err != nil {
 		t.Fatalf("ListMarkets should work against initialized repository, got error: %v", err)
 	}

@@ -17,25 +17,32 @@ type Authenticator interface {
 // AuthService provides a façade over the authentication helpers so callers can
 // depend on a single injected object rather than package-level functions.
 type AuthService struct {
-	users dusers.ServiceInterface
+	users         dusers.ServiceInterface
+	jwtSigningKey []byte
 }
 
 // NewAuthService constructs a façade that uses the provided users service for
 // token validation and password-change enforcement.
-func NewAuthService(users dusers.ServiceInterface) *AuthService {
-	return &AuthService{users: users}
+func NewAuthService(users dusers.ServiceInterface, jwtSigningKey ...[]byte) *AuthService {
+	var key []byte
+	if len(jwtSigningKey) > 0 && len(jwtSigningKey[0]) > 0 {
+		key = append([]byte(nil), jwtSigningKey[0]...)
+	} else {
+		key = currentJWTSigningKey()
+	}
+	return &AuthService{users: users, jwtSigningKey: key}
 }
 
 // CurrentUser returns the authenticated user, ensuring any password-change
 // requirements are enforced.
 func (a *AuthService) CurrentUser(r *http.Request) (*dusers.User, *AuthError) {
-	return ValidateUserAndEnforcePasswordChangeGetUser(r, a.users)
+	return ValidateUserAndEnforcePasswordChangeGetUserWithSigningKey(r, a.users, a.jwtSigningKey)
 }
 
 // RequireUser resolves the authenticated user without checking the
 // must-change-password flag.
 func (a *AuthService) RequireUser(r *http.Request) (*dusers.User, *AuthError) {
-	return ValidateTokenAndGetUser(r, a.users)
+	return ValidateTokenAndGetUserWithSigningKey(r, a.users, a.jwtSigningKey)
 }
 
 // RequireAdmin ensures the current user is authenticated and has admin privileges.

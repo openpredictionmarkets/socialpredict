@@ -21,6 +21,15 @@ type fakeRepo struct {
 	history fakeBetHistoryReader
 }
 
+type fakePlaceUnit struct {
+	repo  bets.Repository
+	users bets.UserService
+}
+
+func (f fakePlaceUnit) PlaceBetTransaction(ctx context.Context, fn bets.PlaceTransactionFunc) error {
+	return fn(ctx, f.repo, f.users)
+}
+
 func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
 	repo := &fakeRepo{
 		writer: fakeBetWriter{
@@ -313,7 +322,15 @@ func newServiceFixture(now time.Time, opts ...serviceFixtureOption) (*serviceFix
 	for _, opt := range opts {
 		opt(fixture)
 	}
-	svc := bets.NewService(fixture.repo, fixture.markets, fixture.users, fixture.config, fixture.clock)
+	placeUnit := fakePlaceUnit{repo: fixture.repo, users: fixture.users}
+	svc := bets.NewService(
+		fixture.repo,
+		fixture.markets,
+		fixture.users,
+		fixture.config,
+		fixture.clock,
+		bets.WithPlaceUnitOfWork(placeUnit),
+	)
 	return fixture, svc
 }
 

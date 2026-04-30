@@ -34,14 +34,15 @@ func main() {
 	if err != nil {
 		logger.Fatal("startup", "database initialization failed", err, logger.Operation("InitDB"))
 	}
+	defer func() {
+		if err := appruntime.CloseDB(db); err != nil {
+			logger.Warn("startup", "database shutdown reported a warning", logger.Operation("CloseDB"), logger.Err(err))
+		}
+	}()
 
 	const MAX_ATTEMPTS = 20
 	if err := seed.EnsureDBReady(db, MAX_ATTEMPTS); err != nil {
 		logger.Fatal("startup", "database readiness check failed", err, logger.Operation("EnsureDBReady"))
-	}
-
-	if err := migration.MigrateDB(db); err != nil {
-		logger.Warn("startup", "database migration reported a warning", logger.Operation("MigrateDB"), logger.Err(err))
 	}
 
 	configService, err := appruntime.LoadConfigService(setup.EmbeddedSource{})
@@ -49,16 +50,34 @@ func main() {
 		logger.Fatal("startup", "configuration service initialization failed", err, logger.Operation("LoadConfigService"))
 	}
 
-	if err := seed.SeedUsers(db, configService); err != nil {
-		logger.Fatal("startup", "user seed failed", err, logger.Operation("SeedUsers"))
+	securityConfig, err := appruntime.LoadSecurityConfigFromEnv()
+	if err != nil {
+		logger.Fatal("startup", "security configuration unavailable", err, logger.Operation("LoadSecurityConfigFromEnv"))
 	}
-	if err := seed.SeedHomepage(db, "."); err != nil {
-		logger.Warn("startup", "homepage seed reported a warning", logger.Operation("SeedHomepage"), logger.Err(err))
+	authsvc.ConfigureJWTSigningKey(securityConfig.JWTSigningKey)
+
+	startupMode, err := appruntime.LoadStartupMutationModeFromEnv()
+	if err != nil {
+		logger.Fatal("startup", "startup mutation mode unavailable", err, logger.Operation("LoadStartupMutationModeFromEnv"))
+	}
+
+	if startupMode.Writer {
+		logger.Info("startup", "startup writer enabled for database migrations and seeds", logger.Operation("StartupMutationMode"))
+	} else {
+		logger.Info("startup", "startup writer disabled; verifying database schema before serving", logger.Operation("StartupMutationMode"))
+	}
+	if err := runStartupMutations(db, configService, startupMode, startupMutationHooks{
+		migrate:      migration.MigrateDB,
+		verify:       migration.VerifyApplied,
+		seedUsers:    seed.SeedUsers,
+		seedHomepage: seed.SeedHomepage,
+	}); err != nil {
+		logger.Fatal("startup", "startup database mutation check failed", err, logger.Operation("RunStartupMutations"))
 	}
 
 	readiness.MarkReady()
 
-	server.Start(openAPISpec, swaggerUIFS, db, configService, readiness)
+	server.Start(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
 }
 
 func secureEndpoint(w http.ResponseWriter, r *http.Request) {
