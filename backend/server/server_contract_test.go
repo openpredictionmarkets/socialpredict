@@ -163,8 +163,8 @@ func TestSystemMetricsRouteRemainsApplicationReporting(t *testing.T) {
 	if got := healthRec.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
 		t.Fatalf("expected /health plain-text probe response, got %q", got)
 	}
-	if body := healthRec.Body.String(); body != "ok" {
-		t.Fatalf("expected /health body ok, got %q", body)
+	if body := healthRec.Body.String(); body != "live" {
+		t.Fatalf("expected /health body live, got %q", body)
 	}
 
 	metricsReq := httptest.NewRequest(http.MethodGet, "/v0/system/metrics", nil)

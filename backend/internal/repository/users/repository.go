@@ -44,6 +44,41 @@ func (r *GormRepository) GetByUsername(ctx context.Context, username string) (*d
 	return r.modelToDomain(&dbUser), nil
 }
 
+func (r *GormRepository) UsernameExists(ctx context.Context, username string) (bool, error) {
+	return r.userFieldExists(ctx, "username", username)
+}
+
+func (r *GormRepository) DisplayNameExists(ctx context.Context, displayName string) (bool, error) {
+	return r.userFieldExists(ctx, "display_name", displayName)
+}
+
+func (r *GormRepository) EmailExists(ctx context.Context, email string) (bool, error) {
+	return r.userFieldExists(ctx, "email", email)
+}
+
+func (r *GormRepository) APIKeyExists(ctx context.Context, apiKey string) (bool, error) {
+	return r.userFieldExists(ctx, "api_key", apiKey)
+}
+
+func (r *GormRepository) userFieldExists(ctx context.Context, field string, value string) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where(field+" = ?", value).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *GormRepository) AnyUserIdentityExists(ctx context.Context, username, displayName, email, apiKey string) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where(
+		"username = ? OR display_name = ? OR email = ? OR api_key = ?",
+		username, displayName, email, apiKey,
+	).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // UpdateBalance updates a user's account balance
 func (r *GormRepository) UpdateBalance(ctx context.Context, username string, newBalance int64) error {
 	result := r.db.WithContext(ctx).Model(&models.User{}).
@@ -337,8 +372,9 @@ func (r *GormRepository) domainToModel(user *dusers.User) models.User {
 			PersonalLink4:         user.PersonalLink4,
 		},
 		PrivateUser: models.PrivateUser{
-			Email:  user.Email,
-			APIKey: user.APIKey,
+			Email:    user.Email,
+			APIKey:   user.APIKey,
+			Password: user.PasswordHash,
 		},
 		MustChangePassword: user.MustChangePassword,
 	}
@@ -351,6 +387,7 @@ func (r *GormRepository) modelToDomain(dbUser *models.User) *dusers.User {
 		Username:              dbUser.Username,
 		DisplayName:           dbUser.DisplayName,
 		Email:                 dbUser.Email,
+		PasswordHash:          dbUser.Password,
 		UserType:              dbUser.UserType,
 		InitialAccountBalance: dbUser.InitialAccountBalance,
 		AccountBalance:        dbUser.AccountBalance,

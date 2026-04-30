@@ -27,7 +27,7 @@ func buildAddUserTestHandler(t *testing.T) (http.HandlerFunc, *gorm.DB) {
 	authService := authsvc.NewAuthService(usersService)
 	configService := configsvc.NewStaticService(modelstesting.GenerateEconomicConfig())
 
-	return AddUserHandler(db, configService, authService), db
+	return AddUserHandler(usersService, configService, authService), db
 }
 
 func createAddUserAuthSubject(t *testing.T, db *gorm.DB, username, userType string, mustChangePassword bool) string {

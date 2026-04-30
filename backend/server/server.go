@@ -191,8 +191,9 @@ type applicationReportingService interface {
 }
 
 func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, readiness *appruntime.Readiness) error {
-	router.HandleFunc("/health", healthHandler).Methods("GET")
-	router.Handle("/readyz", readinessHandler(db, readiness)).Methods("GET")
+	probe := appruntime.NewServingProbe(db, readiness)
+	router.Handle("/health", livenessHandler(probe)).Methods("GET")
+	router.Handle("/readyz", readinessHandler(probe)).Methods("GET")
 
 	// OpenAPI spec endpoint
 	router.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
@@ -216,19 +217,22 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 	return nil
 }
 
-func healthHandler(w http.ResponseWriter, _ *http.Request) {
-	writeProbeResponse(w, http.StatusOK, "ok")
-}
-
-func readinessHandler(db *gorm.DB, readiness *appruntime.Readiness) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if readiness == nil || !readiness.Ready() {
-			writeProbeResponse(w, http.StatusServiceUnavailable, "not ready")
+func livenessHandler(probe appruntime.ServingProbe) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if !probe.Live() {
+			writeProbeResponse(w, http.StatusServiceUnavailable, "not live")
 			return
 		}
+
+		writeProbeResponse(w, http.StatusOK, "live")
+	})
+}
+
+func readinessHandler(probe appruntime.ServingProbe) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), readinessProbeTimeout)
 		defer cancel()
-		if err := appruntime.CheckDBReadiness(ctx, db); err != nil {
+		if err := probe.Ready(ctx); err != nil {
 			writeProbeResponse(w, http.StatusServiceUnavailable, "not ready")
 			return
 		}
@@ -244,10 +248,10 @@ func writeProbeResponse(w http.ResponseWriter, status int, body string) {
 	_, _ = w.Write([]byte(body))
 }
 
-func registerApplicationReportingRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, reportingService applicationReportingService, securityMiddleware func(http.Handler) http.Handler) {
+func registerApplicationReportingRoutes(router *mux.Router, configService configsvc.Service, statsService statshandlers.FinancialStatsService, reportingService applicationReportingService, securityMiddleware func(http.Handler) http.Handler) {
 	// These /v0/ reporting routes stay application-owned. Future tracing or metrics
 	// export work belongs in request-boundary/runtime wiring, not in health probes.
-	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(db, configService))).Methods("GET")
+	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(statsService, configService))).Methods("GET")
 	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(reportingService))).Methods("GET")
 	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(reportingService))).Methods("GET")
 }
@@ -276,7 +280,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// application setup information
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
 	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
-	registerApplicationReportingRoutes(router, db, configService, analyticsService, securityMiddleware)
+	registerApplicationReportingRoutes(router, configService, analyticsService, analyticsService, securityMiddleware)
 
 	// Markets routes - using new Handler instance
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
@@ -341,7 +345,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/sell", securityMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 
 	// admin stuff - apply security middleware
-	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(db, container.GetConfigService(), authService)))).Methods("POST")
+	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(usersService, container.GetConfigService(), authService)))).Methods("POST")
 
 	// homepage content routes
 	homepageRepo := homepage.NewGormRepository(db)

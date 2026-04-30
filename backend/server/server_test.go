@@ -214,8 +214,8 @@ func TestInfraHealthAndReadinessRoutesHaveDistinctSemantics(t *testing.T) {
 	if healthRec.Code != http.StatusOK {
 		t.Fatalf("expected /health status 200, got %d", healthRec.Code)
 	}
-	if body := healthRec.Body.String(); body != "ok" {
-		t.Fatalf("expected /health body ok, got %q", body)
+	if body := healthRec.Body.String(); body != "live" {
+		t.Fatalf("expected /health body live, got %q", body)
 	}
 	if got := healthRec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("expected /health cache-control no-store, got %q", got)
