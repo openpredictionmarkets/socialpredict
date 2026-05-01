@@ -16,4 +16,3 @@ type PortfolioResponse struct {
 	PortfolioItems   []PortfolioItemResponse `json:"portfolioItems"`
 	TotalSharesOwned int64                   `json:"totalSharesOwned"`
 }
-

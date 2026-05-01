@@ -11,6 +11,11 @@ import (
 	dusers "socialpredict/internal/domain/users"
 )
 
+// Helper-level bets tests are pure domain convenience coverage. They keep fee,
+// balance, ledger, and sale math close to the owning package. WAVE07 covered
+// place-bet atomicity with real Postgres; sell-position atomicity and overlap
+// behavior remain DB-truth gaps.
+
 var errUnexpectedHelperCall = errors.New("unexpected call")
 
 type stubMarketService struct {
@@ -381,43 +386,6 @@ func (u ledgerTransactionApplier) ApplyTransaction(ctx context.Context, username
 	}
 	*calls = append(*calls, ledgerCall{username: username, amount: amount, transaction: transactionType})
 	return nil
-}
-
-func TestBetLedger_ChargeAndRecord(t *testing.T) {
-	users := newLedgerUsers()
-	repo := newLedgerRepo()
-	ledger := betLedger{repo: repo, users: users}
-	bet := &boundary.Bet{Username: "bob", Amount: 25}
-
-	if err := ledger.ChargeAndRecord(context.Background(), bet, 25); err != nil {
-		t.Fatalf("expected success, got %v", err)
-	}
-	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionBuy || users.calls[0].amount != 25 {
-		t.Fatalf("unexpected user calls: %+v", users.calls)
-	}
-	if repo.bet == nil || repo.bet.Username != bet.Username || repo.bet.Amount != bet.Amount {
-		t.Fatalf("expected copied bet persisted, got %+v", repo.bet)
-	}
-
-	if _, err := (&ledgerRepo{}).UserHasBet(context.Background(), 1, "bob"); !errors.Is(err, errUnexpectedHelperCall) {
-		t.Fatalf("expected zero-value repo to fail predictably, got %v", err)
-	}
-}
-
-func TestBetLedger_ChargeAndRecord_RollsBackOnRepoError(t *testing.T) {
-	users := newLedgerUsers()
-	repo := newLedgerRepo(withLedgerCreate(func(ctx context.Context, bet *boundary.Bet) error {
-		return errors.New("db down")
-	}))
-	ledger := betLedger{repo: repo, users: users}
-
-	err := ledger.ChargeAndRecord(context.Background(), &boundary.Bet{Username: "alice"}, 10)
-	if err == nil {
-		t.Fatalf("expected error")
-	}
-	if len(users.calls) != 2 || users.calls[1].transaction != dusers.TransactionRefund {
-		t.Fatalf("expected refund on failure, calls: %+v", users.calls)
-	}
 }
 
 func TestBetLedger_CreditSale(t *testing.T) {

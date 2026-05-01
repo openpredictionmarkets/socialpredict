@@ -3,9 +3,9 @@ title: Runtime Performance Tuning
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Replace the older greenfield performance-platform plan with an evidence-driven note that keeps runtime correctness, observability, and DB ownership ahead of speculative optimization."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 runtime readiness completion and keep remaining performance work evidence-driven."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Monday, April 27, 2026 to replace an older performance-platform plan with guidance that matches the live backend, the current design-plan posture, and the three-agent recommendation to treat optimization as later than runtime correctness and observability.
+
+On Thursday, April 30, 2026, the earlier runtime-readiness blocker called out by this note was finished for the serving path: `/health` now has liveness semantics, `/readyz` checks the readiness gate and database availability, and black-box Docker checks confirmed both endpoints on `http://localhost:8080`. That completion does not make broad optimization work current; it narrows the active performance note back to DB pool lifecycle tuning and measured bottlenecks.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -53,16 +55,25 @@ This note explicitly rejects building a new `performance/` subsystem as the main
 
 Performance work done too early often speeds up the wrong things.
 
-For SocialPredict, the live backend still has more urgent runtime concerns:
+For SocialPredict, the live backend still has runtime concerns that should stay ahead of speculative speed work:
 
 - startup ownership is too broad in [main.go](/workspace/socialpredict/backend/main.go)
-- `/health` is still only a static `ok` in [server.go](/workspace/socialpredict/backend/server/server.go)
+- real liveness and readiness semantics landed on April 30, 2026, but those probes are a correctness baseline rather than a performance strategy
 - DB pool and connection lifecycle settings are not yet explicitly owned in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go)
 - accounting-sensitive flows still need clearer atomic boundaries before any optimization layer should obscure behavior
 
 That means the current job is not to add cache tiers, response-compression middleware, or speculative query frameworks. The current job is to make the backend measurable and safe enough that later optimization is grounded in evidence.
 
 ## Current Code Snapshot
+
+### Liveness and readiness are no longer future performance prerequisites
+
+As of April 30, 2026, [server.go](/workspace/socialpredict/backend/server/server.go) exposes:
+
+- `/health` as a liveness response with `Cache-Control: no-store`
+- `/readyz` as a readiness response that checks both the runtime readiness gate and database availability
+
+That problem is finished for the active runtime slice. Performance work should no longer cite "static health check only" as a blocker. The remaining performance-relevant runtime work is DB pool and connection-lifecycle ownership, followed by measurement.
 
 ### DB pool and connection lifecycle tuning is still thin
 
@@ -149,7 +160,7 @@ Those topics now belong either in [12-database-caching.md](/workspace/socialpred
 
 The design-plan-aligned performance direction is:
 
-1. Land stronger runtime DB ownership and real readiness semantics first.
+1. Treat the April 30, 2026 liveness/readiness work as complete for the serving path.
 2. Make operational signals and failure posture clearer through the logging and monitoring notes.
 3. Add explicit `sql.DB` pool and connection-lifecycle ownership in the runtime seam.
 4. Measure real hotspots.

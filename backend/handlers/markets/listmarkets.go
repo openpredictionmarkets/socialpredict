@@ -1,12 +1,12 @@
 package marketshandlers
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/logger"
 )
 
 // ListMarketsHandlerFactory creates an HTTP handler for listing markets with service injection
@@ -64,7 +64,7 @@ func fetchMarkets(r *http.Request, svc dmarkets.ServiceInterface, params listMar
 func writeListMarketsError(w http.ResponseWriter, err error) {
 	message, statusCode := listMarketsErrorResponse(err)
 	if statusCode == http.StatusInternalServerError {
-		log.Printf("Error fetching markets: %v", err)
+		logger.LogError("ListMarkets", "FetchMarkets", err)
 	}
 	http.Error(w, message, statusCode)
 }
@@ -95,7 +95,7 @@ func writeListMarketsResponse(w http.ResponseWriter, r *http.Request, svc dmarke
 func buildListMarketsResponse(r *http.Request, svc dmarkets.ServiceInterface, markets []*dmarkets.Market) (dto.ListMarketsResponse, error) {
 	overviews, err := buildMarketOverviewResponses(r.Context(), svc, markets)
 	if err != nil {
-		log.Printf("Error building market overviews: %v", err)
+		logger.LogError("ListMarkets", "BuildMarketOverviewResponses", err)
 		return dto.ListMarketsResponse{}, err
 	}
 
@@ -117,7 +117,6 @@ func listMarketsErrorResponse(err error) (string, int) {
 }
 
 func handleListMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface) {
-	log.Println("ListMarketsHandler: Request received")
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
 		return
@@ -136,7 +135,10 @@ func handleListMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.Serv
 	}
 
 	if err := writeListMarketsResponse(w, r, svc, markets); err != nil {
-		log.Printf("Error encoding list markets response: %v", err)
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarkets", "WriteResponse", err)
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
 }

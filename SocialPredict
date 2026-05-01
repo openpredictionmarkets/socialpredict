@@ -15,6 +15,41 @@ fi
 
 # --- Main SocialPredict Functionality ---
 
+print_help() {
+  cat <<EOF
+Usage: ./SocialPredict <command> [options]
+
+Commands:
+  install              Initialize environment and build images
+  up                   Start containers for the active APP_ENV
+  down                 Stop containers for the active APP_ENV
+  exec <service> [cmd] Run a command inside a container
+  logs [target]        View logs for a compose service or all services
+  backup <options>     Backup and restore database snapshots
+  help                 Show this help
+
+Examples:
+  ./SocialPredict install
+  ./SocialPredict up
+  ./SocialPredict down
+  ./SocialPredict exec backend /bin/bash
+  ./SocialPredict logs
+  ./SocialPredict logs options
+  ./SocialPredict logs <service> -f
+  ./SocialPredict backup --save
+
+More command-specific help:
+  ./SocialPredict logs help
+EOF
+}
+
+case "${1:-}" in
+  ""|-h|--help|help)
+    print_help
+    exit 0
+    ;;
+esac
+
 # Ensure .env file exists before resolving path
 if [ ! -f "$SCRIPT_DIR/.env" ]; then
   echo ".env file not found."
@@ -122,6 +157,7 @@ if [ "$1" = "install" ]; then
 			*) echo "Invalid option $REPLY";;
 		esac
 	done
+  exit 0
 fi
 
 # Run Docker Exec
@@ -134,6 +170,17 @@ if [ "$1" = "exec" ]; then
   	source "$SCRIPT_DIR/scripts/docker-commands.sh" exec "$2" "$3"
   fi
 	unset CALLED_FROM_SOCIALPREDICT
+  exit 0
+fi
+
+# View container logs
+if [ "$1" = "logs" ]; then
+  source_env
+  export CALLED_FROM_SOCIALPREDICT=yes
+  shift
+  source "$SCRIPT_DIR/scripts/docker-commands.sh" logs "$@"
+  unset CALLED_FROM_SOCIALPREDICT
+  exit 0
 fi
 
 # Run docker compose up
@@ -142,6 +189,7 @@ if [ "$1" = "up" ]; then
   export CALLED_FROM_SOCIALPREDICT=yes
   source "$SCRIPT_DIR/scripts/docker-commands.sh" up
   unset CALLED_FROM_SOCIALPREDICT
+  exit 0
 fi
 
 # Run docker compose down
@@ -150,6 +198,7 @@ if [ "$1" = "down" ]; then
   export CALLED_FROM_SOCIALPREDICT=yes
     source "$SCRIPT_DIR/scripts/docker-commands.sh" down
     unset CALLED_FROM_SOCIALPREDICT
+    exit 0
 fi
 
 # Database backup/restore
@@ -160,4 +209,10 @@ if [ "$1" = "backup" ]; then
 	# Pass remaining args to the backup script, e.g. --save / --list / --restore <file> / --restore-latest
 	source "$SCRIPT_DIR/scripts/backup/db_backup.sh" "$@"
 	unset CALLED_FROM_SOCIALPREDICT
+  exit 0
 fi
+
+echo "Unknown command: ${1}"
+echo
+print_help
+exit 1

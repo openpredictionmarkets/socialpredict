@@ -4,4 +4,3 @@ package dto
 type UserCreditResponse struct {
 	Credit int64 `json:"credit"`
 }
-

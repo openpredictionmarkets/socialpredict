@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"socialpredict/handlers"
 	dusers "socialpredict/internal/domain/users"
 )
 
@@ -108,6 +109,7 @@ func TestGetUserFinancialHandlerUserNotFound(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rec.Code)
 	}
+	requireFinancialFailureReason(t, rec, handlers.ReasonUserNotFound)
 }
 
 func TestGetUserFinancialHandlerInternalError(t *testing.T) {
@@ -121,6 +123,7 @@ func TestGetUserFinancialHandlerInternalError(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rec.Code)
 	}
+	requireFinancialFailureReason(t, rec, handlers.ReasonInternalError)
 }
 
 func TestGetUserFinancialHandlerInvalidMethod(t *testing.T) {
@@ -132,5 +135,18 @@ func TestGetUserFinancialHandlerInvalidMethod(t *testing.T) {
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected status 405, got %d", rec.Code)
+	}
+	requireFinancialFailureReason(t, rec, handlers.ReasonMethodNotAllowed)
+}
+
+func requireFinancialFailureReason(t *testing.T, rec *httptest.ResponseRecorder, reason handlers.FailureReason) {
+	t.Helper()
+
+	var body handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal failure response: %v", err)
+	}
+	if body.OK || body.Reason != string(reason) {
+		t.Fatalf("expected failure reason %q, got %+v", reason, body)
 	}
 }

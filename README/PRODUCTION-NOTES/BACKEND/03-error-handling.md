@@ -3,9 +3,9 @@ title: Error Handling
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-25T21:20:00-05:00
-updated_at_display: "Saturday, April 25, 2026 at 9:20 PM Central (CDT)"
-update_reason: "Clarify the OpenTelemetry posture for runtime failure telemetry while keeping the public API failure contract separate."
+updated_at: 2026-04-30T03:33:18Z
+updated_at_display: "Thursday, April 30, 2026 at 3:33 AM UTC"
+update_reason: "Record migration of public user read failures from PlainTextErrorResponse to ReasonResponse."
 status: active
 ---
 
@@ -104,56 +104,56 @@ The old note treated `backend/errors` as the starting point for a new system. In
 
 Those files are not the main public contract for live routes, and they should not dictate the future architecture.
 
-### Auth still leaks transport concerns into an internal seam
+### Auth now exposes typed outcomes for migrated routes
 
-`internal/service/auth` currently defines its own transport-shaped error type in [authutils.go](/workspace/socialpredict/backend/internal/service/auth/authutils.go):
+`internal/service/auth` now returns typed `AuthError` outcomes from [authutils.go](/workspace/socialpredict/backend/internal/service/auth/authutils.go):
 
 ```go
-type HTTPError struct {
-    StatusCode int
-    Message    string
+type AuthError struct {
+    Kind    ErrorKind
+    Message string
 }
 ```
 
-And auth helpers return that type directly from [auth.go](/workspace/socialpredict/backend/internal/service/auth/auth.go):
+The auth helpers in [auth.go](/workspace/socialpredict/backend/internal/service/auth/auth.go) no longer own public status and response text directly:
 
 ```go
 func ValidateUserAndEnforcePasswordChangeGetUser(
     r *http.Request,
     svc dusers.ServiceInterface,
-) (*dusers.User, *HTTPError)
+) (*dusers.User, *AuthError)
 ```
 
-That means an internal service seam still owns route-visible status and message policy. Login already shows the better direction: it maps internal auth outcomes to the public envelope at the HTTP edge in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go).
+Mature route families map those internal outcomes at the HTTP boundary through [authhttp.go](/workspace/socialpredict/backend/handlers/authhttp/authhttp.go). Login also maps internal auth outcomes to the public envelope at the HTTP edge in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go).
 
-### Middleware and router failures bypass the shared failure contract
+### Middleware and router failures are runtime-owned
 
 Some failures happen before handlers run at all.
 
-Rate limiting currently emits plain-text `429` responses in [ratelimit.go](/workspace/socialpredict/backend/security/ratelimit.go):
+Rate limiting now emits shared JSON failure envelopes in [ratelimit.go](/workspace/socialpredict/backend/security/ratelimit.go):
 
 ```go
 if !limiter.GetLimiter(ip).Allow() {
-    http.Error(w, "Rate limit exceeded. Please try again later.", http.StatusTooManyRequests)
+    WriteRateLimited(w, RuntimeReasonRateLimited)
     return
 }
 ```
 
-The router-level method-not-allowed handler in [server.go](/workspace/socialpredict/backend/server/server.go) writes status and `Allow` but no shared envelope body.
+The router-level method-not-allowed handler in [server.go](/workspace/socialpredict/backend/server/server.go) writes the `Allow` header and the shared JSON `METHOD_NOT_ALLOWED` envelope.
 
 This matters because these failures are part of the public runtime behavior even though they do not originate in a route handler.
 
-### There is no application-owned recovery boundary yet
+### Application-owned recovery now starts at the request boundary
 
-`buildHandler` in [server.go](/workspace/socialpredict/backend/server/server.go) currently builds the router and wraps it with CORS, but it does not establish request correlation or panic-recovery middleware owned by the application.
+`buildHandler` in [server.go](/workspace/socialpredict/backend/server/server.go) now wraps the router with [requestboundary.go](/workspace/socialpredict/backend/security/requestboundary.go), which establishes request correlation, sanitized panic recovery, and runtime status classification.
 
-That means unexpected request-path panics currently fall back to the standard library's default recovery behavior rather than to a SocialPredict-owned recovery path with:
+That gives unexpected request-path panics a SocialPredict-owned recovery path with:
 
 - consistent client-visible failure semantics
 - request correlation
 - controlled runtime logging vocabulary
 
-For HA and fault tolerance, that is too weak to be the long-term design.
+The remaining work is to keep extending that boundary deliberately instead of reintroducing scattered runtime failure writers.
 
 ### Runtime fault telemetry is not standardized yet
 
@@ -170,13 +170,40 @@ That gap matters because high availability requires both bounded client-visible 
 
 ### OpenAPI already documents a migration state
 
-The OpenAPI document is more current than the old note. At the top of [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml), it already documents shared middleware `429 text/plain` behavior. It also defines `ReasonResponse` and `PlainTextErrorResponse` separately.
+The OpenAPI document is more current than the old note. At the top of [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml), it documents shared middleware `429` JSON envelope behavior. It also defines `ReasonResponse` and `PlainTextErrorResponse` separately.
 
 That is the right current-state framing:
 
 - some route families already expose stable `reason` values
 - some paths still return plain-text or other legacy error forms
 - the transition needs to be managed explicitly, not hidden behind a new framework
+
+### Protected user profile route-family migration state
+
+The protected user profile family has converged on the shared JSON envelope and stable public `reason` values:
+
+| Route | Handler boundary behavior | Stable failure reasons | Plain-text exception |
+| --- | --- | --- | --- |
+| `GET /v0/privateprofile` | Uses `authhttp.WriteFailure` for auth outcomes and `handlers.WriteFailure` for user lookup/runtime failures. Shared route dispatch can also emit JSON 405. | `INVALID_TOKEN`, `PASSWORD_CHANGE_REQUIRED`, `USER_NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
+| `POST /v0/profilechange/description` | Uses `authhttp.WriteFailure` for auth outcomes, `INVALID_REQUEST` for malformed JSON, `METHOD_NOT_ALLOWED` for wrong methods, and `writeProfileError` for service failures. | `INVALID_TOKEN`, `PASSWORD_CHANGE_REQUIRED`, `INVALID_REQUEST`, `VALIDATION_FAILED`, `USER_NOT_FOUND`, `AUTHORIZATION_DENIED`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
+| `POST /v0/profilechange/displayname` | Same protected profile update boundary as description. | `INVALID_TOKEN`, `PASSWORD_CHANGE_REQUIRED`, `INVALID_REQUEST`, `VALIDATION_FAILED`, `USER_NOT_FOUND`, `AUTHORIZATION_DENIED`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
+| `POST /v0/profilechange/emoji` | Same protected profile update boundary as description. | `INVALID_TOKEN`, `PASSWORD_CHANGE_REQUIRED`, `INVALID_REQUEST`, `VALIDATION_FAILED`, `USER_NOT_FOUND`, `AUTHORIZATION_DENIED`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
+| `POST /v0/profilechange/links` | Same protected profile update boundary as description. | `INVALID_TOKEN`, `PASSWORD_CHANGE_REQUIRED`, `INVALID_REQUEST`, `VALIDATION_FAILED`, `USER_NOT_FOUND`, `AUTHORIZATION_DENIED`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
+| `POST /v0/changepassword` | Uses `authhttp.WriteFailure` for token outcomes, `INVALID_REQUEST` for malformed JSON, `METHOD_NOT_ALLOWED` for wrong methods, and `writeChangePasswordError` for password service failures. | `INVALID_TOKEN`, `INVALID_REQUEST`, `VALIDATION_FAILED`, `AUTHORIZATION_DENIED`, `USER_NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INTERNAL_ERROR` | None. |
+
+The public user read/credit/portfolio/financial routes have now moved their handler-owned failures to `ReasonResponse`. Their successful payloads remain route-specific legacy JSON shapes.
+
+### WAVE03 stop-and-review inventory
+
+WAVE03 migrated the protected profile/password slice and runtime-owned `405`, `429`, and panic recovery responses to JSON failure envelopes. Those request boundaries no longer import or depend on `backend/errors`; runtime-owned helpers live in [failures.go](/workspace/socialpredict/backend/security/failures.go), and auth HTTP mapping for migrated handlers lives in [authhttp.go](/workspace/socialpredict/backend/handlers/authhttp/authhttp.go).
+
+The remaining live migration surface is explicit:
+
+| Surface | Current live behavior | Examples | Next-wave seam |
+| --- | --- | --- | --- |
+| Legacy markets reads and writes | Several handlers still emit raw `http.Error`; some successful delete/resolve paths still intentionally write status-only `204` responses. | `marketdetailshandler.go`, `searchmarkets.go`, `getmarkets.go`, `createmarket.go`, `resolvemarket.go`, `handler.go`, `listmarkets.go` | Split into a markets route-family wave, starting with read-only routes (`list/search/details/status/projection`) before write-sensitive create/update/resolve paths. |
+| Legacy logger fallback | `logger.RequestLoggingMiddleware` still has a raw `http.Error` fallback for a nil handler, but the main server build path now uses `security.RequestBoundaryMiddleware`. | `logger/middleware.go` | Retire or convert this fallback after confirming no live route wiring still wraps requests with the old logger middleware. |
+| `backend/errors` package | No live request-boundary import remains after WAVE03; the package is compatibility-only test-covered code. | `errors/httperror.go`, `errors/normalerror.go` | Package deletion is a separate cleanup after route-family migrations confirm no generated docs, tests, or legacy adapters still depend on it. |
 
 ## Failure Taxonomy
 
@@ -296,7 +323,7 @@ These seams should own typed internal failures and business-rule rejections. The
 - response envelopes
 - middleware behavior
 
-This is why `internal/service/auth.HTTPError` is transitional rather than target architecture.
+This is why auth now exposes typed internal outcomes and leaves HTTP status and public reason mapping to `handlers/authhttp`.
 
 ### Runtime failure containment
 
@@ -323,12 +350,11 @@ This is not a demand for one giant centralized mapper. Route-family helpers such
 
 ### Legacy compatibility scope
 
-Two current pieces are explicitly transitional:
+The remaining compatibility scope is explicitly transitional:
 
 - `backend/errors`
-- auth-local `HTTPError`
 
-Neither should become the future architectural center of error handling.
+It should not become the future architectural center of error handling. Auth-local `HTTPError` has already been replaced by typed internal auth outcomes for the migrated protected profile/password slice.
 
 ## Current Tree Versus Target Tree
 
@@ -416,14 +442,11 @@ The intended direction is not:
 
 ## Concrete Next Migration Goals
 
-1. Add application-owned request-correlation and panic-recovery middleware at the server boundary.
-2. Add shared failure writers for runtime-owned `405`, `429`, and sanitized internal `500` behavior.
-3. Define the minimal OpenTelemetry-aligned runtime failure telemetry rules for request correlation, `error.type`, and one-time exception recording.
-4. Decide whether protected `/v0` routes should converge fully on `ReasonResponse` or retain explicit plain-text exceptions in some route families.
-5. Replace `internal/service/auth.HTTPError` with cleaner typed internal auth outcomes before HTTP mapping occurs.
-6. Inventory route families that still emit raw `http.Error`, status-only failures, or ad hoc strings, then migrate them by highest-value groups.
-7. Retire `backend/errors` once no live request path depends on it.
-8. Keep OpenAPI and production notes route-family accurate throughout the migration instead of claiming universal envelope coverage too early.
+1. Follow with a markets read-route wave for `list/search/details/status/projection` raw `http.Error` handlers before touching write-sensitive create/update/resolve paths.
+2. Keep successful status-only `204` responses separate from failure migration work; only status-only failures should be converted to an explicit failure contract.
+3. Retire or convert the legacy logger middleware fallback after confirming no live server route build still uses it.
+4. Delete `backend/errors` only as a later cleanup after compatibility tests and adapters are removed; do not expand it into the central architecture.
+5. Keep OpenAPI and production notes route-family accurate throughout the migration instead of claiming universal envelope coverage too early.
 
 ## What This Note Replaces
 

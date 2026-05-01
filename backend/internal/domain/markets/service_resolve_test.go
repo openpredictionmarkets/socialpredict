@@ -10,6 +10,12 @@ import (
 	users "socialpredict/internal/domain/users"
 )
 
+// Resolve-market tests use fakes so resolution policy and payout/refund ordering
+// stay package-local. They do not prove atomic persistence; W04 still needs
+// real-Postgres evidence for resolve-market transaction scope and concurrent
+// payout safety before this path is treated as DB-truthful. This remains
+// deferred behind the next sell-position verification seam.
+
 type resolveRepo struct {
 	createFunc                   func(context.Context, *markets.Market) error
 	updateLabelsFunc             func(context.Context, int64, string, string) error

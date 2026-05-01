@@ -19,6 +19,14 @@ type BetHistoryReader interface {
 	UserHasBet(ctx context.Context, marketID uint, username string) (bool, error)
 }
 
+// PlaceTransactionFunc runs place-bet persistence against transaction-bound collaborators.
+type PlaceTransactionFunc func(ctx context.Context, repo Repository, users UserService) error
+
+// PlaceUnitOfWork scopes balance and bet writes to one database transaction.
+type PlaceUnitOfWork interface {
+	PlaceBetTransaction(ctx context.Context, fn PlaceTransactionFunc) error
+}
+
 // Repository exposes the persistence layer needed by the bets domain service.
 type Repository interface {
 	BetWriter
@@ -87,9 +95,8 @@ type BalanceGuard interface {
 	EnsureSufficient(balance, totalCost int64) error
 }
 
-// BetLedger encapsulates persistence and user accounting for bets.
+// BetLedger encapsulates persistence and user accounting for non-placement bet flows.
 type BetLedger interface {
-	ChargeAndRecord(ctx context.Context, bet *boundary.Bet, totalCost int64) error
 	CreditSale(ctx context.Context, bet *boundary.Bet, saleValue int64) error
 }
 
@@ -132,6 +139,7 @@ type Service struct {
 	balances       BalanceGuard
 	ledger         BetLedger
 	saleCalculator SaleCalculator
+	placeUnit      PlaceUnitOfWork
 }
 
 var (
@@ -230,6 +238,16 @@ func saleCalculatorOrDefault(c SaleCalculator, config Config) SaleCalculator {
 	return c
 }
 
+func placeUnitOfWorkOrDefault(u PlaceUnitOfWork, repo Repository) PlaceUnitOfWork {
+	if u != nil {
+		return u
+	}
+	if repoUnit, ok := repo.(PlaceUnitOfWork); ok {
+		return repoUnit
+	}
+	return nil
+}
+
 // WithPlaceValidator overrides the place validator.
 func WithPlaceValidator(v PlaceValidator) ServiceOption {
 	return func(s *Service) {
@@ -293,6 +311,15 @@ func WithSaleCalculator(c SaleCalculator) ServiceOption {
 	}
 }
 
+// WithPlaceUnitOfWork overrides the transaction scope used by place-bet writes.
+func WithPlaceUnitOfWork(u PlaceUnitOfWork) ServiceOption {
+	return func(s *Service) {
+		if s != nil {
+			s.placeUnit = placeUnitOfWorkOrDefault(u, s.repo)
+		}
+	}
+}
+
 // WithClock overrides the service clock.
 func WithClock(clock Clock) ServiceOption {
 	return func(s *Service) {
@@ -333,4 +360,5 @@ func (s *Service) ensureDefaults() {
 	s.balances = balanceGuardOrDefault(s.balances, s.config)
 	s.ledger = betLedgerOrDefault(s.ledger, s.repo, s.users)
 	s.saleCalculator = saleCalculatorOrDefault(s.saleCalculator, s.config)
+	s.placeUnit = placeUnitOfWorkOrDefault(s.placeUnit, s.repo)
 }

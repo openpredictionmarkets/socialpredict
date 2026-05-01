@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/logger"
 
 	"github.com/gorilla/mux"
 )
@@ -182,12 +184,31 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 		markets, err = h.service.ListMarkets(r.Context(), params.filters)
 	}
 	if err != nil {
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarkets", "FetchMarkets", fmt.Errorf("request_id=%s status=%s created_by=%s limit=%d offset=%d: %w",
+			logger.RequestIDFromContext(r.Context()),
+			params.status,
+			params.filters.CreatedBy,
+			params.limit,
+			params.offset,
+			err,
+		))
 		writeListError(w, err)
 		return
 	}
 
 	overviews, err := buildMarketOverviewResponses(r.Context(), h.service, markets)
 	if err != nil {
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarkets", "BuildMarketOverviewResponses", fmt.Errorf("request_id=%s markets_count=%d: %w",
+			logger.RequestIDFromContext(r.Context()),
+			len(markets),
+			err,
+		))
 		writeInternalError(w)
 		return
 	}
@@ -213,12 +234,20 @@ func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 
 	searchResults, err := h.service.SearchMarkets(r.Context(), params.Query, params.Filters)
 	if err != nil {
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("SearchMarkets", "SearchMarkets", err)
 		writeListError(w, err)
 		return
 	}
 
 	response, buildErr := h.buildSearchResponse(r, searchResults)
 	if buildErr != nil {
+		if isRequestCanceled(buildErr) {
+			return
+		}
+		logger.LogError("SearchMarkets", "BuildSearchResponse", buildErr)
 		writeInternalError(w)
 		return
 	}
@@ -288,12 +317,20 @@ func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
 
 	markets, err := h.fetchMarketsByStatus(r.Context(), statusValue, page)
 	if err != nil {
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarketsByStatus", "FetchMarketsByStatus", err)
 		writeListError(w, err)
 		return
 	}
 
 	overviews, err := buildMarketOverviewResponses(r.Context(), h.service, markets)
 	if err != nil {
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarketsByStatus", "BuildMarketOverviewResponses", err)
 		writeInternalError(w)
 		return
 	}
@@ -543,40 +580,13 @@ type searchParams struct {
 }
 
 func (h *Handler) parseSearchParams(r *http.Request) (searchParams, error) {
-	query := r.URL.Query().Get("query")
-	if query == "" {
-		query = r.URL.Query().Get("q")
+	params, parseErr := parseSearchRequest(r)
+	if parseErr != nil {
+		return searchParams{}, errors.New(parseErr.message)
 	}
-	if query == "" {
-		return searchParams{}, errors.New("Query parameter 'query' is required")
-	}
-
-	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
-	if err != nil {
-		return searchParams{}, err
-	}
-
-	limit := 0
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil {
-			limit = parsedLimit
-		}
-	}
-
-	offset := 0
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil {
-			offset = parsedOffset
-		}
-	}
-
 	return searchParams{
-		Query: query,
-		Filters: dmarkets.SearchFilters{
-			Status: status,
-			Limit:  limit,
-			Offset: offset,
-		},
+		Query:   params.query,
+		Filters: params.filters,
 	}, nil
 }
 

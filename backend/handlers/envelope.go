@@ -15,6 +15,8 @@ const (
 	ReasonAuthorizationDenied    FailureReason = "AUTHORIZATION_DENIED"
 	ReasonPasswordChangeRequired FailureReason = "PASSWORD_CHANGE_REQUIRED"
 	ReasonNotFound               FailureReason = "NOT_FOUND"
+	ReasonRateLimited            FailureReason = "RATE_LIMITED"
+	ReasonLoginRateLimited       FailureReason = "LOGIN_RATE_LIMITED"
 	ReasonUserNotFound           FailureReason = "USER_NOT_FOUND"
 	ReasonMarketNotFound         FailureReason = "MARKET_NOT_FOUND"
 
@@ -34,6 +36,8 @@ var publicFailureReasons = []FailureReason{
 	ReasonAuthorizationDenied,
 	ReasonPasswordChangeRequired,
 	ReasonNotFound,
+	ReasonRateLimited,
+	ReasonLoginRateLimited,
 	ReasonUserNotFound,
 	ReasonMarketNotFound,
 	ReasonValidationFailed,
@@ -77,27 +81,6 @@ func WriteFailure(w http.ResponseWriter, statusCode int, reason FailureReason) e
 
 func WriteBusinessFailure(w http.ResponseWriter, reason FailureReason) error {
 	return WriteFailure(w, http.StatusOK, reason)
-}
-
-// AuthFailureReason maps auth-layer HTTP outcomes to the shared public reason
-// vocabulary used by touched envelope handlers.
-func AuthFailureReason(statusCode int, message string) FailureReason {
-	switch {
-	case statusCode >= http.StatusInternalServerError:
-		return ReasonInternalError
-	case statusCode == http.StatusUnauthorized:
-		return ReasonInvalidToken
-	case statusCode == http.StatusForbidden && strings.EqualFold(message, "Password change required"):
-		return ReasonPasswordChangeRequired
-	case statusCode == http.StatusForbidden:
-		return ReasonAuthorizationDenied
-	case statusCode == http.StatusNotFound:
-		return ReasonUserNotFound
-	case statusCode == http.StatusBadRequest:
-		return ReasonValidationFailed
-	default:
-		return ReasonInternalError
-	}
 }
 
 func IsValidationMessage(message string) bool {

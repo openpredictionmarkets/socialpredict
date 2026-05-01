@@ -11,6 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// These label migration checks use SQLite-backed convenience coverage for
+// package-local schema intent. Real Postgres remains required for DDL behavior
+// and migration serialization proof beyond the WAVE07 startup contract seam.
+
 // MarketV1 mirrors the old schema (no label fields) but uses same table name.
 type MarketV1 struct {
 	ID                      int64 `gorm:"primaryKey"`

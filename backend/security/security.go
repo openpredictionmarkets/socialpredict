@@ -2,6 +2,7 @@ package security
 
 import (
 	"net/http"
+	"strings"
 )
 
 // SecurityService provides a comprehensive security layer for the application
@@ -29,6 +30,16 @@ func NewCustomSecurityService(rateLimitConfig RateLimitConfig) *SecurityService 
 		Validator:   NewValidator(),
 		RateManager: NewCustomRateLimitManager(rateLimitConfig),
 		Headers:     DefaultSecurityHeaders(),
+	}
+}
+
+// NewRuntimeSecurityService creates a security service from runtime-owned posture settings.
+func NewRuntimeSecurityService(rateLimitConfig RateLimitConfig, headers SecurityHeaders) *SecurityService {
+	return &SecurityService{
+		Sanitizer:   NewSanitizer(),
+		Validator:   NewValidator(),
+		RateManager: NewCustomRateLimitManager(rateLimitConfig),
+		Headers:     headers,
 	}
 }
 
@@ -201,12 +212,13 @@ type SanitizedBetInput struct {
 
 // ValidateAndSanitizeBetInput validates and sanitizes betting data
 func (s *SecurityService) ValidateAndSanitizeBetInput(input BetInput) (*SanitizedBetInput, error) {
-	// Validate the input structure
+	input.MarketID = strings.TrimSpace(input.MarketID)
+	input.Outcome = strings.ToUpper(strings.TrimSpace(input.Outcome))
+
 	if err := s.Validator.ValidateStruct(input); err != nil {
 		return nil, err
 	}
 
-	// No additional sanitization needed for betting data since validation covers it
 	return &SanitizedBetInput{
 		MarketID: input.MarketID,
 		Amount:   input.Amount,

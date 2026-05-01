@@ -2,12 +2,12 @@ package betshandlers
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 
 	"socialpredict/handlers"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/logger"
 
 	"github.com/gorilla/mux"
 )
@@ -33,7 +33,7 @@ func MarketBetsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFun
 		}
 
 		if err := handlers.WriteResult(w, http.StatusOK, betsDisplayInfo); err != nil {
-			log.Printf("Error encoding bets response: %v", err)
+			logger.LogError("MarketBets", "WriteResponse", err)
 		}
 	}
 }
@@ -57,7 +57,7 @@ func writeMarketBetsError(w http.ResponseWriter, marketID int64, err error) {
 	case dmarkets.ErrInvalidInput:
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	default:
-		log.Printf("Error getting market bets for market %d: %v", marketID, err)
+		logger.LogError("MarketBets", "GetMarketBets", err)
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }

@@ -17,6 +17,7 @@ type User struct {
 	Username              string
 	DisplayName           string
 	Email                 string
+	PasswordHash          string
 	UserType              string
 	InitialAccountBalance int64
 	AccountBalance        int64

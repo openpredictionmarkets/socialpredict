@@ -340,6 +340,9 @@ func TestChangePasswordHandler_InvalidTokenReturnsFailureEnvelope(t *testing.T) 
 	if response.Reason != "INVALID_TOKEN" {
 		t.Fatalf("expected reason INVALID_TOKEN, got %q", response.Reason)
 	}
+	if strings.Contains(rec.Body.String(), "Invalid token") {
+		t.Fatalf("failure response leaked raw auth message: %s", rec.Body.String())
+	}
 }
 
 func TestChangePasswordHandler_SuccessResponseEnvelope(t *testing.T) {

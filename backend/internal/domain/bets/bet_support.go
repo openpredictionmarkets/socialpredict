@@ -114,18 +114,6 @@ type betLedger struct {
 	users TransactionRecorder
 }
 
-func (l betLedger) ChargeAndRecord(ctx context.Context, bet *boundary.Bet, totalCost int64) error {
-	if err := l.users.ApplyTransaction(ctx, bet.Username, totalCost, dusers.TransactionBuy); err != nil {
-		return err
-	}
-
-	if err := l.repo.Create(ctx, bet); err != nil {
-		_ = l.users.ApplyTransaction(ctx, bet.Username, totalCost, dusers.TransactionRefund)
-		return err
-	}
-	return nil
-}
-
 func (l betLedger) CreditSale(ctx context.Context, bet *boundary.Bet, saleValue int64) error {
 	if err := l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionSale); err != nil {
 		return err

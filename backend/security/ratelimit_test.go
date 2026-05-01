@@ -1,6 +1,7 @@
 package security
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,10 @@ import (
 
 func TestRateLimiter_GetLimiter(t *testing.T) {
 	rl := NewRateLimiter(rate.Every(time.Second), 5, time.Minute)
+
+	if rl.Scope() != RateLimitScopeInProcess {
+		t.Fatalf("expected in-process limiter scope, got %q", rl.Scope())
+	}
 
 	// Test getting a limiter for a new IP
 	limiter1 := rl.GetLimiter("192.168.1.1")
@@ -74,6 +79,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		if rr.Code != http.StatusTooManyRequests {
 			t.Errorf("Expected status TooManyRequests, got %d", rr.Code)
 		}
+		assertRuntimeFailureReason(t, rr, RuntimeReasonRateLimited)
 	})
 }
 
@@ -121,11 +127,170 @@ func TestLoginRateLimitMiddleware(t *testing.T) {
 			t.Errorf("Expected status TooManyRequests, got %d", rr.Code)
 		}
 
-		// Check error message is specific to login
-		if !contains(rr.Body.String(), "login attempts") {
-			t.Error("Expected login-specific error message")
+		assertRuntimeFailureReason(t, rr, RuntimeReasonLoginRateLimited)
+	})
+}
+
+func TestRateLimitMiddlewareUsesExplicitClientIdentityExtractor(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("untrusted forwarded headers cannot split limiter identity", func(t *testing.T) {
+		rl := NewRateLimiter(rate.Every(time.Hour), 1, time.Minute)
+		wrappedHandler := RateLimitMiddlewareWithClientIdentity(rl, NewClientIdentityExtractor(false))(testHandler)
+
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = "10.0.0.10:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.10")
+
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("first request should succeed, got %d", rr.Code)
+		}
+
+		req = httptest.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = "10.0.0.10:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.11")
+
+		rr = httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusTooManyRequests {
+			t.Fatalf("expected second request from same remote address to be limited, got %d", rr.Code)
+		}
+		assertRuntimeFailureReason(t, rr, RuntimeReasonRateLimited)
+	})
+
+	t.Run("trusted forwarded headers define limiter identity after runtime opt in", func(t *testing.T) {
+		rl := NewRateLimiter(rate.Every(time.Hour), 1, time.Minute)
+		wrappedHandler := RateLimitMiddlewareWithClientIdentity(rl, NewClientIdentityExtractor(true))(testHandler)
+
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = "10.0.0.10:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.10")
+
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("first trusted forwarded identity should succeed, got %d", rr.Code)
+		}
+
+		req = httptest.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = "10.0.0.10:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.11")
+
+		rr = httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("different trusted forwarded identity should use a separate in-process limiter, got %d", rr.Code)
 		}
 	})
+}
+
+func TestRateLimitMiddlewareWithProxyTrustKeepsDefaultUntrusted(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	rl := NewRateLimiter(rate.Every(time.Hour), 1, time.Minute)
+	wrappedHandler := RateLimitMiddlewareWithProxyTrust(rl, false)(testHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "10.0.0.20:12345"
+	req.Header.Set("X-Forwarded-For", "203.0.113.20")
+
+	rr := httptest.NewRecorder()
+	wrappedHandler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("first request should succeed, got %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "10.0.0.20:12345"
+	req.Header.Set("X-Forwarded-For", "203.0.113.21")
+
+	rr = httptest.NewRecorder()
+	wrappedHandler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected untrusted forwarded header change to stay on remote-address limiter, got %d", rr.Code)
+	}
+	assertRuntimeFailureReason(t, rr, RuntimeReasonRateLimited)
+}
+
+func TestLoginRateLimitMiddlewareUsesExplicitProxyTrustContract(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("untrusted forwarded headers cannot bypass login limiter", func(t *testing.T) {
+		rl := NewRateLimiter(rate.Every(time.Hour), 1, time.Minute)
+		wrappedHandler := LoginRateLimitMiddlewareWithClientIdentity(rl, NewClientIdentityExtractor(false))(testHandler)
+
+		req := httptest.NewRequest(http.MethodPost, "/v0/login", nil)
+		req.RemoteAddr = "10.0.0.20:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.20")
+
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("first login request should succeed, got %d", rr.Code)
+		}
+
+		req = httptest.NewRequest(http.MethodPost, "/v0/login", nil)
+		req.RemoteAddr = "10.0.0.20:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.21")
+
+		rr = httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusTooManyRequests {
+			t.Fatalf("expected same remote address to hit login limiter despite changed forwarded header, got %d", rr.Code)
+		}
+		assertRuntimeFailureReason(t, rr, RuntimeReasonLoginRateLimited)
+	})
+
+	t.Run("trusted forwarded headers define login limiter identity after runtime opt in", func(t *testing.T) {
+		rl := NewRateLimiter(rate.Every(time.Hour), 1, time.Minute)
+		wrappedHandler := LoginRateLimitMiddlewareWithClientIdentity(rl, NewClientIdentityExtractor(true))(testHandler)
+
+		req := httptest.NewRequest(http.MethodPost, "/v0/login", nil)
+		req.RemoteAddr = "10.0.0.20:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.20")
+
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("first trusted forwarded login identity should succeed, got %d", rr.Code)
+		}
+
+		req = httptest.NewRequest(http.MethodPost, "/v0/login", nil)
+		req.RemoteAddr = "10.0.0.20:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.21")
+
+		rr = httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("different trusted forwarded login identity should use a separate in-process limiter, got %d", rr.Code)
+		}
+	})
+}
+
+func assertRuntimeFailureReason(t *testing.T, rr *httptest.ResponseRecorder, want string) {
+	t.Helper()
+
+	if got := rr.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("expected JSON content type, got %q", got)
+	}
+
+	var response struct {
+		OK     bool   `json:"ok"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode runtime failure response: %v", err)
+	}
+	if response.OK || response.Reason != want {
+		t.Fatalf("expected reason %q, got %+v", want, response)
+	}
 }
 
 func TestGetClientIP(t *testing.T) {
@@ -134,31 +299,50 @@ func TestGetClientIP(t *testing.T) {
 		remoteAddr     string
 		forwardedFor   string
 		realIP         string
+		trustProxy     bool
 		expectedPrefix string
 	}{
 		{
 			name:           "direct connection",
 			remoteAddr:     "192.168.1.1:12345",
-			expectedPrefix: "192.168.1.1:12345",
+			expectedPrefix: "192.168.1.1",
 		},
 		{
-			name:           "with X-Forwarded-For",
+			name:           "ignores forwarded headers by default",
 			remoteAddr:     "10.0.0.1:12345",
 			forwardedFor:   "203.0.113.1, 10.0.0.1",
+			realIP:         "203.0.113.2",
+			expectedPrefix: "10.0.0.1",
+		},
+		{
+			name:           "with trusted X-Forwarded-For",
+			remoteAddr:     "10.0.0.1:12345",
+			forwardedFor:   "203.0.113.1, 10.0.0.1",
+			trustProxy:     true,
 			expectedPrefix: "203.0.113.1",
 		},
 		{
-			name:           "with X-Real-IP",
+			name:           "with trusted X-Real-IP",
 			remoteAddr:     "10.0.0.1:12345",
 			realIP:         "203.0.113.2",
+			trustProxy:     true,
 			expectedPrefix: "203.0.113.2",
 		},
 		{
-			name:           "X-Forwarded-For takes precedence over X-Real-IP",
+			name:           "trusted X-Forwarded-For takes precedence over X-Real-IP",
 			remoteAddr:     "10.0.0.1:12345",
 			forwardedFor:   "203.0.113.1",
 			realIP:         "203.0.113.2",
+			trustProxy:     true,
 			expectedPrefix: "203.0.113.1",
+		},
+		{
+			name:           "trusted invalid forwarded header falls back to real IP",
+			remoteAddr:     "10.0.0.1:12345",
+			forwardedFor:   "not-an-ip",
+			realIP:         "203.0.113.2",
+			trustProxy:     true,
+			expectedPrefix: "203.0.113.2",
 		},
 	}
 
@@ -174,11 +358,24 @@ func TestGetClientIP(t *testing.T) {
 				req.Header.Set("X-Real-IP", tt.realIP)
 			}
 
-			result := getClientIP(req)
+			result := getClientIPWithProxyTrust(req, tt.trustProxy)
 			if result != tt.expectedPrefix {
 				t.Errorf("getClientIP() = %v, want %v", result, tt.expectedPrefix)
 			}
 		})
+	}
+}
+
+func TestGetClientIPWithProxyTrustUsesInjectedPosture(t *testing.T) {
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "10.0.0.1:12345"
+	req.Header.Set("X-Forwarded-For", "203.0.113.1")
+
+	if got := getClientIPWithProxyTrust(req, false); got != "10.0.0.1" {
+		t.Fatalf("expected direct remote address when proxy trust is disabled, got %q", got)
+	}
+	if got := getClientIPWithProxyTrust(req, true); got != "203.0.113.1" {
+		t.Fatalf("expected forwarded address when proxy trust is injected, got %q", got)
 	}
 }
 

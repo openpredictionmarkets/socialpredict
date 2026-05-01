@@ -80,24 +80,43 @@ docker exec -it -e PGPASSWORD=password socialpredict-postgres-container psql -U 
 
 ##### Getting Logs from Different Containers
 
-* There are different containers which serve different purposes in our app, and `docker compose` is used to spin them all up and hook them together. If something goes wrong in the app, you can use a `docker compose -p scripts logs` command to view logs from all of the containers.
+* There are different containers which serve different purposes in our app, and `docker compose` is used to spin them all up and hook them together. If something goes wrong in the app, you can use `./SocialPredict logs all` to view logs from all of the containers.
 
-* However, there are tons and tons of logs, so to be able to look at logs from a specific container, you should add `| grep {whatever}` where `wherever` is the container in question, to filter your logs to see what the problem may have been.
+* For the most common case, it is easier to use the top-level command directly against one service:
 
 ```
-docker compose -p scripts logs | grep backend
+./SocialPredict logs
+./SocialPredict logs options
+./SocialPredict logs <service>
 ```
 
-* Errors from the `backend` container can be viewed by adding the `|` (pipe) and then `grep backend`, which is a way of filtering any lines which include, "backend," in them.
+* To follow logs live, add `-f` or `--follow`:
 
-* Likewise, frontend, nginx, database, certbot errors can be filtered out similarly with:
+```
+./SocialPredict logs <service> -f
+```
+
+* The available service names come from the active compose file, and `options` will show the current service-to-container mapping:
+
+```
+./SocialPredict logs options
+```
+
+* To show usage and examples:
+
+```
+./SocialPredict logs options
+./SocialPredict logs help
+./SocialPredict logs --help
+```
+
+* The older compose-wide pattern still works when you specifically want to grep across all services:
 
 ```
 docker compose -p scripts logs | grep backend
 docker compose -p scripts logs | grep frontend
 docker compose -p scripts logs | grep nginx
 docker compose -p scripts logs | grep postgres
-docker compose -p scripts logs | grep certbot
 ```
 
 ### Backing Up Database On Local Prior to Change

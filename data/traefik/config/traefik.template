@@ -20,6 +20,8 @@ entryPoints:
 
 providers:
   docker:
+    # Traefik owns the public host and TLS edge. Path publishing for
+    # backend-owned /swagger/ and /openapi.yaml is explicit in nginx.
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
     network: socialpredict_external_network
