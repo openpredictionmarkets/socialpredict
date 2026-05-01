@@ -11,8 +11,8 @@ import (
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
-	"socialpredict/logger"
 	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/logger"
 
 	"github.com/gorilla/mux"
 )

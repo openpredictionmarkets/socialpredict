@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 )
@@ -136,6 +137,13 @@ func TestSearchMarketsHandlerSuccess(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
+	var raw map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("unmarshal raw response: %v", err)
+	}
+	if _, wrapped := raw["ok"]; wrapped {
+		t.Fatalf("success response should remain raw SearchResponse, got envelope-like body %s", res.Body.String())
+	}
 
 	if resp.TotalCount != 1 || resp.PrimaryCount != 1 {
 		t.Fatalf("expected counts to be 1, got total=%d primary=%d", resp.TotalCount, resp.PrimaryCount)
@@ -147,37 +155,39 @@ func TestSearchMarketsHandlerSuccess(t *testing.T) {
 }
 
 func TestSearchMarketsHandlerValidation(t *testing.T) {
-	mockSvc := &searchServiceMock{}
-	handler := SearchMarketsHandler(mockSvc)
-
 	t.Run("method not allowed", func(t *testing.T) {
+		handler := SearchMarketsHandler(&searchServiceMock{})
 		req := httptest.NewRequest(http.MethodPost, "/v0/markets/search", nil)
 		rr := httptest.NewRecorder()
 
 		handler(rr, req)
-		if rr.Code != http.StatusMethodNotAllowed {
-			t.Fatalf("expected %d, got %d", http.StatusMethodNotAllowed, rr.Code)
-		}
+		assertFailureEnvelope(t, rr, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 	})
 
 	t.Run("missing query parameter", func(t *testing.T) {
+		handler := SearchMarketsHandler(&searchServiceMock{})
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search", nil)
 		rr := httptest.NewRecorder()
 
 		handler(rr, req)
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("expected %d, got %d", http.StatusBadRequest, rr.Code)
-		}
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	})
 
-	t.Run("domain service error surfaces as server error", func(t *testing.T) {
-		mockSvc.err = errors.New("boom")
+	t.Run("domain invalid input returns validation failure envelope", func(t *testing.T) {
+		handler := SearchMarketsHandler(&searchServiceMock{err: dmarkets.ErrInvalidInput})
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=test", nil)
 		rr := httptest.NewRecorder()
 
 		handler(rr, req)
-		if rr.Code != http.StatusInternalServerError {
-			t.Fatalf("expected %d, got %d", http.StatusInternalServerError, rr.Code)
-		}
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonValidationFailed)
+	})
+
+	t.Run("domain service error surfaces as server error", func(t *testing.T) {
+		handler := SearchMarketsHandler(&searchServiceMock{err: errors.New("boom")})
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=test", nil)
+		rr := httptest.NewRecorder()
+
+		handler(rr, req)
+		assertFailureEnvelope(t, rr, http.StatusInternalServerError, handlers.ReasonInternalError)
 	})
 }

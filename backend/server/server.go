@@ -163,14 +163,14 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 	// Redirect /swagger -> /swagger/
 	router.HandleFunc("/swagger", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/swagger/", http.StatusMovedPermanently)
-	})
+	}).Methods("GET")
 	// File server rooted at swagger-ui/
 	uiFS, err := fs.Sub(swaggerUIFS, "swagger-ui")
 	if err != nil {
 		return fmt.Errorf("failed to set up swagger-ui FS: %w", err)
 	}
 	swaggerHandler := http.FileServer(http.FS(uiFS))
-	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler))
+	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler)).Methods("GET")
 
 	return nil
 }

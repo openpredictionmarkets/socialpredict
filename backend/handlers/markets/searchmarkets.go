@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/logger"
@@ -145,24 +146,24 @@ func writeSearchResponse(w http.ResponseWriter, ctx context.Context, svc dmarket
 }
 
 func writeSearchError(w http.ResponseWriter, err error) {
-	switch err {
-	case dmarkets.ErrInvalidInput:
-		http.Error(w, "Invalid search parameters", http.StatusBadRequest)
+	switch {
+	case errors.Is(err, dmarkets.ErrInvalidInput):
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
 		logger.LogError("SearchMarkets", "SearchMarkets", err)
-		http.Error(w, "Error searching markets", http.StatusInternalServerError)
+		writeInternalError(w)
 	}
 }
 
 func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
 	params, clientErr := parseSearchRequest(r)
 	if clientErr != nil {
-		http.Error(w, clientErr.message, clientErr.statusCode)
+		_ = handlers.WriteFailure(w, clientErr.statusCode, handlers.ReasonInvalidRequest)
 		return
 	}
 
@@ -177,6 +178,6 @@ func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.Se
 			return
 		}
 		logger.LogError("SearchMarkets", "WriteResponse", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeInternalError(w)
 	}
 }

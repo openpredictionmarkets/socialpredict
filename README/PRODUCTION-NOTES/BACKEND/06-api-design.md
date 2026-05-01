@@ -3,9 +3,9 @@ title: API Design
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Align the API note with the April 30 runtime-boundary completion for health, readiness, 405, 429, and auth-gate behavior."
+updated_at: 2026-04-30T13:45:00Z
+updated_at_display: "Thursday, April 30, 2026 at 1:45 PM UTC"
+update_reason: "Finish the WAVE06 stop-and-review inventory for remaining plain-text/auth boundary seams."
 status: active
 ---
 
@@ -16,6 +16,26 @@ status: active
 This note was updated on Sunday, April 26, 2026 to replace an older API standardization plan with guidance that matches the live SocialPredict backend, the current OpenAPI contract, and the active design-plan posture.
 
 On Thursday, April 30, 2026, the runtime-boundary API behavior changed in a few important ways: `/health` now returns `live`, `/readyz` returns readiness state, runtime-owned `405` and `429` failures use JSON `reason` envelopes, and the private action routes enforce `PASSWORD_CHANGE_REQUIRED` before their domain handlers run.
+
+WAVE06 also makes the mixed contract explicit in the OpenAPI artifact instead
+of treating it as cleanup folklore. The source-of-truth order remains
+`server.go` -> touched handlers or DTOs -> `openapi.yaml` -> `API-ISSUES.md`.
+The route-family migration matrix below is mirrored by
+`x-route-family-migration-matrix` in `backend/docs/openapi.yaml` and by focused
+contract tests.
+
+This slice also makes docs publishing explicit: local, dev, and production
+surfaces use the backend-owned root paths `/swagger/` and `/openapi.yaml`.
+The nginx templates publish those paths before the frontend catch-all route;
+`/api/` does not own the docs contract.
+
+The WAVE06 stop-and-review outcome is intentionally narrower than a platform
+backlog: auth transport mapping now has a shared HTTP seam, touched private-user
+and private-action paths use route-visible `ReasonResponse` failures,
+`/v0/markets/search` retired its plain-text application failures while
+preserving raw `SearchResponse` success, and the remaining plain-text boundary
+inventory is concentrated in the markets route family plus intentional probe
+transport.
 
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
@@ -95,29 +115,39 @@ If the backend is running on the default port, the docs surface is:
 
 If `BACKEND_PORT` is overridden, replace `8080` with that port.
 
-### Staging and production docs publishing is still a deployment caveat
+### Proxy docs publishing is explicit
 
-The backend-served docs work directly when the backend is exposed at its own root, but the current nginx proxy templates do not yet publish them explicitly in staging or production.
+The backend-served docs work directly when the backend is exposed at its own
+root, and the nginx proxy templates now publish the same paths explicitly in
+dev and production. Staging uses the same contract when it is deployed from the
+production nginx template.
 
-Today:
+The chosen publishing path is primary-domain root publishing:
 
-- the backend serves docs at root paths:
-  - `/swagger/`
-  - `/openapi.yaml`
+- `/swagger/`
+- `/openapi.yaml`
+
+The related behavior is:
+
+- the backend serves docs at those root paths
+- `GET /swagger` redirects to `/swagger/`
 - the embedded Swagger UI requests `/openapi.yaml` as an absolute root path
-- the current nginx templates proxy:
-  - `/api/` to the backend
-  - `/` to the frontend
+- the dev and production nginx templates route `/openapi.yaml`, `/swagger`,
+  and `/swagger/` to the backend before `/api/` and `/`; staging inherits this
+  only when it uses the production template
+- the Traefik template owns the public host and TLS edge; nginx owns the
+  path-level docs publishing decision
 
-That means the current staging/production topology is likely to hide or break the docs surface unless nginx or ingress publishes those routes explicitly.
+This keeps the external docs contract identical to the backend contract while
+leaving `/api/` as the application API prefix bridge.
 
-The active recommendation is:
+The active rule is:
 
 - keep the backend as the source of truth for Swagger and OpenAPI
-- expose docs explicitly at the reverse-proxy layer, such as:
-  - `/swagger/`
-  - `/openapi.yaml`
-- or use a dedicated docs/admin hostname if operations prefers stricter isolation
+- expose docs explicitly at `/swagger/` and `/openapi.yaml` through the
+  reverse-proxy layer
+- keep access open in this slice; if operations later requires restriction,
+  apply it at the proxy or hostname layer without moving docs ownership
 - do not maintain a second frontend-owned Swagger copy
 
 This is a deployment and contract-publishing issue, not a reason to create a separate API documentation platform inside the application.
@@ -177,15 +207,16 @@ That mixed state is visible in parts of the markets surface and some setup/confi
 
 #### Legacy raw JSON plus plain-text failure routes
 
-Several older public/reporting routes still return raw JSON on success and `http.Error` style plain-text failures.
+Several older compatibility handlers still return raw JSON on success and
+`http.Error` style plain-text failures where they have not yet been migrated to
+the canonical registered `/v0` route boundary.
 
 Examples include:
 
-- [publicuser.go](/workspace/socialpredict/backend/handlers/users/publicuser.go)
-- [portfolio.go](/workspace/socialpredict/backend/handlers/users/publicuser/portfolio.go)
-- [financial.go](/workspace/socialpredict/backend/handlers/users/financial.go)
-- [usercredit.go](/workspace/socialpredict/backend/handlers/users/credit/usercredit.go)
-- [searchmarkets.go](/workspace/socialpredict/backend/handlers/markets/searchmarkets.go)
+- [getmarkets.go](/workspace/socialpredict/backend/handlers/markets/getmarkets.go)
+- [listmarkets.go](/workspace/socialpredict/backend/handlers/markets/listmarkets.go)
+- [marketdetailshandler.go](/workspace/socialpredict/backend/handlers/markets/marketdetailshandler.go)
+- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go)
 
 #### Middleware and infra transport responses
 
@@ -199,6 +230,66 @@ Some failures and infra routes intentionally remain outside application envelope
 - router-level method handling emits JSON `405` envelopes and sets `Allow`
 
 This mixed state is real and should be documented honestly rather than hidden behind a universal response-wrapper proposal.
+
+### WAVE06 route-family migration matrix
+
+The current contract slice is intentionally mixed. This matrix is the starting
+point for route-family migration, not a promise that every route already uses
+one target shape.
+
+| Route family | Paths | Success contract | Failure contract | Migration state |
+| --- | --- | --- | --- | --- |
+| Infra probes | `/health`, `/readyz` | `text/plain` probe body (`live`, `ready`) | `text/plain` probe body (`not ready` where applicable) | Intentional infra transport |
+| Infra docs | `/openapi.yaml`, `/swagger`, `/swagger/` | OpenAPI YAML, redirect, or embedded Swagger UI asset | Router/runtime failure outside application envelope | Intentional unversioned docs transport |
+| Runtime middleware | all registered routes | Not applicable | JSON `{ ok: false, reason }` for router-owned `405` and middleware-owned `429` | Runtime-boundary envelope |
+| Auth | `/v0/login` | JSON `{ ok: true, result }` | `ReasonResponse` | Envelope-based |
+| Setup | `/v0/setup`, `/v0/setup/frontend` | Raw JSON DTO | `ReasonResponse` plus middleware `429` | Mixed raw success plus `ReasonResponse` |
+| Reporting | `/v0/home`, `/v0/stats`, `/v0/system/metrics`, `/v0/global/leaderboard` | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` | Envelope-based |
+| Markets | `/v0/markets`, `/v0/markets/status`, `/v0/markets/status/{status}`, legacy status aliases, market detail/resolve/leaderboard/projection routes, and both legacy market-projection slash variants | Mixed raw JSON DTO, no-content action, and selected envelope results | `ReasonResponse` plus middleware `429` | Mixed raw success plus `ReasonResponse` |
+| Market search | `/v0/markets/search` | Raw JSON `SearchResponse` | `ReasonResponse` plus middleware `429` | Raw success with plain-text failures retired |
+| Market bets and positions | `/v0/markets/bets/{marketId}`, `/v0/markets/positions/{marketId}`, `/v0/markets/positions/{marketId}/{username}` | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` where wrapped | Envelope-based |
+| Public users | `/v0/userinfo/{username}`, `/v0/usercredit/{username}`, `/v0/portfolio/{username}`, `/v0/users/{username}/financial` | Raw JSON DTO | `ReasonResponse` plus middleware `429` | Mixed raw success plus `ReasonResponse` |
+| Private users | `/v0/privateprofile`, `/v0/changepassword`, profile-change routes | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` | Envelope-based |
+| Private actions | `/v0/bet`, `/v0/userposition/{marketId}`, `/v0/sell` | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` and the route-boundary `PASSWORD_CHANGE_REQUIRED` gate | Envelope-based |
+| Admin and content | `/v0/admin/createuser`, `/v0/content/home`, `/v0/admin/content/home` | Mixed raw JSON DTO and JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` where wrapped | Mixed raw success plus `ReasonResponse` |
+
+The matrix deliberately tracks middleware and handler-owned responses together
+because clients see both at the same HTTP boundary.
+
+### Public reason vocabulary
+
+The touched public `reason` values are client-facing HTTP contract values, not
+runtime telemetry vocabulary and not the internal domain error taxonomy. They
+are owned in code by `handlers.PublicFailureReasons()` and mirrored in
+`ReasonResponse`:
+
+`METHOD_NOT_ALLOWED`, `INVALID_REQUEST`, `INVALID_TOKEN`,
+`AUTHORIZATION_DENIED`, `PASSWORD_CHANGE_REQUIRED`, `NOT_FOUND`,
+`RATE_LIMITED`, `LOGIN_RATE_LIMITED`, `USER_NOT_FOUND`, `MARKET_NOT_FOUND`,
+`VALIDATION_FAILED`, `MARKET_CLOSED`, `INSUFFICIENT_BALANCE`, `NO_POSITION`,
+`INSUFFICIENT_SHARES`, `DUST_CAP_EXCEEDED`, `INTERNAL_ERROR`.
+
+Runtime telemetry classifications, including values such as `error.type`, stay
+separate from this public vocabulary. The public `reason` value is what clients
+can branch on; telemetry fields are operator diagnostics.
+
+### PlainTextErrorResponse migration state
+
+`PlainTextErrorResponse` remains in the OpenAPI component set as an explicit
+migration-state marker for infra probe failures and untouched handler-owned
+plain-text failures still being retired. At this checkpoint that means
+intentional `/health` and `/readyz` probe transport plus the remaining markets
+compatibility seams listed in [API-ISSUES.md](/workspace/socialpredict/backend/docs/API-ISSUES.md):
+`getmarkets.go`, `listmarkets.go`, `marketdetailshandler.go`,
+`resolvemarket.go`, legacy update/get methods on `handler.go`, and
+market-create compatibility helpers in `createmarket.go`.
+
+It is not the target application contract. Touched `/v0` route families should
+converge toward `ReasonResponse` or documented infra transport behavior rather
+than adding new plain-text application failures. The concrete next API slice is
+the markets route family: retire unused compatibility entry points and convert
+any still-routed market handler failures to shared `ReasonResponse` helpers
+without a universal wrapper or success-body flag day.
 
 ### OpenAPI already documents migration state
 
@@ -218,6 +309,8 @@ The live API already has important auth contract rules:
 - `POST /v0/login` returns a normal bearer token plus `mustChangePassword`
 - most authenticated actions enforce password-change gating
 - `POST /v0/changepassword` intentionally remains usable when `mustChangePassword` is set
+- touched private-user auth failures are translated at the HTTP boundary and do
+  not expose raw auth service messages in response bodies
 
 Grounding:
 
@@ -295,18 +388,20 @@ The near-term API direction should align with the current design-plan waves rath
 
 1. Keep runtime and boundary failure ownership explicit so middleware-generated `429`, router-level `405`, and auth/runtime failures can be converged intentionally.
 2. Keep `openapi.yaml` aligned route-by-route with live code and document mixed response families honestly during the migration.
-3. Use the later scoped API/auth alignment wave to retire `internal/service/auth.HTTPError` and improve route-visible auth failure translation.
+3. Keep the current auth HTTP mapping seam in `handlers/authhttp` and retire
+   direct auth-error-to-transport call sites as they are touched.
 4. Keep parameter naming stable within current route families before attempting broader normalization.
-5. Decide and document the explicit staging/production publishing path for backend-served docs so Swagger and `openapi.yaml` remain reachable behind reverse proxies without a duplicate frontend copy.
+5. Keep the explicit root publishing path for backend-served docs intact so Swagger and `openapi.yaml` remain reachable behind reverse proxies without a duplicate frontend copy.
 6. Prioritize the highest-value legacy route families for convergence rather than attempting a full API flag day.
 7. Keep route reorganization, token redesign, and API-platform ambitions deferred until the current route-family and boundary work is substantially further along.
 
 ## Open Questions
 
-- Which route families should converge on envelope success/failure first after the current security and auth cleanup work?
+- Which markets compatibility entry points are still exercised by tests or
+  callers, and which can be deleted before converting remaining market failures?
 - Should all `/v0` application routes ultimately converge on `ReasonResponse`, or are there route families that should intentionally retain a non-envelope contract?
 - Which current plain-text failures are acceptable migration state, and which should be prioritized for removal first?
-- Should staging and production expose backend-served docs at `/swagger/` and `/openapi.yaml`, through a dedicated docs hostname, or only behind internal/admin access?
+- If operations later restricts docs access, should that restriction be host-based, network-based, or proxy-auth-based?
 - When does the backend actually have enough stable contract surface to justify broader versioning policy or generated clients?
 - Are there any route families where the current `limit/offset` posture is no longer sufficient and a broader pagination standard is justified?
 

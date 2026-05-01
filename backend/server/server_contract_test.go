@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"socialpredict/handlers"
+	appruntime "socialpredict/internal/app/runtime"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
@@ -53,6 +54,25 @@ func TestServerServesOpenAPIDocumentAndSwaggerRedirect(t *testing.T) {
 	}
 	if !strings.Contains(swaggerRec.Body.String(), "swagger") {
 		t.Fatalf("expected swagger placeholder body, got %q", swaggerRec.Body.String())
+	}
+
+	for _, path := range []string{"/swagger", "/swagger/"} {
+		t.Run("method not allowed "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Fatalf("expected swagger POST status 405, got %d: %s", rec.Code, rec.Body.String())
+			}
+			var response handlers.FailureEnvelope
+			if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+				t.Fatalf("decode swagger method failure: %v", err)
+			}
+			if response.OK || response.Reason != string(handlers.ReasonMethodNotAllowed) {
+				t.Fatalf("expected reason %q, got %+v", handlers.ReasonMethodNotAllowed, response)
+			}
+		})
 	}
 }
 
@@ -187,5 +207,27 @@ func TestSystemMetricsRouteRemainsApplicationReporting(t *testing.T) {
 	}
 	if _, ok := response.Result["moneyCreated"]; !ok {
 		t.Fatalf("expected moneyCreated metrics payload, got %+v", response.Result)
+	}
+}
+
+func TestReadinessProbePlainTextMigrationState(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	handler := buildTestHandlerWithConfig(t, db, modelstesting.GenerateEconomicConfig(), readiness)
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected /readyz status 503 while startup gate is closed, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("expected /readyz PlainTextErrorResponse content type, got %q", got)
+	}
+	if body := rec.Body.String(); body != "not ready" {
+		t.Fatalf("expected /readyz PlainTextErrorResponse body not ready, got %q", body)
 	}
 }
