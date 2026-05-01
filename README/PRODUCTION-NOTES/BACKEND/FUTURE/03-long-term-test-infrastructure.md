@@ -3,9 +3,9 @@ title: Long-Term Test Infrastructure
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T00:13:14Z
-updated_at_display: "Monday, April 27, 2026 at 12:13 AM UTC"
-update_reason: "Create a non-binding holding note for deferred containerized and broader test-infrastructure ideas so the active testing note can stay focused on the current backend and the active HA-focused modernization slice."
+updated_at: 2026-05-01T03:38:44Z
+updated_at_display: "Friday, May 1, 2026 at 3:38 AM UTC"
+update_reason: "Keep long-term testing infrastructure deferred after WAVE07 narrowed the next active verification seam to one package-local Postgres candidate."
 status: future
 ---
 
@@ -19,11 +19,12 @@ Its purpose is to preserve larger testing-infrastructure ideas without letting t
 
 ## Current Status
 
-As of 2026-04-27:
+As of 2026-05-01:
 
 - the active backend testing note should stay focused on package-local tests, current helper packages, contract checks, runtime-risk verification, and targeted DB truthfulness
 - the active design plan is still prioritizing runtime ownership, failure handling, database runtime hardening, security alignment, and API contract cleanup
-- the ideas in this document are explicitly deferred until those nearer-term seams are more stable
+- WAVE07 added DSN-gated Postgres checks for startup readiness/migration posture and place-bet transaction behavior without adopting a containerized platform, shared suite architecture, or broad CI taxonomy
+- the ideas in this document are explicitly deferred until the remaining concrete DB-truth seams cannot be handled with the current package-local posture
 
 This document is non-binding on the active design plan and on `TASKS.json`.
 
@@ -44,6 +45,8 @@ The following ideas are reasonable future candidates, but they are not current a
 - deciding whether containerized DB tests should run locally, only in CI, or both
 
 This is a plausible future direction, but it should be introduced only where a concrete verification need justifies the runtime cost and flake risk.
+
+WAVE07 did not meet that bar. Its next active candidate is a package-local sell-position Postgres check, not a `testcontainers-go` rollout.
 
 ### Centralized cross-boundary integration tests
 
@@ -87,6 +90,8 @@ Reasonable entry criteria are:
 - there is a concrete Postgres/runtime verification gap that package-local tests and current helpers cannot cover well
 - there is a real CI or developer-workflow reason to introduce heavier infrastructure
 - there is a measurable need for cross-repo helper sharing rather than a speculative one
+
+The May 1 WAVE07 stop-and-review did not activate these entry criteria. It kept the active queue on one concrete uncovered behavior at a time.
 
 ## What Is Explicitly Deferred
 

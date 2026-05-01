@@ -34,6 +34,11 @@ type FinancialsRepository interface {
 	UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error)
 }
 
+// StatsRepository exposes aggregate account data required by stats reporting.
+type StatsRepository interface {
+	CountUsersByType(ctx context.Context, userType string) (int64, error)
+}
+
 // Config captures the accounting-relevant policy slice required by analytics.
 // It is a process-start snapshot; historically exact fee or cost reporting across
 // future economics rollouts still requires durable per-market or per-bet policy capture.
@@ -73,6 +78,7 @@ type Repository interface {
 	LeaderboardRepository
 	FeeRepository
 	FinancialsRepository
+	StatsRepository
 }
 
 // Service implements analytics calculations.
@@ -83,6 +89,7 @@ type Service struct {
 	feeRepo          FeeRepository
 	leaderboardRepo  LeaderboardRepository
 	financialsRepo   FinancialsRepository
+	statsRepo        StatsRepository
 	config           Config
 	debtCalculator   DebtCalculator
 	volumeCalculator VolumeCalculator
@@ -159,6 +166,7 @@ func (s *Service) setRepository(repo Repository) {
 	s.feeRepo = repo
 	s.leaderboardRepo = repo
 	s.financialsRepo = repo
+	s.statsRepo = repo
 }
 
 // WithDebtCalculator overrides the default debt calculator.

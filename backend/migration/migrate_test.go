@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Migration tests use SQLite-backed modelstesting helpers as fast package-local
+// convenience coverage for registry ordering, idempotency, and fail-closed
+// checks. WAVE07 added backend-root Postgres verification for writer failure and
+// non-writer VerifyApplied posture; advisory locking or single-writer startup
+// serialization still needs source-of-truth proof after that mechanism exists.
+
 func TestRegister_DuplicateReturnsError(t *testing.T) {
 	migration.ClearRegistry()
 
@@ -90,7 +96,7 @@ func TestRun_AppliesInOrder_And_Persists(t *testing.T) {
 
 func TestRun_IsIdempotent(t *testing.T) {
 	migration.ClearRegistry()
-	db := modelstesting.NewFakeDB(t)
+	db := modelstesting.NewTestDB(t)
 
 	var calls []string
 	if err := migration.Register("20250101000000", func(db *gorm.DB) error {
@@ -127,7 +133,7 @@ func TestRun_IsIdempotent(t *testing.T) {
 
 func TestRun_ErrOnNilUp(t *testing.T) {
 	migration.ClearRegistry()
-	db := modelstesting.NewFakeDB(t)
+	db := modelstesting.NewTestDB(t)
 
 	if err := migration.Register("20250102000000", nil); err != nil {
 		t.Fatalf("Register: %v", err)
@@ -140,7 +146,7 @@ func TestRun_ErrOnNilUp(t *testing.T) {
 
 func TestRun_PersistsAppliedAt(t *testing.T) {
 	migration.ClearRegistry()
-	db := modelstesting.NewFakeDB(t)
+	db := modelstesting.NewTestDB(t)
 
 	if err := migration.Register("20250104000000", func(db *gorm.DB) error { return nil }); err != nil {
 		t.Fatalf("Register: %v", err)
@@ -156,5 +162,56 @@ func TestRun_PersistsAppliedAt(t *testing.T) {
 	}
 	if row.AppliedAt.IsZero() || time.Since(row.AppliedAt) < 0 {
 		t.Fatalf("AppliedAt not set correctly: %+v", row)
+	}
+}
+
+func TestMigrateDBErrorsWhenNoMigrationsRegistered(t *testing.T) {
+	migration.ClearRegistry()
+	db := modelstesting.NewTestDB(t)
+
+	if err := migration.MigrateDB(db); err == nil {
+		t.Fatalf("expected no registered migrations to fail closed")
+	}
+}
+
+func TestVerifyAppliedRequiresAllRegisteredMigrations(t *testing.T) {
+	migration.ClearRegistry()
+	db := modelstesting.NewTestDB(t)
+
+	if err := migration.Register("20250101000000", func(db *gorm.DB) error { return nil }); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if err := migration.Register("20250102000000", func(db *gorm.DB) error { return nil }); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	if err := migration.Run(db); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if err := migration.VerifyApplied(db); err != nil {
+		t.Fatalf("VerifyApplied after Run: %v", err)
+	}
+
+	if err := db.Delete(&migration.SchemaMigration{}, "id = ?", "20250102000000").Error; err != nil {
+		t.Fatalf("delete SchemaMigration: %v", err)
+	}
+	if err := migration.VerifyApplied(db); err == nil {
+		t.Fatalf("expected missing registered migration to fail verification")
+	}
+}
+
+func TestVerifyAppliedDoesNotCreateSchemaMigrationTable(t *testing.T) {
+	migration.ClearRegistry()
+	db := modelstesting.NewTestDB(t)
+
+	if err := migration.Register("20250101000000", func(db *gorm.DB) error { return nil }); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	if err := migration.VerifyApplied(db); err == nil {
+		t.Fatalf("expected missing schema migrations table to fail verification")
+	}
+	if db.Migrator().HasTable(&migration.SchemaMigration{}) {
+		t.Fatalf("VerifyApplied must not create schema migrations table")
 	}
 }

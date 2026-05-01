@@ -85,6 +85,18 @@ func (r *GormRepository) ListUsers(ctx context.Context) ([]UserAccount, error) {
 	return mapUsers(users), nil
 }
 
+func (r *GormRepository) CountUsersByType(ctx context.Context, userType string) (int64, error) {
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	if err := db.Table("users").Where("user_type = ?", userType).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (r *GormRepository) ListMarkets(ctx context.Context) ([]MarketRecord, error) {
 	db, err := r.dbWithContext(ctx)
 	if err != nil {

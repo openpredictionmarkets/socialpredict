@@ -3,9 +3,9 @@ title: Configuration Management
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-25T13:30:00-05:00
-updated_at_display: "Saturday, April 25, 2026 at 1:30 PM Central (CDT)"
-update_reason: "Align production notes with actual progress and evolving architecture."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 runtime-security configuration slice while preserving the runtime/bootstrap versus application-policy split."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Saturday, April 25, 2026 to replace an older greenfield-style configuration plan with guidance that reflects the current SocialPredict codebase and the architecture direction needed for high availability and fault tolerance.
+
+On Thursday, April 30, 2026, the first security-sensitive runtime configuration slice was finished: `JWT_SIGNING_KEY`, `TRUST_PROXY_HEADERS`, CORS posture, security headers, and optional app-level HSTS are now loaded by runtime/bootstrap and injected into server construction rather than hidden inside route-local helpers.
 
 | Topic | Prior to April 25, 2026 | After April 25, 2026 |
 | --- | --- | --- |
@@ -160,7 +162,10 @@ This category covers process and infrastructure detail, for example:
 
 - DB host/user/password/name/port
 - SSL mode and timezone for DB connectivity
+- JWT signing-key presence
 - CORS environment flags
+- trusted proxy-header posture
+- app-level HSTS posture where the app owns it
 - bind/runtime environment selection
 - deployment-time operational toggles
 

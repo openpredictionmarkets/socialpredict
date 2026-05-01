@@ -3,9 +3,9 @@ title: Backend Production Notes Plan
 document_type: production-notes-index
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Re-rank the remaining backend production notes so current-state runtime, monitoring, and validation work come before speculative optimization, caching, and background-job infrastructure."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 runtime-boundary and security-hardening completion while keeping the remaining production-note order intact."
 status: active
 ---
 
@@ -41,10 +41,10 @@ From `08` onward, the numbering now matches the reprioritized execution order in
 
 ## Why The Order Changed
 
-The live backend still has earlier operational concerns:
+The live backend still has earlier operational concerns, though the first liveness/readiness and security-boundary slice finished on April 30, 2026:
 
 - startup ownership is still too broad in [main.go](/workspace/socialpredict/backend/main.go)
-- `/health` is still a static stub in [server.go](/workspace/socialpredict/backend/server/server.go)
+- `/health` and `/readyz` now have serving-path liveness/readiness behavior in [server.go](/workspace/socialpredict/backend/server/server.go)
 - deployment and proxy publishing are real but not yet fully hardened
 - monitoring signals are not yet strong enough to support larger platform layers safely
 - validation already exists and needs consolidation sooner than performance or queue work

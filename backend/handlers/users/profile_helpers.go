@@ -7,7 +7,6 @@ import (
 	"socialpredict/handlers"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
-	authsvc "socialpredict/internal/service/auth"
 )
 
 func writeProfileError(w http.ResponseWriter, err error, _ string) {
@@ -23,10 +22,6 @@ func writeProfileError(w http.ResponseWriter, err error, _ string) {
 	default:
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
-}
-
-func writeProfileJSONError(w http.ResponseWriter, statusCode int, message string) {
-	_ = handlers.WriteFailure(w, statusCode, handlers.FailureReason(message))
 }
 
 func toPrivateUserResponse(user *dusers.User) dto.PrivateUserResponse {
@@ -51,11 +46,4 @@ func toPrivateUserResponse(user *dusers.User) dto.PrivateUserResponse {
 		APIKey:                user.APIKey,
 		MustChangePassword:    user.MustChangePassword,
 	}
-}
-
-func profileAuthFailureReason(err *authsvc.HTTPError) handlers.FailureReason {
-	if err == nil {
-		return handlers.ReasonInternalError
-	}
-	return handlers.AuthFailureReason(err.StatusCode, err.Message)
 }

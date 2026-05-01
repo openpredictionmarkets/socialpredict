@@ -41,6 +41,10 @@ func (r *leaderboardRepo) UserMarketPositions(context.Context, string) ([]positi
 	return []positionsmath.MarketPosition{}, nil
 }
 
+func (r *leaderboardRepo) CountUsersByType(context.Context, string) (int64, error) {
+	return 0, nil
+}
+
 func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 	_ = modelstesting.SeedWPAMFromConfig(modelstesting.GenerateEconomicConfig())
 
@@ -111,6 +115,10 @@ func (f failingRepo) ListBetsOrdered(context.Context) ([]boundary.Bet, error) {
 
 func (f failingRepo) UserMarketPositions(context.Context, string) ([]positionsmath.MarketPosition, error) {
 	return nil, nil
+}
+
+func (f failingRepo) CountUsersByType(context.Context, string) (int64, error) {
+	return 0, nil
 }
 
 type assertError string

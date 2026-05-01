@@ -9,10 +9,13 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"socialpredict/handlers"
 	appruntime "socialpredict/internal/app/runtime"
+	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/logger"
 	"socialpredict/models/modelstesting"
+	"socialpredict/security"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -35,7 +38,7 @@ func buildTestRouter(t *testing.T, db *gorm.DB) *mux.Router {
 	readiness := appruntime.NewReadiness()
 	readiness.MarkReady()
 
-	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), readiness)
+	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), readiness, testSecurityConfig(t))
 	if err != nil {
 		t.Fatalf("build test router: %v", err)
 	}
@@ -169,6 +172,113 @@ func TestBuildHandlerPropagatesRequestIDToPublicRoutes(t *testing.T) {
 	}
 }
 
+func TestBuildHandlerUsesSharedMethodNotAllowedWriter(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodPost, "/health", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status 405, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Allow"); got != http.MethodGet {
+		t.Fatalf("expected Allow GET, got %q", got)
+	}
+
+	var response struct {
+		OK     bool   `json:"ok"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode method-not-allowed response: %v", err)
+	}
+	if response.OK || response.Reason != security.RuntimeReasonMethodNotAllowed {
+		t.Fatalf("expected method-not-allowed reason, got %+v", response)
+	}
+}
+
+func TestBuildHandlerFailsClosedWithoutJWTSigningKey(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+
+	_, err := buildHandler(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(modelstesting.GenerateEconomicConfig()), readiness, appruntime.SecurityConfig{})
+	if err == nil {
+		t.Fatalf("expected missing JWT signing key error")
+	}
+}
+
+func TestBuildHandlerUsesRuntimeSecurityPosture(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+	securityConfig := testSecurityConfig(t)
+	securityConfig.CORS.AllowedOrigins = []string{"https://app.example"}
+	securityConfig.Headers.StrictTransportSecurity = "max-age=300"
+
+	handler, err := buildHandler(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(modelstesting.GenerateEconomicConfig()), readiness, securityConfig)
+	if err != nil {
+		t.Fatalf("build handler: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Origin", "https://app.example")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want runtime origin", got)
+	}
+	if got := rec.Header().Get("Strict-Transport-Security"); got != "max-age=300" {
+		t.Fatalf("Strict-Transport-Security = %q, want runtime HSTS", got)
+	}
+}
+
+func TestBuildHandlerRequiresRuntimeJWTSigningKey(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+
+	_, err := buildHandler(
+		testOpenAPISpec,
+		testSwaggerUIFS(),
+		db,
+		configsvc.NewStaticService(modelstesting.GenerateEconomicConfig()),
+		readiness,
+		appruntime.SecurityConfig{},
+	)
+	if err == nil {
+		t.Fatalf("expected missing JWT signing key error")
+	}
+}
+
+func TestBuildHandlerAppliesRuntimeHeaderPosture(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	t.Setenv("SECURITY_HSTS_ENABLED", "true")
+	t.Setenv("SECURITY_HSTS_MAX_AGE", "99")
+
+	db := modelstesting.NewFakeDB(t)
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Strict-Transport-Security"); got != "max-age=99" {
+		t.Fatalf("expected runtime HSTS header, got %q", got)
+	}
+	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("expected security header posture, got %q", got)
+	}
+}
+
 func TestInfraHealthAndReadinessRoutesHaveDistinctSemantics(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
@@ -183,8 +293,8 @@ func TestInfraHealthAndReadinessRoutesHaveDistinctSemantics(t *testing.T) {
 	if healthRec.Code != http.StatusOK {
 		t.Fatalf("expected /health status 200, got %d", healthRec.Code)
 	}
-	if body := healthRec.Body.String(); body != "ok" {
-		t.Fatalf("expected /health body ok, got %q", body)
+	if body := healthRec.Body.String(); body != "live" {
+		t.Fatalf("expected /health body live, got %q", body)
 	}
 	if got := healthRec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("expected /health cache-control no-store, got %q", got)
@@ -242,7 +352,7 @@ func TestReadyzChecksDatabaseAvailabilityAfterReadinessGateOpens(t *testing.T) {
 	}
 }
 
-func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing.T) {
+func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequiredWithSharedReason(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	db := modelstesting.NewFakeDB(t)
@@ -268,7 +378,6 @@ func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing
 		{name: "change emoji", method: http.MethodPost, path: "/v0/profilechange/emoji", body: `{"emoji":":)"}`},
 		{name: "change description", method: http.MethodPost, path: "/v0/profilechange/description", body: `{"description":"updated description"}`},
 		{name: "change links", method: http.MethodPost, path: "/v0/profilechange/links", body: `{"personalLink1":"https://example.com"}`},
-		{name: "user position", method: http.MethodGet, path: "/v0/userposition/1"},
 	}
 
 	for _, tt := range tests {
@@ -281,6 +390,63 @@ func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing
 
 			if rr.Code != http.StatusForbidden {
 				t.Fatalf("expected status 403, got %d (body: %s)", rr.Code, rr.Body.String())
+			}
+
+			var envelope handlers.FailureEnvelope
+			if err := json.Unmarshal(rr.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("decode failure envelope: %v", err)
+			}
+			if envelope.OK || envelope.Reason != string(handlers.ReasonPasswordChangeRequired) {
+				t.Fatalf("expected reason %q, got %+v", handlers.ReasonPasswordChangeRequired, envelope)
+			}
+		})
+	}
+}
+
+func TestServerBlocksPrivateActionRoutesWhenPasswordChangeRequiredWithSharedReason(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	user := modelstesting.GenerateUser("mustchangeactions", 1000)
+	user.MustChangePassword = true
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	handler := buildTestHandler(t, db)
+	token := modelstesting.GenerateValidJWT(user.Username)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "place bet", method: http.MethodPost, path: "/v0/bet", body: `{"marketId":1,"amount":10,"outcome":"YES"}`},
+		{name: "sell position", method: http.MethodPost, path: "/v0/sell", body: `{"marketId":1,"amount":1,"outcome":"YES"}`},
+		{name: "user position", method: http.MethodGet, path: "/v0/userposition/1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, bytes.NewBufferString(tt.body))
+			req.Header.Set("Authorization", "Bearer "+token)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("expected status 403, got %d (body: %s)", rec.Code, rec.Body.String())
+			}
+
+			var envelope handlers.FailureEnvelope
+			if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("decode failure envelope: %v", err)
+			}
+			if envelope.OK || envelope.Reason != string(handlers.ReasonPasswordChangeRequired) {
+				t.Fatalf("expected reason %q, got %+v", handlers.ReasonPasswordChangeRequired, envelope)
 			}
 		})
 	}
@@ -351,9 +517,20 @@ func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig any, readi
 		gate.MarkReady()
 	}
 
-	handler, err := buildHandler(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), gate)
+	handler, err := buildHandler(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), gate, testSecurityConfig(t))
 	if err != nil {
 		t.Fatalf("build test handler: %v", err)
 	}
 	return handler
+}
+
+func testSecurityConfig(t *testing.T) appruntime.SecurityConfig {
+	t.Helper()
+
+	config, err := appruntime.LoadSecurityConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load test security config: %v", err)
+	}
+	authsvc.ConfigureJWTSigningKey(config.JWTSigningKey)
+	return config
 }

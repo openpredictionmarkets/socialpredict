@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"socialpredict/handlers"
@@ -31,6 +32,9 @@ func TestChangeDescriptionHandler_InvalidTokenReturnsFailureEnvelope(t *testing.
 	}
 	if response.OK || response.Reason != string(handlers.ReasonInvalidToken) {
 		t.Fatalf("expected invalid token envelope, got %+v", response)
+	}
+	if strings.Contains(rec.Body.String(), "Authorization header is required") {
+		t.Fatalf("failure response leaked raw auth message: %s", rec.Body.String())
 	}
 }
 

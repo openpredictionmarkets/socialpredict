@@ -174,19 +174,16 @@ func validateMarketID(fl validator.FieldLevel) bool {
 
 	switch field.Kind() {
 	case reflect.String:
-		// Check if it's a valid UUID format or positive integer string
-		value := field.String()
+		value := strings.TrimSpace(field.String())
 		if value == "" {
 			return false
 		}
 
-		// Try parsing as integer first
 		if id, err := strconv.ParseInt(value, 10, 64); err == nil {
 			return id > 0
 		}
 
-		// Could add UUID validation here if using UUIDs
-		return len(value) > 0
+		return false
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return field.Int() > 0
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:

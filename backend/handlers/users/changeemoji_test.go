@@ -48,7 +48,7 @@ func TestEmojiValidation(t *testing.T) {
 		{
 			name:          "Text with HTML",
 			emoji:         "😀<b>bold</b>",
-			expectedValid: true, // Should be sanitized
+			expectedValid: false,
 		},
 	}
 

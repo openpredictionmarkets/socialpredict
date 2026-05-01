@@ -38,7 +38,8 @@ func TestMarketTitleValidation(t *testing.T) {
 		{
 			name:          "Title with XSS",
 			title:         "Will stocks rise?<script>alert('xss')</script>",
-			expectedValid: true, // Should be sanitized
+			expectedValid: false,
+			expectedError: "potentially dangerous content",
 		},
 		{
 			name:          "Title with HTML",
@@ -49,15 +50,14 @@ func TestMarketTitleValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Test the existing length validation function
 			err := checkQuestionTitleLength(tt.title)
 
-			if tt.expectedValid && len(tt.title) > 0 && len(tt.title) <= maxQuestionTitleLength {
+			lengthValid := len(tt.title) > 0 && len(tt.title) <= maxQuestionTitleLength
+			if lengthValid {
 				if err != nil {
 					t.Errorf("Expected valid title but got error: %v", err)
 				}
 
-				// Test sanitization for valid titles
 				securityService := security.NewSecurityService()
 				marketInput := security.MarketInput{
 					Title:       tt.title,
@@ -66,17 +66,28 @@ func TestMarketTitleValidation(t *testing.T) {
 				}
 
 				sanitized, sanitizeErr := securityService.ValidateAndSanitizeMarketInput(marketInput)
-				if sanitizeErr != nil {
+				if tt.expectedValid && sanitizeErr != nil {
 					t.Errorf("Sanitization failed for valid title: %v", sanitizeErr)
 				}
+				if !tt.expectedValid {
+					if sanitizeErr == nil {
+						t.Fatalf("Expected title sanitization/validation error but got none")
+					}
+					if tt.expectedError != "" && !strings.Contains(sanitizeErr.Error(), tt.expectedError) {
+						t.Fatalf("Expected error containing %q, got %v", tt.expectedError, sanitizeErr)
+					}
+					return
+				}
 
-				// Check XSS was sanitized
 				if strings.Contains(tt.title, "<script>") && strings.Contains(sanitized.Title, "<script>") {
 					t.Error("XSS script tag was not sanitized")
 				}
 			} else {
 				if err == nil {
 					t.Errorf("Expected error but title validation passed")
+				}
+				if tt.expectedError != "" && !strings.Contains(err.Error(), tt.expectedError) {
+					t.Errorf("Expected error containing %q, got %v", tt.expectedError, err)
 				}
 			}
 		})
@@ -119,7 +130,8 @@ func TestMarketDescriptionValidation(t *testing.T) {
 		{
 			name:          "Description with XSS",
 			description:   "Market rules:<script>alert('xss')</script>",
-			expectedValid: true, // Should be sanitized
+			expectedValid: false,
+			expectedError: "potentially dangerous content",
 		},
 		{
 			name:          "Description with HTML",
@@ -130,15 +142,14 @@ func TestMarketDescriptionValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Test the existing length validation function
 			err := checkQuestionDescriptionLength(tt.description)
 
-			if tt.expectedValid && len(tt.description) <= 2000 {
+			lengthValid := len(tt.description) <= 2000
+			if lengthValid {
 				if err != nil {
 					t.Errorf("Expected valid description but got error: %v", err)
 				}
 
-				// Test sanitization for valid descriptions
 				securityService := security.NewSecurityService()
 				marketInput := security.MarketInput{
 					Title:       "Test title",
@@ -147,11 +158,19 @@ func TestMarketDescriptionValidation(t *testing.T) {
 				}
 
 				sanitized, sanitizeErr := securityService.ValidateAndSanitizeMarketInput(marketInput)
-				if sanitizeErr != nil {
+				if tt.expectedValid && sanitizeErr != nil {
 					t.Errorf("Sanitization failed for valid description: %v", sanitizeErr)
 				}
+				if !tt.expectedValid {
+					if sanitizeErr == nil {
+						t.Fatalf("Expected description sanitization/validation error but got none")
+					}
+					if tt.expectedError != "" && !strings.Contains(sanitizeErr.Error(), tt.expectedError) {
+						t.Fatalf("Expected error containing %q, got %v", tt.expectedError, sanitizeErr)
+					}
+					return
+				}
 
-				// Check XSS was sanitized
 				if strings.Contains(tt.description, "<script>") && strings.Contains(sanitized.Description, "<script>") {
 					t.Error("XSS script tag was not sanitized")
 				}
@@ -308,8 +327,8 @@ func TestMarketInputSanitization(t *testing.T) {
 	securityService := security.NewSecurityService()
 
 	input := security.MarketInput{
-		Title:       "Will <b>Tesla</b> stock <script>alert('xss')</script> rise?",
-		Description: "Market rules: <i>Official data only</i><script>alert('desc')</script>",
+		Title:       "Will <b>Tesla</b> stock rise?",
+		Description: "Market rules: <i>Official data only</i>",
 		EndTime:     "2024-12-31T23:59:59Z",
 	}
 

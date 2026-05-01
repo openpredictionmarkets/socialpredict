@@ -3,9 +3,9 @@ title: Database Layer
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-26T04:03:07Z
-updated_at_display: "Sunday, April 26, 2026 at 4:03 AM UTC"
-update_reason: "Replace the older greenfield DAL-oriented plan with current-state-first database architecture guidance grounded in the live backend."
+updated_at: 2026-04-29T22:53:00Z
+updated_at_display: "Wednesday, April 29, 2026 at 10:53 PM UTC"
+update_reason: "Record the first narrow atomic accounting workflow and the remaining transaction surface inventory."
 status: active
 ---
 
@@ -301,6 +301,29 @@ Metrics are useful for diagnosis. They are not a substitute for atomic correctne
 This note allows narrow, explicit transaction-scoped repository binding or unit-of-work behavior where the use case truly needs it.
 
 It does not require a global DAL or generic transaction wrapper for every workflow.
+
+### WAVE04-DB-005 transaction inventory
+
+The first migrated accounting-sensitive workflow is place bet.
+
+For place bet, the atomic unit of work is:
+
+- read the betting user's current balance through a transaction-bound user adapter
+- check prior participation for the initial-bet fee rule
+- debit the user's account balance for bet amount plus applicable fees
+- insert the bet row
+
+Those steps now commit or roll back together. The transaction starts in the bets repository adapter and ends when the callback returns. There is no generic retry or circuit breaker around this money-moving path.
+
+Primary-DB concurrency protection for place bet is the betting user's row. The transaction-bound user adapter applies `FOR UPDATE` when running on Postgres before computing and updating the balance. SQLite-backed tests skip that dialect-specific lock clause but still verify rollback behavior.
+
+Remaining accounting-sensitive transaction surface:
+
+- Sell position still uses the older compensation-style `CreditSale` path. It needs one transaction covering position/bet-history reads, balance credit, sale bet insert, and position-sensitive concurrency protection.
+- Market resolution still needs an explicit transaction boundary for resolution state, payout/accounting writes, and prevention of overlapping resolution or betting writes.
+- Market-resolution interaction with place bet is still a surface to harden because the current place-bet transaction protects the user balance row, not the market row or a resolution gate.
+
+Caching and Redis remain deferred. They are not part of the source-of-truth accounting model for these workflows.
 
 ### Concurrency control
 

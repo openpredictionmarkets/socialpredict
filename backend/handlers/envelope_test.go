@@ -63,29 +63,6 @@ func TestWriteBusinessFailure(t *testing.T) {
 	}
 }
 
-func TestAuthFailureReason(t *testing.T) {
-	tests := []struct {
-		name       string
-		statusCode int
-		message    string
-		want       FailureReason
-	}{
-		{"missing token", http.StatusUnauthorized, "Authorization header is required", ReasonInvalidToken},
-		{"password change required", http.StatusForbidden, "Password change required", ReasonPasswordChangeRequired},
-		{"authorization denied", http.StatusForbidden, "admin privileges required", ReasonAuthorizationDenied},
-		{"user not found", http.StatusNotFound, "User not found", ReasonUserNotFound},
-		{"internal", http.StatusInternalServerError, "Failed to load user", ReasonInternalError},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := AuthFailureReason(tt.statusCode, tt.message); got != tt.want {
-				t.Fatalf("expected %q, got %q", tt.want, got)
-			}
-		})
-	}
-}
-
 func TestIsValidationMessage(t *testing.T) {
 	if !IsValidationMessage("display name must be between 1 and 50 characters") {
 		t.Fatalf("expected validation phrase to match")

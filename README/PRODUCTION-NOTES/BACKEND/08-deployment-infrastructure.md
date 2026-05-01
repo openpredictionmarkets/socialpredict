@@ -3,9 +3,9 @@ title: Deployment Infrastructure
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Replace the older greenfield deployment-platform plan with a current-state-first runtime and deployment note grounded in the live Docker, nginx, Traefik, and GitHub workflow topology."
+updated_at: 2026-04-30T13:12:00Z
+updated_at_display: "Thursday, April 30, 2026 at 1:12 PM UTC"
+update_reason: "Record explicit proxy-root publishing for backend-owned Swagger and OpenAPI docs."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Monday, April 27, 2026 to replace an older Kubernetes-heavy deployment plan with guidance that matches the live SocialPredict deployment topology and the current design-plan priority on runtime safety first.
+
+On Thursday, April 30, 2026, the first deployment-facing health problem was finished for the backend serving path: `/health` now reports liveness, `/readyz` checks readiness and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. The nginx proxy templates also now publish backend-owned docs explicitly at `/swagger/` and `/openapi.yaml`. Deployment work still needs image healthcheck policy, startup-writer posture, and graceful rollout/shutdown discipline.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -60,10 +62,10 @@ The current backend already has a deployable topology, but it does not yet have 
 That matters because:
 
 - [main.go](/workspace/socialpredict/backend/main.go) still performs DB init, readiness wait, migrations, config load, seeding, and server startup in one process path
-- [server.go](/workspace/socialpredict/backend/server/server.go) still exposes only a static `/health`
+- [server.go](/workspace/socialpredict/backend/server/server.go) now exposes `/health` and `/readyz`, but deployment healthcheck policy is not yet wired into the image or compose topology
 - the production compose stack in [docker-compose-prod.yaml](/workspace/socialpredict/scripts/docker-compose-prod.yaml) uses `depends_on`, not real health-gated orchestration
 - the backend Docker image in [Dockerfile](/workspace/socialpredict/docker/backend/Dockerfile) has no `HEALTHCHECK`
-- the nginx production template in [default.conf.template](/workspace/socialpredict/data/nginx/vhosts/prod/default.conf.template) proxies `/api/` and `/`, but does not explicitly publish `/swagger/` or `/openapi.yaml`
+- the nginx production template in [default.conf.template](/workspace/socialpredict/data/nginx/vhosts/prod/default.conf.template) now explicitly proxies `/swagger/` and `/openapi.yaml` to the backend before `/api/` and `/`
 
 So the active deployment problem is not “invent a new cluster platform.” The active problem is to make the current deployment topology safer and more truthful.
 
@@ -98,15 +100,20 @@ The current process startup in [main.go](/workspace/socialpredict/backend/main.g
 
 That is operationally simple, but it is not yet a safe long-term multi-replica posture. Deployment hardening has to acknowledge that reality directly.
 
-### Health semantics are still too weak
+### Health semantics now have a serving-path baseline
 
-The current infra route registration in [server.go](/workspace/socialpredict/backend/server/server.go) exposes only:
+The current infra route registration in [server.go](/workspace/socialpredict/backend/server/server.go) exposes:
 
 - `GET /health`
+- `GET /readyz`
 
-And that route currently returns a plain-text `200 ok` regardless of DB availability, migration state, or startup compatibility.
+As of April 30, 2026:
 
-That is fine as a stub, but it is not sufficient as a readiness signal for HA routing.
+- `/health` returns plain-text `live` for liveness
+- `/readyz` returns `ready` only after the readiness gate is open and database availability passes
+- `/readyz` returns `not ready` with `503` when the readiness gate is closed or the database check fails
+
+That problem is finished for the backend serving path. Deployment infrastructure still needs to decide how Docker, compose, nginx, Traefik, and future orchestrators should consume those endpoints.
 
 ### The backend image is simple and production-usable, but not health-aware yet
 
@@ -128,6 +135,8 @@ That is the right scale of current deployment work for this note.
 
 The current production nginx template in [default.conf.template](/workspace/socialpredict/data/nginx/vhosts/prod/default.conf.template) proxies:
 
+- `/openapi.yaml` to the backend
+- `/swagger` and `/swagger/` to the backend
 - `/api/` to the backend
 - `/` to the frontend
 
@@ -137,7 +146,11 @@ But the backend itself serves:
 - `/openapi.yaml`
 - `/swagger/`
 
-So deployment ownership includes making those backend-root infra and docs paths visible intentionally where needed, rather than assuming the proxy prefix will make them work.
+So deployment ownership now makes those backend-root docs paths visible
+intentionally, rather than assuming the `/api/` proxy prefix will make them
+work. Access remains open in this slice; any future restriction should be
+applied at the proxy or host layer while keeping backend-served docs as the
+single contract surface.
 
 ## What Deployment Infrastructure Should Own
 
@@ -176,12 +189,12 @@ The design-plan-aligned deployment direction is:
    - reduce warning-only migration posture
    - separate liveness from readiness
 3. Add graceful shutdown and explicit health ownership to the backend runtime.
-4. Add explicit proxy or ingress publishing for backend docs and infra routes that should remain visible.
+4. Add remaining explicit proxy or ingress publishing for infra routes that should remain visible beyond the docs paths.
 5. Revisit broader replica or orchestration strategy only after those runtime contracts are materially stronger.
 
 ## Open Questions
 
-- Should docs publishing stay on the primary domain root or move to a dedicated docs or admin host
+- If docs access is restricted later, should the restriction be host-based, network-based, or proxy-auth-based
 - Which startup actions remain inside the backend process and which later move to a separate startup-writer path
 - Whether readiness should fail on any migration incompatibility or only on specific hard failures
 - Which deployment-sensitive settings should be normalized into runtime bootstrap rather than read ad hoc

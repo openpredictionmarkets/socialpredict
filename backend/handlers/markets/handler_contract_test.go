@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,18 +96,18 @@ func (m *contractServiceMock) ProjectProbability(ctx context.Context, req dmarke
 
 type contractAuthMock struct {
 	user *dusers.User
-	err  *authsvc.HTTPError
+	err  *authsvc.AuthError
 }
 
-func (m *contractAuthMock) CurrentUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+func (m *contractAuthMock) CurrentUser(r *http.Request) (*dusers.User, *authsvc.AuthError) {
 	return m.user, m.err
 }
 
-func (m *contractAuthMock) RequireUser(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+func (m *contractAuthMock) RequireUser(r *http.Request) (*dusers.User, *authsvc.AuthError) {
 	return m.user, m.err
 }
 
-func (m *contractAuthMock) RequireAdmin(r *http.Request) (*dusers.User, *authsvc.HTTPError) {
+func (m *contractAuthMock) RequireAdmin(r *http.Request) (*dusers.User, *authsvc.AuthError) {
 	return m.user, m.err
 }
 
@@ -287,6 +288,24 @@ func TestHandlerSearchMarkets_SupportsLegacyQAndInvalidRequestFailure(t *testing
 
 		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	})
+
+	t.Run("suspicious query returns failure envelope", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?query=%3Cscript%3Ealert(1)%3C%2Fscript%3E", nil)
+		rr := httptest.NewRecorder()
+
+		NewHandler(service, nil).SearchMarkets(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("overlong query returns failure envelope", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?query="+strings.Repeat("a", 101), nil)
+		rr := httptest.NewRecorder()
+
+		NewHandler(service, nil).SearchMarkets(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
 }
 
 func TestHandlerGetDetails_NotFoundUsesFailureEnvelope(t *testing.T) {
@@ -308,7 +327,7 @@ func TestHandlerResolveMarket_MapsAuthAndStateFailures(t *testing.T) {
 	t.Run("password change required uses auth reason", func(t *testing.T) {
 		service := &contractServiceMock{}
 		auth := &contractAuthMock{
-			err: &authsvc.HTTPError{StatusCode: http.StatusForbidden, Message: "Password change required"},
+			err: &authsvc.AuthError{Kind: authsvc.ErrorKindPasswordChangeRequired, Message: "Password change required"},
 		}
 
 		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"yes"}`)), map[string]string{"id": "5"})

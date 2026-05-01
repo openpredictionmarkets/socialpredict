@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/bets/dto"
 	dbets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -21,9 +22,9 @@ func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInte
 			return
 		}
 
-		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
-		if httpErr != nil {
-			_ = handlers.WriteFailure(w, httpErr.StatusCode, handlers.AuthFailureReason(httpErr.StatusCode, httpErr.Message))
+		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
 			return
 		}
 

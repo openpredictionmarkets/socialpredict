@@ -3,9 +3,9 @@ title: Logging and Observability
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-25T21:05:00-05:00
-updated_at_display: "Saturday, April 25, 2026 at 9:05 PM Central (CDT)"
-update_reason: "Clarify the OpenTelemetry posture while keeping backend/logger as the owned runtime adapter."
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 liveness/readiness completion while keeping backend/logger as the owned runtime adapter."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 This note was updated on Saturday, April 25, 2026 to replace an older greenfield observability-platform plan with guidance that matches the current SocialPredict backend, the active design-plan posture, and the package-ownership decision to standardize on `backend/logger`.
+
+On Thursday, April 30, 2026, the health/readiness split called out by this note was finished for the serving path: `/health` now reports liveness, and `/readyz` reports readiness plus database availability.
 
 | Topic | Prior to April 25, 2026 | After April 25, 2026 |
 | --- | --- | --- |
@@ -185,7 +187,7 @@ This covers operator-facing signals that determine whether the process is alive,
 Examples:
 
 - `/health`
-- future liveness/readiness separation
+- `/readyz`
 - DB readiness and critical dependency checks
 
 These signals must remain simple, deterministic, and orchestration-friendly.
@@ -299,7 +301,7 @@ The intended direction is:
 - deprecate and delete `backend/logging`
 - keep logging as a runtime and infrastructure concern
 - treat OpenTelemetry as the canonical telemetry model and correlation vocabulary without coupling business code directly to a language SDK surface
-- improve the current `/health` behavior into explicit health/readiness semantics over time
+- keep the April 30, 2026 `/health` and `/readyz` split simple, deterministic, and orchestration-friendly
 - preserve a distinction between logs, metrics, tracing, and health signals
 - add request and correlation context at the runtime boundary in controlled slices
 - harden redaction and sensitive-data handling before expanding log volume
@@ -322,7 +324,7 @@ The intended direction is not:
 3. Define the stable backend logging API and message or field vocabulary for the surviving `backend/logger` package, including OpenTelemetry-aligned correlation fields.
 4. Add request/correlation logging at the server or middleware boundary rather than scattering it across handlers.
 5. Decide the first acceptable OTLP or Collector export path without coupling application code directly to it.
-6. Harden `/health` into clearer liveness/readiness semantics without destabilizing the current runtime surface.
+6. Treat the April 30, 2026 `/health` and `/readyz` split as the completed serving-path baseline, then decide how deployment and monitoring should consume it.
 7. Decide which metrics belong to runtime/infrastructure versus application/business surfaces before adding more endpoints.
 8. Defer tracing until package ownership, request correlation, health semantics, and the logger contract are stable.
 

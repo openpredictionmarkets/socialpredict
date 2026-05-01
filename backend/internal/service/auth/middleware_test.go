@@ -18,18 +18,18 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func TestHTTPError(t *testing.T) {
-	err := &HTTPError{
-		StatusCode: 404,
-		Message:    "Not found",
+func TestAuthError(t *testing.T) {
+	err := &AuthError{
+		Kind:    ErrorKindUserNotFound,
+		Message: "Not found",
 	}
 
 	if err.Error() != "Not found" {
 		t.Errorf("Expected 'Not found', got '%s'", err.Error())
 	}
 
-	if err.StatusCode != 404 {
-		t.Errorf("Expected status code 404, got %d", err.StatusCode)
+	if err.Kind != ErrorKindUserNotFound {
+		t.Errorf("Expected kind %q, got %q", ErrorKindUserNotFound, err.Kind)
 	}
 }
 
@@ -152,17 +152,17 @@ func TestCheckMustChangePasswordFlag(t *testing.T) {
 				MustChangePassword: tt.mustChangePassword,
 			}
 
-			httpErr := CheckMustChangePasswordFlag(user)
+			authErr := CheckMustChangePasswordFlag(user)
 
 			if tt.expectError {
-				if httpErr == nil {
+				if authErr == nil {
 					t.Errorf("Expected error but got none")
-				} else if httpErr.StatusCode != http.StatusForbidden {
-					t.Errorf("Expected status code %d, got %d", http.StatusForbidden, httpErr.StatusCode)
+				} else if authErr.Kind != ErrorKindPasswordChangeRequired {
+					t.Errorf("Expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 				}
 			} else {
-				if httpErr != nil {
-					t.Errorf("Expected no error but got: %v", httpErr)
+				if authErr != nil {
+					t.Errorf("Expected no error but got: %v", authErr)
 				}
 			}
 		})
@@ -201,7 +201,7 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/login", nil)
 			w := httptest.NewRecorder()
 
-			LoginHandler(nil)(w, req)
+			LoginHandler(nil, security.NewSecurityService())(w, req)
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, w.Code)
@@ -223,7 +223,7 @@ func TestLoginHandler_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(invalidJSON))
 	w := httptest.NewRecorder()
 
-	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)))(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)), security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -242,7 +242,7 @@ func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123","extra":"nope"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)))(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)), security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -298,7 +298,7 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(repo)(w, req)
+			LoginHandler(repo, security.NewSecurityService())(w, req)
 
 			if w.Code != http.StatusBadRequest {
 				t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
@@ -325,7 +325,7 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 	w := httptest.NewRecorder()
 
-	LoginHandler(nil)(w, req)
+	LoginHandler(nil, security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
@@ -386,7 +386,7 @@ func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(repo)(w, req)
+			LoginHandler(repo, security.NewSecurityService())(w, req)
 
 			if w.Code != http.StatusOK {
 				t.Errorf("Usernames should be trimmed before DB lookup. Expected status code %d, got %d (body: %s)", http.StatusOK, w.Code, w.Body.String())
@@ -412,7 +412,7 @@ func TestLoginHandler_SuccessResponseEnvelope(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(repo)(w, req)
+	LoginHandler(repo, security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -460,7 +460,7 @@ func TestLoginHandler_InvalidCredentialsReturnsFailureEnvelope(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"wrong-password"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(repo)(w, req)
+	LoginHandler(repo, security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d: %s", w.Code, w.Body.String())
@@ -489,16 +489,16 @@ func TestValidateTokenAndGetUser_MissingHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateTokenAndGetUser(req, svc)
+	user, authErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindMissingToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindMissingToken, authErr.Kind)
 	}
 }
 
@@ -509,16 +509,16 @@ func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 
-	user, httpErr := ValidateTokenAndGetUser(req, svc)
+	user, authErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindInvalidToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindInvalidToken, authErr.Kind)
 	}
 }
 
@@ -556,6 +556,7 @@ func TestValidateAdminToken_InvalidToken(t *testing.T) {
 func TestAuthServiceRequireAdmin_EnforcesPasswordChange(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	ConfigureJWTSigningKey([]byte("test-secret-key"))
 
 	admin := modelstesting.GenerateUser("admin-needs-reset", 1000)
 	admin.UserType = "ADMIN"
@@ -576,16 +577,16 @@ func TestAuthServiceRequireAdmin_EnforcesPasswordChange(t *testing.T) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	user, httpErr := auth.RequireAdmin(req)
+	user, authErr := auth.RequireAdmin(req)
 
 	if user != nil {
 		t.Fatalf("expected nil user when password change is required")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Fatalf("expected password-change enforcement error")
 	}
-	if httpErr.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected status 403, got %d", httpErr.StatusCode)
+	if authErr.Kind != ErrorKindPasswordChangeRequired {
+		t.Fatalf("expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 	}
 }
 
@@ -638,16 +639,16 @@ func TestValidateUserAndEnforcePasswordChangeGetUser_MissingToken(t *testing.T) 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
+	user, authErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindMissingToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindMissingToken, authErr.Kind)
 	}
 }
 
@@ -672,19 +673,19 @@ func TestValidateUserAndEnforcePasswordChangeGetUser_PasswordChangeRequired(t *t
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
+	user, authErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
 
 	if user != nil {
 		t.Fatalf("expected nil user when password change is required")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Fatalf("expected password-change enforcement error")
 	}
-	if httpErr.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected status 403, got %d", httpErr.StatusCode)
+	if authErr.Kind != ErrorKindPasswordChangeRequired {
+		t.Fatalf("expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 	}
-	if httpErr.Message != "Password change required" {
-		t.Fatalf("expected password change message, got %q", httpErr.Message)
+	if authErr.Message != "Password change required" {
+		t.Fatalf("expected password change message, got %q", authErr.Message)
 	}
 }
 
@@ -727,11 +728,7 @@ func TestJWTKeyExists(t *testing.T) {
 }
 
 func TestGenerateJWT_RequiresSigningKey(t *testing.T) {
-	originalKey := os.Getenv("JWT_SIGNING_KEY")
-	os.Setenv("JWT_SIGNING_KEY", "   ")
-	defer func() { os.Setenv("JWT_SIGNING_KEY", originalKey) }()
-
-	token, err := generateJWT("testuser", getJWTKey())
+	token, err := generateJWT("testuser", nil)
 	if err == nil {
 		t.Fatal("expected error when JWT key is empty")
 	}
@@ -744,6 +741,7 @@ func TestGenerateJWT_RequiresSigningKey(t *testing.T) {
 func TestMain(m *testing.M) {
 	// Set up test environment
 	os.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	ConfigureJWTSigningKey([]byte("test-secret-key-for-testing"))
 
 	// Run tests
 	code := m.Run()

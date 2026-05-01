@@ -1,12 +1,11 @@
 package statshandlers
 
 import (
+	"context"
 	"net/http"
 	"socialpredict/handlers"
+	analytics "socialpredict/internal/domain/analytics"
 	configsvc "socialpredict/internal/service/config"
-	"socialpredict/models"
-
-	"gorm.io/gorm"
 )
 
 type FinancialStats struct {
@@ -40,10 +39,14 @@ type StatsResponse struct {
 	SetupConfiguration SetupConfiguration `json:"setupConfiguration"`
 }
 
+type FinancialStatsService interface {
+	ComputeFinancialStats(ctx context.Context, config analytics.StatsConfig) (analytics.FinancialStats, error)
+}
+
 // StatsHandler handles requests for both financial stats and setup configuration.
-func StatsHandler(db *gorm.DB, configService configsvc.Service) http.HandlerFunc {
+func StatsHandler(statsService FinancialStatsService, configService configsvc.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if db == nil {
+		if statsService == nil {
 			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
@@ -54,7 +57,9 @@ func StatsHandler(db *gorm.DB, configService configsvc.Service) http.HandlerFunc
 
 		economics := configService.Economics()
 
-		financialStats, err := calculateFinancialStats(db, economics)
+		financialStats, err := statsService.ComputeFinancialStats(r.Context(), analytics.StatsConfig{
+			InitialAccountBalance: economics.User.InitialAccountBalance,
+		})
 		if err != nil {
 			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
@@ -63,7 +68,7 @@ func StatsHandler(db *gorm.DB, configService configsvc.Service) http.HandlerFunc
 		setupConfig := loadSetupConfiguration(economics)
 
 		response := StatsResponse{
-			FinancialStats:     financialStats,
+			FinancialStats:     mapFinancialStats(financialStats),
 			SetupConfiguration: setupConfig,
 		}
 
@@ -73,33 +78,16 @@ func StatsHandler(db *gorm.DB, configService configsvc.Service) http.HandlerFunc
 	}
 }
 
-func calculateFinancialStats(db *gorm.DB, economics configsvc.Economics) (FinancialStats, error) {
-	var result FinancialStats
-
-	totalMoney, err := calculateTotalMoney(db, economics.User)
-	if err != nil {
-		return result, err
+func mapFinancialStats(stats analytics.FinancialStats) FinancialStats {
+	return FinancialStats{
+		TotalMoney:              stats.TotalMoney,
+		TotalDebtExtended:       stats.TotalDebtExtended,
+		TotalDebtUtilized:       stats.TotalDebtUtilized,
+		TotalFeesCollected:      stats.TotalFeesCollected,
+		TotalBonusesPaid:        stats.TotalBonusesPaid,
+		OutstandingPayouts:      stats.OutstandingPayouts,
+		TotalMoneyInCirculation: stats.TotalMoneyInCirculation,
 	}
-	result.TotalMoney = totalMoney
-
-	result.TotalDebtExtended = 0
-	result.TotalDebtUtilized = 0
-	result.TotalFeesCollected = 0
-	result.TotalBonusesPaid = 0
-	result.OutstandingPayouts = 0
-	result.TotalMoneyInCirculation = 0
-
-	return result, nil
-}
-
-func calculateTotalMoney(db *gorm.DB, userConfig configsvc.User) (int64, error) {
-	var userCount int64
-	if err := db.Model(&models.User{}).Where("user_type = ?", "REGULAR").Count(&userCount).Error; err != nil {
-		return 0, err
-	}
-
-	totalMoney := userConfig.InitialAccountBalance * userCount
-	return totalMoney, nil
 }
 
 func loadSetupConfiguration(economics configsvc.Economics) SetupConfiguration {

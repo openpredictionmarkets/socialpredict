@@ -81,6 +81,10 @@ func (failingAnalyticsRepo) UserMarketPositions(context.Context, string) ([]posi
 	return nil, nil
 }
 
+func (failingAnalyticsRepo) CountUsersByType(context.Context, string) (int64, error) {
+	return 0, nil
+}
+
 func TestGetSystemMetricsHandler_Error(t *testing.T) {
 	cfg := modelstesting.GenerateEconomicConfig()
 	svc := analytics.NewService(failingAnalyticsRepo{}, analytics.Config{
