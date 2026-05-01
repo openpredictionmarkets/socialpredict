@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+// Startup mutation tests validate the local fail-closed mode selection only.
+// The WAVE07 backend-root Postgres test covers the current writer/non-writer
+// migration posture, but multi-replica seed or migration serialization still
+// needs source-of-truth verification once the locking or leader mechanism is
+// chosen.
+
 func TestLoadStartupMutationModeDefaultsToNonWriter(t *testing.T) {
 	unsetEnvForTest(t, StartupWriterEnv)
 	unsetEnvForTest(t, legacyStartupWriterEnv)

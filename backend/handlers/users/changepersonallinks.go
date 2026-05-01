@@ -8,7 +8,6 @@ import (
 	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
-	authsvc "socialpredict/internal/service/auth"
 )
 
 // ChangePersonalLinksHandler returns an HTTP handler that delegates personal link updates to the users service.
@@ -19,9 +18,9 @@ func ChangePersonalLinksHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, svc)
-		if authErr != nil {
-			_ = authhttp.WriteFailure(w, authErr)
+		user, authFailure := authhttp.CurrentUser(r, svc)
+		if authFailure != nil {
+			_ = authFailure.Write(w)
 			return
 		}
 

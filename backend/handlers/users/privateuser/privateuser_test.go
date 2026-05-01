@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"socialpredict/handlers"
@@ -78,6 +79,9 @@ func TestGetPrivateProfileUserResponse_Unauthorized(t *testing.T) {
 	if envelope.OK || envelope.Reason != string(handlers.ReasonInvalidToken) {
 		t.Fatalf("expected invalid token envelope, got %+v", envelope)
 	}
+	if strings.Contains(rec.Body.String(), "Authorization header is required") {
+		t.Fatalf("failure response leaked raw auth message: %s", rec.Body.String())
+	}
 }
 
 func TestGetPrivateProfileUserResponse_RequiresPasswordChange(t *testing.T) {
@@ -109,5 +113,8 @@ func TestGetPrivateProfileUserResponse_RequiresPasswordChange(t *testing.T) {
 	}
 	if envelope.OK || envelope.Reason != string(handlers.ReasonPasswordChangeRequired) {
 		t.Fatalf("expected password change envelope, got %+v", envelope)
+	}
+	if strings.Contains(rec.Body.String(), "Password change required") {
+		t.Fatalf("failure response leaked raw auth message: %s", rec.Body.String())
 	}
 }

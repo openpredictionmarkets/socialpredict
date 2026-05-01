@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -281,6 +282,24 @@ func TestHandlerSearchMarkets_SupportsLegacyQAndInvalidRequestFailure(t *testing
 
 	t.Run("missing query returns failure envelope", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search", nil)
+		rr := httptest.NewRecorder()
+
+		NewHandler(service, nil).SearchMarkets(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("suspicious query returns failure envelope", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?query=%3Cscript%3Ealert(1)%3C%2Fscript%3E", nil)
+		rr := httptest.NewRecorder()
+
+		NewHandler(service, nil).SearchMarkets(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("overlong query returns failure envelope", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?query="+strings.Repeat("a", 101), nil)
 		rr := httptest.NewRecorder()
 
 		NewHandler(service, nil).SearchMarkets(rr, req)

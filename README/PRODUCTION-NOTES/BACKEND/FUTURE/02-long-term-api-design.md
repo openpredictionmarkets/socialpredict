@@ -3,9 +3,9 @@ title: Long-Term API Design
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-26T16:16:21Z
-updated_at_display: "Sunday, April 26, 2026 at 4:16 PM UTC"
-update_reason: "Create a non-binding holding note for deferred API-platform ideas so the active API-design note can stay current-state-first."
+updated_at: 2026-04-30T13:45:00Z
+updated_at_display: "Thursday, April 30, 2026 at 1:45 PM UTC"
+update_reason: "Keep long-term API-platform ideas explicitly deferred after the WAVE06 API stop-and-review."
 status: future
 ---
 
@@ -19,10 +19,12 @@ Its purpose is to preserve broader API ambitions without letting them distort th
 
 ## Current Status
 
-As of 2026-04-26:
+As of the WAVE06 stop-and-review on 2026-04-30:
 
 - the active backend API note should stay focused on the live HTTP contract, route-family migration, auth-visible semantics, and OpenAPI parity
 - the active design plan still treats API/auth work as a later bounded alignment wave after runtime, failure, database, and security prerequisites
+- the concrete next active seam is the markets route family and remaining auth
+  call-site cleanup, not the API-platform topics listed below
 - the ideas in this document are explicitly deferred until the current route-family and boundary cleanup is substantially more stable
 
 This document is non-binding on the active design plan and on `TASKS.json`.

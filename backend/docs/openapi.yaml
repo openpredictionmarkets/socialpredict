@@ -13,6 +13,8 @@ info:
     signing-key presence, trusted proxy header posture, CORS defaults, and
     security header/HSTS posture before route registration. Forwarded client
     identity headers are ignored unless the runtime proxy-trust contract opts in.
+    Public `reason` values are contract vocabulary for clients and are kept
+    separate from runtime telemetry classifications such as `error.type`.
 servers:
   - url: http://localhost:8080
     description: Local dev server
@@ -32,6 +34,158 @@ tags:
   - name: Content
     description: CMS-powered homepage content.
 
+x-route-family-migration-matrix:
+  source_of_truth_order:
+    - backend/server/server.go
+    - touched handlers and DTOs under backend/handlers/**
+    - backend/docs/openapi.yaml
+    - backend/docs/API-ISSUES.md
+  reason_vocabulary_owner: handlers.PublicFailureReasons
+  public_reason_values:
+    - METHOD_NOT_ALLOWED
+    - INVALID_REQUEST
+    - INVALID_TOKEN
+    - AUTHORIZATION_DENIED
+    - PASSWORD_CHANGE_REQUIRED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - LOGIN_RATE_LIMITED
+    - USER_NOT_FOUND
+    - MARKET_NOT_FOUND
+    - VALIDATION_FAILED
+    - MARKET_CLOSED
+    - INSUFFICIENT_BALANCE
+    - NO_POSITION
+    - INSUFFICIENT_SHARES
+    - DUST_CAP_EXCEEDED
+    - INTERNAL_ERROR
+  plain_text_error_response_state: migration_state_not_target_contract
+  route_families:
+    - family: infra-probes
+      paths:
+        - /health
+        - /readyz
+      success_contract: text/plain probe body
+      failure_contract: text/plain probe body
+      migration_state: intentional_infra_transport
+      source: backend/server/server.go registerInfraRoutes
+    - family: infra-docs
+      paths:
+        - /openapi.yaml
+        - /swagger
+        - /swagger/
+      success_contract: OpenAPI YAML, redirect, or static Swagger UI asset
+      failure_contract: router/runtime failure outside application envelope
+      migration_state: intentional_unversioned_docs_transport
+      source: backend/server/server.go registerInfraRoutes
+    - family: runtime-middleware
+      paths:
+        - all registered routes
+      success_contract: not applicable
+      failure_contract: JSON `{ok:false,reason}` for 405 and 429
+      migration_state: runtime_boundary_envelope
+      source: backend/server/server.go and backend/security
+    - family: auth
+      paths:
+        - /v0/login
+      success_contract: JSON `{ok:true,result}`
+      failure_contract: ReasonResponse
+      migration_state: envelope_based
+      source: backend/server/server.go and internal/service/auth/loggin.go
+    - family: setup
+      paths:
+        - /v0/setup
+        - /v0/setup/frontend
+      success_contract: raw JSON DTO
+      failure_contract: ReasonResponse plus middleware 429
+      migration_state: mixed_raw_success_reason_failure
+      source: backend/server/server.go and handlers/setup
+    - family: reporting
+      paths:
+        - /v0/home
+        - /v0/stats
+        - /v0/system/metrics
+        - /v0/global/leaderboard
+      success_contract: JSON `{ok:true,result}`
+      failure_contract: ReasonResponse plus middleware 429
+      migration_state: envelope_based
+      source: backend/server/server.go and handlers/stats, handlers/metrics
+    - family: markets
+      paths:
+        - /v0/markets
+        - /v0/markets/status
+        - /v0/markets/status/{status}
+        - /v0/markets/active
+        - /v0/markets/closed
+        - /v0/markets/resolved
+        - /v0/markets/{id}
+        - /v0/markets/{id}/resolve
+        - /v0/markets/{id}/leaderboard
+        - /v0/markets/{id}/projection
+        - /v0/marketprojection/{marketId}/{amount}/{outcome}
+        - /v0/marketprojection/{marketId}/{amount}/{outcome}/
+      success_contract: mixed raw JSON DTO, no-content action, and selected envelope results
+      failure_contract: ReasonResponse plus middleware 429
+      migration_state: mixed_raw_success_reason_failure
+      source: backend/server/server.go and handlers/markets
+    - family: market-search
+      paths:
+        - /v0/markets/search
+      success_contract: raw JSON SearchResponse
+      failure_contract: ReasonResponse plus middleware 429
+      migration_state: raw_success_plain_text_failures_retired
+      retired_plain_text_failures: true
+      source: backend/server/server.go and handlers/markets/searchmarkets.go
+    - family: market-bets-and-positions
+      paths:
+        - /v0/markets/bets/{marketId}
+        - /v0/markets/positions/{marketId}
+        - /v0/markets/positions/{marketId}/{username}
+      success_contract: JSON `{ok:true,result}`
+      failure_contract: ReasonResponse plus middleware 429 where wrapped
+      migration_state: envelope_based
+      source: backend/server/server.go, handlers/bets, handlers/positions
+    - family: public-users
+      paths:
+        - /v0/userinfo/{username}
+        - /v0/usercredit/{username}
+        - /v0/portfolio/{username}
+        - /v0/users/{username}/financial
+      success_contract: raw JSON DTO
+      failure_contract: ReasonResponse plus middleware 429
+      migration_state: mixed_raw_success_reason_failure
+      source: backend/server/server.go and handlers/users
+    - family: private-users
+      paths:
+        - /v0/privateprofile
+        - /v0/changepassword
+        - /v0/profilechange/displayname
+        - /v0/profilechange/emoji
+        - /v0/profilechange/description
+        - /v0/profilechange/links
+      success_contract: JSON `{ok:true,result}`
+      failure_contract: ReasonResponse plus middleware 429
+      migration_state: envelope_based
+      source: backend/server/server.go and handlers/users
+    - family: private-actions
+      paths:
+        - /v0/bet
+        - /v0/userposition/{marketId}
+        - /v0/sell
+      success_contract: JSON `{ok:true,result}`
+      failure_contract: ReasonResponse plus middleware 429 and PASSWORD_CHANGE_REQUIRED gate
+      migration_state: envelope_based
+      source: backend/server/server.go, handlers/bets, handlers/users
+    - family: admin-and-content
+      paths:
+        - /v0/admin/createuser
+        - /v0/content/home
+        - /v0/admin/content/home
+      success_contract: mixed raw JSON DTO and JSON `{ok:true,result}`
+      failure_contract: ReasonResponse plus middleware 429 where wrapped
+      migration_state: mixed_raw_success_reason_failure
+      source: backend/server/server.go, handlers/admin, handlers/cms
+
 paths:
   /health:
     get:
@@ -39,7 +193,7 @@ paths:
       operationId: getHealth
       summary: Backend health check
       description: >
-        Simple process liveness probe that returns "ok" while the backend is running.
+        Simple process liveness probe that returns "live" while the backend is running.
         It does not report application metrics, downstream dependency reachability,
         or telemetry pipeline status.
       responses:
@@ -49,7 +203,14 @@ paths:
             text/plain:
               schema:
                 type: string
-                example: ok
+                example: live
+        '503':
+          description: Backend process is not live.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+              example: not live
 
   /readyz:
     get:
@@ -73,8 +234,8 @@ paths:
           content:
             text/plain:
               schema:
-                type: string
-                example: not ready
+                $ref: '#/components/schemas/PlainTextErrorResponse'
+              example: not ready
 
   /v0/login:
     post:
@@ -202,6 +363,30 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+
+  /swagger:
+    get:
+      tags: [Config]
+      operationId: redirectSwaggerUI
+      summary: Redirect to Swagger UI
+      description: Redirects to `/swagger/`.
+      responses:
+        '301':
+          description: Swagger UI redirect.
+
+  /swagger/:
+    get:
+      tags: [Config]
+      operationId: getSwaggerUI
+      summary: Serve Swagger UI
+      description: Serves the embedded Swagger UI static assets rooted at `/swagger/`.
+      responses:
+        '200':
+          description: Swagger UI asset returned.
+          content:
+            text/html:
+              schema:
+                type: string
 
   /v0/markets:
     get:
@@ -331,7 +516,8 @@ paths:
       summary: Search markets
       description: >
         Searches markets by question title with optional status filtering. Supports both
-        "query" and legacy "q" parameters.
+        "query" and legacy "q" parameters. Success remains the raw SearchResponse DTO;
+        handler-owned failures use the shared ReasonResponse contract.
       parameters:
         - in: query
           name: query
@@ -379,7 +565,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SearchResponse'
         '400':
-          description: Missing query parameter or invalid status.
+          description: Missing query parameter, invalid status, or invalid search input.
           content:
             application/json:
               schema:
@@ -913,6 +1099,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/marketprojection/{marketId}/{amount}/{outcome}/:
+    get:
+      tags: [Markets]
+      operationId: projectMarketProbabilityLegacySlash
+      summary: Legacy market projection endpoint with trailing slash
+      description: >
+        Trailing-slash compatibility alias for the legacy market projection
+        endpoint. It is documented as migration state and should stay aligned
+        with `/v0/marketprojection/{marketId}/{amount}/{outcome}` until an
+        explicit route redesign removes the alias.
+      parameters:
+        - in: path
+          name: marketId
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: path
+          name: amount
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: path
+          name: outcome
+          required: true
+          description: Hypothetical outcome to bet on. Accepted case-insensitive values are YES and NO.
+          schema:
+            type: string
+            pattern: '^(?:[Yy][Ee][Ss]|[Nn][Oo])$'
+      responses:
+        '200':
+          description: Projection computed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbabilityProjectionResponse'
+        '400':
+          description: Invalid market ID, amount, or outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market is closed for new probability projections.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error while computing projection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/markets/bets/{marketId}:
     get:
       tags: [Bets, Markets]
@@ -1203,7 +1452,9 @@ paths:
       description: >
         Returns the authenticated user's private profile data. Handler-owned failures use
         the shared JSON failure envelope with INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
-        USER_NOT_FOUND, METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
+        USER_NOT_FOUND, METHOD_NOT_ALLOWED, or INTERNAL_ERROR. Auth outcomes for
+        this private-users slice are translated at the HTTP boundary; raw auth
+        messages are not part of the response contract.
       security:
         - bearerAuth: []
       responses:
@@ -1253,7 +1504,8 @@ paths:
         Protected profile update route migrated to the shared JSON failure envelope.
         Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
         INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
-        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR. Auth outcomes are translated at
+        the HTTP boundary; raw auth messages are not part of the response contract.
       security:
         - bearerAuth: []
       requestBody:
@@ -1315,7 +1567,8 @@ paths:
         Protected profile update route migrated to the shared JSON failure envelope.
         Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
         INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
-        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR. Auth outcomes are translated at
+        the HTTP boundary; raw auth messages are not part of the response contract.
       security:
         - bearerAuth: []
       requestBody:
@@ -1377,7 +1630,8 @@ paths:
         Protected profile update route migrated to the shared JSON failure envelope.
         Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
         INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
-        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR. Auth outcomes are translated at
+        the HTTP boundary; raw auth messages are not part of the response contract.
       security:
         - bearerAuth: []
       requestBody:
@@ -1439,7 +1693,8 @@ paths:
         Protected profile update route migrated to the shared JSON failure envelope.
         Handler-owned failures use INVALID_TOKEN, PASSWORD_CHANGE_REQUIRED,
         INVALID_REQUEST, VALIDATION_FAILED, USER_NOT_FOUND, AUTHORIZATION_DENIED,
-        METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
+        METHOD_NOT_ALLOWED, or INTERNAL_ERROR. Auth outcomes are translated at
+        the HTTP boundary; raw auth messages are not part of the response contract.
       security:
         - bearerAuth: []
       requestBody:
@@ -1501,6 +1756,8 @@ paths:
         Protected password-change route migrated to the shared JSON failure envelope.
         Handler-owned failures use INVALID_TOKEN, INVALID_REQUEST, VALIDATION_FAILED,
         AUTHORIZATION_DENIED, USER_NOT_FOUND, METHOD_NOT_ALLOWED, or INTERNAL_ERROR.
+        This route intentionally uses token-only authentication so users with
+        `mustChangePassword` can complete the required password change.
       security:
         - bearerAuth: []
       requestBody:
@@ -2028,7 +2285,17 @@ components:
 
     PlainTextErrorResponse:
       type: string
-      description: Plain text error emitted by legacy handler-owned response paths that have not yet migrated to ReasonResponse.
+      description: >
+        Explicit migration-state schema for infra probe failures and untouched
+        handler-owned plain text failures. The current inventory is /health and
+        /readyz probe transport plus older market compatibility entry points in
+        handlers/markets/getmarkets.go, listmarkets.go, marketdetailshandler.go,
+        resolvemarket.go, legacy update/get methods on handler.go, and
+        market-create compatibility helpers in createmarket.go. It is not the
+        target API contract; the next migration seam is the markets route family,
+        where remaining still-routed failures should move to ReasonResponse and
+        unused compatibility entry points should be retired without introducing a
+        universal wrapper.
 
     StatsEnvelopeResponse:
       type: object
