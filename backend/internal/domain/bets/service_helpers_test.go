@@ -11,6 +11,11 @@ import (
 	dusers "socialpredict/internal/domain/users"
 )
 
+// Helper-level bets tests are pure domain convenience coverage. They keep fee,
+// balance, ledger, and sale math close to the owning package. WAVE07 covered
+// place-bet atomicity with real Postgres; sell-position atomicity and overlap
+// behavior remain DB-truth gaps.
+
 var errUnexpectedHelperCall = errors.New("unexpected call")
 
 type stubMarketService struct {

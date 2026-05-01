@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"socialpredict/handlers"
+	"socialpredict/security"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -251,6 +252,71 @@ func TestReasonResponseEnumMatchesSharedFailureVocabulary(t *testing.T) {
 	}
 }
 
+func TestRuntimeFailureReasonsRemainInPublicOpenAPIVocabulary(t *testing.T) {
+	doc := loadOpenAPIDocument(t)
+	reasonEnum := reasonResponseEnum(t, doc)
+	publicReasons := make(map[string]struct{})
+	for _, reason := range handlers.PublicFailureReasons() {
+		publicReasons[string(reason)] = struct{}{}
+	}
+
+	for _, reason := range []string{
+		security.RuntimeReasonMethodNotAllowed,
+		security.RuntimeReasonRateLimited,
+		security.RuntimeReasonLoginRateLimited,
+		security.RuntimeReasonInternalError,
+	} {
+		if _, ok := publicReasons[reason]; !ok {
+			t.Fatalf("runtime reason %q missing from handlers.PublicFailureReasons", reason)
+		}
+		if _, ok := reasonEnum[reason]; !ok {
+			t.Fatalf("runtime reason %q missing from OpenAPI ReasonResponse enum", reason)
+		}
+	}
+}
+
+func TestOpenAPIDocumentsPasswordChangeAuthExceptions(t *testing.T) {
+	doc := loadOpenAPIDocument(t)
+
+	changePassword := operationFor(t, doc, "/v0/changepassword", httpMethodPost)
+	changePasswordDescription := changePassword.Description
+	for _, want := range []string{"token-only authentication", "mustChangePassword"} {
+		if !strings.Contains(changePasswordDescription, want) {
+			t.Fatalf("/v0/changepassword description missing %q: %s", want, changePasswordDescription)
+		}
+	}
+	if _, ok := changePassword.Responses.Map()["403"]; ok {
+		t.Fatal("/v0/changepassword must not document PASSWORD_CHANGE_REQUIRED as a blocking 403 response")
+	}
+
+	for _, route := range []struct {
+		path   string
+		method string
+	}{
+		{path: "/v0/bet", method: httpMethodPost},
+		{path: "/v0/sell", method: httpMethodPost},
+		{path: "/v0/userposition/{marketId}", method: httpMethodGet},
+	} {
+		t.Run(route.path, func(t *testing.T) {
+			operation := operationFor(t, doc, route.path, route.method)
+			if !strings.Contains(operation.Description, "PASSWORD_CHANGE_REQUIRED") {
+				t.Fatalf("%s description missing PASSWORD_CHANGE_REQUIRED: %s", route.path, operation.Description)
+			}
+			response := operation.Responses.Map()["403"]
+			if response == nil || response.Value == nil {
+				t.Fatalf("%s missing documented 403 password-change response", route.path)
+			}
+			if response.Value.Description == nil || !strings.Contains(*response.Value.Description, "Password change") {
+				description := ""
+				if response.Value.Description != nil {
+					description = *response.Value.Description
+				}
+				t.Fatalf("%s 403 response does not describe password-change gate: %s", route.path, description)
+			}
+		})
+	}
+}
+
 func loadOpenAPIDocument(t *testing.T) *openapi3.T {
 	t.Helper()
 
@@ -263,6 +329,58 @@ func loadOpenAPIDocument(t *testing.T) *openapi3.T {
 	}
 
 	return doc
+}
+
+const (
+	httpMethodGet  = "GET"
+	httpMethodPost = "POST"
+)
+
+func operationFor(t *testing.T, doc *openapi3.T, path string, method string) *openapi3.Operation {
+	t.Helper()
+
+	pathItem := doc.Paths.Find(path)
+	if pathItem == nil {
+		t.Fatalf("OpenAPI path %s missing", path)
+	}
+
+	var operation *openapi3.Operation
+	switch method {
+	case httpMethodGet:
+		operation = pathItem.Get
+	case httpMethodPost:
+		operation = pathItem.Post
+	default:
+		t.Fatalf("unsupported test method %s", method)
+	}
+	if operation == nil {
+		t.Fatalf("OpenAPI operation %s %s missing", method, path)
+	}
+	return operation
+}
+
+func reasonResponseEnum(t *testing.T, doc *openapi3.T) map[string]struct{} {
+	t.Helper()
+
+	reasonSchemaRef := doc.Components.Schemas["ReasonResponse"]
+	if reasonSchemaRef == nil || reasonSchemaRef.Value == nil {
+		t.Fatal("components.schemas.ReasonResponse missing from OpenAPI document")
+	}
+
+	reasonProperty := reasonSchemaRef.Value.Properties["reason"]
+	if reasonProperty == nil || reasonProperty.Value == nil {
+		t.Fatal("components.schemas.ReasonResponse.properties.reason missing from OpenAPI document")
+	}
+
+	enum := make(map[string]struct{}, len(reasonProperty.Value.Enum))
+	for _, value := range reasonProperty.Value.Enum {
+		reason, ok := value.(string)
+		if !ok {
+			t.Fatalf("ReasonResponse reason enum contains non-string value: %#v", value)
+		}
+		enum[reason] = struct{}{}
+	}
+	return enum
 }
 
 func openAPIOperationKeys(doc *openapi3.T) map[string]struct{} {

@@ -352,7 +352,7 @@ func TestReadyzChecksDatabaseAvailabilityAfterReadinessGateOpens(t *testing.T) {
 	}
 }
 
-func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing.T) {
+func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequiredWithSharedReason(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	db := modelstesting.NewFakeDB(t)
@@ -390,6 +390,14 @@ func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequired(t *testing
 
 			if rr.Code != http.StatusForbidden {
 				t.Fatalf("expected status 403, got %d (body: %s)", rr.Code, rr.Body.String())
+			}
+
+			var envelope handlers.FailureEnvelope
+			if err := json.Unmarshal(rr.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("decode failure envelope: %v", err)
+			}
+			if envelope.OK || envelope.Reason != string(handlers.ReasonPasswordChangeRequired) {
+				t.Fatalf("expected reason %q, got %+v", handlers.ReasonPasswordChangeRequired, envelope)
 			}
 		})
 	}

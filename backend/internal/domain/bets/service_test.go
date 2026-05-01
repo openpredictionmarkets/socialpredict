@@ -13,6 +13,12 @@ import (
 	"socialpredict/models/modelstesting"
 )
 
+// Bets service tests use fakes to keep accounting rules package-local and fast.
+// They prove ordering and collaborator boundaries, not database truth. WAVE07
+// added repository-level Postgres proof for place-bet transaction behavior;
+// sell-position concurrency still needs source-of-truth verification once its
+// repository transaction scope is finalized.
+
 var errUnexpectedServiceCall = errors.New("unexpected call")
 
 type fakeRepo struct {

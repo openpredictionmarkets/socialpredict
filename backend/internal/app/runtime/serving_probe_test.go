@@ -7,6 +7,12 @@ import (
 	"socialpredict/models/modelstesting"
 )
 
+// ServingProbe tests deliberately keep the readiness gate package-local and
+// SQLite-backed. They are convenience coverage for liveness/readiness wiring;
+// WAVE07 added source-of-truth Postgres coverage for startup readiness posture,
+// while post-ready outage and recovery behavior remains the next runtime DB
+// gap if readiness semantics expand.
+
 func TestServingProbeLivenessIsIndependentOfReadiness(t *testing.T) {
 	probe := NewServingProbe(nil, nil)
 

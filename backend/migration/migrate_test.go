@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Migration tests use SQLite-backed modelstesting helpers as fast package-local
+// convenience coverage for registry ordering, idempotency, and fail-closed
+// checks. WAVE07 added backend-root Postgres verification for writer failure and
+// non-writer VerifyApplied posture; advisory locking or single-writer startup
+// serialization still needs source-of-truth proof after that mechanism exists.
+
 func TestRegister_DuplicateReturnsError(t *testing.T) {
 	migration.ClearRegistry()
 
