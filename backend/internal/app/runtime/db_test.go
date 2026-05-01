@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// These runtime DB tests use fake handles or SQLite-backed modelstesting helpers
+// for fast package-local coverage. They prove config, handle ownership, and
+// basic ping/close behavior, but real Postgres remains the source of truth for
+// post-ready DB loss/recovery, pool/lifetime behavior, SSL posture, and HA
+// startup semantics not covered by the WAVE07 startup contract test.
+
 func TestInitDBReturnsExplicitHandleWithoutSharedFallback(t *testing.T) {
 	original := GetDB()
 	t.Cleanup(func() {

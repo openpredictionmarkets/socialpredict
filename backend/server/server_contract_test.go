@@ -114,6 +114,52 @@ func TestServerAllowsChangePasswordWhenPasswordChangeRequired(t *testing.T) {
 	}
 }
 
+func TestServerBlocksPrivateActionsWhenPasswordChangeRequired(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	db := modelstesting.NewFakeDB(t)
+	user := modelstesting.GenerateUser("mustchange-action", 1000)
+	if err := user.HashPassword("OldPassword123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	user.MustChangePassword = true
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	handler := buildTestHandler(t, db)
+	req := httptest.NewRequest(http.MethodPost, "/v0/bet", bytes.NewBufferString(`{"marketId":1,"outcome":"YES","amount":10}`))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT(user.Username))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	assertServerFailureReason(t, rec, handlers.ReasonPasswordChangeRequired)
+}
+
+func TestServerSharedMethodNotAllowedFailureEnvelope(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodPost, "/v0/home", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status 405, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
+		t.Fatalf("expected Allow header %q, got %q", http.MethodGet, allow)
+	}
+	assertServerFailureReason(t, rec, handlers.ReasonMethodNotAllowed)
+}
+
 func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
@@ -229,5 +275,21 @@ func TestReadinessProbePlainTextMigrationState(t *testing.T) {
 	}
 	if body := rec.Body.String(); body != "not ready" {
 		t.Fatalf("expected /readyz PlainTextErrorResponse body not ready, got %q", body)
+	}
+}
+
+func assertServerFailureReason(t *testing.T, rec *httptest.ResponseRecorder, reason handlers.FailureReason) {
+	t.Helper()
+
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("expected JSON content type, got %q", got)
+	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure response: %v", err)
+	}
+	if response.OK || response.Reason != string(reason) {
+		t.Fatalf("expected reason %q, got %+v", reason, response)
 	}
 }

@@ -3,9 +3,9 @@ title: Testing Strategy
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record the April 30 WAVE05 backend security smoke evidence while keeping the testing strategy package-local and evidence-driven."
+updated_at: 2026-05-01T03:38:44Z
+updated_at_display: "Friday, May 1, 2026 at 3:38 AM UTC"
+update_reason: "Close WAVE07 with a source-of-truth verification inventory and one concrete remaining Postgres candidate while keeping broader test-platform ideas deferred."
 status: active
 ---
 
@@ -16,6 +16,8 @@ status: active
 This note was updated on Monday, April 27, 2026 to replace an older greenfield test-platform plan with guidance that matches the live SocialPredict backend, idiomatic Go test layout, and the active design-plan posture.
 
 On Thursday, April 30, 2026, the WAVE05 backend security slice was verified with both package-level Go tests and Docker-backed black-box HTTP checks. That evidence confirms the current testing direction: keep most checks close to the owning packages, then add a small number of black-box smoke checks when runtime wiring, CORS, rate limiting, or auth gates need end-to-end confirmation.
+
+On Friday, May 1, 2026, WAVE07 tightened the package-local test notes around runtime DB, migration, and accounting-sensitive domain tests. The current SQLite-backed and fake-collaborator tests remain fast convenience coverage. They do not claim source-of-truth proof for Postgres readiness, migration serialization, startup-writer coordination, transaction isolation, or auth-state contract behavior. The wave then added DSN-gated Postgres checks for startup readiness/migration posture and place-bet transaction rollback/serialization, leaving sell-position, resolve-market, and persisted auth-state route behavior as the remaining DB-truth candidates.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -180,6 +182,23 @@ The live backend still has important verification gaps around the same seams the
 
 Those are the areas where new testing effort should go first.
 
+### WAVE07 source-of-truth stop-and-review
+
+WAVE07 added two narrow DSN-gated Postgres checks without introducing `testcontainers-go`, a top-level `testing/` tree, a shared `TestSuite`, or a broad fast/slow taxonomy:
+
+- [postgres_startup_integration_test.go](/workspace/socialpredict/backend/postgres_startup_integration_test.go) verifies the real-Postgres startup path keeps readiness closed before startup completion, stops before seed writes after migration failure, records successful writer migrations, lets non-writers verify already-applied migrations, and fails non-writers when a registered migration is missing.
+- [place_transaction_postgres_test.go](/workspace/socialpredict/backend/internal/repository/bets/place_transaction_postgres_test.go) verifies place-bet debit and bet creation commit together, bet-create failure rolls back the debit, and overlapping debits serialize so only one insufficient-balance-sensitive placement commits.
+
+That evidence narrows, but does not eliminate, the DB-truth gap. The remaining behaviors that still lack source-of-truth Postgres verification are:
+
+- sell-position transaction behavior: the fake-backed service tests prove quote and ordering rules, but not real row locking, debit/credit atomicity, or concurrent sale safety against Postgres.
+- resolve-market transaction behavior: the fake-backed resolution tests prove payout/refund order and authorization policy, but not atomic persistence of resolution state plus payouts/refunds under concurrent access.
+- persisted auth-state route behavior: the server tests prove middleware contract shape, but `mustChangePassword` enforcement and the intentionally exempt login/change-password flows are not yet exercised against DB-truthful user state.
+- production DB outage and recovery modes beyond the current startup-posture check: WAVE07 proves the readiness gate with a real Postgres handle and migration outcomes, but does not yet simulate live connection loss, pool exhaustion, SSL-mode mismatch, or recovery after outage.
+- migration/startup serialization across multiple real processes: WAVE07 proves writer versus non-writer posture and missing-migration failure against Postgres, but not advisory locking or multi-replica leader coordination because that mechanism is not yet selected.
+
+The next verification seam should be one package-local Postgres check for sell-position transaction atomicity and concurrency. That is the closest remaining accounting-sensitive DB behavior to the completed place-bet check, and it can be handled with the current repository-local posture rather than a new testing platform.
+
 ## What Testing Strategy Should Own
 
 ### Default test posture
@@ -243,17 +262,22 @@ In practice, that means:
    - middleware failure behavior
    - rate limiting and proxy assumptions, with the first spoofed-forwarded-header smoke check completed on April 30, 2026
 4. Strengthen accounting-sensitive verification for:
-   - place bet
+   - place bet, with DSN-gated Postgres commit/rollback/serialization coverage completed on May 1, 2026
    - sell position
    - resolve market
-5. Add a small number of Postgres-backed checks only where SQLite is a poor proxy.
+5. Add a small number of Postgres-backed checks only where SQLite is a poor proxy. After the May 1 WAVE07 additions, the remaining concrete targets are:
+   - W04 sell-position transaction behavior under concurrent accounting-sensitive writes
+   - W04 resolve-market transaction behavior under concurrent payout/refund-sensitive writes
+   - W04 runtime DB readiness against production outage and recovery modes not covered by the startup-posture check
+   - W04 migration/startup-writer serialization across multiple real processes once the locking or leader mechanism is chosen
+   - W06 persisted auth-state contract checks, especially `mustChangePassword` enforcement and the intentionally exempt login/change-password flows, when route tests need DB-truthful user state rather than fake collaborators
 6. Revisit broader infrastructure only after the active runtime, DB, security, and API seams are more stable.
 
 ## Open Questions
 
 The current production note should keep the following questions visible:
 
-- Which exact runtime and DB behaviors now require real-Postgres verification rather than SQLite-backed convenience coverage?
+- Can the next sell-position Postgres check reuse the package-local DSN-gated shape from the place-bet transaction test without creating shared infrastructure?
 - Where should the small number of truly cross-boundary integration tests live if package-local placement becomes awkward?
 - Do we want a clear fast/slow split later, and if so, should it be based on runtime cost rather than a large taxonomy of suite types?
 - Which current helper packages should remain repo-local, and which would only justify a separate shared helper repo if multiple repos genuinely need them?
