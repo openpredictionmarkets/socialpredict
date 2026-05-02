@@ -18,3 +18,9 @@ jobs:
           token: ${{ secrets.ANSIBLE_PLAYBOOK_TOKEN }}
           repository: openpredictionmarkets/ansible_playbooks
           event-type: deploy-to-production
+          client-payload: >-
+            {
+              "startup_writer_service": "backend-startup-writer",
+              "serving_backend_service": "backend",
+              "serving_startup_writer": "false"
+            }

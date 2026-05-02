@@ -7,6 +7,16 @@ server {
 	listen 80;
 	server_name ${DOMAIN};
 
+	# Backend-owned infra probes are published deliberately at root so
+	# deployment checks do not rely on frontend routing or /api/ prefixing.
+	location = /health {
+		proxy_pass http://backend:8080;
+	}
+
+	location = /readyz {
+		proxy_pass http://backend:8080;
+	}
+
 	# Backend-owned API docs are published deliberately at root. Do not
 	# hide these behind /api/ or serve a duplicate Swagger copy from frontend.
 	location = /openapi.yaml {

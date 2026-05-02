@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"socialpredict/handlers"
 	appruntime "socialpredict/internal/app/runtime"
@@ -23,11 +24,67 @@ import (
 
 var testOpenAPISpec = []byte("openapi: 3.0.0\ninfo:\n  title: SocialPredict Test API\n")
 
+type recordingShutdowner struct {
+	t         *testing.T
+	readiness *appruntime.Readiness
+	deadline  time.Time
+}
+
+func (s *recordingShutdowner) Shutdown(ctx context.Context) error {
+	s.t.Helper()
+
+	if s.readiness.Ready() {
+		s.t.Fatalf("expected readiness gate closed before server shutdown")
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		s.t.Fatalf("expected shutdown context deadline")
+	}
+	s.deadline = deadline
+	return nil
+}
+
 func testSwaggerUIFS() fstest.MapFS {
 	return fstest.MapFS{
 		"swagger-ui/index.html": &fstest.MapFile{
 			Data: []byte("<html>swagger</html>"),
 		},
+	}
+}
+
+func TestShutdownHTTPServerClosesReadinessBeforeDrain(t *testing.T) {
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+	shutdowner := &recordingShutdowner{t: t, readiness: readiness}
+	var slept time.Duration
+
+	start := time.Now()
+	err := shutdownHTTPServer(
+		shutdowner,
+		readiness,
+		appruntime.ShutdownConfig{
+			ReadinessDrainWindow: 7 * time.Second,
+			ShutdownTimeout:      15 * time.Second,
+		},
+		func(duration time.Duration) {
+			if readiness.Ready() {
+				t.Fatalf("expected readiness gate closed before drain wait")
+			}
+			slept = duration
+		},
+	)
+	if err != nil {
+		t.Fatalf("shutdownHTTPServer: %v", err)
+	}
+
+	if readiness.Ready() {
+		t.Fatalf("expected readiness gate to remain closed after shutdown")
+	}
+	if slept != 7*time.Second {
+		t.Fatalf("readiness drain sleep = %v, want 7s", slept)
+	}
+	if shutdowner.deadline.Before(start.Add(14*time.Second)) || shutdowner.deadline.After(start.Add(16*time.Second)) {
+		t.Fatalf("shutdown deadline = %v, want about 15s after %v", shutdowner.deadline, start)
 	}
 }
 
