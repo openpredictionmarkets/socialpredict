@@ -152,6 +152,7 @@ func TestRouteFamilyMigrationMatrixMatchesTouchedContractSlice(t *testing.T) {
 
 	expectedFamilies := map[string]struct{}{
 		"infra-probes":              {},
+		"operator-status":           {},
 		"infra-docs":                {},
 		"runtime-middleware":        {},
 		"auth":                      {},

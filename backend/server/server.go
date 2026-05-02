@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -58,7 +59,8 @@ func buildCORS(config appruntime.CORSConfig) *cors.Cors {
 }
 
 func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) (http.Handler, error) {
-	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
+	operationalMetrics := appruntime.NewOperationalMetrics()
+	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig, operationalMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +71,12 @@ func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServ
 	}
 	handler = security.SecurityHeadersMiddleware(securityConfig.Headers)(handler)
 	handler = security.RequestBoundaryMiddlewareWithProxyTrust(securityConfig.TrustProxyHeaders)(handler)
+	handler = operationalMetrics.Middleware(handler)
 
 	return handler, nil
 }
 
-func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) (*mux.Router, error) {
+func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig, operationalMetrics *appruntime.OperationalMetrics) (*mux.Router, error) {
 	if configService == nil {
 		return nil, fmt.Errorf("config init: configuration service unavailable")
 	}
@@ -83,7 +86,7 @@ func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServi
 
 	router := mux.NewRouter()
 	router.MethodNotAllowedHandler = methodNotAllowedHandler(router)
-	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS, db, readiness); err != nil {
+	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS, db, readiness, operationalMetrics); err != nil {
 		return nil, err
 	}
 
@@ -148,10 +151,11 @@ type applicationReportingService interface {
 	metricshandlers.GlobalLeaderboardService
 }
 
-func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, readiness *appruntime.Readiness) error {
+func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, readiness *appruntime.Readiness, operationalMetrics *appruntime.OperationalMetrics) error {
 	probe := appruntime.NewServingProbe(db, readiness)
 	router.Handle("/health", livenessHandler(probe)).Methods("GET")
 	router.Handle("/readyz", readinessHandler(probe)).Methods("GET")
+	router.Handle("/ops/status", operationalStatusHandler(probe, operationalMetrics)).Methods("GET")
 
 	// OpenAPI spec endpoint
 	router.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +179,12 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 	return nil
 }
 
+type operationalStatusResponse struct {
+	Live                 bool   `json:"live"`
+	Ready                bool   `json:"ready"`
+	RequestFailuresTotal uint64 `json:"requestFailuresTotal"`
+}
+
 func livenessHandler(probe appruntime.ServingProbe) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if !probe.Live() {
@@ -196,6 +206,30 @@ func readinessHandler(probe appruntime.ServingProbe) http.Handler {
 		}
 
 		writeProbeResponse(w, http.StatusOK, "ready")
+	})
+}
+
+func operationalStatusHandler(probe appruntime.ServingProbe, operationalMetrics *appruntime.OperationalMetrics) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), readinessProbeTimeout)
+		defer cancel()
+
+		snapshot := operationalMetrics.Snapshot()
+		response := operationalStatusResponse{
+			Live:                 probe.Live(),
+			Ready:                probe.Ready(ctx) == nil,
+			RequestFailuresTotal: snapshot.RequestFailuresTotal,
+		}
+
+		status := http.StatusOK
+		if !response.Live || !response.Ready {
+			status = http.StatusServiceUnavailable
+		}
+
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 }
 

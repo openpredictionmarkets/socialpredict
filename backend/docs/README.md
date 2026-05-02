@@ -27,6 +27,48 @@ Traefik owns the public host and TLS edge while nginx owns these path routes.
 Do not publish these docs by copying Swagger assets into the frontend or by
 relying on `/api/` prefix routing.
 
+## Published Operational Signals
+
+The current backend boundary exposes a small operator-facing signal inventory:
+
+- `GET /health` is a process liveness probe. It returns `text/plain` body
+  `live` with `200` while the HTTP process is serving.
+- `GET /readyz` is a readiness probe. It returns `text/plain` body `ready`
+  with `200` only after startup mutation or verification has completed and the
+  database remains reachable; otherwise it returns `not ready` with `503`.
+- `GET /ops/status` is the minimal operator-facing status export. It returns
+  JSON `{ live, ready, requestFailuresTotal }`, uses `503` when the backend is
+  unready, and keeps the non-probe request-failure counter process-local for
+  spike alerts.
+- Startup configuration load, database initialization, database readiness,
+  security configuration, startup mutation mode, shutdown configuration,
+  migration/verification, and seed failures are fatal startup failures. The
+  process exits through the startup logger before readiness opens.
+- Runtime-owned request failures currently share JSON `{ ok: false, reason }`
+  responses for router `405`, security middleware `429`, and recovered
+  unhandled panics.
+
+The first supported alert set is intentionally small: backend down or unready
+via `/health`, `/readyz`, or `/ops/status`; fatal startup failure via process
+exit before readiness opens plus startup logger events; and severe request
+failure spikes via the monotonic `/ops/status.requestFailuresTotal` counter.
+That counter is process-local and resets when the process restarts, so it is a
+first spike signal rather than a fleet metric.
+
+`GET /v0/system/metrics` remains an application reporting route for
+economics/accounting output such as money creation and utilization. It is not
+the operational monitoring surface and should not be treated as a liveness,
+readiness, latency, or telemetry-export endpoint.
+
+Remaining monitoring gaps should stay scoped to the next app-owned signal
+seams: request latency/duration at the request boundary, route or reason
+classification for server-side failures, process start/reset metadata for local
+counters, and a clear backend-versus-proxy ownership line for traffic and
+edge-failure signals. Prometheus exposition, Grafana dashboards, Alertmanager
+routing, paging policy, centralized log-platform rollout, SLOs, and
+error-budget programs remain deferred outside the current backend OpenAPI
+contract.
+
 ## How to Update
 
 1. Add or adjust DTO structs in the relevant handler package (`backend/handlers/<service>/dto`).

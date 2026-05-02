@@ -182,6 +182,7 @@ func TestRequestBoundaryMiddlewareRecoversPanicWithSanitizedCorrelatedFailure(t 
 		`span_id="00f067aa0ba902b7"`,
 		`status_code="500"`,
 		`duration_ms="25"`,
+		`event="request.panic"`,
 		`error_type="exception.panic"`,
 		`exception_recorded="true"`,
 	} {
@@ -206,6 +207,7 @@ func TestRequestBoundaryMiddlewareClassifiesSharedRuntimeFailures(t *testing.T) 
 		wantReason    string
 		wantLevel     string
 		wantErrorType string
+		wantEvent     string
 	}{
 		{
 			name:   "shared 405 method not allowed",
@@ -218,6 +220,7 @@ func TestRequestBoundaryMiddlewareClassifiesSharedRuntimeFailures(t *testing.T) 
 			wantReason:    RuntimeReasonMethodNotAllowed,
 			wantLevel:     "level=WARN",
 			wantErrorType: RuntimeErrorTypeMethodNotAllowed,
+			wantEvent:     logger.EventRequestFailure,
 		},
 		{
 			name:   "shared 429 login rate limited",
@@ -230,6 +233,7 @@ func TestRequestBoundaryMiddlewareClassifiesSharedRuntimeFailures(t *testing.T) 
 			wantReason:    RuntimeReasonLoginRateLimited,
 			wantLevel:     "level=WARN",
 			wantErrorType: RuntimeErrorTypeRateLimited,
+			wantEvent:     logger.EventRequestFailure,
 		},
 		{
 			name:   "shared sanitized 500 internal error",
@@ -242,6 +246,7 @@ func TestRequestBoundaryMiddlewareClassifiesSharedRuntimeFailures(t *testing.T) 
 			wantReason:    RuntimeReasonInternalError,
 			wantLevel:     "level=ERROR",
 			wantErrorType: RuntimeErrorTypeInternal,
+			wantEvent:     logger.EventRequestFailure,
 		},
 	}
 
@@ -290,12 +295,19 @@ func TestRequestBoundaryMiddlewareClassifiesSharedRuntimeFailures(t *testing.T) 
 			output := buffer.String()
 			for _, want := range []string{
 				tt.wantLevel,
+				`event="` + tt.wantEvent + `"`,
 				`status_code="` + strconv.Itoa(tt.wantStatus) + `"`,
 				`error_type="` + tt.wantErrorType + `"`,
 			} {
 				if !strings.Contains(output, want) {
 					t.Fatalf("expected %q in output, got %q", want, output)
 				}
+			}
+			if tt.wantEvent != "" && !strings.Contains(output, `event="`+tt.wantEvent+`"`) {
+				t.Fatalf("expected event %q in output %q", tt.wantEvent, output)
+			}
+			if tt.wantEvent == "" && strings.Contains(output, `event="request.failure"`) {
+				t.Fatalf("expected non-severe runtime failure to omit severe event, got %q", output)
 			}
 			if strings.Contains(output, tt.wantReason) {
 				t.Fatalf("expected public reason to stay out of telemetry fields, got %q", output)
