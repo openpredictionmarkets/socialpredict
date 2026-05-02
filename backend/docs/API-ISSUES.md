@@ -37,6 +37,24 @@ WAVE06 stop-and-review outcome:
   markets compatibility entry points and are the next route-family migration
   seam, not an API-platform backlog.
 
+WAVE10 validation stop-and-review outcome:
+
+- Markets create/search now use the runtime-injected shared security service
+  rather than production handler-local validator or sanitizer construction.
+- Markets list/search pagination now uses `security.ParseBoundedIntParam` for
+  bounded integer query parsing.
+- Create/search validation failures are intentionally split: malformed or
+  sanitizer-rejected boundary input returns `INVALID_REQUEST`, while
+  syntactically valid domain validation failures return `VALIDATION_FAILED`.
+- Remaining boundary-validation bypasses are route-family scoped: legacy market
+  detail, resolve, projection, and compatibility methods still own local path or
+  action parsing and some plain `http.Error` shaping; market bets and positions
+  still duplicate market ID parsing; private actions still rely mostly on domain
+  validation after local DTO decode.
+- The next validation seam is the remaining markets path/action helper gap, not
+  a generic validation registry, request-body middleware layer, or platform
+  program.
+
 The source-of-truth order remains:
 
 1. `backend/server/server.go`
@@ -84,16 +102,15 @@ been converted. At this checkpoint the explicit inventory is:
   `handlers/markets/marketdetailshandler.go`,
   `handlers/markets/resolvemarket.go`, and the legacy update/get methods on
   `handlers/markets/handler.go`.
-- The remaining market-create compatibility helpers in
-  `handlers/markets/createmarket.go` that still use `http.Error` while the
-  canonical registered `POST /v0/markets` path now goes through
-  `Handler.CreateMarket` and `ReasonResponse` failures.
 
-The precise next migration seam is the markets route family: remove or retire
-the legacy compatibility entry points where they are no longer routed, and then
-convert any still-registered market route failures to shared `ReasonResponse`
-helpers without introducing a universal wrapper or changing successful raw DTO
-contracts in the same slice.
+The precise next migration seam is still the markets route family, now narrowed
+for validation: consolidate the remaining market path/action boundary helpers
+for market ID, projection amount, resolution outcome, and related failure
+shaping in market detail, resolve, projection, and legacy markets handler
+methods. Remove or retire compatibility entry points only where route wiring
+proves they are dead. Do this without introducing a universal wrapper,
+request-body rewriting middleware, validation registry, or broad platform
+program, and without changing successful raw DTO contracts in the same slice.
 
 ## Publishing Decision
 

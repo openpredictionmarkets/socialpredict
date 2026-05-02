@@ -15,6 +15,7 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/security"
 
 	"github.com/gorilla/mux"
 )
@@ -111,6 +112,10 @@ func (m *contractAuthMock) RequireAdmin(r *http.Request) (*dusers.User, *authsvc
 	return m.user, m.err
 }
 
+func newContractHandler(service Service, auth authsvc.Authenticator) *Handler {
+	return NewHandler(service, auth, security.NewSecurityService())
+}
+
 func TestHandlerCreateMarket_SuccessAndBusinessFailure(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	auth := &contractAuthMock{user: &dusers.User{Username: "alice"}}
@@ -141,7 +146,7 @@ func TestHandlerCreateMarket_SuccessAndBusinessFailure(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v0/markets", body)
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, auth).CreateMarket(rr, req)
+		newContractHandler(service, auth).CreateMarket(rr, req)
 
 		if rr.Code != http.StatusCreated {
 			t.Fatalf("expected status 201, got %d", rr.Code)
@@ -167,9 +172,26 @@ func TestHandlerCreateMarket_SuccessAndBusinessFailure(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v0/markets", body)
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, auth).CreateMarket(rr, req)
+		newContractHandler(service, auth).CreateMarket(rr, req)
 
 		assertFailureEnvelope(t, rr, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
+	})
+
+	t.Run("suspicious title rejects before service call", func(t *testing.T) {
+		service := &contractServiceMock{
+			createFn: func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+				t.Fatalf("service should not be called for rejected input")
+				return nil, nil
+			},
+		}
+
+		body := bytes.NewBufferString(`{"questionTitle":"Will BTC rise?<script>alert(1)</script>","description":"Market","outcomeType":"BINARY","resolutionDateTime":"2030-01-01T00:00:00Z"}`)
+		req := httptest.NewRequest(http.MethodPost, "/v0/markets", body)
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, auth).CreateMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	})
 }
 
@@ -209,7 +231,7 @@ func TestHandlerListMarkets_UsesCreatedByFilterWhenStatusProvided(t *testing.T) 
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets?status=closed&created_by=alice&limit=5&offset=2", nil)
 	rr := httptest.NewRecorder()
 
-	NewHandler(service, nil).ListMarkets(rr, req)
+	newContractHandler(service, nil).ListMarkets(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rr.Code)
@@ -265,7 +287,7 @@ func TestHandlerSearchMarkets_SupportsLegacyQAndInvalidRequestFailure(t *testing
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=bitcoin&status=active&limit=4&offset=1", nil)
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, nil).SearchMarkets(rr, req)
+		newContractHandler(service, nil).SearchMarkets(rr, req)
 
 		if rr.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", rr.Code)
@@ -284,7 +306,7 @@ func TestHandlerSearchMarkets_SupportsLegacyQAndInvalidRequestFailure(t *testing
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search", nil)
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, nil).SearchMarkets(rr, req)
+		newContractHandler(service, nil).SearchMarkets(rr, req)
 
 		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	})
@@ -293,7 +315,7 @@ func TestHandlerSearchMarkets_SupportsLegacyQAndInvalidRequestFailure(t *testing
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?query=%3Cscript%3Ealert(1)%3C%2Fscript%3E", nil)
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, nil).SearchMarkets(rr, req)
+		newContractHandler(service, nil).SearchMarkets(rr, req)
 
 		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	})
@@ -302,7 +324,7 @@ func TestHandlerSearchMarkets_SupportsLegacyQAndInvalidRequestFailure(t *testing
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?query="+strings.Repeat("a", 101), nil)
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, nil).SearchMarkets(rr, req)
+		newContractHandler(service, nil).SearchMarkets(rr, req)
 
 		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	})
@@ -318,7 +340,7 @@ func TestHandlerGetDetails_NotFoundUsesFailureEnvelope(t *testing.T) {
 	req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/v0/markets/99", nil), map[string]string{"id": "99"})
 	rr := httptest.NewRecorder()
 
-	NewHandler(service, nil).GetDetails(rr, req)
+	newContractHandler(service, nil).GetDetails(rr, req)
 
 	assertFailureEnvelope(t, rr, http.StatusNotFound, handlers.ReasonMarketNotFound)
 }
@@ -333,7 +355,7 @@ func TestHandlerResolveMarket_MapsAuthAndStateFailures(t *testing.T) {
 		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"yes"}`)), map[string]string{"id": "5"})
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, auth).ResolveMarket(rr, req)
+		newContractHandler(service, auth).ResolveMarket(rr, req)
 
 		assertFailureEnvelope(t, rr, http.StatusForbidden, handlers.ReasonPasswordChangeRequired)
 	})
@@ -352,7 +374,7 @@ func TestHandlerResolveMarket_MapsAuthAndStateFailures(t *testing.T) {
 		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"yes"}`)), map[string]string{"id": "5"})
 		rr := httptest.NewRecorder()
 
-		NewHandler(service, auth).ResolveMarket(rr, req)
+		newContractHandler(service, auth).ResolveMarket(rr, req)
 
 		assertFailureEnvelope(t, rr, http.StatusConflict, handlers.ReasonMarketClosed)
 	})
@@ -377,7 +399,7 @@ func TestHandlerProjectProbability_UsesQueryParams(t *testing.T) {
 	)
 	rr := httptest.NewRecorder()
 
-	NewHandler(service, nil).ProjectProbability(rr, req)
+	newContractHandler(service, nil).ProjectProbability(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rr.Code)

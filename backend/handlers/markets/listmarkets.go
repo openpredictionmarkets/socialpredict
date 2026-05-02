@@ -7,6 +7,7 @@ import (
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/logger"
+	"socialpredict/security"
 )
 
 // ListMarketsHandlerFactory creates an HTTP handler for listing markets with service injection
@@ -47,11 +48,11 @@ func parseListMarketsParams(r *http.Request) (listMarketsParams, error) {
 }
 
 func parseListLimit(rawLimit string) int {
-	return parseBoundedInt(rawLimit, 50, 1, 100)
+	return security.ParseBoundedIntParam(rawLimit, 50, 1, 100)
 }
 
 func parseListOffset(rawOffset string) int {
-	return parseBoundedInt(rawOffset, 0, 0, int(^uint(0)>>1))
+	return security.ParseBoundedIntParam(rawOffset, 0, 0, int(^uint(0)>>1))
 }
 
 func fetchMarkets(r *http.Request, svc dmarkets.ServiceInterface, params listMarketsParams) ([]*dmarkets.Market, error) {

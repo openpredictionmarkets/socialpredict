@@ -13,6 +13,7 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/logger"
+	"socialpredict/security"
 
 	"github.com/gorilla/mux"
 )
@@ -33,15 +34,17 @@ type Service interface {
 
 // Handler handles HTTP requests for markets
 type Handler struct {
-	service Service
-	auth    authsvc.Authenticator
+	service         Service
+	auth            authsvc.Authenticator
+	securityService *security.SecurityService
 }
 
 // NewHandler creates a new markets handler
-func NewHandler(service Service, auth authsvc.Authenticator) *Handler {
+func NewHandler(service Service, auth authsvc.Authenticator, securityService *security.SecurityService) *Handler {
 	return &Handler{
-		service: service,
-		auth:    auth,
+		service:         service,
+		auth:            auth,
+		securityService: securityService,
 	}
 }
 
@@ -68,6 +71,17 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 		writeInvalidRequest(w)
 		return
 	}
+
+	if h.securityService == nil || h.securityService.Sanitizer == nil {
+		writeInternalError(w)
+		return
+	}
+	sanitized, sanitizeErr := sanitizeMarketRequest(h.securityService, req)
+	if sanitizeErr != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	req = sanitized
 
 	createReq := dmarkets.MarketCreateRequest{
 		QuestionTitle:      req.QuestionTitle,
@@ -223,6 +237,10 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeMethodNotAllowed(w)
+		return
+	}
+	if h.securityService == nil || h.securityService.Sanitizer == nil {
+		writeInternalError(w)
 		return
 	}
 
@@ -580,7 +598,7 @@ type searchParams struct {
 }
 
 func (h *Handler) parseSearchParams(r *http.Request) (searchParams, error) {
-	params, parseErr := parseSearchRequest(r)
+	params, parseErr := parseSearchRequest(r, h.securityService)
 	if parseErr != nil {
 		return searchParams{}, errors.New(parseErr.message)
 	}

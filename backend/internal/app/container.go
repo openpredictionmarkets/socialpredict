@@ -145,7 +145,7 @@ func (c *Container) InitializeServices() {
 
 // InitializeHandlers sets up all HTTP handlers with their service dependencies
 func (c *Container) InitializeHandlers() {
-	c.marketsHandler = hmarkets.NewHandler(c.marketsService, c.authService)
+	c.marketsHandler = hmarkets.NewHandler(c.marketsService, c.authService, c.securityService)
 }
 
 // Initialize sets up the entire dependency graph
