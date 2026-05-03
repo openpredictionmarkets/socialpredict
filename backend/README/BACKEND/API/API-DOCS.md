@@ -31,6 +31,10 @@ curl http://localhost:8080/ops/status
 curl http://localhost:8080/openapi.yaml
 ```
 
+These routes are available after the backend HTTP server starts listening. The
+current startup path completes migration or verification before the listener is
+opened, so `/ops/status` is not an early startup-progress endpoint yet.
+
 Open `http://localhost:8080/swagger` in a browser to interact with the backend routes.
 
 ### Building Docs using Redoc

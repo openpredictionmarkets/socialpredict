@@ -55,6 +55,11 @@ failure spikes via the monotonic `/ops/status.requestFailuresTotal` counter.
 That counter is process-local and resets when the process restarts, so it is a
 first spike signal rather than a fleet metric.
 
+These HTTP signals are reachable once the backend HTTP server is listening. The
+current startup path completes migration or verification and opens readiness
+before starting the listener, so `/ops/status` does not yet expose early startup
+progress while migrations or startup-owned seeds are still running.
+
 `GET /v0/system/metrics` remains an application reporting route for
 economics/accounting output such as money creation and utilization. It is not
 the operational monitoring surface and should not be treated as a liveness,
