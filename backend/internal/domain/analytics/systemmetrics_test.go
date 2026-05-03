@@ -2,10 +2,13 @@ package analytics
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
+
+	"gorm.io/gorm"
 )
 
 type systemMetricsComputer interface {
@@ -26,6 +29,16 @@ func requireSystemMetrics(t *testing.T, svc systemMetricsComputer) *SystemMetric
 	}
 
 	return metrics
+}
+
+func requireTableCount(t *testing.T, db *gorm.DB, model any) int64 {
+	t.Helper()
+
+	var count int64
+	if err := db.Model(model).Count(&count).Error; err != nil {
+		t.Fatalf("count %T: %v", model, err)
+	}
+	return count
 }
 
 func TestComputeSystemMetrics_EmptyDatabase(t *testing.T) {
@@ -141,5 +154,70 @@ func TestComputeSystemMetrics_UsesInjectedSnapshot(t *testing.T) {
 	}
 	if val := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); val != 5 {
 		t.Fatalf("expected frozen participation fees 5, got %d", val)
+	}
+}
+
+func TestComputeSystemMetrics_ReplayIsDeterministicAndReadOnly(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.MarketIncentives.CreateMarketCost = 25
+	econ.Economics.Betting.BetFees.InitialBetFee = 7
+	econ.Economics.User.MaximumDebtAllowed = 300
+
+	users := []models.User{
+		modelstesting.GenerateUser("alice", 200),
+		modelstesting.GenerateUser("bob", -50),
+	}
+	for i := range users {
+		if err := db.Create(&users[i]).Error; err != nil {
+			t.Fatalf("create user: %v", err)
+		}
+	}
+
+	activeMarket := modelstesting.GenerateMarket(1101, users[0].Username)
+	activeMarket.IsResolved = false
+	if err := db.Create(&activeMarket).Error; err != nil {
+		t.Fatalf("create active market: %v", err)
+	}
+
+	resolvedMarket := modelstesting.GenerateMarket(1102, users[1].Username)
+	resolvedMarket.IsResolved = true
+	if err := db.Create(&resolvedMarket).Error; err != nil {
+		t.Fatalf("create resolved market: %v", err)
+	}
+
+	bets := []models.Bet{
+		modelstesting.GenerateBet(40, "YES", "alice", uint(activeMarket.ID), 0),
+		modelstesting.GenerateBet(15, "NO", "bob", uint(activeMarket.ID), 0),
+		modelstesting.GenerateBet(90, "YES", "alice", uint(resolvedMarket.ID), 0),
+	}
+	for _, bet := range bets {
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("create bet: %v", err)
+		}
+	}
+
+	svc := newAnalyticsService(t, db, econ)
+	beforeCounts := map[string]int64{
+		"users":   requireTableCount(t, db, &models.User{}),
+		"markets": requireTableCount(t, db, &models.Market{}),
+		"bets":    requireTableCount(t, db, &models.Bet{}),
+	}
+
+	first := requireSystemMetrics(t, svc)
+	for i := 0; i < 5; i++ {
+		replayed := requireSystemMetrics(t, svc)
+		if !reflect.DeepEqual(first, replayed) {
+			t.Fatalf("metrics replay %d changed result:\nfirst:  %+v\nreplay: %+v", i+1, first, replayed)
+		}
+	}
+
+	afterCounts := map[string]int64{
+		"users":   requireTableCount(t, db, &models.User{}),
+		"markets": requireTableCount(t, db, &models.Market{}),
+		"bets":    requireTableCount(t, db, &models.Bet{}),
+	}
+	if !reflect.DeepEqual(beforeCounts, afterCounts) {
+		t.Fatalf("metrics replay changed persisted rows: before=%v after=%v", beforeCounts, afterCounts)
 	}
 }
