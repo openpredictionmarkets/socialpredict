@@ -19,18 +19,29 @@ const (
 	FieldDurationMS = "duration_ms"
 	FieldError      = "error"
 	FieldErrorType  = "error_type"
+	FieldEvent      = "event"
 	FieldException  = "exception_recorded"
 	FieldMethod     = "method"
 	FieldOperation  = "operation"
 	FieldPath       = "path"
 	FieldRequestID  = "request_id"
 	FieldSource     = "source"
+	FieldState      = "state"
 	FieldSpanID     = "span_id"
 	FieldStatusCode = "status_code"
 	FieldTraceFlags = "trace_flags"
 	FieldTraceID    = "trace_id"
 
 	redactedValue = "[REDACTED]"
+)
+
+const (
+	EventReadinessClosed        = "readiness.closed"
+	EventReadinessOpen          = "readiness.open"
+	EventRequestFailure         = "request.failure"
+	EventRequestPanic           = "request.panic"
+	EventStartupIncompatibility = "startup.incompatibility"
+	EventStartupMigrationFailed = "startup.migration_failed"
 )
 
 var (
@@ -128,9 +139,19 @@ func ErrorType(value string) Field {
 	return String(FieldErrorType, value)
 }
 
+// Event records the stable operational event name consumed by monitoring.
+func Event(value string) Field {
+	return String(FieldEvent, value)
+}
+
 // ExceptionRecorded marks the single runtime log line that recorded an exception.
 func ExceptionRecorded() Field {
 	return String(FieldException, "true")
+}
+
+// State records the stable runtime state attached to transition events.
+func State(value string) Field {
+	return String(FieldState, value)
 }
 
 // TraceContext adds explicit OpenTelemetry-aligned correlation fields when available.
@@ -281,6 +302,7 @@ func (l *RuntimeLogger) log(skip int, level, component, message string, fields .
 
 	orderedKeys := []string{
 		FieldComponent,
+		FieldEvent,
 		FieldOperation,
 		FieldRequestID,
 		FieldTraceID,
@@ -291,6 +313,7 @@ func (l *RuntimeLogger) log(skip int, level, component, message string, fields .
 		FieldStatusCode,
 		FieldDurationMS,
 		FieldAddress,
+		FieldState,
 		FieldErrorType,
 		FieldException,
 		FieldError,

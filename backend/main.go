@@ -27,12 +27,12 @@ func main() {
 
 	dbCfg, err := appruntime.LoadDBConfigFromEnv()
 	if err != nil {
-		logger.Fatal("startup", "database configuration unavailable", err, logger.Operation("LoadDBConfigFromEnv"))
+		logger.Fatal("startup", "database configuration unavailable", err, startupIncompatibilityFields("LoadDBConfigFromEnv")...)
 	}
 
 	db, err := appruntime.InitDB(dbCfg, appruntime.PostgresFactory{})
 	if err != nil {
-		logger.Fatal("startup", "database initialization failed", err, logger.Operation("InitDB"))
+		logger.Fatal("startup", "database initialization failed", err, startupIncompatibilityFields("InitDB")...)
 	}
 	defer func() {
 		if err := appruntime.CloseDB(db); err != nil {
@@ -42,28 +42,28 @@ func main() {
 
 	const MAX_ATTEMPTS = 20
 	if err := seed.EnsureDBReady(db, MAX_ATTEMPTS); err != nil {
-		logger.Fatal("startup", "database readiness check failed", err, logger.Operation("EnsureDBReady"))
+		logger.Fatal("startup", "database readiness check failed", err, startupIncompatibilityFields("EnsureDBReady")...)
 	}
 
 	configService, err := appruntime.LoadConfigService(setup.EmbeddedSource{})
 	if err != nil {
-		logger.Fatal("startup", "configuration service initialization failed", err, logger.Operation("LoadConfigService"))
+		logger.Fatal("startup", "configuration service initialization failed", err, startupIncompatibilityFields("LoadConfigService")...)
 	}
 
 	securityConfig, err := appruntime.LoadSecurityConfigFromEnv()
 	if err != nil {
-		logger.Fatal("startup", "security configuration unavailable", err, logger.Operation("LoadSecurityConfigFromEnv"))
+		logger.Fatal("startup", "security configuration unavailable", err, startupIncompatibilityFields("LoadSecurityConfigFromEnv")...)
 	}
 	authsvc.ConfigureJWTSigningKey(securityConfig.JWTSigningKey)
 
 	startupMode, err := appruntime.LoadStartupMutationModeFromEnv()
 	if err != nil {
-		logger.Fatal("startup", "startup mutation mode unavailable", err, logger.Operation("LoadStartupMutationModeFromEnv"))
+		logger.Fatal("startup", "startup mutation mode unavailable", err, startupIncompatibilityFields("LoadStartupMutationModeFromEnv")...)
 	}
 
 	shutdownConfig, err := appruntime.LoadShutdownConfigFromEnv()
 	if err != nil {
-		logger.Fatal("startup", "shutdown configuration unavailable", err, logger.Operation("LoadShutdownConfigFromEnv"))
+		logger.Fatal("startup", "shutdown configuration unavailable", err, startupIncompatibilityFields("LoadShutdownConfigFromEnv")...)
 	}
 
 	if startupMode.Writer {
@@ -77,7 +77,10 @@ func main() {
 		seedUsers:    seed.SeedUsers,
 		seedHomepage: seed.SeedHomepage,
 	}); err != nil {
-		logger.Fatal("startup", "startup database mutation check failed", err, logger.Operation("RunStartupMutations"))
+		if startupMode.Writer {
+			logger.Fatal("startup", "startup database migration failed", err, startupMigrationFailureFields("RunStartupMutations")...)
+		}
+		logger.Fatal("startup", "startup database schema incompatible", err, startupIncompatibilityFields("RunStartupMutations")...)
 	}
 
 	readiness.MarkReady()
@@ -87,4 +90,20 @@ func main() {
 
 func secureEndpoint(w http.ResponseWriter, r *http.Request) {
 	// This is a secure endpoint, only accessible if Authenticate middleware passes
+}
+
+func startupIncompatibilityFields(operation string) []logger.Field {
+	return []logger.Field{
+		logger.Event(logger.EventStartupIncompatibility),
+		logger.Operation(operation),
+		logger.ErrorType(logger.EventStartupIncompatibility),
+	}
+}
+
+func startupMigrationFailureFields(operation string) []logger.Field {
+	return []logger.Field{
+		logger.Event(logger.EventStartupMigrationFailed),
+		logger.Operation(operation),
+		logger.ErrorType(logger.EventStartupMigrationFailed),
+	}
 }

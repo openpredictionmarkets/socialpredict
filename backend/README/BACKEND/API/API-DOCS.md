@@ -18,14 +18,22 @@ When running the backend locally (on port 8080 by default), the server exposes:
 
 - `GET /swagger/` – Embedded Swagger UI, preconfigured to load the current OpenAPI spec.
 - `GET /openapi.yaml` – The bundled OpenAPI 3.0.3 specification served directly from the binary.
-- `GET /health` – Plain-text health check that returns `ok` when the backend is up.
+- `GET /health` – Plain-text liveness probe that returns `live` when the backend HTTP process is serving.
+- `GET /readyz` – Plain-text readiness probe that returns `ready` only after startup completes and database availability is confirmed.
+- `GET /ops/status` – Operator-facing JSON status `{ live, ready, requestFailuresTotal }`, separate from `/v0/system/metrics`.
 
 For example:
 
 ```bash
 curl http://localhost:8080/health
+curl http://localhost:8080/readyz
+curl http://localhost:8080/ops/status
 curl http://localhost:8080/openapi.yaml
 ```
+
+These routes are available after the backend HTTP server starts listening. The
+current startup path completes migration or verification before the listener is
+opened, so `/ops/status` is not an early startup-progress endpoint yet.
 
 Open `http://localhost:8080/swagger` in a browser to interact with the backend routes.
 

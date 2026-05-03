@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -117,7 +118,7 @@ func buildTestRouter(t *testing.T, db *gorm.DB) *mux.Router {
 	readiness := appruntime.NewReadiness()
 	readiness.MarkReady()
 
-	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), readiness, testSecurityConfig(t))
+	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), readiness, testSecurityConfig(t), appruntime.NewOperationalMetrics())
 	if err != nil {
 		t.Fatalf("build test router: %v", err)
 	}
@@ -162,6 +163,7 @@ func TestServerRegistersAndServesCoreRoutes(t *testing.T) {
 	}{
 		{"health", "/health", http.StatusOK},
 		{"readyz", "/readyz", http.StatusOK},
+		{"operator status", "/ops/status", http.StatusOK},
 		{"home", "/v0/home", http.StatusOK},
 		{"setup frontend", "/v0/setup/frontend", http.StatusOK},
 		{"markets", "/v0/markets?status=ACTIVE", http.StatusOK},
@@ -428,6 +430,53 @@ func TestReadyzChecksDatabaseAvailabilityAfterReadinessGateOpens(t *testing.T) {
 	}
 	if body := rec.Body.String(); body != "not ready" {
 		t.Fatalf("expected /readyz body not ready when database is unavailable, got %q", body)
+	}
+}
+
+func TestOperationalStatusRouteExportsRuntimeSignalsOnly(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	handler := buildTestHandlerWithConfig(t, db, modelstesting.GenerateEconomicConfig(), readiness)
+
+	req := httptest.NewRequest(http.MethodGet, "/ops/status", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected /ops/status status 503 before readiness, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("expected /ops/status JSON content type, got %q", got)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected /ops/status cache-control no-store, got %q", got)
+	}
+
+	var status operationalStatusResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+		t.Fatalf("decode /ops/status response: %v", err)
+	}
+	if !status.Live || status.Ready || status.RequestFailuresTotal != 0 {
+		t.Fatalf("unexpected unready operational status: %+v", status)
+	}
+	if strings.Contains(rec.Body.String(), "moneyCreated") {
+		t.Fatalf("expected /ops/status to stay separate from business metrics: %s", rec.Body.String())
+	}
+
+	readiness.MarkReady()
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected /ops/status status 200 after readiness, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+		t.Fatalf("decode ready /ops/status response: %v", err)
+	}
+	if !status.Live || !status.Ready {
+		t.Fatalf("unexpected ready operational status: %+v", status)
 	}
 }
 

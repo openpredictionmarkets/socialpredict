@@ -3,9 +3,9 @@ title: Monitoring and Alerting
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record the April 30 liveness/readiness completion while keeping larger monitoring-platform work deferred."
+updated_at: 2026-05-03T14:25:55Z
+updated_at_display: "Sunday, May 3, 2026 at 2:25 PM UTC"
+update_reason: "Clarify WAVE09 proxy publishing, stage testing, and deferred early-startup status visibility."
 status: active
 ---
 
@@ -16,6 +16,14 @@ status: active
 This note was updated on Monday, April 27, 2026 to replace an older Prometheus-and-dashboards-first plan with guidance that matches the live backend and the current design-plan recommendation to harden app-owned signals before adopting a larger monitoring platform.
 
 On Thursday, April 30, 2026, the first app-owned operational signal gap was closed for the serving path: `/health` now reports liveness, `/readyz` reports readiness and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. Broader metrics export, dashboarding, and alerting remain deferred.
+
+On Saturday, May 2, 2026, this note was tightened into an explicit current-state signal inventory. The backend now documents the operator-facing contract for `/health`, `/readyz`, `/ops/status`, startup fatal failures, and shared request-boundary failure responses while keeping `/v0/system/metrics` classified as economics and accounting output.
+
+On Sunday, May 3, 2026, the production nginx template was updated to publish `/ops/status` explicitly at the public host root alongside `/health` and `/readyz`. Early-startup status visibility remains deferred because the current backend starts listening only after startup mutation or verification completes and readiness opens.
+
+The staging verification checklist for this wave lives in [STAGETEST/09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/STAGETEST/09-monitoring-alerting.md).
+
+The WAVE09 stop-and-review point is that the backend can now support a first alert set for backend down, backend unready, fatal startup failure before readiness opens, and severe server-side request-failure spikes. Broader dashboards or external monitoring platforms should not start until the next app-owned signal seam is chosen and landed.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -56,7 +64,7 @@ The current backend already emits some signals, but the operational contract is 
 
 That matters because:
 
-- `/health` and `/readyz` in [server.go](/workspace/socialpredict/backend/server/server.go) now provide the first liveness/readiness contract, but the backend still lacks broader operational metrics
+- `/health`, `/readyz`, and `/ops/status` in [server.go](/workspace/socialpredict/backend/server/server.go) now provide the first liveness/readiness and request-failure counter contract, while broader latency and telemetry export remain deferred
 - logging is still mostly stdlib-wrapped in [simplelogging.go](/workspace/socialpredict/backend/logger/simplelogging.go) and [loggingutils.go](/workspace/socialpredict/backend/logging/loggingutils.go)
 - there is no `/metrics` route or Prometheus client usage in the active backend runtime
 - the existing `/v0/system/metrics` route is an economics and accounting surface, not a runtime availability or latency surface
@@ -74,19 +82,50 @@ The backend already has:
 
 That means the repo is not blank on logging, but it is also not yet at a mature operational-monitoring posture. This note should describe the operational outcome expected from that logging direction rather than duplicate the app-internal logging design.
 
-### Liveness and readiness now exist, but metrics export does not
+### Liveness, readiness, and the first status export now exist
 
-As of April 30, 2026, the backend serves:
+As of May 2, 2026, the backend serves:
 
 - `GET /health`
 - `GET /readyz`
+- `GET /ops/status`
 
 Those routes are intentionally small text responses in [server.go](/workspace/socialpredict/backend/server/server.go):
 
 - `/health` reports liveness as `live`
 - `/readyz` reports readiness as `ready` or `not ready` and checks database availability after the readiness gate opens
+- `/ops/status` reports JSON `{ live, ready, requestFailuresTotal }` and uses `503` while the backend is live but unready
 
-That first operational signal problem was finished on April 30, 2026. The remaining monitoring gap is not basic liveness/readiness; it is operational metrics export, latency/error visibility, and alert-consumption design.
+The current startup order still completes startup mutation or verification and calls `readiness.MarkReady()` before the HTTP server starts listening. That means `/ops/status` is not an early startup progress endpoint in this wave; it becomes reachable once the backend HTTP process is serving and can show unready state during later readiness closure, database readiness failure, or graceful shutdown drain. Starting HTTP earlier while keeping application routes closed is deferred to [FUTURE/08-early-startup-operational-status.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/08-early-startup-operational-status.md).
+
+That first operational signal problem is intentionally narrow. The remaining monitoring gap is not basic liveness/readiness or a first request-failure counter; it is broader latency telemetry, external metrics export, and alert-consumption design.
+
+### Current operator-facing signal inventory
+
+The current backend signal contract is intentionally small:
+
+| Signal | Live backend behavior | Operator meaning | Not a promise of |
+| --- | --- | --- | --- |
+| `GET /health` | `200 text/plain` body `live` while the HTTP process is serving; `503` body `not live` if the serving probe reports not live | Process liveness for restart or black-box availability checks | Database reachability, latency, request success rate, or telemetry pipeline health |
+| `GET /readyz` | `200 text/plain` body `ready` only after the startup readiness gate opens and the primary database ping succeeds; otherwise `503` body `not ready` | Whether the instance should receive traffic | Business health, background job status, or external monitoring-stack health |
+| `GET /ops/status` | `200` or `503 application/json` body `{ live, ready, requestFailuresTotal }`; non-probe 5xx responses increment the process-local request-failure counter | Minimal app-owned status export for backend down/unready and severe request-failure spike alerts | Prometheus format, fleet-wide aggregation, latency histograms, business metrics, or early startup progress before HTTP is listening |
+| Startup fatal failures | Configuration load, DB initialization, DB readiness, security config, startup mutation mode, shutdown config, migration/verification, and seed failures call `logger.Fatal` before `readiness.MarkReady()` | Failed starts stay out of the ready pool and leave a fatal startup log | Automatic remediation, multi-replica coordination, or alert routing |
+| Shared request-boundary failures | Router-owned `405`, security middleware `429`, and recovered unhandled panics use JSON `{ ok: false, reason }` responses with safe runtime reasons | A consistent first failure surface for operators to count from logs/proxy observations | A full error-budget system, Prometheus metric family, or handler-by-handler failure taxonomy |
+
+This inventory reflects the live server wiring in [server.go](/workspace/socialpredict/backend/server/server.go), startup order in [main.go](/workspace/socialpredict/backend/main.go), and runtime failure helpers in [security/failures.go](/workspace/socialpredict/backend/security/failures.go) and [security/requestboundary.go](/workspace/socialpredict/backend/security/requestboundary.go).
+
+### First supported alert set
+
+The current backend can support only this first alert set:
+
+| Alert | App-owned source | Supported interpretation | Current limit |
+| --- | --- | --- | --- |
+| Backend down | `GET /health` black-box failure or non-`200` response | The HTTP process is not serving the liveness contract | Does not distinguish process crash, host/network outage, or proxy routing failure |
+| Backend unready | `GET /readyz` `503` or `/ops/status.ready=false` | The instance should not receive traffic because startup has not opened readiness or the database ping failed | Does not cover business-rule health, background work, or third-party dependencies |
+| Fatal startup failure | Process exits before readiness opens with startup logger events such as `startup.incompatibility` or `startup.migration_failed` | Startup validation, mutation, migration, seed, security, config, or DB setup blocked service readiness | Requires the runtime supervisor or deployment environment to observe process exit and startup logs |
+| Severe request-failure spike | Rising `/ops/status.requestFailuresTotal` for non-probe server-side `5xx` responses | The process is producing server-side failures after it starts serving traffic | Counter is process-local, monotonic until restart, and not yet split by route, reason, latency, or replica |
+
+This is the end of the current wave's alert surface. Operators can wire these checks in their existing environment, but the backend is not yet promising fleet aggregation, dashboard panels, paging policy, latency histograms, or Prometheus-compatible exposition.
 
 ### Business metrics already exist
 
@@ -96,6 +135,8 @@ The backend already exposes economics and accounting metrics through:
 - [analytics/system_metrics.go](/workspace/socialpredict/backend/internal/domain/analytics/system_metrics.go)
 
 Those metrics are useful and should remain documented as business or accounting outputs. They should not be mislabeled as generic operational monitoring.
+
+In particular, `GET /v0/system/metrics` computes economy/accounting values such as money creation and utilization through the application reporting stack. It is not a replacement for `/health`, `/readyz`, request failure counting, latency telemetry, or a future runtime metrics exporter.
 
 ### The repo does not yet ship a monitoring stack
 
@@ -156,12 +197,23 @@ The design-plan-aligned monitoring direction is:
    - backend down
    - backend unready
    - startup incompatibility or migration failure
-   - severe request-failure spikes once the shared failure surface is more consistent
+   - severe request-failure spikes using `/ops/status.requestFailuresTotal`
 5. Defer dashboards and external stack selection until the signal contract is materially stronger.
 
-## Open Questions
+## Remaining Signal Seams
 
-- Which operational metrics should be app-owned versus inferred from reverse-proxy or host-level systems
-- Whether `/health` should later split into root liveness plus a deeper readiness surface
-- What the smallest useful first alert set is once readiness exists
-- Which operational signals belong at the backend layer versus nginx or Traefik
+The remaining gaps should stay narrow and tied to runtime signals the backend can own:
+
+- Add request-boundary latency and duration fields before promising latency dashboards.
+- Decide whether the next app-owned counter should classify failures by route family, stable reason, or status class before adding more counters.
+- Add process identity or start-time metadata if operators need to distinguish counter resets from real recovery.
+- Decide which traffic-volume and edge-failure signals belong in the backend versus nginx or Traefik before moving proxy observations into app docs.
+- Keep `/health` and `/readyz` small unless a concrete readiness dependency needs a documented server-owned check.
+
+These are signal-contract seams, not monitoring-platform backlog buckets.
+
+## End-of-Wave Deferral
+
+WAVE09 stops here. Prometheus exposition, Grafana dashboards, Alertmanager routing, centralized log-platform rollout, paging policy, formal SLOs, and error-budget programs remain deferred to future platform work after the owned runtime signal contract is stronger.
+
+Until then, the backend monitoring contract is the first alert set above plus the logging and trace-correlation direction owned by [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).

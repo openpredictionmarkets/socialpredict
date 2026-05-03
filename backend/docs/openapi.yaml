@@ -31,6 +31,8 @@ tags:
     description: Public and private user profile and financial data.
   - name: Metrics
     description: Platform-wide metrics and leaderboards.
+  - name: Operations
+    description: Minimal operator-facing runtime status outside business metrics.
   - name: Content
     description: CMS-powered homepage content.
 
@@ -69,6 +71,13 @@ x-route-family-migration-matrix:
       failure_contract: text/plain probe body
       migration_state: intentional_infra_transport
       source: backend/server/server.go registerInfraRoutes
+    - family: operator-status
+      paths:
+        - /ops/status
+      success_contract: JSON runtime status `{live,ready,requestFailuresTotal}`
+      failure_contract: same JSON status with HTTP 503 while not ready
+      migration_state: intentional_operator_transport
+      source: backend/server/server.go and internal/app/runtime
     - family: infra-docs
       paths:
         - /openapi.yaml
@@ -236,6 +245,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/PlainTextErrorResponse'
               example: not ready
+
+  /ops/status:
+    get:
+      tags: [Operations]
+      operationId: getOperationalStatus
+      summary: Get backend operational status
+      description: >
+        Minimal operator-facing runtime status export for the first alert set:
+        backend down or unready, fatal startup failure before readiness opens,
+        and severe server-side request-failure spikes. The request-failure count
+        is process-local and resets when the process restarts. This route is
+        outside the `/v0` business namespace and does not expose
+        economy/accounting metrics.
+      responses:
+        '200':
+          description: Backend is live, ready, and serving operator status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalStatus'
+        '503':
+          description: Backend is not live or is not ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalStatus'
 
   /v0/login:
     post:
@@ -2112,8 +2147,12 @@ paths:
     get:
       tags: [Metrics]
       operationId: getSystemMetrics
-      summary: Get system metrics
-      description: Computes money creation/utilization metrics for auditing the economy.
+      summary: Get economy accounting metrics
+      description: >
+        Computes money creation/utilization metrics for auditing the economy.
+        This application reporting route is business/accounting output, not the
+        operational monitoring surface for liveness, readiness, latency, or
+        telemetry export.
       responses:
         '200':
           description: Metrics returned successfully.
@@ -2296,6 +2335,30 @@ components:
         where remaining still-routed failures should move to ReasonResponse and
         unused compatibility entry points should be retired without introducing a
         universal wrapper.
+
+    OperationalStatus:
+      type: object
+      description: >
+        Process-local operator status for liveness/readiness and severe
+        request-failure spike alerts. Counters reset with the process and are
+        not fleet aggregates. This is not the economy/accounting metrics
+        contract exposed by `/v0/system/metrics`.
+      properties:
+        live:
+          type: boolean
+          description: Whether the HTTP process is live.
+          example: true
+        ready:
+          type: boolean
+          description: Whether startup has completed and the database is reachable.
+          example: true
+        requestFailuresTotal:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Monotonic count of non-probe server-side HTTP 5xx responses in this process.
+          example: 0
+      required: [live, ready, requestFailuresTotal]
 
     StatsEnvelopeResponse:
       type: object

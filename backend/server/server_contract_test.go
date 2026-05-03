@@ -272,6 +272,74 @@ func TestSystemMetricsRouteRemainsApplicationReporting(t *testing.T) {
 	}
 }
 
+func TestPublishedOperationalSignalInventory(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	handler := buildTestHandlerWithConfig(t, db, modelstesting.GenerateEconomicConfig(), readiness)
+
+	probes := []struct {
+		name       string
+		path       string
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:       "liveness",
+			path:       "/health",
+			wantStatus: http.StatusOK,
+			wantBody:   "live",
+		},
+		{
+			name:       "readiness before startup completion",
+			path:       "/readyz",
+			wantStatus: http.StatusServiceUnavailable,
+			wantBody:   "not ready",
+		},
+	}
+
+	for _, tt := range probes {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("expected %s status %d, got %d: %s", tt.path, tt.wantStatus, rec.Code, rec.Body.String())
+			}
+			if got := rec.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+				t.Fatalf("expected %s plain-text probe response, got %q", tt.path, got)
+			}
+			if body := rec.Body.String(); body != tt.wantBody {
+				t.Fatalf("expected %s body %q, got %q", tt.path, tt.wantBody, body)
+			}
+		})
+	}
+
+	readiness.MarkReady()
+
+	readyReq := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	readyRec := httptest.NewRecorder()
+	handler.ServeHTTP(readyRec, readyReq)
+
+	if readyRec.Code != http.StatusOK {
+		t.Fatalf("expected /readyz status 200 after startup completion, got %d: %s", readyRec.Code, readyRec.Body.String())
+	}
+	if body := readyRec.Body.String(); body != "ready" {
+		t.Fatalf("expected /readyz body ready after startup completion, got %q", body)
+	}
+
+	methodReq := httptest.NewRequest(http.MethodPost, "/health", nil)
+	methodRec := httptest.NewRecorder()
+	handler.ServeHTTP(methodRec, methodReq)
+
+	if methodRec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected shared method failure status 405, got %d: %s", methodRec.Code, methodRec.Body.String())
+	}
+	assertServerFailureReason(t, methodRec, handlers.ReasonMethodNotAllowed)
+}
+
 func TestReadinessProbePlainTextMigrationState(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
