@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -122,6 +123,122 @@ func TestLoadDBConfigFromEnv(t *testing.T) {
 	}
 	if cfg.MaxOpenConns != 11 || cfg.MaxIdleConns != 3 || cfg.ConnMaxLifetime != 45*time.Minute || cfg.ConnMaxIdleTime != 90*time.Second {
 		t.Fatalf("unexpected pool config: %+v", cfg)
+	}
+}
+
+func TestLoadDBConfigFromEnvDefaultPoolConfig(t *testing.T) {
+	t.Setenv("DB_HOST", "dbhost")
+	t.Setenv("POSTGRES_USER", "pguser")
+	t.Setenv("POSTGRES_DATABASE", "pgdb")
+
+	cfg, err := LoadDBConfigFromEnv()
+	if err != nil {
+		t.Fatalf("LoadDBConfigFromEnv returned error: %v", err)
+	}
+
+	pool := EffectiveDBPoolConfig(cfg)
+	if pool.MaxOpenConns != defaultDBMaxOpenConns {
+		t.Fatalf("expected default max open conns 25, got %d", pool.MaxOpenConns)
+	}
+	if pool.MaxIdleConns != defaultDBMaxIdleConns {
+		t.Fatalf("expected default max idle conns 5, got %d", pool.MaxIdleConns)
+	}
+	if pool.ConnMaxLifetime != defaultDBConnMaxLifetime {
+		t.Fatalf("expected default conn max lifetime 30m, got %s", pool.ConnMaxLifetime)
+	}
+	if pool.ConnMaxIdleTime != defaultDBConnMaxIdleTime {
+		t.Fatalf("expected default conn max idle time 5m, got %s", pool.ConnMaxIdleTime)
+	}
+}
+
+func TestLoadDBConfigFromEnvUsesDefaultPoolConfigForInvalidValues(t *testing.T) {
+	t.Setenv("DB_HOST", "dbhost")
+	t.Setenv("POSTGRES_USER", "pguser")
+	t.Setenv("POSTGRES_DATABASE", "pgdb")
+	t.Setenv("DB_MAX_OPEN_CONNS", "not-an-int")
+	t.Setenv("DB_MAX_IDLE_CONNS", "invalid")
+	t.Setenv("DB_CONN_MAX_LIFETIME", "forever")
+	t.Setenv("DB_CONN_MAX_IDLE_TIME", "eventually")
+
+	cfg, err := LoadDBConfigFromEnv()
+	if err != nil {
+		t.Fatalf("LoadDBConfigFromEnv returned error: %v", err)
+	}
+
+	pool := EffectiveDBPoolConfig(cfg)
+	if pool.MaxOpenConns != defaultDBMaxOpenConns ||
+		pool.MaxIdleConns != defaultDBMaxIdleConns ||
+		pool.ConnMaxLifetime != defaultDBConnMaxLifetime ||
+		pool.ConnMaxIdleTime != defaultDBConnMaxIdleTime {
+		t.Fatalf("expected invalid pool env values to fall back to defaults, got %+v", pool)
+	}
+}
+
+func TestEffectiveDBPoolConfigNormalizesNegativeValues(t *testing.T) {
+	pool := EffectiveDBPoolConfig(DBConfig{
+		MaxOpenConns:    -1,
+		MaxIdleConns:    -2,
+		ConnMaxLifetime: -time.Second,
+		ConnMaxIdleTime: -time.Minute,
+	})
+
+	if pool.MaxOpenConns != 0 || pool.MaxIdleConns != 0 || pool.ConnMaxLifetime != 0 || pool.ConnMaxIdleTime != 0 {
+		t.Fatalf("expected negative pool values to normalize to zero, got %+v", pool)
+	}
+}
+
+func TestEffectiveDBPoolConfigCapsIdleConnectionsAtMaxOpen(t *testing.T) {
+	pool := EffectiveDBPoolConfig(DBConfig{
+		MaxOpenConns: 2,
+		MaxIdleConns: 5,
+	})
+
+	if pool.MaxIdleConns != 2 {
+		t.Fatalf("expected idle conns to be capped at max open conns, got %+v", pool)
+	}
+}
+
+func TestSnapshotDBPoolReportsConfiguredPoolPosture(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	if err := ConfigureDBPool(db, DBConfig{
+		MaxOpenConns: 3,
+		MaxIdleConns: 1,
+	}); err != nil {
+		t.Fatalf("ConfigureDBPool returned error: %v", err)
+	}
+
+	snapshot := SnapshotDBPool(db)
+	if snapshot.MaxOpenConnections != 3 {
+		t.Fatalf("expected max open connections 3, got %+v", snapshot)
+	}
+	if snapshot.OpenConnections < snapshot.InUseConnections {
+		t.Fatalf("expected open connections to cover in-use connections, got %+v", snapshot)
+	}
+}
+
+func TestDBPoolSnapshotFromSQLStatsIncludesSaturationAndWaitLatency(t *testing.T) {
+	snapshot := DBPoolSnapshotFromSQLStats(sql.DBStats{
+		MaxOpenConnections: 2,
+		OpenConnections:    2,
+		InUse:              2,
+		Idle:               0,
+		WaitCount:          4,
+		WaitDuration:       7 * time.Millisecond,
+		MaxIdleClosed:      3,
+		MaxLifetimeClosed:  1,
+	})
+
+	if snapshot.MaxOpenConnections != 2 ||
+		snapshot.OpenConnections != 2 ||
+		snapshot.InUseConnections != 2 ||
+		snapshot.IdleConnections != 0 {
+		t.Fatalf("expected pool saturation fields to map from sql stats, got %+v", snapshot)
+	}
+	if snapshot.WaitCount != 4 || snapshot.WaitDurationNanoseconds != (7*time.Millisecond).Nanoseconds() {
+		t.Fatalf("expected pool wait latency fields to map from sql stats, got %+v", snapshot)
+	}
+	if snapshot.MaxIdleClosedConnections != 3 || snapshot.MaxLifetimeClosedConnections != 1 {
+		t.Fatalf("expected pool close counters to map from sql stats, got %+v", snapshot)
 	}
 }
 

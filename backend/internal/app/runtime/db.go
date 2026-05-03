@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -13,11 +14,20 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+
+	"socialpredict/logger"
 )
 
 var (
 	db   *gorm.DB
 	dbMu sync.RWMutex
+)
+
+const (
+	defaultDBMaxOpenConns    = 25
+	defaultDBMaxIdleConns    = 5
+	defaultDBConnMaxLifetime = 30 * time.Minute
+	defaultDBConnMaxIdleTime = 5 * time.Minute
 )
 
 // DBConfig holds the normalized database configuration.
@@ -35,6 +45,26 @@ type DBConfig struct {
 	ConnMaxLifetime time.Duration
 	ConnMaxIdleTime time.Duration
 	RequireTLS      bool
+}
+
+// DBPoolConfig is the effective runtime-owned sql.DB pool and lifecycle posture.
+type DBPoolConfig struct {
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
+}
+
+// DBPoolSnapshot is a point-in-time view of the runtime SQL connection pool.
+type DBPoolSnapshot struct {
+	MaxOpenConnections           int   `json:"maxOpenConnections"`
+	OpenConnections              int   `json:"openConnections"`
+	InUseConnections             int   `json:"inUseConnections"`
+	IdleConnections              int   `json:"idleConnections"`
+	WaitCount                    int64 `json:"waitCount"`
+	WaitDurationNanoseconds      int64 `json:"waitDurationNanoseconds"`
+	MaxIdleClosedConnections     int64 `json:"maxIdleClosedConnections"`
+	MaxLifetimeClosedConnections int64 `json:"maxLifetimeClosedConnections"`
 }
 
 // DBFactory provides a hook to open a database using a given configuration.
@@ -57,10 +87,10 @@ func LoadDBConfigFromEnv() (DBConfig, error) {
 		Port:            firstNonEmpty(os.Getenv("POSTGRES_PORT"), os.Getenv("DB_PORT"), "5432"),
 		SSLMode:         firstNonEmpty(os.Getenv("DB_SSLMODE"), os.Getenv("POSTGRES_SSLMODE"), os.Getenv("PGSSLMODE"), "disable"),
 		TimeZone:        firstNonEmpty(os.Getenv("DB_TIMEZONE"), os.Getenv("PGTZ"), "UTC"),
-		MaxOpenConns:    intFromEnv(25, "DB_MAX_OPEN_CONNS", "POSTGRES_MAX_OPEN_CONNS"),
-		MaxIdleConns:    intFromEnv(5, "DB_MAX_IDLE_CONNS", "POSTGRES_MAX_IDLE_CONNS"),
-		ConnMaxLifetime: durationFromEnv(30*time.Minute, "DB_CONN_MAX_LIFETIME", "POSTGRES_CONN_MAX_LIFETIME"),
-		ConnMaxIdleTime: durationFromEnv(5*time.Minute, "DB_CONN_MAX_IDLE_TIME", "POSTGRES_CONN_MAX_IDLE_TIME"),
+		MaxOpenConns:    intFromEnv(defaultDBMaxOpenConns, "DB_MAX_OPEN_CONNS", "POSTGRES_MAX_OPEN_CONNS"),
+		MaxIdleConns:    intFromEnv(defaultDBMaxIdleConns, "DB_MAX_IDLE_CONNS", "POSTGRES_MAX_IDLE_CONNS"),
+		ConnMaxLifetime: durationFromEnv(defaultDBConnMaxLifetime, "DB_CONN_MAX_LIFETIME", "POSTGRES_CONN_MAX_LIFETIME"),
+		ConnMaxIdleTime: durationFromEnv(defaultDBConnMaxIdleTime, "DB_CONN_MAX_IDLE_TIME", "POSTGRES_CONN_MAX_IDLE_TIME"),
 		RequireTLS:      boolFromEnv(isProductionRuntime(), "DB_REQUIRE_TLS", "POSTGRES_REQUIRE_TLS"),
 	}
 
@@ -163,7 +193,41 @@ func InitDB(cfg DBConfig, factory DBFactory) (*gorm.DB, error) {
 	if err := ConfigureDBPool(conn, cfg); err != nil {
 		return nil, fmt.Errorf("configure db pool: %w", err)
 	}
+	LogDBPoolConfig(cfg)
 	return conn, nil
+}
+
+// EffectiveDBPoolConfig returns the sanitized sql.DB pool posture applied at runtime.
+func EffectiveDBPoolConfig(cfg DBConfig) DBPoolConfig {
+	maxOpenConns := normalizeNonNegative(cfg.MaxOpenConns)
+	maxIdleConns := normalizeNonNegative(cfg.MaxIdleConns)
+	if maxOpenConns > 0 && maxIdleConns > maxOpenConns {
+		maxIdleConns = maxOpenConns
+	}
+
+	return DBPoolConfig{
+		MaxOpenConns:    maxOpenConns,
+		MaxIdleConns:    maxIdleConns,
+		ConnMaxLifetime: normalizeNonNegativeDuration(cfg.ConnMaxLifetime),
+		ConnMaxIdleTime: normalizeNonNegativeDuration(cfg.ConnMaxIdleTime),
+	}
+}
+
+// LogDBPoolConfig emits the effective sql.DB pool posture without DSNs or secrets.
+func LogDBPoolConfig(cfg DBConfig) {
+	pool := EffectiveDBPoolConfig(cfg)
+	logger.Info(
+		"startup",
+		"database pool configured",
+		logger.Event(logger.EventDBPoolConfigured),
+		logger.Operation("ConfigureDBPool"),
+		logger.String("db_max_open_conns", strconv.Itoa(pool.MaxOpenConns)),
+		logger.String("db_max_idle_conns", strconv.Itoa(pool.MaxIdleConns)),
+		logger.String("db_conn_max_lifetime", pool.ConnMaxLifetime.String()),
+		logger.String("db_conn_max_idle_time", pool.ConnMaxIdleTime.String()),
+		logger.String("db_sslmode", strings.ToLower(strings.TrimSpace(firstNonEmpty(cfg.SSLMode, "disable")))),
+		logger.String("db_require_tls", strconv.FormatBool(cfg.RequireTLS)),
+	)
 }
 
 // ConfigureDBPool applies runtime-owned connection pool and lifetime policy.
@@ -177,11 +241,39 @@ func ConfigureDBPool(db *gorm.DB, cfg DBConfig) error {
 		return fmt.Errorf("sql db handle unavailable: %w", err)
 	}
 
-	sqlDB.SetMaxOpenConns(normalizeNonNegative(cfg.MaxOpenConns))
-	sqlDB.SetMaxIdleConns(normalizeNonNegative(cfg.MaxIdleConns))
-	sqlDB.SetConnMaxLifetime(normalizeNonNegativeDuration(cfg.ConnMaxLifetime))
-	sqlDB.SetConnMaxIdleTime(normalizeNonNegativeDuration(cfg.ConnMaxIdleTime))
+	pool := EffectiveDBPoolConfig(cfg)
+	sqlDB.SetMaxOpenConns(pool.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(pool.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(pool.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(pool.ConnMaxIdleTime)
 	return nil
+}
+
+// SnapshotDBPool returns SQL pool counters used by operator status reporting.
+func SnapshotDBPool(db *gorm.DB) DBPoolSnapshot {
+	if db == nil {
+		return DBPoolSnapshot{}
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return DBPoolSnapshot{}
+	}
+
+	return DBPoolSnapshotFromSQLStats(sqlDB.Stats())
+}
+
+func DBPoolSnapshotFromSQLStats(stats sql.DBStats) DBPoolSnapshot {
+	return DBPoolSnapshot{
+		MaxOpenConnections:           stats.MaxOpenConnections,
+		OpenConnections:              stats.OpenConnections,
+		InUseConnections:             stats.InUse,
+		IdleConnections:              stats.Idle,
+		WaitCount:                    stats.WaitCount,
+		WaitDurationNanoseconds:      stats.WaitDuration.Nanoseconds(),
+		MaxIdleClosedConnections:     stats.MaxIdleClosed,
+		MaxLifetimeClosedConnections: stats.MaxLifetimeClosed,
+	}
 }
 
 // CheckDBReadiness verifies that the backing SQL connection is reachable for request handling.

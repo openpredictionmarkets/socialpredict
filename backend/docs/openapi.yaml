@@ -94,7 +94,7 @@ x-route-family-migration-matrix:
     - family: operator-status
       paths:
         - /ops/status
-      success_contract: JSON runtime status `{live,ready,requestFailuresTotal}`
+      success_contract: JSON runtime status `{live,ready,requestFailuresTotal,dbPool}`
       failure_contract: same JSON status with HTTP 503 while not ready
       migration_state: intentional_operator_transport
       source: backend/server/server.go and internal/app/runtime
@@ -278,10 +278,11 @@ paths:
       description: >
         Minimal operator-facing runtime status export for the first alert set:
         backend down or unready, fatal startup failure before readiness opens,
-        and severe server-side request-failure spikes. The request-failure count
-        is process-local and resets when the process restarts. This route is
-        outside the `/v0` business namespace and does not expose
-        economy/accounting metrics.
+        severe server-side request-failure spikes, and database connection pool
+        saturation or wait-latency signals affected by pool tuning. The
+        request-failure count and pool snapshot are process-local and reset when
+        the process restarts. This route is outside the `/v0` business namespace
+        and does not expose economy/accounting metrics.
       responses:
         '200':
           description: Backend is live, ready, and serving operator status.
@@ -2386,7 +2387,70 @@ components:
           minimum: 0
           description: Monotonic count of non-probe server-side HTTP 5xx responses in this process.
           example: 0
-      required: [live, ready, requestFailuresTotal]
+        dbPool:
+          $ref: '#/components/schemas/DBPoolSnapshot'
+      required: [live, ready, requestFailuresTotal, dbPool]
+
+    DBPoolSnapshot:
+      type: object
+      description: >
+        Process-local SQL connection pool snapshot from the runtime-owned DB
+        handle. Wait count and wait duration expose contention dimensions that
+        can move when max-open, max-idle, or lifetime tuning changes.
+      properties:
+        maxOpenConnections:
+          type: integer
+          minimum: 0
+          description: Configured maximum open SQL connections; zero means unlimited.
+          example: 25
+        openConnections:
+          type: integer
+          minimum: 0
+          description: Current established SQL connections, including in-use and idle connections.
+          example: 6
+        inUseConnections:
+          type: integer
+          minimum: 0
+          description: Current SQL connections checked out by requests or background work.
+          example: 4
+        idleConnections:
+          type: integer
+          minimum: 0
+          description: Current idle SQL connections retained in the pool.
+          example: 2
+        waitCount:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total waits for a SQL connection because the pool was saturated.
+          example: 0
+        waitDurationNanoseconds:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total time spent waiting for SQL connections because the pool was saturated.
+          example: 0
+        maxIdleClosedConnections:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total SQL connections closed because the idle limit was exceeded.
+          example: 0
+        maxLifetimeClosedConnections:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total SQL connections closed because their maximum lifetime elapsed.
+          example: 0
+      required:
+        - maxOpenConnections
+        - openConnections
+        - inUseConnections
+        - idleConnections
+        - waitCount
+        - waitDurationNanoseconds
+        - maxIdleClosedConnections
+        - maxLifetimeClosedConnections
 
     StatsEnvelopeResponse:
       type: object

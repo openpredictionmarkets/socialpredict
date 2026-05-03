@@ -439,6 +439,9 @@ func TestOperationalStatusRouteExportsRuntimeSignalsOnly(t *testing.T) {
 	if !status.Live || status.Ready || status.RequestFailuresTotal != 0 {
 		t.Fatalf("unexpected unready operational status: %+v", status)
 	}
+	if status.DBPool.MaxOpenConnections < 0 || status.DBPool.WaitDurationNanoseconds < 0 {
+		t.Fatalf("expected non-negative DB pool status fields: %+v", status.DBPool)
+	}
 	if strings.Contains(rec.Body.String(), "moneyCreated") {
 		t.Fatalf("expected /ops/status to stay separate from business metrics: %s", rec.Body.String())
 	}
@@ -455,6 +458,9 @@ func TestOperationalStatusRouteExportsRuntimeSignalsOnly(t *testing.T) {
 	}
 	if !status.Live || !status.Ready {
 		t.Fatalf("unexpected ready operational status: %+v", status)
+	}
+	if status.DBPool.OpenConnections < status.DBPool.InUseConnections {
+		t.Fatalf("expected DB pool status to expose coherent connection counts: %+v", status.DBPool)
 	}
 }
 

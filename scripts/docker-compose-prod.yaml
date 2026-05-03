@@ -24,6 +24,10 @@ services:
       STARTUP_WRITER: "true"
       BACKEND_READINESS_DRAIN_SECONDS: "5"
       BACKEND_SHUTDOWN_TIMEOUT_SECONDS: "10"
+      DB_MAX_OPEN_CONNS: "${DB_MAX_OPEN_CONNS:-25}"
+      DB_MAX_IDLE_CONNS: "${DB_MAX_IDLE_CONNS:-5}"
+      DB_CONN_MAX_LIFETIME: "${DB_CONN_MAX_LIFETIME:-30m}"
+      DB_CONN_MAX_IDLE_TIME: "${DB_CONN_MAX_IDLE_TIME:-5m}"
     networks:
       - socialpredict_internal_network
     env_file:
@@ -45,6 +49,10 @@ services:
       STARTUP_WRITER: "false"
       BACKEND_READINESS_DRAIN_SECONDS: "5"
       BACKEND_SHUTDOWN_TIMEOUT_SECONDS: "10"
+      DB_MAX_OPEN_CONNS: "${DB_MAX_OPEN_CONNS:-25}"
+      DB_MAX_IDLE_CONNS: "${DB_MAX_IDLE_CONNS:-5}"
+      DB_CONN_MAX_LIFETIME: "${DB_CONN_MAX_LIFETIME:-30m}"
+      DB_CONN_MAX_IDLE_TIME: "${DB_CONN_MAX_IDLE_TIME:-5m}"
     networks:
       - socialpredict_internal_network
     env_file:
