@@ -15,16 +15,49 @@ services:
     env_file:
       - ../.env
 
-  backend:
-    container_name: "${BACKEND_CONTAINER_NAME}"
+  backend-startup-writer:
+    container_name: "${BACKEND_CONTAINER_NAME}-startup-writer"
     image: "${BACKEND_IMAGE_NAME}"
     restart: unless-stopped
+    stop_grace_period: 20s
+    environment:
+      STARTUP_WRITER: "true"
+      BACKEND_READINESS_DRAIN_SECONDS: "5"
+      BACKEND_SHUTDOWN_TIMEOUT_SECONDS: "10"
     networks:
       - socialpredict_internal_network
     env_file:
       - ../.env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - \"http://127.0.0.1:$${BACKEND_PORT:-8080}/readyz\" | grep -qx ready"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
     depends_on:
       - db
+
+  backend:
+    image: "${BACKEND_IMAGE_NAME}"
+    restart: unless-stopped
+    stop_grace_period: 20s
+    environment:
+      STARTUP_WRITER: "false"
+      BACKEND_READINESS_DRAIN_SECONDS: "5"
+      BACKEND_SHUTDOWN_TIMEOUT_SECONDS: "10"
+    networks:
+      - socialpredict_internal_network
+    env_file:
+      - ../.env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - \"http://127.0.0.1:$${BACKEND_PORT:-8080}/readyz\" | grep -qx ready"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+    depends_on:
+      backend-startup-writer:
+        condition: service_healthy
 
   frontend:
     container_name: "${FRONTEND_CONTAINER_NAME}"
@@ -35,7 +68,8 @@ services:
     env_file:
       - ../.env
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   webserver:
     container_name: "${NGINX_CONTAINER_NAME}"
@@ -52,8 +86,10 @@ services:
     env_file:
       - ../.env
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.social-predict.rule=Host(`${DOMAIN}`)"

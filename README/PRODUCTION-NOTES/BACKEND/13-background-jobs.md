@@ -3,9 +3,9 @@ title: Background Jobs
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Recast the older job-platform plan as a lower-priority starter draft that explicitly defers background-job infrastructure until runtime correctness, observability, and idempotency posture are stronger."
+updated_at: 2026-05-01T11:50:49Z
+updated_at_display: "Friday, May 01, 2026 at 11:50 AM UTC"
+update_reason: "Refresh the deferred jobs draft against landed readiness and startup-writer seams on upstream main at 051aac6."
 status: draft
 ---
 
@@ -24,6 +24,8 @@ The current posture is explicit:
 - operational visibility comes before retry-heavy worker systems
 - money-moving flows should not be pushed into background jobs to compensate for weak transaction boundaries
 
+This draft was refreshed on Friday, May 01, 2026 against upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`. The backend now has liveness and readiness probes, explicit startup-writer gating, and better request-boundary failure handling, but it still has no worker topology, no idempotency model, and no retry or outbox ownership.
+
 ## Executive Direction
 
 If SocialPredict later introduces background-job infrastructure, it should do so as a narrow support system for explicitly idempotent, non-request-critical work.
@@ -40,14 +42,24 @@ That means:
 
 The live backend still has more urgent concerns:
 
-- startup ownership is still too broad in [main.go](/workspace/socialpredict/backend/main.go)
-- readiness and liveness semantics are still too weak in [server.go](/workspace/socialpredict/backend/server/server.go)
-- atomic accounting-sensitive workflow boundaries still need more explicit hardening
-- the runtime does not yet expose the operational signals that a safe worker or retry system would require
+- the serving runtime baseline is stronger than the older draft assumed, but deployment still runs one HTTP-serving shape with no worker role
+- atomic accounting-sensitive workflow boundaries still need more explicit hardening outside the place-bet path
+- the runtime still lacks worker-specific signals such as lag, replay, retry, or dead-letter visibility
+- no queue, outbox, scheduler, or worker ownership model exists yet in the codebase
 
 Adding queues or workers before those concerns are stronger would add a new failure domain before the current system is fully ready to support it.
 
 ## Current Code Snapshot
+
+### Runtime prerequisites are stronger, but still not worker-ready
+
+The backend now has:
+
+- `STARTUP_WRITER` mode in [runtime/startup_mutation.go](/workspace/socialpredict/backend/internal/app/runtime/startup_mutation.go)
+- startup mutation and verification behavior in [startup_mutation.go](/workspace/socialpredict/backend/startup_mutation.go)
+- liveness and readiness probes in [server.go](/workspace/socialpredict/backend/server/server.go)
+
+That is useful baseline infrastructure, but it is still serving-process infrastructure. It does not define a queue contract, worker lifecycle, retry semantics, or async ownership model.
 
 ### There is no live background-job subsystem in the backend
 
@@ -70,6 +82,8 @@ Important flows currently execute inline through request and domain paths, inclu
 - market resolution flows
 
 That is important because it means correctness and failure semantics are still concentrated in the request path rather than hidden behind async infrastructure.
+
+The place-bet path now has stronger transaction behavior, but that still does not justify moving money-sensitive workflows behind background retries or workers.
 
 ### Deploy and workflow topology assumes one backend runtime shape
 
@@ -105,11 +119,12 @@ The following should not be early background-job targets:
 
 Before the backend should prioritize background-job infrastructure, it should first have:
 
-- clearer runtime startup and shutdown ownership
-- stronger readiness and monitoring posture
+- an operationally enforced startup and shutdown contract for more than one runtime role
+- stronger readiness and monitoring posture for worker-specific failures
 - explicit idempotency rules for candidate async tasks
 - a clear retry and dead-letter policy
 - visibility into failure, replay, and lag behavior
+- at least one candidate task that is valuable, decouplable, and clearly non-financial
 
 ## Relationship To Other Notes
 

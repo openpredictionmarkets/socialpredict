@@ -14,4 +14,6 @@ RUN chown app:app /usr/local/bin/server
 USER app
 ENV BACKEND_PORT=8080
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+	CMD wget -q -O - "http://127.0.0.1:${BACKEND_PORT:-8080}/health" | grep -qx live
 ENTRYPOINT ["/usr/local/bin/server"]

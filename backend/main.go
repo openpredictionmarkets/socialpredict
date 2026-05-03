@@ -61,6 +61,11 @@ func main() {
 		logger.Fatal("startup", "startup mutation mode unavailable", err, logger.Operation("LoadStartupMutationModeFromEnv"))
 	}
 
+	shutdownConfig, err := appruntime.LoadShutdownConfigFromEnv()
+	if err != nil {
+		logger.Fatal("startup", "shutdown configuration unavailable", err, logger.Operation("LoadShutdownConfigFromEnv"))
+	}
+
 	if startupMode.Writer {
 		logger.Info("startup", "startup writer enabled for database migrations and seeds", logger.Operation("StartupMutationMode"))
 	} else {
@@ -77,7 +82,7 @@ func main() {
 
 	readiness.MarkReady()
 
-	server.Start(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
+	server.Start(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig, shutdownConfig)
 }
 
 func secureEndpoint(w http.ResponseWriter, r *http.Request) {

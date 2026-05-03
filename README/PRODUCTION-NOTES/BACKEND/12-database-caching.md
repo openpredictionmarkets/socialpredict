@@ -3,9 +3,9 @@ title: Database Caching
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-26T04:03:07Z
-updated_at_display: "Sunday, April 26, 2026 at 4:03 AM UTC"
-update_reason: "Create a lower-priority starter draft that explicitly defers caching until runtime DB ownership and correctness are stronger."
+updated_at: 2026-05-01T11:50:49Z
+updated_at_display: "Friday, May 01, 2026 at 11:50 AM UTC"
+update_reason: "Refresh the deferred caching draft against runtime DB ownership, readiness, and startup-writer seams landed on upstream main at 051aac6."
 status: draft
 ---
 
@@ -24,6 +24,8 @@ The current posture is explicit:
 - accounting-sensitive transaction correctness comes before caching
 - caching is not a prerequisite for rewriting the current database-layer note
 
+This draft was refreshed on Friday, May 01, 2026 against upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`. Runtime DB config, pool and lifetime policy, readiness checks, and startup-writer gating are now code reality. Caching remains deferred because those seams still need operational follow-through, broader transaction coverage, and evidence of real read hotspots.
+
 ## Executive Direction
 
 If SocialPredict later introduces caching, it should do so as a supporting optimization layer rather than as a replacement for the system of record.
@@ -31,7 +33,7 @@ If SocialPredict later introduces caching, it should do so as a supporting optim
 That means:
 
 1. Postgres remains the authoritative system of record for balances, bets, markets, and resolutions
-2. Caching is introduced only after DB ownership, startup safety, and accounting-sensitive correctness are explicit
+2. Caching is introduced only after DB ownership, readiness, and startup-writer seams are operationally trusted, and after accounting-sensitive correctness is explicit beyond the place-bet path
 3. Redis, if introduced, should be treated as a supporting runtime system for selected concerns rather than as a financial source of truth
 4. Cache policy should be selective and use-case-specific, not a blanket "cache everything" rule
 
@@ -39,13 +41,47 @@ That means:
 
 The live backend still has more urgent problems:
 
-- startup ownership is too broad
-- migration safety is too permissive
-- readiness semantics are too weak
-- some request-boundary DB access still bypasses consistent ownership
-- accounting-sensitive transaction boundaries still need clearer architecture
+- runtime DB ownership, readiness probes, and startup-writer gating now exist, but deployment still needs to enforce them intentionally
+- some persistence-placement and legacy compatibility seams still need cleanup before a cache should obscure them further
+- accounting-sensitive transaction and concurrency policy still needs broader coverage outside the place-bet path
+- the runtime still lacks the hotspot evidence and operational metrics that would justify a first cache target
 
-Adding caching before those concerns are stabilized would risk making an incorrect or operationally unsafe system faster instead of making it safer.
+Adding caching before those concerns are settled would risk making an incorrect or operationally unclear system faster instead of making it safer.
+
+## Current Code Snapshot
+
+### Runtime DB ownership is now explicit
+
+The backend already owns runtime DB configuration in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go), including:
+
+- DSN normalization
+- TLS and `sslmode` posture validation
+- pool sizing and connection lifetime settings
+- readiness ping behavior
+- shutdown of the underlying `sql.DB`
+
+That is important because caching should no longer be justified as a substitute for missing DB runtime ownership. That ownership already exists.
+
+### Startup-writer and readiness behavior are now part of the baseline
+
+The backend now has:
+
+- `STARTUP_WRITER` mode in [runtime/startup_mutation.go](/workspace/socialpredict/backend/internal/app/runtime/startup_mutation.go)
+- startup mutation and verification behavior in [startup_mutation.go](/workspace/socialpredict/backend/startup_mutation.go)
+- liveness and readiness probes in [server.go](/workspace/socialpredict/backend/server/server.go)
+
+Those changes reduce one class of uncertainty, but they do not make caching current. They mean caching should wait until deployment actually uses those runtime seams intentionally.
+
+### There is still no live cache runtime
+
+The active backend does not currently have:
+
+- a Redis service in the production compose topology
+- a backend cache package or cache-aside abstraction
+- cache invalidation ownership in handlers, domain services, or repositories
+- a metrics surface for cache hit, miss, or staleness behavior
+
+That means the note should stay explicit that caching is still a future optimization layer, not current backend reality.
 
 ## What Redis Is And Is Not
 
@@ -101,11 +137,12 @@ These concerns should remain separate:
 
 Before the backend should prioritize caching, it should first have:
 
-- clearer runtime DB ownership
-- stronger startup-writer semantics
-- stronger readiness versus liveness behavior
+- operationally verified runtime DB ownership
+- an enforced startup-writer deployment posture
+- proven readiness and liveness consumption in deployment health policy
 - clearer atomic boundaries for accounting-sensitive writes
 - basic performance evidence showing where real read hotspots exist
+- clear invalidation ownership for whichever first read path gets cached
 
 ## Open Questions For Later
 
@@ -119,5 +156,5 @@ Before the backend should prioritize caching, it should first have:
 
 - Do not treat caching as a substitute for transaction correctness
 - Do not treat Redis as the source of truth for balances or bets
-- Do not add caching before the runtime/bootstrap DB seam is clearer
+- Do not add caching before the runtime/bootstrap DB seam is operationally proven
 - Do not hide weak ownership or weak atomicity behind a cache

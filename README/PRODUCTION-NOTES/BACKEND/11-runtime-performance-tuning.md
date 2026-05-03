@@ -3,9 +3,9 @@ title: Runtime Performance Tuning
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record the April 30 runtime readiness completion and keep remaining performance work evidence-driven."
+updated_at: 2026-05-01T11:50:49Z
+updated_at_display: "Friday, May 01, 2026 at 11:50 AM UTC"
+update_reason: "Refresh the performance note against runtime DB pool ownership landed on upstream main at 051aac6."
 status: active
 ---
 
@@ -15,7 +15,7 @@ status: active
 
 This note was updated on Monday, April 27, 2026 to replace an older performance-platform plan with guidance that matches the live backend, the current design-plan posture, and the three-agent recommendation to treat optimization as later than runtime correctness and observability.
 
-On Thursday, April 30, 2026, the earlier runtime-readiness blocker called out by this note was finished for the serving path: `/health` now has liveness semantics, `/readyz` checks the readiness gate and database availability, and black-box Docker checks confirmed both endpoints on `http://localhost:8080`. That completion does not make broad optimization work current; it narrows the active performance note back to DB pool lifecycle tuning and measured bottlenecks.
+On Thursday, April 30, 2026, the earlier runtime-readiness blocker called out by this note was finished for the serving path: `/health` now has liveness semantics, `/readyz` checks the readiness gate and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. As of upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`, runtime DB ownership also includes explicit `sql.DB` pool and lifetime knobs. That completion does not make broad optimization work current; it narrows the active performance note to tuning the now-landed pool lifecycle controls and measuring real bottlenecks.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ SocialPredict should treat runtime performance tuning as measured hardening of t
 The active direction is:
 
 1. Keep correctness, startup discipline, readiness, and observability ahead of speed work.
-2. Treat runtime DB ownership and `sql.DB` pool or connection-lifecycle tuning as the only clearly near-term performance concern in this note.
+2. Treat the runtime DB seam's existing `sql.DB` pool and connection-lifecycle knobs as the main near-term performance lever in this note, and tune them only against measured bottlenecks.
 3. Make query and index changes only when a real hotspot is visible, and keep those changes owned by repository or migration seams rather than inventing a runtime "query optimizer" package.
 4. Prefer proxy-edge features that already exist, such as nginx gzip, over adding speculative in-app compression middleware.
 5. Keep business/accounting metrics separate from latency and operational performance signals.
@@ -59,10 +59,10 @@ For SocialPredict, the live backend still has runtime concerns that should stay 
 
 - startup ownership is too broad in [main.go](/workspace/socialpredict/backend/main.go)
 - real liveness and readiness semantics landed on April 30, 2026, but those probes are a correctness baseline rather than a performance strategy
-- DB pool and connection lifecycle settings are not yet explicitly owned in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go)
+- the DB pool and connection-lifecycle seam now exists in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go), but its operating values and real saturation points still need measurement
 - accounting-sensitive flows still need clearer atomic boundaries before any optimization layer should obscure behavior
 
-That means the current job is not to add cache tiers, response-compression middleware, or speculative query frameworks. The current job is to make the backend measurable and safe enough that later optimization is grounded in evidence.
+That means the current job is not to add cache tiers, response-compression middleware, or speculative query frameworks. The current job is to tune and observe the performance seams that already landed so later optimization is grounded in evidence.
 
 ## Current Code Snapshot
 
@@ -73,18 +73,20 @@ As of April 30, 2026, [server.go](/workspace/socialpredict/backend/server/server
 - `/health` as a liveness response with `Cache-Control: no-store`
 - `/readyz` as a readiness response that checks both the runtime readiness gate and database availability
 
-That problem is finished for the active runtime slice. Performance work should no longer cite "static health check only" as a blocker. The remaining performance-relevant runtime work is DB pool and connection-lifecycle ownership, followed by measurement.
+That problem is finished for the active runtime slice. Performance work should no longer cite "static health check only" as a blocker. The remaining performance-relevant runtime work is tuning the already-landed DB pool and connection-lifecycle seam, followed by measurement.
 
-### DB pool and connection lifecycle tuning is still thin
+### DB pool and connection lifecycle tuning is now runtime-owned
 
-The current runtime DB seam in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go) normalizes environment variables and opens GORM against Postgres, but it does not yet own explicit `sql.DB` tuning such as:
+The current runtime DB seam in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go) normalizes environment variables, builds the Postgres DSN, opens GORM, and applies explicit `sql.DB` tuning through `ConfigureDBPool`, including:
 
 - max open connections
 - max idle connections
 - connection lifetime
 - idle timeout
 
-That is real current-state work, and it belongs to runtime DB ownership rather than a separate optimization subsystem.
+Those knobs are already wired through env-backed config such as `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`, `DB_CONN_MAX_LIFETIME`, and `DB_CONN_MAX_IDLE_TIME`.
+
+That means the missing piece is not ownership. The missing piece is choosing per-environment values from evidence, understanding saturation behavior, and deciding whether any later hotspot needs query or index work.
 
 ### Proxy-edge compression already exists
 
@@ -162,7 +164,7 @@ The design-plan-aligned performance direction is:
 
 1. Treat the April 30, 2026 liveness/readiness work as complete for the serving path.
 2. Make operational signals and failure posture clearer through the logging and monitoring notes.
-3. Add explicit `sql.DB` pool and connection-lifecycle ownership in the runtime seam.
+3. Tune the existing env-backed `sql.DB` pool and connection-lifecycle settings against measured behavior.
 4. Measure real hotspots.
 5. Make targeted query or index changes only where the evidence justifies them.
 6. Consider caching later, and only after correctness and runtime safety are materially stronger.
