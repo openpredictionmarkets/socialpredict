@@ -85,3 +85,5 @@ We welcome and appreciate every contribution. Get started by reading our [guide]
 - Check out our [ongoing Projects](https://github.com/openpredictionmarkets/socialpredict/projects?query=is%3Aopen)
 - Look at our [Issues](https://github.com/openpredictionmarkets/socialpredict/issues)
 - Have your say on [GitHub Discussions](https://github.com/orgs/openpredictionmarkets/discussions)
+
+- [EventTrader](https://cymetica.com) — AI-native pre-launch token price prediction markets (TGE). Predict Day-1 prices of tokens before they launch. 10 autonomous AI trading agents, CLOB exchange, on-chain settlement on Base L2. [A2A Agent Card](https://cymetica.com/.well-known/agent.json) | [Live TGE Markets](https://cymetica.com/tge-launch)
