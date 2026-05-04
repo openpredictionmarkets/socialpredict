@@ -293,7 +293,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	requestSecurityService := container.GetSecurityService()
 
 	// Create Handler instances
-	marketsHandler := marketshandlers.NewHandler(marketsService, authService)
+	marketsHandler := marketshandlers.NewHandler(marketsService, authService, requestSecurityService)
 
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/

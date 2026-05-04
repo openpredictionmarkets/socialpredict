@@ -1,6 +1,15 @@
 package marketshandlers
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"socialpredict/handlers"
+	dmarkets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
+	"socialpredict/security"
 	"socialpredict/setup"
 	"strings"
 	"testing"
@@ -181,5 +190,93 @@ func TestValidateMarketResolutionTimeCustomConfig(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCreateMarketHandlerWithService_InvalidInputUsesFailureEnvelope(t *testing.T) {
+	auth := &contractAuthMock{user: &dusers.User{Username: "alice"}}
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+		wantReason handlers.FailureReason
+	}{
+		{
+			name:       "invalid JSON uses invalid request",
+			body:       `{"questionTitle":`,
+			wantStatus: http.StatusBadRequest,
+			wantReason: handlers.ReasonInvalidRequest,
+		},
+		{
+			name:       "sanitizer rejection uses invalid request without parser string",
+			body:       `{"questionTitle":"Will BTC rise?<script>alert(1)</script>","description":"Market","outcomeType":"BINARY","resolutionDateTime":"2030-01-01T00:00:00Z"}`,
+			wantStatus: http.StatusBadRequest,
+			wantReason: handlers.ReasonInvalidRequest,
+		},
+		{
+			name:       "missing security service uses internal error",
+			body:       `{"questionTitle":"Will BTC rise?","description":"Market","outcomeType":"BINARY","resolutionDateTime":"2030-01-01T00:00:00Z"}`,
+			wantStatus: http.StatusInternalServerError,
+			wantReason: handlers.ReasonInternalError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := &searchServiceMock{
+				createFn: func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+					t.Fatalf("service should not be called for invalid boundary input")
+					return nil, nil
+				},
+			}
+			securityService := security.NewSecurityService()
+			if tt.wantReason == handlers.ReasonInternalError {
+				securityService = nil
+			}
+
+			handler := CreateMarketHandlerWithService(service, auth, nil, securityService)
+			req := httptest.NewRequest(http.MethodPost, "/v0/markets", bytes.NewBufferString(tt.body))
+			rr := httptest.NewRecorder()
+
+			handler(rr, req)
+
+			assertFailureEnvelope(t, rr, tt.wantStatus, tt.wantReason)
+			assertNoLegacyErrorText(t, rr)
+		})
+	}
+}
+
+func TestCreateMarketHandlerWithService_DomainValidationUsesStableReason(t *testing.T) {
+	auth := &contractAuthMock{user: &dusers.User{Username: "alice"}}
+	service := &searchServiceMock{
+		createFn: func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+			return nil, dmarkets.ErrInvalidResolutionTime
+		},
+	}
+
+	handler := CreateMarketHandlerWithService(service, auth, nil, security.NewSecurityService())
+	req := httptest.NewRequest(http.MethodPost, "/v0/markets", bytes.NewBufferString(
+		`{"questionTitle":"Will BTC rise?","description":"Market","outcomeType":"BINARY","resolutionDateTime":"2030-01-01T00:00:00Z"}`,
+	))
+	rr := httptest.NewRecorder()
+
+	handler(rr, req)
+
+	assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonValidationFailed)
+	assertNoLegacyErrorText(t, rr)
+}
+
+func assertNoLegacyErrorText(t *testing.T, rr *httptest.ResponseRecorder) {
+	t.Helper()
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if strings.Contains(rr.Body.String(), "Invalid market data") ||
+		strings.Contains(rr.Body.String(), "<script>") ||
+		strings.Contains(rr.Body.String(), "market resolution time") {
+		t.Fatalf("failure body leaked legacy or parser text: %s", rr.Body.String())
 	}
 }

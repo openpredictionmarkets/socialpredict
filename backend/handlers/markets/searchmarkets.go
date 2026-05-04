@@ -13,9 +13,9 @@ import (
 )
 
 // SearchMarketsHandler handles HTTP requests for searching markets - HTTP-only with service injection
-func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
+func SearchMarketsHandler(svc dmarkets.ServiceInterface, securityService *security.SecurityService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		handleSearchMarkets(w, r, svc)
+		handleSearchMarkets(w, r, svc, securityService)
 	}
 }
 
@@ -29,13 +29,13 @@ type httpError struct {
 	statusCode int
 }
 
-func parseSearchRequest(r *http.Request) (searchRequestParams, *httpError) {
+func parseSearchRequest(r *http.Request, securityService *security.SecurityService) (searchRequestParams, *httpError) {
 	query, queryErr := extractQuery(r)
 	if queryErr != nil {
 		return searchRequestParams{}, queryErr
 	}
 
-	sanitizedQuery, sanitizeErr := sanitizeQuery(query)
+	sanitizedQuery, sanitizeErr := sanitizeQuery(query, securityService)
 	if sanitizeErr != nil {
 		return searchRequestParams{}, sanitizeErr
 	}
@@ -52,9 +52,12 @@ func extractQuery(r *http.Request) (string, *httpError) {
 	return "", &httpError{message: "Query parameter 'query' is required", statusCode: http.StatusBadRequest}
 }
 
-func sanitizeQuery(query string) (string, *httpError) {
-	sanitizer := security.NewSanitizer()
-	sanitizedQuery, err := sanitizer.SanitizeMarketTitle(query)
+func sanitizeQuery(query string, securityService *security.SecurityService) (string, *httpError) {
+	if securityService == nil || securityService.Sanitizer == nil {
+		return "", &httpError{message: "Security service unavailable", statusCode: http.StatusInternalServerError}
+	}
+
+	sanitizedQuery, err := securityService.Sanitizer.SanitizeMarketTitle(query)
 	if err != nil {
 		logger.LogWarn("SearchMarkets", "SanitizeQuery", "sanitization failed for query '"+query+"': "+err.Error())
 		return "", &httpError{message: "Invalid search query: " + err.Error(), statusCode: http.StatusBadRequest}
@@ -66,11 +69,11 @@ func sanitizeQuery(query string) (string, *httpError) {
 }
 
 func parseLimit(rawLimit string) int {
-	return parseBoundedInt(rawLimit, 20, 1, 50)
+	return security.ParseBoundedIntParam(rawLimit, 20, 1, 50)
 }
 
 func parseOffset(rawOffset string) int {
-	return parseBoundedInt(rawOffset, 0, 0, int(^uint(0)>>1))
+	return security.ParseBoundedIntParam(rawOffset, 0, 0, int(^uint(0)>>1))
 }
 
 func buildSearchResponse(ctx context.Context, svc dmarkets.ServiceInterface, searchResults *dmarkets.SearchResults) (dto.SearchResponse, error) {
@@ -155,13 +158,17 @@ func writeSearchError(w http.ResponseWriter, err error) {
 	}
 }
 
-func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface) {
+func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface, securityService *security.SecurityService) {
 	if r.Method != http.MethodGet {
 		writeMethodNotAllowed(w)
 		return
 	}
+	if securityService == nil || securityService.Sanitizer == nil {
+		writeInternalError(w)
+		return
+	}
 
-	params, clientErr := parseSearchRequest(r)
+	params, clientErr := parseSearchRequest(r, securityService)
 	if clientErr != nil {
 		_ = handlers.WriteFailure(w, clientErr.statusCode, handlers.ReasonInvalidRequest)
 		return

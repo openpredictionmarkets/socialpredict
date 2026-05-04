@@ -67,6 +67,8 @@ node_modules/
 # Codex stuff
 .codex-tmp
 .codex-cache/
+.codex-go-contract/
+.codex-go-verify/
 .codex-reports/
 .bin/
 
