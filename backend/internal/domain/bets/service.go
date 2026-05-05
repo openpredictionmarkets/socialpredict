@@ -22,7 +22,7 @@ type BetHistoryReader interface {
 // PlaceTransactionFunc runs place-bet persistence against transaction-bound collaborators.
 type PlaceTransactionFunc func(ctx context.Context, repo Repository, users UserService) error
 
-// PlaceUnitOfWork scopes balance and bet writes to one database transaction.
+// PlaceUnitOfWork scopes balance and bet writes to one synchronous database transaction.
 type PlaceUnitOfWork interface {
 	PlaceBetTransaction(ctx context.Context, fn PlaceTransactionFunc) error
 }
@@ -95,7 +95,7 @@ type BalanceGuard interface {
 	EnsureSufficient(balance, totalCost int64) error
 }
 
-// BetLedger encapsulates persistence and user accounting for non-placement bet flows.
+// BetLedger encapsulates synchronous persistence and user accounting for non-placement bet flows.
 type BetLedger interface {
 	CreditSale(ctx context.Context, bet *boundary.Bet, saleValue int64) error
 }

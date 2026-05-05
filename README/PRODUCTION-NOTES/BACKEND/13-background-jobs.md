@@ -3,9 +3,9 @@ title: Background Jobs
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-01T11:50:49Z
-updated_at_display: "Friday, May 01, 2026 at 11:50 AM UTC"
-update_reason: "Refresh the deferred jobs draft against landed readiness and startup-writer seams on upstream main at 051aac6."
+updated_at: 2026-05-03T12:00:00Z
+updated_at_display: "Sunday, May 03, 2026 at 12:00 PM UTC"
+update_reason: "Finish WAVE13 stop-and-review by naming a concrete non-financial async seam and the missing runtime-role, retry, dead-letter, and visibility prerequisites."
 status: draft
 ---
 
@@ -25,6 +25,8 @@ The current posture is explicit:
 - money-moving flows should not be pushed into background jobs to compensate for weak transaction boundaries
 
 This draft was refreshed on Friday, May 01, 2026 against upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`. The backend now has liveness and readiness probes, explicit startup-writer gating, and better request-boundary failure handling, but it still has no worker topology, no idempotency model, and no retry or outbox ownership.
+
+The WAVE13 stop-and-review conclusion on Sunday, May 03, 2026 is to keep the background-job platform deferred. The one concrete next async seam worth preserving for later review is **homepage CMS render/sanitize warm-up**: a non-financial, recomputable derived-content operation that must not write balances, bets, market outcomes, settlement state, or economy/accounting metrics.
 
 ## Executive Direction
 
@@ -97,11 +99,21 @@ There is no parallel worker deployment contract yet, which is another reason to 
 
 ## Candidate Future Uses
 
-If background jobs are introduced later, plausible early candidates are:
+If background jobs are introduced later, the first justified seam should be homepage CMS render/sanitize warm-up after an admin content update.
 
+That candidate remains intentionally narrow:
+
+- it is non-financial and must not mutate account balances, bets, orders, market resolution, settlement records, or economy/accounting metrics
+- it should reuse the existing `handlers/cms/homepage.Service.RenderContent` seam, which already owns derived homepage rendering outside HTTP handler code
+- a future job shape would be `homepage_render_warmup`, keyed by immutable `slug` plus `version`, after `PUT /v0/admin/content/home`
+- stale or failed warm-up work should degrade only preview, audit, or cache freshness; it must not change the stored homepage publication contract
+- it still needs explicit idempotency, ownership, retry, dead-letter, and visibility rules before any rollout
+
+Other plausible uses remain lower-priority examples, not active backlog buckets:
+
+- scheduled derived content snapshots that are safe to recompute and explicitly non-financial
 - email delivery
 - periodic or triggered cache refreshes
-- scheduled derived snapshots that are safe to recompute
 - export generation
 - non-critical notification fan-out
 
@@ -119,12 +131,17 @@ The following should not be early background-job targets:
 
 Before the backend should prioritize background-job infrastructure, it should first have:
 
-- an operationally enforced startup and shutdown contract for more than one runtime role
-- stronger readiness and monitoring posture for worker-specific failures
-- explicit idempotency rules for candidate async tasks
-- a clear retry and dead-letter policy
-- visibility into failure, replay, and lag behavior
-- at least one candidate task that is valuable, decouplable, and clearly non-financial
+- runtime roles: an operationally enforced startup, readiness, shutdown, deployment, and rollback contract for at least an HTTP-serving role and a separate worker role
+- role separation: configuration that prevents the HTTP-serving role from consuming jobs, prevents the worker role from serving public traffic, and prevents either role from accidentally running startup-writer mutations
+- ownership boundaries: one named owner for the worker contract, job schema, retry decisions, and runbook maintenance
+- DB ownership: workers acquire `*gorm.DB` once near the runtime boundary and pass it downward, rather than opening ad hoc connections inside job handlers
+- idempotency: a per-job rule for duplicate delivery, replay after crash, and concurrent execution, starting with immutable `slug` plus `version` for the homepage render warm-up candidate
+- retry and dead-letter policy: bounded retry counts, backoff behavior, retryable-versus-terminal failure classification, dead-letter retention, and an operator path for inspect, replay, or discard
+- lag and failure visibility: metrics and alerts for enqueue-to-start lag, oldest pending work, retry volume, terminal failures, dead-letter depth, worker heartbeat, and successful completion freshness
+- logging: structured worker logs with job type, job id or idempotency key, attempt number, and terminal failure reason, without secrets
+- release safety: a way to deploy, disable, drain, and roll back workers without changing synchronous request-path correctness
+
+Until those prerequisites exist, the backend should not add queue tables, an outbox rollout, scheduler frameworks, Redis infrastructure, worker pools, or a second worker deployment platform.
 
 ## Relationship To Other Notes
 

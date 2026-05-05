@@ -5,6 +5,8 @@ import (
 )
 
 // ResolveMarket resolves a market with a given outcome.
+// Resolution updates market state and user balances synchronously and remains
+// outside background execution or retry infrastructure.
 func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
 	outcome, err := s.resolutionPolicy.NormalizeResolution(resolution)
 	if err != nil {
