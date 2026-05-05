@@ -55,6 +55,22 @@ func TestServerServesOpenAPIDocumentAndSwaggerRedirect(t *testing.T) {
 	if !strings.Contains(swaggerRec.Body.String(), "swagger") {
 		t.Fatalf("expected swagger placeholder body, got %q", swaggerRec.Body.String())
 	}
+	if csp := swaggerRec.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "'unsafe-eval'") {
+		t.Fatalf("expected swagger CSP to allow bundled UI runtime, got %q", csp)
+	} else if strings.Contains(csp, "upgrade-insecure-requests") {
+		t.Fatalf("expected swagger CSP to avoid upgrading localhost HTTP assets, got %q", csp)
+	}
+
+	swaggerAssetReq := httptest.NewRequest(http.MethodGet, "/swagger/swagger-ui-bundle.js", nil)
+	swaggerAssetRec := httptest.NewRecorder()
+	handler.ServeHTTP(swaggerAssetRec, swaggerAssetReq)
+
+	if swaggerAssetRec.Code != http.StatusOK {
+		t.Fatalf("expected swagger asset status 200, got %d: %s", swaggerAssetRec.Code, swaggerAssetRec.Body.String())
+	}
+	if !strings.Contains(swaggerAssetRec.Body.String(), "SwaggerUIBundle") {
+		t.Fatalf("expected swagger bundle asset body, got %q", swaggerAssetRec.Body.String())
+	}
 
 	for _, path := range []string{"/swagger", "/swagger/"} {
 		t.Run("method not allowed "+path, func(t *testing.T) {

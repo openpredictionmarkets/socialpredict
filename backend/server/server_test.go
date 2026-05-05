@@ -48,7 +48,29 @@ func (s *recordingShutdowner) Shutdown(ctx context.Context) error {
 func testSwaggerUIFS() fstest.MapFS {
 	return fstest.MapFS{
 		"swagger-ui/index.html": &fstest.MapFile{
-			Data: []byte("<html>swagger</html>"),
+			Data: []byte(`<html>
+<head>
+<link rel="stylesheet" type="text/css" href="./swagger-ui.css" />
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="./swagger-ui-bundle.js"></script>
+<script src="./swagger-ui-standalone-preset.js"></script>
+<script src="./swagger-initializer.js"></script>
+</body>
+</html>`),
+		},
+		"swagger-ui/swagger-ui.css": &fstest.MapFile{
+			Data: []byte("body { margin: 0; }"),
+		},
+		"swagger-ui/swagger-ui-bundle.js": &fstest.MapFile{
+			Data: []byte("window.SwaggerUIBundle = function () {};"),
+		},
+		"swagger-ui/swagger-ui-standalone-preset.js": &fstest.MapFile{
+			Data: []byte("window.SwaggerUIStandalonePreset = {};"),
+		},
+		"swagger-ui/swagger-initializer.js": &fstest.MapFile{
+			Data: []byte(`window.ui = SwaggerUIBundle({ url: "/openapi.yaml" });`),
 		},
 	}
 }
