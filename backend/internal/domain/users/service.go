@@ -49,8 +49,9 @@ type UserReader interface {
 	GetByUsername(ctx context.Context, username string) (*User, error)
 }
 
-// UserBalanceRepository exposes balance mutation operations.
+// UserBalanceRepository exposes the authoritative read/write path for balance mutations.
 type UserBalanceRepository interface {
+	GetByUsername(ctx context.Context, username string) (*User, error)
 	UpdateBalance(ctx context.Context, username string, newBalance int64) error
 }
 
@@ -622,16 +623,17 @@ func (s *Service) requireUser(ctx context.Context, username string) (*User, erro
 }
 
 func (s *Service) updateUserBalance(ctx context.Context, username string, compute func(*User) (int64, error)) error {
-	user, err := s.requireUser(ctx, username)
+	repo, err := s.userBalanceRepository()
+	if err != nil {
+		return err
+	}
+
+	user, err := repo.GetByUsername(ctx, username)
 	if err != nil {
 		return err
 	}
 
 	newBalance, err := compute(user)
-	if err != nil {
-		return err
-	}
-	repo, err := s.userBalanceRepository()
 	if err != nil {
 		return err
 	}

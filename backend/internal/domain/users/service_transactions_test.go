@@ -2,6 +2,7 @@ package users_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	analytics "socialpredict/internal/domain/analytics"
@@ -10,6 +11,40 @@ import (
 	"socialpredict/models/modelstesting"
 	"socialpredict/security"
 )
+
+type staleUserReader struct {
+	user *users.User
+}
+
+func (r staleUserReader) GetByUsername(context.Context, string) (*users.User, error) {
+	if r.user == nil {
+		return nil, users.ErrUserNotFound
+	}
+	return r.user, nil
+}
+
+type authoritativeBalanceRepo struct {
+	user          *users.User
+	updatedTo     int64
+	updateCalled  bool
+	failOnMissing bool
+}
+
+func (r *authoritativeBalanceRepo) GetByUsername(context.Context, string) (*users.User, error) {
+	if r.user == nil {
+		return nil, users.ErrUserNotFound
+	}
+	return r.user, nil
+}
+
+func (r *authoritativeBalanceRepo) UpdateBalance(_ context.Context, _ string, newBalance int64) error {
+	if r.failOnMissing {
+		return errors.New("unexpected balance update")
+	}
+	r.updatedTo = newBalance
+	r.updateCalled = true
+	return nil
+}
 
 type fakeAnalyticsService struct {
 	computeUserFinancialsFn func(context.Context, analytics.FinancialSnapshotRequest) (*analytics.FinancialSnapshot, error)
@@ -85,6 +120,34 @@ func TestServiceApplyTransaction(t *testing.T) {
 				t.Fatalf("balance = %d, want %d", updatedBalance, tt.wantBalance)
 			}
 		})
+	}
+}
+
+func TestServiceApplyTransactionUsesBalanceRepositoryAsAuthoritativeSource(t *testing.T) {
+	balanceRepo := &authoritativeBalanceRepo{
+		user: &users.User{
+			Username:       "tx_user",
+			AccountBalance: 300,
+		},
+	}
+	service := users.NewServiceWithDependencies(users.ServiceDependencies{
+		Reader: staleUserReader{
+			user: &users.User{
+				Username:       "tx_user",
+				AccountBalance: 100,
+			},
+		},
+		BalanceRepo: balanceRepo,
+	}, fakeAnalyticsService{}, security.NewSecurityService().Sanitizer)
+
+	if err := service.ApplyTransaction(context.Background(), "tx_user", 50, users.TransactionBuy); err != nil {
+		t.Fatalf("ApplyTransaction returned error: %v", err)
+	}
+	if !balanceRepo.updateCalled {
+		t.Fatalf("expected authoritative balance repository update")
+	}
+	if balanceRepo.updatedTo != 250 {
+		t.Fatalf("balance update used stale reader value; got %d, want 250", balanceRepo.updatedTo)
 	}
 }
 

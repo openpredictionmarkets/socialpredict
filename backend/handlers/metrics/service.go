@@ -14,5 +14,5 @@ type SystemMetricsService interface {
 
 // GlobalLeaderboardService defines the application-owned leaderboard seam exposed under /v0/.
 type GlobalLeaderboardService interface {
-	ComputeGlobalLeaderboard(context.Context) ([]analytics.GlobalUserProfitability, error)
+	ComputeGlobalLeaderboardSnapshot(context.Context) (*analytics.GlobalLeaderboardSnapshot, error)
 }
