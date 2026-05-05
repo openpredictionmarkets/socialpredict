@@ -94,7 +94,7 @@ Those routes are intentionally small text responses in [server.go](/workspace/so
 
 - `/health` reports liveness as `live`
 - `/readyz` reports readiness as `ready` or `not ready` and checks database availability after the readiness gate opens
-- `/ops/status` reports JSON `{ live, ready, requestFailuresTotal }` and uses `503` while the backend is live but unready
+- `/ops/status` reports JSON `{ live, ready, requestFailuresTotal, dbPool }` and uses `503` while the backend is live but unready. The `dbPool` object exposes process-local SQL pool saturation and wait counters for DB pool tuning checks.
 
 The current startup order still completes startup mutation or verification and calls `readiness.MarkReady()` before the HTTP server starts listening. That means `/ops/status` is not an early startup progress endpoint in this wave; it becomes reachable once the backend HTTP process is serving and can show unready state during later readiness closure, database readiness failure, or graceful shutdown drain. Starting HTTP earlier while keeping application routes closed is deferred to [FUTURE/08-early-startup-operational-status.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/08-early-startup-operational-status.md).
 
@@ -108,7 +108,7 @@ The current backend signal contract is intentionally small:
 | --- | --- | --- | --- |
 | `GET /health` | `200 text/plain` body `live` while the HTTP process is serving; `503` body `not live` if the serving probe reports not live | Process liveness for restart or black-box availability checks | Database reachability, latency, request success rate, or telemetry pipeline health |
 | `GET /readyz` | `200 text/plain` body `ready` only after the startup readiness gate opens and the primary database ping succeeds; otherwise `503` body `not ready` | Whether the instance should receive traffic | Business health, background job status, or external monitoring-stack health |
-| `GET /ops/status` | `200` or `503 application/json` body `{ live, ready, requestFailuresTotal }`; non-probe 5xx responses increment the process-local request-failure counter | Minimal app-owned status export for backend down/unready and severe request-failure spike alerts | Prometheus format, fleet-wide aggregation, latency histograms, business metrics, or early startup progress before HTTP is listening |
+| `GET /ops/status` | `200` or `503 application/json` body `{ live, ready, requestFailuresTotal, dbPool }`; non-probe 5xx responses increment the process-local request-failure counter, and `dbPool` exposes SQL pool saturation and wait counters | Minimal app-owned status export for backend down/unready, severe request-failure spike alerts, and first DB pool wait-pressure checks | Prometheus format, fleet-wide aggregation, latency histograms, query tracing, business metrics, or early startup progress before HTTP is listening |
 | Startup fatal failures | Configuration load, DB initialization, DB readiness, security config, startup mutation mode, shutdown config, migration/verification, and seed failures call `logger.Fatal` before `readiness.MarkReady()` | Failed starts stay out of the ready pool and leave a fatal startup log | Automatic remediation, multi-replica coordination, or alert routing |
 | Shared request-boundary failures | Router-owned `405`, security middleware `429`, and recovered unhandled panics use JSON `{ ok: false, reason }` responses with safe runtime reasons | A consistent first failure surface for operators to count from logs/proxy observations | A full error-budget system, Prometheus metric family, or handler-by-handler failure taxonomy |
 
@@ -124,6 +124,7 @@ The current backend can support only this first alert set:
 | Backend unready | `GET /readyz` `503` or `/ops/status.ready=false` | The instance should not receive traffic because startup has not opened readiness or the database ping failed | Does not cover business-rule health, background work, or third-party dependencies |
 | Fatal startup failure | Process exits before readiness opens with startup logger events such as `startup.incompatibility` or `startup.migration_failed` | Startup validation, mutation, migration, seed, security, config, or DB setup blocked service readiness | Requires the runtime supervisor or deployment environment to observe process exit and startup logs |
 | Severe request-failure spike | Rising `/ops/status.requestFailuresTotal` for non-probe server-side `5xx` responses | The process is producing server-side failures after it starts serving traffic | Counter is process-local, monotonic until restart, and not yet split by route, reason, latency, or replica |
+| DB pool wait pressure | Rising `/ops/status.dbPool.waitCount` or `waitDurationNanoseconds` during normal traffic | Requests or background work are waiting for SQL connections from this process-local pool | Does not identify the slow route or query by itself and is not fleet-wide without external aggregation |
 
 This is the end of the current wave's alert surface. Operators can wire these checks in their existing environment, but the backend is not yet promising fleet aggregation, dashboard panels, paging policy, latency histograms, or Prometheus-compatible exposition.
 
@@ -198,6 +199,7 @@ The design-plan-aligned monitoring direction is:
    - backend unready
    - startup incompatibility or migration failure
    - severe request-failure spikes using `/ops/status.requestFailuresTotal`
+   - DB pool wait pressure using `/ops/status.dbPool.waitCount` and `waitDurationNanoseconds`
 5. Defer dashboards and external stack selection until the signal contract is materially stronger.
 
 ## Remaining Signal Seams

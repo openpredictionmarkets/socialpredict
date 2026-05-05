@@ -155,7 +155,7 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 	probe := appruntime.NewServingProbe(db, readiness)
 	router.Handle("/health", livenessHandler(probe)).Methods("GET")
 	router.Handle("/readyz", readinessHandler(probe)).Methods("GET")
-	router.Handle("/ops/status", operationalStatusHandler(probe, operationalMetrics)).Methods("GET")
+	router.Handle("/ops/status", operationalStatusHandler(probe, db, operationalMetrics)).Methods("GET")
 
 	// OpenAPI spec endpoint
 	router.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
@@ -180,9 +180,10 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 }
 
 type operationalStatusResponse struct {
-	Live                 bool   `json:"live"`
-	Ready                bool   `json:"ready"`
-	RequestFailuresTotal uint64 `json:"requestFailuresTotal"`
+	Live                 bool                      `json:"live"`
+	Ready                bool                      `json:"ready"`
+	RequestFailuresTotal uint64                    `json:"requestFailuresTotal"`
+	DBPool               appruntime.DBPoolSnapshot `json:"dbPool"`
 }
 
 func swaggerUIHeaders(next http.Handler) http.Handler {
@@ -229,7 +230,7 @@ func readinessHandler(probe appruntime.ServingProbe) http.Handler {
 	})
 }
 
-func operationalStatusHandler(probe appruntime.ServingProbe, operationalMetrics *appruntime.OperationalMetrics) http.Handler {
+func operationalStatusHandler(probe appruntime.ServingProbe, db *gorm.DB, operationalMetrics *appruntime.OperationalMetrics) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), readinessProbeTimeout)
 		defer cancel()
@@ -239,6 +240,7 @@ func operationalStatusHandler(probe appruntime.ServingProbe, operationalMetrics 
 			Live:                 probe.Live(),
 			Ready:                probe.Ready(ctx) == nil,
 			RequestFailuresTotal: snapshot.RequestFailuresTotal,
+			DBPool:               appruntime.SnapshotDBPool(db),
 		}
 
 		status := http.StatusOK

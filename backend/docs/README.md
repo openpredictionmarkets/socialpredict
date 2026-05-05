@@ -37,9 +37,9 @@ The current backend boundary exposes a small operator-facing signal inventory:
   with `200` only after startup mutation or verification has completed and the
   database remains reachable; otherwise it returns `not ready` with `503`.
 - `GET /ops/status` is the minimal operator-facing status export. It returns
-  JSON `{ live, ready, requestFailuresTotal }`, uses `503` when the backend is
-  unready, and keeps the non-probe request-failure counter process-local for
-  spike alerts.
+  JSON `{ live, ready, requestFailuresTotal, dbPool }`, uses `503` when the
+  backend is unready, and keeps the non-probe request-failure counter plus SQL
+  pool saturation/wait counters process-local for spike and pool-tuning alerts.
 - Startup configuration load, database initialization, database readiness,
   security configuration, startup mutation mode, shutdown configuration,
   migration/verification, and seed failures are fatal startup failures. The
@@ -52,8 +52,10 @@ The first supported alert set is intentionally small: backend down or unready
 via `/health`, `/readyz`, or `/ops/status`; fatal startup failure via process
 exit before readiness opens plus startup logger events; and severe request
 failure spikes via the monotonic `/ops/status.requestFailuresTotal` counter.
-That counter is process-local and resets when the process restarts, so it is a
-first spike signal rather than a fleet metric.
+`/ops/status.dbPool.waitCount` and `waitDurationNanoseconds` provide the first
+pool saturation and wait-latency seam for DB pool tuning checks. These counters
+are process-local and reset when the process restarts, so they are first spike
+signals rather than fleet metrics.
 
 These HTTP signals are reachable once the backend HTTP server is listening. The
 current startup path completes migration or verification and opens readiness

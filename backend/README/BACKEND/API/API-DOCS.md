@@ -20,7 +20,7 @@ When running the backend locally (on port 8080 by default), the server exposes:
 - `GET /openapi.yaml` – The bundled OpenAPI 3.0.3 specification served directly from the binary.
 - `GET /health` – Plain-text liveness probe that returns `live` when the backend HTTP process is serving.
 - `GET /readyz` – Plain-text readiness probe that returns `ready` only after startup completes and database availability is confirmed.
-- `GET /ops/status` – Operator-facing JSON status `{ live, ready, requestFailuresTotal }`, separate from `/v0/system/metrics`.
+- `GET /ops/status` – Operator-facing JSON status `{ live, ready, requestFailuresTotal, dbPool }`, separate from `/v0/system/metrics`. The `dbPool` object exposes process-local SQL pool counters such as open, in-use, idle, wait-count, and wait-duration values.
 
 For example:
 

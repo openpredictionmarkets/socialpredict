@@ -40,6 +40,7 @@ const (
 	EventReadinessOpen          = "readiness.open"
 	EventRequestFailure         = "request.failure"
 	EventRequestPanic           = "request.panic"
+	EventDBPoolConfigured       = "db_pool.configured"
 	EventStartupIncompatibility = "startup.incompatibility"
 	EventStartupMigrationFailed = "startup.migration_failed"
 )
