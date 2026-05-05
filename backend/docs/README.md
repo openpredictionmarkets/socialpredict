@@ -57,6 +57,11 @@ pool saturation and wait-latency seam for DB pool tuning checks. These counters
 are process-local and reset when the process restarts, so they are first spike
 signals rather than fleet metrics.
 
+These HTTP signals are reachable once the backend HTTP server is listening. The
+current startup path completes migration or verification and opens readiness
+before starting the listener, so `/ops/status` does not yet expose early startup
+progress while migrations or startup-owned seeds are still running.
+
 `GET /v0/system/metrics` remains an application reporting route for
 economics/accounting output such as money creation and utilization. It is not
 the operational monitoring surface and should not be treated as a liveness,

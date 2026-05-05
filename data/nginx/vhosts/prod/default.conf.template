@@ -17,6 +17,10 @@ server {
 		proxy_pass http://backend:8080;
 	}
 
+	location = /ops/status {
+		proxy_pass http://backend:8080;
+	}
+
 	# Backend-owned API docs are published deliberately at root. Do not
 	# hide these behind /api/ or serve a duplicate Swagger copy from frontend.
 	location = /openapi.yaml {

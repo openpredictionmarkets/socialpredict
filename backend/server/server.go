@@ -174,7 +174,7 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 		return fmt.Errorf("failed to set up swagger-ui FS: %w", err)
 	}
 	swaggerHandler := http.FileServer(http.FS(uiFS))
-	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler)).Methods("GET")
+	router.PathPrefix("/swagger/").Handler(swaggerUIHeaders(http.StripPrefix("/swagger/", swaggerHandler))).Methods("GET")
 
 	return nil
 }
@@ -184,6 +184,26 @@ type operationalStatusResponse struct {
 	Ready                bool                      `json:"ready"`
 	RequestFailuresTotal uint64                    `json:"requestFailuresTotal"`
 	DBPool               appruntime.DBPoolSnapshot `json:"dbPool"`
+}
+
+func swaggerUIHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Swagger UI's bundled runtime uses dynamic function evaluation. Keep
+		// that CSP exception scoped to the docs UI instead of the whole API.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; "+
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
+			"style-src 'self' 'unsafe-inline'; "+
+			"img-src 'self' data: https:; "+
+			"connect-src 'self'; "+
+			"font-src 'self'; "+
+			"object-src 'none'; "+
+			"media-src 'self'; "+
+			"frame-src 'none'; "+
+			"worker-src 'none'; "+
+			"child-src 'none'; "+
+			"form-action 'self'")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func livenessHandler(probe appruntime.ServingProbe) http.Handler {
