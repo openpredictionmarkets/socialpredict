@@ -11,6 +11,22 @@ status: active
 
 # Deployment Infrastructure
 
+## TL;DR
+
+WAVE08 is hardening the deployment contract for the backend stack we already
+run. The backend now exposes `/health` for process liveness and `/readyz` for
+traffic readiness, so Docker can ask "is the process serving HTTP?" separately
+from "should this instance receive user traffic?" Production compose uses one
+explicit `backend-startup-writer` service for migrations and startup-owned
+seeds, while the request-serving `backend` service verifies those migrations
+and runs with `STARTUP_WRITER=false`. The production nginx template deliberately
+publishes `/health`, `/readyz`, `/openapi.yaml`, `/swagger`, and `/swagger/` at
+the public host root, so a production host such as `brierfoxforecast.com` should
+serve `https://brierfoxforecast.com/health` and
+`https://brierfoxforecast.com/readyz` through the proxy instead of requiring a
+`/v0/` path or direct `:8080` backend access. The remaining deployment review is
+to prove this compose/nginx contract on a real staging or production host.
+
 ## Update Summary
 
 This note was updated on Monday, April 27, 2026 to replace an older Kubernetes-heavy deployment plan with guidance that matches the live SocialPredict deployment topology and the current design-plan priority on runtime safety first.

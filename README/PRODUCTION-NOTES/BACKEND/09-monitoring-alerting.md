@@ -3,9 +3,9 @@ title: Monitoring and Alerting
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-02T18:20:00Z
-updated_at_display: "Saturday, May 2, 2026 at 6:20 PM UTC"
-update_reason: "Close WAVE09 with the first supported alert set and deferred monitoring-platform topics."
+updated_at: 2026-05-03T14:25:55Z
+updated_at_display: "Sunday, May 3, 2026 at 2:25 PM UTC"
+update_reason: "Clarify WAVE09 proxy publishing, stage testing, and deferred early-startup status visibility."
 status: active
 ---
 
@@ -18,6 +18,10 @@ This note was updated on Monday, April 27, 2026 to replace an older Prometheus-a
 On Thursday, April 30, 2026, the first app-owned operational signal gap was closed for the serving path: `/health` now reports liveness, `/readyz` reports readiness and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. Broader metrics export, dashboarding, and alerting remain deferred.
 
 On Saturday, May 2, 2026, this note was tightened into an explicit current-state signal inventory. The backend now documents the operator-facing contract for `/health`, `/readyz`, `/ops/status`, startup fatal failures, and shared request-boundary failure responses while keeping `/v0/system/metrics` classified as economics and accounting output.
+
+On Sunday, May 3, 2026, the production nginx template was updated to publish `/ops/status` explicitly at the public host root alongside `/health` and `/readyz`. Early-startup status visibility remains deferred because the current backend starts listening only after startup mutation or verification completes and readiness opens.
+
+The staging verification checklist for this wave lives in [STAGETEST/09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/STAGETEST/09-monitoring-alerting.md).
 
 The WAVE09 stop-and-review point is that the backend can now support a first alert set for backend down, backend unready, fatal startup failure before readiness opens, and severe server-side request-failure spikes. Broader dashboards or external monitoring platforms should not start until the next app-owned signal seam is chosen and landed.
 
@@ -92,6 +96,8 @@ Those routes are intentionally small text responses in [server.go](/workspace/so
 - `/readyz` reports readiness as `ready` or `not ready` and checks database availability after the readiness gate opens
 - `/ops/status` reports JSON `{ live, ready, requestFailuresTotal, dbPool }` and uses `503` while the backend is live but unready. The `dbPool` object exposes process-local SQL pool saturation and wait counters for DB pool tuning checks.
 
+The current startup order still completes startup mutation or verification and calls `readiness.MarkReady()` before the HTTP server starts listening. That means `/ops/status` is not an early startup progress endpoint in this wave; it becomes reachable once the backend HTTP process is serving and can show unready state during later readiness closure, database readiness failure, or graceful shutdown drain. Starting HTTP earlier while keeping application routes closed is deferred to [FUTURE/08-early-startup-operational-status.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/08-early-startup-operational-status.md).
+
 That first operational signal problem is intentionally narrow. The remaining monitoring gap is not basic liveness/readiness or a first request-failure counter; it is broader latency telemetry, external metrics export, and alert-consumption design.
 
 ### Current operator-facing signal inventory
@@ -102,7 +108,7 @@ The current backend signal contract is intentionally small:
 | --- | --- | --- | --- |
 | `GET /health` | `200 text/plain` body `live` while the HTTP process is serving; `503` body `not live` if the serving probe reports not live | Process liveness for restart or black-box availability checks | Database reachability, latency, request success rate, or telemetry pipeline health |
 | `GET /readyz` | `200 text/plain` body `ready` only after the startup readiness gate opens and the primary database ping succeeds; otherwise `503` body `not ready` | Whether the instance should receive traffic | Business health, background job status, or external monitoring-stack health |
-| `GET /ops/status` | `200` or `503 application/json` body `{ live, ready, requestFailuresTotal, dbPool }`; non-probe 5xx responses increment the process-local request-failure counter, and `dbPool` exposes SQL pool saturation and wait counters | Minimal app-owned status export for backend down/unready, severe request-failure spike alerts, and first DB pool wait-pressure checks | Prometheus format, fleet-wide aggregation, latency histograms, query tracing, or business metrics |
+| `GET /ops/status` | `200` or `503 application/json` body `{ live, ready, requestFailuresTotal, dbPool }`; non-probe 5xx responses increment the process-local request-failure counter, and `dbPool` exposes SQL pool saturation and wait counters | Minimal app-owned status export for backend down/unready, severe request-failure spike alerts, and first DB pool wait-pressure checks | Prometheus format, fleet-wide aggregation, latency histograms, query tracing, business metrics, or early startup progress before HTTP is listening |
 | Startup fatal failures | Configuration load, DB initialization, DB readiness, security config, startup mutation mode, shutdown config, migration/verification, and seed failures call `logger.Fatal` before `readiness.MarkReady()` | Failed starts stay out of the ready pool and leave a fatal startup log | Automatic remediation, multi-replica coordination, or alert routing |
 | Shared request-boundary failures | Router-owned `405`, security middleware `429`, and recovered unhandled panics use JSON `{ ok: false, reason }` responses with safe runtime reasons | A consistent first failure surface for operators to count from logs/proxy observations | A full error-budget system, Prometheus metric family, or handler-by-handler failure taxonomy |
 
