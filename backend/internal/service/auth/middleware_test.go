@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"socialpredict/handlers"
 	"socialpredict/models/modelstesting"
-	"socialpredict/util"
 	"testing"
 	"time"
 
@@ -18,18 +18,18 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func TestHTTPError(t *testing.T) {
-	err := &HTTPError{
-		StatusCode: 404,
-		Message:    "Not found",
+func TestAuthError(t *testing.T) {
+	err := &AuthError{
+		Kind:    ErrorKindUserNotFound,
+		Message: "Not found",
 	}
 
 	if err.Error() != "Not found" {
 		t.Errorf("Expected 'Not found', got '%s'", err.Error())
 	}
 
-	if err.StatusCode != 404 {
-		t.Errorf("Expected status code 404, got %d", err.StatusCode)
+	if err.Kind != ErrorKindUserNotFound {
+		t.Errorf("Expected kind %q, got %q", ErrorKindUserNotFound, err.Kind)
 	}
 }
 
@@ -152,17 +152,17 @@ func TestCheckMustChangePasswordFlag(t *testing.T) {
 				MustChangePassword: tt.mustChangePassword,
 			}
 
-			httpErr := CheckMustChangePasswordFlag(user)
+			authErr := CheckMustChangePasswordFlag(user)
 
 			if tt.expectError {
-				if httpErr == nil {
+				if authErr == nil {
 					t.Errorf("Expected error but got none")
-				} else if httpErr.StatusCode != http.StatusForbidden {
-					t.Errorf("Expected status code %d, got %d", http.StatusForbidden, httpErr.StatusCode)
+				} else if authErr.Kind != ErrorKindPasswordChangeRequired {
+					t.Errorf("Expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 				}
 			} else {
-				if httpErr != nil {
-					t.Errorf("Expected no error but got: %v", httpErr)
+				if authErr != nil {
+					t.Errorf("Expected no error but got: %v", authErr)
 				}
 			}
 		})
@@ -174,21 +174,25 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 		name           string
 		method         string
 		expectedStatus int
+		expectedReason handlers.FailureReason
 	}{
 		{
 			name:           "Valid POST method",
 			method:         http.MethodPost,
 			expectedStatus: http.StatusBadRequest, // Will fail due to invalid body, but method is accepted
+			expectedReason: handlers.ReasonInvalidRequest,
 		},
 		{
 			name:           "Invalid GET method",
 			method:         http.MethodGet,
-			expectedStatus: http.StatusNotFound,
+			expectedStatus: http.StatusMethodNotAllowed,
+			expectedReason: handlers.ReasonMethodNotAllowed,
 		},
 		{
 			name:           "Invalid PUT method",
 			method:         http.MethodPut,
-			expectedStatus: http.StatusNotFound,
+			expectedStatus: http.StatusMethodNotAllowed,
+			expectedReason: handlers.ReasonMethodNotAllowed,
 		},
 	}
 
@@ -197,38 +201,59 @@ func TestLoginHandler_MethodValidation(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/login", nil)
 			w := httptest.NewRecorder()
 
-			LoginHandler(w, req)
+			LoginHandler(nil, security.NewSecurityService())(w, req)
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, w.Code)
+			}
+
+			var response handlers.FailureEnvelope
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatalf("decode failure response: %v", err)
+			}
+			if response.OK || response.Reason != string(tt.expectedReason) {
+				t.Fatalf("expected reason %q, got %+v", tt.expectedReason, response)
 			}
 		})
 	}
 }
 
 func TestLoginHandler_InvalidJSON(t *testing.T) {
-	util.DB = modelstesting.NewFakeDB(t)
 	invalidJSON := "{ invalid json }"
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(invalidJSON))
 	w := httptest.NewRecorder()
 
-	LoginHandler(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)), security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
 	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure response: %v", err)
+	}
+	if response.OK || response.Reason != string(handlers.ReasonInvalidRequest) {
+		t.Fatalf("expected reason %q, got %+v", handlers.ReasonInvalidRequest, response)
+	}
 }
 
 func TestLoginHandler_RejectsUnknownFields(t *testing.T) {
-	util.DB = modelstesting.NewFakeDB(t)
-
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123","extra":"nope"}`))
 	w := httptest.NewRecorder()
 
-	LoginHandler(w, req)
+	LoginHandler(rusers.NewGormRepository(modelstesting.NewFakeDB(t)), security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
+	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure response: %v", err)
+	}
+	if response.OK || response.Reason != string(handlers.ReasonInvalidRequest) {
+		t.Fatalf("expected reason %q, got %+v", handlers.ReasonInvalidRequest, response)
 	}
 }
 
@@ -262,7 +287,8 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			util.DB = modelstesting.NewFakeDB(t)
+			db := modelstesting.NewFakeDB(t)
+			repo := rusers.NewGormRepository(db)
 			loginReq := map[string]string{
 				"username": tt.username,
 				"password": tt.password,
@@ -272,20 +298,24 @@ func TestLoginHandler_ValidationFailure(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(w, req)
+			LoginHandler(repo, security.NewSecurityService())(w, req)
 
 			if w.Code != http.StatusBadRequest {
 				t.Errorf("Expected status code %d, got %d", http.StatusBadRequest, w.Code)
+			}
+
+			var response handlers.FailureEnvelope
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatalf("decode failure response: %v", err)
+			}
+			if response.OK || response.Reason != string(handlers.ReasonValidationFailed) {
+				t.Fatalf("expected reason %q, got %+v", handlers.ReasonValidationFailed, response)
 			}
 		})
 	}
 }
 
 func TestLoginHandler_MissingDB(t *testing.T) {
-	originalDB := util.GetDB()
-	util.DB = nil
-	defer func() { util.DB = originalDB }()
-
 	loginReq := map[string]string{
 		"username": "testuser",
 		"password": "password123",
@@ -295,16 +325,24 @@ func TestLoginHandler_MissingDB(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 	w := httptest.NewRecorder()
 
-	LoginHandler(w, req)
+	LoginHandler(nil, security.NewSecurityService())(w, req)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+
+	var response handlers.FailureEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode failure response: %v", err)
+	}
+	if response.OK || response.Reason != string(handlers.ReasonInternalError) {
+		t.Fatalf("expected reason %q, got %+v", handlers.ReasonInternalError, response)
 	}
 }
 
 func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	util.DB = db
+	repo := rusers.NewGormRepository(db)
 
 	testUser := modelstesting.GenerateUser("testuser", 1000)
 	if err := testUser.HashPassword("password123"); err != nil {
@@ -348,12 +386,99 @@ func TestLoginHandler_TrimsUsernameWhitespace(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(jsonData))
 			w := httptest.NewRecorder()
 
-			LoginHandler(w, req)
+			LoginHandler(repo, security.NewSecurityService())(w, req)
 
 			if w.Code != http.StatusOK {
 				t.Errorf("Usernames should be trimmed before DB lookup. Expected status code %d, got %d (body: %s)", http.StatusOK, w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestLoginHandler_SuccessResponseEnvelope(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := rusers.NewGormRepository(db)
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	testUser := modelstesting.GenerateUser("testuser", 1000)
+	if err := testUser.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	testUser.MustChangePassword = true
+	if err := db.Create(&testUser).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password123"}`))
+	w := httptest.NewRecorder()
+
+	LoginHandler(repo, security.NewSecurityService())(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var response struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			Token              string `json:"token"`
+			Username           string `json:"username"`
+			UserType           string `json:"usertype"`
+			MustChangePassword bool   `json:"mustChangePassword"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !response.OK {
+		t.Fatalf("expected ok=true")
+	}
+	if response.Result.Token == "" {
+		t.Fatalf("expected token in response")
+	}
+	if response.Result.Username != testUser.Username {
+		t.Fatalf("expected username %q, got %q", testUser.Username, response.Result.Username)
+	}
+	if !response.Result.MustChangePassword {
+		t.Fatalf("expected mustChangePassword=true")
+	}
+}
+
+func TestLoginHandler_InvalidCredentialsReturnsFailureEnvelope(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := rusers.NewGormRepository(db)
+
+	testUser := modelstesting.GenerateUser("testuser", 1000)
+	if err := testUser.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := db.Create(&testUser).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"wrong-password"}`))
+	w := httptest.NewRecorder()
+
+	LoginHandler(repo, security.NewSecurityService())(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var response struct {
+		OK     bool   `json:"ok"`
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if response.OK {
+		t.Fatalf("expected ok=false")
+	}
+	if response.Reason != string(handlers.ReasonAuthorizationDenied) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonAuthorizationDenied, response.Reason)
 	}
 }
 
@@ -364,16 +489,16 @@ func TestValidateTokenAndGetUser_MissingHeader(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateTokenAndGetUser(req, svc)
+	user, authErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindMissingToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindMissingToken, authErr.Kind)
 	}
 }
 
@@ -384,16 +509,16 @@ func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 
-	user, httpErr := ValidateTokenAndGetUser(req, svc)
+	user, authErr := ValidateTokenAndGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindInvalidToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindInvalidToken, authErr.Kind)
 	}
 }
 
@@ -425,6 +550,43 @@ func TestValidateAdminToken_InvalidToken(t *testing.T) {
 
 	if err == nil {
 		t.Error("Expected error but got none")
+	}
+}
+
+func TestAuthServiceRequireAdmin_EnforcesPasswordChange(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	ConfigureJWTSigningKey([]byte("test-secret-key"))
+
+	admin := modelstesting.GenerateUser("admin-needs-reset", 1000)
+	admin.UserType = "ADMIN"
+	admin.MustChangePassword = true
+	if err := admin.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := db.Create(&admin).Error; err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	auth := NewAuthService(svc)
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	token, err := generateJWT(admin.Username, getJWTKey())
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	user, authErr := auth.RequireAdmin(req)
+
+	if user != nil {
+		t.Fatalf("expected nil user when password change is required")
+	}
+	if authErr == nil {
+		t.Fatalf("expected password-change enforcement error")
+	}
+	if authErr.Kind != ErrorKindPasswordChangeRequired {
+		t.Fatalf("expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
 	}
 }
 
@@ -477,16 +639,53 @@ func TestValidateUserAndEnforcePasswordChangeGetUser_MissingToken(t *testing.T) 
 	req := httptest.NewRequest("GET", "/test", nil)
 	// No Authorization header
 
-	user, httpErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
+	user, authErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
 
 	if user != nil {
 		t.Error("Expected nil user")
 	}
-	if httpErr == nil {
+	if authErr == nil {
 		t.Error("Expected error but got none")
 	}
-	if httpErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("Expected status code %d, got %d", http.StatusUnauthorized, httpErr.StatusCode)
+	if authErr.Kind != ErrorKindMissingToken {
+		t.Errorf("Expected kind %q, got %q", ErrorKindMissingToken, authErr.Kind)
+	}
+}
+
+func TestValidateUserAndEnforcePasswordChangeGetUser_PasswordChangeRequired(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	testUser := modelstesting.GenerateUser("testuser", 1000)
+	testUser.MustChangePassword = true
+	if err := testUser.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := db.Create(&testUser).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	token, err := generateJWT(testUser.Username, getJWTKey())
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	user, authErr := ValidateUserAndEnforcePasswordChangeGetUser(req, svc)
+
+	if user != nil {
+		t.Fatalf("expected nil user when password change is required")
+	}
+	if authErr == nil {
+		t.Fatalf("expected password-change enforcement error")
+	}
+	if authErr.Kind != ErrorKindPasswordChangeRequired {
+		t.Fatalf("expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
+	}
+	if authErr.Message != "Password change required" {
+		t.Fatalf("expected password change message, got %q", authErr.Message)
 	}
 }
 
@@ -529,11 +728,7 @@ func TestJWTKeyExists(t *testing.T) {
 }
 
 func TestGenerateJWT_RequiresSigningKey(t *testing.T) {
-	originalKey := os.Getenv("JWT_SIGNING_KEY")
-	os.Setenv("JWT_SIGNING_KEY", "   ")
-	defer func() { os.Setenv("JWT_SIGNING_KEY", originalKey) }()
-
-	token, err := generateJWT("testuser", getJWTKey())
+	token, err := generateJWT("testuser", nil)
 	if err == nil {
 		t.Fatal("expected error when JWT key is empty")
 	}
@@ -546,6 +741,7 @@ func TestGenerateJWT_RequiresSigningKey(t *testing.T) {
 func TestMain(m *testing.M) {
 	// Set up test environment
 	os.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	ConfigureJWTSigningKey([]byte("test-secret-key-for-testing"))
 
 	// Run tests
 	code := m.Run()

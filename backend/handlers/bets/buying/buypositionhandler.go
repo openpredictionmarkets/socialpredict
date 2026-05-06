@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/bets/dto"
 	dbets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -16,19 +18,19 @@ import (
 func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
-		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
-		if httpErr != nil {
-			http.Error(w, httpErr.Error(), httpErr.StatusCode)
+		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
 			return
 		}
 
 		req, decodeErr := decodePlaceBetRequest(r)
 		if decodeErr != nil {
-			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -62,15 +64,15 @@ func toPlaceRequest(req dto.PlaceBetRequest, username string) dbets.PlaceRequest
 func writePlaceBetError(w http.ResponseWriter, err error) {
 	switch err {
 	case dbets.ErrInvalidOutcome, dbets.ErrInvalidAmount:
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	case dbets.ErrMarketClosed:
-		http.Error(w, err.Error(), http.StatusConflict)
+		_ = handlers.WriteFailure(w, http.StatusConflict, handlers.ReasonMarketClosed)
 	case dbets.ErrInsufficientBalance:
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
 	case dmarkets.ErrMarketNotFound:
-		http.Error(w, "Market not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }
 
@@ -83,7 +85,5 @@ func writePlaceBetResponse(w http.ResponseWriter, placedBet *dbets.PlacedBet) {
 		PlacedAt: placedBet.PlacedAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	_ = handlers.WriteResult(w, http.StatusCreated, response)
 }

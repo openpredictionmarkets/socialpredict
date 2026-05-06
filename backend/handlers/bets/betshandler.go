@@ -1,13 +1,13 @@
 package betshandlers
 
 import (
-	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 
+	"socialpredict/handlers"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/logger"
 
 	"github.com/gorilla/mux"
 )
@@ -16,13 +16,13 @@ import (
 func MarketBetsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
 		marketID, err := parseMarketID(mux.Vars(r)["marketId"])
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -32,11 +32,8 @@ func MarketBetsHandlerWithService(svc dmarkets.ServiceInterface) http.HandlerFun
 			return
 		}
 
-		// Respond with the bets display information
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(betsDisplayInfo); err != nil {
-			log.Printf("Error encoding bets response: %v", err)
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		if err := handlers.WriteResult(w, http.StatusOK, betsDisplayInfo); err != nil {
+			logger.LogError("MarketBets", "WriteResponse", err)
 		}
 	}
 }
@@ -56,11 +53,11 @@ func parseMarketID(marketIDStr string) (int64, error) {
 func writeMarketBetsError(w http.ResponseWriter, marketID int64, err error) {
 	switch err {
 	case dmarkets.ErrMarketNotFound:
-		http.Error(w, "Market not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	case dmarkets.ErrInvalidInput:
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 	default:
-		log.Printf("Error getting market bets for market %d: %v", marketID, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		logger.LogError("MarketBets", "GetMarketBets", err)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }

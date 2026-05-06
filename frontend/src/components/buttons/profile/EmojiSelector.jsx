@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { API_URL } from '../../../config';
-import ProfileEditButton from './ProfileButtons';
 import SiteButton from '../SiteButtons';
-import { emojis } from './Emojis';
+import EmojiPickerInput from '../../inputs/EmojiPicker';
 
-const EmojiSelector = ({ onSave }) => {
-    const [selectedEmoji, setSelectedEmoji] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filteredEmojis, setFilteredEmojis] = useState([]);
+const EmojiSelector = ({ currentEmoji = '', onSave }) => {
+    const [selectedEmoji, setSelectedEmoji] = useState(currentEmoji || '');
 
     // JWT token retrieval
     const token = localStorage.getItem('token');
@@ -16,22 +13,10 @@ const EmojiSelector = ({ onSave }) => {
         throw new Error('Token not found');
     }
 
-    useEffect(() => {
-        const regex = new RegExp(searchTerm, 'i');
-        const numberOfEmojisShown = 20;
-        setFilteredEmojis(emojis.filter(emoji => regex.test(emoji.name)).slice(0, numberOfEmojisShown));
-    }, [searchTerm]);
-
-    const handleEmojiClick = (emoji) => {
-        setSelectedEmoji(emoji);
-    };
-
-    const handleSearchChange = (event) => {
-        setSearchTerm(event.target.value);
-    };
-
     const handleSave = async () => {
-        if (!selectedEmoji) {
+        const emoji = selectedEmoji.trim();
+
+        if (!emoji) {
             alert('Please select an emoji before saving.');
             return;
         }
@@ -43,7 +28,7 @@ const EmojiSelector = ({ onSave }) => {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ emoji: selectedEmoji.symbol }), // Send only the symbol
+                body: JSON.stringify({ emoji }),
             });
 
             if (!response.ok) {
@@ -51,7 +36,7 @@ const EmojiSelector = ({ onSave }) => {
             }
 
             await response.json();
-            if (onSave) onSave(selectedEmoji.symbol);
+            if (onSave) onSave(emoji);
         } catch (error) {
             console.error('Error changing emoji:', error);
         }
@@ -59,27 +44,16 @@ const EmojiSelector = ({ onSave }) => {
 
 
     return (
-        <div>
-            <input
+        <div className="w-80 max-w-[80vw]">
+            <EmojiPickerInput
                 type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Search emojis..."
-                className="mb-4 px-2 py-1 border rounded text-black"
+                value={selectedEmoji}
+                onChange={(event) => setSelectedEmoji(event.target.value)}
+                placeholder="Choose an emoji"
+                maxLength={20}
+                replaceValueOnEmojiSelect
+                className="w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            {searchTerm && (
-                <div className="grid grid-cols-4 gap-1 max-h-56 overflow-auto">
-                    {filteredEmojis.map((emoji) => (
-                        <ProfileEditButton
-                            key={emoji.name}
-                            onClick={() => handleEmojiClick(emoji)}
-                            isSelected={selectedEmoji && selectedEmoji.name === emoji.name}
-                        >
-                            {emoji.symbol}
-                        </ProfileEditButton>
-                    ))}
-                </div>
-            )}
             <div className="mt-4 px-4 py-2">
                 <SiteButton onClick={handleSave}>
                     SAVE

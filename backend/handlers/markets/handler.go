@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/logger"
+	"socialpredict/security"
 
 	"github.com/gorilla/mux"
 )
@@ -30,45 +34,55 @@ type Service interface {
 
 // Handler handles HTTP requests for markets
 type Handler struct {
-	service Service
-	auth    authsvc.Authenticator
+	service         Service
+	auth            authsvc.Authenticator
+	securityService *security.SecurityService
 }
 
 // NewHandler creates a new markets handler
-func NewHandler(service Service, auth authsvc.Authenticator) *Handler {
+func NewHandler(service Service, auth authsvc.Authenticator, securityService *security.SecurityService) *Handler {
 	return &Handler{
-		service: service,
-		auth:    auth,
+		service:         service,
+		auth:            auth,
+		securityService: securityService,
 	}
 }
 
 // CreateMarket handles POST /markets
 func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
 	if h.auth == nil {
-		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		writeInternalError(w)
 		return
 	}
 
-	// Validate user authentication via auth service
 	user, httperr := h.auth.CurrentUser(r)
 	if httperr != nil {
-		http.Error(w, httperr.Error(), httperr.StatusCode)
+		writeAuthError(w, httperr)
 		return
 	}
 
-	// Parse request body
 	var req dto.CreateMarketRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON in request body", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	// Convert DTO to domain model
+	if h.securityService == nil || h.securityService.Sanitizer == nil {
+		writeInternalError(w)
+		return
+	}
+	sanitized, sanitizeErr := sanitizeMarketRequest(h.securityService, req)
+	if sanitizeErr != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	req = sanitized
+
 	createReq := dmarkets.MarketCreateRequest{
 		QuestionTitle:      req.QuestionTitle,
 		Description:        req.Description,
@@ -78,20 +92,15 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 		NoLabel:            req.NoLabel,
 	}
 
-	// Call service
 	market, err := h.service.CreateMarket(r.Context(), createReq, user.Username)
 	if err != nil {
-		h.handleError(w, err)
+		writeCreateError(w, err)
 		return
 	}
 
-	// Convert to response DTO
 	response := marketToResponse(market)
 
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	_ = writeJSON(w, http.StatusCreated, response)
 }
 
 // UpdateLabels handles PUT /markets/{id}/labels
@@ -171,38 +180,54 @@ func (h *Handler) GetMarket(w http.ResponseWriter, r *http.Request) {
 // ListMarkets handles GET /markets
 func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
 	params, err := parseListMarketsParams(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	// Call service
 	var markets []*dmarkets.Market
-	if params.status != "" {
+	if params.status != "" && params.filters.CreatedBy == "" {
 		page := dmarkets.Page{Limit: params.limit, Offset: params.offset}
 		markets, err = h.service.ListByStatus(r.Context(), params.status, page)
 	} else {
 		markets, err = h.service.ListMarkets(r.Context(), params.filters)
 	}
 	if err != nil {
-		h.handleError(w, err)
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarkets", "FetchMarkets", fmt.Errorf("request_id=%s status=%s created_by=%s limit=%d offset=%d: %w",
+			logger.RequestIDFromContext(r.Context()),
+			params.status,
+			params.filters.CreatedBy,
+			params.limit,
+			params.offset,
+			err,
+		))
+		writeListError(w, err)
 		return
 	}
 
 	overviews, err := buildMarketOverviewResponses(r.Context(), h.service, markets)
 	if err != nil {
-		h.handleError(w, err)
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarkets", "BuildMarketOverviewResponses", fmt.Errorf("request_id=%s markets_count=%d: %w",
+			logger.RequestIDFromContext(r.Context()),
+			len(markets),
+			err,
+		))
+		writeInternalError(w)
 		return
 	}
 
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+	_ = writeJSON(w, http.StatusOK, dto.ListMarketsResponse{
 		Markets: overviews,
 		Total:   len(overviews),
 	})
@@ -211,94 +236,98 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 // SearchMarkets handles GET /markets/search
 func (h *Handler) SearchMarkets(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
+		return
+	}
+	if h.securityService == nil || h.securityService.Sanitizer == nil {
+		writeInternalError(w)
 		return
 	}
 
 	params, err := h.parseSearchParams(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	// Call service
 	searchResults, err := h.service.SearchMarkets(r.Context(), params.Query, params.Filters)
 	if err != nil {
-		h.handleError(w, err)
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("SearchMarkets", "SearchMarkets", err)
+		writeListError(w, err)
 		return
 	}
 
 	response, buildErr := h.buildSearchResponse(r, searchResults)
 	if buildErr != nil {
-		h.handleError(w, buildErr)
+		if isRequestCanceled(buildErr) {
+			return
+		}
+		logger.LogError("SearchMarkets", "BuildSearchResponse", buildErr)
+		writeInternalError(w)
 		return
 	}
 
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = writeJSON(w, http.StatusOK, response)
 }
 
 // ResolveMarket handles POST /markets/{id}/resolve
 func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
-	// Parse market ID from URL
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	if idStr == "" {
-		http.Error(w, "Market ID is required", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
 	if h.auth == nil {
-		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		writeInternalError(w)
 		return
 	}
 
-	// Get user for authorization
 	user, httperr := h.auth.CurrentUser(r)
 	if httperr != nil {
-		http.Error(w, httperr.Error(), httperr.StatusCode)
+		writeAuthError(w, httperr)
 		return
 	}
 
-	// Parse request body
 	var req dto.ResolveMarketRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON in request body", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	// Call service
 	if err := h.service.ResolveMarket(r.Context(), id, req.Resolution, user.Username); err != nil {
-		h.handleError(w, err)
+		writeResolveErrorResponse(w, err)
 		return
 	}
 
-	// Send success response
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // ListByStatus handles GET /markets/status/{status}
 func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
 	statusValue, err := parseStatusFromRequest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
@@ -306,20 +335,25 @@ func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
 
 	markets, err := h.fetchMarketsByStatus(r.Context(), statusValue, page)
 	if err != nil {
-		h.handleError(w, err)
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarketsByStatus", "FetchMarketsByStatus", err)
+		writeListError(w, err)
 		return
 	}
 
-	// Convert to response DTOs
 	overviews, err := buildMarketOverviewResponses(r.Context(), h.service, markets)
 	if err != nil {
-		h.handleError(w, err)
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("ListMarketsByStatus", "BuildMarketOverviewResponses", err)
+		writeInternalError(w)
 		return
 	}
 
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+	_ = writeJSON(w, http.StatusOK, dto.ListMarketsResponse{
 		Markets: overviews,
 		Total:   len(overviews),
 	})
@@ -328,28 +362,26 @@ func (h *Handler) ListByStatus(w http.ResponseWriter, r *http.Request) {
 // GetDetails handles GET /markets/{id} with full market details
 func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
-	// Parse market ID from URL
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	if idStr == "" {
-		http.Error(w, "Market ID is required", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	// Call service
 	details, err := h.service.GetMarketDetails(r.Context(), id)
 	if err != nil {
-		h.handleError(w, err)
+		writeDetailsError(w, err)
 		return
 	}
 
@@ -362,29 +394,27 @@ func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
 		MarketDust:         details.MarketDust,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = writeJSON(w, http.StatusOK, response)
 }
 
 // MarketLeaderboard handles GET /markets/{id}/leaderboard
 func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
 	id, err := parseMarketIDFromRequest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
 	page := parsePagination(r, 100)
 
-	// Call service
 	leaderboard, err := h.service.GetMarketLeaderboard(r.Context(), id, page)
 	if err != nil {
-		h.handleError(w, err)
+		writeLeaderboardError(w, err)
 		return
 	}
 
@@ -396,63 +426,49 @@ func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
 		Total:       len(leaderRows),
 	}
 
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = handlers.WriteResult(w, http.StatusOK, response)
 }
 
 // ProjectProbability handles GET /markets/{id}/projection
 func (h *Handler) ProjectProbability(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
-	// Parse market ID from URL
-	vars := mux.Vars(r)
-	marketIdStr := vars["marketId"]
-	amountStr := vars["amount"]
-	outcome := vars["outcome"]
-
-	// Parse marketId
-	marketId, err := strconv.ParseInt(marketIdStr, 10, 64)
+	marketID, err := parseMarketIDFromRequest(r)
 	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	// Parse amount
-	amount, err := strconv.ParseInt(amountStr, 10, 64)
+	amount, outcome, err := parseProjectionQuery(r)
 	if err != nil {
-		http.Error(w, "Invalid amount value", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	// Build domain request
 	projectionReq := dmarkets.ProbabilityProjectionRequest{
-		MarketID: marketId,
+		MarketID: marketID,
 		Amount:   amount,
 		Outcome:  outcome,
 	}
 
-	// Call service
 	projection, err := h.service.ProjectProbability(r.Context(), projectionReq)
 	if err != nil {
-		h.handleError(w, err)
+		writeProjectionError(w, err)
 		return
 	}
 
-	// Return response DTO
 	response := dto.ProbabilityProjectionResponse{
-		MarketID:             marketId,
+		MarketID:             marketID,
 		CurrentProbability:   projection.CurrentProbability,
 		ProjectedProbability: projection.ProjectedProbability,
 		Amount:               amount,
 		Outcome:              outcome,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = writeJSON(w, http.StatusOK, response)
 }
 
 // handleError maps domain errors to HTTP responses
@@ -541,6 +557,20 @@ func parseMarketIDFromRequest(r *http.Request) (int64, error) {
 	return strconv.ParseInt(idStr, 10, 64)
 }
 
+func parseProjectionQuery(r *http.Request) (int64, string, error) {
+	amount, err := strconv.ParseInt(r.URL.Query().Get("amount"), 10, 64)
+	if err != nil {
+		return 0, "", err
+	}
+
+	outcome := r.URL.Query().Get("outcome")
+	if outcome == "" {
+		return 0, "", errors.New("outcome is required")
+	}
+
+	return amount, outcome, nil
+}
+
 func buildLeaderboardRows(leaderboard []*dmarkets.LeaderboardRow) []dto.LeaderboardRow {
 	if len(leaderboard) == 0 {
 		return []dto.LeaderboardRow{}
@@ -568,40 +598,13 @@ type searchParams struct {
 }
 
 func (h *Handler) parseSearchParams(r *http.Request) (searchParams, error) {
-	query := r.URL.Query().Get("query")
-	if query == "" {
-		query = r.URL.Query().Get("q")
+	params, parseErr := parseSearchRequest(r, h.securityService)
+	if parseErr != nil {
+		return searchParams{}, errors.New(parseErr.message)
 	}
-	if query == "" {
-		return searchParams{}, errors.New("Query parameter 'query' is required")
-	}
-
-	status, err := normalizeStatusParam(r.URL.Query().Get("status"))
-	if err != nil {
-		return searchParams{}, err
-	}
-
-	limit := 0
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil {
-			limit = parsedLimit
-		}
-	}
-
-	offset := 0
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil {
-			offset = parsedOffset
-		}
-	}
-
 	return searchParams{
-		Query: query,
-		Filters: dmarkets.SearchFilters{
-			Status: status,
-			Limit:  limit,
-			Offset: offset,
-		},
+		Query:   params.query,
+		Filters: params.filters,
 	}, nil
 }
 

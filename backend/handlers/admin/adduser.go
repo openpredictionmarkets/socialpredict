@@ -1,38 +1,44 @@
 package adminhandlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
-	"math/rand"
 	"net/http"
+	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
+	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
-	"socialpredict/models"
+	configsvc "socialpredict/internal/service/config"
+	"socialpredict/logger"
 	"socialpredict/security"
-	"socialpredict/setup"
-	"socialpredict/util"
-
-	"github.com/brianvoe/gofakeit"
-	"gorm.io/gorm"
+	"strings"
 )
 
-func AddUserHandler(loadEconConfig setup.EconConfigLoader, auth authsvc.Authenticator) func(http.ResponseWriter, *http.Request) {
+type adminUserCreator interface {
+	CreateAdminManagedUser(ctx context.Context, req dusers.AdminManagedUserCreateRequest) (*dusers.AdminManagedUserCreateResult, error)
+}
+
+func AddUserHandler(userCreator adminUserCreator, configService configsvc.Service, auth authsvc.Authenticator, securityService *security.SecurityService) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
-		responseData, handlerErr := processAddUser(r, loadEconConfig, auth)
+		responseData, handlerErr := processAddUser(r, userCreator, configService, auth, securityService)
 		if handlerErr != nil {
-			http.Error(w, handlerErr.message, handlerErr.statusCode)
-			if handlerErr.logErr != nil {
-				log.Printf("AddUserHandler: %v", handlerErr.logErr)
-			}
+			_ = handlers.WriteFailure(w, handlerErr.statusCode, handlerErr.reason)
+			logAddUserFailure(handlerErr)
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(responseData)
+		if username, ok := responseData["username"].(string); ok {
+			logger.LogInfo("AddUser", "ProcessAddUser", "Created user "+username)
+		}
 	}
 }
 
@@ -40,50 +46,68 @@ type handlerError struct {
 	message    string
 	statusCode int
 	logErr     error
+	reason     handlers.FailureReason
 }
 
-func processAddUser(r *http.Request, loadEconConfig setup.EconConfigLoader, auth authsvc.Authenticator) (map[string]interface{}, *handlerError) {
-	securityService := security.NewSecurityService()
+func processAddUser(r *http.Request, userCreator adminUserCreator, configService configsvc.Service, auth authsvc.Authenticator, securityService *security.SecurityService) (map[string]interface{}, *handlerError) {
 	req, decodeErr := decodeAddUserRequest(r)
 	if decodeErr != nil {
-		return nil, &handlerError{message: decodeErr.Error(), statusCode: http.StatusBadRequest, logErr: decodeErr}
+		return nil, &handlerError{
+			message:    decodeErr.Error(),
+			statusCode: http.StatusBadRequest,
+			logErr:     decodeErr,
+			reason:     handlers.ReasonInvalidRequest,
+		}
+	}
+
+	if securityService == nil {
+		return nil, &handlerError{message: "security service unavailable", statusCode: http.StatusInternalServerError, reason: handlers.ReasonInternalError}
 	}
 
 	if err := validateAddUserUsername(securityService, req.Username); err != nil {
-		return nil, &handlerError{message: "Invalid username: " + err.Error(), statusCode: http.StatusBadRequest, logErr: err}
+		return nil, &handlerError{
+			message:    "Invalid username: " + err.Error(),
+			statusCode: http.StatusBadRequest,
+			logErr:     err,
+			reason:     handlers.ReasonValidationFailed,
+		}
 	}
 	req.Username, _ = securityService.Sanitizer.SanitizeUsername(req.Username)
 
-	db := util.GetDB()
+	if userCreator == nil {
+		return nil, &handlerError{message: "user service unavailable", statusCode: http.StatusInternalServerError, reason: handlers.ReasonInternalError}
+	}
 
 	if auth == nil {
-		return nil, &handlerError{message: "authentication service unavailable", statusCode: http.StatusInternalServerError}
+		return nil, &handlerError{message: "authentication service unavailable", statusCode: http.StatusInternalServerError, reason: handlers.ReasonInternalError}
 	}
-	if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
-		return nil, &handlerError{message: httpErr.Message, statusCode: httpErr.StatusCode}
-	}
-
-	appConfig := loadEconConfig()
-	user := buildNewUser(db, req.Username, appConfig)
-
-	if err := checkUniqueFields(db, &user); err != nil {
-		return nil, &handlerError{message: err.Error(), statusCode: http.StatusBadRequest, logErr: err}
+	if _, authErr := auth.RequireAdmin(r); authErr != nil {
+		return nil, &handlerError{
+			message:    authErr.Message,
+			statusCode: authhttp.StatusCode(authErr),
+			logErr:     errors.New(authErr.Message),
+			reason:     authhttp.FailureReason(authErr),
+		}
 	}
 
-	password, err := generateAndHashPassword(&user)
+	if configService == nil {
+		return nil, &handlerError{message: "configuration service unavailable", statusCode: http.StatusInternalServerError, reason: handlers.ReasonInternalError}
+	}
+
+	appConfig := configService.Current()
+	result, err := userCreator.CreateAdminManagedUser(r.Context(), dusers.AdminManagedUserCreateRequest{
+		Username:              req.Username,
+		InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
+	})
 	if err != nil {
-		return nil, &handlerError{message: err.Error(), statusCode: http.StatusInternalServerError, logErr: err}
-	}
-
-	if result := db.Create(&user); result.Error != nil {
-		return nil, &handlerError{message: "Failed to create user", statusCode: http.StatusInternalServerError, logErr: result.Error}
+		return nil, addUserCreateError(err)
 	}
 
 	responseData := map[string]interface{}{
 		"message":  "User created successfully",
-		"username": user.Username,
-		"password": password,
-		"usertype": user.UserType,
+		"username": result.Username,
+		"password": result.Password,
+		"usertype": result.UserType,
 	}
 	return responseData, nil
 }
@@ -108,48 +132,38 @@ func validateAddUserUsername(securityService *security.SecurityService, username
 	return err
 }
 
-func buildNewUser(db *gorm.DB, username string, appConfig *setup.EconomicConfig) models.User {
-	return models.User{
-		PublicUser: models.PublicUser{
-			Username:              username,
-			DisplayName:           util.UniqueDisplayName(db),
-			UserType:              "REGULAR",
-			InitialAccountBalance: appConfig.Economics.User.InitialAccountBalance,
-			AccountBalance:        appConfig.Economics.User.InitialAccountBalance,
-			PersonalEmoji:         randomEmoji(),
-		},
-		PrivateUser: models.PrivateUser{
-			Email:  util.UniqueEmail(db),
-			APIKey: util.GenerateUniqueApiKey(db),
-		},
-		MustChangePassword: true,
+func addUserCreateError(err error) *handlerError {
+	if errors.Is(err, dusers.ErrUserAlreadyExists) {
+		validationErr := fmt.Errorf("username, display name, email, or API key already in use")
+		return &handlerError{
+			message:    validationErr.Error(),
+			statusCode: http.StatusBadRequest,
+			logErr:     validationErr,
+			reason:     handlers.ReasonValidationFailed,
+		}
+	}
+
+	return &handlerError{
+		message:    "Failed to create user",
+		statusCode: http.StatusInternalServerError,
+		logErr:     err,
+		reason:     handlers.ReasonInternalError,
 	}
 }
 
-func generateAndHashPassword(user *models.User) (string, error) {
-	password := gofakeit.Password(true, true, true, false, false, 12)
-	if err := user.HashPassword(password); err != nil {
-		return "", fmt.Errorf("Failed to hash password")
-	}
-	return password, nil
-}
-
-func checkUniqueFields(db *gorm.DB, user *models.User) error {
-	// Check for existing users with the same username, display name, email, or API key.
-	var count int64
-	db.Model(&models.User{}).Where(
-		"username = ? OR display_name = ? OR email = ? OR api_key = ?",
-		user.Username, user.DisplayName, user.Email, user.APIKey,
-	).Count(&count)
-
-	if count > 0 {
-		return fmt.Errorf("username, display name, email, or API key already in use")
+func logAddUserFailure(handlerErr *handlerError) {
+	if handlerErr == nil || handlerErr.logErr == nil {
+		return
 	}
 
-	return nil
-}
+	if handlerErr.statusCode >= http.StatusInternalServerError {
+		logger.LogError("AddUser", "ProcessAddUser", handlerErr.logErr)
+		return
+	}
 
-func randomEmoji() string {
-	emojis := []string{"😀", "😃", "😄", "😁", "😆"}
-	return emojis[rand.Intn(len(emojis))]
+	message := strings.TrimSpace(handlerErr.message)
+	if message == "" {
+		message = handlerErr.logErr.Error()
+	}
+	logger.LogWarn("AddUser", "ProcessAddUser", message)
 }

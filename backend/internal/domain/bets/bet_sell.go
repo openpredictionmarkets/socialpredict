@@ -7,6 +7,8 @@ import (
 )
 
 // Sell processes a sell request for credits.
+// Sale settlement is accounting-sensitive and remains a synchronous ledger write,
+// not a replayable read seam or background execution candidate.
 func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error) {
 	outcome, err := s.sellValidator.Validate(ctx, req)
 	if err != nil {

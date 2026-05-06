@@ -15,20 +15,14 @@ func (s *Service) ComputeUserFinancials(ctx context.Context, req FinancialSnapsh
 		return nil, errors.New("repository not provided")
 	}
 
-	if s.econLoader == nil {
-		return nil, errors.New("economic configuration loader not provided")
-	}
-
 	positions, err := s.repo.UserMarketPositions(ctx, req.Username)
 	if err != nil {
 		return nil, err
 	}
 
-	econConfig := s.econLoader()
-
 	snapshot := &FinancialSnapshot{
 		AccountBalance:     req.AccountBalance,
-		MaximumDebtAllowed: econConfig.Economics.User.MaximumDebtAllowed,
+		MaximumDebtAllowed: s.config.MaximumDebtAllowed,
 	}
 
 	for _, pos := range positions {

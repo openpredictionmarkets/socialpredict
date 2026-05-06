@@ -1,77 +1,41 @@
-### SocialPredict Logging — simplelogging.go Conventions & Usage Overview
+### SocialPredict Runtime Logger Contract
 
-Purpose: provide consistent INFO, WARN, and ERROR lines that include the original caller’s file:line plus your message.
+`backend/logger` is the sole backend runtime log-emission adapter for startup, server, and middleware code.
 
-Output format (stdout): YYYY/MM/DD HH:MM:SS LEVEL file.go:line logger.(*CustomLogger).Level() - Context - Function: Message
+Use the concrete package helpers:
 
-Where to view (Docker): run and watch backend logs
-docker logs -f socialpredict-backend-container
-
-Current Logger with levels: (backend/logger/simplelogging.go)
-
-```
-// LogInfo is a convenience function to log informational messages with context.
-func LogInfo(context, function, message string) {
-logger := NewCustomLogger(os.Stdout, "", log.LstdFlags)
-logger.Info(fmt.Sprintf("%s - %s: %s", context, function, message))
-}
-
-// LogWarn is a convenience function to log warning messages with context.
-func LogWarn(context, function, message string) {
-logger := NewCustomLogger(os.Stdout, "", log.LstdFlags)
-logger.Warn(fmt.Sprintf("%s - %s: %s", context, function, message))
-}
-
-// LogError is a convenience function to log errors with context.
-func LogError(context, function string, err error) {
-logger := NewCustomLogger(os.Stdout, "", log.LstdFlags)
-logger.Error(fmt.Sprintf("%s - %s: %v", context, function, err))
-}
+```go
+logger.Info("server", "HTTP server listening", logger.Operation("Start"), logger.Address(":8080"))
+logger.Warn("startup", "development environment override not loaded", logger.Operation("LoadDevFile"), logger.Err(err))
+logger.Error("auth", "request authentication failed", err, logger.Operation("Authenticate"))
+logger.Fatal("startup", "database initialization failed", err, logger.Operation("InitDB"))
 ```
 
-#### Usage in code (handlers or core)
+Stable runtime field vocabulary:
 
-```
-Import the logger package
-import "socialpredict/logger"
+- `component`: runtime area such as `startup`, `server`, or `middleware`
+- `operation`: the concrete function or boundary action
+- `trace_id`
+- `span_id`
+- `trace_flags`
+- `address`
+- `error`
+- `source`: caller file and line injected by the logger
 
-Log at key points in your function
+Trace correlation:
 
-logger.LogInfo("ChangePassword", "ChangePassword", "ChangePassword handler called")
+- Use `logger.TraceContext(traceID, spanID, traceFlags)` when identifiers already exist.
+- Use `logger.TraceContextFromTraceparent(r.Header.Get("Traceparent"))` in middleware or transport code that receives W3C trace headers.
+- If correlation data is unavailable, omit those fields rather than inventing placeholders.
+- These helpers preserve correlation fields only; future tracing or metric export rollout stays in runtime wiring and is not defined by the logger's stdout format.
 
-securityService := security.NewSecurityService()
-db := util.GetDB()
+Secret-safety rules:
 
-user, httperr := auth.ValidateTokenAndGetUser(r, usersSvc)
-if httperr != nil {
-http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
-logger.LogError("ChangePassword", "ValidateTokenAndGetUser", httperr)
-return
-}
+- Never log passwords, raw tokens, API keys, cookies, authorization headers, or full request bodies.
+- The logger redacts obvious secret-bearing field keys and common `key=value` or `Bearer ...` patterns before emission.
+- Redaction is a guardrail, not a license to pass secrets into log messages.
 
-if _, err := securityService.Sanitizer.SanitizePassword(req.NewPassword); err != nil {
-http.Error(w, err.Error(), http.StatusBadRequest)
-logger.LogError("ChangePassword", "ValidateNewPasswordStrength", err)
-return
-}
-```
+Compatibility:
 
-#### Conventions for message content
-
-Format: Context - Function: Message
-
-Context examples: ChangePassword, BuyPosition, ResolveMarket
-
-Function examples: DecodeRequestBody, ValidateInputFields, UpdatePasswordInDB
-
-Message: concise, human-readable, and safe
-
-Do not include passwords, raw tokens, or full request bodies
-
-Example outputs
-
-```
-2025/10/06 11:36:13 INFO changepassword.go:25 logger.(*CustomLogger).Info() - ChangePassword - ChangePassword: ChangePassword handler called
-
-2025/10/06 11:36:13 ERROR changepassword.go:54 logger.(*CustomLogger).Error() - ChangePassword - ValidateInputFields: New password is required
-```
+- `LogInfo`, `LogWarn`, and `LogError` remain as shims for older call sites.
+- New runtime callers should prefer `Info`, `Warn`, `Error`, `Fatal`, and the field helpers above so the package vocabulary stays uniform.

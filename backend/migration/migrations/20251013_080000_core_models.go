@@ -1,7 +1,7 @@
 package migrations
 
 import (
-	"log"
+	"os"
 
 	"socialpredict/logger"
 	"socialpredict/migration"
@@ -37,7 +37,7 @@ func init() {
 
 	// In init() functions, registration failure is a critical startup error
 	if err != nil {
-		logger.LogError("migrations", "init", err)
-		log.Fatalf("Failed to register migration 20251013080000: %v", err)
+		logger.LogError("MigrationRegistration", "init", err)
+		os.Exit(1)
 	}
 }

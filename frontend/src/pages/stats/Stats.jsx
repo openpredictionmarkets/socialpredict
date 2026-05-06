@@ -4,6 +4,7 @@ import { API_URL } from '../../config';
 import SiteButton from '../../components/buttons/SiteButtons';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import SiteTabs from '../../components/tabs/SiteTabs';
+import { unwrapApiResponse } from '../../utils/apiResponse';
 
 // MetricCard Component
 const MetricCard = ({
@@ -88,7 +89,7 @@ const Stats = () => {
         }
 
         const data = await response.json();
-        setStatsData(data);
+        setStatsData(unwrapApiResponse(data));
       } catch (err) {
         setError(err.message);
       } finally {
@@ -115,7 +116,7 @@ const Stats = () => {
       }
 
       const data = await response.json();
-      setSystemMetrics(data);
+      setSystemMetrics(unwrapApiResponse(data));
     } catch (err) {
       setMetricsError(err.message);
     } finally {
@@ -139,7 +140,7 @@ const Stats = () => {
       }
 
       const data = await response.json();
-      setGlobalLeaderboard(data);
+      setGlobalLeaderboard(unwrapApiResponse(data));
     } catch (err) {
       setLeaderboardError(err.message);
     } finally {

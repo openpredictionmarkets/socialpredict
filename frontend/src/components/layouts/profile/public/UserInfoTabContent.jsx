@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../../../../config';
 import LoadingSpinner from '../../../loaders/LoadingSpinner';
+import { useAuth } from '../../../../helpers/AuthContent';
 
 const UserInfoTabContent = ({ username, userData }) => {
     const [userCredit, setUserCredit] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { token } = useAuth();
 
     useEffect(() => {
         const fetchUserCredit = async () => {
             try {
-                const response = await fetch(`${API_URL}/v0/usercredit/${username}`);
+                const headers = token
+                    ? {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                    : {};
+
+                const response = await fetch(`${API_URL}/v0/usercredit/${username}`, { headers });
                 if (response.ok) {
                     const data = await response.json();
                     setUserCredit(data);
@@ -24,10 +33,12 @@ const UserInfoTabContent = ({ username, userData }) => {
             }
         };
 
-        if (username) {
+        if (username && token) {
             fetchUserCredit();
+        } else {
+            setLoading(false);
         }
-    }, [username]);
+    }, [username, token]);
 
     const renderPersonalLinks = () => {
         if (!userData) return null;

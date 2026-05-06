@@ -9,47 +9,51 @@ import (
 
 // Authenticator exposes the authentication operations used by HTTP handlers.
 type Authenticator interface {
-	CurrentUser(r *http.Request) (*dusers.User, *HTTPError)
-	RequireUser(r *http.Request) (*dusers.User, *HTTPError)
-	RequireAdmin(r *http.Request) (*dusers.User, *HTTPError)
+	CurrentUser(r *http.Request) (*dusers.User, *AuthError)
+	RequireUser(r *http.Request) (*dusers.User, *AuthError)
+	RequireAdmin(r *http.Request) (*dusers.User, *AuthError)
 }
 
 // AuthService provides a façade over the authentication helpers so callers can
 // depend on a single injected object rather than package-level functions.
 type AuthService struct {
-	users dusers.ServiceInterface
+	users         dusers.ServiceInterface
+	jwtSigningKey []byte
 }
 
 // NewAuthService constructs a façade that uses the provided users service for
 // token validation and password-change enforcement.
-func NewAuthService(users dusers.ServiceInterface) *AuthService {
-	return &AuthService{users: users}
+func NewAuthService(users dusers.ServiceInterface, jwtSigningKey ...[]byte) *AuthService {
+	var key []byte
+	if len(jwtSigningKey) > 0 && len(jwtSigningKey[0]) > 0 {
+		key = append([]byte(nil), jwtSigningKey[0]...)
+	} else {
+		key = currentJWTSigningKey()
+	}
+	return &AuthService{users: users, jwtSigningKey: key}
 }
 
 // CurrentUser returns the authenticated user, ensuring any password-change
 // requirements are enforced.
-func (a *AuthService) CurrentUser(r *http.Request) (*dusers.User, *HTTPError) {
-	return ValidateUserAndEnforcePasswordChangeGetUser(r, a.users)
+func (a *AuthService) CurrentUser(r *http.Request) (*dusers.User, *AuthError) {
+	return ValidateUserAndEnforcePasswordChangeGetUserWithSigningKey(r, a.users, a.jwtSigningKey)
 }
 
 // RequireUser resolves the authenticated user without checking the
 // must-change-password flag.
-func (a *AuthService) RequireUser(r *http.Request) (*dusers.User, *HTTPError) {
-	return ValidateTokenAndGetUser(r, a.users)
+func (a *AuthService) RequireUser(r *http.Request) (*dusers.User, *AuthError) {
+	return ValidateTokenAndGetUserWithSigningKey(r, a.users, a.jwtSigningKey)
 }
 
 // RequireAdmin ensures the current user is authenticated and has admin privileges.
-func (a *AuthService) RequireAdmin(r *http.Request) (*dusers.User, *HTTPError) {
-	user, err := a.RequireUser(r)
+func (a *AuthService) RequireAdmin(r *http.Request) (*dusers.User, *AuthError) {
+	user, err := a.CurrentUser(r)
 	if err != nil {
 		return nil, err
 	}
 
 	if strings.ToUpper(user.UserType) != "ADMIN" {
-		return nil, &HTTPError{
-			StatusCode: http.StatusForbidden,
-			Message:    "admin privileges required",
-		}
+		return nil, newAuthError(ErrorKindAdminRequired)
 	}
 
 	return user, nil

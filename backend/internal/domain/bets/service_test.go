@@ -7,25 +7,39 @@ import (
 	"time"
 
 	bets "socialpredict/internal/domain/bets"
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
-	"socialpredict/setup"
 )
+
+// Bets service tests use fakes to keep accounting rules package-local and fast.
+// They prove ordering and collaborator boundaries, not database truth. WAVE07
+// added repository-level Postgres proof for place-bet transaction behavior;
+// sell-position concurrency still needs source-of-truth verification once its
+// repository transaction scope is finalized.
 
 var errUnexpectedServiceCall = errors.New("unexpected call")
 
 type fakeRepo struct {
-	created *models.Bet
+	created *boundary.Bet
 	writer  fakeBetWriter
 	history fakeBetHistoryReader
+}
+
+type fakePlaceUnit struct {
+	repo  bets.Repository
+	users bets.UserService
+}
+
+func (f fakePlaceUnit) PlaceBetTransaction(ctx context.Context, fn bets.PlaceTransactionFunc) error {
+	return fn(ctx, f.repo, f.users)
 }
 
 func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
 	repo := &fakeRepo{
 		writer: fakeBetWriter{
-			createFunc: func(context.Context, *models.Bet) error { return nil },
+			createFunc: func(context.Context, *boundary.Bet) error { return nil },
 		},
 		history: fakeBetHistoryReader{
 			hasBetFunc: func(context.Context, uint, string) (bool, error) { return false, nil },
@@ -37,7 +51,7 @@ func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
 	return repo
 }
 
-func withFakeRepoCreate(fn func(ctx context.Context, bet *models.Bet) error) func(*fakeRepo) {
+func withFakeRepoCreate(fn func(ctx context.Context, bet *boundary.Bet) error) func(*fakeRepo) {
 	return func(repo *fakeRepo) {
 		repo.writer.createFunc = fn
 	}
@@ -50,10 +64,10 @@ func withFakeRepoHasBet(fn func(ctx context.Context, marketID uint, username str
 }
 
 type fakeBetWriter struct {
-	createFunc func(ctx context.Context, bet *models.Bet) error
+	createFunc func(ctx context.Context, bet *boundary.Bet) error
 }
 
-func (f *fakeRepo) Create(ctx context.Context, bet *models.Bet) error {
+func (f *fakeRepo) Create(ctx context.Context, bet *boundary.Bet) error {
 	return f.writer.Create(ctx, bet, f)
 }
 
@@ -65,7 +79,7 @@ func (f *fakeRepo) UserHasBet(ctx context.Context, marketID uint, username strin
 	return f.history.UserHasBet(ctx, marketID, username)
 }
 
-func (f fakeBetWriter) Create(ctx context.Context, bet *models.Bet, repo *fakeRepo) error {
+func (f fakeBetWriter) Create(ctx context.Context, bet *boundary.Bet, repo *fakeRepo) error {
 	if f.createFunc == nil {
 		return errUnexpectedServiceCall
 	}
@@ -247,7 +261,7 @@ func (c fixedClock) Now() time.Time {
 }
 
 type serviceFixture struct {
-	econ    *setup.EconomicConfig
+	config  bets.Config
 	repo    *fakeRepo
 	markets *fakeMarkets
 	users   *fakeUsers
@@ -289,14 +303,23 @@ func withFixtureUser(user *dusers.User) serviceFixtureOption {
 
 func withFixtureMaxDust(maxDust int64) serviceFixtureOption {
 	return func(f *serviceFixture) {
-		f.econ.Economics.Betting.MaxDustPerSale = maxDust
+		f.config.MaxDustPerSale = maxDust
+	}
+}
+
+func defaultBetsConfig() bets.Config {
+	econ := modelstesting.GenerateEconomicConfig()
+	return bets.Config{
+		InitialBetFee:      econ.Economics.Betting.BetFees.InitialBetFee,
+		BuySharesFee:       econ.Economics.Betting.BetFees.BuySharesFee,
+		MaxDustPerSale:     econ.Economics.Betting.MaxDustPerSale,
+		MaximumDebtAllowed: econ.Economics.User.MaximumDebtAllowed,
 	}
 }
 
 func newServiceFixture(now time.Time, opts ...serviceFixtureOption) (*serviceFixture, *bets.Service) {
-	econ := modelstesting.GenerateEconomicConfig()
 	fixture := &serviceFixture{
-		econ:    econ,
+		config:  defaultBetsConfig(),
 		repo:    newFakeRepo(),
 		markets: newFakeMarkets(),
 		users:   newFakeUsers(),
@@ -305,7 +328,15 @@ func newServiceFixture(now time.Time, opts ...serviceFixtureOption) (*serviceFix
 	for _, opt := range opts {
 		opt(fixture)
 	}
-	svc := bets.NewService(fixture.repo, fixture.markets, fixture.users, fixture.econ, fixture.clock)
+	placeUnit := fakePlaceUnit{repo: fixture.repo, users: fixture.users}
+	svc := bets.NewService(
+		fixture.repo,
+		fixture.markets,
+		fixture.users,
+		fixture.config,
+		fixture.clock,
+		bets.WithPlaceUnitOfWork(placeUnit),
+	)
 	return fixture, svc
 }
 
@@ -343,12 +374,12 @@ func TestServicePlace_Succeeds(t *testing.T) {
 	if len(fixture.users.calls) != 1 {
 		t.Fatalf("expected one ApplyTransaction call, got %d", len(fixture.users.calls))
 	}
-	totalCost := int64(100 + fixture.econ.Economics.Betting.BetFees.InitialBetFee + fixture.econ.Economics.Betting.BetFees.BuySharesFee)
+	totalCost := int64(100 + fixture.config.InitialBetFee + fixture.config.BuySharesFee)
 	if fixture.users.calls[0].amount != totalCost {
 		t.Fatalf("unexpected transaction amount: %d", fixture.users.calls[0].amount)
 	}
 
-	fallbackService := bets.NewService(fixture.repo, fixture.markets, fixture.users, nil, nil, bets.WithClock(nil))
+	fallbackService := bets.NewService(fixture.repo, fixture.markets, fixture.users, bets.Config{}, nil, bets.WithClock(nil))
 	if fallbackService == nil {
 		t.Fatalf("expected fallback service")
 	}

@@ -3,8 +3,6 @@ package app
 import (
 	"time"
 
-	"socialpredict/setup"
-
 	"gorm.io/gorm"
 
 	// Domain services
@@ -23,6 +21,7 @@ import (
 	// Handlers
 	hmarkets "socialpredict/handlers/markets"
 	authsvc "socialpredict/internal/service/auth"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/security"
 )
 
@@ -40,9 +39,10 @@ func (SystemClock) Now() time.Time {
 
 // Container holds all the application dependencies
 type Container struct {
-	db     *gorm.DB
-	config *setup.EconomicConfig
-	clock  Clock
+	db            *gorm.DB
+	configService configsvc.Service
+	config        *configsvc.AppConfig
+	clock         Clock
 
 	// Repositories
 	marketsRepo   rmarkets.GormRepository
@@ -56,18 +56,31 @@ type Container struct {
 	usersService     *dusers.Service
 	betsService      *dbets.Service
 	authService      *authsvc.AuthService
+	jwtSigningKey    []byte
+	securityService  *security.SecurityService
 
 	// Handlers
 	marketsHandler *hmarkets.Handler
 }
 
 // NewContainer creates a new dependency injection container
-func NewContainer(db *gorm.DB, config *setup.EconomicConfig) *Container {
-	return &Container{
-		db:     db,
-		config: config,
-		clock:  SystemClock{},
+func NewContainer(db *gorm.DB, configService configsvc.Service) *Container {
+	if configService == nil {
+		configService = configsvc.NewStaticService(nil)
 	}
+
+	return &Container{
+		db:            db,
+		configService: configService,
+		config:        configService.Current(),
+		clock:         SystemClock{},
+	}
+}
+
+func NewContainerWithJWTSigningKey(db *gorm.DB, configService configsvc.Service, jwtSigningKey []byte) *Container {
+	container := NewContainer(db, configService)
+	container.jwtSigningKey = append([]byte(nil), jwtSigningKey...)
+	return container
 }
 
 // InitializeRepositories sets up all repository implementations
@@ -80,8 +93,7 @@ func (c *Container) InitializeRepositories() {
 // InitializeServices sets up all domain services with their dependencies
 func (c *Container) InitializeServices() {
 	// Users service depends on users repository and configuration
-	securityService := security.NewSecurityService()
-	configLoader := func() *setup.EconomicConfig { return c.config }
+	c.securityService = security.NewSecurityService()
 
 	wpamSeeds := wpam.Seeds{
 		InitialProbability:     c.config.Economics.MarketCreation.InitialMarketProbability,
@@ -96,11 +108,22 @@ func (c *Container) InitializeServices() {
 	)
 
 	positionCalcAdapter := analytics.NewMarketPositionCalculator(positionCalculator)
+	analyticsConfig := analytics.Config{
+		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
+		CreateMarketCost:   c.config.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:      c.config.Economics.Betting.BetFees.InitialBetFee,
+	}
+	betsConfig := dbets.Config{
+		InitialBetFee:      c.config.Economics.Betting.BetFees.InitialBetFee,
+		BuySharesFee:       c.config.Economics.Betting.BetFees.BuySharesFee,
+		MaxDustPerSale:     c.config.Economics.Betting.MaxDustPerSale,
+		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
+	}
 
 	c.analyticsRepo = *analytics.NewGormRepository(c.db, analytics.WithRepositoryPositionCalculator(positionCalcAdapter))
-	c.analyticsService = analytics.NewService(&c.analyticsRepo, configLoader, analytics.WithPositionCalculator(positionCalcAdapter))
-	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, securityService.Sanitizer)
-	c.authService = authsvc.NewAuthService(c.usersService)
+	c.analyticsService = analytics.NewService(&c.analyticsRepo, analyticsConfig, analytics.WithPositionCalculator(positionCalcAdapter))
+	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, c.securityService.Sanitizer)
+	c.authService = authsvc.NewAuthService(c.usersService, c.jwtSigningKey)
 
 	// Markets service depends on markets repository and users service
 	marketsConfig := dmarkets.Config{
@@ -117,12 +140,12 @@ func (c *Container) InitializeServices() {
 		dmarkets.WithProbabilityEngine(dmarkets.DefaultProbabilityEngine(wpamCalculator)),
 	)
 
-	c.betsService = dbets.NewService(&c.betsRepo, c.marketsService, c.usersService, c.config, c.clock)
+	c.betsService = dbets.NewService(&c.betsRepo, c.marketsService, c.usersService, betsConfig, c.clock)
 }
 
 // InitializeHandlers sets up all HTTP handlers with their service dependencies
 func (c *Container) InitializeHandlers() {
-	c.marketsHandler = hmarkets.NewHandler(c.marketsService, c.authService)
+	c.marketsHandler = hmarkets.NewHandler(c.marketsService, c.authService, c.securityService)
 }
 
 // Initialize sets up the entire dependency graph
@@ -140,6 +163,11 @@ func (c *Container) GetMarketsHandler() *hmarkets.Handler {
 // GetUsersService returns the users domain service
 func (c *Container) GetUsersService() *dusers.Service {
 	return c.usersService
+}
+
+// GetUsersRepository returns the users repository edge for boundary-contained consumers such as login.
+func (c *Container) GetUsersRepository() *rusers.GormRepository {
+	return &c.usersRepo
 }
 
 // GetAnalyticsService returns the analytics domain service
@@ -162,9 +190,30 @@ func (c *Container) GetAuthService() *authsvc.AuthService {
 	return c.authService
 }
 
-// BuildApplication creates a fully wired application container
-func BuildApplication(db *gorm.DB, config *setup.EconomicConfig) *Container {
-	container := NewContainer(db, config)
+// GetSecurityService returns the request-boundary validation and sanitization support.
+func (c *Container) GetSecurityService() *security.SecurityService {
+	return c.securityService
+}
+
+// GetConfigService returns the runtime configuration service.
+func (c *Container) GetConfigService() configsvc.Service {
+	return c.configService
+}
+
+// BuildApplicationWithConfigService creates a fully wired application container using the runtime config service.
+func BuildApplicationWithConfigService(db *gorm.DB, configService configsvc.Service) *Container {
+	container := NewContainer(db, configService)
 	container.Initialize()
 	return container
+}
+
+func BuildApplicationWithConfigAndJWTSigningKey(db *gorm.DB, configService configsvc.Service, jwtSigningKey []byte) *Container {
+	container := NewContainerWithJWTSigningKey(db, configService, jwtSigningKey)
+	container.Initialize()
+	return container
+}
+
+// BuildApplication preserves older call sites that still provide an owned or legacy raw config snapshot.
+func BuildApplication(db *gorm.DB, config any) *Container {
+	return BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
 }

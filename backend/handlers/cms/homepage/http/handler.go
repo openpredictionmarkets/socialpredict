@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/cms/homepage"
 	authsvc "socialpredict/internal/service/auth"
 )
@@ -20,12 +22,11 @@ func NewHandler(svc *homepage.Service, auth authsvc.Authenticator) *Handler {
 func (h *Handler) PublicGet(w http.ResponseWriter, r *http.Request) {
 	item, err := h.svc.GetHome()
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = handlers.WriteResult(w, http.StatusOK, map[string]interface{}{
 		"title":     item.Title,
 		"format":    item.Format,
 		"html":      item.HTML,
@@ -46,18 +47,18 @@ type updateReq struct {
 func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	// Validate admin access
 	if h.auth == nil {
-		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		return
 	}
-	admin, httpErr := h.auth.RequireAdmin(r)
-	if httpErr != nil {
-		http.Error(w, httpErr.Message, httpErr.StatusCode)
+	admin, authErr := h.auth.RequireAdmin(r)
+	if authErr != nil {
+		_ = authhttp.WriteFailure(w, authErr)
 		return
 	}
 
 	var in updateReq
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 		return
 	}
 
@@ -70,16 +71,17 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		UpdatedBy: admin.Username,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"title":   item.Title,
-		"format":  item.Format,
-		"html":    item.HTML,
-		"version": item.Version,
+	_ = handlers.WriteResult(w, http.StatusOK, map[string]interface{}{
+		"title":     item.Title,
+		"format":    item.Format,
+		"html":      item.HTML,
+		"markdown":  item.Markdown,
+		"version":   item.Version,
+		"updatedAt": item.UpdatedAt,
 	})
 }
 
@@ -87,11 +89,11 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 func RequireAdmin(auth authsvc.Authenticator, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if auth == nil {
-			http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
-		if _, httpErr := auth.RequireAdmin(r); httpErr != nil {
-			http.Error(w, httpErr.Message, httpErr.StatusCode)
+		if _, authErr := auth.RequireAdmin(r); authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
 			return
 		}
 		next.ServeHTTP(w, r)

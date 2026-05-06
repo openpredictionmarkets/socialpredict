@@ -136,3 +136,175 @@ func TestGormRepositoryListBetsForMarket(t *testing.T) {
 		t.Fatalf("bets not ordered ascending by PlacedAt")
 	}
 }
+
+func TestGormRepositoryListHonorsStatusAndCreatorFilter(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	alice := modelstesting.GenerateUser("alice", 1000)
+	bob := modelstesting.GenerateUser("bob", 1000)
+	if err := db.Create(&alice).Error; err != nil {
+		t.Fatalf("seed alice: %v", err)
+	}
+	if err := db.Create(&bob).Error; err != nil {
+		t.Fatalf("seed bob: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	active := modelstesting.GenerateMarket(300, alice.Username)
+	active.ResolutionDateTime = now.Add(24 * time.Hour)
+	active.IsResolved = false
+
+	closed := modelstesting.GenerateMarket(301, alice.Username)
+	closed.ResolutionDateTime = now.Add(-24 * time.Hour)
+	closed.IsResolved = false
+
+	resolved := modelstesting.GenerateMarket(302, alice.Username)
+	resolved.ResolutionDateTime = now.Add(-48 * time.Hour)
+	resolved.FinalResolutionDateTime = now.Add(-12 * time.Hour)
+	resolved.IsResolved = true
+	resolved.ResolutionResult = "YES"
+
+	bobsClosed := modelstesting.GenerateMarket(303, bob.Username)
+	bobsClosed.ResolutionDateTime = now.Add(-24 * time.Hour)
+	bobsClosed.IsResolved = false
+
+	for _, market := range []any{&active, &closed, &resolved, &bobsClosed} {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("seed market: %v", err)
+		}
+	}
+
+	tests := []struct {
+		name       string
+		filters    dmarkets.ListFilters
+		wantID     int64
+		wantStatus string
+	}{
+		{
+			name:       "active for alice",
+			filters:    dmarkets.ListFilters{Status: "active", CreatedBy: alice.Username, Limit: 10},
+			wantID:     active.ID,
+			wantStatus: "active",
+		},
+		{
+			name:       "closed for alice",
+			filters:    dmarkets.ListFilters{Status: "closed", CreatedBy: alice.Username, Limit: 10},
+			wantID:     closed.ID,
+			wantStatus: "closed",
+		},
+		{
+			name:       "resolved for alice",
+			filters:    dmarkets.ListFilters{Status: "resolved", CreatedBy: alice.Username, Limit: 10},
+			wantID:     resolved.ID,
+			wantStatus: "resolved",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			markets, err := repo.List(ctx, tt.filters)
+			if err != nil {
+				t.Fatalf("List returned error: %v", err)
+			}
+			if len(markets) != 1 {
+				t.Fatalf("expected 1 market, got %d", len(markets))
+			}
+			if markets[0].ID != tt.wantID {
+				t.Fatalf("expected market ID %d, got %d", tt.wantID, markets[0].ID)
+			}
+			if markets[0].Status != tt.wantStatus {
+				t.Fatalf("expected status %q, got %q", tt.wantStatus, markets[0].Status)
+			}
+		})
+	}
+}
+
+func TestGormRepositoryPublicSearchStatusResolveAndDelete(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	active := modelstesting.GenerateMarket(400, creator.Username)
+	active.QuestionTitle = "Will oranges rally?"
+	active.Description = "Citrus market"
+	active.ResolutionDateTime = now.Add(24 * time.Hour)
+	active.IsResolved = false
+
+	closed := modelstesting.GenerateMarket(401, creator.Username)
+	closed.QuestionTitle = "Will apples close?"
+	closed.Description = "Orchard market"
+	closed.ResolutionDateTime = now.Add(-24 * time.Hour)
+	closed.IsResolved = false
+
+	resolved := modelstesting.GenerateMarket(402, creator.Username)
+	resolved.QuestionTitle = "Will pears resolve?"
+	resolved.Description = "Resolved orchard market"
+	resolved.ResolutionDateTime = now.Add(-48 * time.Hour)
+	resolved.IsResolved = true
+	resolved.ResolutionResult = "NO"
+
+	for _, market := range []*models.Market{&active, &closed, &resolved} {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("seed market %d: %v", market.ID, err)
+		}
+	}
+
+	publicMarket, err := repo.GetPublicMarket(ctx, active.ID)
+	if err != nil {
+		t.Fatalf("GetPublicMarket returned error: %v", err)
+	}
+	if publicMarket.ID != active.ID || publicMarket.QuestionTitle != active.QuestionTitle || publicMarket.CreatorUsername != creator.Username {
+		t.Fatalf("unexpected public market: %+v", publicMarket)
+	}
+	if _, err := repo.GetPublicMarket(ctx, 9999); !errors.Is(err, dmarkets.ErrMarketNotFound) {
+		t.Fatalf("expected ErrMarketNotFound for missing public market, got %v", err)
+	}
+
+	searchResults, err := repo.Search(ctx, "orchard", dmarkets.SearchFilters{Status: "closed", Limit: 10})
+	if err != nil {
+		t.Fatalf("Search returned error: %v", err)
+	}
+	if len(searchResults) != 1 || searchResults[0].ID != closed.ID {
+		t.Fatalf("unexpected closed search results: %+v", searchResults)
+	}
+
+	resolvedResults, err := repo.ListByStatus(ctx, "resolved", dmarkets.Page{Limit: 10})
+	if err != nil {
+		t.Fatalf("ListByStatus returned error: %v", err)
+	}
+	if len(resolvedResults) != 1 || resolvedResults[0].ID != resolved.ID || resolvedResults[0].Status != "resolved" {
+		t.Fatalf("unexpected resolved results: %+v", resolvedResults)
+	}
+
+	if err := repo.ResolveMarket(ctx, active.ID, "YES"); err != nil {
+		t.Fatalf("ResolveMarket returned error: %v", err)
+	}
+	refreshed, err := repo.GetByID(ctx, active.ID)
+	if err != nil {
+		t.Fatalf("GetByID after resolve returned error: %v", err)
+	}
+	if refreshed.Status != "resolved" || refreshed.ResolutionResult != "YES" {
+		t.Fatalf("unexpected resolved market: %+v", refreshed)
+	}
+	if err := repo.ResolveMarket(ctx, 9999, "YES"); !errors.Is(err, dmarkets.ErrMarketNotFound) {
+		t.Fatalf("expected ErrMarketNotFound for missing resolve, got %v", err)
+	}
+
+	if err := repo.Delete(ctx, closed.ID); err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if _, err := repo.GetByID(ctx, closed.ID); !errors.Is(err, dmarkets.ErrMarketNotFound) {
+		t.Fatalf("expected deleted market to be missing, got %v", err)
+	}
+	if err := repo.Delete(ctx, closed.ID); !errors.Is(err, dmarkets.ErrMarketNotFound) {
+		t.Fatalf("expected ErrMarketNotFound for repeated delete, got %v", err)
+	}
+}

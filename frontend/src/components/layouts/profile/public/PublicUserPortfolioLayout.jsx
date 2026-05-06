@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../../../../config';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../../../helpers/AuthContent';
 
 const PublicUserPortfolioLayout = ({ username, userData }) => {
     const [portfolioTotal, setPortfolioTotal] = useState({
         portfolioItems: [],
         totalSharesOwned: 0,
     });
+    const { token } = useAuth();
 
     useEffect(() => {
         const fetchPortfolio = async () => {
             try {
-                const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
+                const headers = token
+                    ? {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                    : {};
+
+                const response = await fetch(`${API_URL}/v0/portfolio/${username}`, { headers });
                 if (response.ok) {
                     const data = await response.json();
                     setPortfolioTotal(data);
@@ -21,10 +30,10 @@ const PublicUserPortfolioLayout = ({ username, userData }) => {
             }
         };
 
-        if (username) {
+        if (username && token) {
             fetchPortfolio();
         }
-    }, [username]);
+    }, [username, token]);
 
     const { portfolioItems, totalSharesOwned } = portfolioTotal;
 

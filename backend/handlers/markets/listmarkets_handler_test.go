@@ -3,8 +3,10 @@ package marketshandlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"socialpredict/handlers/markets/dto"
@@ -15,6 +17,7 @@ type listMarketsServiceMock struct {
 	listMarketsResult []*dmarkets.Market
 	listMarketsErr    error
 	listByStatusErr   error
+	detailsErrByID    map[int64]error
 	overviews         map[int64]*dmarkets.MarketOverview
 
 	capturedFilters dmarkets.ListFilters
@@ -62,6 +65,9 @@ func (m *listMarketsServiceMock) ProjectProbability(ctx context.Context, req dma
 }
 
 func (m *listMarketsServiceMock) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	if err, ok := m.detailsErrByID[marketID]; ok {
+		return nil, err
+	}
 	if overview, ok := m.overviews[marketID]; ok {
 		return overview, nil
 	}
@@ -160,5 +166,24 @@ func TestListMarketsHandlerFactoryUsesDefaultListingFilters(t *testing.T) {
 	expectedFilters := dmarkets.ListFilters{Limit: 50, Offset: 0}
 	if mockSvc.capturedFilters != expectedFilters {
 		t.Fatalf("expected filters %+v, got %+v", expectedFilters, mockSvc.capturedFilters)
+	}
+}
+
+func TestBuildMarketOverviewResponsesIncludesMarketIDInError(t *testing.T) {
+	mockSvc := &listMarketsServiceMock{
+		detailsErrByID: map[int64]error{
+			7: errors.New("boom"),
+		},
+	}
+
+	_, err := buildMarketOverviewResponses(context.Background(), mockSvc, []*dmarkets.Market{
+		{ID: 7, QuestionTitle: "Any Market"},
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "market_id=7") {
+		t.Fatalf("expected market id in error, got %q", err.Error())
 	}
 }

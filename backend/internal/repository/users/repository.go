@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
@@ -14,6 +15,13 @@ import (
 // GormRepository implements the users domain repository interface using GORM
 type GormRepository struct {
 	db *gorm.DB
+}
+
+type authenticatedUserRow struct {
+	Username           string
+	UserType           string
+	Password           string
+	MustChangePassword bool
 }
 
 // NewGormRepository creates a new GORM-based users repository
@@ -34,6 +42,41 @@ func (r *GormRepository) GetByUsername(ctx context.Context, username string) (*d
 	}
 
 	return r.modelToDomain(&dbUser), nil
+}
+
+func (r *GormRepository) UsernameExists(ctx context.Context, username string) (bool, error) {
+	return r.userFieldExists(ctx, "username", username)
+}
+
+func (r *GormRepository) DisplayNameExists(ctx context.Context, displayName string) (bool, error) {
+	return r.userFieldExists(ctx, "display_name", displayName)
+}
+
+func (r *GormRepository) EmailExists(ctx context.Context, email string) (bool, error) {
+	return r.userFieldExists(ctx, "email", email)
+}
+
+func (r *GormRepository) APIKeyExists(ctx context.Context, apiKey string) (bool, error) {
+	return r.userFieldExists(ctx, "api_key", apiKey)
+}
+
+func (r *GormRepository) userFieldExists(ctx context.Context, field string, value string) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where(field+" = ?", value).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *GormRepository) AnyUserIdentityExists(ctx context.Context, username, displayName, email, apiKey string) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where(
+		"username = ? OR display_name = ? OR email = ? OR api_key = ?",
+		username, displayName, email, apiKey,
+	).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // UpdateBalance updates a user's account balance
@@ -183,7 +226,20 @@ func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID i
 		ResolutionResult: market.ResolutionResult,
 	}
 
-	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, bets, username)
+	boundaryBets := make([]boundary.Bet, len(bets))
+	for i := range bets {
+		boundaryBets[i] = boundary.Bet{
+			ID:        uint(bets[i].ID),
+			Username:  bets[i].Username,
+			MarketID:  bets[i].MarketID,
+			Amount:    bets[i].Amount,
+			PlacedAt:  bets[i].PlacedAt,
+			Outcome:   bets[i].Outcome,
+			CreatedAt: bets[i].CreatedAt,
+		}
+	}
+
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, boundaryBets, username)
 	if err != nil {
 		return nil, err
 	}
@@ -252,6 +308,28 @@ func (r *GormRepository) GetCredentials(ctx context.Context, username string) (*
 	}, nil
 }
 
+// FindAuthenticatedUser returns the login-facing user fields while containing persistence details in the repository edge.
+func (r *GormRepository) FindAuthenticatedUser(ctx context.Context, username string) (*boundary.AuthenticatedUser, error) {
+	var user authenticatedUserRow
+	if err := r.db.WithContext(ctx).
+		Table("users").
+		Select("username", "user_type", "password", "must_change_password").
+		Where("username = ?", username).
+		Take(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, dusers.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return &boundary.AuthenticatedUser{
+		Username:           user.Username,
+		UserType:           user.UserType,
+		PasswordHash:       user.Password,
+		MustChangePassword: user.MustChangePassword,
+	}, nil
+}
+
 // UpdatePassword persists a new password hash and updates the must-change flag.
 func (r *GormRepository) UpdatePassword(ctx context.Context, username string, hashedPassword string, mustChange bool) error {
 	result := r.db.WithContext(ctx).Model(&models.User{}).
@@ -294,8 +372,9 @@ func (r *GormRepository) domainToModel(user *dusers.User) models.User {
 			PersonalLink4:         user.PersonalLink4,
 		},
 		PrivateUser: models.PrivateUser{
-			Email:  user.Email,
-			APIKey: user.APIKey,
+			Email:    user.Email,
+			APIKey:   user.APIKey,
+			Password: user.PasswordHash,
 		},
 		MustChangePassword: user.MustChangePassword,
 	}
@@ -308,6 +387,7 @@ func (r *GormRepository) modelToDomain(dbUser *models.User) *dusers.User {
 		Username:              dbUser.Username,
 		DisplayName:           dbUser.DisplayName,
 		Email:                 dbUser.Email,
+		PasswordHash:          dbUser.Password,
 		UserType:              dbUser.UserType,
 		InitialAccountBalance: dbUser.InitialAccountBalance,
 		AccountBalance:        dbUser.AccountBalance,

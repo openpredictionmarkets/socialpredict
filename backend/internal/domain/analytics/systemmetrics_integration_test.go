@@ -7,6 +7,8 @@ import (
 	"socialpredict/internal/app"
 	"socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
+	"socialpredict/internal/domain/boundary"
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 	"socialpredict/setup"
@@ -14,9 +16,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func newAnalyticsMetricsService(db *gorm.DB, loadEcon setup.EconConfigLoader, opts ...analytics.ServiceOption) *analytics.Service {
+func analyticsConfigFromSetup(cfg *setup.EconomicConfig) analytics.Config {
+	return analytics.Config{
+		MaximumDebtAllowed: cfg.Economics.User.MaximumDebtAllowed,
+		CreateMarketCost:   cfg.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:      cfg.Economics.Betting.BetFees.InitialBetFee,
+	}
+}
+
+func newAnalyticsMetricsService(db *gorm.DB, config analytics.Config, opts ...analytics.ServiceOption) *analytics.Service {
 	repo := analytics.NewGormRepository(db)
-	return analytics.NewService(repo, loadEcon, opts...)
+	return analytics.NewService(repo, config, opts...)
 }
 
 type analyticsSystemMetricsComputer interface {
@@ -39,9 +49,33 @@ func requireAnalyticsSystemMetrics(t *testing.T, svc analyticsSystemMetricsCompu
 	return metrics
 }
 
+func calculateParticipationFees(cfg *setup.EconomicConfig, bets []boundary.Bet) int64 {
+	var total int64
+	type betKey struct {
+		username string
+		marketID uint
+	}
+	seen := make(map[betKey]bool)
+	initialFee := cfg.Economics.Betting.BetFees.InitialBetFee
+
+	for _, bet := range bets {
+		if bet.Amount <= 0 {
+			continue
+		}
+
+		key := betKey{username: bet.Username, marketID: bet.MarketID}
+		if !seen[key] {
+			seen[key] = true
+			total += initialFee
+		}
+	}
+
+	return total
+}
+
 func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	econConfig, loadEcon := modelstesting.UseStandardTestEconomics(t)
+	econConfig, _ := modelstesting.UseStandardTestEconomics(t)
 
 	users := []models.User{
 		modelstesting.GenerateUser("alice", 0),
@@ -65,7 +99,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		t.Fatalf("apply creation fee: %v", err)
 	}
 
-	container := app.BuildApplication(db, econConfig)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(econConfig))
 	betsService := container.GetBetsService()
 
 	placeBet := func(username string, amount int64, outcome string) {
@@ -85,7 +119,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 	placeBet("bob", 10, "NO")
 	placeBet("carol", 30, "YES")
 
-	svc := newAnalyticsMetricsService(db, loadEcon)
+	svc := newAnalyticsMetricsService(db, analyticsConfigFromSetup(econConfig))
 	metrics := requireAnalyticsSystemMetrics(t, svc)
 
 	maxDebt := econConfig.Economics.User.MaximumDebtAllowed
@@ -114,7 +148,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		expectedActiveVolume += b.Amount
 	}
 
-	participationFees := modelstesting.CalculateParticipationFees(econConfig, bets)
+	participationFees := calculateParticipationFees(econConfig, bets)
 	totalUtilized := expectedUnusedDebt + expectedActiveVolume + creationFee + participationFees
 	totalCapacity := maxDebt * int64(len(usersAfter))
 
@@ -143,7 +177,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 
 func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
-	econConfig, loadEcon := modelstesting.UseStandardTestEconomics(t)
+	econConfig, _ := modelstesting.UseStandardTestEconomics(t)
 
 	users := []models.User{
 		modelstesting.GenerateUser("patrick", 0),
@@ -168,7 +202,7 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 		t.Fatalf("apply creation fee: %v", err)
 	}
 
-	container := app.BuildApplication(db, econConfig)
+	container := app.BuildApplicationWithConfigService(db, configsvc.NewStaticService(econConfig))
 	betsService := container.GetBetsService()
 	placeBet := func(username string, amount int64, outcome string) {
 		if _, err := betsService.Place(context.Background(), dbets.PlaceRequest{
@@ -192,7 +226,7 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 	}
 
 	repo := analytics.NewGormRepository(db)
-	metricsSvc := newAnalyticsMetricsService(db, loadEcon)
+	metricsSvc := newAnalyticsMetricsService(db, analyticsConfigFromSetup(econConfig))
 	metrics := requireAnalyticsSystemMetrics(t, metricsSvc)
 
 	if surplus := metrics.Verification.SurplusValue(); surplus != 0 {

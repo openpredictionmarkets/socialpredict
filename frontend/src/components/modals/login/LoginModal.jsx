@@ -10,7 +10,25 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const history = useHistory();
-    const { login, changePasswordNeeded } = useAuth();
+
+    const getPostLoginDestination = () => {
+        const mustChangePassword = localStorage.getItem('changePasswordNeeded') === 'true';
+        if (mustChangePassword) {
+            return '/changepassword';
+        }
+
+        const fallbackPath = '/markets';
+        const safeRedirects = new Set([
+            '/',
+            '/about',
+            '/markets',
+            '/polls',
+            '/stats',
+            '/style',
+        ]);
+
+        return safeRedirects.has(redirectAfterLogin) ? redirectAfterLogin : fallbackPath;
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -20,15 +38,11 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
             const loginSuccess = await onLogin(username.trim(), password);
             if (loginSuccess) {
                 onClose();
-                history.push(redirectAfterLogin);
-                // window.location.reload(); // this is a hack which goes against the principle of reloading the state
-            } else {
-                console.error('Login failed:', response.status, await response.text());
-                setError('Error logging in.');
+                history.push(getPostLoginDestination());
             }
         } catch (loginError) {
             console.error('Login error:', loginError);
-            setError('An error occurred during login. Please try again.');
+            setError(loginError.message || 'An error occurred during login. Please try again.');
         }
     };
 

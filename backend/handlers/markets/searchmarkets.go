@@ -3,18 +3,19 @@ package marketshandlers
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/logger"
 	"socialpredict/security"
 )
 
 // SearchMarketsHandler handles HTTP requests for searching markets - HTTP-only with service injection
-func SearchMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
+func SearchMarketsHandler(svc dmarkets.ServiceInterface, securityService *security.SecurityService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		handleSearchMarkets(w, r, svc)
+		handleSearchMarkets(w, r, svc, securityService)
 	}
 }
 
@@ -28,13 +29,13 @@ type httpError struct {
 	statusCode int
 }
 
-func parseSearchRequest(r *http.Request) (searchRequestParams, *httpError) {
+func parseSearchRequest(r *http.Request, securityService *security.SecurityService) (searchRequestParams, *httpError) {
 	query, queryErr := extractQuery(r)
 	if queryErr != nil {
 		return searchRequestParams{}, queryErr
 	}
 
-	sanitizedQuery, sanitizeErr := sanitizeQuery(query)
+	sanitizedQuery, sanitizeErr := sanitizeQuery(query, securityService)
 	if sanitizeErr != nil {
 		return searchRequestParams{}, sanitizeErr
 	}
@@ -51,11 +52,14 @@ func extractQuery(r *http.Request) (string, *httpError) {
 	return "", &httpError{message: "Query parameter 'query' is required", statusCode: http.StatusBadRequest}
 }
 
-func sanitizeQuery(query string) (string, *httpError) {
-	sanitizer := security.NewSanitizer()
-	sanitizedQuery, err := sanitizer.SanitizeMarketTitle(query)
+func sanitizeQuery(query string, securityService *security.SecurityService) (string, *httpError) {
+	if securityService == nil || securityService.Sanitizer == nil {
+		return "", &httpError{message: "Security service unavailable", statusCode: http.StatusInternalServerError}
+	}
+
+	sanitizedQuery, err := securityService.Sanitizer.SanitizeMarketTitle(query)
 	if err != nil {
-		log.Printf("SearchMarketsHandler: Sanitization failed for query '%s': %v", query, err)
+		logger.LogWarn("SearchMarkets", "SanitizeQuery", "sanitization failed for query '"+query+"': "+err.Error())
 		return "", &httpError{message: "Invalid search query: " + err.Error(), statusCode: http.StatusBadRequest}
 	}
 	if len(sanitizedQuery) > 100 {
@@ -65,23 +69,23 @@ func sanitizeQuery(query string) (string, *httpError) {
 }
 
 func parseLimit(rawLimit string) int {
-	return parseBoundedInt(rawLimit, 20, 1, 50)
+	return security.ParseBoundedIntParam(rawLimit, 20, 1, 50)
 }
 
 func parseOffset(rawOffset string) int {
-	return parseBoundedInt(rawOffset, 0, 0, int(^uint(0)>>1))
+	return security.ParseBoundedIntParam(rawOffset, 0, 0, int(^uint(0)>>1))
 }
 
 func buildSearchResponse(ctx context.Context, svc dmarkets.ServiceInterface, searchResults *dmarkets.SearchResults) (dto.SearchResponse, error) {
 	primaryOverviews, err := buildSearchResultSet(ctx, svc, searchResults.PrimaryResults)
 	if err != nil {
-		log.Printf("Error building primary results: %v", err)
+		logger.LogError("SearchMarkets", "BuildPrimaryResults", err)
 		return dto.SearchResponse{}, errors.New("Error building primary results")
 	}
 
 	fallbackOverviews, err := buildSearchResultSet(ctx, svc, searchResults.FallbackResults)
 	if err != nil {
-		log.Printf("Error building fallback results: %v", err)
+		logger.LogError("SearchMarkets", "BuildFallbackResults", err)
 		return dto.SearchResponse{}, errors.New("Error building fallback results")
 	}
 
@@ -137,7 +141,7 @@ func writeSearchResponse(w http.ResponseWriter, ctx context.Context, svc dmarket
 	}
 
 	if err := writeJSON(w, http.StatusOK, response); err != nil {
-		log.Printf("Error encoding search response: %v", err)
+		logger.LogError("SearchMarkets", "EncodeResponse", err)
 		return err
 	}
 
@@ -145,25 +149,28 @@ func writeSearchResponse(w http.ResponseWriter, ctx context.Context, svc dmarket
 }
 
 func writeSearchError(w http.ResponseWriter, err error) {
-	switch err {
-	case dmarkets.ErrInvalidInput:
-		http.Error(w, "Invalid search parameters", http.StatusBadRequest)
+	switch {
+	case errors.Is(err, dmarkets.ErrInvalidInput):
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
-		log.Printf("Error searching markets: %v", err)
-		http.Error(w, "Error searching markets", http.StatusInternalServerError)
+		logger.LogError("SearchMarkets", "SearchMarkets", err)
+		writeInternalError(w)
 	}
 }
 
-func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface) {
-	log.Printf("SearchMarketsHandler: Request received")
+func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface, securityService *security.SecurityService) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
+		return
+	}
+	if securityService == nil || securityService.Sanitizer == nil {
+		writeInternalError(w)
 		return
 	}
 
-	params, clientErr := parseSearchRequest(r)
+	params, clientErr := parseSearchRequest(r, securityService)
 	if clientErr != nil {
-		http.Error(w, clientErr.message, clientErr.statusCode)
+		_ = handlers.WriteFailure(w, clientErr.statusCode, handlers.ReasonInvalidRequest)
 		return
 	}
 
@@ -174,7 +181,10 @@ func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.Se
 	}
 
 	if err := writeSearchResponse(w, r.Context(), svc, searchResults); err != nil {
-		log.Printf("Error writing search response: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if isRequestCanceled(err) {
+			return
+		}
+		logger.LogError("SearchMarkets", "WriteResponse", err)
+		writeInternalError(w)
 	}
 }

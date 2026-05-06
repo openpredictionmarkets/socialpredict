@@ -4,10 +4,10 @@ import (
 	"sort"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	marketmath "socialpredict/internal/domain/math/market"
 	"socialpredict/internal/domain/math/outcomes/dbpm"
 	"socialpredict/internal/domain/math/probabilities/wpam"
-	"socialpredict/models"
 )
 
 // holds the number of YES and NO shares owned by all users in a market
@@ -44,17 +44,17 @@ type MarketSnapshot struct {
 
 // ProbabilityProvider abstracts probability timeline calculations.
 type ProbabilityProvider interface {
-	Calculate(createdAt time.Time, bets []models.Bet) []wpam.ProbabilityChange
+	Calculate(createdAt time.Time, bets []boundary.Bet) []wpam.ProbabilityChange
 	Current(changes []wpam.ProbabilityChange) float64
 }
 
 // NetPositionCalculator computes net user positions from ordered bets and probability changes.
 type NetPositionCalculator interface {
-	CalculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition
+	CalculateNetPositions(sortedBets []boundary.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition
 }
 
 type BetSorter interface {
-	Sort(bets []models.Bet) []models.Bet
+	Sort(bets []boundary.Bet) []boundary.Bet
 }
 
 type ValuationCalculatorStrategy interface {
@@ -146,12 +146,12 @@ func (c *PositionCalculator) ensureDefaults() {
 }
 
 // CalculateMarketPositions_WPAM_DBPM summarizes positions for a given market using WPAM/DBPM math.
-func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error) {
+func CalculateMarketPositions_WPAM_DBPM(snapshot MarketSnapshot, bets []boundary.Bet) ([]MarketPosition, error) {
 	return NewPositionCalculator().CalculateMarketPositions(snapshot, bets)
 }
 
 // CalculateMarketPositions runs the position calculation using the calculator's injected strategies.
-func (c PositionCalculator) CalculateMarketPositions(snapshot MarketSnapshot, bets []models.Bet) ([]MarketPosition, error) {
+func (c PositionCalculator) CalculateMarketPositions(snapshot MarketSnapshot, bets []boundary.Bet) ([]MarketPosition, error) {
 	c.ensureDefaults()
 	probabilities := c.probabilities
 
@@ -185,7 +185,7 @@ func (c PositionCalculator) CalculateMarketPositions(snapshot MarketSnapshot, be
 	return displayPositions, nil
 }
 
-func computeEarliestBets(bets []models.Bet) map[string]time.Time {
+func computeEarliestBets(bets []boundary.Bet) map[string]time.Time {
 	earliest := make(map[string]time.Time)
 	for _, bet := range bets {
 		if existing, ok := earliest[bet.Username]; !ok || bet.PlacedAt.Before(existing) {
@@ -195,14 +195,14 @@ func computeEarliestBets(bets []models.Bet) map[string]time.Time {
 	return earliest
 }
 
-func sortBetsChronologically(bets []models.Bet) []models.Bet {
+func sortBetsChronologically(bets []boundary.Bet) []boundary.Bet {
 	return chronologicalBetSorter{}.Sort(bets)
 }
 
 type chronologicalBetSorter struct{}
 
-func (chronologicalBetSorter) Sort(bets []models.Bet) []models.Bet {
-	sortedBets := make([]models.Bet, len(bets))
+func (chronologicalBetSorter) Sort(bets []boundary.Bet) []boundary.Bet {
+	sortedBets := make([]boundary.Bet, len(bets))
 	copy(sortedBets, bets)
 	sort.Slice(sortedBets, func(i, j int) bool {
 		return sortedBets[i].PlacedAt.Before(sortedBets[j].PlacedAt)
@@ -210,16 +210,16 @@ func (chronologicalBetSorter) Sort(bets []models.Bet) []models.Bet {
 	return sortedBets
 }
 
-func calculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
+func calculateNetPositions(sortedBets []boundary.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
 	return NewPositionCalculator().calculateNetPositions(sortedBets, probabilityChanges)
 }
 
-func (c PositionCalculator) calculateNetPositions(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
+func (c PositionCalculator) calculateNetPositions(sortedBets []boundary.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
 	c.ensureDefaults()
 	return c.calculateNetPositionsWith(sortedBets, probabilityChanges)
 }
 
-func (c PositionCalculator) calculateNetPositionsWith(sortedBets []models.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
+func (c PositionCalculator) calculateNetPositionsWith(sortedBets []boundary.Bet, probabilityChanges []wpam.ProbabilityChange) []dbpm.DBPMMarketPosition {
 	return c.netPositions.CalculateNetPositions(sortedBets, probabilityChanges)
 }
 
@@ -234,7 +234,7 @@ func mapUserPositions(netPositions []dbpm.DBPMMarketPosition) map[string]UserMar
 	return userPositionMap
 }
 
-func aggregateUserBetTotals(sortedBets []models.Bet, isResolved bool) map[string]struct {
+func aggregateUserBetTotals(sortedBets []boundary.Bet, isResolved bool) map[string]struct {
 	TotalSpent       int64
 	TotalSpentInPlay int64
 } {
@@ -308,7 +308,7 @@ func assembleDisplayPositions(
 }
 
 // CalculateMarketPositionForUser_WPAM_DBPM fetches and summarizes the position for a given user in a specific market.
-func CalculateMarketPositionForUser_WPAM_DBPM(snapshot MarketSnapshot, bets []models.Bet, username string) (UserMarketPosition, error) {
+func CalculateMarketPositionForUser_WPAM_DBPM(snapshot MarketSnapshot, bets []boundary.Bet, username string) (UserMarketPosition, error) {
 	marketPositions, err := CalculateMarketPositions_WPAM_DBPM(snapshot, bets)
 	if err != nil {
 		return UserMarketPosition{}, err

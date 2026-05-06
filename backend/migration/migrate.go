@@ -2,14 +2,11 @@ package migration
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"time"
 
 	"gorm.io/gorm"
-
-	// core models for fallback
-	"socialpredict/models"
+	"socialpredict/logger"
 )
 
 // Registry of migrations; you already have tests that exercise this.
@@ -36,6 +33,9 @@ func ClearRegistry() { // used by tests
 
 // Run applies registered migrations in ID order and records them.
 func Run(db *gorm.DB) error {
+	if len(registry) == 0 {
+		return fmt.Errorf("no registered migrations found")
+	}
 	if err := ensureSchemaTable(db); err != nil {
 		return err
 	}
@@ -51,6 +51,30 @@ func Run(db *gorm.DB) error {
 		}
 		if err := applyMigration(db, id); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// VerifyApplied confirms that all registered migrations have already been
+// recorded without mutating the schema. Request-serving startup paths use this
+// when they are not the explicit startup writer.
+func VerifyApplied(db *gorm.DB) error {
+	if len(registry) == 0 {
+		return fmt.Errorf("no registered migrations found")
+	}
+	if !db.Migrator().HasTable(&SchemaMigration{}) {
+		return fmt.Errorf("schema migrations table is missing")
+	}
+
+	applied, err := loadAppliedMigrations(db)
+	if err != nil {
+		return err
+	}
+
+	for _, id := range sortedRegistryIDs() {
+		if !applied[id] {
+			return fmt.Errorf("registered migration %s has not been applied", id)
 		}
 	}
 	return nil
@@ -98,31 +122,18 @@ func applyMigration(db *gorm.DB, id string) error {
 	return nil
 }
 
-// MigrateDB is the public entry; it never crashes the app.
-// If there are zero registered migrations, we WARN and fallback to AutoMigrate core tables.
+// MigrateDB is the public entry for explicit startup writers.
 func MigrateDB(db *gorm.DB) error {
-	log.Printf("migration - MigrateDB: starting database migrations")
+	logger.LogInfo("Migration", "MigrateDB", "starting database migrations")
 
 	if len(registry) == 0 {
-		log.Printf("migration - WARN: no registered migrations found; falling back to AutoMigrate for baseline schema")
-		// Baseline schema so the app can run:
-		// Keep this list tight (public, stable domain models only).
-		if err := db.AutoMigrate(
-			&models.User{},
-			&models.Market{},
-			&models.Bet{},
-			&models.HomepageContent{},
-		); err != nil {
-			return fmt.Errorf("fallback AutoMigrate failed: %w", err)
-		}
-		log.Printf("migration - fallback AutoMigrate completed")
-		return nil
+		return fmt.Errorf("no registered migrations found")
 	}
 
 	if err := Run(db); err != nil {
 		return err
 	}
 
-	log.Printf("migration - MigrateDB: database migrations completed")
+	logger.LogInfo("Migration", "MigrateDB", "database migrations completed")
 	return nil
 }

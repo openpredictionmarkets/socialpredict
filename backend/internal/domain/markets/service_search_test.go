@@ -8,7 +8,6 @@ import (
 	"time"
 
 	markets "socialpredict/internal/domain/markets"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 
 	"gorm.io/gorm"
@@ -18,58 +17,28 @@ func seedSearchMarkets(t *testing.T, db *gorm.DB, username string) {
 	t.Helper()
 
 	now := time.Now()
-	for _, market := range buildSearchMarkets(username, now) {
-		if err := db.Create(&market).Error; err != nil {
-			t.Fatalf("seed market %d: %v", market.ID, err)
+	marketsToSeed := []any{
+		mustSearchMarket(1, username, now, "Will Bitcoin reach $100k by end of year?", "Bitcoin price prediction", now.Add(48*time.Hour), time.Time{}, false, ""),
+		mustSearchMarket(2, username, now, "Bitcoin market prediction", "Closed bitcoin market", now.Add(-1*time.Hour), time.Time{}, false, ""),
+		mustSearchMarket(3, username, now, "Will Bitcoin overtake gold market cap?", "Resolved bitcoin market", now.Add(-24*time.Hour), now.Add(-12*time.Hour), true, "YES"),
+		mustSearchMarket(4, username, now, "Stock market crash prediction", "Market about stocks", now.Add(24*time.Hour), time.Time{}, false, ""),
+	}
+	for _, market := range marketsToSeed {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("seed market: %v", err)
 		}
 	}
 }
 
-func buildSearchMarkets(username string, now time.Time) []models.Market {
-	return []models.Market{
-		{
-			ID:                 1,
-			QuestionTitle:      "Will Bitcoin reach $100k by end of year?",
-			Description:        "Bitcoin price prediction",
-			OutcomeType:        "BINARY",
-			ResolutionDateTime: now.Add(48 * time.Hour),
-			IsResolved:         false,
-			InitialProbability: 0.5,
-			CreatorUsername:    username,
-		},
-		{
-			ID:                 2,
-			QuestionTitle:      "Bitcoin market prediction",
-			Description:        "Closed bitcoin market",
-			OutcomeType:        "BINARY",
-			ResolutionDateTime: now.Add(-1 * time.Hour),
-			IsResolved:         false,
-			InitialProbability: 0.5,
-			CreatorUsername:    username,
-		},
-		{
-			ID:                      3,
-			QuestionTitle:           "Will Bitcoin overtake gold market cap?",
-			Description:             "Resolved bitcoin market",
-			OutcomeType:             "BINARY",
-			ResolutionDateTime:      now.Add(-24 * time.Hour),
-			FinalResolutionDateTime: now.Add(-12 * time.Hour),
-			IsResolved:              true,
-			ResolutionResult:        "YES",
-			InitialProbability:      0.5,
-			CreatorUsername:         username,
-		},
-		{
-			ID:                 4,
-			QuestionTitle:      "Stock market crash prediction",
-			Description:        "Market about stocks",
-			OutcomeType:        "BINARY",
-			ResolutionDateTime: now.Add(24 * time.Hour),
-			IsResolved:         false,
-			InitialProbability: 0.5,
-			CreatorUsername:    username,
-		},
-	}
+func mustSearchMarket(id int64, username string, _ time.Time, title, description string, resolution, finalResolution time.Time, resolved bool, result string) any {
+	market := modelstesting.GenerateMarket(id, username)
+	market.QuestionTitle = title
+	market.Description = description
+	market.ResolutionDateTime = resolution
+	market.FinalResolutionDateTime = finalResolution
+	market.IsResolved = resolved
+	market.ResolutionResult = result
+	return &market
 }
 
 func TestServiceSearchMarketsFiltersByStatus(t *testing.T) {

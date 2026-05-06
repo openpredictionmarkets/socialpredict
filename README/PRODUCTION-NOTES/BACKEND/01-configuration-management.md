@@ -1,157 +1,316 @@
-# Configuration Management Implementation Plan
+---
+title: Configuration Management
+document_type: production-notes
+domain: backend
+author: Patrick Delaney
+updated_at: 2026-04-30T11:55:00Z
+updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
+update_reason: "Record the April 30 runtime-security configuration slice while preserving the runtime/bootstrap versus application-policy split."
+status: active
+---
 
-## Overview
-Transform the current basic environment variable loading into a robust configuration management system suitable for production environments.
+# Configuration Management
 
-## Current State Analysis
-- Configuration loaded in `main.go` using `util.GetEnv()`
-- Basic environment variables without validation
-- No default values or configuration structure
-- No environment-specific configurations
+## Update Summary
 
-## Implementation Steps
+This note was updated on Saturday, April 25, 2026 to replace an older greenfield-style configuration plan with guidance that reflects the current SocialPredict codebase and the architecture direction needed for high availability and fault tolerance.
 
-### Step 1: Create Configuration Structure
-**Timeline: 1-2 days**
+On Thursday, April 30, 2026, the first security-sensitive runtime configuration slice was finished: `JWT_SIGNING_KEY`, `TRUST_PROXY_HEADERS`, CORS posture, security headers, and optional app-level HSTS are now loaded by runtime/bootstrap and injected into server construction rather than hidden inside route-local helpers.
 
-Create a centralized configuration package:
+| Topic | Prior to April 25, 2026 | After April 25, 2026 |
+| --- | --- | --- |
+| Core framing | Treated configuration as one generic subsystem | Splits configuration into runtime/bootstrap detail and application-policy input |
+| Main proposal | Create a new centralized `config/` package with environment hierarchies and hot reload | Finish the existing runtime and config-service boundaries already present in the backend |
+| Operational model | Considered hot reload as a production feature | Prefer validate once at startup, inject immutable snapshots, and roll forward via controlled restart/deployment |
+| Source of truth | Implied a new file hierarchy would replace current behavior | Keep `backend/setup/setup.yaml` as the source asset for application policy during this migration |
+| Current-state assumptions | Assumed `main.go` still used old env-loading patterns | Reflects current `internal/app/runtime`, `internal/service/config`, and explicit container wiring |
+| HA / fault tolerance | Optimized for flexibility first | Optimizes for deterministic startup, replica consistency, and rollback safety |
 
-```go
-// config/config.go
-type Config struct {
-    Server   ServerConfig   `yaml:"server"`
-    Database DatabaseConfig `yaml:"database"`
-    Auth     AuthConfig     `yaml:"auth"`
-    Security SecurityConfig `yaml:"security"`
-    Logging  LoggingConfig  `yaml:"logging"`
-}
-```
+## Executive Direction
 
-**Files to create/modify:**
-- `config/config.go` - Main configuration struct
-- `config/loader.go` - Configuration loading logic
-- `config/validator.go` - Configuration validation
+SocialPredict should treat configuration as two concerns:
 
-### Step 2: Environment-Specific Configuration Files
-**Timeline: 1 day**
+1. Runtime/bootstrap detail
+2. Application-policy input
 
-Create YAML configuration files for different environments:
+Runtime/bootstrap config should be loaded and validated at startup and injected immutably. Economics and frontend policy should be served through an owned internal configuration boundary with no globals and no direct `setup` leakage into use-case code.
 
-```
-config/
-├── environments/
-│   ├── development.yaml
-│   ├── staging.yaml
-│   ├── production.yaml
-│   └── testing.yaml
-└── config.go
-```
+For high-availability operation, the backend should:
 
-**Features:**
-- Environment-specific defaults
-- Sensitive data via environment variables
-- Configuration inheritance
+- validate once at startup
+- inject immutable snapshots
+- roll forward with controlled restarts and deployments
 
-### Step 3: Configuration Validation
-**Timeline: 1 day**
+Hot-reloading economics or accounting-relevant policy is not a goal. If economics can change while the system is live in an uncontrolled way, the platform can eliminate financial and accounting correctness. Financial correctness is binary. The objective is 100% financial and accounting correctness.
 
-Implement validation using struct tags and custom validators:
+## Why This Matters
 
-```go
-type ServerConfig struct {
-    Port    int    `yaml:"port" validate:"required,min=1024,max=65535"`
-    Host    string `yaml:"host" validate:"required"`
-    Timeout int    `yaml:"timeout" validate:"required,min=1"`
-}
-```
+The older version of this note was useful as a generic checklist, but it no longer matched the codebase or the architecture direction. SocialPredict is already moving toward explicit runtime seams and a service-backed configuration boundary. The production notes need to document and accelerate that transition, not restart the discussion from a hypothetical greenfield configuration subsystem.
 
-**Validation features:**
-- Required field validation
-- Range validation for numeric values
-- Format validation for URLs, emails, etc.
-- Custom business logic validation
+This matters even more under the broader production objective of high availability and fault tolerance:
 
-### Step 4: Configuration Hot-Reloading
-**Timeline: 2 days**
+- replicas must start from the same validated configuration snapshot
+- rollouts must be deterministic and reversible
+- economics and accounting behavior must not drift between instances
+- business-policy inputs must remain stable enough to preserve market and ledger correctness
 
-Implement configuration hot-reloading for non-critical settings:
+## Current Code Snapshot
+
+As of 2026-04-25, the backend is in a transitional but meaningful intermediate state.
+
+### Runtime/bootstrap concerns already have explicit seams
+
+`backend/main.go` no longer follows the older `util.GetEnv()` pattern. Startup now uses explicit runtime helpers:
 
 ```go
-type ConfigWatcher struct {
-    config *Config
-    watchers []chan Config
-}
-
-func (cw *ConfigWatcher) Watch() error {
-    // File system watcher implementation
-}
+dbCfg, err := appruntime.LoadDBConfigFromEnv()
+db, err := appruntime.InitDB(dbCfg, appruntime.PostgresFactory{})
+configService, err := appruntime.LoadConfigService()
+server.Start(openAPISpec, swaggerUIFS, db, configService)
 ```
 
-**Features:**
-- File system watcher
-- Configuration change notifications
-- Safe configuration updates
-- Rollback on invalid configurations
-
-### Step 5: Integration with Dependency Injection
-**Timeline: 1 day**
-
-Integrate configuration with a dependency injection container:
+`backend/internal/app/runtime/db.go` already owns normalized DB bootstrap concerns:
 
 ```go
-func NewContainer(cfg *Config) *Container {
-    container := &Container{}
-    container.Register("config", cfg)
-    container.Register("db", NewDatabase(cfg.Database))
-    return container
+type DBConfig struct {
+    Host     string
+    Port     string
+    User     string
+    Password string
+    Name     string
+    SSLMode  string
+    TimeZone string
 }
 ```
 
-## Directory Structure
+This is the right category for environment-driven infrastructure configuration.
+
+### A configuration service already exists
+
+The backend already has an internal config service:
+
+```go
+type Service interface {
+    Current() *AppConfig
+    Economics() Economics
+    Frontend() Frontend
+    ChartSigFigs() int
+}
 ```
-config/
-├── config.go              # Main configuration struct
-├── loader.go              # Configuration loading logic
-├── validator.go           # Configuration validation
-├── watcher.go             # Hot-reload functionality
-├── environments/
-│   ├── development.yaml   # Development environment config
-│   ├── staging.yaml       # Staging environment config
-│   ├── production.yaml    # Production environment config
-│   └── testing.yaml       # Testing environment config
-└── schema.json            # JSON schema for validation
+
+The service is already wired through the application container and server route registration:
+
+```go
+func NewContainer(db *gorm.DB, configService configsvc.Service) *Container
+func BuildApplicationWithConfigService(db *gorm.DB, configService configsvc.Service) *Container
 ```
 
-## Dependencies
-- `gopkg.in/yaml.v3` - YAML parsing
-- `github.com/go-playground/validator/v10` - Validation
-- `github.com/fsnotify/fsnotify` - File watching
-- `github.com/spf13/viper` - Advanced configuration management
+Setup handlers also already consume the service explicitly:
 
-## Testing Strategy
-- Unit tests for configuration loading
-- Validation tests for all configuration scenarios
-- Integration tests for hot-reloading
-- Environment-specific configuration tests
+```go
+func GetSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request)
+func GetFrontendSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request)
+```
 
-## Migration Strategy
-1. Create new configuration package alongside existing code
-2. Gradually migrate modules to use new configuration
-3. Update deployment scripts to use new configuration files
-4. Remove old environment variable loading
+### `backend/setup` is still a transitional seam
 
-## Benefits
-- Type-safe configuration access
-- Environment-specific settings
-- Configuration validation at startup
-- Hot-reloading for operational flexibility
-- Centralized configuration management
-- Better documentation through YAML comments
+`backend/setup/setup.go` is currently the source asset boundary for economics and frontend policy, but it still mixes two responsibilities:
 
-## Risks & Mitigation
-- **Risk**: Configuration file corruption
-- **Mitigation**: Configuration validation and rollback mechanisms
-- **Risk**: Hot-reload causing service instability
-- **Mitigation**: Only allow hot-reload for non-critical settings
-- **Risk**: Secrets in configuration files
-- **Mitigation**: Use environment variables for sensitive data
+1. policy-shaped configuration data
+2. package-global loading and access behavior
+
+Today it still contains:
+
+- embedded `setup.yaml`
+- package-global `economicConfig`
+- `sync.Once`
+- `init()` loading
+- package-level convenience accessors
+
+That means `setup` is not yet the final owned boundary. It is a source asset plus a legacy access path.
+
+### The migration is incomplete
+
+The current config service is still partly a thin wrapper around `setup`:
+
+```go
+type AppConfig = setup.EconomicConfig
+type Economics = setup.Economics
+type Frontend = setup.Frontend
+```
+
+And runtime loading still calls:
+
+```go
+return configsvc.NewService(configsvc.LoaderFunc(setup.LoadEconomicsConfig))
+```
+
+Some consumers are on the right path, but others still accept or retain raw setup-shaped configuration. For example:
+
+- `backend/internal/domain/bets/service.go` still stores `*setup.EconomicConfig`
+- `backend/internal/domain/analytics/service.go` still uses `setup.EconConfigLoader`
+- `backend/handlers/stats/statshandler.go` still reaches through `configService.Current()` and reads the full tree
+- `backend/internal/service/config/service_test.go` still builds test values directly from `setup` types
+
+So the live state is neither the old monolithic global approach nor the final target state. It is an in-progress migration.
+
+## Configuration Taxonomy
+
+### 1. Runtime/Bootstrap Configuration
+
+This category covers process and infrastructure detail, for example:
+
+- DB host/user/password/name/port
+- SSL mode and timezone for DB connectivity
+- JWT signing-key presence
+- CORS environment flags
+- trusted proxy-header posture
+- app-level HSTS posture where the app owns it
+- bind/runtime environment selection
+- deployment-time operational toggles
+
+This configuration belongs in startup, infrastructure wiring, and the composition root.
+
+Properties:
+
+- loaded from env or runtime deployment sources
+- validated at startup
+- immutable for the running process
+- not exposed as a general-purpose business-policy object
+
+### 2. Application-Policy Configuration
+
+This category covers policy inputs that influence product behavior, for example:
+
+- market creation defaults
+- subsidies and incentives
+- user starting balances and debt limits
+- betting fee rules
+- frontend chart formatting policy where it reflects product policy
+
+This configuration belongs behind an owned internal boundary and should be consumed through narrow interfaces or snapshots, not through package globals.
+
+Properties:
+
+- source asset currently remains `backend/setup/setup.yaml`
+- loaded once into validated, explicit application-policy structures
+- injected into the parts of the system that need it
+- not mutated ad hoc during live operation
+
+## Economics Freeze and Financial Correctness
+
+Economics configuration is not merely cosmetic. It affects the correctness of market behavior, fee rules, balances, debt, and other accounting-relevant flows.
+
+SocialPredict should therefore treat economic policy as frozen for the scope whose accounting it governs.
+
+That means:
+
+- running processes should not hot-reload economics policy
+- deployments should roll forward with versioned, validated snapshots
+- accounting-relevant values should be copied into durable domain state at the right workflow boundaries when required
+- the design must preserve 100% financial and accounting correctness
+
+This note intentionally rejects configuration hot reload as a default strategy for economics or accounting-sensitive behavior.
+
+## Current Tree Versus Target Tree
+
+### Current configuration-related tree
+
+```text
+backend/
+├── main.go
+├── setup/
+│   ├── setup.go
+│   └── setup.yaml
+├── internal/
+│   ├── app/
+│   │   ├── container.go
+│   │   └── runtime/
+│   │       ├── config.go
+│   │       └── db.go
+│   └── service/
+│       └── config/
+│           ├── service.go
+│           └── service_test.go
+├── handlers/
+│   ├── setup/
+│   │   └── setuphandler.go
+│   └── stats/
+│       └── statshandler.go
+└── server/
+    └── server.go
+```
+
+### End-state objective
+
+The objective is not to create a giant generic `config/` package. The objective is to finish the boundary split and move consumers to owned, narrow configuration interfaces.
+
+```text
+backend/
+├── main.go
+├── setup/
+│   └── setup.yaml                    # source asset during migration
+├── internal/
+│   ├── app/
+│   │   ├── container.go
+│   │   └── runtime/
+│   │       ├── config.go            # startup loading/validation of runtime/bootstrap config
+│   │       └── db.go
+│   ├── service/
+│   │   └── config/
+│   │       ├── types.go             # owned app-policy types, no setup aliases
+│   │       ├── loader.go            # loads from setup source asset during migration
+│   │       ├── service.go           # narrow interfaces / immutable snapshots
+│   │       └── service_test.go
+│   └── domain/
+│       ├── markets/                 # receives narrow config structs
+│       ├── bets/                    # no direct setup imports
+│       └── analytics/               # no direct setup imports
+├── handlers/
+│   ├── setup/                       # read-only API exposure of approved config slices
+│   └── stats/                       # depends on narrow policy views, not raw config tree
+└── server/
+    └── server.go
+```
+
+## Design Rules
+
+The intended direction is:
+
+- keep runtime/bootstrap concerns separate from application-policy concerns
+- keep `backend/setup/setup.yaml` as the source asset during this migration
+- remove `init()`-driven config loading from the long-term design
+- remove package-global mutable configuration access
+- stop handing the entire config tree to code that only needs a narrow slice
+- stop importing `setup` directly from use-case code
+- move from setup aliases to owned configuration types in `internal/service/config`
+- validate configuration once at startup and fail fast on invalid state
+- favor rolling deployment and restart over live mutation
+
+The intended direction is not:
+
+- one mega configuration service for every concern in the system
+- early introduction of hot reload for accounting-sensitive rules
+- externalizing the current singleton without first fixing the boundary
+- confusing deployment-time settings with business-policy inputs
+
+## Concrete Next Migration Goals
+
+1. Keep using explicit runtime/bootstrap loading in `main.go` and `internal/app/runtime`.
+2. Retain `backend/setup/setup.yaml` as the policy source asset for now.
+3. Replace type aliases in `internal/service/config` with owned configuration types.
+4. Move `setup` to a pure source-asset and translation role, not a package-global runtime access role.
+5. Convert domain and handler consumers from whole-tree access to narrow config inputs.
+6. Persist accounting-relevant economics at the appropriate workflow boundaries where replay and correctness require durable values.
+7. Keep the runtime operational model simple: validate, inject, deploy, restart, verify.
+
+## What This Note Replaces
+
+This update replaces the older recommendation to:
+
+- build a new top-level generic `config/` subsystem
+- add environment-specific YAML inheritance as the main architecture move
+- introduce hot reload as a featured direction
+- treat configuration as primarily a tooling problem
+
+SocialPredict’s real need is boundary completion, deterministic startup, and protection of financial and accounting correctness.

@@ -1,13 +1,13 @@
 package analytics
 
 import (
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 )
 
 type defaultMarketPositionCalculator struct{}
 
-func (defaultMarketPositionCalculator) Calculate(snapshot positionsmath.MarketSnapshot, bets []models.Bet) ([]positionsmath.MarketPosition, error) {
+func (defaultMarketPositionCalculator) Calculate(snapshot positionsmath.MarketSnapshot, bets []boundary.Bet) ([]positionsmath.MarketPosition, error) {
 	return positionsmath.NewPositionCalculator().CalculateMarketPositions(snapshot, bets)
 }
 
@@ -20,7 +20,7 @@ type configurableMarketPositionCalculator struct {
 	calculator positionsmath.PositionCalculator
 }
 
-func (c configurableMarketPositionCalculator) Calculate(snapshot positionsmath.MarketSnapshot, bets []models.Bet) ([]positionsmath.MarketPosition, error) {
+func (c configurableMarketPositionCalculator) Calculate(snapshot positionsmath.MarketSnapshot, bets []boundary.Bet) ([]positionsmath.MarketPosition, error) {
 	calc := c.calculator
 	return calc.CalculateMarketPositions(snapshot, bets)
 }

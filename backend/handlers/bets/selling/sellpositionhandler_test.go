@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -30,9 +31,15 @@ func (f *fakeSellService) Sell(ctx context.Context, req bets.SellRequest) (*bets
 	return f.resp, f.err
 }
 
-type fakeUsersService struct{ user *dusers.User }
+type fakeUsersService struct {
+	user *dusers.User
+	err  error
+}
 
 func (f *fakeUsersService) GetUser(ctx context.Context, username string) (*dusers.User, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	return f.user, nil
 }
 func (f *fakeUsersService) ApplyTransaction(ctx context.Context, username string, amount int64, transactionType string) error {
@@ -134,11 +141,14 @@ func TestSellPositionHandler_Success(t *testing.T) {
 		t.Fatalf("unexpected request payload: %+v", svc.req)
 	}
 
-	var resp dto.SellBetResponse
+	var resp handlers.SuccessEnvelope[dto.SellBetResponse]
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if resp.SharesSold != 3 || resp.SaleValue != 60 || resp.Dust != 5 {
+	if !resp.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if resp.Result.SharesSold != 3 || resp.Result.SaleValue != 60 || resp.Result.Dust != 5 {
 		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
@@ -148,15 +158,17 @@ func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
 
 	cases := []struct {
-		name string
-		err  error
-		want int
+		name   string
+		err    error
+		want   int
+		reason string
 	}{
-		{"bad outcome", bets.ErrInvalidOutcome, http.StatusBadRequest},
-		{"market closed", bets.ErrMarketClosed, http.StatusConflict},
-		{"no position", bets.ErrNoPosition, http.StatusUnprocessableEntity},
-		{"dust cap", bets.ErrDustCapExceeded{Cap: 2, Requested: 3}, http.StatusUnprocessableEntity},
-		{"market not found", dmarkets.ErrMarketNotFound, http.StatusNotFound},
+		{"bad outcome", bets.ErrInvalidOutcome, http.StatusBadRequest, string(handlers.ReasonValidationFailed)},
+		{"market closed", bets.ErrMarketClosed, http.StatusConflict, string(handlers.ReasonMarketClosed)},
+		{"no position", bets.ErrNoPosition, http.StatusUnprocessableEntity, string(handlers.ReasonNoPosition)},
+		{"insufficient shares", bets.ErrInsufficientShares, http.StatusUnprocessableEntity, string(handlers.ReasonInsufficientShares)},
+		{"dust cap", bets.ErrDustCapExceeded{Cap: 2, Requested: 3}, http.StatusUnprocessableEntity, string(handlers.ReasonDustCapExceeded)},
+		{"market not found", dmarkets.ErrMarketNotFound, http.StatusNotFound, string(handlers.ReasonMarketNotFound)},
 	}
 
 	for _, tc := range cases {
@@ -173,6 +185,14 @@ func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 
 			if rr.Code != tc.want {
 				t.Fatalf("expected status %d, got %d", tc.want, rr.Code)
+			}
+
+			var resp handlers.FailureEnvelope
+			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("decode failure envelope: %v", err)
+			}
+			if resp.Reason != tc.reason {
+				t.Fatalf("expected reason %q, got %q", tc.reason, resp.Reason)
 			}
 		})
 	}
@@ -193,5 +213,67 @@ func TestSellPositionHandler_InvalidJSON(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInvalidRequest) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInvalidRequest, resp.Reason)
+	}
+}
+
+func TestSellPositionHandler_PasswordChangeRequired(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	svc := &fakeSellService{}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice", MustChangePassword: true}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 7, Amount: 65, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellPositionHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonPasswordChangeRequired) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonPasswordChangeRequired, resp.Reason)
+	}
+}
+
+func TestSellPositionHandler_UserNotFound(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	svc := &fakeSellService{}
+	users := &fakeUsersService{err: dusers.ErrUserNotFound}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 7, Amount: 65, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellPositionHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonUserNotFound) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonUserNotFound, resp.Reason)
 	}
 }

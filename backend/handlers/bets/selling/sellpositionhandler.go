@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/bets/dto"
 	bets "socialpredict/internal/domain/bets"
 	dmarkets "socialpredict/internal/domain/markets"
@@ -16,19 +18,19 @@ import (
 func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
-		user, httpErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
-		if httpErr != nil {
-			http.Error(w, httpErr.Error(), httpErr.StatusCode)
+		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
 			return
 		}
 
 		req, decodeErr := decodeSellRequest(r)
 		if decodeErr != nil {
-			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -60,22 +62,24 @@ func toSellRequest(req dto.SellBetRequest, username string) bets.SellRequest {
 }
 
 func handleSellError(w http.ResponseWriter, err error) {
-	if dustErr, ok := err.(bets.ErrDustCapExceeded); ok {
-		http.Error(w, dustErr.Error(), http.StatusUnprocessableEntity)
+	if _, ok := err.(bets.ErrDustCapExceeded); ok {
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonDustCapExceeded)
 		return
 	}
 
 	switch {
 	case errors.Is(err, bets.ErrInvalidOutcome), errors.Is(err, bets.ErrInvalidAmount):
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	case errors.Is(err, bets.ErrMarketClosed):
-		http.Error(w, err.Error(), http.StatusConflict)
-	case errors.Is(err, bets.ErrNoPosition), errors.Is(err, bets.ErrInsufficientShares):
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		_ = handlers.WriteFailure(w, http.StatusConflict, handlers.ReasonMarketClosed)
+	case errors.Is(err, bets.ErrNoPosition):
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonNoPosition)
+	case errors.Is(err, bets.ErrInsufficientShares):
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientShares)
 	case errors.Is(err, dmarkets.ErrMarketNotFound):
-		http.Error(w, "Market not found", http.StatusNotFound)
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 	}
 }
 
@@ -90,7 +94,5 @@ func writeSellResponse(w http.ResponseWriter, result *bets.SellResult) {
 		TransactionAt: result.TransactionAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	_ = handlers.WriteResult(w, http.StatusCreated, response)
 }

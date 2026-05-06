@@ -1,319 +1,220 @@
-# Issues/Concerns with the Backend API
-
-In my experimentation with the backend, I've discovered a number of issues that
-I feel should be addressed before we can consider the API "fully baked".
-
-## Routes That Fail To Handle Errors Correctly
-
-Once I reconstructed the openapi.yaml file from the source code rather than
-the documentation, I found a number of routes that bubble unhandled errors
-up to the top-level service.
-
-The first I found was `POST /v0/markets` which failed to handle validation correctly
-resulting in `500 Server failed` responses. After digging into the code, I found
-that a new market created with a `resolutionDateTime` that was, according to the
-business rules, too short in duration, would fail to trap the condition and bubbled
-up this 500.
-
-I fixed this code in commit `(af21cd85) - fix 500 resp when market resolution time is too short`.
-
-However, further investigation has found several other handlers that have the same problem:
-
-- Stats
-  - backend/handlers/stats/statshandler.go
-    - On failures computing or encoding stats, uses:
-      - `http.Error(w, "Failed to calculate financial stats: "+err.Error(), http.StatusInternalServerError))`
-      - `http.Error(w, "Failed to load setup configuration: "+err.Error(), http.StatusInternalServerError))`
-      - `http.Error(w, "Failed to encode stats response: "+err.Error(), http.StatusInternalServerError))`
-- CMS Homepage
-  - backend/handlers/cms/homepage/http/handler.go
-    - Several branches write raw errors:
-      - `http.Error(w, err.Error(), http.StatusBadRequest)` in the parse/validation path.
-- Bets – Buying/Selling
-  - backend/handlers/bets/selling/sellpositionhandler.go
-    - Uses `httpErr.Error()` and various `err.Error()` / `dustErr.Error()` for 4xx/5xx:
-      - e.g. `http.Error(w, err.Error(), http.StatusBadRequest/Conflict/UnprocessableEntity/InternalServerError)`
-  - backend/handlers/bets/buying/buypositionhandler.go
-    - Similar pattern:
-      - `http.Error(w, httpErr.Error(), httpErr.StatusCode)`
-      - `http.Error(w, err.Error(), http.StatusBadRequest/Conflict/UnprocessableEntity/InternalServerError)`
-- Positions
-  - `backend/handlers/positions/positionshandler.go`
-    - On certain service errors, uses:
-      - `http.Error(w, "Internal server error", http.StatusInternalServerError)` (generic, not leaking message)
-    - But other errors are mapped to literal strings (“Market not found”, etc.), not raw `err.Error()`.
-- Users – Profile / Position
-  - `backend/handlers/users/changedisplayname.go`
-    - Final catch-all path uses:
-      - `http.Error(w, err.Error(), http.StatusInternalServerError)`
-  - backend/handlers/users/userpositiononmarkethandler.go
-    - On some paths:
-      - `http.Error(w, "Failed to fetch user position", 500)`
-      - `http.Error(w, err.Error(), http.StatusInternalServerError)`
-- Users – Profile helpers
-  - `backend/handlers/users/profile_helpers.go`
-    - writeProfileError inspects `err.Error()` and, for validation errors, passes the message straight through in JSON:
-      - `writeProfileJSONError(w, http.StatusBadRequest, message)`
-    - For some error types it maps to sanitized messages (“User not found”, etc.), but in the generic case it uses the raw error string.
-
-### Thoughts
-
-Generally I really don't favor relying on HTTP Response Codes to indicate error conditions.
-
-Originally when we formalized the HTTP Protocol, its Response Codes were designed specifically to alert clients of problematic conditions with the server-layer rather than the operational-layer. In other words, these codes were to inform clients of a failure of the server itself, *not the operations it undertook.*
-
-Most developers do not have the luxury of this hindsight and continue to try to force their error conditions into the procrustean bed of HTTP Response Codes.
-
-A perfect example of this is these responses returned by `POST /v0/markets`:
-
-- '400': Bad Request - Validation failed while creating the market.
-  - From a server standpoint, this operation is not a bad request, the payload was received and handled properly by the server. Rather, it's an issue with payload validation.
-- '403': Forbidden - Password change required before creating markets.
-  - This is an abuse of the HTTP standard since the issue is one of business rules, not that the user cannot complete the activity. (I have thoughts on the login process which I'll discuss below.)
-
-So, rather than trying to shoehorn everything into Response Codes, what is a better pattern?
-
-All requests that have been *processed correctly by the backend* return 2XX (200, 201, or 204 as appropriate) along with a payload like:
-
-```json
-{
-  "ok": true,
-  "result": any
-}
-```
-
-for successful operations, and
-
-```json
-{
-  "ok": false,
-  "reason": string
-}
-```
-
-for failed operations.
-
-A quick check on the value of `ok` informs the client whether to look for `result` or `reason`.
-
-## The Current Login Process
-
-As you know, the current login flow follows:
+# Backend API Follow-Ups
+
+This file tracks only intentionally deferred API-shaping decisions after the
+final API sweep.
+
+Source of truth order for the current backend remains:
+
+1. `backend/server/server.go`
+2. touched handlers and DTOs under `backend/handlers/**`
+3. `backend/docs/openapi.yaml`
+4. this file
+
+The final sweep reconciled the live backend, embedded OpenAPI document, and
+Swagger UI surface for the currently implemented contract. If future work
+introduces route/spec drift, update the code and `backend/docs/openapi.yaml`
+first and only then revise this file if a decision is intentionally deferred.
+
+## WAVE06 Route-Family Migration Matrix
+
+`backend/docs/openapi.yaml` now carries the canonical machine-checkable matrix
+as `x-route-family-migration-matrix`. This file mirrors the deferred-decision
+parts of that contract so follow-up API work does not need to rediscover the
+mixed state from handler code.
+
+WAVE06 stop-and-review outcome:
+
+- Touched private-user routes no longer expose raw auth transport messages in
+  their response bodies. They route auth outcomes through `handlers/authhttp`
+  and return stable `ReasonResponse` values.
+- `/v0/changepassword` intentionally uses token-only auth so first-login users
+  can complete the password change, but its auth failures still use
+  `ReasonResponse` rather than raw auth messages.
+- `/v0/markets/search` keeps its raw `SearchResponse` success body while its
+  touched validation, method, service, and write failures now use
+  `ReasonResponse`; its plain-text application failures are retired.
+- Remaining documented plain-text application failures are limited to older
+  markets compatibility entry points and are the next route-family migration
+  seam, not an API-platform backlog.
+
+WAVE10 validation stop-and-review outcome:
+
+- Markets create/search now use the runtime-injected shared security service
+  rather than production handler-local validator or sanitizer construction.
+- Markets list/search pagination now uses `security.ParseBoundedIntParam` for
+  bounded integer query parsing.
+- Create/search validation failures are intentionally split: malformed or
+  sanitizer-rejected boundary input returns `INVALID_REQUEST`, while
+  syntactically valid domain validation failures return `VALIDATION_FAILED`.
+- Remaining boundary-validation bypasses are route-family scoped: legacy market
+  detail, resolve, projection, and compatibility methods still own local path or
+  action parsing and some plain `http.Error` shaping; market bets and positions
+  still duplicate market ID parsing; private actions still rely mostly on domain
+  validation after local DTO decode.
+- The next validation seam is the remaining markets path/action helper gap, not
+  a generic validation registry, request-body middleware layer, or platform
+  program.
+
+The source-of-truth order remains:
+
+1. `backend/server/server.go`
+2. touched handlers and DTOs under `backend/handlers/**`
+3. `backend/docs/openapi.yaml`
+4. this file
+
+| Route family | Paths | Success contract | Failure contract | Migration state |
+| --- | --- | --- | --- | --- |
+| Infra probes | `/health`, `/readyz` | `text/plain` probe body | `text/plain` probe body where applicable | Intentional infra transport |
+| Infra docs | `/openapi.yaml`, `/swagger`, `/swagger/` | YAML, redirect, or embedded Swagger UI asset | Router/runtime failure outside application envelope | Intentional unversioned docs transport published at the proxy root, not under `/api/` |
+| Runtime middleware | all registered routes | Not applicable | JSON `{ ok: false, reason }` for router-owned `405` and middleware-owned `429` | Runtime-boundary envelope |
+| Auth | `/v0/login` | JSON `{ ok: true, result }` | `ReasonResponse` | Envelope-based |
+| Setup | `/v0/setup`, `/v0/setup/frontend` | Raw JSON DTO | `ReasonResponse` plus middleware `429` | Mixed raw success plus `ReasonResponse` |
+| Reporting | `/v0/home`, `/v0/stats`, `/v0/system/metrics`, `/v0/global/leaderboard` | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` | Envelope-based |
+| Markets | `/v0/markets`, status aliases, detail, resolve, leaderboard, projection routes, and both legacy market-projection slash variants | Mixed raw JSON DTO, no-content action, and selected envelope results | `ReasonResponse` plus middleware `429` | Mixed raw success plus `ReasonResponse` |
+| Market search | `/v0/markets/search` | Raw JSON `SearchResponse` | `ReasonResponse` plus middleware `429` | Raw success with plain-text failures retired |
+| Market bets and positions | market bet and position routes under `/v0/markets/...` | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` where wrapped | Envelope-based |
+| Public users | `/v0/userinfo/{username}`, `/v0/usercredit/{username}`, `/v0/portfolio/{username}`, `/v0/users/{username}/financial` | Raw JSON DTO | `ReasonResponse` plus middleware `429` | Mixed raw success plus `ReasonResponse` |
+| Private users | `/v0/privateprofile`, `/v0/changepassword`, profile-change routes | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` | Envelope-based |
+| Private actions | `/v0/bet`, `/v0/userposition/{marketId}`, `/v0/sell` | JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` and `PASSWORD_CHANGE_REQUIRED` gate | Envelope-based |
+| Admin and content | `/v0/admin/createuser`, `/v0/content/home`, `/v0/admin/content/home` | Mixed raw JSON DTO and JSON `{ ok: true, result }` | `ReasonResponse` plus middleware `429` where wrapped | Mixed raw success plus `ReasonResponse` |
+
+The public `reason` values in this matrix are client-facing contract values
+only. They must stay separate from runtime or telemetry vocabulary such as
+`error.type`.
+
+The current public `reason` vocabulary is:
+
+`METHOD_NOT_ALLOWED`, `RATE_LIMITED`, `LOGIN_RATE_LIMITED`,
+`INVALID_REQUEST`, `INVALID_TOKEN`, `AUTHORIZATION_DENIED`,
+`PASSWORD_CHANGE_REQUIRED`, `NOT_FOUND`, `USER_NOT_FOUND`,
+`MARKET_NOT_FOUND`, `VALIDATION_FAILED`, `MARKET_CLOSED`,
+`INSUFFICIENT_BALANCE`, `NO_POSITION`, `INSUFFICIENT_SHARES`,
+`DUST_CAP_EXCEEDED`, and `INTERNAL_ERROR`.
+
+`PlainTextErrorResponse` is retained only as explicit migration state for infra
+probe failures and untouched handler-owned plain-text failures that have not yet
+been converted. At this checkpoint the explicit inventory is:
+
+- `/health` and `/readyz` probe transport, which intentionally remains
+  `text/plain`.
+- The older market handler entry points in `handlers/markets/getmarkets.go`,
+  `handlers/markets/listmarkets.go`,
+  `handlers/markets/marketdetailshandler.go`,
+  `handlers/markets/resolvemarket.go`, and the legacy update/get methods on
+  `handlers/markets/handler.go`.
 
-- Initial login for new user with initial (temporary) credentials, returns (temporary) JWT
-- Client then must change password using JWT, returns string
-- Client must then re-login with new (correct) credentials, returns JWT.
+The precise next migration seam is still the markets route family, now narrowed
+for validation: consolidate the remaining market path/action boundary helpers
+for market ID, projection amount, resolution outcome, and related failure
+shaping in market detail, resolve, projection, and legacy markets handler
+methods. Remove or retire compatibility entry points only where route wiring
+proves they are dead. Do this without introducing a universal wrapper,
+request-body rewriting middleware, validation registry, or broad platform
+program, and without changing successful raw DTO contracts in the same slice.
 
-This flow is problematic for a number of reasons:
+## Publishing Decision
 
-**1. You’re fully authenticating a user you don’t fully trust.**
+The canonical backend docs endpoints are `GET /openapi.yaml`, `GET /swagger/`,
+and the `GET /swagger` redirect. The dev and production nginx templates publish
+those paths at the primary domain root and proxy them to the backend before
+frontend routing; staging inherits this contract only when deployed from the
+production template. The `/api/` proxy remains for application API traffic only
+and does not own the docs contract. In production, Traefik owns the public host
+and TLS edge; nginx owns the docs path publishing behind that edge.
 
-On first login you return:
+Access restriction is not added in this slice. If operations later needs to
+limit public docs access, keep the backend endpoints and Swagger assets
+backend-owned and add the restriction at the proxy or host layer without
+creating a frontend-maintained Swagger copy.
 
-```json
-{
-  "mustChangePassword": true,
-  "token": "...",
-  "username": "...",
-  "usertype": "..."
-}
-```
+## Deferred Decisions
 
-Even if the client UI says “you must change your password first,” a malicious client can just ignore mustChangePassword and start using the JWT.
+Only the following API decisions remain deferred at this stage.
 
-Unless every single protected endpoint:
+### 1. Limited-Scope Token Login Redesign
 
-- parses the JWT,
-- looks up the user,
-- checks mustChangePassword == false,
-- and denies access if not…
+Current implementation:
 
-…then this user effectively has full access with a default/compromised password.
+- `POST /v0/login` returns a normal bearer token plus `mustChangePassword`.
+- Protected handlers enforce the password-change gate through HTTP-boundary
+  helpers such as `authhttp.CurrentUser(...)` or the shared auth service path,
+  with raw auth messages translated before they reach the response body.
+- `POST /v0/changepassword` still accepts an authenticated request using the
+  current token-validation path.
+- The private-users route family now routes auth checks through the HTTP
+  boundary helper: profile and profile-change routes enforce the
+  `mustChangePassword` gate, while `/v0/changepassword` intentionally uses the
+  token-only auth path so first-login users can complete the password change.
+- Admin-only routes use `AuthService.RequireAdmin(...)`, which enforces the
+  same password-change gate before the admin role check.
 
-This is:
+Why it remains deferred:
 
-- error-prone (easy to forget the check on a new endpoint),
-  - The following routes do not return 401:
-    - GET /health
-    - GET /v0/home
-    - GET /v0/setup
-    - GET /v0/setup/frontend
-    - GET /v0/markets
-    - GET /v0/markets/search
-    - GET /v0/markets/status
-    - GET /v0/markets/status/{status}
-    - GET /v0/markets/{id}
-    - GET /v0/markets/{id}/leaderboard
-    - GET /v0/markets/{id}/projection
-    - GET /v0/marketprojection/{marketId}/{amount}/{outcome}
-    - GET /v0/markets/bets/{marketId}
-    - GET /v0/markets/positions/{marketId}
-    - GET /v0/markets/positions/{marketId}/{username}
-    - GET /v0/userinfo/{username}
-    - GET /v0/usercredit/{username}
-    - GET /v0/portfolio/{username}
-    - GET /v0/users/{username}/financial
-    - GET /v0/stats
-    - GET /v0/system/metrics
-    - GET /v0/global/leaderboard
-    - GET /v0/content/home
-  - If it is your intent to make all of these routes freely accessible, I'd suggest you reconsider since many of these leak information that could be used nefariously by person or persons unknown.
-- a violation of least privilege, and
-- gives attackers a very nice “foot in the door” with default credentials.
+- The product/security redesign question is still whether first-login users
+  should receive a limited-scope or short-lived token instead of the normal
+  bearer token.
+- That redesign would change auth semantics across multiple routes and does not
+  belong in this validation-and-reconciliation task.
 
-Safer pattern:
+Decision for this wave:
 
-If mustChangePassword is true, don’t issue a normal access token. Instead:
+- Keep the existing login contract and its current OpenAPI shape.
+- Do not redesign token issuance in this task.
 
-- Return a distinct error / status like `{ ok: false, reason: "PASSWORD_CHANGE_REQUIRED" }`, or
-- Return a limited-scope, short-lived token this is only allowed to call `/changepassword`.
+### 2. Public Route Reorganization
 
-**2. You’re encoding workflow in a flag the server may not actually enforce**
+Current implementation:
 
-Right now your security story is “the client will do the right thing.”
+- `backend/server/server.go` remains the route source of truth.
+- The OpenAPI document mirrors the current monolith route layout, including the
+  existing public aliases and legacy service-shaped paths that still exist in
+  code.
+- Swagger UI is served from `/swagger/`, while the live contract document is
+  served from `/openapi.yaml`.
 
-Security should **always** assume a hostile client.
+Why it remains deferred:
 
-If the server is relying on `mustChangePassword` being respected by the front-end, but not enforcing it everywhere server-side, you’ve got:
+- The remaining work is a route-design decision, not a documentation
+  reconstruction problem.
+- Reorganizing public resource paths would be broader than this task and would
+  require coordinated code, OpenAPI, and client updates.
 
-- Inconsistent authorization rules
-- Lots of subtle bugs waiting to happen
-- Potential privilege escalation if any endpoint forgets the mustChangePassword check
+Decision for this wave:
 
-**3. Unnecessary double-login and token churn**
+- Keep documenting the live route structure exactly as implemented.
+- Do not revive the earlier CRUD-style rewrite proposal in this file.
 
-Your flow:
+### 3. Bets-To-Trades Rename
 
-Login → get token A (mustChangePassword: true)
+Current implementation:
 
-Change password (probably using username+password body, not token)
+- The API still uses bets terminology in both routes and tags, including
+  `/v0/markets/bets/{marketId}`, `/v0/bet`, `/v0/sell`, and the related
+  OpenAPI schema/tag naming.
 
-Login again → get token B (mustChangePassword: false)
+Why it remains deferred:
 
-Issues:
+- The naming change is still a cross-cutting rename with client and
+  documentation impact.
+- Nothing in the current code state narrows that work beyond a future rename
+  decision.
 
-- Two logins where one would do.
-- Now token A is still valid unless you implement revocation / invalidation on password change.
-- If token A remains usable, you’ve just given a long-lived token to someone with a weak/default password.
+Decision for this wave:
 
-Cleaner flow:
+- Keep the existing bets terminology as the canonical current contract.
+- Do not partially rename routes, tags, or schemas in this task.
 
-- First login attempt with default password → respond with `{ ok: false, reason: "PASSWORD_CHANGE_REQUIRED" }` + password-reset token (or reuse the same endpoint but no normal JWT yet).
-- Call `/changepassword` using that special token.
-- If successful, issue a new normal JWT in the same response or require a regular login from then on.
+## Non-Goals For This File
 
-**4. Inconsistent API semantics & UX**
+The following ideas were discussed historically but are not active issues for
+this task:
 
-A few design smells (less severe, but still worth fixing):
+- forcing a universal `ok/result/reason` response envelope across the API
+- treating security-boundary cleanup as an API-platform backlog; the remaining
+  auth call-site cleanup and market-handler failures are tracked as bounded
+  backend boundary migration seams
+- rewriting the API into a new CRUD path taxonomy
+- bundling unrelated implementation changes into this documentation cleanup
 
-- You return 200 OK with a JWT even though the user cannot (or should not) use the system yet. That’s semantically weird; 4xx (“extra action required before full login”) is more natural than “OK, here’s a token, but also no.”
-
-- `/changepassword` returns text/plain instead of JSON, which is inconsistent with the rest of the API shape and makes clients do special-casing.
-
-- You mix authentication concerns (issuing tokens) with account-state workflow in an ad hoc way (mustChangePassword + “but here’s a full token”).
-
-**5. Default / temporary credentials become more dangerous**
-
-If new users are created with known/guessable passwords (common in enterprise setups):
-
-Anyone who learns those default creds can log in and immediately get a full JWT.
-
-Even if you intend to require a password change, in practice they may already have enough access to cause harm unless you’ve perfectly locked down all other endpoints to mustChangePassword == false.
-
-If instead you:
-
-Treat “must change password” as a hard gate to issuing a real access token,
-you dramatically reduce the damage possible from leaked default credentials.
-
-### Bottom Line
-
-This login flow is brittle and requires special handling on the server **and on the client**.
-
-If, on initial login, you reply with:
-
-```json
-{
-  "ok": false,
-  "reason": "MUST CHANGE PASSWORD"
-}
-```
-
-The client can then call `/changepassword` with:
-
-```json
-{
-  "username": string,
-  "password": string,
-  "newPassword": string
-}
-```
-
-which
-
-1. authenticates username and password
-2. updates password with newPassword
-3. return a JWT that allows the user access to the rest of the routes.
-
-## Route Organization
-
-REST is about **Resources** and all of its commands are meant to retrieve and otherwise manipulate resources.
-
-In the backend, I identify the following resources:
-
-- Users
-- Content
-- Markets
-- Bets (Buys/Sells) - N.B. rename this Trades to disconnect semantically from gambling
-- Configuration
-
-As it is, there are a number of routes that seem miss-identified related to their resource, e.g. `/v0/markets/positions/{marketId}` is identified as a 'Users' route.
-
-And the Users routes are very oddly organized. `POST /v0/profilechange/description` and its ilk really seem like they could be better designed, i.e. more RESTully.
-
-Here's how I'd redesign the User routes using Create/Retrieve/Update/Delete (CRUD) semantics:
-
-- Create:
-  - POST /user - creates a new user
-
-- Retrieve:
-  - GET /user[?filter=fields] - paged list of users, optionally filtered
-  - GET /user[?name=username] - info for a specific user
-    - replaces:
-      - GET /userinfo/{username}
-  - GET /user/my - info for the currently logged in user
-    - replaces:
-      - GET /privateprofile
-  - GET /user/{id} - info for a specific user
-
-- Update:
-  - PUT /user/{id} - replaces a user record
-  - PATCH /user/{id} - updates a part of a user record
-    - replaces:
-      - POST /profilechange/description
-      - POST /profilechange/displayname
-      - POST /profilechange/emoji
-      - POST /profilechange/link
-
-- Delete:
-  - DELETE /user/{id} - deletes a user
-
-And the Markets routes: (TO BE COMPLETED... I ran out of steam)
-
-- Create
-  - POST /market - creates a new market
-- Retrieve
-  - GET /market[?filter=fields] - paged list of markets, optionally filtered
-  - GET /market[?username=name] - paged list of markets owned by name
-  - GET /market[?status=value] - paged list of markets by status
-  - GET /market[?search=query] - paged list of markets found using query
-    - Note: These query params can be combined, e.g. [?filter=id,questionTitle,description&search=foobar]
-  - GET /market/my - list of markets owned by current user
-  - GET /market/{id} - get a market by id
-
-- Update
-  - PUT /market/{id}
-  - PATCH /market/{id} -
-    - replaces:
-      - POST /markets/{id}/resolve
-        - payload: {isResolved:true}
-- Delete
-  - DELETE /market/{id} - deletes a market (and its associated records in the DB)
+If future work changes the backend or OpenAPI contract, update that code/spec
+first and then revise this file to match the new implementation.

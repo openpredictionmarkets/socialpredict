@@ -1,13 +1,11 @@
 package statshandlers
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
-	"socialpredict/models"
-	"socialpredict/setup"
-	"socialpredict/util"
-
-	"gorm.io/gorm"
+	"socialpredict/handlers"
+	analytics "socialpredict/internal/domain/analytics"
+	configsvc "socialpredict/internal/service/config"
 )
 
 type FinancialStats struct {
@@ -41,102 +39,73 @@ type StatsResponse struct {
 	SetupConfiguration SetupConfiguration `json:"setupConfiguration"`
 }
 
-// StatsHandler handles requests for both financial stats and setup configuration
-func StatsHandler() http.HandlerFunc {
+type FinancialStatsService interface {
+	ComputeFinancialStats(ctx context.Context, config analytics.StatsConfig) (analytics.FinancialStats, error)
+}
+
+// StatsHandler handles requests for both financial stats and setup configuration.
+func StatsHandler(statsService FinancialStatsService, configService configsvc.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		db := util.GetDB()
-
-		// Calculate financial stats
-		financialStats, err := calculateFinancialStats(db)
-		if err != nil {
-			http.Error(w, "Failed to calculate financial stats: "+err.Error(), http.StatusInternalServerError)
+		if statsService == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		if configService == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
-		// Load setup configuration
-		setupConfig, err := loadSetupConfiguration()
+		economics := configService.Economics()
+
+		financialStats, err := statsService.ComputeFinancialStats(r.Context(), analytics.StatsConfig{
+			InitialAccountBalance: economics.User.InitialAccountBalance,
+		})
 		if err != nil {
-			http.Error(w, "Failed to load setup configuration: "+err.Error(), http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
+
+		setupConfig := loadSetupConfiguration(economics)
 
 		response := StatsResponse{
-			FinancialStats:     financialStats,
+			FinancialStats:     mapFinancialStats(financialStats),
 			SetupConfiguration: setupConfig,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, "Failed to encode stats response: "+err.Error(), http.StatusInternalServerError)
+		if err := handlers.WriteResult(w, http.StatusOK, response); err != nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }
 
-func calculateFinancialStats(db *gorm.DB) (FinancialStats, error) {
-	var result FinancialStats
-
-	// Calculate TotalMoney by calling the new function
-	totalMoney, err := calculateTotalMoney(db)
-	if err != nil {
-		return result, err // Return the current result and the error
+func mapFinancialStats(stats analytics.FinancialStats) FinancialStats {
+	return FinancialStats{
+		TotalMoney:              stats.TotalMoney,
+		TotalDebtExtended:       stats.TotalDebtExtended,
+		TotalDebtUtilized:       stats.TotalDebtUtilized,
+		TotalFeesCollected:      stats.TotalFeesCollected,
+		TotalBonusesPaid:        stats.TotalBonusesPaid,
+		OutstandingPayouts:      stats.OutstandingPayouts,
+		TotalMoneyInCirculation: stats.TotalMoneyInCirculation,
 	}
-	result.TotalMoney = totalMoney
-
-	// Initialize other financial stats with dummy data (or implement real calculations)
-	result.TotalDebtExtended = 0       // Real calculation should be implemented later
-	result.TotalDebtUtilized = 0       // Real calculation should be implemented later
-	result.TotalFeesCollected = 0      // Real calculation should be implemented later
-	result.TotalBonusesPaid = 0        // Real calculation should be implemented later
-	result.OutstandingPayouts = 0      // Real calculation should be implemented later
-	result.TotalMoneyInCirculation = 0 // Real calculation should be implemented later
-
-	return result, nil
 }
 
-// calculateTotalMoney calculates the total initial money in the system based on the number of regular users.
-func calculateTotalMoney(db *gorm.DB) (int64, error) {
-	// Load economic configuration
-	economicConfig, err := setup.LoadEconomicsConfig()
-	if err != nil {
-		return 0, err // Return zero and the error if config can't be loaded
-	}
-
-	// Count the number of regular users
-	var userCount int64
-	if err := db.Model(&models.User{}).Where("user_type = ?", "REGULAR").Count(&userCount).Error; err != nil {
-		return 0, err // Return zero and the error if the query fails
-	}
-
-	// Calculate total money based on the initial account balance and user count
-	totalMoney := economicConfig.Economics.User.InitialAccountBalance * userCount
-	return totalMoney, nil
-}
-
-// loadSetupConfiguration loads the setup configuration from setup.yaml
-func loadSetupConfiguration() (SetupConfiguration, error) {
+func loadSetupConfiguration(economics configsvc.Economics) SetupConfiguration {
 	var result SetupConfiguration
 
-	// Load economic configuration
-	economicConfig, err := setup.LoadEconomicsConfig()
-	if err != nil {
-		return result, err
-	}
+	result.InitialMarketProbability = economics.MarketCreation.InitialMarketProbability
+	result.InitialMarketSubsidization = economics.MarketCreation.InitialMarketSubsidization
+	result.InitialMarketYes = economics.MarketCreation.InitialMarketYes
+	result.InitialMarketNo = economics.MarketCreation.InitialMarketNo
+	result.CreateMarketCost = economics.MarketIncentives.CreateMarketCost
+	result.TraderBonus = economics.MarketIncentives.TraderBonus
+	result.InitialAccountBalance = economics.User.InitialAccountBalance
+	result.MaximumDebtAllowed = economics.User.MaximumDebtAllowed
+	result.MinimumBet = economics.Betting.MinimumBet
+	result.MaxDustPerSale = economics.Betting.MaxDustPerSale
+	result.InitialBetFee = economics.Betting.BetFees.InitialBetFee
+	result.BuySharesFee = economics.Betting.BetFees.BuySharesFee
+	result.SellSharesFee = economics.Betting.BetFees.SellSharesFee
 
-	// Map configuration values to our response struct
-	result.InitialMarketProbability = economicConfig.Economics.MarketCreation.InitialMarketProbability
-	result.InitialMarketSubsidization = economicConfig.Economics.MarketCreation.InitialMarketSubsidization
-	result.InitialMarketYes = economicConfig.Economics.MarketCreation.InitialMarketYes
-	result.InitialMarketNo = economicConfig.Economics.MarketCreation.InitialMarketNo
-	result.CreateMarketCost = economicConfig.Economics.MarketIncentives.CreateMarketCost
-	result.TraderBonus = economicConfig.Economics.MarketIncentives.TraderBonus
-	result.InitialAccountBalance = economicConfig.Economics.User.InitialAccountBalance
-	result.MaximumDebtAllowed = economicConfig.Economics.User.MaximumDebtAllowed
-	result.MinimumBet = economicConfig.Economics.Betting.MinimumBet
-	result.MaxDustPerSale = economicConfig.Economics.Betting.MaxDustPerSale
-	result.InitialBetFee = economicConfig.Economics.Betting.BetFees.InitialBetFee
-	result.BuySharesFee = economicConfig.Economics.Betting.BetFees.BuySharesFee
-	result.SellSharesFee = economicConfig.Economics.Betting.BetFees.SellSharesFee
-
-	return result, nil
+	return result
 }

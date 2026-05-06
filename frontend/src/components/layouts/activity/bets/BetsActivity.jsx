@@ -1,6 +1,7 @@
 import { API_URL } from '../../../../config';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom'; // Import Link
+import { unwrapApiResponse } from '../../../../utils/apiResponse';
 
 const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
     const [bets, setBets] = useState([]);
@@ -10,7 +11,7 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
             const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}`, {
             });
             if (response.ok) {
-                const data = await response.json();
+                const data = unwrapApiResponse(await response.json());
                 setBets(data.sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt)));
             } else {
                 console.error('Error fetching bets:', response.statusText);

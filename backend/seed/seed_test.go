@@ -5,9 +5,36 @@ import (
 	"strings"
 	"testing"
 
+	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
+
+func TestSeedUsersUsesConfigServiceInitialBalance(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	t.Setenv("ADMIN_PASSWORD", "admin-password")
+
+	config := modelstesting.GenerateEconomicConfig()
+	config.Economics.User.InitialAccountBalance = 4321
+
+	if err := SeedUsers(db, economicsOnlyConfigService{
+		economics: configsvc.FromSetup(config).Economics,
+	}); err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+
+	var admin models.User
+	if err := db.Where("username = ?", "admin").First(&admin).Error; err != nil {
+		t.Fatalf("expected admin user to be seeded: %v", err)
+	}
+
+	if admin.InitialAccountBalance != 4321 {
+		t.Fatalf("expected initial balance 4321, got %d", admin.InitialAccountBalance)
+	}
+	if admin.AccountBalance != 4321 {
+		t.Fatalf("expected account balance 4321, got %d", admin.AccountBalance)
+	}
+}
 
 func TestSeedHomepage_RendersHTML(t *testing.T) {
 	// Create fake database for testing
@@ -187,4 +214,24 @@ func TestSeedHomepage_DoesNotDuplicateExisting(t *testing.T) {
 	if content.Title != "Existing" {
 		t.Errorf("Existing content was modified: %s", content.Title)
 	}
+}
+
+type economicsOnlyConfigService struct {
+	economics configsvc.Economics
+}
+
+func (s economicsOnlyConfigService) Current() *configsvc.AppConfig {
+	panic("Current should not be called")
+}
+
+func (s economicsOnlyConfigService) Economics() configsvc.Economics {
+	return s.economics
+}
+
+func (economicsOnlyConfigService) Frontend() configsvc.Frontend {
+	panic("Frontend should not be called")
+}
+
+func (economicsOnlyConfigService) ChartSigFigs() int {
+	panic("ChartSigFigs should not be called")
 }

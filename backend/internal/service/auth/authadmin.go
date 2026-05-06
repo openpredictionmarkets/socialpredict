@@ -13,9 +13,9 @@ func ValidateAdminToken(r *http.Request, auth Authenticator) error {
 		return errors.New("authenticator is required")
 	}
 
-	user, httpErr := auth.RequireAdmin(r)
-	if httpErr != nil {
-		return errors.New(httpErr.Message)
+	user, authErr := auth.RequireAdmin(r)
+	if authErr != nil {
+		return errors.New(authErr.Message)
 	}
 
 	// Extra guard: RequireAdmin already checks admin, but ensure status handling.

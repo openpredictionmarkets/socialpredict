@@ -1,12 +1,13 @@
 package wpam_test
 
 import (
-	"socialpredict/internal/domain/math/outcomes/dbpm"
-	"socialpredict/internal/domain/math/probabilities/wpam"
-	"socialpredict/models"
-	"socialpredict/models/modelstesting"
 	"testing"
 	"time"
+
+	"socialpredict/internal/domain/boundary"
+	"socialpredict/internal/domain/math/outcomes/dbpm"
+	"socialpredict/internal/domain/math/probabilities/wpam"
+	"socialpredict/models/modelstesting"
 )
 
 type fixedFormula struct{ probability float64 }
@@ -15,7 +16,7 @@ func (f fixedFormula) Calculate(wpam.Seeds, int64, int64) float64 { return f.pro
 
 type TestCase struct {
 	Name                  string
-	Bets                  []models.Bet
+	Bets                  []boundary.Bet
 	ProbabilityChanges    []wpam.ProbabilityChange
 	S_YES                 int64
 	S_NO                  int64
@@ -35,7 +36,7 @@ var wpamProbabilityBaseTime = time.Date(2025, 1, 1, 14, 0, 0, 0, time.UTC)
 var TestCases = []TestCase{
 	{
 		Name: "Prevent simultaneous shares held",
-		Bets: []models.Bet{
+		Bets: []boundary.Bet{
 			{
 				Amount:   3,
 				Outcome:  "YES",
@@ -77,7 +78,7 @@ var TestCases = []TestCase{
 	},
 	{
 		Name: "infinity avoidance",
-		Bets: []models.Bet{
+		Bets: []boundary.Bet{
 			{
 				Amount:   1,
 				Outcome:  "YES",
@@ -188,7 +189,7 @@ func TestNewProbabilityCalculatorWithOptions(t *testing.T) {
 		wpam.WithProbabilityFormula(fixedFormula{probability: 0.8}),
 	)
 
-	bets := []models.Bet{{Amount: 5, Outcome: "YES", PlacedAt: wpamProbabilityBaseTime}}
+	bets := []boundary.Bet{{Amount: 5, Outcome: "YES", PlacedAt: wpamProbabilityBaseTime}}
 	changes := calculator.CalculateMarketProbabilitiesWPAM(wpamProbabilityBaseTime, bets)
 
 	if len(changes) != 2 {

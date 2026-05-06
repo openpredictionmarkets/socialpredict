@@ -7,6 +7,10 @@ import (
 	"socialpredict/models/modelstesting"
 )
 
+// This migration smoke test uses SQLite-backed convenience coverage to catch
+// model/table drift quickly. Real Postgres remains required for migration DDL,
+// locking, and serialization semantics beyond the WAVE07 startup contract seam.
+
 func TestCoreModelsMigration_CreatesTablesAndColumns(t *testing.T) {
 	db := modelstesting.NewFakeDB(t) // runs global migrations incl. this file's init-registered one
 

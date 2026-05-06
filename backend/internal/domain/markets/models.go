@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"socialpredict/models"
+	"socialpredict/internal/domain/boundary"
 )
 
 // Market represents the core market domain model
@@ -92,37 +92,39 @@ type Bet struct {
 	CreatedAt time.Time
 }
 
-func modelBetFromDomain(bet *Bet) models.Bet {
+func boundaryBetFromDomain(bet *Bet) boundary.Bet {
 	if bet == nil {
-		return models.Bet{}
+		return boundary.Bet{}
 	}
 
-	return models.Bet{
-		Username: bet.Username,
-		MarketID: bet.MarketID,
-		Amount:   bet.Amount,
-		Outcome:  bet.Outcome,
-		PlacedAt: bet.PlacedAt,
+	return boundary.Bet{
+		ID:        bet.ID,
+		Username:  bet.Username,
+		MarketID:  bet.MarketID,
+		Amount:    bet.Amount,
+		Outcome:   bet.Outcome,
+		PlacedAt:  bet.PlacedAt,
+		CreatedAt: bet.CreatedAt,
 	}
 }
 
-// ToModelBet converts the domain bet into the shared model shape used by math services.
-func (b Bet) ToModelBet() models.Bet {
-	return modelBetFromDomain(&b)
+// ToBoundaryBet converts the domain bet into the shared boundary shape used by math services.
+func (b Bet) ToBoundaryBet() boundary.Bet {
+	return boundaryBetFromDomain(&b)
 }
 
-// ToModelBets converts a domain bet slice into the shared model representation.
-func ToModelBets(bets []*Bet) []models.Bet {
+// ToBoundaryBets converts a domain bet slice into the shared boundary representation.
+func ToBoundaryBets(bets []*Bet) []boundary.Bet {
 	if len(bets) == 0 {
-		return []models.Bet{}
+		return []boundary.Bet{}
 	}
 
-	modelBets := make([]models.Bet, len(bets))
+	boundaryBets := make([]boundary.Bet, len(bets))
 	for i, bet := range bets {
-		modelBets[i] = modelBetFromDomain(bet)
+		boundaryBets[i] = boundaryBetFromDomain(bet)
 	}
 
-	return modelBets
+	return boundaryBets
 }
 
 // PayoutPosition captures the resolved valuation per user for distribution.

@@ -10,15 +10,28 @@ import UserFinancialStatementsLayout from '../../components/layouts/profile/publ
 const User = () => {
   const [userData, setUserData] = useState(null);
   const { username } = useParams();
-  const { isLoggedIn, username: loggedInUsername } = useAuth();
+  const { isLoggedIn, username: loggedInUsername, token } = useAuth();
   const history = useHistory();
 
   useEffect(() => {
-    fetch(`${API_URL}/v0/userinfo/${username}`)
-      .then((response) => response.json())
+    const headers = token
+      ? {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      : {};
+
+    fetch(`${API_URL}/v0/userinfo/${username}`, { headers })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch user data: ${response.status}`);
+        }
+
+        return response.json();
+      })
       .then((data) => setUserData(data))
       .catch((error) => console.error('Error fetching user data:', error));
-  }, [username]);
+  }, [username, token]);
 
   if (!userData) {
     return (

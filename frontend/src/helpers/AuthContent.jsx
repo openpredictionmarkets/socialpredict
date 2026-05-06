@@ -1,5 +1,43 @@
 import { API_URL } from './../config';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+    getApiErrorMessage,
+    parseApiResponseText,
+    unwrapApiResponse,
+} from '../utils/apiResponse';
+
+const decodeJwtPayload = (token) => {
+    if (!token) return null;
+
+    try {
+        const [, payload] = token.split('.');
+        if (!payload) return null;
+
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+        return JSON.parse(window.atob(padded));
+    } catch (error) {
+        console.error('Failed to decode JWT payload:', error);
+        return null;
+    }
+};
+
+const getStoredAuthState = () => {
+    const token = localStorage.getItem('token');
+    const tokenPayload = decodeJwtPayload(token);
+    const storedUsername = localStorage.getItem('username');
+    const normalizedUsername = storedUsername && storedUsername !== 'undefined'
+        ? storedUsername
+        : tokenPayload?.username || null;
+
+    return {
+        isLoggedIn: Boolean(token),
+        token,
+        username: normalizedUsername,
+        usertype: localStorage.getItem('usertype'),
+        changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
+    };
+};
 
 const AuthContext = createContext({
     username: null,
@@ -16,13 +54,15 @@ const useAuth = () => useContext(
 );
 
 const AuthProvider = ({ children }) => {
-    const [authState, setAuthState] = useState({
-        isLoggedIn: false,
-        token: localStorage.getItem('token'),
-        username: localStorage.getItem('username'),
-        usertype: localStorage.getItem('usertype'),
-        changePasswordNeeded: null  // Initialized as null
-    });
+    const [authState, setAuthState] = useState(getStoredAuthState);
+
+    const loginReasonMessages = {
+        AUTHORIZATION_DENIED: 'Invalid username or password.',
+        VALIDATION_FAILED: 'Username must use lowercase letters and numbers, and password cannot be empty.',
+        INVALID_REQUEST: 'Invalid login request.',
+        INVALID_TOKEN: 'Your session is invalid. Please try again.',
+        PASSWORD_CHANGE_REQUIRED: 'Password change required before continuing.',
+    };
 
     useEffect(() => {
         if (authState.isLoggedIn && authState.usertype) {
@@ -31,17 +71,12 @@ const AuthProvider = ({ children }) => {
     }, [authState.isLoggedIn, authState.usertype]);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            setAuthState(prevState => ({
-                ...prevState,
-                isLoggedIn: true,
-                token: token,
-                username: localStorage.getItem('username'),
-                usertype: localStorage.getItem('usertype'),
-                // assume password change needed until shown not
-                changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
-            }));
+        const storedState = getStoredAuthState();
+        if (storedState.token) {
+            if (storedState.username) {
+                localStorage.setItem('username', storedState.username);
+            }
+            setAuthState(storedState);
         }
     }, []);
 
@@ -57,32 +92,30 @@ const AuthProvider = ({ children }) => {
 
             // Read response as text first to handle both JSON and non-JSON responses
             const text = await response.text();
-            let data = {};
-
-            // Safely attempt to parse JSON
-            try {
-                data = JSON.parse(text);
-            } catch (parseError) {
-                // If JSON parsing fails, create a basic error object
-                data = { error: text || 'Unknown error occurred' };
-            }
+            const data = parseApiResponseText(text);
 
             if (response.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username);
-                localStorage.setItem('usertype', data.usertype);
-                localStorage.setItem('changePasswordNeeded', data.mustChangePassword);
+                const authData = unwrapApiResponse(data);
+
+                localStorage.setItem('token', authData.token);
+                localStorage.setItem('username', authData.username);
+                localStorage.setItem('usertype', authData.usertype);
+                localStorage.setItem('changePasswordNeeded', authData.mustChangePassword);
                 setAuthState({
                     isLoggedIn: true,
-                    token: data.token,
-                    username: data.username,
-                    usertype: data.usertype,
-                    changePasswordNeeded: data.mustChangePassword,
+                    token: authData.token,
+                    username: authData.username,
+                    usertype: authData.usertype,
+                    changePasswordNeeded: authData.mustChangePassword,
                 });
                 return true;
             } else {
-                // Create meaningful error message based on response
-                const errorMessage = data.error || data.message || `HTTP ${response.status}: ${text}`;
+                const errorMessage = getApiErrorMessage(
+                    response,
+                    data,
+                    `Login failed with status ${response.status}.`,
+                    loginReasonMessages,
+                );
                 throw new Error(errorMessage);
             }
         } catch (error) {

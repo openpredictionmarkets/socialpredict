@@ -49,8 +49,9 @@ type UserReader interface {
 	GetByUsername(ctx context.Context, username string) (*User, error)
 }
 
-// UserBalanceRepository exposes balance mutation operations.
+// UserBalanceRepository exposes the authoritative read/write path for balance mutations.
 type UserBalanceRepository interface {
+	GetByUsername(ctx context.Context, username string) (*User, error)
 	UpdateBalance(ctx context.Context, username string, newBalance int64) error
 }
 
@@ -59,6 +60,15 @@ type UserWriter interface {
 	Create(ctx context.Context, user *User) error
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, username string) error
+}
+
+// UserUniquenessRepository exposes uniqueness checks for generated user fields.
+type UserUniquenessRepository interface {
+	UsernameExists(ctx context.Context, username string) (bool, error)
+	DisplayNameExists(ctx context.Context, displayName string) (bool, error)
+	EmailExists(ctx context.Context, email string) (bool, error)
+	APIKeyExists(ctx context.Context, apiKey string) (bool, error)
+	AnyUserIdentityExists(ctx context.Context, username, displayName, email, apiKey string) (bool, error)
 }
 
 // UserLister exposes list operations.
@@ -89,6 +99,7 @@ type ServiceDependencies struct {
 	Reader      UserReader
 	BalanceRepo UserBalanceRepository
 	Writer      UserWriter
+	Uniqueness  UserUniquenessRepository
 	Lister      UserLister
 	Portfolio   UserPortfolioRepository
 	Markets     UserMarketsRepository
@@ -121,6 +132,7 @@ type Service struct {
 	reader      UserReader
 	balanceRepo UserBalanceRepository
 	writer      UserWriter
+	uniqueness  UserUniquenessRepository
 	lister      UserLister
 	portfolio   UserPortfolioRepository
 	markets     UserMarketsRepository
@@ -221,7 +233,7 @@ func validateUserID(userID int64) error {
 
 // NewService creates a new users service from the legacy repository shape.
 func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
-	return NewServiceWithDependencies(ServiceDependencies{
+	deps := ServiceDependencies{
 		Reader:      repo,
 		BalanceRepo: repo,
 		Writer:      repo,
@@ -229,7 +241,11 @@ func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Saniti
 		Portfolio:   repo,
 		Markets:     repo,
 		Credentials: repo,
-	}, analyticsSvc, sanitizer)
+	}
+	if uniqueness, ok := repo.(UserUniquenessRepository); ok {
+		deps.Uniqueness = uniqueness
+	}
+	return NewServiceWithDependencies(deps, analyticsSvc, sanitizer)
 }
 
 // NewServiceWithDependencies creates a new users service from explicit ports.
@@ -238,6 +254,7 @@ func NewServiceWithDependencies(deps ServiceDependencies, analyticsSvc Analytics
 		reader:      deps.Reader,
 		balanceRepo: deps.BalanceRepo,
 		writer:      deps.Writer,
+		uniqueness:  deps.Uniqueness,
 		lister:      deps.Lister,
 		portfolio:   deps.Portfolio,
 		markets:     deps.Markets,
@@ -606,16 +623,17 @@ func (s *Service) requireUser(ctx context.Context, username string) (*User, erro
 }
 
 func (s *Service) updateUserBalance(ctx context.Context, username string, compute func(*User) (int64, error)) error {
-	user, err := s.requireUser(ctx, username)
+	repo, err := s.userBalanceRepository()
+	if err != nil {
+		return err
+	}
+
+	user, err := repo.GetByUsername(ctx, username)
 	if err != nil {
 		return err
 	}
 
 	newBalance, err := compute(user)
-	if err != nil {
-		return err
-	}
-	repo, err := s.userBalanceRepository()
 	if err != nil {
 		return err
 	}
@@ -825,6 +843,13 @@ func (s *Service) userWriter() (UserWriter, error) {
 		return nil, ErrInvalidUserData
 	}
 	return s.writer, nil
+}
+
+func (s *Service) userUniquenessRepository() (UserUniquenessRepository, error) {
+	if s == nil || s.uniqueness == nil {
+		return nil, ErrInvalidUserData
+	}
+	return s.uniqueness, nil
 }
 
 func (s *Service) userLister() (UserLister, error) {

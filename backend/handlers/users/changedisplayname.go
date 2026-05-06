@@ -4,28 +4,29 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
-	authsvc "socialpredict/internal/service/auth"
 )
 
 // ChangeDisplayNameHandler returns an HTTP handler that delegates display name updates to the users service.
 func ChangeDisplayNameHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
 			return
 		}
 
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
-		if httperr != nil {
-			http.Error(w, "Invalid token: "+httperr.Error(), httperr.StatusCode)
+		user, authFailure := authhttp.CurrentUser(r, svc)
+		if authFailure != nil {
+			_ = authFailure.Write(w)
 			return
 		}
 
 		var request dto.ChangeDisplayNameRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 			return
 		}
 
@@ -35,10 +36,8 @@ func ChangeDisplayNameHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(toPrivateUserResponse(updated)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := handlers.WriteResult(w, http.StatusOK, toPrivateUserResponse(updated)); err != nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }

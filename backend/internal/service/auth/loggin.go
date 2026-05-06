@@ -1,26 +1,25 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"socialpredict/models"
+	"socialpredict/handlers"
+
+	"socialpredict/internal/domain/boundary"
+	dusers "socialpredict/internal/domain/users"
 	"socialpredict/security"
-	"socialpredict/util"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-	"gorm.io/gorm"
 )
 
-// login and validation stuff
-// getJWTKey returns the JWT signing key, checking environment variable at runtime
-func getJWTKey() []byte {
-	return []byte(strings.TrimSpace(os.Getenv("JWT_SIGNING_KEY")))
+// LoginUserRepository exposes only the user lookup required for login.
+type LoginUserRepository interface {
+	FindAuthenticatedUser(ctx context.Context, username string) (*boundary.AuthenticatedUser, error)
 }
 
 // UserClaims represents the expected structure of the JWT claims
@@ -29,51 +28,68 @@ type UserClaims struct {
 	jwt.StandardClaims
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
+type loginResponse struct {
+	Token              string `json:"token"`
+	Username           string `json:"username"`
+	UserType           string `json:"usertype"`
+	MustChangePassword bool   `json:"mustChangePassword"`
+}
+
+func LoginHandler(users LoginUserRepository, securityService *security.SecurityService, jwtSigningKey ...[]byte) http.HandlerFunc {
+	key := currentJWTSigningKey()
+	if len(jwtSigningKey) > 0 {
+		key = jwtSigningKey[0]
 	}
+	key = cloneJWTKey(key)
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			_ = writeLoginFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+			return
+		}
 
-	securityService := security.NewSecurityService()
+		req, err := decodeLoginRequest(r)
+		if err != nil {
+			_ = writeLoginFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+			return
+		}
 
-	req, err := decodeLoginRequest(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		req, err = validateAndSanitizeLogin(securityService, req)
+		if err != nil {
+			_ = writeLoginFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
+			return
+		}
+
+		if users == nil {
+			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+
+		user, loginErr := authenticateUser(r.Context(), users, req)
+		if loginErr != nil {
+			_ = writeLoginFailure(w, loginErr.statusCode, loginFailureReason(loginErr.statusCode))
+			return
+		}
+
+		if len(key) == 0 {
+			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+
+		tokenString, err := generateJWT(user.Username, key)
+		if err != nil {
+			_ = writeLoginFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+
+		_ = writeLoginResponse(w, user, tokenString)
 	}
+}
 
-	req, err = validateAndSanitizeLogin(securityService, req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+func cloneJWTKey(jwtSigningKey []byte) []byte {
+	if len(jwtSigningKey) == 0 {
+		return nil
 	}
-
-	db := util.GetDB()
-	if db == nil {
-		http.Error(w, "Error accessing database", http.StatusInternalServerError)
-		return
-	}
-
-	user, loginErr := authenticateUser(db, req)
-	if loginErr != nil {
-		http.Error(w, loginErr.message, loginErr.statusCode)
-		return
-	}
-
-	jwtKey := getJWTKey()
-	if len(jwtKey) == 0 {
-		http.Error(w, "Error creating token", http.StatusInternalServerError)
-		return
-	}
-
-	tokenString, err := generateJWT(user.Username, jwtKey)
-	if err != nil {
-		http.Error(w, "Error creating token", http.StatusInternalServerError)
-		return
-	}
-
-	writeLoginResponse(w, user, tokenString)
+	return append([]byte(nil), jwtSigningKey...)
 }
 
 type loginRequest struct {
@@ -95,6 +111,10 @@ func decodeLoginRequest(r *http.Request) (loginRequest, error) {
 }
 
 func validateAndSanitizeLogin(securityService *security.SecurityService, req loginRequest) (loginRequest, error) {
+	if securityService == nil {
+		return req, fmt.Errorf("security service unavailable")
+	}
+
 	sanitizedUsername, err := securityService.Sanitizer.SanitizeUsername(req.Username)
 	if err != nil {
 		return req, fmt.Errorf("invalid input")
@@ -109,38 +129,42 @@ func validateAndSanitizeLogin(securityService *security.SecurityService, req log
 }
 
 type loginError struct {
-	message    string
 	statusCode int
 }
 
-func authenticateUser(db *gorm.DB, req loginRequest) (models.User, *loginError) {
-	if db == nil {
-		return models.User{}, &loginError{message: "Error accessing database", statusCode: http.StatusInternalServerError}
+func authenticateUser(ctx context.Context, users LoginUserRepository, req loginRequest) (boundary.AuthenticatedUser, *loginError) {
+	if users == nil {
+		return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusInternalServerError}
 	}
 
-	user, err := findUserByUsername(db, req.Username)
+	user, err := findUserByUsername(ctx, users, req.Username)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return models.User{}, &loginError{message: "Invalid Credentials", statusCode: http.StatusUnauthorized}
+		if errors.Is(err, dusers.ErrUserNotFound) {
+			return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusUnauthorized}
 		}
-		return models.User{}, &loginError{message: "Error accessing database", statusCode: http.StatusInternalServerError}
+		return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusInternalServerError}
 	}
 
 	if !user.CheckPasswordHash(req.Password) {
-		return models.User{}, &loginError{message: "Invalid Credentials", statusCode: http.StatusUnauthorized}
+		return boundary.AuthenticatedUser{}, &loginError{statusCode: http.StatusUnauthorized}
 	}
 
 	return user, nil
 }
 
-func findUserByUsername(db *gorm.DB, username string) (models.User, error) {
-	if db == nil {
-		return models.User{}, fmt.Errorf("database connection is not initialized")
+func findUserByUsername(ctx context.Context, users LoginUserRepository, username string) (boundary.AuthenticatedUser, error) {
+	if users == nil {
+		return boundary.AuthenticatedUser{}, fmt.Errorf("database connection is not initialized")
 	}
 
-	var user models.User
-	result := db.Where("username = ?", username).First(&user)
-	return user, result.Error
+	user, err := users.FindAuthenticatedUser(ctx, username)
+	if err != nil {
+		return boundary.AuthenticatedUser{}, err
+	}
+	if user == nil {
+		return boundary.AuthenticatedUser{}, dusers.ErrUserNotFound
+	}
+	return *user, nil
 }
 
 func generateJWT(username string, jwtKey []byte) (string, error) {
@@ -159,15 +183,24 @@ func generateJWT(username string, jwtKey []byte) (string, error) {
 	return token.SignedString(jwtKey)
 }
 
-func writeLoginResponse(w http.ResponseWriter, user models.User, tokenString string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+func writeLoginResponse(w http.ResponseWriter, user boundary.AuthenticatedUser, tokenString string) error {
+	return handlers.WriteResult(w, http.StatusOK, loginResponse{
+		Token:              tokenString,
+		Username:           user.Username,
+		UserType:           user.UserType,
+		MustChangePassword: user.MustChangePassword,
+	})
+}
 
-	responseData := map[string]interface{}{
-		"token":              tokenString,
-		"username":           user.Username,
-		"usertype":           user.UserType,
-		"mustChangePassword": user.MustChangePassword,
+func writeLoginFailure(w http.ResponseWriter, statusCode int, reason handlers.FailureReason) error {
+	return handlers.WriteFailure(w, statusCode, reason)
+}
+
+func loginFailureReason(statusCode int) handlers.FailureReason {
+	switch statusCode {
+	case http.StatusUnauthorized:
+		return handlers.ReasonAuthorizationDenied
+	default:
+		return handlers.ReasonInternalError
 	}
-	_ = json.NewEncoder(w).Encode(responseData)
 }

@@ -8,36 +8,41 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	analytics "socialpredict/internal/domain/analytics"
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
 
 type leaderboardRepo struct {
-	users    []models.User
-	markets  []models.Market
-	betsByID map[uint][]models.Bet
+	users    []analytics.UserAccount
+	markets  []analytics.MarketRecord
+	betsByID map[uint][]boundary.Bet
 }
 
-func (r *leaderboardRepo) ListUsers(ctx context.Context) ([]models.User, error) {
-	return append([]models.User(nil), r.users...), nil
+func (r *leaderboardRepo) ListUsers(ctx context.Context) ([]analytics.UserAccount, error) {
+	return append([]analytics.UserAccount(nil), r.users...), nil
 }
 
-func (r *leaderboardRepo) ListMarkets(ctx context.Context) ([]models.Market, error) {
-	return append([]models.Market(nil), r.markets...), nil
+func (r *leaderboardRepo) ListMarkets(ctx context.Context) ([]analytics.MarketRecord, error) {
+	return append([]analytics.MarketRecord(nil), r.markets...), nil
 }
 
-func (r *leaderboardRepo) ListBetsForMarket(ctx context.Context, marketID uint) ([]models.Bet, error) {
-	return append([]models.Bet(nil), r.betsByID[marketID]...), nil
+func (r *leaderboardRepo) ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error) {
+	return append([]boundary.Bet(nil), r.betsByID[marketID]...), nil
 }
 
-func (r *leaderboardRepo) ListBetsOrdered(context.Context) ([]models.Bet, error) {
-	return []models.Bet{}, nil
+func (r *leaderboardRepo) ListBetsOrdered(context.Context) ([]boundary.Bet, error) {
+	return []boundary.Bet{}, nil
 }
 
 func (r *leaderboardRepo) UserMarketPositions(context.Context, string) ([]positionsmath.MarketPosition, error) {
 	return []positionsmath.MarketPosition{}, nil
+}
+
+func (r *leaderboardRepo) CountUsersByType(context.Context, string) (int64, error) {
+	return 0, nil
 }
 
 func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
@@ -45,20 +50,19 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 
 	now := time.Now()
 	repo := &leaderboardRepo{
-		users: []models.User{
-			{PublicUser: models.PublicUser{Username: "alice"}},
-			{PublicUser: models.PublicUser{Username: "bob"}},
+		users: []analytics.UserAccount{
+			{Username: "alice"},
+			{Username: "bob"},
 		},
-		markets: []models.Market{
+		markets: []analytics.MarketRecord{
 			{
-				ID:                 1,
-				CreatorUsername:    "alice",
-				IsResolved:         true,
-				ResolutionResult:   "YES",
-				ResolutionDateTime: now.Add(24 * time.Hour),
+				ID:               1,
+				CreatedAt:        now.Add(-24 * time.Hour),
+				IsResolved:       true,
+				ResolutionResult: "YES",
 			},
 		},
-		betsByID: map[uint][]models.Bet{
+		betsByID: map[uint][]boundary.Bet{
 			1: {
 				{Username: "alice", Outcome: "YES", Amount: 100, MarketID: 1, PlacedAt: now.Add(-2 * time.Hour)},
 				{Username: "bob", Outcome: "NO", Amount: 50, MarketID: 1, PlacedAt: now.Add(-1 * time.Hour)},
@@ -66,7 +70,7 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 		},
 	}
 
-	svc := analytics.NewService(repo, nil)
+	svc := analytics.NewService(repo, analytics.Config{})
 	handler := GetGlobalLeaderboardHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard", nil)
@@ -78,31 +82,34 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var payload []analytics.GlobalUserProfitability
+	var payload handlers.SuccessEnvelope[[]analytics.GlobalUserProfitability]
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 
-	if len(payload) == 0 {
+	if !payload.OK {
+		t.Fatalf("expected ok=true, got false")
+	}
+	if len(payload.Result) == 0 {
 		t.Fatalf("expected non-empty leaderboard")
 	}
 }
 
 type failingRepo struct{}
 
-func (f failingRepo) ListUsers(context.Context) ([]models.User, error) {
+func (f failingRepo) ListUsers(context.Context) ([]analytics.UserAccount, error) {
 	return nil, assertError("boom")
 }
 
-func (f failingRepo) ListMarkets(context.Context) ([]models.Market, error) {
+func (f failingRepo) ListMarkets(context.Context) ([]analytics.MarketRecord, error) {
 	return nil, nil
 }
 
-func (f failingRepo) ListBetsForMarket(context.Context, uint) ([]models.Bet, error) {
+func (f failingRepo) ListBetsForMarket(context.Context, uint) ([]boundary.Bet, error) {
 	return nil, nil
 }
 
-func (f failingRepo) ListBetsOrdered(context.Context) ([]models.Bet, error) {
+func (f failingRepo) ListBetsOrdered(context.Context) ([]boundary.Bet, error) {
 	return nil, nil
 }
 
@@ -110,12 +117,16 @@ func (f failingRepo) UserMarketPositions(context.Context, string) ([]positionsma
 	return nil, nil
 }
 
+func (f failingRepo) CountUsersByType(context.Context, string) (int64, error) {
+	return 0, nil
+}
+
 type assertError string
 
 func (e assertError) Error() string { return string(e) }
 
 func TestGetGlobalLeaderboardHandler_Error(t *testing.T) {
-	svc := analytics.NewService(failingRepo{}, nil)
+	svc := analytics.NewService(failingRepo{}, analytics.Config{})
 	handler := GetGlobalLeaderboardHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard", nil)
@@ -125,5 +136,13 @@ func TestGetGlobalLeaderboardHandler_Error(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+
+	var payload handlers.FailureEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal failure: %v", err)
+	}
+	if payload.Reason != string(handlers.ReasonInternalError) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, payload.Reason)
 	}
 }

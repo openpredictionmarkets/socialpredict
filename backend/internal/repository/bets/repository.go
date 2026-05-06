@@ -3,6 +3,7 @@ package bets
 import (
 	"context"
 
+	"socialpredict/internal/domain/boundary"
 	"socialpredict/models"
 
 	"gorm.io/gorm"
@@ -19,8 +20,21 @@ func NewGormRepository(db *gorm.DB) *GormRepository {
 }
 
 // Create persists a bet record.
-func (r *GormRepository) Create(ctx context.Context, bet *models.Bet) error {
-	return r.db.WithContext(ctx).Create(bet).Error
+func (r *GormRepository) Create(ctx context.Context, bet *boundary.Bet) error {
+	dbBet := models.Bet{
+		ID:       bet.ID,
+		Username: bet.Username,
+		MarketID: bet.MarketID,
+		Amount:   bet.Amount,
+		Outcome:  bet.Outcome,
+		PlacedAt: bet.PlacedAt,
+	}
+	if err := r.db.WithContext(ctx).Create(&dbBet).Error; err != nil {
+		return err
+	}
+	bet.ID = uint(dbBet.ID)
+	bet.CreatedAt = dbBet.CreatedAt
+	return nil
 }
 
 // UserHasBet checks whether the user has previously placed a bet in the market.

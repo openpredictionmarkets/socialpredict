@@ -6,11 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
-	"socialpredict/models"
-	"socialpredict/setup"
 )
+
+// Helper-level bets tests are pure domain convenience coverage. They keep fee,
+// balance, ledger, and sale math close to the owning package. WAVE07 covered
+// place-bet atomicity with real Postgres; sell-position atomicity and overlap
+// behavior remain DB-truth gaps.
 
 var errUnexpectedHelperCall = errors.New("unexpected call")
 
@@ -164,11 +168,10 @@ func TestMarketGate_Open(t *testing.T) {
 }
 
 func TestFeeCalculator_Calculate(t *testing.T) {
-	econ := &setup.EconomicConfig{}
-	econ.Economics.Betting.BetFees.InitialBetFee = 5
-	econ.Economics.Betting.BetFees.BuySharesFee = 2
-
-	calc := feeCalculator{econ: econ}
+	calc := feeCalculator{config: Config{
+		InitialBetFee: 5,
+		BuySharesFee:  2,
+	}}
 
 	tests := []struct {
 		name   string
@@ -199,7 +202,7 @@ func TestFeeCalculator_Calculate(t *testing.T) {
 		})
 	}
 
-	if zeroFees := (feeCalculator{econ: &setup.EconomicConfig{}}).Calculate(false, 0); zeroFees.totalCost != 0 {
+	if zeroFees := (feeCalculator{config: Config{}}).Calculate(false, 0); zeroFees.totalCost != 0 {
 		t.Fatalf("expected zero-value config to remain usable, got %+v", zeroFees)
 	}
 }
@@ -235,7 +238,7 @@ func TestBalanceGuard_EnsureSufficient(t *testing.T) {
 }
 
 type ledgerRepo struct {
-	bet     *models.Bet
+	bet     *boundary.Bet
 	creator ledgerBetCreator
 	checker ledgerBetChecker
 }
@@ -243,7 +246,7 @@ type ledgerRepo struct {
 func newLedgerRepo(opts ...func(*ledgerRepo)) *ledgerRepo {
 	repo := &ledgerRepo{
 		creator: ledgerBetCreator{
-			createFunc: func(context.Context, *models.Bet) error { return nil },
+			createFunc: func(context.Context, *boundary.Bet) error { return nil },
 		},
 		checker: ledgerBetChecker{
 			hasBetFunc: func(context.Context, uint, string) (bool, error) {
@@ -257,7 +260,7 @@ func newLedgerRepo(opts ...func(*ledgerRepo)) *ledgerRepo {
 	return repo
 }
 
-func withLedgerCreate(fn func(ctx context.Context, bet *models.Bet) error) func(*ledgerRepo) {
+func withLedgerCreate(fn func(ctx context.Context, bet *boundary.Bet) error) func(*ledgerRepo) {
 	return func(repo *ledgerRepo) {
 		repo.creator.createFunc = fn
 	}
@@ -270,10 +273,10 @@ func withLedgerHasBet(fn func(ctx context.Context, marketID uint, username strin
 }
 
 type ledgerBetCreator struct {
-	createFunc func(ctx context.Context, bet *models.Bet) error
+	createFunc func(ctx context.Context, bet *boundary.Bet) error
 }
 
-func (l *ledgerRepo) Create(ctx context.Context, bet *models.Bet) error {
+func (l *ledgerRepo) Create(ctx context.Context, bet *boundary.Bet) error {
 	return l.creator.Create(ctx, bet, l)
 }
 
@@ -285,7 +288,7 @@ func (l *ledgerRepo) UserHasBet(ctx context.Context, marketID uint, username str
 	return l.checker.UserHasBet(ctx, marketID, username)
 }
 
-func (c ledgerBetCreator) Create(ctx context.Context, bet *models.Bet, repo *ledgerRepo) error {
+func (c ledgerBetCreator) Create(ctx context.Context, bet *boundary.Bet, repo *ledgerRepo) error {
 	if c.createFunc == nil {
 		return errUnexpectedHelperCall
 	}
@@ -385,49 +388,12 @@ func (u ledgerTransactionApplier) ApplyTransaction(ctx context.Context, username
 	return nil
 }
 
-func TestBetLedger_ChargeAndRecord(t *testing.T) {
-	users := newLedgerUsers()
-	repo := newLedgerRepo()
-	ledger := betLedger{repo: repo, users: users}
-	bet := &models.Bet{Username: "bob", Amount: 25}
-
-	if err := ledger.ChargeAndRecord(context.Background(), bet, 25); err != nil {
-		t.Fatalf("expected success, got %v", err)
-	}
-	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionBuy || users.calls[0].amount != 25 {
-		t.Fatalf("unexpected user calls: %+v", users.calls)
-	}
-	if repo.bet == nil || repo.bet.Username != bet.Username || repo.bet.Amount != bet.Amount {
-		t.Fatalf("expected copied bet persisted, got %+v", repo.bet)
-	}
-
-	if _, err := (&ledgerRepo{}).UserHasBet(context.Background(), 1, "bob"); !errors.Is(err, errUnexpectedHelperCall) {
-		t.Fatalf("expected zero-value repo to fail predictably, got %v", err)
-	}
-}
-
-func TestBetLedger_ChargeAndRecord_RollsBackOnRepoError(t *testing.T) {
-	users := newLedgerUsers()
-	repo := newLedgerRepo(withLedgerCreate(func(ctx context.Context, bet *models.Bet) error {
-		return errors.New("db down")
-	}))
-	ledger := betLedger{repo: repo, users: users}
-
-	err := ledger.ChargeAndRecord(context.Background(), &models.Bet{Username: "alice"}, 10)
-	if err == nil {
-		t.Fatalf("expected error")
-	}
-	if len(users.calls) != 2 || users.calls[1].transaction != dusers.TransactionRefund {
-		t.Fatalf("expected refund on failure, calls: %+v", users.calls)
-	}
-}
-
 func TestBetLedger_CreditSale(t *testing.T) {
 	users := newLedgerUsers()
 	repo := newLedgerRepo()
 	ledger := betLedger{repo: repo, users: users}
 
-	if err := ledger.CreditSale(context.Background(), &models.Bet{Username: "alice"}, 15); err != nil {
+	if err := ledger.CreditSale(context.Background(), &boundary.Bet{Username: "alice"}, 15); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if len(users.calls) != 1 || users.calls[0].transaction != dusers.TransactionSale || users.calls[0].amount != 15 {

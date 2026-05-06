@@ -3,21 +3,22 @@ package setup
 import (
 	"encoding/json"
 	"net/http"
-	"socialpredict/setup"
+
+	"socialpredict/handlers"
+	configsvc "socialpredict/internal/service/config"
 )
 
-func GetSetupHandler(loadEconomicsConfig func() (*setup.EconomicConfig, error)) func(w http.ResponseWriter, r *http.Request) {
+func GetSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		appConfig, err := loadEconomicsConfig()
-		if err != nil {
-			http.Error(w, "Failed to load economic config", http.StatusInternalServerError)
+		if configService == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(appConfig.Economics)
+		err := json.NewEncoder(w).Encode(configService.Economics())
 		if err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
 }
@@ -30,23 +31,22 @@ type frontendConfigResponse struct {
 	Charts frontendChartsResponse `json:"charts"`
 }
 
-func GetFrontendSetupHandler(loadEconomicsConfig func() (*setup.EconomicConfig, error)) func(w http.ResponseWriter, r *http.Request) {
+func GetFrontendSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := loadEconomicsConfig()
-		if err != nil {
-			http.Error(w, "Failed to load frontend config", http.StatusInternalServerError)
+		if configService == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
 		response := frontendConfigResponse{
 			Charts: frontendChartsResponse{
-				SigFigs: setup.ChartSigFigs(),
+				SigFigs: configService.ChartSigFigs(),
 			},
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, "Failed to encode frontend setup response", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 	}

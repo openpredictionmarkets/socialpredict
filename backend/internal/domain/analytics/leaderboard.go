@@ -5,8 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
-	"socialpredict/models"
 )
 
 // GlobalUserProfitability summarises a user's profitability across all markets.
@@ -21,14 +21,29 @@ type GlobalUserProfitability struct {
 	Rank              int       `json:"rank"`
 }
 
-// ComputeGlobalLeaderboard ranks users by profitability across all markets.
-func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserProfitability, error) {
+// GlobalLeaderboardSnapshot is the analytics-owned result seam for the global
+// leaderboard read. It keeps future caching behind the analytics boundary while
+// preserving the existing HTTP response contract.
+type GlobalLeaderboardSnapshot struct {
+	Entries []GlobalUserProfitability
+}
+
+// Result returns the response-ready leaderboard entries.
+func (s *GlobalLeaderboardSnapshot) Result() []GlobalUserProfitability {
+	if s == nil || s.Entries == nil {
+		return []GlobalUserProfitability{}
+	}
+	return s.Entries
+}
+
+// ComputeGlobalLeaderboardSnapshot ranks users by profitability across all markets.
+func (s *Service) ComputeGlobalLeaderboardSnapshot(ctx context.Context) (*GlobalLeaderboardSnapshot, error) {
 	users, err := s.repo.ListUsers(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if len(users) == 0 {
-		return []GlobalUserProfitability{}, nil
+		return newGlobalLeaderboardSnapshot(nil), nil
 	}
 
 	markets, err := s.repo.ListMarkets(ctx)
@@ -36,7 +51,7 @@ func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserPro
 		return nil, err
 	}
 	if len(markets) == 0 {
-		return []GlobalUserProfitability{}, nil
+		return newGlobalLeaderboardSnapshot(nil), nil
 	}
 
 	marketData, err := s.loadLeaderboardMarketData(ctx, markets)
@@ -44,23 +59,40 @@ func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserPro
 		return nil, err
 	}
 	if len(marketData) == 0 {
-		return []GlobalUserProfitability{}, nil
+		return newGlobalLeaderboardSnapshot(nil), nil
 	}
 
 	aggregates := aggregateLeaderboardUserStats(marketData)
 	if len(aggregates) == 0 {
-		return []GlobalUserProfitability{}, nil
+		return newGlobalLeaderboardSnapshot(nil), nil
 	}
 
 	earliestBets := findEarliestBetsPerUser(marketData, aggregates)
 	leaderboard := assembleLeaderboardEntries(aggregates, earliestBets)
-	return rankLeaderboardEntries(leaderboard), nil
+	return newGlobalLeaderboardSnapshot(rankLeaderboardEntries(leaderboard)), nil
+}
+
+// ComputeGlobalLeaderboard returns the legacy leaderboard slice for callers that
+// do not need the snapshot seam.
+func (s *Service) ComputeGlobalLeaderboard(ctx context.Context) ([]GlobalUserProfitability, error) {
+	snapshot, err := s.ComputeGlobalLeaderboardSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.Result(), nil
+}
+
+func newGlobalLeaderboardSnapshot(entries []GlobalUserProfitability) *GlobalLeaderboardSnapshot {
+	if entries == nil {
+		entries = []GlobalUserProfitability{}
+	}
+	return &GlobalLeaderboardSnapshot{Entries: entries}
 }
 
 type leaderboardMarketData struct {
 	snapshot  positionsmath.MarketSnapshot
 	positions []positionsmath.MarketPosition
-	bets      []models.Bet
+	bets      []boundary.Bet
 }
 
 type leaderboardAggregate struct {
@@ -71,7 +103,7 @@ type leaderboardAggregate struct {
 	resolvedMarkets   int
 }
 
-func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []models.Market) ([]leaderboardMarketData, error) {
+func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []MarketRecord) ([]leaderboardMarketData, error) {
 	data := make([]leaderboardMarketData, 0, len(markets))
 
 	for _, market := range markets {
@@ -80,12 +112,7 @@ func (s *Service) loadLeaderboardMarketData(ctx context.Context, markets []model
 			return nil, err
 		}
 
-		snapshot := positionsmath.MarketSnapshot{
-			ID:               int64(market.ID),
-			CreatedAt:        market.CreatedAt,
-			IsResolved:       market.IsResolved,
-			ResolutionResult: market.ResolutionResult,
-		}
+		snapshot := market.Snapshot()
 
 		if s.positions == nil {
 			s.ensureStrategyDefaults()

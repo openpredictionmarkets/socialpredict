@@ -3,13 +3,16 @@ package marketshandlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/security"
 
 	"github.com/gorilla/mux"
 )
@@ -39,7 +42,7 @@ func TestListByStatusHandler_Smoke(t *testing.T) {
 		}}, nil
 	}
 
-	handler := NewHandler(svc, nil)
+	handler := NewHandler(svc, nil, security.NewSecurityService())
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/status/active?limit=50", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
@@ -87,7 +90,7 @@ func TestMarketLeaderboardHandler_Smoke(t *testing.T) {
 		}}, nil
 	}
 
-	handler := NewHandler(svc, nil)
+	handler := NewHandler(svc, nil, security.NewSecurityService())
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/77/leaderboard?limit=25", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
@@ -99,14 +102,44 @@ func TestMarketLeaderboardHandler_Smoke(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rr.Code)
 	}
 
-	var resp dto.LeaderboardResponse
+	var resp handlers.SuccessEnvelope[dto.LeaderboardResponse]
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if resp.Total != 1 {
-		t.Fatalf("expected total 1, got %d", resp.Total)
+	if !resp.OK {
+		t.Fatalf("expected ok=true, got false")
 	}
-	if len(resp.Leaderboard) != 1 || resp.Leaderboard[0].Username != "alice" {
-		t.Fatalf("unexpected leaderboard payload: %+v", resp.Leaderboard)
+	if resp.Result.Total != 1 {
+		t.Fatalf("expected total 1, got %d", resp.Result.Total)
+	}
+	if len(resp.Result.Leaderboard) != 1 || resp.Result.Leaderboard[0].Username != "alice" {
+		t.Fatalf("unexpected leaderboard payload: %+v", resp.Result.Leaderboard)
+	}
+}
+
+func TestMarketLeaderboardHandler_FailureEnvelope(t *testing.T) {
+	svc := &MockService{}
+	svc.MarketLeaderboardFn = func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+		return nil, errors.New("boom")
+	}
+
+	handler := NewHandler(svc, nil, security.NewSecurityService())
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/77/leaderboard", nil)
+	rr := httptest.NewRecorder()
+	router := mux.NewRouter()
+	router.HandleFunc("/v0/markets/{id}/leaderboard", handler.MarketLeaderboard)
+
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failure: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInternalError) {
+		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, resp.Reason)
 	}
 }

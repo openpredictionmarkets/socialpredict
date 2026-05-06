@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"socialpredict/models"
+	"socialpredict/internal/domain/boundary"
 )
 
 // GetMarketBets returns the bet history for a market with probabilities.
@@ -37,12 +37,12 @@ func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisp
 	return buildBetDisplayInfos(modelBets, probabilityChanges), nil
 }
 
-func (s *Service) loadMarketBets(ctx context.Context, marketID int64) ([]models.Bet, error) {
+func (s *Service) loadMarketBets(ctx context.Context, marketID int64) ([]boundary.Bet, error) {
 	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
 	if err != nil {
 		return nil, err
 	}
-	return convertToModelBets(bets), nil
+	return convertToBoundaryBets(bets), nil
 }
 
 func ensureProbabilityChanges(changes []ProbabilityChange, createdAt time.Time) []ProbabilityChange {
@@ -61,15 +61,15 @@ func sortProbabilityChanges(changes []ProbabilityChange) {
 	})
 }
 
-func sortBetsByTime(bets []models.Bet) {
+func sortBetsByTime(bets []boundary.Bet) {
 	sort.Slice(bets, func(i, j int) bool {
 		return bets[i].PlacedAt.Before(bets[j].PlacedAt)
 	})
 }
 
-func buildBetDisplayInfos(modelBets []models.Bet, probabilityChanges []ProbabilityChange) []*BetDisplayInfo {
-	results := make([]*BetDisplayInfo, 0, len(modelBets))
-	for _, bet := range modelBets {
+func buildBetDisplayInfos(boundaryBets []boundary.Bet, probabilityChanges []ProbabilityChange) []*BetDisplayInfo {
+	results := make([]*BetDisplayInfo, 0, len(boundaryBets))
+	for _, bet := range boundaryBets {
 		matchedProbability := latestProbabilityAt(probabilityChanges, bet.PlacedAt)
 		results = append(results, &BetDisplayInfo{
 			Username:    bet.Username,

@@ -1,36 +1,33 @@
 package privateuser
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"socialpredict/handlers"
+	"socialpredict/handlers/authhttp"
 	"socialpredict/handlers/users/dto"
 	dusers "socialpredict/internal/domain/users"
-	authsvc "socialpredict/internal/service/auth"
 )
 
 func GetPrivateProfileHandler(svc dusers.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, httperr := authsvc.ValidateTokenAndGetUser(r, svc)
-		if httperr != nil {
-			http.Error(w, "Invalid token: "+httperr.Error(), http.StatusUnauthorized)
+		user, authFailure := authhttp.CurrentUser(r, svc)
+		if authFailure != nil {
+			_ = authFailure.Write(w)
 			return
 		}
 
 		profile, err := svc.GetPrivateProfile(r.Context(), user.Username)
 		if err != nil {
 			if err == dusers.ErrUserNotFound {
-				http.Error(w, "user not found", http.StatusNotFound)
+				_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 				return
 			}
-			http.Error(w, "failed to fetch user", http.StatusInternalServerError)
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(privateProfileResponse(profile)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		_ = handlers.WriteResult(w, http.StatusOK, privateProfileResponse(profile))
 	}
 }
 

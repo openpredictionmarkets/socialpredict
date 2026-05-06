@@ -104,6 +104,68 @@ func TestService_GetHome(t *testing.T) {
 	}
 }
 
+func TestService_RenderContent_Markdown(t *testing.T) {
+	repo := newMockRepository()
+	renderer := newMockRenderer()
+	svc := NewService(repo, renderer)
+
+	result, err := svc.RenderContent(RenderInput{
+		Format:   "markdown",
+		Markdown: "# Test",
+	})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if result.Format != "markdown" {
+		t.Errorf("Expected format 'markdown', got '%s'", result.Format)
+	}
+	if result.Markdown != "# Test" {
+		t.Errorf("Expected markdown '# Test', got '%s'", result.Markdown)
+	}
+	if result.HTML != "<h1>Test</h1>" {
+		t.Errorf("Expected HTML '<h1>Test</h1>', got '%s'", result.HTML)
+	}
+}
+
+func TestService_RenderContent_HTML(t *testing.T) {
+	repo := newMockRepository()
+	renderer := newMockRenderer()
+	svc := NewService(repo, renderer)
+
+	result, err := svc.RenderContent(RenderInput{
+		Format: "html",
+		HTML:   "<p>Direct HTML</p>",
+	})
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if result.Format != "html" {
+		t.Errorf("Expected format 'html', got '%s'", result.Format)
+	}
+	if result.Markdown != "" {
+		t.Errorf("Expected markdown to be cleared, got '%s'", result.Markdown)
+	}
+	if result.HTML != "<p>Direct HTML</p>" {
+		t.Errorf("Expected sanitized HTML, got '%s'", result.HTML)
+	}
+}
+
+func TestService_RenderContent_UnsupportedFormat(t *testing.T) {
+	repo := newMockRepository()
+	renderer := newMockRenderer()
+	svc := NewService(repo, renderer)
+
+	_, err := svc.RenderContent(RenderInput{
+		Format: "pdf",
+	})
+	if err == nil {
+		t.Fatal("Expected unsupported format error")
+	}
+	if !strings.Contains(err.Error(), "unsupported format") {
+		t.Errorf("Expected unsupported format error, got '%s'", err.Error())
+	}
+}
+
 func TestService_UpdateHome_Markdown(t *testing.T) {
 	repo := newMockRepository()
 	renderer := newMockRenderer()

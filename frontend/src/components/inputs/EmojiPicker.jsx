@@ -8,6 +8,7 @@ const EmojiPickerInput = ({
   className = '', 
   type = 'text',
   maxLength,
+  replaceValueOnEmojiSelect = false,
   ...props 
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -53,13 +54,19 @@ const EmojiPickerInput = ({
   // Handle emoji selection
   const onEmojiClick = (emojiData) => {
     const emoji = emojiData.emoji;
-    const newValue = value.slice(0, cursorPosition) + emoji + value.slice(cursorPosition);
+    const safeValue = value || '';
+    const newValue = replaceValueOnEmojiSelect
+      ? emoji
+      : safeValue.slice(0, cursorPosition) + emoji + safeValue.slice(cursorPosition);
+    const nextCursorPosition = replaceValueOnEmojiSelect
+      ? emoji.length
+      : cursorPosition + emoji.length;
     
     // Create synthetic event object
     const syntheticEvent = {
       target: {
         value: newValue,
-        selectionStart: cursorPosition + emoji.length
+        selectionStart: nextCursorPosition
       }
     };
     
@@ -70,10 +77,10 @@ const EmojiPickerInput = ({
       if (inputRef.current) {
         inputRef.current.focus();
         inputRef.current.setSelectionRange(
-          cursorPosition + emoji.length, 
-          cursorPosition + emoji.length
+          nextCursorPosition,
+          nextCursorPosition
         );
-        setCursorPosition(cursorPosition + emoji.length);
+        setCursorPosition(nextCursorPosition);
       }
     }, 10);
     
