@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom';
 import { useHistory } from 'react-router-dom';
 import { PersonInput, LockInput } from '../../inputs/InputBar';
 import SiteButton from '../../buttons/SiteButtons';
-import { useAuth } from '../../../helpers/AuthContent';
 
 const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
     const [username, setUsername] = useState('');
@@ -11,8 +10,7 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
     const [error, setError] = useState('');
     const history = useHistory();
 
-    const getPostLoginDestination = () => {
-        const mustChangePassword = localStorage.getItem('changePasswordNeeded') === 'true';
+    const getPostLoginDestination = (mustChangePassword) => {
         if (mustChangePassword) {
             return '/changepassword';
         }
@@ -35,10 +33,10 @@ const LoginModal = ({ isOpen, onClose, onLogin, redirectAfterLogin }) => {
         setError('');
 
         try {
-            const loginSuccess = await onLogin(username.trim(), password);
-            if (loginSuccess) {
+            const authData = await onLogin(username.trim(), password);
+            if (authData) {
                 onClose();
-                history.push(getPostLoginDestination());
+                history.push(getPostLoginDestination(authData.mustChangePassword));
             }
         } catch (loginError) {
             console.error('Login error:', loginError);

@@ -34,7 +34,7 @@ const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
 );
 
 const Sidebar = () => {
-  const { isLoggedIn, usertype, logout, changePasswordNeeded, username } = useAuth();
+  const { isLoggedIn, usertype, logout, changePasswordNeeded, username, isAuthReady } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { userCredit, loading, error } = useUserCredit(username); // Correct destructuring
 
@@ -92,6 +92,30 @@ const Sidebar = () => {
       );
     }
 
+    if (!isAuthReady) {
+      return (
+        <>
+          <li className='p-2 text-sm text-gray-400'>Loading account...</li>
+          <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
+            Logout
+          </SidebarLink>
+        </>
+      );
+    }
+
+    if (changePasswordNeeded) {
+      return (
+        <>
+          <SidebarLink to='/changepassword' icon={LockPasswordSVG}>
+            Change Password
+          </SidebarLink>
+          <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
+            Logout
+          </SidebarLink>
+        </>
+      );
+    }
+
     if (usertype === 'ADMIN') {
       return (
         <>
@@ -109,19 +133,6 @@ const Sidebar = () => {
           </SidebarLink>
           <SidebarLink to='/stats' icon={StatsSVG}>
             Stats
-          </SidebarLink>
-          <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
-            Logout
-          </SidebarLink>
-        </>
-      );
-    }
-
-    if (changePasswordNeeded) {
-      return (
-        <>
-          <SidebarLink to='/changepassword' icon={LockPasswordSVG}>
-            Change Password
           </SidebarLink>
           <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
             Logout
@@ -209,14 +220,14 @@ const Sidebar = () => {
           <Link to='/markets' className='text-gray-300 hover:text-white'>
             <MarketsSVG className='w-5 h-5' />
           </Link>
-          {isLoggedIn ? (
+          {isLoggedIn && isAuthReady && !changePasswordNeeded && usertype !== 'ADMIN' ? (
             <Link to='/create' className='text-gray-300 hover:text-white'>
               <CreateSVG className='w-5 h-5' />
             </Link>
           ) : (
-            <LoginModalButton iconOnly={true} />
+            !isLoggedIn && <LoginModalButton iconOnly={true} />
           )}
-          {isLoggedIn && (
+          {isLoggedIn && isAuthReady && !changePasswordNeeded && usertype !== 'ADMIN' && (
             <Link to='/profile' className='text-gray-300 hover:text-white'>
               <ProfileSVG className='w-5 h-5' />
             </Link>

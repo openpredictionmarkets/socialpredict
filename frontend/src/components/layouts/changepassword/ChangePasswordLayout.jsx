@@ -13,7 +13,7 @@ function ChangePasswordLayout() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const history = useHistory();  // Initialize useHistory hook
-    const { logout } = useContext(AuthContext); // Use logout from AuthContext
+    const { logout, token } = useContext(AuthContext); // Use auth state from AuthContext
     const changePasswordReasonMessages = {
         AUTHORIZATION_DENIED: 'Current password is incorrect.',
         VALIDATION_FAILED: 'New password must be 8-128 characters, include uppercase, lowercase, and a digit, contain no spaces, and differ from the current password.',
@@ -48,7 +48,7 @@ function ChangePasswordLayout() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({ currentPassword, newPassword })
             });

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Route, Switch, Redirect } from 'react-router-dom';
 import { useAuth } from './AuthContent';
 import ChangePassword from '../pages/changepassword/ChangePassword';
@@ -15,13 +15,18 @@ import User from '../pages/user/User';
 import Style from '../pages/style/Style';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import NotFound from '../pages/notfound/NotFound';
+import LoadingSpinner from '../components/loaders/LoadingSpinner';
 
 const AppRoutes = () => {
   const auth = useAuth();
 
-  const isLoggedIn = !!auth.username;
+  const isLoggedIn = auth.isLoggedIn;
   const isRegularUser = isLoggedIn && auth.usertype !== 'ADMIN';
-  const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
+  const mustChangePassword = isLoggedIn && auth.changePasswordNeeded === true;
+
+  if (isLoggedIn && !auth.isAuthReady) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <Switch>

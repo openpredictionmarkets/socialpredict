@@ -6,6 +6,8 @@ import {
     unwrapApiResponse,
 } from '../utils/apiResponse';
 
+const AUTH_STORAGE_KEYS = ['token', 'username', 'usertype', 'changePasswordNeeded'];
+
 const decodeJwtPayload = (token) => {
     if (!token) return null;
 
@@ -22,6 +24,10 @@ const decodeJwtPayload = (token) => {
     }
 };
 
+const clearStoredAuthState = () => {
+    AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+};
+
 const getStoredAuthState = () => {
     const token = localStorage.getItem('token');
     const tokenPayload = decodeJwtPayload(token);
@@ -35,7 +41,8 @@ const getStoredAuthState = () => {
         token,
         username: normalizedUsername,
         usertype: localStorage.getItem('usertype'),
-        changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
+        changePasswordNeeded: null,
+        isAuthReady: !token,
     };
 };
 
@@ -44,8 +51,9 @@ const AuthContext = createContext({
     setUsername: () => {},
     isLoggedIn: false,
     usertype: null,
-    changePasswordNeeded: true, // Default to true until login confirms otherwise
-    login: () => {},
+    changePasswordNeeded: null,
+    isAuthReady: false,
+    login: async () => null,
     logout: () => {},
 });
 
@@ -65,20 +73,103 @@ const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        if (authState.isLoggedIn && authState.usertype) {
-            // Redirect or perform other actions based on usertype
+        if (!authState.token || authState.isAuthReady) {
+            return;
         }
-    }, [authState.isLoggedIn, authState.usertype]);
 
-    useEffect(() => {
-        const storedState = getStoredAuthState();
-        if (storedState.token) {
-            if (storedState.username) {
-                localStorage.setItem('username', storedState.username);
+        let isCancelled = false;
+
+        // Restore password-change state from the API instead of persisting it in browser storage.
+        const hydrateAuthState = async () => {
+            try {
+                const response = await fetch(`${API_URL}/v0/privateprofile`, {
+                    headers: {
+                        'Authorization': `Bearer ${authState.token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const payload = parseApiResponseText(await response.text());
+
+                if (response.ok) {
+                    const profile = unwrapApiResponse(payload);
+
+                    if (isCancelled) {
+                        return;
+                    }
+
+                    localStorage.setItem('username', profile.username);
+                    localStorage.setItem('usertype', profile.usertype);
+                    localStorage.removeItem('changePasswordNeeded');
+
+                    setAuthState((currentState) => {
+                        if (currentState.token !== authState.token) {
+                            return currentState;
+                        }
+
+                        return {
+                            isLoggedIn: true,
+                            token: authState.token,
+                            username: profile.username,
+                            usertype: profile.usertype,
+                            changePasswordNeeded: profile.mustChangePassword,
+                            isAuthReady: true,
+                        };
+                    });
+                    return;
+                }
+
+                if (response.status === 403 && payload?.reason === 'PASSWORD_CHANGE_REQUIRED') {
+                    if (isCancelled) {
+                        return;
+                    }
+
+                    localStorage.removeItem('changePasswordNeeded');
+
+                    setAuthState((currentState) => {
+                        if (currentState.token !== authState.token) {
+                            return currentState;
+                        }
+
+                        return {
+                            ...currentState,
+                            isLoggedIn: true,
+                            changePasswordNeeded: true,
+                            isAuthReady: true,
+                        };
+                    });
+                    return;
+                }
+
+                throw new Error(getApiErrorMessage(
+                    response,
+                    payload,
+                    'Failed to restore your session.',
+                ));
+            } catch (error) {
+                console.error('Failed to restore auth state:', error);
+
+                if (isCancelled) {
+                    return;
+                }
+
+                clearStoredAuthState();
+                setAuthState({
+                    isLoggedIn: false,
+                    token: null,
+                    username: null,
+                    usertype: null,
+                    changePasswordNeeded: null,
+                    isAuthReady: true,
+                });
             }
-            setAuthState(storedState);
-        }
-    }, []);
+        };
+
+        hydrateAuthState();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [authState.isAuthReady, authState.token]);
 
     const login = async (username, password) => {
         try {
@@ -100,15 +191,16 @@ const AuthProvider = ({ children }) => {
                 localStorage.setItem('token', authData.token);
                 localStorage.setItem('username', authData.username);
                 localStorage.setItem('usertype', authData.usertype);
-                localStorage.setItem('changePasswordNeeded', authData.mustChangePassword);
+                localStorage.removeItem('changePasswordNeeded');
                 setAuthState({
                     isLoggedIn: true,
                     token: authData.token,
                     username: authData.username,
                     usertype: authData.usertype,
                     changePasswordNeeded: authData.mustChangePassword,
+                    isAuthReady: true,
                 });
-                return true;
+                return authData;
             } else {
                 const errorMessage = getApiErrorMessage(
                     response,
@@ -126,13 +218,14 @@ const AuthProvider = ({ children }) => {
 
 
     const logout = () => {
-        localStorage.clear();
+        clearStoredAuthState();
         setAuthState({
             isLoggedIn: false,
             token: null,
             username: null,
             usertype: null,
             changePasswordNeeded: null,
+            isAuthReady: true,
         });
     };
 
