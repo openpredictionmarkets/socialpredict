@@ -7,6 +7,8 @@ import (
 )
 
 // Place creates a buy bet after validating market status and user balance.
+// Placement mutates balances and bet history synchronously inside one transaction;
+// it is not a background execution candidate.
 func (s *Service) Place(ctx context.Context, req PlaceRequest) (*PlacedBet, error) {
 	outcome, err := s.placeValidator.Validate(ctx, req)
 	if err != nil {

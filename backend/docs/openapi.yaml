@@ -31,6 +31,8 @@ tags:
     description: Public and private user profile and financial data.
   - name: Metrics
     description: Platform-wide metrics and leaderboards.
+  - name: Operations
+    description: Minimal operator-facing runtime status outside business metrics.
   - name: Content
     description: CMS-powered homepage content.
 
@@ -60,6 +62,26 @@ x-route-family-migration-matrix:
     - DUST_CAP_EXCEEDED
     - INTERNAL_ERROR
   plain_text_error_response_state: migration_state_not_target_contract
+  validation_stop_review:
+    wave: WAVE10
+    landed_consolidation:
+      - markets create/search use the runtime-injected shared security service for boundary validation and sanitization
+      - markets list/search pagination uses security.ParseBoundedIntParam for bounded integer query parsing
+      - create/search distinguish INVALID_REQUEST boundary failures from VALIDATION_FAILED domain validation failures
+    remaining_boundary_validation_bypasses:
+      - family: markets
+        gap: market detail, resolve, projection, and legacy markets methods still own local path/action parsing and some plain http.Error shaping
+      - family: market-bets-and-positions
+        gap: marketId path parsing is duplicated in bets and positions handlers even though failures already use ReasonResponse
+      - family: private-actions
+        gap: bet and sell request bodies are decoded at the boundary but amount/outcome validation remains domain-first after DTO decode
+    next_validation_seam: markets path/action helper gap for market ID, projection amount, resolution outcome, and related failure shaping
+    deferred:
+      - generic validation registry
+      - request-body rewriting middleware
+      - validation platform program
+      - DB-backed business-rule registry
+      - broad output-sanitization campaign
   route_families:
     - family: infra-probes
       paths:
@@ -69,6 +91,13 @@ x-route-family-migration-matrix:
       failure_contract: text/plain probe body
       migration_state: intentional_infra_transport
       source: backend/server/server.go registerInfraRoutes
+    - family: operator-status
+      paths:
+        - /ops/status
+      success_contract: JSON runtime status `{live,ready,requestFailuresTotal,dbPool}`
+      failure_contract: same JSON status with HTTP 503 while not ready
+      migration_state: intentional_operator_transport
+      source: backend/server/server.go and internal/app/runtime
     - family: infra-docs
       paths:
         - /openapi.yaml
@@ -127,6 +156,7 @@ x-route-family-migration-matrix:
       success_contract: mixed raw JSON DTO, no-content action, and selected envelope results
       failure_contract: ReasonResponse plus middleware 429
       migration_state: mixed_raw_success_reason_failure
+      validation_state: create/search and pagination partially consolidated; detail, resolve, projection, and legacy methods still need path/action helper convergence
       source: backend/server/server.go and handlers/markets
     - family: market-search
       paths:
@@ -134,6 +164,7 @@ x-route-family-migration-matrix:
       success_contract: raw JSON SearchResponse
       failure_contract: ReasonResponse plus middleware 429
       migration_state: raw_success_plain_text_failures_retired
+      validation_state: shared security service and bounded pagination helper in use
       retired_plain_text_failures: true
       source: backend/server/server.go and handlers/markets/searchmarkets.go
     - family: market-bets-and-positions
@@ -144,6 +175,7 @@ x-route-family-migration-matrix:
       success_contract: JSON `{ok:true,result}`
       failure_contract: ReasonResponse plus middleware 429 where wrapped
       migration_state: envelope_based
+      validation_state: reason-shaped failures with duplicated package-local marketId path parsing
       source: backend/server/server.go, handlers/bets, handlers/positions
     - family: public-users
       paths:
@@ -175,6 +207,7 @@ x-route-family-migration-matrix:
       success_contract: JSON `{ok:true,result}`
       failure_contract: ReasonResponse plus middleware 429 and PASSWORD_CHANGE_REQUIRED gate
       migration_state: envelope_based
+      validation_state: domain-owned amount/outcome validation after local DTO decode; boundary helper gap remains for any future DTO-level convergence
       source: backend/server/server.go, handlers/bets, handlers/users
     - family: admin-and-content
       paths:
@@ -236,6 +269,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/PlainTextErrorResponse'
               example: not ready
+
+  /ops/status:
+    get:
+      tags: [Operations]
+      operationId: getOperationalStatus
+      summary: Get backend operational status
+      description: >
+        Minimal operator-facing runtime status export for the first alert set:
+        backend down or unready, fatal startup failure before readiness opens,
+        severe server-side request-failure spikes, and database connection pool
+        saturation or wait-latency signals affected by pool tuning. The
+        request-failure count and pool snapshot are process-local and reset when
+        the process restarts. This route is outside the `/v0` business namespace
+        and does not expose economy/accounting metrics.
+      responses:
+        '200':
+          description: Backend is live, ready, and serving operator status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalStatus'
+        '503':
+          description: Backend is not live or is not ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalStatus'
 
   /v0/login:
     post:
@@ -473,7 +533,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketResponse'
         '400':
-          description: Invalid request body or market validation failure.
+          description: >
+            Invalid request body or sanitizer rejection returns `INVALID_REQUEST`;
+            syntactically valid domain validation failures return `VALIDATION_FAILED`.
           content:
             application/json:
               schema:
@@ -565,7 +627,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/SearchResponse'
         '400':
-          description: Missing query parameter, invalid status, or invalid search input.
+          description: >
+            Missing query parameter, invalid status, or sanitizer-rejected search input
+            returns `INVALID_REQUEST`; domain search validation failures return
+            `VALIDATION_FAILED`.
           content:
             application/json:
               schema:
@@ -2112,8 +2177,12 @@ paths:
     get:
       tags: [Metrics]
       operationId: getSystemMetrics
-      summary: Get system metrics
-      description: Computes money creation/utilization metrics for auditing the economy.
+      summary: Get economy accounting metrics
+      description: >
+        Computes money creation/utilization metrics for auditing the economy.
+        This application reporting route is business/accounting output, not the
+        operational monitoring surface for liveness, readiness, latency, or
+        telemetry export.
       responses:
         '200':
           description: Metrics returned successfully.
@@ -2290,12 +2359,98 @@ components:
         handler-owned plain text failures. The current inventory is /health and
         /readyz probe transport plus older market compatibility entry points in
         handlers/markets/getmarkets.go, listmarkets.go, marketdetailshandler.go,
-        resolvemarket.go, legacy update/get methods on handler.go, and
-        market-create compatibility helpers in createmarket.go. It is not the
-        target API contract; the next migration seam is the markets route family,
-        where remaining still-routed failures should move to ReasonResponse and
-        unused compatibility entry points should be retired without introducing a
-        universal wrapper.
+        resolvemarket.go, and legacy update/get methods on handler.go. It is
+        not the target API contract; the next migration seam is the markets
+        route family, where remaining still-routed failures should move to
+        ReasonResponse and unused compatibility entry points should be retired
+        without introducing a universal wrapper.
+
+    OperationalStatus:
+      type: object
+      description: >
+        Process-local operator status for liveness/readiness and severe
+        request-failure spike alerts. Counters reset with the process and are
+        not fleet aggregates. This is not the economy/accounting metrics
+        contract exposed by `/v0/system/metrics`.
+      properties:
+        live:
+          type: boolean
+          description: Whether the HTTP process is live.
+          example: true
+        ready:
+          type: boolean
+          description: Whether startup has completed and the database is reachable.
+          example: true
+        requestFailuresTotal:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Monotonic count of non-probe server-side HTTP 5xx responses in this process.
+          example: 0
+        dbPool:
+          $ref: '#/components/schemas/DBPoolSnapshot'
+      required: [live, ready, requestFailuresTotal, dbPool]
+
+    DBPoolSnapshot:
+      type: object
+      description: >
+        Process-local SQL connection pool snapshot from the runtime-owned DB
+        handle. Wait count and wait duration expose contention dimensions that
+        can move when max-open, max-idle, or lifetime tuning changes.
+      properties:
+        maxOpenConnections:
+          type: integer
+          minimum: 0
+          description: Configured maximum open SQL connections; zero means unlimited.
+          example: 25
+        openConnections:
+          type: integer
+          minimum: 0
+          description: Current established SQL connections, including in-use and idle connections.
+          example: 6
+        inUseConnections:
+          type: integer
+          minimum: 0
+          description: Current SQL connections checked out by requests or background work.
+          example: 4
+        idleConnections:
+          type: integer
+          minimum: 0
+          description: Current idle SQL connections retained in the pool.
+          example: 2
+        waitCount:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total waits for a SQL connection because the pool was saturated.
+          example: 0
+        waitDurationNanoseconds:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total time spent waiting for SQL connections because the pool was saturated.
+          example: 0
+        maxIdleClosedConnections:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total SQL connections closed because the idle limit was exceeded.
+          example: 0
+        maxLifetimeClosedConnections:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total SQL connections closed because their maximum lifetime elapsed.
+          example: 0
+      required:
+        - maxOpenConnections
+        - openConnections
+        - inUseConnections
+        - idleConnections
+        - waitCount
+        - waitDurationNanoseconds
+        - maxIdleClosedConnections
+        - maxLifetimeClosedConnections
 
     StatsEnvelopeResponse:
       type: object

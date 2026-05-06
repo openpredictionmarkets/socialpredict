@@ -3,9 +3,9 @@ title: Background Jobs
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Recast the older job-platform plan as a lower-priority starter draft that explicitly defers background-job infrastructure until runtime correctness, observability, and idempotency posture are stronger."
+updated_at: 2026-05-03T12:00:00Z
+updated_at_display: "Sunday, May 03, 2026 at 12:00 PM UTC"
+update_reason: "Finish WAVE13 stop-and-review by naming a concrete non-financial async seam and the missing runtime-role, retry, dead-letter, and visibility prerequisites."
 status: draft
 ---
 
@@ -24,6 +24,10 @@ The current posture is explicit:
 - operational visibility comes before retry-heavy worker systems
 - money-moving flows should not be pushed into background jobs to compensate for weak transaction boundaries
 
+This draft was refreshed on Friday, May 01, 2026 against upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`. The backend now has liveness and readiness probes, explicit startup-writer gating, and better request-boundary failure handling, but it still has no worker topology, no idempotency model, and no retry or outbox ownership.
+
+The WAVE13 stop-and-review conclusion on Sunday, May 03, 2026 is to keep the background-job platform deferred. The one concrete next async seam worth preserving for later review is **homepage CMS render/sanitize warm-up**: a non-financial, recomputable derived-content operation that must not write balances, bets, market outcomes, settlement state, or economy/accounting metrics.
+
 ## Executive Direction
 
 If SocialPredict later introduces background-job infrastructure, it should do so as a narrow support system for explicitly idempotent, non-request-critical work.
@@ -40,14 +44,24 @@ That means:
 
 The live backend still has more urgent concerns:
 
-- startup ownership is still too broad in [main.go](/workspace/socialpredict/backend/main.go)
-- readiness and liveness semantics are still too weak in [server.go](/workspace/socialpredict/backend/server/server.go)
-- atomic accounting-sensitive workflow boundaries still need more explicit hardening
-- the runtime does not yet expose the operational signals that a safe worker or retry system would require
+- the serving runtime baseline is stronger than the older draft assumed, but deployment still runs one HTTP-serving shape with no worker role
+- atomic accounting-sensitive workflow boundaries still need more explicit hardening outside the place-bet path
+- the runtime still lacks worker-specific signals such as lag, replay, retry, or dead-letter visibility
+- no queue, outbox, scheduler, or worker ownership model exists yet in the codebase
 
 Adding queues or workers before those concerns are stronger would add a new failure domain before the current system is fully ready to support it.
 
 ## Current Code Snapshot
+
+### Runtime prerequisites are stronger, but still not worker-ready
+
+The backend now has:
+
+- `STARTUP_WRITER` mode in [runtime/startup_mutation.go](/workspace/socialpredict/backend/internal/app/runtime/startup_mutation.go)
+- startup mutation and verification behavior in [startup_mutation.go](/workspace/socialpredict/backend/startup_mutation.go)
+- liveness and readiness probes in [server.go](/workspace/socialpredict/backend/server/server.go)
+
+That is useful baseline infrastructure, but it is still serving-process infrastructure. It does not define a queue contract, worker lifecycle, retry semantics, or async ownership model.
 
 ### There is no live background-job subsystem in the backend
 
@@ -71,6 +85,8 @@ Important flows currently execute inline through request and domain paths, inclu
 
 That is important because it means correctness and failure semantics are still concentrated in the request path rather than hidden behind async infrastructure.
 
+The place-bet path now has stronger transaction behavior, but that still does not justify moving money-sensitive workflows behind background retries or workers.
+
 ### Deploy and workflow topology assumes one backend runtime shape
 
 The current Docker and workflow topology publishes and deploys the backend as one primary HTTP-serving binary:
@@ -83,11 +99,21 @@ There is no parallel worker deployment contract yet, which is another reason to 
 
 ## Candidate Future Uses
 
-If background jobs are introduced later, plausible early candidates are:
+If background jobs are introduced later, the first justified seam should be homepage CMS render/sanitize warm-up after an admin content update.
 
+That candidate remains intentionally narrow:
+
+- it is non-financial and must not mutate account balances, bets, orders, market resolution, settlement records, or economy/accounting metrics
+- it should reuse the existing `handlers/cms/homepage.Service.RenderContent` seam, which already owns derived homepage rendering outside HTTP handler code
+- a future job shape would be `homepage_render_warmup`, keyed by immutable `slug` plus `version`, after `PUT /v0/admin/content/home`
+- stale or failed warm-up work should degrade only preview, audit, or cache freshness; it must not change the stored homepage publication contract
+- it still needs explicit idempotency, ownership, retry, dead-letter, and visibility rules before any rollout
+
+Other plausible uses remain lower-priority examples, not active backlog buckets:
+
+- scheduled derived content snapshots that are safe to recompute and explicitly non-financial
 - email delivery
 - periodic or triggered cache refreshes
-- scheduled derived snapshots that are safe to recompute
 - export generation
 - non-critical notification fan-out
 
@@ -105,11 +131,17 @@ The following should not be early background-job targets:
 
 Before the backend should prioritize background-job infrastructure, it should first have:
 
-- clearer runtime startup and shutdown ownership
-- stronger readiness and monitoring posture
-- explicit idempotency rules for candidate async tasks
-- a clear retry and dead-letter policy
-- visibility into failure, replay, and lag behavior
+- runtime roles: an operationally enforced startup, readiness, shutdown, deployment, and rollback contract for at least an HTTP-serving role and a separate worker role
+- role separation: configuration that prevents the HTTP-serving role from consuming jobs, prevents the worker role from serving public traffic, and prevents either role from accidentally running startup-writer mutations
+- ownership boundaries: one named owner for the worker contract, job schema, retry decisions, and runbook maintenance
+- DB ownership: workers acquire `*gorm.DB` once near the runtime boundary and pass it downward, rather than opening ad hoc connections inside job handlers
+- idempotency: a per-job rule for duplicate delivery, replay after crash, and concurrent execution, starting with immutable `slug` plus `version` for the homepage render warm-up candidate
+- retry and dead-letter policy: bounded retry counts, backoff behavior, retryable-versus-terminal failure classification, dead-letter retention, and an operator path for inspect, replay, or discard
+- lag and failure visibility: metrics and alerts for enqueue-to-start lag, oldest pending work, retry volume, terminal failures, dead-letter depth, worker heartbeat, and successful completion freshness
+- logging: structured worker logs with job type, job id or idempotency key, attempt number, and terminal failure reason, without secrets
+- release safety: a way to deploy, disable, drain, and roll back workers without changing synchronous request-path correctness
+
+Until those prerequisites exist, the backend should not add queue tables, an outbox rollout, scheduler frameworks, Redis infrastructure, worker pools, or a second worker deployment platform.
 
 ## Relationship To Other Notes
 

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -58,7 +59,8 @@ func buildCORS(config appruntime.CORSConfig) *cors.Cors {
 }
 
 func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) (http.Handler, error) {
-	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
+	operationalMetrics := appruntime.NewOperationalMetrics()
+	router, err := buildRouter(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig, operationalMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +71,12 @@ func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServ
 	}
 	handler = security.SecurityHeadersMiddleware(securityConfig.Headers)(handler)
 	handler = security.RequestBoundaryMiddlewareWithProxyTrust(securityConfig.TrustProxyHeaders)(handler)
+	handler = operationalMetrics.Middleware(handler)
 
 	return handler, nil
 }
 
-func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) (*mux.Router, error) {
+func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig, operationalMetrics *appruntime.OperationalMetrics) (*mux.Router, error) {
 	if configService == nil {
 		return nil, fmt.Errorf("config init: configuration service unavailable")
 	}
@@ -83,7 +86,7 @@ func buildRouter(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServi
 
 	router := mux.NewRouter()
 	router.MethodNotAllowedHandler = methodNotAllowedHandler(router)
-	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS, db, readiness); err != nil {
+	if err := registerInfraRoutes(router, openAPISpec, swaggerUIFS, db, readiness, operationalMetrics); err != nil {
 		return nil, err
 	}
 
@@ -148,10 +151,11 @@ type applicationReportingService interface {
 	metricshandlers.GlobalLeaderboardService
 }
 
-func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, readiness *appruntime.Readiness) error {
+func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, readiness *appruntime.Readiness, operationalMetrics *appruntime.OperationalMetrics) error {
 	probe := appruntime.NewServingProbe(db, readiness)
 	router.Handle("/health", livenessHandler(probe)).Methods("GET")
 	router.Handle("/readyz", readinessHandler(probe)).Methods("GET")
+	router.Handle("/ops/status", operationalStatusHandler(probe, db, operationalMetrics)).Methods("GET")
 
 	// OpenAPI spec endpoint
 	router.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
@@ -170,9 +174,36 @@ func registerInfraRoutes(router *mux.Router, openAPISpec []byte, swaggerUIFS fs.
 		return fmt.Errorf("failed to set up swagger-ui FS: %w", err)
 	}
 	swaggerHandler := http.FileServer(http.FS(uiFS))
-	router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerHandler)).Methods("GET")
+	router.PathPrefix("/swagger/").Handler(swaggerUIHeaders(http.StripPrefix("/swagger/", swaggerHandler))).Methods("GET")
 
 	return nil
+}
+
+type operationalStatusResponse struct {
+	Live                 bool                      `json:"live"`
+	Ready                bool                      `json:"ready"`
+	RequestFailuresTotal uint64                    `json:"requestFailuresTotal"`
+	DBPool               appruntime.DBPoolSnapshot `json:"dbPool"`
+}
+
+func swaggerUIHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Swagger UI's bundled runtime uses dynamic function evaluation. Keep
+		// that CSP exception scoped to the docs UI instead of the whole API.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; "+
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
+			"style-src 'self' 'unsafe-inline'; "+
+			"img-src 'self' data: https:; "+
+			"connect-src 'self'; "+
+			"font-src 'self'; "+
+			"object-src 'none'; "+
+			"media-src 'self'; "+
+			"frame-src 'none'; "+
+			"worker-src 'none'; "+
+			"child-src 'none'; "+
+			"form-action 'self'")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func livenessHandler(probe appruntime.ServingProbe) http.Handler {
@@ -196,6 +227,31 @@ func readinessHandler(probe appruntime.ServingProbe) http.Handler {
 		}
 
 		writeProbeResponse(w, http.StatusOK, "ready")
+	})
+}
+
+func operationalStatusHandler(probe appruntime.ServingProbe, db *gorm.DB, operationalMetrics *appruntime.OperationalMetrics) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), readinessProbeTimeout)
+		defer cancel()
+
+		snapshot := operationalMetrics.Snapshot()
+		response := operationalStatusResponse{
+			Live:                 probe.Live(),
+			Ready:                probe.Ready(ctx) == nil,
+			RequestFailuresTotal: snapshot.RequestFailuresTotal,
+			DBPool:               appruntime.SnapshotDBPool(db),
+		}
+
+		status := http.StatusOK
+		if !response.Live || !response.Ready {
+			status = http.StatusServiceUnavailable
+		}
+
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 }
 
@@ -239,7 +295,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	requestSecurityService := container.GetSecurityService()
 
 	// Create Handler instances
-	marketsHandler := marketshandlers.NewHandler(marketsService, authService)
+	marketsHandler := marketshandlers.NewHandler(marketsService, authService, requestSecurityService)
 
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
@@ -337,12 +393,33 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
 }
 
-func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig) {
+type gracefulShutdowner interface {
+	Shutdown(context.Context) error
+}
+
+func shutdownHTTPServer(server gracefulShutdowner, readiness *appruntime.Readiness, config appruntime.ShutdownConfig, sleep func(time.Duration)) error {
+	if readiness != nil {
+		readiness.MarkNotReady()
+	}
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	config = appruntime.NormalizeShutdownConfig(config)
+	sleep(config.ReadinessDrainWindow)
+
+	shutdownContext, cancel := context.WithTimeout(context.Background(), config.ShutdownTimeout)
+	defer cancel()
+
+	return server.Shutdown(shutdownContext)
+}
+
+func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService configsvc.Service, readiness *appruntime.Readiness, securityConfig appruntime.SecurityConfig, shutdownConfig appruntime.ShutdownConfig) {
 	authsvc.ConfigureJWTSigningKey(securityConfig.JWTSigningKey)
 	handler, err := buildHandler(openAPISpec, swaggerUIFS, db, configService, readiness, securityConfig)
 	if err != nil {
 		logger.Fatal("server", "http handler initialization failed", err, logger.Operation("buildHandler"))
 	}
+	shutdownConfig = appruntime.NormalizeShutdownConfig(shutdownConfig)
 
 	// Allow BACKEND_PORT to be configured via environment, default to 8080
 	port := os.Getenv("BACKEND_PORT")
@@ -374,15 +451,17 @@ func Start(openAPISpec []byte, swaggerUIFS embed.FS, db *gorm.DB, configService 
 		}
 		logger.Info("server", "HTTP server stopped", logger.Operation("ListenAndServe"), logger.Address(address))
 	case shutdownSignal := <-shutdownSignals:
-		if readiness != nil {
-			readiness.MarkNotReady()
-		}
-		logger.Info("server", "shutdown signal received", logger.Operation("Shutdown"), logger.Address(address), logger.String("signal", shutdownSignal.String()))
+		logger.Info(
+			"server",
+			"shutdown signal received",
+			logger.Operation("Shutdown"),
+			logger.Address(address),
+			logger.String("signal", shutdownSignal.String()),
+			logger.String("readinessDrainWindow", shutdownConfig.ReadinessDrainWindow.String()),
+			logger.String("shutdownTimeout", shutdownConfig.ShutdownTimeout.String()),
+		)
 
-		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := server.Shutdown(shutdownContext); err != nil {
+		if err := shutdownHTTPServer(server, readiness, shutdownConfig, time.Sleep); err != nil {
 			logger.Fatal("server", "graceful shutdown failed", err, logger.Operation("Shutdown"), logger.Address(address))
 		}
 

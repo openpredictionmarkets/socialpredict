@@ -97,8 +97,45 @@ type UpdateInput struct {
 	Version   uint
 }
 
+type RenderInput struct {
+	Format   string
+	Markdown string
+	HTML     string
+}
+
+type RenderedContent struct {
+	Format   string
+	Markdown string
+	HTML     string
+}
+
 func (s *Service) GetHome() (*models.HomepageContent, error) {
 	return s.repo.GetBySlug("home")
+}
+
+// RenderContent owns the derived homepage render/sanitize operation. It is
+// intentionally synchronous today but can be invoked without HTTP coupling.
+func (s *Service) RenderContent(in RenderInput) (*RenderedContent, error) {
+	switch in.Format {
+	case "markdown":
+		rendered, err := s.renderer.MarkdownToHTML(in.Markdown)
+		if err != nil {
+			return nil, err
+		}
+		return &RenderedContent{
+			Format:   in.Format,
+			Markdown: in.Markdown,
+			HTML:     s.renderer.SanitizeHTML(rendered),
+		}, nil
+	case "html":
+		return &RenderedContent{
+			Format:   in.Format,
+			Markdown: "",
+			HTML:     s.renderer.SanitizeHTML(in.HTML),
+		}, nil
+	default:
+		return nil, errors.New("unsupported format")
+	}
 }
 
 func (s *Service) UpdateHome(in UpdateInput) (*models.HomepageContent, error) {
@@ -116,20 +153,17 @@ func (s *Service) UpdateHome(in UpdateInput) (*models.HomepageContent, error) {
 	item.UpdatedBy = in.UpdatedBy
 	item.Version = item.Version + 1
 
-	switch in.Format {
-	case "markdown":
-		item.Markdown = in.Markdown
-		rendered, err := s.renderer.MarkdownToHTML(in.Markdown)
-		if err != nil {
-			return nil, err
-		}
-		item.HTML = s.renderer.SanitizeHTML(rendered)
-	case "html":
-		item.HTML = s.renderer.SanitizeHTML(in.HTML)
-		item.Markdown = "" // optional: clear or keep last md
-	default:
-		return nil, errors.New("unsupported format")
+	rendered, err := s.RenderContent(RenderInput{
+		Format:   in.Format,
+		Markdown: in.Markdown,
+		HTML:     in.HTML,
+	})
+	if err != nil {
+		return nil, err
 	}
+	item.Format = rendered.Format
+	item.Markdown = rendered.Markdown
+	item.HTML = rendered.HTML
 
 	if err := s.repo.Save(item); err != nil {
 		return nil, err

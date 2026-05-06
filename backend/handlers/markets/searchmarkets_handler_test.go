@@ -11,17 +11,22 @@ import (
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/security"
 )
 
 type searchServiceMock struct {
 	result          *dmarkets.SearchResults
 	err             error
+	createFn        func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error)
 	capturedQuery   string
 	capturedFilters dmarkets.SearchFilters
 	overviews       map[int64]*dmarkets.MarketOverview
 }
 
 func (m *searchServiceMock) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, req, creatorUsername)
+	}
 	return nil, nil
 }
 
@@ -114,7 +119,7 @@ func TestSearchMarketsHandlerSuccess(t *testing.T) {
 			},
 		},
 	}
-	handler := SearchMarketsHandler(mockSvc)
+	handler := SearchMarketsHandler(mockSvc, security.NewSecurityService())
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=bitcoin&status=active&limit=5&offset=2", nil)
 	res := httptest.NewRecorder()
@@ -154,9 +159,32 @@ func TestSearchMarketsHandlerSuccess(t *testing.T) {
 	}
 }
 
+func TestSearchMarketsHandlerDefaultsInvalidPaginationAtBoundary(t *testing.T) {
+	mockSvc := &searchServiceMock{
+		result: &dmarkets.SearchResults{
+			Query:      "bitcoin",
+			TotalCount: 0,
+		},
+	}
+	handler := SearchMarketsHandler(mockSvc, security.NewSecurityService())
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=bitcoin&limit=abc&offset=-1", nil)
+	res := httptest.NewRecorder()
+
+	handler(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, res.Code)
+	}
+
+	if mockSvc.capturedFilters.Limit != 20 || mockSvc.capturedFilters.Offset != 0 {
+		t.Fatalf("expected boundary pagination defaults limit=20 offset=0, got %+v", mockSvc.capturedFilters)
+	}
+}
+
 func TestSearchMarketsHandlerValidation(t *testing.T) {
 	t.Run("method not allowed", func(t *testing.T) {
-		handler := SearchMarketsHandler(&searchServiceMock{})
+		handler := SearchMarketsHandler(&searchServiceMock{}, security.NewSecurityService())
 		req := httptest.NewRequest(http.MethodPost, "/v0/markets/search", nil)
 		rr := httptest.NewRecorder()
 
@@ -165,7 +193,7 @@ func TestSearchMarketsHandlerValidation(t *testing.T) {
 	})
 
 	t.Run("missing query parameter", func(t *testing.T) {
-		handler := SearchMarketsHandler(&searchServiceMock{})
+		handler := SearchMarketsHandler(&searchServiceMock{}, security.NewSecurityService())
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search", nil)
 		rr := httptest.NewRecorder()
 
@@ -174,7 +202,7 @@ func TestSearchMarketsHandlerValidation(t *testing.T) {
 	})
 
 	t.Run("domain invalid input returns validation failure envelope", func(t *testing.T) {
-		handler := SearchMarketsHandler(&searchServiceMock{err: dmarkets.ErrInvalidInput})
+		handler := SearchMarketsHandler(&searchServiceMock{err: dmarkets.ErrInvalidInput}, security.NewSecurityService())
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=test", nil)
 		rr := httptest.NewRecorder()
 
@@ -183,7 +211,7 @@ func TestSearchMarketsHandlerValidation(t *testing.T) {
 	})
 
 	t.Run("domain service error surfaces as server error", func(t *testing.T) {
-		handler := SearchMarketsHandler(&searchServiceMock{err: errors.New("boom")})
+		handler := SearchMarketsHandler(&searchServiceMock{err: errors.New("boom")}, security.NewSecurityService())
 		req := httptest.NewRequest(http.MethodGet, "/v0/markets/search?q=test", nil)
 		rr := httptest.NewRecorder()
 

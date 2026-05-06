@@ -96,6 +96,25 @@ func TestTraceContextFromTraceparentUsesOTelFieldVocabulary(t *testing.T) {
 	}
 }
 
+func TestEventAndStateFieldsUseStableRuntimeVocabulary(t *testing.T) {
+	var buffer bytes.Buffer
+	logger := newRuntimeLogger(&buffer, func(int) {})
+
+	logger.Info("runtime", "readiness opened", Event(EventReadinessOpen), Operation("MarkReady"), State("open"))
+
+	output := buffer.String()
+	for _, want := range []string{
+		`component="runtime"`,
+		`event="readiness.open"`,
+		`operation="MarkReady"`,
+		`state="open"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in output, got %q", want, output)
+		}
+	}
+}
+
 func TestFatalLogsAndUsesInjectedExit(t *testing.T) {
 	var (
 		buffer   bytes.Buffer
@@ -105,7 +124,14 @@ func TestFatalLogsAndUsesInjectedExit(t *testing.T) {
 		exitCode = code
 	})
 
-	logger.Fatal("startup", "database initialization failed", errors.New("password=swordfish"), Operation("InitDB"))
+	logger.Fatal(
+		"startup",
+		"database initialization failed",
+		errors.New("password=swordfish"),
+		Event(EventStartupIncompatibility),
+		Operation("InitDB"),
+		ErrorType(EventStartupIncompatibility),
+	)
 
 	output := buffer.String()
 	if exitCode != 1 {
@@ -116,6 +142,12 @@ func TestFatalLogsAndUsesInjectedExit(t *testing.T) {
 	}
 	if !strings.Contains(output, `operation="InitDB"`) {
 		t.Fatalf("expected operation field in output, got %q", output)
+	}
+	if !strings.Contains(output, `event="startup.incompatibility"`) {
+		t.Fatalf("expected startup event field in output, got %q", output)
+	}
+	if !strings.Contains(output, `error_type="startup.incompatibility"`) {
+		t.Fatalf("expected startup error_type field in output, got %q", output)
 	}
 	if !strings.Contains(output, `error="password=[REDACTED]"`) {
 		t.Fatalf("expected redacted error field in output, got %q", output)

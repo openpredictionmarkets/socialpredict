@@ -7,6 +7,7 @@ import (
 
 	appruntime "socialpredict/internal/app/runtime"
 	configsvc "socialpredict/internal/service/config"
+	"socialpredict/logger"
 
 	"gorm.io/gorm"
 )
@@ -115,5 +116,31 @@ func TestRunStartupMutationsNonWriterReturnsVerificationFailure(t *testing.T) {
 	err := runStartupMutations(nil, nil, appruntime.StartupMutationMode{}, hooks)
 	if !errors.Is(err, verifyErr) {
 		t.Fatalf("expected verification error, got %v", err)
+	}
+}
+
+func TestStartupIncompatibilityFieldsUseLoggerRuntimeVocabulary(t *testing.T) {
+	fields := startupIncompatibilityFields("LoadDBConfigFromEnv")
+	want := []logger.Field{
+		logger.Event(logger.EventStartupIncompatibility),
+		logger.Operation("LoadDBConfigFromEnv"),
+		logger.ErrorType(logger.EventStartupIncompatibility),
+	}
+
+	if !reflect.DeepEqual(fields, want) {
+		t.Fatalf("fields = %+v, want %+v", fields, want)
+	}
+}
+
+func TestStartupMigrationFailureFieldsUseLoggerRuntimeVocabulary(t *testing.T) {
+	fields := startupMigrationFailureFields("RunStartupMutations")
+	want := []logger.Field{
+		logger.Event(logger.EventStartupMigrationFailed),
+		logger.Operation("RunStartupMutations"),
+		logger.ErrorType(logger.EventStartupMigrationFailed),
+	}
+
+	if !reflect.DeepEqual(fields, want) {
+		t.Fatalf("fields = %+v, want %+v", fields, want)
 	}
 }

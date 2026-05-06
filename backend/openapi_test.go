@@ -103,9 +103,28 @@ func TestDocsPublishingProxyTemplatesExposeBackendDocs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read traefik template: %v", err)
 	}
-	for _, snippet := range []string{"public host and TLS edge", "/swagger/", "/openapi.yaml", "explicit in nginx"} {
+	for _, snippet := range []string{"public host and TLS edge", "/ops/status", "/swagger/", "/openapi.yaml", "explicit in nginx"} {
 		if !strings.Contains(string(content), snippet) {
 			t.Fatalf("traefik template missing docs publishing note %q", snippet)
+		}
+	}
+}
+
+func TestProductionProxyTemplateExposesOperationalStatus(t *testing.T) {
+	template := filepath.Join("..", "data", "nginx", "vhosts", "prod", "default.conf.template")
+	content, err := os.ReadFile(template)
+	if err != nil {
+		t.Fatalf("read production proxy template: %v", err)
+	}
+
+	for _, snippet := range []string{
+		"location = /health",
+		"location = /readyz",
+		"location = /ops/status",
+		"proxy_pass http://backend:8080;",
+	} {
+		if !strings.Contains(string(content), snippet) {
+			t.Fatalf("production proxy template missing %q", snippet)
 		}
 	}
 }
@@ -152,6 +171,7 @@ func TestRouteFamilyMigrationMatrixMatchesTouchedContractSlice(t *testing.T) {
 
 	expectedFamilies := map[string]struct{}{
 		"infra-probes":              {},
+		"operator-status":           {},
 		"infra-docs":                {},
 		"runtime-middleware":        {},
 		"auth":                      {},

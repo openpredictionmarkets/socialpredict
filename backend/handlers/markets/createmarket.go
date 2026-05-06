@@ -12,7 +12,7 @@ import (
 	"socialpredict/setup"
 	"time"
 
-	"socialpredict/handlers/authhttp"
+	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/logger"
@@ -22,6 +22,8 @@ import (
 const (
 	maxQuestionTitleLength = 160
 )
+
+var errSecurityServiceUnavailable = errors.New("security service unavailable")
 
 // Helper functions for backward compatibility with tests
 func checkQuestionTitleLength(title string) error {
@@ -52,14 +54,16 @@ func ValidateMarketResolutionTime(resolutionTime time.Time, config *setup.Econom
 }
 
 type CreateMarketService struct {
-	svc  dmarkets.Service
-	auth authsvc.Authenticator
+	svc             dmarkets.Service
+	auth            authsvc.Authenticator
+	securityService *security.SecurityService
 }
 
-func NewCreateMarketService(svc dmarkets.Service, auth authsvc.Authenticator) *CreateMarketService {
+func NewCreateMarketService(svc dmarkets.Service, auth authsvc.Authenticator, securityService *security.SecurityService) *CreateMarketService {
 	return &CreateMarketService{
-		svc:  svc,
-		auth: auth,
+		svc:             svc,
+		auth:            auth,
+		securityService: securityService,
 	}
 }
 
@@ -72,28 +76,28 @@ func (h *CreateMarketService) currentUser(r *http.Request) (*dusers.User, *auths
 
 func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
 	user, httpErr := h.currentUser(r)
 	if httpErr != nil {
 		logger.LogWarn("CreateMarket", "CurrentUser", httpErr.Message)
-		http.Error(w, httpErr.Error(), authhttp.StatusCode(httpErr))
+		writeAuthError(w, httpErr)
 		return
 	}
 
 	req, decodeErr := decodeCreateMarketRequest(r)
 	if decodeErr != nil {
 		logger.LogWarn("CreateMarket", "DecodeRequest", decodeErr.Error())
-		http.Error(w, decodeErr.Error(), http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
-	sanitized, sanitizeErr := sanitizeMarketRequest(req)
+	sanitized, sanitizeErr := sanitizeMarketRequest(h.securityService, req)
 	if sanitizeErr != nil {
 		logger.LogWarn("CreateMarket", "SanitizeMarketRequest", sanitizeErr.Error())
-		http.Error(w, "Invalid market data: "+sanitizeErr.Error(), http.StatusBadRequest)
+		writeCreateMarketSanitizationError(w, sanitizeErr)
 		return
 	}
 
@@ -115,10 +119,10 @@ func (h *CreateMarketService) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateMarketHandlerWithService creates a handler with service injection
-func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.Authenticator, econConfig *setup.EconomicConfig) http.HandlerFunc {
+func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.Authenticator, econConfig *setup.EconomicConfig, securityService *security.SecurityService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+			writeMethodNotAllowed(w)
 			return
 		}
 
@@ -130,14 +134,14 @@ func CreateMarketHandlerWithService(svc dmarkets.ServiceInterface, auth authsvc.
 		req, decodeErr := decodeCreateMarketRequest(r)
 		if decodeErr != nil {
 			logger.LogWarn("CreateMarket", "DecodeRequest", decodeErr.Error())
-			http.Error(w, decodeErr.Error(), http.StatusBadRequest)
+			writeInvalidRequest(w)
 			return
 		}
 
-		sanitized, sanitizeErr := sanitizeMarketRequest(req)
+		sanitized, sanitizeErr := sanitizeMarketRequest(securityService, req)
 		if sanitizeErr != nil {
 			logger.LogWarn("CreateMarket", "SanitizeMarketRequest", sanitizeErr.Error())
-			http.Error(w, "Invalid market data: "+sanitizeErr.Error(), http.StatusBadRequest)
+			writeCreateMarketSanitizationError(w, sanitizeErr)
 			return
 		}
 
@@ -167,8 +171,10 @@ func decodeCreateMarketRequest(r *http.Request) (dto.CreateMarketRequest, error)
 	return req, nil
 }
 
-func sanitizeMarketRequest(req dto.CreateMarketRequest) (dto.CreateMarketRequest, error) {
-	securityService := security.NewSecurityService()
+func sanitizeMarketRequest(securityService *security.SecurityService, req dto.CreateMarketRequest) (dto.CreateMarketRequest, error) {
+	if securityService == nil {
+		return dto.CreateMarketRequest{}, errSecurityServiceUnavailable
+	}
 	marketInput := security.MarketInput{
 		Title:       req.QuestionTitle,
 		Description: req.Description,
@@ -183,6 +189,14 @@ func sanitizeMarketRequest(req dto.CreateMarketRequest) (dto.CreateMarketRequest
 	req.QuestionTitle = sanitizedInput.Title
 	req.Description = sanitizedInput.Description
 	return req, nil
+}
+
+func writeCreateMarketSanitizationError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errSecurityServiceUnavailable) {
+		writeInternalError(w)
+		return
+	}
+	_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 }
 
 func toDomainCreateRequest(req dto.CreateMarketRequest) dmarkets.MarketCreateRequest {
@@ -214,32 +228,20 @@ func toCreateMarketResponse(market *dmarkets.Market) dto.CreateMarketResponse {
 func currentUserOrError(w http.ResponseWriter, r *http.Request, auth authsvc.Authenticator) (*dusers.User, *authsvc.AuthError) {
 	if auth == nil {
 		logger.LogError("CreateMarket", "CurrentUser", errors.New("authentication service unavailable"))
-		http.Error(w, "authentication service unavailable", http.StatusInternalServerError)
+		writeInternalError(w)
 		return nil, &authsvc.AuthError{Kind: authsvc.ErrorKindServiceUnavailable, Message: "authentication service unavailable"}
 	}
 	user, httperr := auth.CurrentUser(r)
 	if httperr != nil {
 		logger.LogWarn("CreateMarket", "CurrentUser", httperr.Message)
-		http.Error(w, httperr.Error(), authhttp.StatusCode(httperr))
+		writeAuthError(w, httperr)
 		return nil, httperr
 	}
 	return user, nil
 }
 
 func writeCreateMarketError(w http.ResponseWriter, err error) {
-	switch err {
-	case dmarkets.ErrUserNotFound:
-		http.Error(w, "User not found", http.StatusNotFound)
-	case dmarkets.ErrInsufficientBalance:
-		http.Error(w, "Insufficient balance", http.StatusBadRequest)
-	case dmarkets.ErrInvalidQuestionLength,
-		dmarkets.ErrInvalidDescriptionLength,
-		dmarkets.ErrInvalidLabel,
-		dmarkets.ErrInvalidResolutionTime:
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	default:
-		http.Error(w, "Error creating market", http.StatusInternalServerError)
-	}
+	writeCreateError(w, err)
 }
 
 func logCreateMarketFailure(username string, err error) {

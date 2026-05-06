@@ -12,6 +12,7 @@ import (
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/security"
 
 	"github.com/gorilla/mux"
 )
@@ -41,7 +42,7 @@ func TestListByStatusHandler_Smoke(t *testing.T) {
 		}}, nil
 	}
 
-	handler := NewHandler(svc, nil)
+	handler := NewHandler(svc, nil, security.NewSecurityService())
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/status/active?limit=50", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
@@ -89,7 +90,7 @@ func TestMarketLeaderboardHandler_Smoke(t *testing.T) {
 		}}, nil
 	}
 
-	handler := NewHandler(svc, nil)
+	handler := NewHandler(svc, nil, security.NewSecurityService())
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/77/leaderboard?limit=25", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()
@@ -122,7 +123,7 @@ func TestMarketLeaderboardHandler_FailureEnvelope(t *testing.T) {
 		return nil, errors.New("boom")
 	}
 
-	handler := NewHandler(svc, nil)
+	handler := NewHandler(svc, nil, security.NewSecurityService())
 	req := httptest.NewRequest(http.MethodGet, "/v0/markets/77/leaderboard", nil)
 	rr := httptest.NewRecorder()
 	router := mux.NewRouter()

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"socialpredict/handlers"
 	appruntime "socialpredict/internal/app/runtime"
@@ -23,11 +25,89 @@ import (
 
 var testOpenAPISpec = []byte("openapi: 3.0.0\ninfo:\n  title: SocialPredict Test API\n")
 
+type recordingShutdowner struct {
+	t         *testing.T
+	readiness *appruntime.Readiness
+	deadline  time.Time
+}
+
+func (s *recordingShutdowner) Shutdown(ctx context.Context) error {
+	s.t.Helper()
+
+	if s.readiness.Ready() {
+		s.t.Fatalf("expected readiness gate closed before server shutdown")
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		s.t.Fatalf("expected shutdown context deadline")
+	}
+	s.deadline = deadline
+	return nil
+}
+
 func testSwaggerUIFS() fstest.MapFS {
 	return fstest.MapFS{
 		"swagger-ui/index.html": &fstest.MapFile{
-			Data: []byte("<html>swagger</html>"),
+			Data: []byte(`<html>
+<head>
+<link rel="stylesheet" type="text/css" href="./swagger-ui.css" />
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="./swagger-ui-bundle.js"></script>
+<script src="./swagger-ui-standalone-preset.js"></script>
+<script src="./swagger-initializer.js"></script>
+</body>
+</html>`),
 		},
+		"swagger-ui/swagger-ui.css": &fstest.MapFile{
+			Data: []byte("body { margin: 0; }"),
+		},
+		"swagger-ui/swagger-ui-bundle.js": &fstest.MapFile{
+			Data: []byte("window.SwaggerUIBundle = function () {};"),
+		},
+		"swagger-ui/swagger-ui-standalone-preset.js": &fstest.MapFile{
+			Data: []byte("window.SwaggerUIStandalonePreset = {};"),
+		},
+		"swagger-ui/swagger-initializer.js": &fstest.MapFile{
+			Data: []byte(`window.ui = SwaggerUIBundle({ url: "/openapi.yaml" });`),
+		},
+	}
+}
+
+func TestShutdownHTTPServerClosesReadinessBeforeDrain(t *testing.T) {
+	readiness := appruntime.NewReadiness()
+	readiness.MarkReady()
+	shutdowner := &recordingShutdowner{t: t, readiness: readiness}
+	var slept time.Duration
+
+	start := time.Now()
+	err := shutdownHTTPServer(
+		shutdowner,
+		readiness,
+		appruntime.ShutdownConfig{
+			ReadinessDrainWindow: 7 * time.Second,
+			ShutdownTimeout:      15 * time.Second,
+		},
+		func(duration time.Duration) {
+			if readiness.Ready() {
+				t.Fatalf("expected readiness gate closed before drain wait")
+			}
+			slept = duration
+		},
+	)
+	if err != nil {
+		t.Fatalf("shutdownHTTPServer: %v", err)
+	}
+
+	if readiness.Ready() {
+		t.Fatalf("expected readiness gate to remain closed after shutdown")
+	}
+	if slept != 7*time.Second {
+		t.Fatalf("readiness drain sleep = %v, want 7s", slept)
+	}
+	if shutdowner.deadline.Before(start.Add(14*time.Second)) || shutdowner.deadline.After(start.Add(16*time.Second)) {
+		t.Fatalf("shutdown deadline = %v, want about 15s after %v", shutdowner.deadline, start)
 	}
 }
 
@@ -38,7 +118,7 @@ func buildTestRouter(t *testing.T, db *gorm.DB) *mux.Router {
 	readiness := appruntime.NewReadiness()
 	readiness.MarkReady()
 
-	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), readiness, testSecurityConfig(t))
+	router, err := buildRouter(testOpenAPISpec, testSwaggerUIFS(), db, configsvc.NewStaticService(econConfig), readiness, testSecurityConfig(t), appruntime.NewOperationalMetrics())
 	if err != nil {
 		t.Fatalf("build test router: %v", err)
 	}
@@ -83,6 +163,7 @@ func TestServerRegistersAndServesCoreRoutes(t *testing.T) {
 	}{
 		{"health", "/health", http.StatusOK},
 		{"readyz", "/readyz", http.StatusOK},
+		{"operator status", "/ops/status", http.StatusOK},
 		{"home", "/v0/home", http.StatusOK},
 		{"setup frontend", "/v0/setup/frontend", http.StatusOK},
 		{"markets", "/v0/markets?status=ACTIVE", http.StatusOK},
@@ -349,6 +430,59 @@ func TestReadyzChecksDatabaseAvailabilityAfterReadinessGateOpens(t *testing.T) {
 	}
 	if body := rec.Body.String(); body != "not ready" {
 		t.Fatalf("expected /readyz body not ready when database is unavailable, got %q", body)
+	}
+}
+
+func TestOperationalStatusRouteExportsRuntimeSignalsOnly(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	readiness := appruntime.NewReadiness()
+	handler := buildTestHandlerWithConfig(t, db, modelstesting.GenerateEconomicConfig(), readiness)
+
+	req := httptest.NewRequest(http.MethodGet, "/ops/status", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected /ops/status status 503 before readiness, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("expected /ops/status JSON content type, got %q", got)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected /ops/status cache-control no-store, got %q", got)
+	}
+
+	var status operationalStatusResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+		t.Fatalf("decode /ops/status response: %v", err)
+	}
+	if !status.Live || status.Ready || status.RequestFailuresTotal != 0 {
+		t.Fatalf("unexpected unready operational status: %+v", status)
+	}
+	if status.DBPool.MaxOpenConnections < 0 || status.DBPool.WaitDurationNanoseconds < 0 {
+		t.Fatalf("expected non-negative DB pool status fields: %+v", status.DBPool)
+	}
+	if strings.Contains(rec.Body.String(), "moneyCreated") {
+		t.Fatalf("expected /ops/status to stay separate from business metrics: %s", rec.Body.String())
+	}
+
+	readiness.MarkReady()
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected /ops/status status 200 after readiness, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+		t.Fatalf("decode ready /ops/status response: %v", err)
+	}
+	if !status.Live || !status.Ready {
+		t.Fatalf("unexpected ready operational status: %+v", status)
+	}
+	if status.DBPool.OpenConnections < status.DBPool.InUseConnections {
+		t.Fatalf("expected DB pool status to expose coherent connection counts: %+v", status.DBPool)
 	}
 }
 

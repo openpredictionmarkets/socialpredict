@@ -86,6 +86,7 @@ func newRequestBoundaryMiddleware(runtimeLogger *logger.RuntimeLogger, now func(
 						stderrors.New("panic recovered"),
 						append(
 							requestBoundaryFields(r, requestID, recorder.statusCode, now().Sub(startedAt), RuntimeErrorTypePanic, clientIdentity),
+							logger.Event(logger.EventRequestPanic),
 							logger.ExceptionRecorded(),
 						)...,
 					)
@@ -126,6 +127,7 @@ func requestBoundaryFields(r *http.Request, requestID string, statusCode int, du
 	}
 	fields = append(fields, logger.TraceContextFromTraceparent(r.Header.Get("Traceparent"))...)
 	if strings.TrimSpace(errorType) != "" {
+		fields = append(fields, logger.Event(logger.EventRequestFailure))
 		fields = append(fields, logger.ErrorType(errorType))
 	}
 

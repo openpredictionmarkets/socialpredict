@@ -101,7 +101,7 @@ type CreationPolicy interface {
 	BuildMarketEntity(now time.Time, req MarketCreateRequest, creatorUsername string, labels labelPair) *Market
 }
 
-// ResolutionPolicy encapsulates resolution rules and post-resolution actions.
+// ResolutionPolicy encapsulates synchronous resolution rules and post-resolution accounting actions.
 type ResolutionPolicy interface {
 	NormalizeResolution(resolution string) (string, error)
 	ValidateResolutionRequest(market *Market, username string) error

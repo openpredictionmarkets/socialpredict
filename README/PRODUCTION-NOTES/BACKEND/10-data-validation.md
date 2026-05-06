@@ -3,9 +3,9 @@ title: Data Validation
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-27T02:03:51Z
-updated_at_display: "Monday, April 27, 2026 at 2:03 AM UTC"
-update_reason: "Replace the older validation-framework plan with a current-state-first note grounded in the live security validation and sanitization seam, existing domain validators, and boundary-owned failure shaping."
+updated_at: 2026-05-02T23:30:00Z
+updated_at_display: "Saturday, May 2, 2026 at 11:30 PM UTC"
+update_reason: "Close WAVE10 with the landed markets boundary-validation consolidation, remaining route-family bypass inventory, and explicit deferral of framework-heavy validation ideas."
 status: active
 ---
 
@@ -13,7 +13,7 @@ status: active
 
 ## Update Summary
 
-This note was updated on Monday, April 27, 2026 to replace an older validation-platform plan with guidance that matches the live backend and the current design-plan direction to consolidate existing request-boundary validation before inventing a new framework.
+This note was updated on Saturday, May 2, 2026 to close WAVE10 with the validation-specific stop-and-review point. The wave consolidated the markets request-boundary seam without introducing a new validation framework, and this note now records the remaining route-family bypasses that should drive the next slice.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -47,6 +47,30 @@ For a high-availability and fault-tolerant backend, validation should prefer:
 - no new platform layer unless the existing seams are proven insufficient
 
 This note explicitly rejects building a large new `validation/` or `sanitization/` subsystem as the immediate main move.
+
+## WAVE10 Stop-And-Review Outcome
+
+WAVE10 landed a narrow boundary-validation consolidation in the markets route family:
+
+- [server.go](/workspace/socialpredict/backend/server/server.go) and [container.go](/workspace/socialpredict/backend/internal/app/container.go) now pass the runtime-owned `*security.SecurityService` into markets handlers instead of letting production handlers construct fresh security services or sanitizers.
+- [createmarket.go](/workspace/socialpredict/backend/handlers/markets/createmarket.go) and [searchmarkets.go](/workspace/socialpredict/backend/handlers/markets/searchmarkets.go) use the shared security seam for create/search sanitization and map malformed, sanitizer-rejected, and domain-validation failures to stable `ReasonResponse` values.
+- [queryparams.go](/workspace/socialpredict/backend/security/queryparams.go) now owns the shared bounded integer query parsing helper used by markets list/search pagination.
+- [docs/API-ISSUES.md](/workspace/socialpredict/backend/docs/API-ISSUES.md) and [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml) document the create/search validation failure split: malformed or sanitizer-rejected input is `INVALID_REQUEST`, while syntactically valid domain validation failures are `VALIDATION_FAILED`.
+
+That work was intentionally not a universal envelope migration and did not move business invariants out of `internal/domain/markets`.
+
+## Remaining Boundary-Validation Bypasses
+
+The remaining bypasses are route-family seams, not proof that SocialPredict needs a new validation platform:
+
+| Route family | Remaining bypass | Why it matters |
+| --- | --- | --- |
+| Markets legacy/details/actions | `handlers/markets/marketdetailshandler.go`, `resolvemarket.go`, `marketprojectedprobability.go`, and legacy methods on `handlers/markets/handler.go` still parse path/action input locally and some still use plain `http.Error` failure shaping | This is the closest continuation of WAVE10 because it keeps the work in the already-touched markets boundary and can reuse shared market ID, amount, outcome, and failure helpers |
+| Market bets and positions | `handlers/bets/betshandler.go` and `handlers/positions/positionshandler.go` have package-local `marketId` parsing helpers | Their failures already use `ReasonResponse`, but the parsing rule is duplicated instead of living in a shared request-boundary helper |
+| Private actions | `/v0/bet` and `/v0/sell` decode payloads locally and rely on domain services for amount/outcome validation | This preserves domain invariants, but there is still a boundary-helper gap for DTO-level malformed versus domain-invalid input if the route family is revisited |
+| Admin and content | Admin create-user now uses injected security validation, while CMS content remains a domain-specific HTML rendering/sanitization seam | These should not drive the next validation slice unless a concrete route behavior issue appears |
+
+The next validation seam should be the remaining markets path/action helper gap: consolidate market ID, projection amount, resolution outcome, and related failure shaping for market detail, resolve, projection, and legacy markets handler methods. That is a concrete route-family continuation of WAVE10 and should happen before any discussion of registries, generic request-body middleware, or a platform-wide validation subsystem.
 
 ## Why This Matters
 
@@ -155,10 +179,13 @@ The design-plan-aligned validation direction is:
 2. Reduce ad hoc one-off validation or sanitizer construction where touched.
 3. Converge validation failures toward the shared boundary failure posture already established in the security and API notes.
 4. Keep business invariants in domain validators rather than moving them into middleware.
-5. Revisit broader framework ideas only if the current seam proves structurally insufficient.
+5. Continue with the remaining markets path/action helper gap before moving to bets, positions, or private-action DTO validation.
+6. Revisit broader framework ideas only if the current seam proves structurally insufficient.
 
 ## Open Questions
 
-- Which remaining route families still bypass the shared validation seam unnecessarily
-- Which validation failures should map to stable shared public reasons once route-family convergence continues
-- Whether any output-sanitization follow-up is actually required beyond the current boundary and domain posture
+- Whether the remaining markets path/action helper gap should live in `backend/security` or in a markets-boundary helper that delegates only generic parsing to `security`.
+- Whether market bets and positions should share the same market ID boundary helper after the markets slice lands.
+- Whether any output-sanitization follow-up is actually required beyond the current boundary and domain posture.
+
+WAVE10 stops here. A top-level validation framework, rule registry, generic request-body rewriting middleware, broad output-sanitization campaign, validation platform backlog, or DB-backed business-rule registry remains explicitly deferred until the existing route-family seams prove insufficient.

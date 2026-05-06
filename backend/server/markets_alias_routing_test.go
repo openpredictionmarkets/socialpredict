@@ -94,7 +94,7 @@ func (m *marketsAliasServiceMock) ProjectProbability(ctx context.Context, req dm
 func TestLegacyMarketAliasRoutesPrecedeMarketIDRoute(t *testing.T) {
 	router := mux.NewRouter()
 	securityMiddleware := security.NewSecurityService().SecurityMiddleware()
-	marketsHandler := marketshandlers.NewHandler(&marketsAliasServiceMock{}, nil)
+	marketsHandler := marketshandlers.NewHandler(&marketsAliasServiceMock{}, nil, security.NewSecurityService())
 
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")

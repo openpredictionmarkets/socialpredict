@@ -3,9 +3,9 @@ title: Runtime Performance Tuning
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record the April 30 runtime readiness completion and keep remaining performance work evidence-driven."
+updated_at: 2026-05-03T00:08:00Z
+updated_at_display: "Sunday, May 03, 2026 at 12:08 AM UTC"
+update_reason: "Close WAVE11 with the measured DB pool tuning stop-and-review outcome and defer unproven performance programs."
 status: active
 ---
 
@@ -15,7 +15,7 @@ status: active
 
 This note was updated on Monday, April 27, 2026 to replace an older performance-platform plan with guidance that matches the live backend, the current design-plan posture, and the three-agent recommendation to treat optimization as later than runtime correctness and observability.
 
-On Thursday, April 30, 2026, the earlier runtime-readiness blocker called out by this note was finished for the serving path: `/health` now has liveness semantics, `/readyz` checks the readiness gate and database availability, and black-box Docker checks confirmed both endpoints on `http://localhost:8080`. That completion does not make broad optimization work current; it narrows the active performance note back to DB pool lifecycle tuning and measured bottlenecks.
+On Thursday, April 30, 2026, the earlier runtime-readiness blocker called out by this note was finished for the serving path: `/health` now has liveness semantics, `/readyz` checks the readiness gate and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. As of upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`, runtime DB ownership also includes explicit `sql.DB` pool and lifetime knobs. That completion does not make broad optimization work current; it narrows the active performance note to tuning the now-landed pool lifecycle controls and measuring real bottlenecks.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ SocialPredict should treat runtime performance tuning as measured hardening of t
 The active direction is:
 
 1. Keep correctness, startup discipline, readiness, and observability ahead of speed work.
-2. Treat runtime DB ownership and `sql.DB` pool or connection-lifecycle tuning as the only clearly near-term performance concern in this note.
+2. Treat the runtime DB seam's existing `sql.DB` pool and connection-lifecycle knobs as the main near-term performance lever in this note, and tune them only against measured bottlenecks.
 3. Make query and index changes only when a real hotspot is visible, and keep those changes owned by repository or migration seams rather than inventing a runtime "query optimizer" package.
 4. Prefer proxy-edge features that already exist, such as nginx gzip, over adding speculative in-app compression middleware.
 5. Keep business/accounting metrics separate from latency and operational performance signals.
@@ -59,10 +59,10 @@ For SocialPredict, the live backend still has runtime concerns that should stay 
 
 - startup ownership is too broad in [main.go](/workspace/socialpredict/backend/main.go)
 - real liveness and readiness semantics landed on April 30, 2026, but those probes are a correctness baseline rather than a performance strategy
-- DB pool and connection lifecycle settings are not yet explicitly owned in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go)
+- the DB pool and connection-lifecycle seam now exists in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go), but its operating values and real saturation points still need measurement
 - accounting-sensitive flows still need clearer atomic boundaries before any optimization layer should obscure behavior
 
-That means the current job is not to add cache tiers, response-compression middleware, or speculative query frameworks. The current job is to make the backend measurable and safe enough that later optimization is grounded in evidence.
+That means the current job is not to add cache tiers, response-compression middleware, or speculative query frameworks. The current job is to tune and observe the performance seams that already landed so later optimization is grounded in evidence.
 
 ## Current Code Snapshot
 
@@ -73,18 +73,67 @@ As of April 30, 2026, [server.go](/workspace/socialpredict/backend/server/server
 - `/health` as a liveness response with `Cache-Control: no-store`
 - `/readyz` as a readiness response that checks both the runtime readiness gate and database availability
 
-That problem is finished for the active runtime slice. Performance work should no longer cite "static health check only" as a blocker. The remaining performance-relevant runtime work is DB pool and connection-lifecycle ownership, followed by measurement.
+That problem is finished for the active runtime slice. Performance work should no longer cite "static health check only" as a blocker. The remaining performance-relevant runtime work is tuning the already-landed DB pool and connection-lifecycle seam, followed by measurement.
 
-### DB pool and connection lifecycle tuning is still thin
+### DB pool and connection lifecycle tuning is now runtime-owned
 
-The current runtime DB seam in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go) normalizes environment variables and opens GORM against Postgres, but it does not yet own explicit `sql.DB` tuning such as:
+The current runtime DB seam in [db.go](/workspace/socialpredict/backend/internal/app/runtime/db.go) normalizes environment variables, builds the Postgres DSN, opens GORM, and applies explicit `sql.DB` tuning through `ConfigureDBPool`, including:
 
 - max open connections
 - max idle connections
 - connection lifetime
 - idle timeout
 
-That is real current-state work, and it belongs to runtime DB ownership rather than a separate optimization subsystem.
+Those knobs are already wired through env-backed config such as `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`, `DB_CONN_MAX_LIFETIME`, and `DB_CONN_MAX_IDLE_TIME`.
+
+Startup now also logs the effective pool posture with the `db_pool.configured` event. That log line includes only normalized pool and lifecycle values plus TLS posture; it must not include passwords, full DSNs, hosts, database names, or usernames.
+
+The current owned knobs are:
+
+| Runtime setting | Env vars | Default | Notes |
+| --- | --- | --- | --- |
+| Max open DB connections | `DB_MAX_OPEN_CONNS`, `POSTGRES_MAX_OPEN_CONNS` | `25` | Process-local ceiling passed to `sql.DB.SetMaxOpenConns`; tune with database capacity and replica count in mind. |
+| Max idle DB connections | `DB_MAX_IDLE_CONNS`, `POSTGRES_MAX_IDLE_CONNS` | `5` | Process-local idle pool size passed to `sql.DB.SetMaxIdleConns`; should usually stay no higher than max open connections. |
+| Connection max lifetime | `DB_CONN_MAX_LIFETIME`, `POSTGRES_CONN_MAX_LIFETIME` | `30m` | Go duration passed to `sql.DB.SetConnMaxLifetime`; use to recycle long-lived connections before infrastructure-side expiry. |
+| Connection max idle time | `DB_CONN_MAX_IDLE_TIME`, `POSTGRES_CONN_MAX_IDLE_TIME` | `5m` | Go duration passed to `sql.DB.SetConnMaxIdleTime`; use to shed idle connections during quieter periods. |
+| TLS requirement | `DB_REQUIRE_TLS`, `POSTGRES_REQUIRE_TLS` | production-like envs default to `true`; other envs default to `false` | Validated with `DB_SSLMODE` or `POSTGRES_SSLMODE`; logged as posture only, not as a connection string. |
+
+Unparseable integer or Go-duration values fall back to the defaults above. Negative pool and lifetime values normalize to zero before they are applied to `sql.DB`; when max idle connections exceeds a positive max open connection value, the effective runtime posture is capped to match the `database/sql` pool behavior.
+
+For a single local or development instance, the defaults are intentionally modest and explicit enough to avoid hidden driver behavior. For multiple app replicas, treat max open connections as a per-process value and budget total possible connections across all replicas before increasing it. For production-like deployments, prefer evidence from readiness failures, database wait pressure, and request latency before changing these values; do not use this note as a reason to add cache tiers, query rewriters, or a new performance subsystem.
+
+### Initial deployment defaults from the measurement seam
+
+WAVE11-PERF-002 added a runtime-local DB pool wait measurement seam and exposed process-local SQL pool counters on `/ops/status` under `dbPool`. The targeted benchmark compared one held connection plus one waiter with two pool postures:
+
+| Measured posture | Result |
+| --- | --- |
+| `DB_MAX_OPEN_CONNS=1` | Saturated: `1.000 pool_waits/op` and about `1 ms` to `2 ms` of pool wait per operation in short local benchmark runs. |
+| `DB_MAX_OPEN_CONNS=2` | Headroom: `0 pool_waits/op` and `0 pool_wait_ns/op` for the same held-connection scenario. |
+
+That evidence is enough to reject a one-connection pool for the current backend runtime, but it is not evidence that the service needs a larger pool than the existing runtime defaults. The current initial posture is therefore to make the already-owned defaults explicit and reversible in the environment surfaces:
+
+| Deployment shape | Encoded defaults | Why |
+| --- | --- | --- |
+| Local development through `backend/.env.dev` | `DB_MAX_OPEN_CONNS=25`, `DB_MAX_IDLE_CONNS=5`, `DB_CONN_MAX_LIFETIME=30m`, `DB_CONN_MAX_IDLE_TIME=5m` | Keeps local behavior aligned with runtime defaults and well above the measured one-connection saturation point without changing code defaults. |
+| Production compose `backend-startup-writer` | `${DB_MAX_OPEN_CONNS:-25}`, `${DB_MAX_IDLE_CONNS:-5}`, `${DB_CONN_MAX_LIFETIME:-30m}`, `${DB_CONN_MAX_IDLE_TIME:-5m}` | Keeps the startup writer on the same conservative process-local posture while allowing operators to lower or raise it through `.env` without editing compose. |
+| Production compose request-serving `backend` | `${DB_MAX_OPEN_CONNS:-25}`, `${DB_MAX_IDLE_CONNS:-5}`, `${DB_CONN_MAX_LIFETIME:-30m}`, `${DB_CONN_MAX_IDLE_TIME:-5m}` | Keeps the serving process explicit and overrideable; total possible DB connections remain the per-process max multiplied by active backend containers. |
+
+The tradeoff is intentional: these values avoid the measured saturation failure mode, preserve enough headroom for normal request bursts, and avoid increasing total database connection pressure before production traffic shows a need. They are also easy to reverse because operators can override `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`, `DB_CONN_MAX_LIFETIME`, or `DB_CONN_MAX_IDLE_TIME` in the deployment environment.
+
+Revisit this posture when `/ops/status.dbPool.waitCount` increases during normal traffic, `waitDurationNanoseconds` grows alongside request latency or readiness failures, or database-side connection limits make the per-process budget too high for the number of backend containers. Raise `DB_MAX_OPEN_CONNS` only when wait pressure is visible and Postgres has capacity for the new replica-adjusted total; lower it when database connection pressure appears without corresponding pool waits. Revisit lifetimes when infrastructure closes long-lived connections, Postgres restart/failover behavior leaves stale connections visible, or `maxLifetimeClosedConnections` grows in a way that correlates with request errors.
+
+That means the missing piece is not ownership or initial deployment defaults. The missing piece is observing whether these explicit per-process values create real wait pressure under production-like traffic and deciding whether any later hotspot needs query or index work.
+
+### WAVE11 stop-and-review outcome
+
+The first measured performance hotspot was the runtime DB pool wait seam, not an application query. The WAVE11-PERF-002 benchmark showed that a one-connection pool turned one held connection plus one waiter into repeatable pool contention, while a two-connection pool removed the waits for the same controlled workload. WAVE11-PERF-003 then encoded the existing `25` max-open, `5` max-idle, `30m` lifetime, and `5m` idle-time defaults into local development and production compose surfaces without changing the runtime code defaults.
+
+That tuning moved the first bottleneck for this wave: the measured one-connection pool saturation case is no longer represented by the active deployment defaults. There is no current measurement showing that a query, index, cache, worker, compression middleware, or broader performance-platform change is the next bottleneck.
+
+Do not queue a query or index migration from this wave alone. The next migration-owned performance seam should be named only when `/ops/status.dbPool.waitCount` or `waitDurationNanoseconds` rises under normal or production-like traffic and the correlated request path identifies a concrete slow query or missing index. At that point, the follow-up should be a specific repository query and timestamped migration, not a runtime query-optimizer package.
+
+Caching and Redis work remain deferred to [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md). Background jobs and worker topology remain deferred to [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md). App-owned compression middleware, profiling programs, load-testing programs, autoscaling work, and broader performance-platform ideas remain deferred to [FUTURE/06-long-term-performance-optimization.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/06-long-term-performance-optimization.md).
 
 ### Proxy-edge compression already exists
 
@@ -162,7 +211,7 @@ The design-plan-aligned performance direction is:
 
 1. Treat the April 30, 2026 liveness/readiness work as complete for the serving path.
 2. Make operational signals and failure posture clearer through the logging and monitoring notes.
-3. Add explicit `sql.DB` pool and connection-lifecycle ownership in the runtime seam.
+3. Tune the existing env-backed `sql.DB` pool and connection-lifecycle settings against measured behavior.
 4. Measure real hotspots.
 5. Make targeted query or index changes only where the evidence justifies them.
 6. Consider caching later, and only after correctness and runtime safety are materially stronger.
