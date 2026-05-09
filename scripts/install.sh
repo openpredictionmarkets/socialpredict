@@ -107,7 +107,7 @@ generate_password() {
   local char_set="A-Za-z0-9"
 
   # Generate a random password
-  tr -dc "$char_set" < /dev/urandom | head -c "$length"
+  LC_ALL=C tr -dc "$char_set" < /dev/urandom | head -c "$length"
   echo
 }
 
