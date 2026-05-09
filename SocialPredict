@@ -76,6 +76,7 @@ Commands:
   down        Stop SocialPredict containers
   exec        Execute command on SocialPredict containers
   backup      Backup operations on SocialPredict
+  cleanup     Cleanup unused Docker artifacts
 
 Run './SocialPredict COMMAND --help' for more information on a command.
 
@@ -117,6 +118,13 @@ case "$COMMAND" in
     shift
     # Pass remaining args to the backup script, e.g. --save / --list / --restore <file>
     source "${SCRIPT_DIR}/scripts/backup/db_backup.sh" "$@"
+    unset CALLED_FROM_SOCIALPREDICT
+    ;;
+  cleanup)
+    check_docker
+    export CALLED_FROM_SOCIALPREDICT=yes
+    shift
+    source "${SCRIPT_DIR}/scripts/docker-commands.sh" cleanup "$@"
     unset CALLED_FROM_SOCIALPREDICT
     ;;
   --help|-h|help)
