@@ -32,7 +32,7 @@ Purpose:
 Commands:
   env list                        List local environments under ~/.keys/socialpredict
   host ssh <env>                  Open SSH session to environment host
-  host env get <env> <KEY>        (Planned) Read remote .env key
+  host env get <env> <KEY>        Read remote .env key
   host logs <env> <service>       (Planned) Tail remote service logs
   deploy <env>                    (Planned) Orchestrate remote ./SocialPredict deploy
   tf <plan|apply|destroy> <env>   (Planned) Terraform wrapper
@@ -41,6 +41,7 @@ Commands:
 Current implementation:
   - env list is implemented
   - host ssh is implemented
+  - host env get is implemented
   - all other commands are scaffold placeholders
 
 Environment directories:
@@ -86,6 +87,11 @@ Shell overrides also work:
   HOSTOPS_<ENV>_PORT       SSH port, e.g. 22
   HOSTOPS_<ENV>_KEY        private key path
   HOSTOPS_<ENV>_REPO_PATH  remote repo path, planned deploy/env/log commands
+
+Examples:
+  ./HostOps env list
+  ./HostOps host ssh staging
+  ./HostOps host env get staging ADMIN_PASSWORD
 
 Example:
   # ~/.keys/socialpredict/staging/hostops.env
@@ -168,6 +174,68 @@ env_to_key() {
   printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
 }
 
+resolve_env_connection() {
+  local env="$1"
+
+  load_config_for_env "$env"
+
+  local env_key
+  env_key="$(env_to_key "$env")"
+
+  local host_var="HOSTOPS_${env_key}_HOST"
+  local host_ip_var="HOSTOPS_${env_key}_HOST_IP"
+  local user_var="HOSTOPS_${env_key}_USER"
+  local port_var="HOSTOPS_${env_key}_PORT"
+  local key_var="HOSTOPS_${env_key}_KEY"
+  local repo_path_var="HOSTOPS_${env_key}_REPO_PATH"
+
+  local env_host env_host_ip env_user env_port env_key_value env_repo_path
+  env_host="$(value_for_name "$host_var")"
+  env_host_ip="$(value_for_name "$host_ip_var")"
+  env_user="$(value_for_name "$user_var")"
+  env_port="$(value_for_name "$port_var")"
+  env_key_value="$(value_for_name "$key_var")"
+  env_repo_path="$(value_for_name "$repo_path_var")"
+
+  local default_host
+  default_host="$(default_host_for_env "$env")"
+
+  HOSTOPS_RESOLVED_HOST="${HOSTOPS_HOST:-}"
+  if [[ -z "$HOSTOPS_RESOLVED_HOST" ]]; then HOSTOPS_RESOLVED_HOST="$env_host"; fi
+  if [[ -z "$HOSTOPS_RESOLVED_HOST" ]]; then HOSTOPS_RESOLVED_HOST="${HOSTOPS_HOST_IP:-}"; fi
+  if [[ -z "$HOSTOPS_RESOLVED_HOST" ]]; then HOSTOPS_RESOLVED_HOST="$env_host_ip"; fi
+  if [[ -z "$HOSTOPS_RESOLVED_HOST" ]]; then HOSTOPS_RESOLVED_HOST="$default_host"; fi
+
+  HOSTOPS_RESOLVED_USER="${HOSTOPS_USER:-}"
+  if [[ -z "$HOSTOPS_RESOLVED_USER" ]]; then HOSTOPS_RESOLVED_USER="$env_user"; fi
+  if [[ -z "$HOSTOPS_RESOLVED_USER" ]]; then HOSTOPS_RESOLVED_USER="root"; fi
+
+  HOSTOPS_RESOLVED_PORT="${HOSTOPS_PORT:-}"
+  if [[ -z "$HOSTOPS_RESOLVED_PORT" ]]; then HOSTOPS_RESOLVED_PORT="$env_port"; fi
+  if [[ -z "$HOSTOPS_RESOLVED_PORT" ]]; then HOSTOPS_RESOLVED_PORT="22"; fi
+
+  HOSTOPS_RESOLVED_KEY="${HOSTOPS_KEY:-}"
+  if [[ -z "$HOSTOPS_RESOLVED_KEY" ]]; then HOSTOPS_RESOLVED_KEY="$env_key_value"; fi
+  if [[ -z "$HOSTOPS_RESOLVED_KEY" ]]; then HOSTOPS_RESOLVED_KEY="$(env_default_key_path "$env")"; fi
+  HOSTOPS_RESOLVED_KEY="$(expand_home "$HOSTOPS_RESOLVED_KEY")"
+
+  HOSTOPS_RESOLVED_REPO_PATH="${HOSTOPS_REPO_PATH:-}"
+  if [[ -z "$HOSTOPS_RESOLVED_REPO_PATH" ]]; then HOSTOPS_RESOLVED_REPO_PATH="$env_repo_path"; fi
+  if [[ -z "$HOSTOPS_RESOLVED_REPO_PATH" ]]; then HOSTOPS_RESOLVED_REPO_PATH="/opt/socialpredict"; fi
+
+  if [[ -z "$HOSTOPS_RESOLVED_HOST" ]]; then
+    print_error "No host configured for environment '$env'."
+    echo "Create ~/.keys/socialpredict/${env}/hostops.env with HOSTOPS_HOST=..."
+    exit 1
+  fi
+
+  if [[ ! -f "$HOSTOPS_RESOLVED_KEY" ]]; then
+    print_error "SSH key not found: $HOSTOPS_RESOLVED_KEY"
+    echo "Set HOSTOPS_KEY, set ${key_var}, or create the default key path."
+    exit 1
+  fi
+}
+
 list_envs() {
   local root
   root="$(expand_home "$CONFIG_ROOT")"
@@ -231,62 +299,42 @@ list_envs() {
 ssh_to_env() {
   local env="$1"
 
-  load_config_for_env "$env"
+  resolve_env_connection "$env"
 
-  local env_key
-  env_key="$(env_to_key "$env")"
+  print_info "Connecting to ${env}: ${HOSTOPS_RESOLVED_USER}@${HOSTOPS_RESOLVED_HOST}"
+  print_info "Using port: ${HOSTOPS_RESOLVED_PORT}"
+  print_info "Using key: ${HOSTOPS_RESOLVED_KEY}"
+  exec ssh -i "$HOSTOPS_RESOLVED_KEY" -p "$HOSTOPS_RESOLVED_PORT" "${HOSTOPS_RESOLVED_USER}@${HOSTOPS_RESOLVED_HOST}"
+}
 
-  local host_var="HOSTOPS_${env_key}_HOST"
-  local host_ip_var="HOSTOPS_${env_key}_HOST_IP"
-  local user_var="HOSTOPS_${env_key}_USER"
-  local port_var="HOSTOPS_${env_key}_PORT"
-  local key_var="HOSTOPS_${env_key}_KEY"
+host_env_get() {
+  local env="$1"
+  local requested_key="$2"
 
-  local env_host env_host_ip env_user env_port env_key_value
-  env_host="$(value_for_name "$host_var")"
-  env_host_ip="$(value_for_name "$host_ip_var")"
-  env_user="$(value_for_name "$user_var")"
-  env_port="$(value_for_name "$port_var")"
-  env_key_value="$(value_for_name "$key_var")"
-
-  local default_host
-  default_host="$(default_host_for_env "$env")"
-
-  local host="${HOSTOPS_HOST:-}"
-  if [[ -z "$host" ]]; then host="$env_host"; fi
-  if [[ -z "$host" ]]; then host="${HOSTOPS_HOST_IP:-}"; fi
-  if [[ -z "$host" ]]; then host="$env_host_ip"; fi
-  if [[ -z "$host" ]]; then host="$default_host"; fi
-
-  local user="${HOSTOPS_USER:-}"
-  if [[ -z "$user" ]]; then user="$env_user"; fi
-  if [[ -z "$user" ]]; then user="root"; fi
-
-  local port="${HOSTOPS_PORT:-}"
-  if [[ -z "$port" ]]; then port="$env_port"; fi
-  if [[ -z "$port" ]]; then port="22"; fi
-
-  local key="${HOSTOPS_KEY:-}"
-  if [[ -z "$key" ]]; then key="$env_key_value"; fi
-  if [[ -z "$key" ]]; then key="$(env_default_key_path "$env")"; fi
-  key="$(expand_home "$key")"
-
-  if [[ -z "$host" ]]; then
-    print_error "No host configured for environment '$env'."
-    echo "Create ~/.keys/socialpredict/${env}/hostops.env with HOSTOPS_HOST=..."
+  if [[ ! "$requested_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    print_error "Invalid environment key: $requested_key"
+    echo "Keys must match: ^[A-Za-z_][A-Za-z0-9_]*$"
     exit 1
   fi
 
-  if [[ ! -f "$key" ]]; then
-    print_error "SSH key not found: $key"
-    echo "Set HOSTOPS_KEY, set ${key_var}, or create the default key path."
-    exit 1
-  fi
+  resolve_env_connection "$env"
 
-  print_info "Connecting to ${env}: ${user}@${host}"
-  print_info "Using port: ${port}"
-  print_info "Using key: ${key}"
-  exec ssh -i "$key" -p "$port" "${user}@${host}"
+  ssh -i "$HOSTOPS_RESOLVED_KEY" \
+    -o BatchMode=yes \
+    -p "$HOSTOPS_RESOLVED_PORT" \
+    "${HOSTOPS_RESOLVED_USER}@${HOSTOPS_RESOLVED_HOST}" \
+    "REPO_PATH='$HOSTOPS_RESOLVED_REPO_PATH' REQUESTED_KEY='$requested_key' bash -s" <<'REMOTE'
+set -euo pipefail
+env_file="${REPO_PATH}/.env"
+if [[ ! -f "$env_file" ]]; then
+  echo "Remote .env file not found: $env_file" >&2
+  exit 1
+fi
+grep -E "^${REQUESTED_KEY}=" "$env_file" || {
+  echo "Key not found in $env_file: $REQUESTED_KEY" >&2
+  exit 1
+}
+REMOTE
 }
 
 main() {
@@ -320,7 +368,26 @@ main() {
           fi
           ssh_to_env "$env"
           ;;
-        env|get|logs|run)
+        env)
+          local env_action="${3:-}"
+          case "$env_action" in
+            get)
+              local env="${4:-}"
+              local requested_key="${5:-}"
+              if [[ -z "$env" || -z "$requested_key" ]]; then
+                print_error "Usage: ./HostOps host env get <env> <KEY>"
+                exit 1
+              fi
+              host_env_get "$env" "$requested_key"
+              ;;
+            *)
+              print_error "Unknown host env subcommand: '${env_action:-<none>}'"
+              echo "Usage: ./HostOps host env get <env> <KEY>"
+              exit 1
+              ;;
+          esac
+          ;;
+        get|logs|run)
           require_planned
           ;;
         *)

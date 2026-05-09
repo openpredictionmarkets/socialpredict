@@ -29,8 +29,8 @@ Scaffold only.
 - Implemented:
   - `./HostOps env list`
   - `./HostOps host ssh <env>`
-- Planned:
   - `./HostOps host env get <env> <KEY>`
+- Planned:
   - `./HostOps host logs <env> <service>`
   - `./HostOps deploy <env>`
   - `./HostOps tf <plan|apply|destroy> <env>`
@@ -216,11 +216,18 @@ Use shell syntax only: `KEY=value`, one setting per line. Do not commit this fil
 - Optional: SSH user via `HOSTOPS_USER` or `HOSTOPS_<ENV>_USER`, default `root`
 - Optional: SSH port via `HOSTOPS_PORT` or `HOSTOPS_<ENV>_PORT`, default `22`
 
-`./HostOps host env get <env> <KEY>` (planned):
+`./HostOps host env get <env> <KEY>`:
 
 - Needs the same SSH keys as `host ssh`
 - Needs remote repo path via `HOSTOPS_REPO_PATH` or `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
 - Reads from `/opt/socialpredict/.env` by convention
+- Prints the matching `KEY=value` line, so use carefully for secrets
+
+Example:
+
+```bash
+./HostOps host env get staging ADMIN_PASSWORD
+```
 
 `./HostOps host logs <env> <service>` (planned):
 
