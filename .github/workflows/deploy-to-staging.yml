@@ -5,6 +5,7 @@ on:
     branches:
       - main
     types: [closed]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -13,7 +14,7 @@ jobs:
       contents: write
     steps:
       - name: Deploy SocialPredict to Staging
-        if: github.event.pull_request.merged == true
+        if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
         uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.ANSIBLE_PLAYBOOK_TOKEN }}
