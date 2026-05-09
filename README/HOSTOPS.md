@@ -105,6 +105,52 @@ Override via environment variables:
 
 `HOSTOPS_HOST` and `HOSTOPS_<ENV>_HOST` can be a domain or an IP address. Keep `HOSTOPS_HOST_IP` or `HOSTOPS_<ENV>_HOST_IP` available as documentation and fallback even when DNS is the normal connection target.
 
+## DigitalOcean CLI authentication
+
+SSH-only commands such as `./HostOps host ssh <env>` do not require DigitalOcean API access. Any HostOps command that inspects or changes DigitalOcean resources will require `doctl` authentication first.
+
+Authenticate `doctl` locally before running DigitalOcean operations:
+
+```bash
+doctl auth init --context socialpredict
+```
+
+The command prompts for a DigitalOcean personal access token. Generate the token in the DigitalOcean control panel:
+
+```text
+https://cloud.digitalocean.com/account/api/tokens
+```
+
+Do not commit or paste the token into chat. `doctl` stores it in your local doctl config.
+
+Verify authentication:
+
+```bash
+doctl auth list
+doctl account get --context socialpredict
+doctl compute droplet list --context socialpredict --format ID,Name,PublicIPv4,PrivateIPv4,Region,Status,Tags
+```
+
+If `socialpredict` is not the current context, either switch to it:
+
+```bash
+doctl auth switch --context socialpredict
+```
+
+or pass `--context socialpredict` on each `doctl` command.
+
+Recommended local DigitalOcean credential convention for future HostOps cloud/Terraform commands:
+
+```bash
+~/.keys/socialpredict/<env>/digitalocean.env
+```
+
+That file should remain local and may contain non-repo settings such as:
+
+```bash
+DIGITALOCEAN_CONTEXT=socialpredict
+```
+
 ## Config file format
 
 Create this file locally:
@@ -177,7 +223,7 @@ Use shell syntax only: `KEY=value`, one setting per line. Do not commit this fil
 
 - Needs Terraform environment directory, likely `infra/terraform/environments/<env>`
 - Needs Terraform state/backend configuration, likely `infra/terraform/backend/<env>.hcl`
-- Needs DigitalOcean API credentials outside the repo, for example `~/.keys/socialpredict/<env>/digitalocean.env`
+- Needs authenticated `doctl` or DigitalOcean API credentials outside the repo, for example `~/.keys/socialpredict/<env>/digitalocean.env`
 - Should write local plan artifacts under `.context/infra-plans/<env>/`
 
 ## Example setup
