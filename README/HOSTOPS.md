@@ -36,6 +36,18 @@ Scaffold only.
 
 ## DigitalOcean host convention
 
+HostOps reads per-machine configuration from:
+
+- `~/.keys/openpredictionmarkets/hostops.env`
+
+You can override that path for one command:
+
+```bash
+HOSTOPS_CONFIG=/path/to/hostops.env ./HostOps host ssh staging
+```
+
+The config file is intentionally outside the repository because it may point at private keys, server IPs, and future cloud credentials.
+
 Default environment host mapping:
 
 - `staging` -> `kconfs.com`
@@ -61,6 +73,34 @@ Override via environment variables:
 - `HOSTOPS_PRODUCTION_HOST`, `HOSTOPS_PRODUCTION_HOST_IP`, `HOSTOPS_PRODUCTION_USER`, `HOSTOPS_PRODUCTION_PORT`, `HOSTOPS_PRODUCTION_KEY`, `HOSTOPS_PRODUCTION_REPO_PATH`
 
 `HOSTOPS_<ENV>_HOST` can be a domain or an IP address. Keep `HOSTOPS_<ENV>_HOST_IP` available as documentation and fallback even when DNS is the normal connection target.
+
+## Config file format
+
+Create this file locally:
+
+```bash
+~/.keys/openpredictionmarkets/hostops.env
+```
+
+Example contents:
+
+```bash
+HOSTOPS_STAGING_HOST=kconfs.com
+HOSTOPS_STAGING_HOST_IP=203.0.113.10
+HOSTOPS_STAGING_USER=root
+HOSTOPS_STAGING_PORT=22
+HOSTOPS_STAGING_KEY=~/.keys/openpredictionmarkets/staging/id_ed25519
+HOSTOPS_STAGING_REPO_PATH=/opt/socialpredict
+
+HOSTOPS_PRODUCTION_HOST=brierfoxforecast.com
+HOSTOPS_PRODUCTION_HOST_IP=203.0.113.20
+HOSTOPS_PRODUCTION_USER=root
+HOSTOPS_PRODUCTION_PORT=22
+HOSTOPS_PRODUCTION_KEY=~/.keys/openpredictionmarkets/production/id_ed25519
+HOSTOPS_PRODUCTION_REPO_PATH=/opt/socialpredict
+```
+
+Use shell syntax only: `KEY=value`, one setting per line. Do not commit this file.
 
 ## Per-command setup keys
 
@@ -110,15 +150,10 @@ cp ~/Downloads/do-prod-id ~/.keys/openpredictionmarkets/production/id_ed25519
 chmod 600 ~/.keys/openpredictionmarkets/staging/id_ed25519 ~/.keys/openpredictionmarkets/production/id_ed25519
 ```
 
-Example shell setup:
+Create the config file:
 
 ```bash
-export HOSTOPS_STAGING_HOST=kconfs.com
-export HOSTOPS_STAGING_HOST_IP=203.0.113.10
-export HOSTOPS_STAGING_USER=root
-export HOSTOPS_STAGING_PORT=22
-export HOSTOPS_STAGING_KEY=~/.keys/openpredictionmarkets/staging/id_ed25519
-export HOSTOPS_STAGING_REPO_PATH=/opt/socialpredict
+$EDITOR ~/.keys/openpredictionmarkets/hostops.env
 ```
 
 Connect with:
