@@ -140,15 +140,34 @@ Use shell syntax only: `KEY=value`, one setting per line. Do not commit this fil
 
 ## Example setup
 
-```bash
-mkdir -p ~/.keys/openpredictionmarkets/staging ~/.keys/openpredictionmarkets/production
-chmod 700 ~/.keys ~/.keys/openpredictionmarkets ~/.keys/openpredictionmarkets/staging ~/.keys/openpredictionmarkets/production
+Staging example:
 
-# Example: copy your private keys into the convention paths
-cp ~/Downloads/do-staging-id ~/.keys/openpredictionmarkets/staging/id_ed25519
-cp ~/Downloads/do-prod-id ~/.keys/openpredictionmarkets/production/id_ed25519
-chmod 600 ~/.keys/openpredictionmarkets/staging/id_ed25519 ~/.keys/openpredictionmarkets/production/id_ed25519
+```bash
+mkdir -p ~/.keys/openpredictionmarkets/staging
+chmod 700 ~/.keys ~/.keys/openpredictionmarkets ~/.keys/openpredictionmarkets/staging
+
+ssh-keygen -t ed25519 \
+  -f ~/.keys/openpredictionmarkets/staging/id_ed25519 \
+  -C "socialpredict-staging-hostops"
+
+chmod 600 ~/.keys/openpredictionmarkets/staging/id_ed25519
 ```
+
+Then add the public key to the staging VPS user's `authorized_keys`.
+
+Local public key:
+
+```bash
+~/.keys/openpredictionmarkets/staging/id_ed25519.pub
+```
+
+Remote destination:
+
+```bash
+root@kconfs.com:~/.ssh/authorized_keys
+```
+
+For production or another environment, use that environment's directory and host, for example `~/.keys/openpredictionmarkets/production/id_ed25519`.
 
 Create the config file:
 

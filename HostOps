@@ -73,6 +73,17 @@ Example:
   HOSTOPS_STAGING_PORT=22
   HOSTOPS_STAGING_KEY=~/.keys/openpredictionmarkets/staging/id_ed25519
   HOSTOPS_STAGING_REPO_PATH=/opt/socialpredict
+
+Staging SSH setup:
+  mkdir -p ~/.keys/openpredictionmarkets/staging
+  ssh-keygen -t ed25519 -f ~/.keys/openpredictionmarkets/staging/id_ed25519 -C "socialpredict-staging-hostops"
+  chmod 600 ~/.keys/openpredictionmarkets/staging/id_ed25519
+
+  Add the public key on the VPS user's authorized_keys:
+    ~/.keys/openpredictionmarkets/staging/id_ed25519.pub
+    -> root@kconfs.com:~/.ssh/authorized_keys
+
+  For another environment, use that environment's directory and host.
 EOF
 }
 
