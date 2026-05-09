@@ -27,7 +27,8 @@ If runtime behavior changes, update `./SocialPredict`; `./HostOps` should keep c
 Scaffold only.
 
 - Implemented:
-  - `./HostOps host ssh <staging|production>`
+  - `./HostOps env list`
+  - `./HostOps host ssh <env>`
 - Planned:
   - `./HostOps host env get <env> <KEY>`
   - `./HostOps host logs <env> <service>`
@@ -36,9 +37,30 @@ Scaffold only.
 
 ## DigitalOcean host convention
 
+HostOps treats each directory under this root as a local environment:
+
+- `~/.keys/socialpredict/<env>/`
+
+This is intentionally directory-based. Your local key/config layout can mirror your cloud operations layout:
+
+- `~/.keys/socialpredict/staging` for `kconfs.com`
+- `~/.keys/socialpredict/mo` for `brierfoxforecast.com`
+- `~/.keys/socialpredict/dev`, `prod`, `demo`, or any other environment name if your setup needs them
+
+List the environments HostOps can see:
+
+```bash
+./HostOps env list
+```
+
+Each environment directory can contain:
+
+- `hostops.env` for host/user/port/path settings
+- `id_ed25519` for the SSH private key used by HostOps for that environment
+
 HostOps reads per-machine configuration from:
 
-- `~/.keys/socialpredict/hostops.env`
+- `~/.keys/socialpredict/<env>/hostops.env`
 
 You can override that path for one command:
 
@@ -46,12 +68,21 @@ You can override that path for one command:
 HOSTOPS_CONFIG=/path/to/hostops.env ./HostOps host ssh staging
 ```
 
+You can also point HostOps at a different environment root:
+
+```bash
+HOSTOPS_CONFIG_ROOT=/path/to/socialpredict-keys ./HostOps env list
+HOSTOPS_CONFIG_ROOT=/path/to/socialpredict-keys ./HostOps host ssh staging
+```
+
 The config file is intentionally outside the repository because it may point at private keys, server IPs, and future cloud credentials.
 
-Default environment host mapping:
+Our environment conventions:
 
 - `staging` -> `kconfs.com`
-- `production` -> `brierfoxforecast.com`
+- `mo` -> `brierfoxforecast.com`
+
+The `<env>` value is polymorphic: it is just the directory name under `~/.keys/socialpredict`. A different user can choose `prod`, `dev`, `demo`, or a single environment such as `site`.
 
 Default SSH user and port:
 
@@ -61,7 +92,7 @@ Default SSH user and port:
 Default key path convention:
 
 - `~/.keys/socialpredict/staging/id_ed25519`
-- `~/.keys/socialpredict/production/id_ed25519`
+- `~/.keys/socialpredict/mo/id_ed25519`
 
 Default remote repository path convention:
 
@@ -69,65 +100,76 @@ Default remote repository path convention:
 
 Override via environment variables:
 
-- `HOSTOPS_STAGING_HOST`, `HOSTOPS_STAGING_HOST_IP`, `HOSTOPS_STAGING_USER`, `HOSTOPS_STAGING_PORT`, `HOSTOPS_STAGING_KEY`, `HOSTOPS_STAGING_REPO_PATH`
-- `HOSTOPS_PRODUCTION_HOST`, `HOSTOPS_PRODUCTION_HOST_IP`, `HOSTOPS_PRODUCTION_USER`, `HOSTOPS_PRODUCTION_PORT`, `HOSTOPS_PRODUCTION_KEY`, `HOSTOPS_PRODUCTION_REPO_PATH`
+- Environment config file keys: `HOSTOPS_HOST`, `HOSTOPS_HOST_IP`, `HOSTOPS_USER`, `HOSTOPS_PORT`, `HOSTOPS_KEY`, `HOSTOPS_REPO_PATH`
+- Shell override keys: `HOSTOPS_<ENV>_HOST`, `HOSTOPS_<ENV>_HOST_IP`, `HOSTOPS_<ENV>_USER`, `HOSTOPS_<ENV>_PORT`, `HOSTOPS_<ENV>_KEY`, `HOSTOPS_<ENV>_REPO_PATH`
 
-`HOSTOPS_<ENV>_HOST` can be a domain or an IP address. Keep `HOSTOPS_<ENV>_HOST_IP` available as documentation and fallback even when DNS is the normal connection target.
+`HOSTOPS_HOST` and `HOSTOPS_<ENV>_HOST` can be a domain or an IP address. Keep `HOSTOPS_HOST_IP` or `HOSTOPS_<ENV>_HOST_IP` available as documentation and fallback even when DNS is the normal connection target.
 
 ## Config file format
 
 Create this file locally:
 
 ```bash
-~/.keys/socialpredict/hostops.env
+~/.keys/socialpredict/<env>/hostops.env
 ```
 
-Example contents:
+Staging example:
 
 ```bash
-HOSTOPS_STAGING_HOST=kconfs.com
-HOSTOPS_STAGING_HOST_IP=203.0.113.10
-HOSTOPS_STAGING_USER=root
-HOSTOPS_STAGING_PORT=22
-HOSTOPS_STAGING_KEY=~/.keys/socialpredict/staging/id_ed25519
-HOSTOPS_STAGING_REPO_PATH=/opt/socialpredict
+HOSTOPS_HOST=kconfs.com
+HOSTOPS_HOST_IP=203.0.113.10
+HOSTOPS_USER=root
+HOSTOPS_PORT=22
+HOSTOPS_KEY=~/.keys/socialpredict/staging/id_ed25519
+HOSTOPS_REPO_PATH=/opt/socialpredict
+```
 
-HOSTOPS_PRODUCTION_HOST=brierfoxforecast.com
-HOSTOPS_PRODUCTION_HOST_IP=203.0.113.20
-HOSTOPS_PRODUCTION_USER=root
-HOSTOPS_PRODUCTION_PORT=22
-HOSTOPS_PRODUCTION_KEY=~/.keys/socialpredict/production/id_ed25519
-HOSTOPS_PRODUCTION_REPO_PATH=/opt/socialpredict
+Model office example:
+
+```bash
+HOSTOPS_HOST=brierfoxforecast.com
+HOSTOPS_HOST_IP=203.0.113.20
+HOSTOPS_USER=root
+HOSTOPS_PORT=22
+HOSTOPS_KEY=~/.keys/socialpredict/mo/id_ed25519
+HOSTOPS_REPO_PATH=/opt/socialpredict
 ```
 
 Use shell syntax only: `KEY=value`, one setting per line. Do not commit this file.
 
 ## Per-command setup keys
 
+`./HostOps env list`:
+
+- Reads local directories under `~/.keys/socialpredict`
+- Optional: use `HOSTOPS_CONFIG_ROOT` to list a different root
+- Shows the resolved host plus whether each environment has `hostops.env` and an SSH key
+- Does not connect to any server
+
 `./HostOps host ssh <env>`:
 
-- Required: SSH private key at `HOSTOPS_<ENV>_KEY` or `~/.keys/socialpredict/<env>/id_ed25519`
-- Required: host via `HOSTOPS_<ENV>_HOST` or built-in default
-- Optional: raw IP fallback via `HOSTOPS_<ENV>_HOST_IP`
-- Optional: SSH user via `HOSTOPS_<ENV>_USER`, default `root`
-- Optional: SSH port via `HOSTOPS_<ENV>_PORT`, default `22`
+- Required: SSH private key at `HOSTOPS_KEY`, `HOSTOPS_<ENV>_KEY`, or `~/.keys/socialpredict/<env>/id_ed25519`
+- Required: host via `HOSTOPS_HOST`, `HOSTOPS_<ENV>_HOST`, or a built-in default
+- Optional: raw IP fallback via `HOSTOPS_HOST_IP` or `HOSTOPS_<ENV>_HOST_IP`
+- Optional: SSH user via `HOSTOPS_USER` or `HOSTOPS_<ENV>_USER`, default `root`
+- Optional: SSH port via `HOSTOPS_PORT` or `HOSTOPS_<ENV>_PORT`, default `22`
 
 `./HostOps host env get <env> <KEY>` (planned):
 
 - Needs the same SSH keys as `host ssh`
-- Needs remote repo path via `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
+- Needs remote repo path via `HOSTOPS_REPO_PATH` or `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
 - Reads from `/opt/socialpredict/.env` by convention
 
 `./HostOps host logs <env> <service>` (planned):
 
 - Needs the same SSH keys as `host ssh`
-- Needs remote repo path via `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
+- Needs remote repo path via `HOSTOPS_REPO_PATH` or `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
 - Expected service names should mirror `./SocialPredict exec` and compose services, such as `backend`, `frontend`, `postgres`, and `nginx`
 
 `./HostOps deploy <env>` (planned):
 
 - Needs the same SSH keys as `host ssh`
-- Needs remote repo path via `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
+- Needs remote repo path via `HOSTOPS_REPO_PATH` or `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
 - Should call remote `./SocialPredict install` and `./SocialPredict up`
 - Should not duplicate Docker Compose behavior from `./SocialPredict`
 
@@ -167,19 +209,20 @@ Remote destination:
 root@kconfs.com:~/.ssh/authorized_keys
 ```
 
-For production or another environment, use that environment's directory and host, for example `~/.keys/socialpredict/production/id_ed25519`.
+For `mo` or another environment, use that environment's directory and host, for example `~/.keys/socialpredict/mo/id_ed25519`.
 
 Create the config file:
 
 ```bash
-$EDITOR ~/.keys/socialpredict/hostops.env
+$EDITOR ~/.keys/socialpredict/staging/hostops.env
 ```
 
 Connect with:
 
 ```bash
+./HostOps env list
 ./HostOps host ssh staging
-./HostOps host ssh production
+./HostOps host ssh mo
 ```
 
 ## Optional SSH config integration
@@ -194,18 +237,18 @@ Host sp-staging
   IdentityFile ~/.keys/socialpredict/staging/id_ed25519
   IdentitiesOnly yes
 
-Host sp-production
+Host sp-mo
   HostName brierfoxforecast.com
   User root
   Port 22
-  IdentityFile ~/.keys/socialpredict/production/id_ed25519
+  IdentityFile ~/.keys/socialpredict/mo/id_ed25519
   IdentitiesOnly yes
 ```
 
 Then you may either:
 
 - keep using `./HostOps host ssh <env>`, or
-- call `ssh sp-staging` / `ssh sp-production` directly.
+- call `ssh sp-staging` / `ssh sp-mo` directly.
 
 ## Future extension ideas
 

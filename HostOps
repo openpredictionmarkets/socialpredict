@@ -6,7 +6,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
-DEFAULT_CONFIG_FILE="$HOME/.keys/socialpredict/hostops.env"
+CONFIG_ROOT="${HOSTOPS_CONFIG_ROOT:-$HOME/.keys/socialpredict}"
 
 print_info() {
   echo -e "${GREEN}[INFO]${NC} $1"
@@ -30,7 +30,8 @@ Purpose:
   It MUST NOT reimplement app runtime logic owned by ./SocialPredict.
 
 Commands:
-  host ssh <staging|production>   Open SSH session to known host
+  env list                        List local environments under ~/.keys/socialpredict
+  host ssh <env>                  Open SSH session to environment host
   host env get <env> <KEY>        (Planned) Read remote .env key
   host logs <env> <service>       (Planned) Tail remote service logs
   deploy <env>                    (Planned) Orchestrate remote ./SocialPredict deploy
@@ -38,26 +39,47 @@ Commands:
   help                            Show this help
 
 Current implementation:
+  - env list is implemented
   - host ssh is implemented
   - all other commands are scaffold placeholders
 
+Environment directories:
+  HostOps treats each directory under ~/.keys/socialpredict as an environment:
+    ~/.keys/socialpredict/<env>/
+
+  This lets your local setup mirror your cloud/host setup. For this project,
+  expected names are staging for kconfs.com and mo for brierfoxforecast.com.
+  Other users may choose dev, prod, demo, site, or any other environment name.
+
+  List configured local environments with:
+    ./HostOps env list
+
 Configuration file:
-  HostOps loads this file if it exists:
-    ~/.keys/socialpredict/hostops.env
+  HostOps loads this file for the requested environment if it exists:
+    ~/.keys/socialpredict/<env>/hostops.env
 
   Override with:
     HOSTOPS_CONFIG=/path/to/hostops.env ./HostOps ...
+    HOSTOPS_CONFIG_ROOT=/path/to/root ./HostOps ...
 
   This file is local to your machine and should not be committed.
 
 Conventions:
   staging host defaults to: kconfs.com
-  production host defaults to: brierfoxforecast.com
+  mo host defaults to: brierfoxforecast.com
   key path defaults to: ~/.keys/socialpredict/<env>/id_ed25519
   SSH user defaults to: root
   SSH port defaults to: 22
 
-Per-environment setup keys:
+Per-environment setup keys in ~/.keys/socialpredict/<env>/hostops.env:
+  HOSTOPS_HOST             domain or IP address, e.g. kconfs.com
+  HOSTOPS_HOST_IP          optional raw IP fallback/documentation value
+  HOSTOPS_USER             SSH user, e.g. root
+  HOSTOPS_PORT             SSH port, e.g. 22
+  HOSTOPS_KEY              private key path
+  HOSTOPS_REPO_PATH        remote repo path, planned deploy/env/log commands
+
+Shell overrides also work:
   HOSTOPS_<ENV>_HOST       domain or IP address, e.g. kconfs.com
   HOSTOPS_<ENV>_HOST_IP    optional raw IP fallback/documentation value
   HOSTOPS_<ENV>_USER       SSH user, e.g. root
@@ -66,13 +88,13 @@ Per-environment setup keys:
   HOSTOPS_<ENV>_REPO_PATH  remote repo path, planned deploy/env/log commands
 
 Example:
-  # ~/.keys/socialpredict/hostops.env
-  HOSTOPS_STAGING_HOST=kconfs.com
-  HOSTOPS_STAGING_HOST_IP=203.0.113.10
-  HOSTOPS_STAGING_USER=root
-  HOSTOPS_STAGING_PORT=22
-  HOSTOPS_STAGING_KEY=~/.keys/socialpredict/staging/id_ed25519
-  HOSTOPS_STAGING_REPO_PATH=/opt/socialpredict
+  # ~/.keys/socialpredict/staging/hostops.env
+  HOSTOPS_HOST=kconfs.com
+  HOSTOPS_HOST_IP=203.0.113.10
+  HOSTOPS_USER=root
+  HOSTOPS_PORT=22
+  HOSTOPS_KEY=~/.keys/socialpredict/staging/id_ed25519
+  HOSTOPS_REPO_PATH=/opt/socialpredict
 
 Staging SSH setup:
   mkdir -p ~/.keys/socialpredict/staging
@@ -102,8 +124,14 @@ expand_home() {
   fi
 }
 
-load_config() {
-  local config="${HOSTOPS_CONFIG:-$DEFAULT_CONFIG_FILE}"
+value_for_name() {
+  local name="$1"
+  printf '%s' "${!name-}"
+}
+
+load_config_for_env() {
+  local env="$1"
+  local config="${HOSTOPS_CONFIG:-$(env_config_path "$env")}"
   config="$(expand_home "$config")"
 
   if [[ -n "${HOSTOPS_CONFIG:-}" && ! -f "$config" ]]; then
@@ -121,41 +149,137 @@ default_host_for_env() {
   local env="$1"
   case "$env" in
     staging) echo "kconfs.com" ;;
-    production) echo "brierfoxforecast.com" ;;
-    *)
-      print_error "Unknown environment '$env'. Use 'staging' or 'production'."
-      exit 1
-      ;;
+    mo|production|prod) echo "brierfoxforecast.com" ;;
+    *) echo "" ;;
   esac
+}
+
+env_config_path() {
+  local env="$1"
+  echo "$CONFIG_ROOT/${env}/hostops.env"
+}
+
+env_default_key_path() {
+  local env="$1"
+  echo "$CONFIG_ROOT/${env}/id_ed25519"
 }
 
 env_to_key() {
   printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
 }
 
+list_envs() {
+  local root
+  root="$(expand_home "$CONFIG_ROOT")"
+
+  if [[ ! -d "$root" ]]; then
+    print_warn "No HostOps environment root found: $root"
+    echo "Create directories such as:"
+    echo "  ~/.keys/socialpredict/staging"
+    echo "  ~/.keys/socialpredict/mo"
+    echo
+    echo "Each directory can contain:"
+    echo "  hostops.env"
+    echo "  id_ed25519"
+    return 0
+  fi
+
+  local found=0
+  local env_dir env config key host
+
+  printf '%-18s %-28s %-8s %-8s %s\n' "ENV" "HOST" "CONFIG" "KEY" "PATH"
+
+  for env_dir in "$root"/*; do
+    [[ -d "$env_dir" ]] || continue
+    found=1
+    env="$(basename "$env_dir")"
+    config="$env_dir/hostops.env"
+    key="$env_dir/id_ed25519"
+    host="$(default_host_for_env "$env")"
+
+    if [[ -f "$config" ]]; then
+      host="$(
+        HOSTOPS_HOST=
+        HOSTOPS_HOST_IP=
+        # shellcheck source=/dev/null
+        source "$config"
+        printf '%s' "${HOSTOPS_HOST:-${HOSTOPS_HOST_IP:-$host}}"
+      )"
+      key="$(
+        HOSTOPS_KEY=
+        # shellcheck source=/dev/null
+        source "$config"
+        printf '%s' "${HOSTOPS_KEY:-$key}"
+      )"
+      key="$(expand_home "$key")"
+    fi
+
+    printf '%-18s %-28s %-8s %-8s %s\n' \
+      "$env" \
+      "${host:-<unset>}" \
+      "$([[ -f "$config" ]] && echo yes || echo no)" \
+      "$([[ -f "$key" ]] && echo yes || echo no)" \
+      "$env_dir"
+  done
+
+  if [[ "$found" -eq 0 ]]; then
+    print_warn "No HostOps environments found under: $root"
+    echo "Create a directory like ~/.keys/socialpredict/staging to define an environment."
+  fi
+}
+
 ssh_to_env() {
   local env="$1"
 
-  local default_host
-  default_host="$(default_host_for_env "$env")"
+  load_config_for_env "$env"
 
   local env_key
   env_key="$(env_to_key "$env")"
 
   local host_var="HOSTOPS_${env_key}_HOST"
+  local host_ip_var="HOSTOPS_${env_key}_HOST_IP"
   local user_var="HOSTOPS_${env_key}_USER"
   local port_var="HOSTOPS_${env_key}_PORT"
   local key_var="HOSTOPS_${env_key}_KEY"
 
-  local host="${!host_var:-$default_host}"
-  local user="${!user_var:-root}"
-  local port="${!port_var:-22}"
-  local key="${!key_var:-~/.keys/socialpredict/${env}/id_ed25519}"
+  local env_host env_host_ip env_user env_port env_key_value
+  env_host="$(value_for_name "$host_var")"
+  env_host_ip="$(value_for_name "$host_ip_var")"
+  env_user="$(value_for_name "$user_var")"
+  env_port="$(value_for_name "$port_var")"
+  env_key_value="$(value_for_name "$key_var")"
+
+  local default_host
+  default_host="$(default_host_for_env "$env")"
+
+  local host="${HOSTOPS_HOST:-}"
+  if [[ -z "$host" ]]; then host="$env_host"; fi
+  if [[ -z "$host" ]]; then host="${HOSTOPS_HOST_IP:-}"; fi
+  if [[ -z "$host" ]]; then host="$env_host_ip"; fi
+  if [[ -z "$host" ]]; then host="$default_host"; fi
+
+  local user="${HOSTOPS_USER:-}"
+  if [[ -z "$user" ]]; then user="$env_user"; fi
+  if [[ -z "$user" ]]; then user="root"; fi
+
+  local port="${HOSTOPS_PORT:-}"
+  if [[ -z "$port" ]]; then port="$env_port"; fi
+  if [[ -z "$port" ]]; then port="22"; fi
+
+  local key="${HOSTOPS_KEY:-}"
+  if [[ -z "$key" ]]; then key="$env_key_value"; fi
+  if [[ -z "$key" ]]; then key="$(env_default_key_path "$env")"; fi
   key="$(expand_home "$key")"
+
+  if [[ -z "$host" ]]; then
+    print_error "No host configured for environment '$env'."
+    echo "Create ~/.keys/socialpredict/${env}/hostops.env with HOSTOPS_HOST=..."
+    exit 1
+  fi
 
   if [[ ! -f "$key" ]]; then
     print_error "SSH key not found: $key"
-    echo "Set ${key_var} or create the default key path."
+    echo "Set HOSTOPS_KEY, set ${key_var}, or create the default key path."
     exit 1
   fi
 
@@ -166,13 +290,24 @@ ssh_to_env() {
 }
 
 main() {
-  load_config
-
   local cmd="${1:-help}"
 
   case "$cmd" in
     help|--help|-h)
       usage
+      ;;
+    env)
+      local sub="${2:-}"
+      case "$sub" in
+        list)
+          list_envs
+          ;;
+        *)
+          print_error "Unknown env subcommand: '${sub:-<none>}'"
+          echo "Usage: ./HostOps env list"
+          exit 1
+          ;;
+      esac
       ;;
     host)
       local sub="${2:-}"
@@ -180,7 +315,7 @@ main() {
         ssh)
           local env="${3:-}"
           if [[ -z "$env" ]]; then
-            print_error "Usage: ./HostOps host ssh <staging|production>"
+            print_error "Usage: ./HostOps host ssh <env>"
             exit 1
           fi
           ssh_to_env "$env"
