@@ -44,6 +44,24 @@ Conventions:
   staging host defaults to: kconfs.com
   production host defaults to: brierfoxforecast.com
   key path defaults to: ~/.keys/openpredictionmarkets/<env>/id_ed25519
+  SSH user defaults to: root
+  SSH port defaults to: 22
+
+Per-environment setup keys:
+  HOSTOPS_<ENV>_HOST       domain or IP address, e.g. kconfs.com
+  HOSTOPS_<ENV>_HOST_IP    optional raw IP fallback/documentation value
+  HOSTOPS_<ENV>_USER       SSH user, e.g. root
+  HOSTOPS_<ENV>_PORT       SSH port, e.g. 22
+  HOSTOPS_<ENV>_KEY        private key path
+  HOSTOPS_<ENV>_REPO_PATH  remote repo path, planned deploy/env/log commands
+
+Example:
+  HOSTOPS_STAGING_HOST=kconfs.com
+  HOSTOPS_STAGING_HOST_IP=203.0.113.10
+  HOSTOPS_STAGING_USER=root
+  HOSTOPS_STAGING_PORT=22
+  HOSTOPS_STAGING_KEY=~/.keys/openpredictionmarkets/staging/id_ed25519
+  HOSTOPS_STAGING_REPO_PATH=/opt/socialpredict
 EOF
 }
 
@@ -74,18 +92,27 @@ default_host_for_env() {
   esac
 }
 
+env_to_key() {
+  printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
+}
+
 ssh_to_env() {
   local env="$1"
 
   local default_host
   default_host="$(default_host_for_env "$env")"
 
-  local host_var="HOSTOPS_${env^^}_HOST"
-  local user_var="HOSTOPS_${env^^}_USER"
-  local key_var="HOSTOPS_${env^^}_KEY"
+  local env_key
+  env_key="$(env_to_key "$env")"
+
+  local host_var="HOSTOPS_${env_key}_HOST"
+  local user_var="HOSTOPS_${env_key}_USER"
+  local port_var="HOSTOPS_${env_key}_PORT"
+  local key_var="HOSTOPS_${env_key}_KEY"
 
   local host="${!host_var:-$default_host}"
   local user="${!user_var:-root}"
+  local port="${!port_var:-22}"
   local key="${!key_var:-~/.keys/openpredictionmarkets/${env}/id_ed25519}"
   key="$(expand_home "$key")"
 
@@ -96,8 +123,9 @@ ssh_to_env() {
   fi
 
   print_info "Connecting to ${env}: ${user}@${host}"
+  print_info "Using port: ${port}"
   print_info "Using key: ${key}"
-  exec ssh -i "$key" "${user}@${host}"
+  exec ssh -i "$key" -p "$port" "${user}@${host}"
 }
 
 main() {
