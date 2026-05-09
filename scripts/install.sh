@@ -15,6 +15,10 @@ else
   SED_INPLACE=(sed -i '' -e)
 fi
 
+if [ -f "${SCRIPT_DIR}/scripts/lib/jwt_key.sh" ]; then
+  source "${SCRIPT_DIR}/scripts/lib/jwt_key.sh"
+fi
+
 # Check if Application is already running
 check_if_running() {
   if [ -f "${SCRIPT_DIR}/.env" ]; then
@@ -111,6 +115,24 @@ generate_password() {
   echo
 }
 
+ensure_jwt_signing_key() {
+  local jwt_key=""
+  if command -v apply_jwt_signing_key >/dev/null 2>&1; then
+    jwt_key="$(apply_jwt_signing_key "${SCRIPT_DIR}/.env")"
+  fi
+
+  if [[ -z "$jwt_key" ]]; then
+    jwt_key="$(generate_password)$(generate_password)$(generate_password)"
+    if grep -q '^JWT_SIGNING_KEY=' "${SCRIPT_DIR}/.env"; then
+      "${SED_INPLACE[@]}" "s|^JWT_SIGNING_KEY=.*|JWT_SIGNING_KEY='${jwt_key}'|" "${SCRIPT_DIR}/.env"
+    else
+      printf "\nJWT_SIGNING_KEY='%s'\n" "$jwt_key" >> "${SCRIPT_DIR}/.env"
+    fi
+  fi
+
+  echo "Setting JWT Signing Key"
+}
+
 # Check if Docker Image exists on the system
 check_image() {
   local image_name=$1
@@ -170,6 +192,8 @@ build_dev() {
   "${SED_INPLACE[@]}" "s|^BACKEND_IMAGE_NAME=.*|BACKEND_IMAGE_NAME=${BACKEND_IMAGE_NAME}|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^FRONTEND_IMAGE_NAME=.*|FRONTEND_IMAGE_NAME=${FRONTEND_IMAGE_NAME}|" "${SCRIPT_DIR}/.env"
 
+  ensure_jwt_signing_key
+
   print_status "Searching for Docker Images ..."
 
   DIRECTORY="${SCRIPT_DIR}"
@@ -220,6 +244,8 @@ services:
     platform: ${FORCE_PLATFORM:-linux/amd64}
 EOF
   echo "Wrote docker-compose.override.yml to pin platform = ${FORCE_PLATFORM:-linux/amd64}"
+
+  ensure_jwt_signing_key
 
   docker compose \
     -f "${SCRIPT_DIR}/scripts/docker-compose-local.yaml" \
@@ -273,6 +299,8 @@ build_production() {
   "${SED_INPLACE[@]}" "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD='${ADMIN_PASS}'|" "${SCRIPT_DIR}/.env"
   echo "Setting Admin Password"
 
+  ensure_jwt_signing_key
+
   # Pull images
   echo "Pulling images ..."
   docker compose --env-file "${SCRIPT_DIR}"/.env --file "${SCRIPT_DIR}/scripts/docker-compose-prod.yaml" pull
@@ -314,6 +342,8 @@ build_production_args() {
   ADMIN_PASS=$(generate_password)
   "${SED_INPLACE[@]}" "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD='${ADMIN_PASS}'|" "${SCRIPT_DIR}/.env"
   echo "Setting Admin Password"
+
+  ensure_jwt_signing_key
 
   # Pull images
   echo "Pulling images ..."
