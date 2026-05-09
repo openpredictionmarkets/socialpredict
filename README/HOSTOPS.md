@@ -151,6 +151,22 @@ That file should remain local and may contain non-repo settings such as:
 DIGITALOCEAN_CONTEXT=socialpredict
 ```
 
+The DigitalOcean context is not necessarily unique per environment. Multiple HostOps environments can point at the same DigitalOcean account/context while still keeping separate host, key, droplet, firewall, and Terraform settings under each `~/.keys/socialpredict/<env>/` directory.
+
+Example shared account layout:
+
+```text
+~/.keys/socialpredict/staging/digitalocean.env  # DIGITALOCEAN_CONTEXT=socialpredict
+~/.keys/socialpredict/mo/digitalocean.env       # DIGITALOCEAN_CONTEXT=socialpredict
+```
+
+Useful DigitalOcean inspection commands:
+
+```bash
+doctl compute droplet list --context socialpredict --format ID,Name,PublicIPv4,PrivateIPv4,Region,Status,Tags
+doctl compute firewall list --context socialpredict --format ID,Name,Status,DropletIDs,Tags
+```
+
 ## Config file format
 
 Create this file locally:
