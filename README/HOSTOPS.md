@@ -38,7 +38,7 @@ Scaffold only.
 
 HostOps reads per-machine configuration from:
 
-- `~/.keys/openpredictionmarkets/hostops.env`
+- `~/.keys/socialpredict/hostops.env`
 
 You can override that path for one command:
 
@@ -60,8 +60,8 @@ Default SSH user and port:
 
 Default key path convention:
 
-- `~/.keys/openpredictionmarkets/staging/id_ed25519`
-- `~/.keys/openpredictionmarkets/production/id_ed25519`
+- `~/.keys/socialpredict/staging/id_ed25519`
+- `~/.keys/socialpredict/production/id_ed25519`
 
 Default remote repository path convention:
 
@@ -79,7 +79,7 @@ Override via environment variables:
 Create this file locally:
 
 ```bash
-~/.keys/openpredictionmarkets/hostops.env
+~/.keys/socialpredict/hostops.env
 ```
 
 Example contents:
@@ -89,14 +89,14 @@ HOSTOPS_STAGING_HOST=kconfs.com
 HOSTOPS_STAGING_HOST_IP=203.0.113.10
 HOSTOPS_STAGING_USER=root
 HOSTOPS_STAGING_PORT=22
-HOSTOPS_STAGING_KEY=~/.keys/openpredictionmarkets/staging/id_ed25519
+HOSTOPS_STAGING_KEY=~/.keys/socialpredict/staging/id_ed25519
 HOSTOPS_STAGING_REPO_PATH=/opt/socialpredict
 
 HOSTOPS_PRODUCTION_HOST=brierfoxforecast.com
 HOSTOPS_PRODUCTION_HOST_IP=203.0.113.20
 HOSTOPS_PRODUCTION_USER=root
 HOSTOPS_PRODUCTION_PORT=22
-HOSTOPS_PRODUCTION_KEY=~/.keys/openpredictionmarkets/production/id_ed25519
+HOSTOPS_PRODUCTION_KEY=~/.keys/socialpredict/production/id_ed25519
 HOSTOPS_PRODUCTION_REPO_PATH=/opt/socialpredict
 ```
 
@@ -106,7 +106,7 @@ Use shell syntax only: `KEY=value`, one setting per line. Do not commit this fil
 
 `./HostOps host ssh <env>`:
 
-- Required: SSH private key at `HOSTOPS_<ENV>_KEY` or `~/.keys/openpredictionmarkets/<env>/id_ed25519`
+- Required: SSH private key at `HOSTOPS_<ENV>_KEY` or `~/.keys/socialpredict/<env>/id_ed25519`
 - Required: host via `HOSTOPS_<ENV>_HOST` or built-in default
 - Optional: raw IP fallback via `HOSTOPS_<ENV>_HOST_IP`
 - Optional: SSH user via `HOSTOPS_<ENV>_USER`, default `root`
@@ -135,7 +135,7 @@ Use shell syntax only: `KEY=value`, one setting per line. Do not commit this fil
 
 - Needs Terraform environment directory, likely `infra/terraform/environments/<env>`
 - Needs Terraform state/backend configuration, likely `infra/terraform/backend/<env>.hcl`
-- Needs DigitalOcean API credentials outside the repo, for example `~/.keys/openpredictionmarkets/<env>/digitalocean.env`
+- Needs DigitalOcean API credentials outside the repo, for example `~/.keys/socialpredict/<env>/digitalocean.env`
 - Should write local plan artifacts under `.context/infra-plans/<env>/`
 
 ## Example setup
@@ -143,14 +143,14 @@ Use shell syntax only: `KEY=value`, one setting per line. Do not commit this fil
 Staging example:
 
 ```bash
-mkdir -p ~/.keys/openpredictionmarkets/staging
-chmod 700 ~/.keys ~/.keys/openpredictionmarkets ~/.keys/openpredictionmarkets/staging
+mkdir -p ~/.keys/socialpredict/staging
+chmod 700 ~/.keys ~/.keys/socialpredict ~/.keys/socialpredict/staging
 
 ssh-keygen -t ed25519 \
-  -f ~/.keys/openpredictionmarkets/staging/id_ed25519 \
+  -f ~/.keys/socialpredict/staging/id_ed25519 \
   -C "socialpredict-staging-hostops"
 
-chmod 600 ~/.keys/openpredictionmarkets/staging/id_ed25519
+chmod 600 ~/.keys/socialpredict/staging/id_ed25519
 ```
 
 Then add the public key to the staging VPS user's `authorized_keys`.
@@ -158,7 +158,7 @@ Then add the public key to the staging VPS user's `authorized_keys`.
 Local public key:
 
 ```bash
-~/.keys/openpredictionmarkets/staging/id_ed25519.pub
+~/.keys/socialpredict/staging/id_ed25519.pub
 ```
 
 Remote destination:
@@ -167,12 +167,12 @@ Remote destination:
 root@kconfs.com:~/.ssh/authorized_keys
 ```
 
-For production or another environment, use that environment's directory and host, for example `~/.keys/openpredictionmarkets/production/id_ed25519`.
+For production or another environment, use that environment's directory and host, for example `~/.keys/socialpredict/production/id_ed25519`.
 
 Create the config file:
 
 ```bash
-$EDITOR ~/.keys/openpredictionmarkets/hostops.env
+$EDITOR ~/.keys/socialpredict/hostops.env
 ```
 
 Connect with:
@@ -191,14 +191,14 @@ Host sp-staging
   HostName kconfs.com
   User root
   Port 22
-  IdentityFile ~/.keys/openpredictionmarkets/staging/id_ed25519
+  IdentityFile ~/.keys/socialpredict/staging/id_ed25519
   IdentitiesOnly yes
 
 Host sp-production
   HostName brierfoxforecast.com
   User root
   Port 22
-  IdentityFile ~/.keys/openpredictionmarkets/production/id_ed25519
+  IdentityFile ~/.keys/socialpredict/production/id_ed25519
   IdentitiesOnly yes
 ```
 
