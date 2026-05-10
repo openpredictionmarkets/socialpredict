@@ -13,6 +13,8 @@ status: active
 
 ## Update Summary
 
+On Sunday, May 10, 2026, this note was touched during API documentation consolidation. The deferred follow-up pointer now references `backend/docs/README.md` because the old `backend/docs/API-ISSUES.md` file was folded into the canonical backend docs README.
+
 This note was updated on Sunday, April 26, 2026 to replace an older API standardization plan with guidance that matches the live SocialPredict backend, the current OpenAPI contract, and the active design-plan posture.
 
 On Thursday, April 30, 2026, the runtime-boundary API behavior changed in a few important ways: `/health` now returns `live`, `/readyz` returns readiness state, runtime-owned `405` and `429` failures use JSON `reason` envelopes, and the private action routes enforce `PASSWORD_CHANGE_REQUIRED` before their domain handlers run.

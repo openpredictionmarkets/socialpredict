@@ -13,6 +13,8 @@ status: active
 
 ## Update Summary
 
+On Sunday, May 10, 2026, this note was touched during API documentation consolidation. Its API follow-up reference now points to `backend/docs/README.md` because the old `backend/docs/API-ISSUES.md` file was folded into the canonical backend docs README.
+
 This note was updated on Saturday, May 2, 2026 to close WAVE10 with the validation-specific stop-and-review point. The wave consolidated the markets request-boundary seam without introducing a new validation framework, and this note now records the remaining route-family bypasses that should drive the next slice.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
