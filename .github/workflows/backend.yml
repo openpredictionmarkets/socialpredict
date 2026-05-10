@@ -23,10 +23,10 @@ jobs:
     outputs:
       matrix: ${{ steps.build.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: build
         name: Build Go version matrix JSON
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -58,9 +58,9 @@ jobs:
       matrix:
         go-version: [ '1.25.x' ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
       - name: Get Dependencies
@@ -89,19 +89,19 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
       # Use go-version-file when mode == file, otherwise go-version
       - name: Setup Go (from go.mod)
         if: ${{ !startsWith(github.head_ref, 'doc/') && matrix.go.mode == 'file' }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: ${{ matrix.go.value }}
           check-latest: true
           cache: true
       - name: Setup Go ${{ matrix.go.value }}
         if: ${{ !startsWith(github.head_ref, 'doc/') && matrix.go.mode == 'version' }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go.value }}
           check-latest: true
