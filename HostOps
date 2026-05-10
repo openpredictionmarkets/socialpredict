@@ -117,7 +117,7 @@ EOF
 
 require_planned() {
   print_warn "This subcommand is scaffolded but not implemented yet."
-  print_warn "See README/HOSTOPS.md for intended behavior and conventions."
+  print_warn "See README/INFRA/README-INFRA-HOSTOPS.md for intended behavior and conventions."
   exit 2
 }
 

@@ -70,7 +70,9 @@ Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.co
 ### Deploying to the Web
 
 - [How to Set Up Your Own Website](/README/STAGE_SETUP.md)
-- [HostOps Scaffold and Infra Boundary Notes](/README/HOSTOPS.md)
+- [HostOps Scaffold and Infra Boundary Notes](/README/INFRA/README-INFRA-HOSTOPS.md)
+- [Staging Deployment Guide](/README/INFRA/README-INFRA-STAGING.md)
+- [Production Deployment Guide](/README/INFRA/README-INFRA-PRODUCTION.md)
 
 ### How Do Prediction Markets Work?
 
@@ -83,6 +85,7 @@ We welcome and appreciate every contribution. Get started by reading our [guide]
 ### Where to Next?
 
 - Brush up on our [Development Conventions](/README/README-CONVENTIONS.md)
+- Review the canonical [Backend API documentation](/backend/docs/README.md)
 - Check out our [ongoing Projects](https://github.com/openpredictionmarkets/socialpredict/projects?query=is%3Aopen)
 - Look at our [Issues](https://github.com/openpredictionmarkets/socialpredict/issues)
 - Have your say on [GitHub Discussions](https://github.com/orgs/openpredictionmarkets/discussions)
