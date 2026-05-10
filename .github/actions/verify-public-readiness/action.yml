@@ -1,0 +1,68 @@
+name: Verify Public Readiness
+description: Poll public liveness and readiness endpoints until a deployment is externally available.
+
+inputs:
+  base-url:
+    description: Public application origin, for example https://kconfs.com.
+    required: true
+  timeout-seconds:
+    description: Maximum time to wait for public readiness.
+    required: false
+    default: '600'
+  interval-seconds:
+    description: Delay between probe attempts.
+    required: false
+    default: '30'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        BASE_URL: ${{ inputs.base-url }}
+        TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        INTERVAL_SECONDS: ${{ inputs.interval-seconds }}
+      run: |
+        set -euo pipefail
+
+        check_endpoint() {
+          local path="$1"
+          local expected_body="$2"
+          local url="${BASE_URL}${path}"
+          local response=""
+          local body=""
+
+          if ! response="$(curl -fsS --max-time 15 "${url}")"; then
+            echo "${url} did not return a successful response."
+            return 1
+          fi
+
+          body="$(printf '%s' "${response}" | tr -d '\r\n')"
+          if [[ "${body}" != "${expected_body}" ]]; then
+            echo "${url} returned unexpected body. Expected '${expected_body}', got '${body:0:160}'."
+            return 1
+          fi
+
+          echo "${url} returned '${expected_body}'."
+          return 0
+        }
+
+        deadline=$((SECONDS + TIMEOUT_SECONDS))
+        attempt=1
+
+        echo "Polling ${BASE_URL}/health and ${BASE_URL}/readyz for up to ${TIMEOUT_SECONDS} seconds."
+
+        while (( SECONDS < deadline )); do
+          echo "Public readiness attempt ${attempt}."
+
+          if check_endpoint /health live && check_endpoint /readyz ready; then
+            echo "Public deployment is live and ready."
+            exit 0
+          fi
+
+          attempt=$((attempt + 1))
+          sleep "${INTERVAL_SECONDS}"
+        done
+
+        echo "Timed out waiting for ${BASE_URL} to become live and ready."
+        exit 1

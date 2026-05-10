@@ -23,12 +23,18 @@ This document explains how SocialPredict is deployed to **mo/production** at [ht
 3. `.github/workflows/deploy-to-production.yml` runs after that image workflow completes.
 4. `deploy-to-production.yml` dispatches `deploy-to-production` to `openpredictionmarkets/ansible_playbooks`.
 5. The Ansible production playbook connects to the production host and runs the deployment.
+6. The `socialpredict` workflow waits for the downstream Ansible workflow to
+   finish, then performs an external public check of
+   `https://brierfoxforecast.com/health` and
+   `https://brierfoxforecast.com/readyz`.
 
 `openpredictionmarkets/ansible_playbooks` is the separate deployment-control
 repo. It owns the GitHub workflow that installs Ansible, loads the production
 SSH key from GitHub secrets, and runs the production playbook against the host.
 The `socialpredict` repo only needs `ANSIBLE_PLAYBOOK_TOKEN` so it can dispatch
-the production deployment event.
+the production deployment event and read the matching downstream Ansible
+workflow run status. For a fine-grained token, make sure it can dispatch
+repository events and read Actions runs in `openpredictionmarkets/ansible_playbooks`.
 
 The production deploy workflow is intentionally gated to release-triggered image builds:
 
@@ -108,7 +114,14 @@ After a production release deploy, verify:
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' https://brierfoxforecast.com/
 curl -sS -o /dev/null -w '%{http_code}\n' https://brierfoxforecast.com/api/v0/content/home
+curl -sS https://brierfoxforecast.com/health
+curl -sS https://brierfoxforecast.com/readyz
 ```
+
+The GitHub production deploy workflow now performs the `/health` and `/readyz`
+checks externally from GitHub Actions after the Ansible workflow completes. It
+polls every 30 seconds for up to 10 minutes and expects `/health` to return
+`live` and `/readyz` to return `ready`.
 
 ## Notes
 
