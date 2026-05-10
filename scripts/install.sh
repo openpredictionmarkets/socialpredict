@@ -289,6 +289,15 @@ build_production() {
   echo "Setting EMAIL to: $email_answer"
 
   # Update Database User Password:
+  # The packaged production compose topology uses local Docker Postgres.
+  # Keep TLS disabled for that in-container DB connection unless an operator
+  # replaces the DB topology and opts into TLS explicitly.
+  if grep -q '^DB_REQUIRE_TLS=' "${SCRIPT_DIR}/.env"; then
+    "${SED_INPLACE[@]}" "s|^DB_REQUIRE_TLS=.*|DB_REQUIRE_TLS=false|" "${SCRIPT_DIR}/.env"
+  else
+    printf "\nDB_REQUIRE_TLS=false\n" >> "${SCRIPT_DIR}/.env"
+  fi
+
   local db_pass
   db_pass=$(generate_password)
   "${SED_INPLACE[@]}" "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD='${db_pass}'|" "${SCRIPT_DIR}/.env"
@@ -333,6 +342,15 @@ build_production_args() {
   echo "Setting EMAIL to: $2"
 
   # Update Database User Password:
+  # The packaged production compose topology uses local Docker Postgres.
+  # Keep TLS disabled for that in-container DB connection unless an operator
+  # replaces the DB topology and opts into TLS explicitly.
+  if grep -q '^DB_REQUIRE_TLS=' "${SCRIPT_DIR}/.env"; then
+    "${SED_INPLACE[@]}" "s|^DB_REQUIRE_TLS=.*|DB_REQUIRE_TLS=false|" "${SCRIPT_DIR}/.env"
+  else
+    printf "\nDB_REQUIRE_TLS=false\n" >> "${SCRIPT_DIR}/.env"
+  fi
+
   local db_pass
   db_pass=$(generate_password)
   "${SED_INPLACE[@]}" "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD='${db_pass}'|" "${SCRIPT_DIR}/.env"
