@@ -226,17 +226,25 @@ root@DROPLET_NAME:/home# git clone https://github.com/openpredictionmarkets/soci
 From here, navigate to your `socialpredict` folder:
 
 ```
-root@DROPLET_NAME: cd /home/socialpredict
+root@DROPLET_NAME:/home# cd /home/socialpredict
 ```
 And run `./SocialPredict install`:
 
 ```
-root@DROPLET_NAME:/home/socialpredict ./SocialPredict install
+root@DROPLET_NAME:/home/socialpredict# ./SocialPredict install
 ```
 
-SocialPredict will prompt you to type `1` for development, `2` for production, or `3` to quit. Hit `2` on your keyboard to start.
+SocialPredict will prompt you to choose an application environment:
 
-![Screenshot 2024-08-03 111737](https://github.com/user-attachments/assets/3423a047-213b-48cc-baf3-4eadb326c111)
+```text
+1) Development
+2) Localhost
+3) Production
+4) Quit
+Please enter your choice:
+```
+
+For a public web deployment with HTTPS, choose `3` for `Production`.
 
 Next, SocialPredict will prompt you for the name of your domain.
 
@@ -246,21 +254,15 @@ It will also prompt you for the email address linked to your SSL certificate.
 
 ![Screenshot 2024-08-03 111905](https://github.com/user-attachments/assets/d35a4ce8-991f-4389-96aa-e9920e87ccca)
 
-Type in the default username.
+The installer now generates runtime secrets automatically. It sets the database password, admin password, and JWT signing key in `.env`. When install finishes, it prints the generated admin credentials:
 
-![Screenshot 2024-08-03 111941](https://github.com/user-attachments/assets/1ad1062e-439e-40aa-ad2c-430b9c491801)
+```text
+Your admin credentials are:
+Username: admin
+Password: <generated password>
+```
 
-Specify a default password.
-
-![Screenshot 2024-08-03 112119](https://github.com/user-attachments/assets/381dc8ac-3c43-4695-a477-6656c98be933)
-
-Specify a name for the database.
-
-![Screenshot 2024-08-03 112155](https://github.com/user-attachments/assets/36571a06-ae6b-464b-b974-bec11361a2e8)
-
-Lastly, choose an admin password.
-
-![Screenshot 2024-08-03 112236](https://github.com/user-attachments/assets/9bef37ff-8299-46f5-babd-6a2d54aef44d)
+Save that generated admin password somewhere secure. If you lose it, you can SSH into the host later and read `ADMIN_PASSWORD` from `/home/socialpredict/.env`, or from the repo path where you installed SocialPredict.
 
 Once you're done, type `./SocialPredict up` to spin up a SocialPredict instance ready to deploy to the web, and navigate to your domain to see if it works.
 
@@ -319,8 +321,9 @@ Instructions vary depending on your router make&mode. Your goal is to forward po
 - **Install docker compose**: Install `docker compose` on your local machine. [Here is the link to the docker compose installation guide](https://docs.docker.com/compose/install/). We are assuming the latest version of docker compose as of the date of this document. NOTE: `docker-compose` is deprecated and the command to use should be `docker compose`.
 - If you have not run this previously, within the root of the `./socialpredict` directory, create a `.env` file which will be ignored in the gitignore.
 - Within the root of the `./socialpredict` repo, run the command, `./SocialPredict install`.
-- Select (2) Production, then select to rebuild the `.env` file and rebuild the images.
-- Follow all the prompts to setup admin and passwords (for the DB and admin)
+- Select `3` for Production.
+- Enter your public domain and the email address to use for SSL certificate registration.
+- The installer generates the database password, admin password, and JWT signing key automatically. Save the printed admin password.
 - When this has completed, run `./SocialPredict up`...this will use `docker compose` to spin up the images into containers on your machine.
 - Make sure to complete the domain setup and port forwarding mentioned in requirements above.
 To test this, try to ping the domain name you setup. It should respond. If it doesnt, try nslookup `domain name` to ask your local DNS server (sometimes it takes few minutes to propagate)
