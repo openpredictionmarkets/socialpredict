@@ -157,6 +157,18 @@ STAGING_EMAIL
 STAGING_PASSWORD
 ```
 
+These are CI/CD deployment secrets, not HostOps local variables:
+
+| Secret | Primary purpose |
+| --- | --- |
+| `STAGING_PRIVATE_KEY` | SSH private key used by GitHub Actions/Ansible to connect to the VPS |
+| `STAGING_USER` | SSH user used by Ansible |
+| `STAGING_HOST` | Hostname or IP address Ansible connects to |
+| `STAGING_PORT` | SSH port Ansible connects to |
+| `STAGING_PASSWORD` | Ansible become/sudo password when the host requires one |
+| `STAGING_DOMAIN` | Domain passed into `./SocialPredict install -e production -d`; becomes app/domain/proxy config in `.env` |
+| `STAGING_EMAIL` | Email passed into `./SocialPredict install -e production -m`; used for Traefik/Let's Encrypt certificate registration |
+
 Typical OpenPredictionMarkets staging values are:
 
 ```text
@@ -174,6 +186,11 @@ model can be simplified.
 
 For production / `mo`, the same pattern uses `PRODUCTION_*` secrets in the
 Ansible repository.
+
+The Ansible secrets let GitHub Actions connect to the VPS and invoke
+`./SocialPredict install` and `./SocialPredict up`. Docker, nginx, and Traefik
+then consume the generated `.env` and config files on the host. By contrast,
+HostOps variables live only on an operator laptop and are for human access.
 
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret.
 The current staging and production workflows do not pass that secret into the
@@ -202,6 +219,10 @@ or a one-off maintenance workflow that already has host access.
 ## HostOps Local Operator Setup
 
 `./HostOps` is a local operator convenience wrapper. It is useful after deployment for SSH access and reading generated host `.env` values such as `ADMIN_PASSWORD`, but it is not the GitHub workflow deploy mechanism.
+
+HostOps configuration lives on your laptop under `~/.keys/socialpredict/<env>/`.
+It is separate from GitHub repository secrets. It does not trigger a GitHub
+workflow and is not read by Ansible.
 
 Detailed setup lives in [`README-INFRA-HOSTOPS.md`](./README-INFRA-HOSTOPS.md). Keep the key-generation, `hostops.env`, DigitalOcean, and command reference there so this staging guide only describes where HostOps fits in the deployment model.
 

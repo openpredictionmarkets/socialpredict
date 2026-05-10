@@ -41,6 +41,12 @@ HostOps treats each directory under this root as a local environment:
 
 - `~/.keys/socialpredict/<env>/`
 
+These are local operator settings on your laptop or workstation. They are not
+GitHub Actions secrets, and they are not used by the Ansible deployment
+workflows. GitHub/Ansible deploy secrets live in
+`openpredictionmarkets/ansible_playbooks`; HostOps files live outside the repo
+so a human can connect to or inspect a host after deployment.
+
 This is intentionally directory-based. Your local key/config layout can mirror your cloud operations layout:
 
 - `~/.keys/socialpredict/staging` for `kconfs.com`
