@@ -51,7 +51,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout workflow helpers
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Wait for downstream Ansible workflow
         uses: ./.github/actions/wait-for-ansible-workflow
@@ -70,7 +70,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout workflow helpers
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Verify public liveness and readiness
         uses: ./.github/actions/verify-public-readiness
