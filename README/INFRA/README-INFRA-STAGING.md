@@ -57,6 +57,9 @@ Deployment chain:
 6. Ansible pulls `openpredictionmarkets/socialpredict@main` into
    `/opt/socialpredict`.
 7. Ansible runs the app-owned install and runtime commands on the host.
+8. The `socialpredict` workflow waits for the downstream Ansible workflow to
+   finish, then performs an external public check of `https://kconfs.com/health`
+   and `https://kconfs.com/readyz`.
 
 The key boundary is:
 
@@ -128,6 +131,9 @@ ANSIBLE_PLAYBOOK_TOKEN
 For OpenPredictionMarkets this token is used by
 `peter-evans/repository-dispatch` to send `deploy-to-staging` and
 `deploy-to-production` events to `openpredictionmarkets/ansible_playbooks`.
+It is also used by the `socialpredict` workflow to read the matching downstream
+Ansible workflow run status, so the token must be able to dispatch repository
+events and read Actions runs in `openpredictionmarkets/ansible_playbooks`.
 
 No host SSH keys, hostnames, domains, or sudo/become passwords are required in
 the `socialpredict` repo for the current deployment workflows. Older secrets
@@ -274,6 +280,11 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://kconfs.com/api/v0/content/home
 curl -sS -o /dev/null -w '%{http_code}\n' https://kconfs.com/health
 curl -sS -o /dev/null -w '%{http_code}\n' https://kconfs.com/readyz
 ```
+
+The GitHub staging workflow now performs the `/health` and `/readyz` checks
+externally from GitHub Actions after the Ansible workflow completes. It polls
+every 30 seconds for up to 10 minutes and expects `/health` to return `live`
+and `/readyz` to return `ready`.
 
 A deploy is not zero-downtime today. Brief 404s or failed probes can occur
 while containers are stopped and restarted.
