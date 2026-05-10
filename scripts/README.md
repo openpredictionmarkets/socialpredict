@@ -6,7 +6,6 @@ This directory contains example prediction markets and scripts to populate the S
 
 - `example_markets.sql` - SQL file containing 10 example prediction markets
 - `populate_markets.sh` - Bash script to populate markets via SQL
-- `seed_markets.go` - Go program to populate markets using GORM
 - `README.md` - This file
 
 ## Example Markets Included
@@ -53,23 +52,7 @@ cd /path/to/socialpredict
 DB_HOST=db.example.com ./scripts/populate_markets.sh
 ```
 
-### Option 2: Using the Go Program
-
-The Go program integrates with the existing codebase and provides better error handling:
-
-```bash
-# Navigate to the project root
-cd /path/to/socialpredict
-
-# Run the Go seeder script (handles dependencies automatically)
-./scripts/seed_markets_go.sh
-
-# Or manually (requires Go modules setup)
-cd scripts
-go run seed_markets.go
-```
-
-### Option 3: Direct SQL Import
+### Option 2: Direct SQL Import
 
 For direct SQL import (advanced users):
 
@@ -147,17 +130,6 @@ export POSTGRES_DATABASE="devdb"
 - ✅ Help documentation
 - ✅ Custom `.env` file support
 
-### Go Program (`seed_markets.go` + wrapper)
-
-- ✅ Automatic `.env` file loading
-- ✅ GORM integration
-- ✅ Proper Go struct usage
-- ✅ Database transaction handling
-- ✅ Error reporting
-- ✅ Interactive prompts
-- ✅ Existing data checks
-- ✅ Automatic dependency management
-
 ## Market Data Structure
 
 Each market includes the following fields:
@@ -205,10 +177,6 @@ type Market struct {
    - Verify no syntax errors (no spaces around `=`)
    - Use `.env.example` as a template
 
-6. **Go Module Issues**
-   - Use the wrapper script: `./scripts/seed_markets_go.sh`
-   - Or manually run: `cd scripts && go mod tidy && go run seed_markets.go`
-
 ### Getting Help
 
 - Use `./scripts/populate_markets.sh --help` for bash script options
@@ -220,9 +188,8 @@ type Market struct {
 To create your own markets:
 
 1. **Modify SQL file**: Edit `example_markets.sql` with your markets
-2. **Update Go program**: Modify the `markets` slice in `seed_markets.go`
-3. **Follow the schema**: Ensure all required fields are included
-4. **Test thoroughly**: Use `--check-only` flag to verify setup
+2. **Follow the schema**: Ensure all required fields are included
+3. **Test thoroughly**: Use `--check-only` flag to verify setup
 
 ## Market Categories
 
