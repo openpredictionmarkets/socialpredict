@@ -82,6 +82,13 @@ The Ansible secrets let GitHub Actions connect to the VPS and invoke
 then consume the generated `.env` and config files on the host. By contrast,
 HostOps variables live only on an operator laptop and are for human access.
 
+The packaged production compose topology uses a local Docker Postgres service.
+For that topology, `./SocialPredict install -e production` writes
+`DB_REQUIRE_TLS=false` so the backend does not reject the in-container
+`sslmode=disable` connection. Operators who replace the local Docker database
+with an external production database should review `DB_REQUIRE_TLS` and
+`DB_SSLMODE` explicitly.
+
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
 but the current production workflow does not pass it into the Ansible command.
 It is only relevant if the workflow or a manual Ansible run supplies an
