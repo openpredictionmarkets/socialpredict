@@ -1,4 +1,4 @@
-# HostOps (Scaffold)
+# Infrastructure: HostOps Scaffold
 
 ## Why this exists
 
@@ -35,7 +35,7 @@ Scaffold only.
   - `./HostOps deploy <env>`
   - `./HostOps tf <plan|apply|destroy> <env>`
 
-## DigitalOcean host convention
+## Local Environment Convention
 
 HostOps treats each directory under this root as a local environment:
 
@@ -77,7 +77,7 @@ HOSTOPS_CONFIG_ROOT=/path/to/socialpredict-keys ./HostOps host ssh staging
 
 The config file is intentionally outside the repository because it may point at private keys, server IPs, and future cloud credentials.
 
-Our environment conventions:
+OpenPredictionMarkets environment conventions:
 
 - `staging` -> `kconfs.com`
 - `mo` -> `brierfoxforecast.com`

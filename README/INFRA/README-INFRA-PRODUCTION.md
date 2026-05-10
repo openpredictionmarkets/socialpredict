@@ -35,40 +35,18 @@ This prevents a manual run of the Docker image workflow from accidentally deploy
 
 ## Local HostOps Convention
 
-HostOps local environment files for production should live under:
+HostOps is optional local operator access. It is not required for the release workflow because the Ansible workflow uses GitHub secrets to connect to the production host.
+
+Detailed setup lives in [`README-INFRA-HOSTOPS.md`](./README-INFRA-HOSTOPS.md). For OpenPredictionMarkets production / `mo`, use the local environment directory:
 
 ```bash
 ~/.keys/socialpredict/mo/
 ```
 
-Expected local files:
+Expected production settings are `HOSTOPS_HOST=brierfoxforecast.com`, `HOSTOPS_HOST_IP=143.198.177.112`, `HOSTOPS_USER=root`, `HOSTOPS_PORT=22`, and `HOSTOPS_REPO_PATH=/opt/socialpredict`. If HostOps SSH is authorized for `mo`, retrieve the generated admin password with:
 
 ```bash
-~/.keys/socialpredict/mo/hostops.env
-~/.keys/socialpredict/mo/digitalocean.env
-~/.keys/socialpredict/mo/id_ed25519
-~/.keys/socialpredict/mo/id_ed25519.pub
-```
-
-Example `hostops.env`:
-
-```bash
-HOSTOPS_HOST=brierfoxforecast.com
-HOSTOPS_HOST_IP=143.198.177.112
-HOSTOPS_USER=root
-HOSTOPS_PORT=22
-HOSTOPS_KEY=~/.keys/socialpredict/mo/id_ed25519
-HOSTOPS_REPO_PATH=/opt/socialpredict
-```
-
-Example `digitalocean.env`:
-
-```bash
-DIGITALOCEAN_CONTEXT=socialpredict
-DIGITALOCEAN_DROPLET_ID=422726269
-DIGITALOCEAN_DROPLET_NAME=breirfoxforecast-alpha
-DIGITALOCEAN_FIREWALL_ID=1aa45531-83bc-4371-821c-8fa2abcda411
-DIGITALOCEAN_FIREWALL_NAME=port80-access
+./HostOps host env get mo ADMIN_PASSWORD
 ```
 
 ## Operator Checks
@@ -78,12 +56,6 @@ After a production release deploy, verify:
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' https://brierfoxforecast.com/
 curl -sS -o /dev/null -w '%{http_code}\n' https://brierfoxforecast.com/api/v0/content/home
-```
-
-If HostOps SSH is authorized for `mo`, retrieve the generated admin password:
-
-```bash
-./HostOps host env get mo ADMIN_PASSWORD
 ```
 
 ## Notes

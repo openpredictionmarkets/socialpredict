@@ -70,7 +70,7 @@ Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.co
 ### Deploying to the Web
 
 - [How to Set Up Your Own Website](/README/STAGE_SETUP.md)
-- [HostOps Scaffold and Infra Boundary Notes](/README/HOSTOPS.md)
+- [HostOps Scaffold and Infra Boundary Notes](/README/INFRA/README-INFRA-HOSTOPS.md)
 - [Staging Deployment Guide](/README/INFRA/README-INFRA-STAGING.md)
 - [Production Deployment Guide](/README/INFRA/README-INFRA-PRODUCTION.md)
 
