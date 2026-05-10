@@ -71,6 +71,8 @@ Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.co
 
 - [How to Set Up Your Own Website](/README/STAGE_SETUP.md)
 - [HostOps Scaffold and Infra Boundary Notes](/README/HOSTOPS.md)
+- [Staging Deployment Guide](/README/INFRA/README-INFRA-STAGING.md)
+- [Production Deployment Guide](/README/INFRA/README-INFRA-PRODUCTION.md)
 
 ### How Do Prediction Markets Work?
 
