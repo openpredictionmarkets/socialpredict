@@ -1,6 +1,6 @@
-[![Deploy To Production](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml/badge.svg)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml)
+[![Deploy To Production](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml/badge.svg?event=workflow_run)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml)
 
-[![Deploy To Staging](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml/badge.svg)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml)
+[![Deploy To Staging](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml/badge.svg?event=pull_request)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml)
 
 # SocialPredict
 
