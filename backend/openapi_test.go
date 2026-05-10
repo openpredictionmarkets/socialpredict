@@ -151,7 +151,7 @@ func TestRouteFamilyMigrationMatrixMatchesTouchedContractSlice(t *testing.T) {
 		"backend/server/server.go",
 		"touched handlers and DTOs under backend/handlers/**",
 		"backend/docs/openapi.yaml",
-		"backend/docs/API-ISSUES.md",
+		"backend/docs/README.md",
 	}
 	if got := stringSlice(t, matrix["source_of_truth_order"], "source_of_truth_order"); !reflect.DeepEqual(got, wantSourceOrder) {
 		t.Fatalf("source_of_truth_order mismatch\nwant: %v\ngot:  %v", wantSourceOrder, got)

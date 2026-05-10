@@ -41,7 +41,7 @@ x-route-family-migration-matrix:
     - backend/server/server.go
     - touched handlers and DTOs under backend/handlers/**
     - backend/docs/openapi.yaml
-    - backend/docs/API-ISSUES.md
+    - backend/docs/README.md
   reason_vocabulary_owner: handlers.PublicFailureReasons
   public_reason_values:
     - METHOD_NOT_ALLOWED

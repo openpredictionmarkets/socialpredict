@@ -55,7 +55,7 @@ WAVE10 landed a narrow boundary-validation consolidation in the markets route fa
 - [server.go](/workspace/socialpredict/backend/server/server.go) and [container.go](/workspace/socialpredict/backend/internal/app/container.go) now pass the runtime-owned `*security.SecurityService` into markets handlers instead of letting production handlers construct fresh security services or sanitizers.
 - [createmarket.go](/workspace/socialpredict/backend/handlers/markets/createmarket.go) and [searchmarkets.go](/workspace/socialpredict/backend/handlers/markets/searchmarkets.go) use the shared security seam for create/search sanitization and map malformed, sanitizer-rejected, and domain-validation failures to stable `ReasonResponse` values.
 - [queryparams.go](/workspace/socialpredict/backend/security/queryparams.go) now owns the shared bounded integer query parsing helper used by markets list/search pagination.
-- [docs/API-ISSUES.md](/workspace/socialpredict/backend/docs/API-ISSUES.md) and [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml) document the create/search validation failure split: malformed or sanitizer-rejected input is `INVALID_REQUEST`, while syntactically valid domain validation failures are `VALIDATION_FAILED`.
+- [docs/README.md](/workspace/socialpredict/backend/docs/README.md) and [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml) document the create/search validation failure split: malformed or sanitizer-rejected input is `INVALID_REQUEST`, while syntactically valid domain validation failures are `VALIDATION_FAILED`.
 
 That work was intentionally not a universal envelope migration and did not move business invariants out of `internal/domain/markets`.
 

@@ -19,7 +19,7 @@ On Thursday, April 30, 2026, the runtime-boundary API behavior changed in a few 
 
 WAVE06 also makes the mixed contract explicit in the OpenAPI artifact instead
 of treating it as cleanup folklore. The source-of-truth order remains
-`server.go` -> touched handlers or DTOs -> `openapi.yaml` -> `API-ISSUES.md`.
+`server.go` -> touched handlers or DTOs -> `backend/docs/openapi.yaml` -> `backend/docs/README.md`.
 The route-family migration matrix below is mirrored by
 `x-route-family-migration-matrix` in `backend/docs/openapi.yaml` and by focused
 contract tests.
@@ -40,7 +40,7 @@ transport.
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
 | Core framing | Treated API design as a new platform to build from scratch | Treats API design as route-family contract governance and migration of a live monolith |
-| Current-state accuracy | Assumed there was no OpenAPI or Swagger surface yet | Recognizes the live `openapi.yaml`, embedded Swagger UI, route/spec parity tests, and existing deferred follow-up file |
+| Current-state accuracy | Assumed there was no OpenAPI or Swagger surface yet | Recognizes the live `openapi.yaml`, embedded Swagger UI, route/spec parity tests, and backend docs README |
 | Main proposal | Build `api/standards.go`, version managers, response middleware, code generation, and broad versioning/platform features | Focus on truthful contract documentation, response-family convergence, auth semantics, route-family migration, and OpenAPI parity |
 | Architecture posture | Proposed a new top-level `api/` subsystem | Extends the live `server`, `handlers`, `security`, `internal/service/auth`, and `backend/docs/openapi.yaml` seams |
 | Response strategy | Assumed a universal `APIResponse` wrapper should become the standard immediately | Documents the current mixed route families honestly and shrinks that mixed state incrementally |
@@ -58,7 +58,7 @@ The active direction is:
    - route wiring in `backend/server/server.go`
    - touched handlers and DTOs
    - `backend/docs/openapi.yaml`
-   - deferred follow-ups in `backend/docs/API-ISSUES.md`
+   - human overview and deferred follow-ups in `backend/docs/README.md`
 2. Describe the live route and response families honestly before trying to normalize them.
 3. Use the existing envelope and public `reason` direction where it already exists, but treat mixed `PlainTextErrorResponse` and legacy raw-response paths as migration state rather than pretending the whole API already converged.
 4. Keep API cleanup aligned with the active design-plan sequencing:
@@ -154,7 +154,7 @@ This is a deployment and contract-publishing issue, not a reason to create a sep
 
 ### Source-of-truth order already exists
 
-The repo already has a practical source-of-truth order in [API-ISSUES.md](/workspace/socialpredict/backend/docs/API-ISSUES.md):
+The repo already has a practical source-of-truth order in [backend/docs/README.md](/workspace/socialpredict/backend/docs/README.md):
 
 1. `backend/server/server.go`
 2. touched handlers and DTOs
@@ -279,7 +279,7 @@ can branch on; telemetry fields are operator diagnostics.
 migration-state marker for infra probe failures and untouched handler-owned
 plain-text failures still being retired. At this checkpoint that means
 intentional `/health` and `/readyz` probe transport plus the remaining markets
-compatibility seams listed in [API-ISSUES.md](/workspace/socialpredict/backend/docs/API-ISSUES.md):
+compatibility seams listed in [backend/docs/README.md](/workspace/socialpredict/backend/docs/README.md):
 `getmarkets.go`, `listmarkets.go`, `marketdetailshandler.go`,
 `resolvemarket.go`, legacy update/get methods on `handler.go`, and
 market-create compatibility helpers in `createmarket.go`.
@@ -318,7 +318,7 @@ Grounding:
 - [auth.go](/workspace/socialpredict/backend/internal/service/auth/auth.go)
 - [changepassword.go](/workspace/socialpredict/backend/handlers/users/changepassword.go)
 - [server_contract_test.go](/workspace/socialpredict/backend/server/server_contract_test.go)
-- [API-ISSUES.md](/workspace/socialpredict/backend/docs/API-ISSUES.md)
+- [backend/docs/README.md](/workspace/socialpredict/backend/docs/README.md)
 
 The note should describe that explicitly and treat broader token redesign as deferred.
 
