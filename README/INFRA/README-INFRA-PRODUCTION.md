@@ -24,6 +24,12 @@ This document explains how SocialPredict is deployed to **mo/production** at [ht
 4. `deploy-to-production.yml` dispatches `deploy-to-production` to `openpredictionmarkets/ansible_playbooks`.
 5. The Ansible production playbook connects to the production host and runs the deployment.
 
+`openpredictionmarkets/ansible_playbooks` is the separate deployment-control
+repo. It owns the GitHub workflow that installs Ansible, loads the production
+SSH key from GitHub secrets, and runs the production playbook against the host.
+The `socialpredict` repo only needs `ANSIBLE_PLAYBOOK_TOKEN` so it can dispatch
+the production deployment event.
+
 The production deploy workflow is intentionally gated to release-triggered image builds:
 
 ```yaml
@@ -32,6 +38,31 @@ github.event.workflow_run.event == 'release'
 ```
 
 This prevents a manual run of the Docker image workflow from accidentally deploying production.
+
+## Required GitHub Secrets
+
+In `openpredictionmarkets/socialpredict`, production deployment requires only:
+
+```text
+ANSIBLE_PLAYBOOK_TOKEN
+```
+
+In `openpredictionmarkets/ansible_playbooks`, the production workflow expects:
+
+```text
+PRODUCTION_PRIVATE_KEY
+PRODUCTION_USER
+PRODUCTION_HOST
+PRODUCTION_PORT
+PRODUCTION_DOMAIN
+PRODUCTION_EMAIL
+PRODUCTION_PASSWORD
+```
+
+The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
+but the current production workflow does not pass it into the Ansible command.
+It is only relevant if the workflow or a manual Ansible run supplies an
+`ADMIN_PASSWORD` variable to the playbook.
 
 ## Local HostOps Convention
 

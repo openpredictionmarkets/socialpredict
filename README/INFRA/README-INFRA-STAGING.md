@@ -27,6 +27,11 @@ Repositories involved:
 - Staging host: `kconfs.com`
 - Production / model-office host: `brierfoxforecast.com`
 
+`openpredictionmarkets/ansible_playbooks` is where OpenPredictionMarkets keeps
+the GitHub workflows, inventories, and Ansible playbooks that actually connect
+to the VPS hosts. The `socialpredict` repo only dispatches deployment events to
+that repo.
+
 This is our organization's pipeline. Someone self-hosting SocialPredict can use
 the same pattern, but they will need their own GitHub repositories, secrets,
 VPS/Droplet, DNS, firewall, and SSH keys.
@@ -124,6 +129,12 @@ For OpenPredictionMarkets this token is used by
 `peter-evans/repository-dispatch` to send `deploy-to-staging` and
 `deploy-to-production` events to `openpredictionmarkets/ansible_playbooks`.
 
+No host SSH keys, hostnames, domains, or sudo/become passwords are required in
+the `socialpredict` repo for the current deployment workflows. Older secrets
+such as `ACCESS_KEY`, `COMPOSE_ENV`, `DOCKER_TOKEN`, `HOST`, or `USERNAME` are
+not referenced by the current `socialpredict/.github/workflows/*` deployment
+files.
+
 A self-hosted fork can either:
 
 - keep this two-repository pattern and create a token that can dispatch to its
@@ -163,6 +174,12 @@ model can be simplified.
 
 For production / `mo`, the same pattern uses `PRODUCTION_*` secrets in the
 Ansible repository.
+
+The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret.
+The current staging and production workflows do not pass that secret into the
+Ansible command, so it is not required for the active deployment path. The
+playbooks can optionally update the admin password only if an `ADMIN_PASSWORD`
+variable is supplied by the workflow or a manual Ansible run.
 
 ## VPS / DigitalOcean Setup Checklist
 
