@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"strings"
@@ -52,7 +53,16 @@ func ValidateUserAndEnforcePasswordChangeGetUser(r *http.Request, svc dusers.Ser
 
 // ValidateUserAndEnforcePasswordChangeGetUserWithSigningKey performs user validation with an injected JWT key.
 func ValidateUserAndEnforcePasswordChangeGetUserWithSigningKey(r *http.Request, svc dusers.ServiceInterface, jwtSigningKey []byte) (*dusers.User, *AuthError) {
-	user, authErr := validateTokenAndGetUser(r, svc, jwtSigningKey)
+	tokenString, authErr := tokenFromRequest(r)
+	if authErr != nil {
+		return nil, authErr
+	}
+	return ValidateUserAndEnforcePasswordChangeFromToken(r.Context(), tokenString, svc, jwtSigningKey)
+}
+
+// ValidateUserAndEnforcePasswordChangeFromToken performs user validation from an already extracted bearer token.
+func ValidateUserAndEnforcePasswordChangeFromToken(ctx context.Context, tokenString string, svc dusers.ServiceInterface, jwtSigningKey []byte) (*dusers.User, *AuthError) {
+	user, authErr := ValidateTokenAndGetUserFromToken(ctx, tokenString, svc, jwtSigningKey)
 	if authErr != nil {
 		return nil, authErr
 	}
@@ -66,21 +76,41 @@ func ValidateUserAndEnforcePasswordChangeGetUserWithSigningKey(r *http.Request, 
 
 // ValidateTokenAndGetUser checks that the user is who they claim to be, and returns their information for use
 func ValidateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface) (*dusers.User, *AuthError) {
-	return validateTokenAndGetUser(r, svc, currentJWTSigningKey())
+	return ValidateTokenAndGetUserWithSigningKey(r, svc, currentJWTSigningKey())
 }
 
 // ValidateTokenAndGetUserWithSigningKey checks that the user is who they claim to be using an injected JWT key.
 func ValidateTokenAndGetUserWithSigningKey(r *http.Request, svc dusers.ServiceInterface, jwtSigningKey []byte) (*dusers.User, *AuthError) {
-	return validateTokenAndGetUser(r, svc, jwtSigningKey)
+	tokenString, authErr := tokenFromRequest(r)
+	if authErr != nil {
+		return nil, authErr
+	}
+	return ValidateTokenAndGetUserFromToken(r.Context(), tokenString, svc, jwtSigningKey)
 }
 
-func validateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface, jwtSigningKey []byte) (*dusers.User, *AuthError) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return nil, newAuthError(ErrorKindMissingToken)
+// ValidateTokenAndGetUserFromToken validates an extracted bearer token without depending on HTTP request shape.
+func ValidateTokenAndGetUserFromToken(ctx context.Context, tokenString string, svc dusers.ServiceInterface, jwtSigningKey []byte) (*dusers.User, *AuthError) {
+	return validateTokenAndGetUser(ctx, tokenString, svc, jwtSigningKey)
+}
+
+func tokenFromRequest(r *http.Request) (string, *AuthError) {
+	if r == nil {
+		return "", newAuthError(ErrorKindMissingToken)
 	}
 
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", newAuthError(ErrorKindMissingToken)
+	}
+
+	return strings.TrimPrefix(authHeader, "Bearer "), nil
+}
+
+func validateTokenAndGetUser(ctx context.Context, tokenString string, svc dusers.ServiceInterface, jwtSigningKey []byte) (*dusers.User, *AuthError) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if len(strings.Split(tokenString, ".")) != 3 {
 		return nil, newAuthError(ErrorKindInvalidToken)
 	}
@@ -97,7 +127,7 @@ func validateTokenAndGetUser(r *http.Request, svc dusers.ServiceInterface, jwtSi
 	}
 
 	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-		user, err := svc.GetUser(r.Context(), claims.Username)
+		user, err := svc.GetUser(ctx, claims.Username)
 		if err != nil {
 			if err == dusers.ErrUserNotFound {
 				return nil, newAuthError(ErrorKindUserNotFound)
