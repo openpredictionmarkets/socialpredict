@@ -3,9 +3,9 @@ title: Database Layer
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-29T22:53:00Z
-updated_at_display: "Wednesday, April 29, 2026 at 10:53 PM UTC"
-update_reason: "Record the first narrow atomic accounting workflow and the remaining transaction surface inventory."
+updated_at: 2026-05-11T22:15:00Z
+updated_at_display: "Monday, May 11, 2026 at 10:15 PM UTC"
+update_reason: "Ground database topology, DB TLS posture, and startup-writer ownership in the v3.0.1 production baseline."
 status: active
 ---
 
@@ -15,15 +15,24 @@ status: active
 
 This note was updated on Sunday, April 26, 2026 to replace an older greenfield `database/` plus `repository/` plus `dal/` plan with guidance that matches the current SocialPredict backend, the active design-plan posture, and the high-availability or fault-tolerance objective.
 
+On Monday, May 11, 2026, this note was corrected against the v3.0.1 production
+baseline. The packaged Docker production topology now has one
+`backend-startup-writer` service, request-serving backend containers run with
+`STARTUP_WRITER=false`, `/readyz` checks database availability after the
+readiness gate opens, and `./SocialPredict install -e production` writes
+`DB_REQUIRE_TLS=false` for the local Docker Postgres topology. External
+production databases still require an explicit operator decision for
+`DB_REQUIRE_TLS` and `DB_SSLMODE`.
+
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
 | Core framing | Treated the database layer as a new technical stack to build from scratch | Treats database architecture as runtime/bootstrap ownership, repository edge ownership, and explicit accounting-sensitive transaction boundaries |
 | Organizing principle | Proposed top-level `database/`, `repository/`, and `dal/` trees | Extends the live `internal/app/runtime`, `internal/app/container`, `internal/repository`, and `internal/domain` shape |
-| Current-state accuracy | Assumed bootstrap, repository, health, and migration structure were still mostly missing | Recognizes that DB bootstrap, repositories, startup pinging, and migration registry already exist, but they are operationally inconsistent |
+| Current-state accuracy | Assumed bootstrap, repository, health, and migration structure were still mostly missing | Recognizes that DB bootstrap, repositories, startup pinging, migration registry, startup-writer mode, and serving-path readiness now exist, while custom topology and transaction work remain |
 | DAL posture | Assumed a unified data-access facade should become central | Rejects a new central DAL and keeps repositories as edge translators rather than turning data access into the architecture center |
 | Startup posture | Treated migrations and startup writes as implementation details | Treats startup ownership, migration serialization, and seed ownership as first-class HA concerns |
 | Consistency posture | Discussed generic transaction helpers and retry language | Focuses on explicit atomic boundaries for accounting-sensitive flows and rejects generic retry for money-moving writes |
-| Health posture | Claimed health checks were absent | Recognizes existing startup DB pinging and `/health`, but requires a stronger readiness/liveness split |
+| Health posture | Claimed health checks were absent | Recognizes the landed `/health` liveness and `/readyz` database-readiness split |
 | Caching posture | Left optimization and persistence concerns blurred together | Defers caching and Redis-related work until after correctness, runtime ownership, and transaction boundaries are clear |
 
 ## Executive Direction
@@ -40,7 +49,7 @@ The backend direction is:
 2. Keep the application container as the composition root that wires repositories and services
 3. Keep repositories as edge translators and adapters, not as generic CRUD facades over `models.*`
 4. Treat shared startup mutation such as migrations and one-time seed writes as single-writer work, not as per-replica default behavior
-5. Move toward fail-closed startup or unready startup on schema incompatibility rather than warning-only continuation
+5. Preserve fail-closed startup or unready startup on schema incompatibility rather than warning-only continuation
 6. Introduce explicit atomic transaction boundaries and concurrency control for accounting-sensitive flows
 7. Remove remaining handler-level raw DB access and residual process-global DB fallback over time
 8. Defer caching and Redis-related work until correctness and ownership are explicit
@@ -71,9 +80,12 @@ SocialPredict already has:
 
 The real problems are now different:
 
-- every replica still behaves like a startup coordinator
-- migration failure handling is too permissive
-- readiness after startup is too weak
+- non-packaged topologies still need to prove equivalent startup-writer
+  enforcement
+- migration failure and schema incompatibility must remain fail-closed startup
+  concerns
+- readiness must stay tied to the runtime database check and startup-writer
+  posture
 - some handlers still bypass service and repository seams
 - accounting-sensitive write flows still need clearer atomicity and concurrency rules
 
@@ -81,7 +93,9 @@ If those issues are not fixed, then the system can become fast or feature-rich w
 
 ## Current Code Snapshot
 
-As of 2026-04-26, the backend already has meaningful database-layer structure, but it is split between good direction and risky transitional behavior.
+As of the v3.0.1 production baseline, the backend already has meaningful
+database-layer structure, but it still has targeted cleanup and transaction
+work remaining.
 
 ### Runtime DB bootstrap already exists
 
@@ -96,44 +110,59 @@ The live seam already includes:
 
 This means the backend is not starting from a blank slate.
 
-Important current limitations:
+Important current posture:
 
 - DB config is environment-driven but narrow
 - `SSLMode` defaults to `disable`
-- pool sizing and connection lifetime are not configured yet
+- production runtime requires TLS by default unless `DB_REQUIRE_TLS=false` is
+  explicitly supplied
+- packaged Docker production installs set `DB_REQUIRE_TLS=false` because their
+  Postgres service is local to the compose network and uses `sslmode=disable`
+- external production databases must explicitly set `DB_REQUIRE_TLS` and
+  `DB_SSLMODE` for their topology
+- pool sizing and connection lifetime are runtime-owned through
+  `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`, `DB_CONN_MAX_LIFETIME`, and
+  `DB_CONN_MAX_IDLE_TIME`
 - the runtime seam still stores a shared fallback handle through `SetDB` and `GetDB`
 
-### Startup ownership is still too broad
+### Startup ownership now has an explicit writer mode
 
-The main startup path in [main.go](/workspace/socialpredict/backend/main.go) currently does all of the following in every process:
+The main startup path in [main.go](/workspace/socialpredict/backend/main.go)
+now loads explicit startup mutation mode before shared startup work:
 
 - load DB config
 - open DB
 - wait for DB ping success
-- run migrations
+- run migrations only when startup writer mode is enabled
+- verify applied migrations when startup writer mode is disabled
 - load config service
-- seed admin user
-- seed homepage
+- seed admin user and homepage only from the startup writer path
 - start serving
 
-That is simple for a single local process, but it is too broad for HA replica startup because every instance is performing shared-state startup work rather than only local process startup work.
+The packaged production compose file makes that role split concrete:
 
-### Readiness exists at startup but not as a serving contract
+- `backend-startup-writer` runs with `STARTUP_WRITER=true`
+- request-serving `backend` runs with `STARTUP_WRITER=false`
+- frontend and nginx wait for the request-serving backend `/readyz` healthcheck
 
-The backend already does startup DB pinging in [seed.go](/workspace/socialpredict/backend/seed/seed.go):
+That closes the first broad-startup gap for the packaged topology. Custom
+topologies still need to preserve equivalent exactly-one-writer behavior.
 
-- `EnsureDBReady`
+### Readiness is now a serving contract
 
-But the live infrastructure health route in [server.go](/workspace/socialpredict/backend/server/server.go) currently returns a hard-coded `200 ok` from `/health`.
+The backend still does startup DB pinging, but it also exposes a serving-path
+readiness contract:
 
-So the backend currently has:
+- `/health` reports process liveness as `live`
+- `/readyz` reports `ready` only after the readiness gate is open and the
+  primary database ping succeeds
+- `/readyz` reports `not ready` with `503` when the readiness gate is closed or
+  the database check fails
 
-- startup DB reachability gating
-- but no strong post-startup readiness contract tied to DB condition
+This means database availability is no longer only a startup concern. The
+runtime readiness path is the deploy and compose traffic-readiness signal.
 
-That is not enough for orchestrated HA operation.
-
-### Migrations already exist, but HA discipline is weak
+### Migrations already exist, and packaged startup discipline is explicit
 
 The backend already has a migration registry and schema history model in [migrate.go](/workspace/socialpredict/backend/migration/migrate.go):
 
@@ -141,14 +170,17 @@ The backend already has a migration registry and schema history model in [migrat
 - `SchemaMigration`
 - ordered application via `sortedRegistryIDs`
 
-The current migration runner is therefore real. However, the HA posture is weak because:
+The current migration runner is therefore real. In the packaged production
+topology, the startup writer owns migration application and request-serving
+backends verify applied migrations before opening readiness.
 
-- every replica currently calls `MigrateDB`
-- there is no explicit cross-replica writer discipline shown here
-- `MigrateDB` falls back to `AutoMigrate` if no migrations are registered
-- `main.go` logs migration failure as a warning instead of failing closed
+The remaining migration and HA questions are narrower:
 
-For production HA, that is too permissive.
+- whether non-compose deployments need a dedicated migration job, advisory lock,
+  or another exactly-one-writer enforcement mechanism
+- how to retire older compatibility behavior safely
+- which additional Postgres-backed tests are worth adding when behavior depends
+  on real Postgres semantics
 
 ### Repository architecture already exists
 
@@ -180,21 +212,19 @@ This matters because the goal is not only to "have repositories somewhere." The 
 
 ### Accounting-sensitive write consistency remains under-specified
 
-The backend still has money-moving or economically sensitive workflows that are not yet documented as explicit atomic units of work.
+The place-bet flow now has an explicit transaction baseline, but the backend
+still has other money-moving or economically sensitive workflows that are not
+yet documented as explicit atomic units of work.
 
-The clearest live example is the bet flow in [bet_support.go](/workspace/socialpredict/backend/internal/domain/bets/bet_support.go), which currently follows a compensation-style pattern:
+The remaining concern is the old compensation-style pattern in flows such as
+sell position: write one side effect, then try to undo it if later work fails.
+That is weaker than one atomic DB transaction because the undo can also fail,
+overlapping requests can interleave, and partial commit can leave economic state
+inconsistent.
 
-- change user balance
-- write the bet
-- if later work fails, try to undo earlier work
-
-That is weaker than one atomic DB transaction because:
-
-- the undo can also fail
-- overlapping requests can interleave
-- partial commit can leave economic state inconsistent
-
-This note does not fully redesign those flows, but it makes the architectural direction explicit: accounting-sensitive workflows need clearer atomic boundaries and concurrency control.
+This note does not fully redesign those remaining flows, but it keeps the
+architectural direction explicit: accounting-sensitive workflows need clear
+atomic boundaries and concurrency control.
 
 ## What The Database Layer Should Own
 
@@ -244,7 +274,7 @@ The database layer should not become:
 
 ## Startup Ownership and Replica Model
 
-The intended operational model should be:
+The current packaged production operational model is:
 
 - multiple stateless app replicas
 - one primary relational system of record
@@ -253,23 +283,58 @@ The intended operational model should be:
 That means:
 
 - app replicas should be interchangeable request-serving processes
-- not every replica should own migrations and one-time seeds by default
+- not every replica owns migrations and one-time seeds by default
 - a schema incompatibility should prevent readiness
-- warning-only migration failure is not a strong production posture
+- migration failure must fail the writer path and prevent request-serving
+  readiness
 
-A practical near-term target is:
+The packaged compose topology implements this as:
 
-1. one startup writer performs migrations
-2. one startup writer performs one-time seed operations if they remain startup-owned
-3. request-serving replicas wait for safe startup state or remain unready
+1. `backend-startup-writer` runs with `STARTUP_WRITER=true`
+2. the startup writer performs migrations and startup-owned seed operations
+3. request-serving `backend` containers run with `STARTUP_WRITER=false`
+4. request-serving containers verify applied migrations and remain unready if
+   the database is not ready
+5. frontend and nginx wait on request-serving backend readiness
 
-This note does not lock the mechanism. That mechanism could later be:
+This note does not require every self-hosted topology to use Docker Compose, but
+it does require equivalent startup ownership. Other mechanisms could be:
 
 - a dedicated migration job
 - a leader-only startup mode
 - an explicit DB-backed lock or equivalent serialization strategy
 
-But the architectural requirement is clear: shared startup writes must not be treated as every-replica default behavior.
+The architectural requirement is clear: shared startup writes must not be
+treated as every-replica default behavior.
+
+## Packaged Production DB TLS Policy
+
+The runtime default is conservative: production requires database TLS unless an
+operator explicitly disables that requirement.
+
+The packaged Docker production topology is the deliberate exception. It runs
+Postgres as a local compose service on the internal Docker network, so
+`./SocialPredict install -e production` writes:
+
+```text
+DB_REQUIRE_TLS=false
+```
+
+That allows the local in-container Postgres connection to use the existing
+`sslmode=disable` default without being rejected by runtime validation.
+
+Operators who replace packaged local Postgres with an external production
+database must make the TLS posture explicit instead of inheriting the compose
+default. At minimum, review:
+
+```text
+DB_REQUIRE_TLS=true
+DB_SSLMODE=verify-full
+```
+
+The exact `DB_SSLMODE` value depends on the external database provider and
+certificate setup, but `DB_REQUIRE_TLS=false` should be treated as a packaged
+local-compose topology setting, not a generic production recommendation.
 
 ## Transaction and Concurrency Direction
 
@@ -339,9 +404,10 @@ The exact mechanism is a later implementation choice. The architectural requirem
 
 ## Runtime DB Hardening Direction
 
-The live runtime seam needs hardening, not replacement.
+The live runtime seam has a first hardening baseline and needs continued
+cleanup, not replacement.
 
-That hardening should include:
+That baseline now includes:
 
 - max open connection ownership
 - max idle connection ownership
@@ -349,7 +415,15 @@ That hardening should include:
 - idle connection lifetime ownership
 - explicit SSL or TLS mode ownership
 - startup ping and readiness policy
-- eventual graceful shutdown of the underlying `sql.DB`
+- serving-path readiness tied to database availability
+
+Remaining cleanup includes:
+
+- retiring process-global DB fallback behavior when callers no longer need it
+- deciding whether custom non-compose topologies need stronger exactly-one-writer
+  enforcement
+- adding source-of-truth Postgres checks only for behaviors that SQLite cannot
+  model credibly
 
 The key point is ownership:
 
@@ -397,11 +471,13 @@ The practical sequence for the database layer is:
 
 This note leaves several questions open for later implementation and design-plan updates:
 
-- what exact mechanism should enforce single-writer startup semantics
+- what exact mechanism should enforce single-writer startup semantics outside
+  the packaged compose topology
 - whether one-time seed writes should remain startup-owned or move to controlled administration or bootstrap jobs
 - which exact workflows must be atomic in one transaction
 - which concurrency-control mechanism fits SocialPredict's balance and market flows best
-- what concrete readiness conditions should gate request traffic
+- what additional concrete readiness conditions, if any, should gate request
+  traffic beyond startup readiness and database reachability
 - whether `SetDB` and `GetDB` can be reduced to test-only compatibility and later removed
 
 ## Explicit Do-Not-Do List
