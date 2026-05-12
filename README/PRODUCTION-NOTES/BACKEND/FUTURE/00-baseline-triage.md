@@ -33,13 +33,45 @@ The backend is no longer starting from zero on production operations:
   readiness, request-failure counting, and DB pool counters.
 - staging and production workflows dispatch downstream Ansible deploys and then
   verify public readiness externally from GitHub Actions.
-- DigitalOcean host-level disk, memory, and CPU visibility is available as an
-  operational fallback for the current single-host topology.
+- outside the codebase, DigitalOcean host-level disk, memory, and CPU visibility
+  is available as an operational fallback for the current single-host topology.
 
 That baseline means the next move should not be Kubernetes, Prometheus/Grafana,
 OAuth, API keys, broad load testing, or background jobs by default. Those may
 become appropriate later, but they should not displace the remaining baseline
 hardening work.
+
+## Code-Grounded Evidence
+
+The assumptions above are grounded in the current repo as follows:
+
+- [server.go](/workspace/socialpredict/backend/server/server.go) registers
+  `/health`, `/readyz`, and `/ops/status` as unversioned infrastructure routes.
+- [operational_status.go](/workspace/socialpredict/backend/internal/app/runtime/operational_status.go)
+  owns the process-local request-failure counter used by `/ops/status`.
+- [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml) documents
+  `/ops/status` and the `OperationalStatus` response shape.
+- [default.conf.template](/workspace/socialpredict/data/nginx/vhosts/prod/default.conf.template)
+  publishes `/ops/status` through the production nginx proxy alongside
+  `/health` and `/readyz`.
+- [deploy-to-staging.yml](/workspace/socialpredict/.github/workflows/deploy-to-staging.yml)
+  and [deploy-to-production.yml](/workspace/socialpredict/.github/workflows/deploy-to-production.yml)
+  dispatch the downstream Ansible deploy and then run the public readiness
+  verification job.
+- [verify-public-readiness/action.yml](/workspace/socialpredict/.github/actions/verify-public-readiness/action.yml)
+  polls the public `/health` and `/readyz` endpoints and requires exact `live`
+  and `ready` bodies.
+- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go)
+  still parses bearer JWTs directly, reads `JWT_SIGNING_KEY` in the handler
+  path, and emits raw `http.Error` failures.
+- The remaining non-test `http.Error` calls under
+  [handlers/markets](/workspace/socialpredict/backend/handlers/markets) are
+  concentrated in legacy market handlers, while newer market helper code already
+  uses shared failure writers.
+
+DigitalOcean host metrics are not repository code. They are operator-provided
+fallback visibility for the current deployment environment and should not be
+treated as a substitute for app-owned status or future time-series monitoring.
 
 ## Highest-Priority Baseline Work
 
