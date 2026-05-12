@@ -201,7 +201,7 @@ The remaining live migration surface is explicit:
 
 | Surface | Current live behavior | Examples | Next-wave seam |
 | --- | --- | --- | --- |
-| Legacy markets reads and writes | Several handlers still emit raw `http.Error`; some successful delete/resolve paths still intentionally write status-only `204` responses. | `marketdetailshandler.go`, `searchmarkets.go`, `getmarkets.go`, `createmarket.go`, `resolvemarket.go`, `handler.go`, `listmarkets.go` | Split into a markets route-family wave, starting with read-only routes (`list/search/details/status/projection`) before write-sensitive create/update/resolve paths. |
+| Legacy markets reads and writes | The read-route failure slice for list/get/details and legacy label/update helpers now uses shared failure envelopes; remaining raw `http.Error` behavior is limited to the old resolve handler and disabled create compatibility bridge on this branch. Some successful delete/resolve paths still intentionally write status-only `204` responses. | `resolvemarket.go`, `createmarket.go` compatibility bridge | Finish or retire the remaining compatibility entry points without changing successful status-only action semantics. |
 | Legacy logger fallback | `logger.RequestLoggingMiddleware` still has a raw `http.Error` fallback for a nil handler, but the main server build path now uses `security.RequestBoundaryMiddleware`. | `logger/middleware.go` | Retire or convert this fallback after confirming no live route wiring still wraps requests with the old logger middleware. |
 | `backend/errors` package | No live request-boundary import remains after WAVE03; the package is compatibility-only test-covered code. | `errors/httperror.go`, `errors/normalerror.go` | Package deletion is a separate cleanup after route-family migrations confirm no generated docs, tests, or legacy adapters still depend on it. |
 
@@ -442,7 +442,7 @@ The intended direction is not:
 
 ## Concrete Next Migration Goals
 
-1. Follow with a markets read-route wave for `list/search/details/status/projection` raw `http.Error` handlers before touching write-sensitive create/update/resolve paths.
+1. Finish or retire the remaining market compatibility entry points that still emit raw `http.Error`, starting with the old resolve handler and disabled create bridge.
 2. Keep successful status-only `204` responses separate from failure migration work; only status-only failures should be converted to an explicit failure contract.
 3. Retire or convert the legacy logger middleware fallback after confirming no live server route build still uses it.
 4. Delete `backend/errors` only as a later cleanup after compatibility tests and adapters are removed; do not expand it into the central architecture.
