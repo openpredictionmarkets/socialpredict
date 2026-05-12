@@ -286,12 +286,24 @@ paths:
       responses:
         '200':
           description: Backend is live, ready, and serving operator status.
+          headers:
+            Cache-Control:
+              description: Operator status is runtime state and must not be cached.
+              schema:
+                type: string
+                example: no-store
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OperationalStatus'
         '503':
           description: Backend is not live or is not ready to serve traffic.
+          headers:
+            Cache-Control:
+              description: Operator status is runtime state and must not be cached.
+              schema:
+                type: string
+                example: no-store
           content:
             application/json:
               schema:
