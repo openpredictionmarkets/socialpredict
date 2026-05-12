@@ -3,9 +3,9 @@ title: Monitoring and Alerting Stage Test
 document_type: stage-test-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-03T14:25:55Z
-updated_at_display: "Sunday, May 03, 2026 at 02:25 PM UTC"
-update_reason: "Add staging verification checklist for the WAVE09 operational signal and first-alert contract."
+updated_at: 2026-05-12T00:00:00Z
+updated_at_display: "Tuesday, May 12, 2026"
+update_reason: "Align staging verification with the stable /ops/status JSON and cache-control contract."
 status: active
 ---
 
@@ -22,7 +22,7 @@ first operational signal set:
 
 - `/health` reports backend HTTP process liveness.
 - `/readyz` reports traffic readiness after startup and database availability.
-- `/ops/status` reports JSON `{ live, ready, requestFailuresTotal }`.
+- `/ops/status` reports JSON `{ live, ready, requestFailuresTotal, dbPool }`.
 - `/ops/status` is published at the public host root by nginx, not hidden behind
   `/api/` or direct `:8080` backend access.
 - non-probe backend `5xx` responses increment the process-local
@@ -41,7 +41,8 @@ first operational signal set:
 - [ ] Confirm public `https://STAGING_HOST/readyz` returns `200` and body `ready`
   after startup completes.
 - [ ] Confirm public `https://STAGING_HOST/ops/status` returns `200` JSON with
-  `live: true`, `ready: true`, and numeric `requestFailuresTotal`.
+  `live: true`, `ready: true`, numeric `requestFailuresTotal`, and a `dbPool`
+  object with SQL pool counters.
 - [ ] Confirm `/ops/status` response includes `Cache-Control: no-store`.
 - [ ] Confirm `/ops/status` does not expose business metrics such as money
   creation, utilization, user balances, or market accounting values.
@@ -87,8 +88,25 @@ curl -fsS https://STAGING_HOST/ops/status
 Expected shape:
 
 ```json
-{"live":true,"ready":true,"requestFailuresTotal":0}
+{
+  "live": true,
+  "ready": true,
+  "requestFailuresTotal": 0,
+  "dbPool": {
+    "maxOpenConnections": 25,
+    "openConnections": 1,
+    "inUseConnections": 0,
+    "idleConnections": 1,
+    "waitCount": 0,
+    "waitDurationNanoseconds": 0,
+    "maxIdleClosedConnections": 0,
+    "maxLifetimeClosedConnections": 0
+  }
+}
 ```
+
+The numeric `dbPool` values vary by runtime and traffic level; the field names
+and non-secret operator-only shape are the contract.
 
 On the staging server:
 

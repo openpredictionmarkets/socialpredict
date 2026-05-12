@@ -45,7 +45,7 @@ of pretending the migration is complete.
 Current route-family notes:
 
 - Infra probes use plain text: `/health` and `/readyz`.
-- Operator status uses JSON: `/ops/status`.
+- Operator status uses cache-disabled JSON: `/ops/status`.
 - Runtime middleware can return JSON `{ ok: false, reason }` for router-owned
   `405` and middleware-owned `429` failures.
 - Many newer or touched handlers return envelope-shaped success or failure
