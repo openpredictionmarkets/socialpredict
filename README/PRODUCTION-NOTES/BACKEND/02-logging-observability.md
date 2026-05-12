@@ -94,7 +94,7 @@ backend/
 
 - it provides a thin wrapper and ad hoc debug helpers in [loggingutils.go](/workspace/socialpredict/backend/logging/loggingutils.go)
 - it includes a mock in [mocklogging.go](/workspace/socialpredict/backend/logging/mocklogging.go)
-- it appears to have only one remaining active non-test import in [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go)
+- it no longer has active non-test imports after the retired standalone resolve-market handler was removed
 
 ### `backend/logger` is the live standardization target
 
@@ -261,8 +261,6 @@ backend/
 │   ├── loggingutils.go
 │   └── mocklogging.go
 ├── handlers/
-│   ├── markets/
-│   │   └── resolvemarket.go
 │   ├── metrics/
 │   │   ├── getgloballeaderboard.go
 │   │   └── getsystemmetrics.go

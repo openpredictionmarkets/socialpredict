@@ -2359,8 +2359,8 @@ components:
         handler-owned plain text failures. The current inventory is /health and
         /readyz probe transport plus older market compatibility entry points in
         handlers/markets/getmarkets.go, listmarkets.go, marketdetailshandler.go,
-        resolvemarket.go, and legacy update/get methods on handler.go. It is
-        not the target API contract; the next migration seam is the markets
+        and legacy update/get methods on handler.go. It is not the target API
+        contract; the next migration seam is the markets
         route family, where remaining still-routed failures should move to
         ReasonResponse and unused compatibility entry points should be retired
         without introducing a universal wrapper.

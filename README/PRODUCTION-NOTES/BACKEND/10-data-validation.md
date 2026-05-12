@@ -3,9 +3,9 @@ title: Data Validation
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-02T23:30:00Z
-updated_at_display: "Saturday, May 2, 2026 at 11:30 PM UTC"
-update_reason: "Close WAVE10 with the landed markets boundary-validation consolidation, remaining route-family bypass inventory, and explicit deferral of framework-heavy validation ideas."
+updated_at: 2026-05-12T00:00:00Z
+updated_at_display: "Tuesday, May 12, 2026"
+update_reason: "Remove the retired resolve-market bypass from the remaining markets boundary-validation inventory."
 status: active
 ---
 
@@ -14,6 +14,8 @@ status: active
 ## Update Summary
 
 On Sunday, May 10, 2026, this note was touched during API documentation consolidation. Its API follow-up reference now points to `backend/docs/README.md` because the old `backend/docs/API-ISSUES.md` file was folded into the canonical backend docs README.
+
+On Tuesday, May 12, 2026, the retired standalone `resolvemarket.go` handler was removed from the markets bypass inventory. The production resolve route already lives on `Handler.ResolveMarket`, which uses injected auth and shared failure helpers; the remaining validation work should focus on the market route slices still present in code.
 
 This note was updated on Saturday, May 2, 2026 to close WAVE10 with the validation-specific stop-and-review point. The wave consolidated the markets request-boundary seam without introducing a new validation framework, and this note now records the remaining route-family bypasses that should drive the next slice.
 
@@ -67,12 +69,12 @@ The remaining bypasses are route-family seams, not proof that SocialPredict need
 
 | Route family | Remaining bypass | Why it matters |
 | --- | --- | --- |
-| Markets legacy/details/actions | `handlers/markets/marketdetailshandler.go`, `resolvemarket.go`, `marketprojectedprobability.go`, and legacy methods on `handlers/markets/handler.go` still parse path/action input locally and some still use plain `http.Error` failure shaping | This is the closest continuation of WAVE10 because it keeps the work in the already-touched markets boundary and can reuse shared market ID, amount, outcome, and failure helpers |
+| Markets legacy/details/actions | `handlers/markets/marketdetailshandler.go`, `marketprojectedprobability.go`, and legacy methods on `handlers/markets/handler.go` still parse path/action input locally and some still use plain `http.Error` failure shaping | This is the closest continuation of WAVE10 because it keeps the work in the already-touched markets boundary and can reuse shared market ID, amount, outcome, and failure helpers |
 | Market bets and positions | `handlers/bets/betshandler.go` and `handlers/positions/positionshandler.go` have package-local `marketId` parsing helpers | Their failures already use `ReasonResponse`, but the parsing rule is duplicated instead of living in a shared request-boundary helper |
 | Private actions | `/v0/bet` and `/v0/sell` decode payloads locally and rely on domain services for amount/outcome validation | This preserves domain invariants, but there is still a boundary-helper gap for DTO-level malformed versus domain-invalid input if the route family is revisited |
 | Admin and content | Admin create-user now uses injected security validation, while CMS content remains a domain-specific HTML rendering/sanitization seam | These should not drive the next validation slice unless a concrete route behavior issue appears |
 
-The next validation seam should be the remaining markets path/action helper gap: consolidate market ID, projection amount, resolution outcome, and related failure shaping for market detail, resolve, projection, and legacy markets handler methods. That is a concrete route-family continuation of WAVE10 and should happen before any discussion of registries, generic request-body middleware, or a platform-wide validation subsystem.
+The next validation seam should be the remaining markets path/action helper gap: consolidate market ID, projection amount, and related failure shaping for market detail, projection, and legacy markets handler methods. That is a concrete route-family continuation of WAVE10 and should happen before any discussion of registries, generic request-body middleware, or a platform-wide validation subsystem.
 
 ## Why This Matters
 
