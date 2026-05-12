@@ -118,9 +118,5 @@ func (l betLedger) CreditSale(ctx context.Context, bet *boundary.Bet, saleValue 
 	if err := l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionSale); err != nil {
 		return err
 	}
-	if err := l.repo.Create(ctx, bet); err != nil {
-		_ = l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionBuy)
-		return err
-	}
-	return nil
+	return l.repo.Create(ctx, bet)
 }

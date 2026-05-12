@@ -18,34 +18,54 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 		return nil, ErrInvalidOutcome
 	}
 
-	if _, err := s.marketGate.Open(ctx, int64(req.MarketID)); err != nil {
-		return nil, err
+	if s.sellUnit == nil {
+		return nil, ErrSellTransactionUnavailable
 	}
 
-	sharesOwned, position, err := s.loadUserShares(ctx, req, outcome)
+	return s.sellInTransaction(ctx, req, outcome)
+}
+
+func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcome string) (*SellResult, error) {
+	var result *SellResult
+	err := s.sellUnit.SellBetTransaction(ctx, func(txCtx context.Context, repo Repository, markets MarketService, users UserService) error {
+		if _, err := (marketGate{markets: markets, clock: s.clock}).Open(txCtx, int64(req.MarketID)); err != nil {
+			return err
+		}
+
+		sharesOwned, position, err := loadUserSharesFrom(txCtx, markets, req, outcome)
+		if err != nil {
+			return err
+		}
+
+		sale, err := s.saleCalculator.Calculate(position, sharesOwned, req.Amount)
+		if err != nil {
+			return err
+		}
+		if sale.SharesToSell == 0 {
+			return ErrInsufficientShares
+		}
+
+		now := s.clock.Now()
+		bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
+		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, sale.SaleValue); err != nil {
+			return err
+		}
+
+		result = new(SellResult).Build(req, outcome, sale, now)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	sale, err := s.saleCalculator.Calculate(position, sharesOwned, req.Amount)
-	if err != nil {
-		return nil, err
-	}
-	if sale.SharesToSell == 0 {
-		return nil, ErrInsufficientShares
-	}
-
-	now := s.clock.Now()
-	bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
-	if err := s.ledger.CreditSale(ctx, bet, sale.SaleValue); err != nil {
-		return nil, err
-	}
-
-	return new(SellResult).Build(req, outcome, sale, now), nil
+	return result, nil
 }
 
 func (s *Service) loadUserShares(ctx context.Context, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, error) {
-	position, err := s.markets.GetUserPositionInMarket(ctx, int64(req.MarketID), req.Username)
+	return loadUserSharesFrom(ctx, s.markets, req, outcome)
+}
+
+func loadUserSharesFrom(ctx context.Context, markets PositionReader, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, error) {
+	position, err := markets.GetUserPositionInMarket(ctx, int64(req.MarketID), req.Username)
 	if err != nil {
 		return 0, nil, err
 	}
