@@ -184,15 +184,16 @@ Those are the areas where new testing effort should go first.
 
 ### WAVE07 source-of-truth stop-and-review
 
-WAVE07 added two narrow DSN-gated Postgres checks without introducing `testcontainers-go`, a top-level `testing/` tree, a shared `TestSuite`, or a broad fast/slow taxonomy:
+WAVE07 added narrow DSN-gated Postgres checks without introducing `testcontainers-go`, a top-level `testing/` tree, a shared `TestSuite`, or a broad fast/slow taxonomy:
 
 - [postgres_startup_integration_test.go](/workspace/socialpredict/backend/postgres_startup_integration_test.go) verifies the real-Postgres startup path keeps readiness closed before startup completion, stops before seed writes after migration failure, records successful writer migrations, lets non-writers verify already-applied migrations, and fails non-writers when a registered migration is missing.
 - [place_transaction_postgres_test.go](/workspace/socialpredict/backend/internal/repository/bets/place_transaction_postgres_test.go) verifies place-bet debit and bet creation commit together, bet-create failure rolls back the debit, and overlapping debits serialize so only one insufficient-balance-sensitive placement commits.
+- [market_resolution_postgres_test.go](/workspace/socialpredict/backend/internal/domain/analytics/market_resolution_postgres_test.go) verifies the existing resolve-market payout accounting path against real Postgres and checks that resolved user positions do not retain simultaneous positive YES and NO shares.
 
 That evidence narrows, but does not eliminate, the DB-truth gap. The remaining behaviors that still lack source-of-truth Postgres verification are:
 
 - sell-position transaction behavior: the fake-backed service tests prove quote and ordering rules, but not real row locking, debit/credit atomicity, or concurrent sale safety against Postgres.
-- resolve-market transaction behavior: the fake-backed resolution tests prove payout/refund order and authorization policy, but not atomic persistence of resolution state plus payouts/refunds under concurrent access.
+- resolve-market transaction behavior: fake-backed and DSN-gated Postgres tests now cover payout/refund order, authorization policy, and real-Postgres accounting output, but not atomic persistence of resolution state plus payouts/refunds under concurrent access.
 - persisted auth-state route behavior: the server tests prove middleware contract shape, but `mustChangePassword` enforcement and the intentionally exempt login/change-password flows are not yet exercised against DB-truthful user state.
 - production DB outage and recovery modes beyond the current startup-posture check: WAVE07 proves the readiness gate with a real Postgres handle and migration outcomes, but does not yet simulate live connection loss, pool exhaustion, SSL-mode mismatch, or recovery after outage.
 - migration/startup serialization across multiple real processes: WAVE07 proves writer versus non-writer posture and missing-migration failure against Postgres, but not advisory locking or multi-replica leader coordination because that mechanism is not yet selected.
@@ -264,10 +265,10 @@ In practice, that means:
 4. Strengthen accounting-sensitive verification for:
    - place bet, with DSN-gated Postgres commit/rollback/serialization coverage completed on May 1, 2026
    - sell position
-   - resolve market
+   - resolve market, with DSN-gated Postgres payout/accounting coverage added while transaction/concurrency policy remains open
 5. Add a small number of Postgres-backed checks only where SQLite is a poor proxy. After the May 1 WAVE07 additions, the remaining concrete targets are:
    - W04 sell-position transaction behavior under concurrent accounting-sensitive writes
-   - W04 resolve-market transaction behavior under concurrent payout/refund-sensitive writes
+   - W04 resolve-market transaction/concurrency behavior under payout/refund-sensitive writes
    - W04 runtime DB readiness against production outage and recovery modes not covered by the startup-posture check
    - W04 migration/startup-writer serialization across multiple real processes once the locking or leader mechanism is chosen
    - W06 persisted auth-state contract checks, especially `mustChangePassword` enforcement and the intentionally exempt login/change-password flows, when route tests need DB-truthful user state rather than fake collaborators
