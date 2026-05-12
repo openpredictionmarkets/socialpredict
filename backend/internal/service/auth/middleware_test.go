@@ -522,6 +522,63 @@ func TestValidateTokenAndGetUser_InvalidToken(t *testing.T) {
 	}
 }
 
+func TestValidateTokenAndGetUserFromToken_ValidToken(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	signingKey := []byte("test-secret-key")
+
+	testUser := modelstesting.GenerateUser("token-user", 1000)
+	if err := testUser.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := db.Create(&testUser).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	token, err := generateJWT(testUser.Username, signingKey)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	user, authErr := ValidateTokenAndGetUserFromToken(t.Context(), token, svc, signingKey)
+
+	if authErr != nil {
+		t.Fatalf("expected valid token, got %v", authErr)
+	}
+	if user == nil || user.Username != testUser.Username {
+		t.Fatalf("unexpected user: %+v", user)
+	}
+}
+
+func TestValidateUserAndEnforcePasswordChangeFromToken_PasswordChangeRequired(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	signingKey := []byte("test-secret-key")
+
+	testUser := modelstesting.GenerateUser("token-reset-user", 1000)
+	testUser.MustChangePassword = true
+	if err := testUser.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := db.Create(&testUser).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	token, err := generateJWT(testUser.Username, signingKey)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	user, authErr := ValidateUserAndEnforcePasswordChangeFromToken(t.Context(), token, svc, signingKey)
+
+	if user != nil {
+		t.Fatalf("expected nil user when password change is required")
+	}
+	if authErr == nil || authErr.Kind != ErrorKindPasswordChangeRequired {
+		t.Fatalf("expected password-change error, got %v", authErr)
+	}
+}
+
 func TestValidateAdminToken_MissingHeader(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
@@ -587,6 +644,40 @@ func TestAuthServiceRequireAdmin_EnforcesPasswordChange(t *testing.T) {
 	}
 	if authErr.Kind != ErrorKindPasswordChangeRequired {
 		t.Fatalf("expected kind %q, got %q", ErrorKindPasswordChangeRequired, authErr.Kind)
+	}
+}
+
+func TestAuthServiceRequireAdminFromToken_SucceedsForAdmin(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	signingKey := []byte("test-secret-key")
+
+	admin := modelstesting.GenerateUser("token-admin", 1000)
+	admin.UserType = "ADMIN"
+	admin.MustChangePassword = false
+	if err := admin.HashPassword("password123"); err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := db.Create(&admin).Error; err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	if err := db.Model(&admin).Update("must_change_password", false).Error; err != nil {
+		t.Fatalf("clear must-change flag: %v", err)
+	}
+
+	svc := dusers.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer)
+	auth := NewAuthService(svc, signingKey)
+	token, err := generateJWT(admin.Username, signingKey)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	user, authErr := auth.RequireAdminFromToken(t.Context(), token)
+
+	if authErr != nil {
+		t.Fatalf("expected admin token, got %v", authErr)
+	}
+	if user == nil || user.Username != admin.Username {
+		t.Fatalf("unexpected user: %+v", user)
 	}
 }
 

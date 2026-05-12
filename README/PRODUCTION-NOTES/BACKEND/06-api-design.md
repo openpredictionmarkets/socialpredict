@@ -310,6 +310,9 @@ The live API already has important auth contract rules:
 - `POST /v0/changepassword` intentionally remains usable when `mustChangePassword` is set
 - touched private-user auth failures are translated at the HTTP boundary and do
   not expose raw auth service messages in response bodies
+- `internal/service/auth` now has token-string validation entry points so
+  future HTTP adapters can extract bearer tokens at the boundary before calling
+  auth policy code
 
 Grounding:
 

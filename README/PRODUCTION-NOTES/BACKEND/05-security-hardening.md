@@ -3,9 +3,9 @@ title: Security Hardening
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record WAVE05 completion evidence, keep the remaining security future work scoped, and preserve the next precise auth-boundary seam."
+updated_at: 2026-05-12T00:00:00Z
+updated_at_display: "Tuesday, May 12, 2026"
+update_reason: "Record the first token-string auth service seam while keeping broader identity-platform work deferred."
 status: active
 ---
 
@@ -24,6 +24,8 @@ On Thursday, April 30, 2026, WAVE05 finished the first runtime-security ownershi
 | Runtime-owned `405` and `429` responses now use shared JSON failure envelopes. | [failures.go](/workspace/socialpredict/backend/security/failures.go), [server.go](/workspace/socialpredict/backend/server/server.go), and black-box checks for `METHOD_NOT_ALLOWED` and `LOGIN_RATE_LIMITED`. |
 | Login and admin-user request validation use the shared security service through application wiring. | [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go), [adduser.go](/workspace/socialpredict/backend/handlers/admin/adduser.go), and `go test ./internal/service/auth ./handlers/admin`. |
 | Private action routes now enforce `mustChangePassword` before domain handlers run. | [server.go](/workspace/socialpredict/backend/server/server.go), server tests, and a Docker smoke check showing `/v0/privateprofile` and `/v0/bet` return `PASSWORD_CHANGE_REQUIRED` before password change and succeed after password change. |
+
+On Tuesday, May 12, 2026, `internal/service/auth` gained token-string and `context.Context` validation entry points. Existing request-shaped helpers remain as compatibility wrappers, but token parsing and user lookup now have a non-HTTP seam that future handler adapters can call after extracting bearer tokens at the request boundary.
 
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
@@ -142,7 +144,7 @@ The current auth helper layer now returns `AuthError` values from [auth.go](/wor
 
 That is cleaner than the earlier transport-shaped `HTTPError` seam, but auth is not fully centralized yet:
 
-- auth helpers still take `*http.Request`
+- auth helpers still expose `*http.Request` compatibility wrappers, though token-string validation entry points now exist underneath them
 - some legacy market paths still translate auth failures into raw `http.Error` responses
 - [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go) still parses JWTs directly and reads `JWT_SIGNING_KEY` instead of going through the auth service contract
 
@@ -294,7 +296,7 @@ Those topics now belong in [FUTURE/01-long-term-security-hardening.md](/workspac
 The near-term security direction should align with the current design-plan waves rather than invent a separate security-platform track.
 
 1. Keep configuration and runtime ownership explicit so JWT key presence, CORS posture, and runtime-sensitive security settings are not hidden in ad hoc helpers.
-2. Use the next auth-boundary slice to migrate [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go) away from direct JWT parsing and raw auth failures.
+2. Continue migrating handler adapters toward token extraction at the HTTP boundary plus `internal/service/auth` token-string validation, starting with [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go).
 3. Use the active error-handling wave to converge remaining market handler failures and other sanitized boundary behavior on shared envelopes.
 4. Tighten CORS, proxy-trust, and header posture once deployment assumptions are explicit.
 5. Keep long-term identity and security-platform work deferred until the active production notes and current design-plan waves are complete.
