@@ -23,6 +23,8 @@ On Sunday, May 3, 2026, the production nginx template was updated to publish `/o
 
 On Tuesday, May 12, 2026, `/ops/status` was tightened as a stable cache-disabled JSON operator contract. Server tests assert the top-level fields `live`, `ready`, `requestFailuresTotal`, and `dbPool`, plus the current SQL pool counter field names. The staging checklist and OpenAPI response headers now call out `Cache-Control: no-store`.
 
+Also on Tuesday, May 12, 2026, the request-boundary observability chain was made explicit. `security.RequestBoundaryMiddlewareWithProxyTrust` is the production owner for request IDs, trace correlation, completion logs, and panic recovery; `OperationalMetrics.Middleware` is the production owner for the first app-owned request-failure counter exposed through `/ops/status`.
+
 The staging verification checklist for this wave lives in [STAGETEST/09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/STAGETEST/09-monitoring-alerting.md).
 
 The WAVE09 stop-and-review point is that the backend can now support a first alert set for backend down, backend unready, fatal startup failure before readiness opens, and severe server-side request-failure spikes. Broader dashboards or external monitoring platforms should not start until the next app-owned signal seam is chosen and landed.
@@ -116,6 +118,8 @@ The current backend signal contract is intentionally small:
 
 This inventory reflects the live server wiring in [server.go](/workspace/socialpredict/backend/server/server.go), startup order in [main.go](/workspace/socialpredict/backend/main.go), and runtime failure helpers in [security/failures.go](/workspace/socialpredict/backend/security/failures.go) and [security/requestboundary.go](/workspace/socialpredict/backend/security/requestboundary.go).
 
+The production request-boundary chain is intentionally singular: do not add `logger.RequestLoggingMiddleware` to `server.go`. Request completion logging belongs to `security.RequestBoundaryMiddlewareWithProxyTrust`, while the process-local failure counter belongs to `OperationalMetrics.Middleware`. Keeping those responsibilities separate avoids duplicate completion logs and keeps `/ops/status.requestFailuresTotal` tied to the same public response status an operator sees.
+
 ### First supported alert set
 
 The current backend can support only this first alert set:
@@ -208,7 +212,7 @@ The design-plan-aligned monitoring direction is:
 
 The remaining gaps should stay narrow and tied to runtime signals the backend can own:
 
-- Add request-boundary latency and duration fields before promising latency dashboards.
+- Add richer request-boundary latency and duration aggregation before promising latency dashboards.
 - Decide whether the next app-owned counter should classify failures by route family, stable reason, or status class before adding more counters.
 - Add process identity or start-time metadata if operators need to distinguish counter resets from real recovery.
 - Decide which traffic-volume and edge-failure signals belong in the backend versus nginx or Traefik before moving proxy observations into app docs.
