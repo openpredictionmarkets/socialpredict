@@ -1,7 +1,6 @@
 package marketshandlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -14,32 +13,25 @@ func GetMarketsHandler(svc dmarkets.ServiceInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params, err := parseGetMarketsParams(r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeInvalidRequest(w)
 			return
 		}
 
 		// 3. Call domain service
 		markets, err := svc.ListMarkets(r.Context(), params.filters)
 		if err != nil {
-			// 4. Map domain errors to HTTP status codes
-			switch err {
-			case dmarkets.ErrInvalidInput:
-				http.Error(w, "Invalid input parameters", http.StatusBadRequest)
-			default:
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-			}
+			writeListError(w, err)
 			return
 		}
 
 		overviews, err := buildMarketOverviewResponses(r.Context(), svc, markets)
 		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			writeInternalError(w)
 			return
 		}
 
 		// 7. Return response
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(dto.ListMarketsResponse{
+		_ = writeJSON(w, http.StatusOK, dto.ListMarketsResponse{
 			Markets: overviews,
 			Total:   len(overviews),
 		})

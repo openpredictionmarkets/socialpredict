@@ -215,10 +215,8 @@ the canonical registered `/v0` route boundary.
 
 Examples include:
 
-- [getmarkets.go](/workspace/socialpredict/backend/handlers/markets/getmarkets.go)
-- [listmarkets.go](/workspace/socialpredict/backend/handlers/markets/listmarkets.go)
-- [marketdetailshandler.go](/workspace/socialpredict/backend/handlers/markets/marketdetailshandler.go)
 - [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go)
+- the disabled market-create compatibility bridge in [createmarket.go](/workspace/socialpredict/backend/handlers/markets/createmarket.go)
 
 #### Middleware and infra transport responses
 
@@ -282,9 +280,8 @@ migration-state marker for infra probe failures and untouched handler-owned
 plain-text failures still being retired. At this checkpoint that means
 intentional `/health` and `/readyz` probe transport plus the remaining markets
 compatibility seams listed in [backend/docs/README.md](/workspace/socialpredict/backend/docs/README.md):
-`getmarkets.go`, `listmarkets.go`, `marketdetailshandler.go`,
-`resolvemarket.go`, legacy update/get methods on `handler.go`, and
-market-create compatibility helpers in `createmarket.go`.
+`resolvemarket.go` and the disabled market-create compatibility bridge in
+`createmarket.go`.
 
 It is not the target application contract. Touched `/v0` route families should
 converge toward `ReasonResponse` or documented infra transport behavior rather

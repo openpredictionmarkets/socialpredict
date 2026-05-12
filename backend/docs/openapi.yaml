@@ -70,7 +70,7 @@ x-route-family-migration-matrix:
       - create/search distinguish INVALID_REQUEST boundary failures from VALIDATION_FAILED domain validation failures
     remaining_boundary_validation_bypasses:
       - family: markets
-        gap: market detail, resolve, projection, and legacy markets methods still own local path/action parsing and some plain http.Error shaping
+        gap: resolve, projection, and remaining legacy markets methods still own local path/action parsing; legacy market list/get/details/update failures now use shared failure envelopes
       - family: market-bets-and-positions
         gap: marketId path parsing is duplicated in bets and positions handlers even though failures already use ReasonResponse
       - family: private-actions
@@ -2370,12 +2370,12 @@ components:
         Explicit migration-state schema for infra probe failures and untouched
         handler-owned plain text failures. The current inventory is /health and
         /readyz probe transport plus older market compatibility entry points in
-        handlers/markets/getmarkets.go, listmarkets.go, marketdetailshandler.go,
-        resolvemarket.go, and legacy update/get methods on handler.go. It is
-        not the target API contract; the next migration seam is the markets
-        route family, where remaining still-routed failures should move to
-        ReasonResponse and unused compatibility entry points should be retired
-        without introducing a universal wrapper.
+        handlers/markets/resolvemarket.go and the disabled market-create
+        compatibility bridge in createmarket.go. It is not the target API
+        contract; the next migration seam is the markets route family, where
+        remaining still-routed failures should move to ReasonResponse and
+        unused compatibility entry points should be retired without introducing
+        a universal wrapper.
 
     OperationalStatus:
       type: object

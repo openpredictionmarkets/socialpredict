@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"socialpredict/handlers"
+	dmarkets "socialpredict/internal/domain/markets"
+
 	"github.com/gorilla/mux"
 )
 
@@ -121,4 +124,28 @@ func TestMarketDetailsHandler_MarketDustZeroWithNoBets(t *testing.T) {
 	if response.TotalVolume != 0 {
 		t.Errorf("Expected total volume to be 0 with no bets, got %d", response.TotalVolume)
 	}
+}
+
+func TestMarketDetailsHandler_UsesFailureEnvelope(t *testing.T) {
+	t.Run("invalid market id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/not-an-id", nil)
+		req = mux.SetURLVars(req, map[string]string{"marketId": "not-an-id"})
+		w := httptest.NewRecorder()
+
+		MarketDetailsHandler(&listMarketsServiceMock{}).ServeHTTP(w, req)
+
+		assertFailureEnvelope(t, w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("market not found", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/404", nil)
+		req = mux.SetURLVars(req, map[string]string{"marketId": "404"})
+		w := httptest.NewRecorder()
+
+		MarketDetailsHandler(&listMarketsServiceMock{
+			detailsErrByID: map[int64]error{404: dmarkets.ErrMarketNotFound},
+		}).ServeHTTP(w, req)
+
+		assertFailureEnvelope(t, w, http.StatusNotFound, handlers.ReasonMarketNotFound)
+	})
 }
