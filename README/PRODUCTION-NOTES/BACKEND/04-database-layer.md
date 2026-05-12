@@ -304,7 +304,9 @@ It does not require a global DAL or generic transaction wrapper for every workfl
 
 ### WAVE04-DB-005 transaction inventory
 
-The first migrated accounting-sensitive workflow is place bet.
+The first migrated accounting-sensitive workflow was place bet. On Monday,
+May 11, 2026, sell-position settlement also moved onto an explicit repository
+unit-of-work seam.
 
 For place bet, the atomic unit of work is:
 
@@ -317,9 +319,21 @@ Those steps now commit or roll back together. The transaction starts in the bets
 
 Primary-DB concurrency protection for place bet is the betting user's row. The transaction-bound user adapter applies `FOR UPDATE` when running on Postgres before computing and updating the balance. SQLite-backed tests skip that dialect-specific lock clause but still verify rollback behavior.
 
+For sell position, the atomic unit of work is:
+
+- verify the market is still open through the transaction-scoped market reader
+- derive the seller's current position from the transaction-scoped market and bet
+  snapshot
+- credit the seller's account balance for the sale value
+- insert the negative sale bet row
+
+Those steps now commit or roll back together through the bets repository
+`SellBetTransaction` adapter. On Postgres, the transaction-scoped sell reader
+locks the market row before deriving the seller's position, and the user
+balance collaborator locks the seller's account row before applying the credit.
+
 Remaining accounting-sensitive transaction surface:
 
-- Sell position still uses the older compensation-style `CreditSale` path. It needs one transaction covering position/bet-history reads, balance credit, sale bet insert, and position-sensitive concurrency protection.
 - Market resolution still needs an explicit transaction boundary for resolution state, payout/accounting writes, and prevention of overlapping resolution or betting writes.
 - Market-resolution interaction with place bet is still a surface to harden because the current place-bet transaction protects the user balance row, not the market row or a resolution gate.
 

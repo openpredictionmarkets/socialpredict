@@ -27,6 +27,14 @@ type PlaceUnitOfWork interface {
 	PlaceBetTransaction(ctx context.Context, fn PlaceTransactionFunc) error
 }
 
+// SellTransactionFunc runs sale settlement against transaction-bound collaborators.
+type SellTransactionFunc func(ctx context.Context, repo Repository, markets MarketService, users UserService) error
+
+// SellUnitOfWork scopes sale credit and sale-bet writes to one database transaction.
+type SellUnitOfWork interface {
+	SellBetTransaction(ctx context.Context, fn SellTransactionFunc) error
+}
+
 // Repository exposes the persistence layer needed by the bets domain service.
 type Repository interface {
 	BetWriter
@@ -140,6 +148,7 @@ type Service struct {
 	ledger         BetLedger
 	saleCalculator SaleCalculator
 	placeUnit      PlaceUnitOfWork
+	sellUnit       SellUnitOfWork
 }
 
 var (
@@ -248,6 +257,16 @@ func placeUnitOfWorkOrDefault(u PlaceUnitOfWork, repo Repository) PlaceUnitOfWor
 	return nil
 }
 
+func sellUnitOfWorkOrDefault(u SellUnitOfWork, repo Repository) SellUnitOfWork {
+	if u != nil {
+		return u
+	}
+	if repoUnit, ok := repo.(SellUnitOfWork); ok {
+		return repoUnit
+	}
+	return nil
+}
+
 // WithPlaceValidator overrides the place validator.
 func WithPlaceValidator(v PlaceValidator) ServiceOption {
 	return func(s *Service) {
@@ -320,6 +339,15 @@ func WithPlaceUnitOfWork(u PlaceUnitOfWork) ServiceOption {
 	}
 }
 
+// WithSellUnitOfWork overrides the transaction scope used by sell-settlement writes.
+func WithSellUnitOfWork(u SellUnitOfWork) ServiceOption {
+	return func(s *Service) {
+		if s != nil {
+			s.sellUnit = sellUnitOfWorkOrDefault(u, s.repo)
+		}
+	}
+}
+
 // WithClock overrides the service clock.
 func WithClock(clock Clock) ServiceOption {
 	return func(s *Service) {
@@ -361,4 +389,5 @@ func (s *Service) ensureDefaults() {
 	s.ledger = betLedgerOrDefault(s.ledger, s.repo, s.users)
 	s.saleCalculator = saleCalculatorOrDefault(s.saleCalculator, s.config)
 	s.placeUnit = placeUnitOfWorkOrDefault(s.placeUnit, s.repo)
+	s.sellUnit = sellUnitOfWorkOrDefault(s.sellUnit, s.repo)
 }

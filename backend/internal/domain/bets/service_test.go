@@ -15,9 +15,9 @@ import (
 
 // Bets service tests use fakes to keep accounting rules package-local and fast.
 // They prove ordering and collaborator boundaries, not database truth. WAVE07
-// added repository-level Postgres proof for place-bet transaction behavior;
-// sell-position concurrency still needs source-of-truth verification once its
-// repository transaction scope is finalized.
+// added repository-level Postgres proof for place-bet transaction behavior.
+// Sell-position settlement now has a repository transaction seam; broader
+// market-resolution accounting remains separate.
 
 var errUnexpectedServiceCall = errors.New("unexpected call")
 
@@ -34,6 +34,16 @@ type fakePlaceUnit struct {
 
 func (f fakePlaceUnit) PlaceBetTransaction(ctx context.Context, fn bets.PlaceTransactionFunc) error {
 	return fn(ctx, f.repo, f.users)
+}
+
+type fakeSellUnit struct {
+	repo    bets.Repository
+	markets bets.MarketService
+	users   bets.UserService
+}
+
+func (f fakeSellUnit) SellBetTransaction(ctx context.Context, fn bets.SellTransactionFunc) error {
+	return fn(ctx, f.repo, f.markets, f.users)
 }
 
 func newFakeRepo(opts ...func(*fakeRepo)) *fakeRepo {
@@ -329,6 +339,7 @@ func newServiceFixture(now time.Time, opts ...serviceFixtureOption) (*serviceFix
 		opt(fixture)
 	}
 	placeUnit := fakePlaceUnit{repo: fixture.repo, users: fixture.users}
+	sellUnit := fakeSellUnit{repo: fixture.repo, markets: fixture.markets, users: fixture.users}
 	svc := bets.NewService(
 		fixture.repo,
 		fixture.markets,
@@ -336,6 +347,7 @@ func newServiceFixture(now time.Time, opts ...serviceFixtureOption) (*serviceFix
 		fixture.config,
 		fixture.clock,
 		bets.WithPlaceUnitOfWork(placeUnit),
+		bets.WithSellUnitOfWork(sellUnit),
 	)
 	return fixture, svc
 }

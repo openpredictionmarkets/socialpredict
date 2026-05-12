@@ -42,6 +42,8 @@ var (
 	ErrInsufficientBalance BetError = newDomainError("insufficient balance for requested bet")
 	// ErrPlaceTransactionUnavailable indicates the buy flow has no explicit transaction boundary.
 	ErrPlaceTransactionUnavailable BetError = newDomainError("place bet transaction boundary unavailable")
+	// ErrSellTransactionUnavailable indicates the sell flow has no explicit transaction boundary.
+	ErrSellTransactionUnavailable BetError = newDomainError("sell transaction boundary unavailable")
 	// ErrNoPosition indicates the user has no position to sell.
 	ErrNoPosition BetError = newDomainError("no position found for the given market and outcome")
 	// ErrInsufficientShares indicates the user cannot sell the requested credits.
