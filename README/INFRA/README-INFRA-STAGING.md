@@ -104,6 +104,12 @@ The generated `.env` on the host contains values such as `ADMIN_PASSWORD`.
 That value can change after a deployment because the install flow regenerates
 runtime secrets.
 
+Staging currently uses the same packaged local Docker Postgres topology as the
+production guide describes. `DB_REQUIRE_TLS=false` is appropriate for that
+local compose database. If staging is moved to an external managed database,
+review `DB_REQUIRE_TLS` and `DB_SSLMODE` instead of carrying the packaged local
+database setting forward automatically.
+
 ## Production / Model Office Difference
 
 Production is documented separately in
