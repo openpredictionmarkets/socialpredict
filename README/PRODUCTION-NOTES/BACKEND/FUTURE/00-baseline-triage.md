@@ -3,9 +3,9 @@ title: Future Backend Baseline Triage
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-11T00:00:00Z
-updated_at_display: "Monday, May 11, 2026"
-update_reason: "Add a baseline triage document to rank future backend work after release and deployment hardening."
+updated_at: 2026-05-11T20:20:00Z
+updated_at_display: "Monday, May 11, 2026 at 8:20 PM CDT"
+update_reason: "Add a baseline triage document to rank future backend work after release and deployment hardening, then align the design-plan source note with the updated spec-socialpredict-tasks layout."
 status: draft
 ---
 
@@ -272,9 +272,25 @@ If the answer is no, keep the item in `FUTURE`.
 
 ## Design Plan Alignment
 
-The read-only design-plan reference emphasizes runtime boundary cleanup,
-configuration/service ownership, legacy-model decoupling, and API/auth contract
-alignment in small reversible steps.
+The read-only `spec-socialpredict-tasks` reference was checked at commit
+`7ad1a11` after the workspace contract update. That repo now treats
+`lib/design/` as the canonical home for repository-level design-plan state, and
+`lib/task-registry.json` is version `2`.
+
+One important caveat: the current `lib/design/design-plan.json` is a
+schema-shaped placeholder, not a populated SocialPredict architecture plan. It
+does not currently override the populated root-level `design-plan.json` or the
+completed task/archive evidence in the same reference repo. When
+`lib/design/design-plan.json` is populated with real SocialPredict content, it
+should become the preferred design-plan source for future triage updates.
+
+The populated read-only design-plan reference still emphasizes runtime boundary
+cleanup, configuration/service ownership, legacy-model decoupling, and API/auth
+contract alignment in small reversible steps. The version-2 task registry and
+archive history also reinforce that the earlier boundary-cleanup waves are
+completed or archived, so the next baseline work should target remaining
+operational and API/auth boundary seams rather than reopen completed
+prerequisite architecture work.
 
 This triage follows that posture:
 
@@ -284,7 +300,8 @@ This triage follows that posture:
 - Grafana, Prometheus, Kubernetes, Terraform, OAuth, and queues remain deferred
   until smaller seams prove the need
 
-The design plan does not need a full rewrite before this triage document. If
-the next branch starts implementing `/ops/status` changes or market route auth
-cleanup, the active design plan should receive a short update naming that
-specific next slice.
+The design plan does not need a full rewrite before this triage document. The
+next planning update should be narrow: either populate the canonical
+`spec-socialpredict-tasks/lib/design/design-plan.json` with the current
+SocialPredict plan, or add a short active-slice note there before implementing
+`/ops/status` changes or market route auth cleanup.
