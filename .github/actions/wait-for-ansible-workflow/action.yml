@@ -1,0 +1,102 @@
+name: Wait for Ansible Workflow
+description: Wait for a repository_dispatch-triggered workflow run in the Ansible deployment repository.
+
+inputs:
+  repository:
+    description: GitHub repository containing the Ansible deployment workflow.
+    required: true
+  workflow:
+    description: Ansible workflow name to wait for.
+    required: true
+  dispatched-at:
+    description: UTC timestamp captured immediately before repository_dispatch.
+    required: true
+  find-timeout-seconds:
+    description: Maximum time to wait for the dispatched workflow run to appear.
+    required: false
+    default: '300'
+  completion-timeout-seconds:
+    description: Maximum time to wait for the dispatched workflow run to complete.
+    required: false
+    default: '3600'
+
+outputs:
+  run-url:
+    description: URL of the matched Ansible workflow run.
+    value: ${{ steps.wait.outputs.run_url }}
+
+runs:
+  using: composite
+  steps:
+    - id: wait
+      shell: bash
+      env:
+        ANSIBLE_REPOSITORY: ${{ inputs.repository }}
+        ANSIBLE_WORKFLOW: ${{ inputs.workflow }}
+        DISPATCHED_AT: ${{ inputs.dispatched-at }}
+        FIND_TIMEOUT_SECONDS: ${{ inputs.find-timeout-seconds }}
+        COMPLETION_TIMEOUT_SECONDS: ${{ inputs.completion-timeout-seconds }}
+      run: |
+        set -euo pipefail
+
+        : "${GH_TOKEN:?GH_TOKEN must be set to a token that can read the Ansible repository Actions runs.}"
+
+        echo "Waiting for '${ANSIBLE_WORKFLOW}' in ${ANSIBLE_REPOSITORY} after ${DISPATCHED_AT}."
+
+        find_deadline=$((SECONDS + FIND_TIMEOUT_SECONDS))
+        run_id=""
+        run_url=""
+
+        while (( SECONDS < find_deadline )); do
+          runs_json="$(gh run list \
+            --repo "${ANSIBLE_REPOSITORY}" \
+            --workflow "${ANSIBLE_WORKFLOW}" \
+            --event repository_dispatch \
+            --limit 20 \
+            --json databaseId,status,conclusion,createdAt,url,event)"
+
+          run_json="$(printf '%s' "${runs_json}" | jq -c --arg dispatched_at "${DISPATCHED_AT}" \
+            '[.[] | select(.createdAt >= $dispatched_at)] | sort_by(.createdAt) | reverse | .[0] // empty')"
+
+          if [[ -n "${run_json}" ]]; then
+            run_id="$(printf '%s' "${run_json}" | jq -r '.databaseId')"
+            run_url="$(printf '%s' "${run_json}" | jq -r '.url')"
+            echo "Matched Ansible workflow run: ${run_url}"
+            echo "run_url=${run_url}" >> "${GITHUB_OUTPUT}"
+            break
+          fi
+
+          echo "No matching Ansible workflow run found yet; checking again in 10 seconds."
+          sleep 10
+        done
+
+        if [[ -z "${run_id}" ]]; then
+          echo "Timed out waiting for the Ansible workflow run to appear."
+          exit 1
+        fi
+
+        completion_deadline=$((SECONDS + COMPLETION_TIMEOUT_SECONDS))
+        while (( SECONDS < completion_deadline )); do
+          run_json="$(gh run view "${run_id}" \
+            --repo "${ANSIBLE_REPOSITORY}" \
+            --json status,conclusion,url)"
+
+          status="$(printf '%s' "${run_json}" | jq -r '.status')"
+          conclusion="$(printf '%s' "${run_json}" | jq -r '.conclusion // ""')"
+
+          echo "Ansible workflow status: ${status}${conclusion:+ (${conclusion})}"
+
+          if [[ "${status}" == "completed" ]]; then
+            if [[ "${conclusion}" == "success" ]]; then
+              exit 0
+            fi
+
+            echo "Ansible workflow did not succeed: ${run_url}"
+            exit 1
+          fi
+
+          sleep 30
+        done
+
+        echo "Timed out waiting for the Ansible workflow run to complete: ${run_url}"
+        exit 1

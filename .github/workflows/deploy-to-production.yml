@@ -5,18 +5,38 @@ on:
     workflows: ["Create and publish Docker images"]
     types: [completed]
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  ANSIBLE_REPOSITORY: openpredictionmarkets/ansible_playbooks
+  ANSIBLE_WORKFLOW: Deploy to Production with Ansible
+  PRODUCTION_URL: https://brierfoxforecast.com
+
 jobs:
-  deploy:
+  dispatch-deploy:
+    name: Dispatch production deploy
     runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'release'
+      }}
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      dispatched_at: ${{ steps.dispatch-metadata.outputs.dispatched_at }}
     steps:
+      - name: Capture dispatch timestamp
+        id: dispatch-metadata
+        run: echo "dispatched_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Deploy SocialPredict to Production
-        if: ${{ github.event.workflow_run.conclusion == 'success' }}
         uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.ANSIBLE_PLAYBOOK_TOKEN }}
-          repository: openpredictionmarkets/ansible_playbooks
+          repository: ${{ env.ANSIBLE_REPOSITORY }}
           event-type: deploy-to-production
           client-payload: >-
             {
@@ -24,3 +44,39 @@ jobs:
               "serving_backend_service": "backend",
               "serving_startup_writer": "false"
             }
+
+  wait-for-ansible-deploy:
+    name: Wait for Ansible production deploy
+    runs-on: ubuntu-latest
+    needs: dispatch-deploy
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout workflow helpers
+        uses: actions/checkout@v5
+
+      - name: Wait for downstream Ansible workflow
+        uses: ./.github/actions/wait-for-ansible-workflow
+        env:
+          GH_TOKEN: ${{ secrets.ANSIBLE_PLAYBOOK_TOKEN }}
+        with:
+          repository: ${{ env.ANSIBLE_REPOSITORY }}
+          workflow: ${{ env.ANSIBLE_WORKFLOW }}
+          dispatched-at: ${{ needs.dispatch-deploy.outputs.dispatched_at }}
+
+  verify-public-readiness:
+    name: Verify public production readiness
+    runs-on: ubuntu-latest
+    needs: wait-for-ansible-deploy
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout workflow helpers
+        uses: actions/checkout@v5
+
+      - name: Verify public liveness and readiness
+        uses: ./.github/actions/verify-public-readiness
+        with:
+          base-url: ${{ env.PRODUCTION_URL }}
+          timeout-seconds: '600'
+          interval-seconds: '30'

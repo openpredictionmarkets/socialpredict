@@ -35,7 +35,7 @@ const getStoredAuthState = () => {
         token,
         username: normalizedUsername,
         usertype: localStorage.getItem('usertype'),
-        changePasswordNeeded: localStorage.getItem('changePasswordNeeded') === 'true',
+        changePasswordNeeded: false,
     };
 };
 
@@ -71,6 +71,7 @@ const AuthProvider = ({ children }) => {
     }, [authState.isLoggedIn, authState.usertype]);
 
     useEffect(() => {
+        localStorage.removeItem('changePasswordNeeded');
         const storedState = getStoredAuthState();
         if (storedState.token) {
             if (storedState.username) {
@@ -100,7 +101,6 @@ const AuthProvider = ({ children }) => {
                 localStorage.setItem('token', authData.token);
                 localStorage.setItem('username', authData.username);
                 localStorage.setItem('usertype', authData.usertype);
-                localStorage.setItem('changePasswordNeeded', authData.mustChangePassword);
                 setAuthState({
                     isLoggedIn: true,
                     token: authData.token,
@@ -108,7 +108,7 @@ const AuthProvider = ({ children }) => {
                     usertype: authData.usertype,
                     changePasswordNeeded: authData.mustChangePassword,
                 });
-                return true;
+                return { success: true, mustChangePassword: authData.mustChangePassword };
             } else {
                 const errorMessage = getApiErrorMessage(
                     response,
@@ -126,7 +126,10 @@ const AuthProvider = ({ children }) => {
 
 
     const logout = () => {
-        localStorage.clear();
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        localStorage.removeItem('usertype');
+        localStorage.removeItem('changePasswordNeeded');
         setAuthState({
             isLoggedIn: false,
             token: null,

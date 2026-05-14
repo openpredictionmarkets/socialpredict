@@ -13,6 +13,8 @@ status: active
 
 ## Update Summary
 
+On Sunday, May 10, 2026, this note was touched during API documentation consolidation. Its API follow-up reference now points to `backend/docs/README.md` because the old `backend/docs/API-ISSUES.md` file was folded into the canonical backend docs README.
+
 This note was updated on Saturday, May 2, 2026 to close WAVE10 with the validation-specific stop-and-review point. The wave consolidated the markets request-boundary seam without introducing a new validation framework, and this note now records the remaining route-family bypasses that should drive the next slice.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
@@ -55,7 +57,7 @@ WAVE10 landed a narrow boundary-validation consolidation in the markets route fa
 - [server.go](/workspace/socialpredict/backend/server/server.go) and [container.go](/workspace/socialpredict/backend/internal/app/container.go) now pass the runtime-owned `*security.SecurityService` into markets handlers instead of letting production handlers construct fresh security services or sanitizers.
 - [createmarket.go](/workspace/socialpredict/backend/handlers/markets/createmarket.go) and [searchmarkets.go](/workspace/socialpredict/backend/handlers/markets/searchmarkets.go) use the shared security seam for create/search sanitization and map malformed, sanitizer-rejected, and domain-validation failures to stable `ReasonResponse` values.
 - [queryparams.go](/workspace/socialpredict/backend/security/queryparams.go) now owns the shared bounded integer query parsing helper used by markets list/search pagination.
-- [docs/API-ISSUES.md](/workspace/socialpredict/backend/docs/API-ISSUES.md) and [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml) document the create/search validation failure split: malformed or sanitizer-rejected input is `INVALID_REQUEST`, while syntactically valid domain validation failures are `VALIDATION_FAILED`.
+- [docs/README.md](/workspace/socialpredict/backend/docs/README.md) and [openapi.yaml](/workspace/socialpredict/backend/docs/openapi.yaml) document the create/search validation failure split: malformed or sanitizer-rejected input is `INVALID_REQUEST`, while syntactically valid domain validation failures are `VALIDATION_FAILED`.
 
 That work was intentionally not a universal envelope migration and did not move business invariants out of `internal/domain/markets`.
 
