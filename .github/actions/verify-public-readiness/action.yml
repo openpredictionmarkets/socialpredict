@@ -25,19 +25,76 @@ runs:
       run: |
         set -euo pipefail
 
+        BASE_URL="${BASE_URL%/}"
+        started_at="${SECONDS}"
+        attempt=1
+        attempts_completed=0
+        health_body="not checked"
+        ready_body="not checked"
+
+        summary_body() {
+          local value="$1"
+
+          value="${value//$'\r'/ }"
+          value="${value//$'\n'/ }"
+          if (( ${#value} > 160 )); then
+            value="${value:0:160}..."
+          fi
+          value="${value//|/\\|}"
+
+          printf '%s' "${value}"
+        }
+
+        write_summary() {
+          local result="$1"
+          local details="$2"
+          local elapsed_seconds=$((SECONDS - started_at))
+          local health_summary=""
+          local ready_summary=""
+
+          if [[ -z "${GITHUB_STEP_SUMMARY:-}" ]]; then
+            return 0
+          fi
+
+          health_summary="$(summary_body "${health_body}")"
+          ready_summary="$(summary_body "${ready_body}")"
+
+          {
+            echo "## Public Readiness Verification"
+            echo
+            echo "- Result: ${result}"
+            echo "- Base URL: ${BASE_URL}"
+            echo "- Attempts completed: ${attempts_completed}"
+            echo "- Elapsed time: ${elapsed_seconds}s"
+            echo "- Timeout: ${TIMEOUT_SECONDS}s"
+            echo "- Interval: ${INTERVAL_SECONDS}s"
+            echo
+            echo "| Probe | URL | Expected body | Last observed body |"
+            echo "| --- | --- | --- | --- |"
+            echo "| Liveness | ${BASE_URL}/health | \`live\` | ${health_summary} |"
+            echo "| Readiness | ${BASE_URL}/readyz | \`ready\` | ${ready_summary} |"
+            echo
+            echo "${details}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+        }
+
         check_endpoint() {
           local path="$1"
           local expected_body="$2"
+          local body_var="$3"
           local url="${BASE_URL}${path}"
           local response=""
           local body=""
 
           if ! response="$(curl -fsS --max-time 15 "${url}")"; then
+            printf -v "${body_var}" '%s' "request failed"
             echo "${url} did not return a successful response."
             return 1
           fi
 
           body="$(printf '%s' "${response}" | tr -d '\r\n')"
+          printf -v "${body_var}" '%s' "${body}"
+
           if [[ "${body}" != "${expected_body}" ]]; then
             echo "${url} returned unexpected body. Expected '${expected_body}', got '${body:0:160}'."
             return 1
@@ -48,15 +105,28 @@ runs:
         }
 
         deadline=$((SECONDS + TIMEOUT_SECONDS))
-        attempt=1
 
         echo "Polling ${BASE_URL}/health and ${BASE_URL}/readyz for up to ${TIMEOUT_SECONDS} seconds."
 
         while (( SECONDS < deadline )); do
           echo "Public readiness attempt ${attempt}."
+          attempts_completed="${attempt}"
+          health_body="not checked"
+          ready_body="not checked"
+          health_ok=0
+          ready_ok=0
 
-          if check_endpoint /health live && check_endpoint /readyz ready; then
+          if check_endpoint /health live health_body; then
+            health_ok=1
+          fi
+
+          if check_endpoint /readyz ready ready_body; then
+            ready_ok=1
+          fi
+
+          if (( health_ok == 1 && ready_ok == 1 )); then
             echo "Public deployment is live and ready."
+            write_summary "passed" "Public deployment became live and ready from GitHub Actions."
             exit 0
           fi
 
@@ -65,4 +135,5 @@ runs:
         done
 
         echo "Timed out waiting for ${BASE_URL} to become live and ready."
+        write_summary "failed" "Timed out waiting for the public deployment to become live and ready from GitHub Actions."
         exit 1

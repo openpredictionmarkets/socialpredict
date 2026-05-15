@@ -33,6 +33,11 @@ This note was updated on Monday, April 27, 2026 to replace an older Kubernetes-h
 
 On Thursday, April 30, 2026, the first deployment-facing health problem was finished for the backend serving path: `/health` now reports liveness, `/readyz` checks readiness and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. On Saturday, May 02, 2026, the backend image and production compose topology were wired to that contract: the image-level Docker `HEALTHCHECK` consumes `/health` as a process liveness probe, while production compose overrides backend service healthchecks to consume `/readyz` before starting dependents. The nginx production template also publishes backend-owned infra probes, Swagger UI, and the OpenAPI document explicitly at `/health`, `/readyz`, `/swagger/`, and `/openapi.yaml`. As of upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`, startup mutation mode is explicit: the `backend-startup-writer` compose service runs the same backend image with `STARTUP_WRITER=true` for migrations and startup-owned seeds, while the request-serving `backend` service sets `STARTUP_WRITER=false` and verifies applied migrations before serving. The backend now closes readiness, waits `BACKEND_READINESS_DRAIN_SECONDS`, and then lets HTTP shutdown drain in-flight requests for `BACKEND_SHUTDOWN_TIMEOUT_SECONDS`.
 
+On Monday, May 11, 2026, release-to-readiness feedback was split into its own
+note in [14-release-readiness-feedback.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/14-release-readiness-feedback.md). That note owns the
+GitHub Actions external verification policy and the decision that `/health` and
+`/readyz` are deploy gates while `/ops/status` remains operator status.
+
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
 | Core framing | Treated deployment infrastructure as a large new platform buildout | Treats deployment infrastructure as hardening the runtime and publish path the repo already uses |
