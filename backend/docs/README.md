@@ -56,6 +56,22 @@ Current route-family notes:
 Public failure `reason` values are owned by `handlers.PublicFailureReasons` and
 mirrored in `openapi.yaml` under `x-route-family-migration-matrix`.
 
+## Infra And Operator Routes
+
+The unversioned infra routes are part of the deployment contract, not the public
+application API taxonomy:
+
+| Route | Success body | Proves | Does not prove |
+| --- | --- | --- | --- |
+| `GET /health` | `200 text/plain` body `live` | The HTTP process is serving the liveness contract | Database readiness, business correctness, or request success rate |
+| `GET /readyz` | `200 text/plain` body `ready` | The readiness gate is open and the database ping succeeds | Zero-downtime deploy, end-to-end user workflows, or monitoring-stack health |
+| `GET /ops/status` | `200 application/json` while ready, `503 application/json` while unready | Minimal app-owned status fields for operators | Prometheus format, fleet aggregation, latency telemetry, or early startup progress |
+
+Current deploy verification gates only on `/health` and `/readyz` for
+`https://kconfs.com` and `https://brierfoxforecast.com`. `/ops/status` remains
+operator troubleshooting surface unless a future design-plan review promotes it
+into deploy verification.
+
 ## Updating The API Contract
 
 When changing API behavior:

@@ -3,9 +3,9 @@ title: Database Layer
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-29T22:53:00Z
-updated_at_display: "Wednesday, April 29, 2026 at 10:53 PM UTC"
-update_reason: "Record the first narrow atomic accounting workflow and the remaining transaction surface inventory."
+updated_at: 2026-05-14T10:23:25Z
+updated_at_display: "Thursday, May 14, 2026 at 10:23 AM UTC"
+update_reason: "Document the implemented runtime DB contract, packaged DB TLS boundary, and startup-writer guarantees."
 status: active
 ---
 
@@ -14,6 +14,12 @@ status: active
 ## Update Summary
 
 This note was updated on Sunday, April 26, 2026 to replace an older greenfield `database/` plus `repository/` plus `dal/` plan with guidance that matches the current SocialPredict backend, the active design-plan posture, and the high-availability or fault-tolerance objective.
+
+On Thursday, May 14, 2026, this note was updated from the future baseline
+triage to make the current production topology contract explicit. Runtime DB
+configuration, TLS/SSL validation, pool lifecycle, readiness pinging, close
+behavior, readiness drain, and startup-writer posture are documented here as
+implemented deployment boundaries, not generic database preferences.
 
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
@@ -93,45 +99,89 @@ The live seam already includes:
 - `BuildPostgresDSN`
 - `PostgresFactory`
 - `InitDB`
+- `ConfigureDBPool`
+- `CheckDBReadiness`
+- `CloseDB`
+- `SnapshotDBPool`
 
 This means the backend is not starting from a blank slate.
 
+The implemented runtime DB production contract is:
+
+- config is loaded from environment variables and normalized before the DB is
+  opened
+- SSL mode is validated against the `DB_REQUIRE_TLS` or `POSTGRES_REQUIRE_TLS`
+  posture before the Postgres DSN is built
+- production-like runtimes default `RequireTLS` to `true` unless the topology
+  explicitly overrides it
+- `DB_MAX_OPEN_CONNS` defaults to `25`
+- `DB_MAX_IDLE_CONNS` defaults to `5` and is clamped so it cannot exceed max
+  open connections
+- `DB_CONN_MAX_LIFETIME` defaults to `30m`
+- `DB_CONN_MAX_IDLE_TIME` defaults to `5m`
+- negative pool and duration values are normalized to zero
+- the effective pool posture is logged without DSNs or secrets
+- readiness uses a bounded SQL `PingContext` through the runtime serving probe
+- `/ops/status.dbPool` exposes process-local SQL pool counters for operator
+  pressure checks
+- shutdown calls `CloseDB` on the underlying SQL pool after the server path
+  leaves readiness and drains
+- the legacy process-global `SetDB` and `GetDB` bridge remains for tests and
+  narrow migration compatibility, not as the production composition model
+
 Important current limitations:
 
-- DB config is environment-driven but narrow
-- `SSLMode` defaults to `disable`
-- pool sizing and connection lifetime are not configured yet
-- the runtime seam still stores a shared fallback handle through `SetDB` and `GetDB`
+- DB config is still environment-driven and should stay explicit in deployment
+  docs
+- `DB_REQUIRE_TLS=false` is valid for packaged local Docker Postgres, not a
+  general external-production database rule
+- runtime pool counters are process-local and should not be documented as
+  fleet-wide metrics without a later aggregation design
 
-### Startup ownership is still too broad
+### Startup ownership is explicit in packaged production compose
 
-The main startup path in [main.go](/workspace/socialpredict/backend/main.go) currently does all of the following in every process:
+The main startup path in [main.go](/workspace/socialpredict/backend/main.go)
+still initializes runtime prerequisites in every backend process:
 
 - load DB config
 - open DB
 - wait for DB ping success
-- run migrations
 - load config service
-- seed admin user
-- seed homepage
+- load security config
+- load shutdown config
+- load startup mutation mode
 - start serving
 
-That is simple for a single local process, but it is too broad for HA replica startup because every instance is performing shared-state startup work rather than only local process startup work.
+Shared startup DB writes are now role-gated instead of being every-replica
+defaults:
 
-### Readiness exists at startup but not as a serving contract
+- writer mode runs migrations plus startup-owned user and homepage seeds
+- non-writer mode verifies registered migrations before serving
+- writer migration or seed failure is fatal before readiness opens
+- non-writer schema incompatibility is fatal before readiness opens
+
+The packaged production compose file makes that boundary concrete with exactly
+one `backend-startup-writer` service using `STARTUP_WRITER=true` and a separate
+request-serving `backend` service using `STARTUP_WRITER=false`.
+
+### Readiness now exists as a serving contract
 
 The backend already does startup DB pinging in [seed.go](/workspace/socialpredict/backend/seed/seed.go):
 
 - `EnsureDBReady`
 
-But the live infrastructure health route in [server.go](/workspace/socialpredict/backend/server/server.go) currently returns a hard-coded `200 ok` from `/health`.
+The live infrastructure routes in [server.go](/workspace/socialpredict/backend/server/server.go) now separate liveness and readiness:
 
-So the backend currently has:
+- `/health` reports process liveness with body `live`
+- `/readyz` reports `ready` only after the readiness gate is open and the
+  runtime DB ping succeeds
+- `/readyz` returns `503` body `not ready` when the readiness gate is closed or
+  the DB ping fails
+- shutdown closes readiness before the HTTP server drain window
 
-- startup DB reachability gating
-- but no strong post-startup readiness contract tied to DB condition
-
-That is not enough for orchestrated HA operation.
+That is enough for the current packaged compose and public deploy verification
+baseline. It is not a complete monitoring platform or a proof of business
+correctness.
 
 ### Migrations already exist, but HA discipline is weak
 
@@ -141,14 +191,18 @@ The backend already has a migration registry and schema history model in [migrat
 - `SchemaMigration`
 - ordered application via `sortedRegistryIDs`
 
-The current migration runner is therefore real. However, the HA posture is weak because:
+The current migration runner is therefore real. The packaged HA posture is now
+stronger because:
 
-- every replica currently calls `MigrateDB`
-- there is no explicit cross-replica writer discipline shown here
-- `MigrateDB` falls back to `AutoMigrate` if no migrations are registered
-- `main.go` logs migration failure as a warning instead of failing closed
+- only the explicit startup writer runs `MigrateDB` in production compose
+- request-serving backends call migration verification before serving
+- migration or verification failure is fatal before readiness opens
+- frontend and nginx startup are health-gated on the non-writer backend's
+  readiness
 
-For production HA, that is too permissive.
+The remaining non-packaged topology question is the coordination mechanism. A
+dedicated migration job or DB-backed advisory lock may replace compose
+sequencing later, but only after a design-plan update names that mechanism.
 
 ### Repository architecture already exists
 
@@ -257,19 +311,59 @@ That means:
 - a schema incompatibility should prevent readiness
 - warning-only migration failure is not a strong production posture
 
-A practical near-term target is:
+A practical near-term target is now implemented for packaged compose:
 
 1. one startup writer performs migrations
 2. one startup writer performs one-time seed operations if they remain startup-owned
 3. request-serving replicas wait for safe startup state or remain unready
 
-This note does not lock the mechanism. That mechanism could later be:
+The current packaged startup-failure posture is fail-closed:
+
+- writer mode runs migrations and startup-owned seeds
+- writer startup mutation failure is fatal before readiness opens
+- non-writer mode verifies registered migrations before serving
+- non-writer verification failure is fatal before readiness opens
+- request-serving capacity comes from non-writer backends, not by scaling the
+  startup-writer service
+
+The next non-packaged topology rule is deployment-only exactly-one-writer until
+a stronger mechanism is deliberately selected. That means every deployed
+topology must identify exactly one startup mutation actor before serving
+traffic, and request-serving replicas must run with `STARTUP_WRITER=false`.
+
+This note does not lock the future mechanism. That mechanism could later be:
 
 - a dedicated migration job
 - a leader-only startup mode
 - an explicit DB-backed lock or equivalent serialization strategy
 
 But the architectural requirement is clear: shared startup writes must not be treated as every-replica default behavior.
+
+## DB TLS And Topology Boundary
+
+The packaged staging and production compose topology uses a local Docker
+Postgres service on the internal Docker network. For that topology,
+`./SocialPredict install -e production` writes `DB_REQUIRE_TLS=false` so the
+backend accepts the local in-container `sslmode=disable` connection.
+
+That exception must not be copied into external database topologies by default.
+If operators replace the packaged local Postgres service with an external
+production database, they must make these values explicit:
+
+- `DB_REQUIRE_TLS`
+- `DB_SSLMODE`
+- the equivalent `POSTGRES_REQUIRE_TLS` or `POSTGRES_SSLMODE` only if those
+  names are the chosen operator interface
+
+External production databases should normally use a TLS-satisfying SSL mode
+such as `require`, `verify-ca`, or `verify-full` when `DB_REQUIRE_TLS=true`.
+Any choice to use `disable`, `allow`, or `prefer` in an external production
+database topology requires design-plan review because it changes the production
+security posture.
+
+HostOps may inspect or orchestrate hosts, but it must not become the owner of
+app runtime DB semantics. Runtime DB policy belongs in `./SocialPredict`,
+deployment documentation, and the design plan.
 
 ## Transaction and Concurrency Direction
 
@@ -339,9 +433,10 @@ The exact mechanism is a later implementation choice. The architectural requirem
 
 ## Runtime DB Hardening Direction
 
-The live runtime seam needs hardening, not replacement.
+The live runtime seam has been hardened enough to be the current baseline, and
+future work should continue improving it rather than replacing it.
 
-That hardening should include:
+The current baseline includes:
 
 - max open connection ownership
 - max idle connection ownership
@@ -349,7 +444,7 @@ That hardening should include:
 - idle connection lifetime ownership
 - explicit SSL or TLS mode ownership
 - startup ping and readiness policy
-- eventual graceful shutdown of the underlying `sql.DB`
+- graceful shutdown of the underlying `sql.DB`
 
 The key point is ownership:
 

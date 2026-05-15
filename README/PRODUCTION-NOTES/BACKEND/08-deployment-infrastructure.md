@@ -3,9 +3,9 @@ title: Deployment Infrastructure
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-02T16:52:00Z
-updated_at_display: "Saturday, May 02, 2026 at 04:52 PM UTC"
-update_reason: "Close WAVE08 with a deployment stop-and-review inventory for current health, writer-role, docs-publishing, and graceful-shutdown behavior."
+updated_at: 2026-05-14T10:23:25Z
+updated_at_display: "Thursday, May 14, 2026 at 10:23 AM UTC"
+update_reason: "Formalize release-to-readiness feedback, public probe semantics, and design-review triggers for current staging and production deploys."
 status: active
 ---
 
@@ -15,23 +15,30 @@ status: active
 
 WAVE08 is hardening the deployment contract for the backend stack we already
 run. The backend now exposes `/health` for process liveness and `/readyz` for
-traffic readiness, so Docker can ask "is the process serving HTTP?" separately
-from "should this instance receive user traffic?" Production compose uses one
-explicit `backend-startup-writer` service for migrations and startup-owned
-seeds, while the request-serving `backend` service verifies those migrations
-and runs with `STARTUP_WRITER=false`. The production nginx template deliberately
-publishes `/health`, `/readyz`, `/openapi.yaml`, `/swagger`, and `/swagger/` at
-the public host root, so a production host such as `brierfoxforecast.com` should
-serve `https://brierfoxforecast.com/health` and
-`https://brierfoxforecast.com/readyz` through the proxy instead of requiring a
-`/v0/` path or direct `:8080` backend access. The remaining deployment review is
-to prove this compose/nginx contract on a real staging or production host.
+traffic readiness, so Docker and GitHub Actions can ask "is the process serving
+HTTP?" separately from "should this instance receive user traffic?" Production
+compose uses one explicit `backend-startup-writer` service for migrations and
+startup-owned seeds, while the request-serving `backend` service verifies those
+migrations and runs with `STARTUP_WRITER=false`. The production nginx template
+deliberately publishes `/health`, `/readyz`, `/ops/status`, `/openapi.yaml`,
+`/swagger`, and `/swagger/` at the public host root. Current public deployment
+verification is limited to `https://kconfs.com` and
+`https://brierfoxforecast.com`.
 
 ## Update Summary
 
 This note was updated on Monday, April 27, 2026 to replace an older Kubernetes-heavy deployment plan with guidance that matches the live SocialPredict deployment topology and the current design-plan priority on runtime safety first.
 
 On Thursday, April 30, 2026, the first deployment-facing health problem was finished for the backend serving path: `/health` now reports liveness, `/readyz` checks readiness and database availability, and Docker black-box checks confirmed both endpoints on `http://localhost:8080`. On Saturday, May 02, 2026, the backend image and production compose topology were wired to that contract: the image-level Docker `HEALTHCHECK` consumes `/health` as a process liveness probe, while production compose overrides backend service healthchecks to consume `/readyz` before starting dependents. The nginx production template also publishes backend-owned infra probes, Swagger UI, and the OpenAPI document explicitly at `/health`, `/readyz`, `/swagger/`, and `/openapi.yaml`. As of upstream `main` at `051aac6b2fefa5634b8c98cc38caf52acf0043a9`, startup mutation mode is explicit: the `backend-startup-writer` compose service runs the same backend image with `STARTUP_WRITER=true` for migrations and startup-owned seeds, while the request-serving `backend` service sets `STARTUP_WRITER=false` and verifies applied migrations before serving. The backend now closes readiness, waits `BACKEND_READINESS_DRAIN_SECONDS`, and then lets HTTP shutdown drain in-flight requests for `BACKEND_SHUTDOWN_TIMEOUT_SECONDS`.
+
+On Thursday, May 14, 2026, this note was updated from the future baseline
+triage to make release-to-readiness feedback a documented deployment policy.
+The deploy workflows already dispatch the downstream Ansible run, wait for that
+run to finish, and then poll public `/health` and `/readyz`. The missing scope
+is documentation and summary visibility: a deploy is allowed to conclude only
+that the public host answered the current liveness and readiness contracts from
+outside the host. It is not allowed to conclude zero-downtime rollout, business
+correctness, fleet-wide health, or monitoring-platform health from those probes.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |
@@ -133,14 +140,79 @@ The current infra route registration in [server.go](/workspace/socialpredict/bac
 
 - `GET /health`
 - `GET /readyz`
+- `GET /ops/status`
 
 As of April 30, 2026:
 
 - `/health` returns plain-text `live` for liveness
 - `/readyz` returns `ready` only after the readiness gate is open and database availability passes
 - `/readyz` returns `not ready` with `503` when the readiness gate is closed or the database check fails
+- `/ops/status` returns cache-disabled JSON with `live`, `ready`,
+  `requestFailuresTotal`, and process-local DB pool counters; it returns `503`
+  while the backend is live but not ready
 
 That problem is finished for the backend serving path. Deployment infrastructure now consumes those endpoints explicitly in the backend image, production compose health policy, and nginx proxy publishing.
+
+### Release-to-readiness feedback is a deployment boundary
+
+The current release-to-readiness policy is intentionally small:
+
+| Public environment | Base URL | Deploy trigger | Required public probes |
+| --- | --- | --- | --- |
+| Staging | `https://kconfs.com` | merged pull request to `main` or manual staging workflow | `GET /health` body `live`; `GET /readyz` body `ready` |
+| Production / model office | `https://brierfoxforecast.com` | published GitHub release image workflow | `GET /health` body `live`; `GET /readyz` body `ready` |
+
+Those probes are run from GitHub Actions after the downstream Ansible workflow
+finishes. The check must use public URLs, not host-internal container names or
+direct backend ports, because the release boundary includes Traefik, nginx, and
+the published route contract.
+
+The deploy verification result is allowed to prove only:
+
+- the public host routes `/health` to a backend process that reports liveness
+- the public host routes `/readyz` to a backend process whose readiness gate is
+  open and whose database ping succeeds
+- the downstream Ansible workflow completed before public readiness was checked
+
+It does not prove:
+
+- zero-downtime deployment
+- app-level business correctness
+- end-to-end user workflows
+- absence of request failures after the probe
+- database transaction correctness
+- monitoring-stack, dashboard, or alert health
+- readiness of arbitrary future endpoints
+
+Future workflow work should write the verified base URL, each probe URL, the
+expected body, the final observed body, and the final pass/fail result into the
+GitHub Actions job summary. That is release feedback, not a new runtime feature.
+
+`/ops/status` should not be a required deploy gate yet. It is publicly
+published and useful for operator troubleshooting, but the release gate should
+remain `/health` plus `/readyz` until the team deliberately promotes
+`/ops/status` into deploy verification. If it is added to the deploy workflow
+later, it should run after `/health` and `/readyz`, record only safe summary
+fields, and avoid treating process-local counters as fleet-wide release truth.
+
+### Design-plan review triggers
+
+The current design plan treats release/deploy workflows, public readiness
+verification, packaged compose topology, and HostOps documentation as
+operational architecture. Any change in the following areas requires
+design-plan review before it is treated as the new deployment baseline:
+
+- public readiness semantics for `/health` or `/readyz`
+- whether `/ops/status` is a required deploy gate, a non-gating smoke check, or
+  only an operator troubleshooting endpoint
+- startup-writer role names, role count, or `STARTUP_WRITER` defaults
+- whether request-serving backend replicas may run startup mutations
+- packaged production DB TLS posture, especially `DB_REQUIRE_TLS` and
+  `DB_SSLMODE`
+- replacement of public GitHub Actions verification with host-internal checks
+- ownership transfer of downstream Ansible implementation into this repo
+- introduction of Kubernetes, blue-green/canary deploys, or a monitoring
+  platform as part of the release gate
 
 ### The backend image is simple, production-usable, and liveness-aware
 
