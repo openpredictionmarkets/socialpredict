@@ -216,7 +216,7 @@ HOSTOPS_KEY=~/.keys/socialpredict/mo/id_ed25519
 HOSTOPS_REPO_PATH=/opt/socialpredict
 ```
 
-Use shell syntax only: `KEY=value`, one setting per line. Do not commit this file.
+Use shell syntax only: `KEY=value`, one setting per line. Do not commit `hostops.env`.
 
 ## Per-command setup keys
 
