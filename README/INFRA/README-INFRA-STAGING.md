@@ -69,6 +69,13 @@ The key boundary is:
 - `./HostOps` is a local operator convenience wrapper, not the staging deploy
   engine.
 
+The release-to-readiness boundary is public and external. After Ansible
+finishes, the application repo checks `https://kconfs.com/health` for exact
+body `live` and `https://kconfs.com/readyz` for exact body `ready` from GitHub
+Actions. Those probes prove public liveness and traffic readiness only; they do
+not prove zero-downtime rollout, business correctness, or monitoring-platform
+health.
+
 ## What Ansible Does On Staging
 
 The staging playbook in `openpredictionmarkets/ansible_playbooks` currently
@@ -103,6 +110,11 @@ performs this high-level flow:
 The generated `.env` on the host contains values such as `ADMIN_PASSWORD`.
 That value can change after a deployment because the install flow regenerates
 runtime secrets.
+
+`DB_REQUIRE_TLS=false` belongs to this packaged local Docker Postgres topology.
+If staging is changed to use an external database, `DB_REQUIRE_TLS` and
+`DB_SSLMODE` must be reviewed explicitly instead of inheriting the local-Docker
+exception.
 
 ## Production / Model Office Difference
 
@@ -285,6 +297,10 @@ The GitHub staging workflow now performs the `/health` and `/readyz` checks
 externally from GitHub Actions after the Ansible workflow completes. It polls
 every 30 seconds for up to 10 minutes and expects `/health` to return `live`
 and `/readyz` to return `ready`.
+
+`/ops/status` is published for operator troubleshooting, but it is not a
+required staging deploy gate yet. If it is added later, record only safe summary
+fields and keep process-local counters separate from release readiness.
 
 A deploy is not zero-downtime today. Brief 404s or failed probes can occur
 while containers are stopped and restarted.

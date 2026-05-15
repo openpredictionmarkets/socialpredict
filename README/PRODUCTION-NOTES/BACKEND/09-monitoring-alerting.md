@@ -3,9 +3,9 @@ title: Monitoring and Alerting
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-03T14:25:55Z
-updated_at_display: "Sunday, May 3, 2026 at 2:25 PM UTC"
-update_reason: "Clarify WAVE09 proxy publishing, stage testing, and deferred early-startup status visibility."
+updated_at: 2026-05-14T10:23:25Z
+updated_at_display: "Thursday, May 14, 2026 at 10:23 AM UTC"
+update_reason: "Align operator signal inventory with release-to-readiness policy and keep ops status out of the required deploy gate."
 status: active
 ---
 
@@ -20,6 +20,13 @@ On Thursday, April 30, 2026, the first app-owned operational signal gap was clos
 On Saturday, May 2, 2026, this note was tightened into an explicit current-state signal inventory. The backend now documents the operator-facing contract for `/health`, `/readyz`, `/ops/status`, startup fatal failures, and shared request-boundary failure responses while keeping `/v0/system/metrics` classified as economics and accounting output.
 
 On Sunday, May 3, 2026, the production nginx template was updated to publish `/ops/status` explicitly at the public host root alongside `/health` and `/readyz`. Early-startup status visibility remains deferred because the current backend starts listening only after startup mutation or verification completes and readiness opens.
+
+On Thursday, May 14, 2026, this note was aligned with the
+release-to-readiness policy in [08-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-deployment-infrastructure.md).
+`/health` and `/readyz` remain the required public deploy gate for
+`https://kconfs.com` and `https://brierfoxforecast.com`. `/ops/status` remains a
+runtime signal for operator troubleshooting or a later explicit smoke check,
+not a monitoring-platform rollout and not a required deploy gate.
 
 The staging verification checklist for this wave lives in [STAGETEST/09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/STAGETEST/09-monitoring-alerting.md).
 
@@ -219,3 +226,8 @@ These are signal-contract seams, not monitoring-platform backlog buckets.
 WAVE09 stops here. Prometheus exposition, Grafana dashboards, Alertmanager routing, centralized log-platform rollout, paging policy, formal SLOs, and error-budget programs remain deferred to future platform work after the owned runtime signal contract is stronger.
 
 Until then, the backend monitoring contract is the first alert set above plus the logging and trace-correlation direction owned by [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).
+
+Promoting `/ops/status` into deploy verification would be a release-policy
+change, not a monitoring-platform prerequisite. If that happens, the deploy
+summary should record only safe status fields and must not treat process-local
+counters as fleet-wide release truth.

@@ -45,6 +45,13 @@ github.event.workflow_run.event == 'release'
 
 This prevents a manual run of the Docker image workflow from accidentally deploying production.
 
+The release-to-readiness boundary is public and external. After Ansible
+finishes, the application repo checks `https://brierfoxforecast.com/health` for
+exact body `live` and `https://brierfoxforecast.com/readyz` for exact body
+`ready` from GitHub Actions. Those probes prove public liveness and traffic
+readiness only; they do not prove zero-downtime rollout, business correctness,
+or monitoring-platform health.
+
 ## Required GitHub Secrets
 
 In `openpredictionmarkets/socialpredict`, production deployment requires only:
@@ -86,8 +93,16 @@ The packaged production compose topology uses a local Docker Postgres service.
 For that topology, `./SocialPredict install -e production` writes
 `DB_REQUIRE_TLS=false` so the backend does not reject the in-container
 `sslmode=disable` connection. Operators who replace the local Docker database
-with an external production database should review `DB_REQUIRE_TLS` and
-`DB_SSLMODE` explicitly.
+with an external production database must review `DB_REQUIRE_TLS` and
+`DB_SSLMODE` explicitly. The local-Docker exception is not a general production
+database policy.
+
+Production compose also relies on one startup mutation actor:
+`backend-startup-writer` runs with `STARTUP_WRITER=true`, while the
+request-serving `backend` runs with `STARTUP_WRITER=false` and verifies
+migrations before serving. Do not scale the startup-writer service to add
+serving capacity; scale only non-writer serving backends under an explicit
+topology review.
 
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
 but the current production workflow does not pass it into the Ansible command.
@@ -129,6 +144,10 @@ The GitHub production deploy workflow now performs the `/health` and `/readyz`
 checks externally from GitHub Actions after the Ansible workflow completes. It
 polls every 30 seconds for up to 10 minutes and expects `/health` to return
 `live` and `/readyz` to return `ready`.
+
+`/ops/status` is published for operator troubleshooting, but it is not a
+required production deploy gate yet. If it is added later, record only safe
+summary fields and keep process-local counters separate from release readiness.
 
 ## Notes
 
