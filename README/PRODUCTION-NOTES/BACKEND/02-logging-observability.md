@@ -3,9 +3,9 @@ title: Logging and Observability
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record the April 30 liveness/readiness completion while keeping backend/logger as the owned runtime adapter."
+updated_at: 2026-05-12T00:00:00Z
+updated_at_display: "Tuesday, May 12, 2026"
+update_reason: "Clarify the canonical production request-boundary observability chain."
 status: active
 ---
 
@@ -16,6 +16,8 @@ status: active
 This note was updated on Saturday, April 25, 2026 to replace an older greenfield observability-platform plan with guidance that matches the current SocialPredict backend, the active design-plan posture, and the package-ownership decision to standardize on `backend/logger`.
 
 On Thursday, April 30, 2026, the health/readiness split called out by this note was finished for the serving path: `/health` now reports liveness, and `/readyz` reports readiness plus database availability.
+
+On Tuesday, May 12, 2026, the production request-boundary ownership was clarified: server wiring uses `security.RequestBoundaryMiddlewareWithProxyTrust` for request IDs, trace correlation, panic recovery, and completion logs, then wraps it with `OperationalMetrics.Middleware` for the first app-owned request-failure counter. The older `logger.RequestLoggingMiddleware` remains compatibility/test support and should not be reintroduced into production server wiring.
 
 | Topic | Prior to April 25, 2026 | After April 25, 2026 |
 | --- | --- | --- |
@@ -129,12 +131,30 @@ Current limitations include:
 
 - string-oriented convenience APIs rather than structured event shapes
 - per-call convenience construction in [simplelogging.go](/workspace/socialpredict/backend/logger/simplelogging.go)
-- incomplete request-correlation and middleware-level logging
+- request-boundary logging is now centralized in [requestboundary.go](/workspace/socialpredict/backend/security/requestboundary.go), but richer route, latency, and failure classification remains intentionally narrow
 - no unified redaction policy documented here yet
-- no explicit readiness/liveness split yet
+- readiness/liveness now exist, but early-startup status before the HTTP listener is reachable remains deferred
 - no tracing boundary yet
 
 That is acceptable for the current note because the first task is not to build everything. The first task is to unify ownership and make future hardening coherent.
+
+### Canonical production request boundary
+
+The production HTTP chain in [server.go](/workspace/socialpredict/backend/server/server.go) receives requests in this order:
+
+```text
+OperationalMetrics.Middleware
+RequestBoundaryMiddlewareWithProxyTrust
+SecurityHeadersMiddleware
+CORS, when enabled
+router
+```
+
+That ownership matters:
+
+- `security.RequestBoundaryMiddlewareWithProxyTrust` owns request ID propagation, logger correlation context, traceparent field extraction, sanitized path logging, panic recovery, and one completion log per request.
+- `OperationalMetrics.Middleware` owns the process-local `/ops/status.requestFailuresTotal` counter for non-probe server-side `5xx` responses.
+- `logger.RequestLoggingMiddleware` is a legacy compatibility helper for package-level tests only. It should not be added to `server.go`, because that would create duplicate completion logs and competing request-boundary behavior.
 
 ## OpenTelemetry Posture
 

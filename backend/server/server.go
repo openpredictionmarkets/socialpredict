@@ -70,6 +70,9 @@ func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServ
 		handler = c.Handler(handler)
 	}
 	handler = security.SecurityHeadersMiddleware(securityConfig.Headers)(handler)
+	// Canonical production request boundary: request IDs, panic recovery, and
+	// completion logging live here. Keep logger.RequestLoggingMiddleware out of
+	// server wiring to avoid duplicate request IDs and completion logs.
 	handler = security.RequestBoundaryMiddlewareWithProxyTrust(securityConfig.TrustProxyHeaders)(handler)
 	handler = operationalMetrics.Middleware(handler)
 
