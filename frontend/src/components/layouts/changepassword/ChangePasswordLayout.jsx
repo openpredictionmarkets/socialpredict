@@ -1,10 +1,9 @@
 import React, { useState, useContext } from 'react';
-import { API_URL } from '../../../config';
 import { useHistory } from 'react-router-dom';
 import SiteButton from '../../buttons/SiteButtons';
 import { RegularInput } from '../../inputs/InputBar';
 import { AuthContext } from '../../../helpers/AuthContent';
-import { getApiErrorMessage, parseApiResponseText } from '../../../utils/apiResponse';
+import { authenticatedApiRequest } from '../../../api/httpClient';
 
 function ChangePasswordLayout() {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -44,24 +43,15 @@ function ChangePasswordLayout() {
         }
 
         try {
-            const response = await fetch(`${API_URL}/v0/changepassword`, {
+            await authenticatedApiRequest('/v0/changepassword', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
-                body: JSON.stringify({ currentPassword, newPassword })
+                body: JSON.stringify({ currentPassword, newPassword }),
+                fallbackMessage: 'Failed to change password',
+                reasonMessages: changePasswordReasonMessages,
             });
-            if (!response.ok) {
-                const payload = parseApiResponseText(await response.text());
-                const errMsg = capitalizeFirstChar(getApiErrorMessage(
-                    response,
-                    payload,
-                    'Failed to change password',
-                    changePasswordReasonMessages,
-                ));
-                throw new Error(errMsg || 'Failed to change password');
-            }
 
             // Set success message
             setSuccess("Password changed successfully! Logging out. Please log in with your new password.");
@@ -73,7 +63,7 @@ function ChangePasswordLayout() {
             }, 2000);  // Delay of 2000 milliseconds (2 seconds)
         } catch (err) {
             console.error('Failed to change password:', err);
-            setError(err.message);
+            setError(capitalizeFirstChar(err.message || 'Failed to change password'));
         }
     };
 

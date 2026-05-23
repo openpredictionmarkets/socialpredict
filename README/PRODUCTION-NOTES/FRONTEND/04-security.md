@@ -23,7 +23,7 @@ Broader security-platform work now lives in [FUTURE/04-long-term-security-platfo
 
 - Login state now uses the first API/auth adapter seam from `AuthContent`.
 - Some code still reads tokens directly from browser storage outside that seam.
-- Components and hooks can still construct authenticated requests directly.
+- Create-market, change-password, homepage, and admin homepage flows now use the adapter; other components and hooks can still construct authenticated requests directly.
 - `mustChangePassword` persistence was removed from localStorage in a prior security fix.
 - CSP, server-managed sessions, and advanced auth flows are not current frontend-only changes.
 

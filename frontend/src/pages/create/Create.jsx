@@ -7,7 +7,7 @@ import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
 import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
-import { API_URL } from '../../config';
+import { authenticatedApiRequest } from '../../api/httpClient';
 
 function Create() {
   const [questionTitle, setQuestionTitle] = useState('');
@@ -52,12 +52,6 @@ function Create() {
       }
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Authentication token not found. Please log in again.');
-      return;
-    }
-
     try {
       const marketData = {
         questionTitle,
@@ -72,26 +66,19 @@ function Create() {
         noLabel: trimmedNoLabel || 'NO',
       };
 
-      const response = await fetch(`${API_URL}/v0/markets`, {
+      const responseData = await authenticatedApiRequest('/v0/markets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(marketData),
+        fallbackMessage: 'Market creation failed. Please try again.',
       });
 
-      if (response.ok) {
-        const responseData = await response.json();
-        history.push(`/markets/${responseData.id}`);
-      } else {
-        const errorText = await response.text();
-        console.error('Market creation failed:', errorText);
-        setError(`Market creation failed: ${errorText}`);
-      }
+      history.push(`/markets/${responseData.id}`);
     } catch (error) {
       console.error('Error during market creation:', error);
-      setError(`Error during market creation: ${error.message}`);
+      setError(error.message || 'Market creation failed. Please try again.');
     }
   };
 
