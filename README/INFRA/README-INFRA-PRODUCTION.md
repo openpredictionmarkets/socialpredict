@@ -87,7 +87,10 @@ For that topology, `./SocialPredict install -e production` writes
 `DB_REQUIRE_TLS=false` so the backend does not reject the in-container
 `sslmode=disable` connection. Operators who replace the local Docker database
 with an external production database should review `DB_REQUIRE_TLS` and
-`DB_SSLMODE` explicitly.
+`DB_SSLMODE` explicitly. In practice, keep `DB_REQUIRE_TLS=false` only for the
+packaged local compose database. For an external production database, set a
+provider-appropriate TLS mode, for example `DB_REQUIRE_TLS=true` with
+`DB_SSLMODE=verify-full` when certificate validation is configured.
 
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
 but the current production workflow does not pass it into the Ansible command.
