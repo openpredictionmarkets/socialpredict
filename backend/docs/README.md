@@ -113,9 +113,10 @@ change. Avoid partial route/tag/schema renames in unrelated documentation work.
 ### Remaining Markets Boundary Cleanup
 
 Markets create/search now use shared security validation and bounded query
-parsing, but older market detail, resolve, projection, and compatibility methods
-still own some local path/action parsing and failure shaping.
+parsing, and the retired standalone resolve handler has been removed. Older
+market detail, projection, and compatibility methods still own some local
+path/action parsing and failure shaping.
 
 The next narrow migration seam is the remaining markets path/action helper gap:
-market ID, projection amount, resolution outcome, and related failure responses.
-Do not turn that into a generic validation registry or broad middleware rewrite.
+market ID, projection amount, and related failure responses. Do not turn that
+into a generic validation registry or broad middleware rewrite.
