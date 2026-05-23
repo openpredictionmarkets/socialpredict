@@ -3,9 +3,9 @@ title: Monitoring and Alerting
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-03T14:25:55Z
-updated_at_display: "Sunday, May 3, 2026 at 2:25 PM UTC"
-update_reason: "Clarify WAVE09 proxy publishing, stage testing, and deferred early-startup status visibility."
+updated_at: 2026-05-12T00:00:00Z
+updated_at_display: "Tuesday, May 12, 2026"
+update_reason: "Stabilize /ops/status as a cache-disabled JSON operator contract with explicit dbPool shape."
 status: active
 ---
 
@@ -20,6 +20,8 @@ On Thursday, April 30, 2026, the first app-owned operational signal gap was clos
 On Saturday, May 2, 2026, this note was tightened into an explicit current-state signal inventory. The backend now documents the operator-facing contract for `/health`, `/readyz`, `/ops/status`, startup fatal failures, and shared request-boundary failure responses while keeping `/v0/system/metrics` classified as economics and accounting output.
 
 On Sunday, May 3, 2026, the production nginx template was updated to publish `/ops/status` explicitly at the public host root alongside `/health` and `/readyz`. Early-startup status visibility remains deferred because the current backend starts listening only after startup mutation or verification completes and readiness opens.
+
+On Tuesday, May 12, 2026, `/ops/status` was tightened as a stable cache-disabled JSON operator contract. Server tests assert the top-level fields `live`, `ready`, `requestFailuresTotal`, and `dbPool`, plus the current SQL pool counter field names. The staging checklist and OpenAPI response headers now call out `Cache-Control: no-store`.
 
 The staging verification checklist for this wave lives in [STAGETEST/09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/STAGETEST/09-monitoring-alerting.md).
 
