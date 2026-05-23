@@ -37,6 +37,10 @@ On Monday, May 11, 2026, the packaged production database topology was called
 out as a deployment policy decision: local Docker Postgres uses
 `DB_REQUIRE_TLS=false`, while external production databases must make
 `DB_REQUIRE_TLS` and `DB_SSLMODE` explicit operator choices.
+On Monday, May 11, 2026, release-to-readiness feedback was split into its own
+note in [14-release-readiness-feedback.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/14-release-readiness-feedback.md). That note owns the
+GitHub Actions external verification policy and the decision that `/health` and
+`/readyz` are deploy gates while `/ops/status` remains operator status.
 
 | Topic | Prior to April 27, 2026 | After April 27, 2026 |
 | --- | --- | --- |

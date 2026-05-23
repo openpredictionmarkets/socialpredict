@@ -3,9 +3,9 @@ title: Backend Production Notes Plan
 document_type: production-notes-index
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record the April 30 runtime-boundary and security-hardening completion while keeping the remaining production-note order intact."
+updated_at: 2026-05-11T21:45:00Z
+updated_at_display: "Monday, May 11, 2026 at 09:45 PM UTC"
+update_reason: "Add release-to-readiness feedback as an active deployment verification note."
 status: active
 ---
 
@@ -36,6 +36,7 @@ The current production-note priority is:
 11. [11-runtime-performance-tuning.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/11-runtime-performance-tuning.md)
 12. [12-database-caching.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/12-database-caching.md)
 13. [13-background-jobs.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/13-background-jobs.md)
+14. [14-release-readiness-feedback.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/14-release-readiness-feedback.md)
 
 From `08` onward, the numbering now matches the reprioritized execution order instead of preserving the older sequence.
 
@@ -52,6 +53,8 @@ The live backend still has earlier operational concerns, though the first livene
 That means:
 
 - deployment runtime hardening should come before optimization
+- release-to-readiness feedback should stay visible in the application repo, not
+  only in the downstream Ansible repo
 - operational monitoring contract should come before dashboards or alert platforms
 - validation consolidation should come before caching or worker systems
 - caching and background jobs should remain later and more explicitly deferred
@@ -64,6 +67,8 @@ The active notes are the ones that should drive near-term design-plan and task-p
 
 - `01` through `11`, with the re-ranked order above
 - `08`, but only as a lower-priority evidence-driven optimization note
+- `14`, as the active note for GitHub Actions external deploy verification and
+  release-to-readiness feedback policy
 
 ### Deferred or draft notes
 

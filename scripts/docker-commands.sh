@@ -234,8 +234,154 @@ sp_exec() {
   esac
 }
 
+compose_cmd() {
+  docker compose --env-file "${SCRIPT_DIR}/.env" "${COMPOSE_FILES[@]}" "$@"
+}
+
+compose_services() {
+  compose_cmd config --services
+}
+
+compose_container_name() {
+  local target_service="${1:-}"
+
+  compose_cmd config | awk -v target="${target_service}" '
+    /^services:/ { in_services=1; next }
+    in_services && /^[^[:space:]]/ { in_services=0 }
+    in_services {
+      if ($0 ~ /^  [^[:space:]][^:]*:$/) {
+        current=$0
+        sub(/^  /, "", current)
+        sub(/:$/, "", current)
+        next
+      }
+
+      if (current == target && $0 ~ /^    container_name:/) {
+        sub(/^    container_name:[[:space:]]*/, "", $0)
+        gsub(/^"/, "", $0)
+        gsub(/"$/, "", $0)
+        print $0
+        exit
+      }
+    }
+  '
+}
+
+print_logs_options() {
+  local service
+  local container_name
+
+  echo "Available log targets:"
+  while IFS= read -r service; do
+    [ -z "${service}" ] && continue
+    container_name="$(compose_container_name "${service}")"
+    if [ -n "${container_name}" ]; then
+      printf "  %-22s %s\n" "${service}" "${container_name}"
+    else
+      printf "  %-22s %s\n" "${service}" "(container name managed by docker compose)"
+    fi
+  done < <(compose_services)
+  printf "  %-22s %s\n" "all" "docker compose aggregated logs"
+  echo
+  echo "Use './SocialPredict logs help' or './SocialPredict logs --help' for examples."
+}
+
+resolve_log_service() {
+  local target="${1:-}"
+  local service
+  local container_name
+
+  while IFS= read -r service; do
+    [ -z "${service}" ] && continue
+
+    if [ "${target}" = "${service}" ]; then
+      echo "${service}"
+      return 0
+    fi
+
+    container_name="$(compose_container_name "${service}")"
+    if [ -n "${container_name}" ] && [ "${target}" = "${container_name}" ]; then
+      echo "${service}"
+      return 0
+    fi
+  done < <(compose_services)
+
+  return 1
+}
+
+sp_logs() {
+  local target="${1:-}"
+  local resolved_service
+  shift || true
+
+  if [ -z "${target}" ]; then
+    print_logs_options
+    return 0
+  fi
+
+  case "${target}" in
+    options|list)
+      print_logs_options
+      return 0
+      ;;
+    -h|--help|help)
+      cat <<EOF
+Usage: ./SocialPredict logs <service> [-f|--follow]
+       ./SocialPredict logs all [-f|--follow]
+
+Examples:
+  ./SocialPredict logs
+  ./SocialPredict logs options
+  ./SocialPredict logs help
+  ./SocialPredict logs <service>
+  ./SocialPredict logs <service> -f
+  ./SocialPredict logs all
+
+Services and current container names from the active compose file:
+EOF
+      print_logs_options
+      return 0
+      ;;
+  esac
+
+  local follow_args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -f|--follow)
+        follow_args+=("-f")
+        ;;
+      *)
+        echo "Unknown logs option '$1'. Use -f or --follow."
+        exit 1
+        ;;
+    esac
+    shift
+  done
+
+  if [ "${target}" = "all" ]; then
+    if [ "${#follow_args[@]}" -gt 0 ]; then
+      compose_cmd logs "${follow_args[@]}"
+    else
+      compose_cmd logs
+    fi
+    return 0
+  fi
+
+  resolved_service="$(resolve_log_service "${target}")" || {
+    echo "Unknown log target '${target}'."
+    print_logs_options
+    exit 1
+  }
+
+  if [ "${#follow_args[@]}" -gt 0 ]; then
+    compose_cmd logs "${follow_args[@]}" "${resolved_service}"
+  else
+    compose_cmd logs "${resolved_service}"
+  fi
+}
+
 # --------------------------------------------------------------------------------------
-# Entry points (up / down / exec / cleanup)
+# Entry points (up / down / exec / logs / cleanup)
 # --------------------------------------------------------------------------------------
 case "${1:-}" in
   up)
@@ -248,12 +394,16 @@ case "${1:-}" in
     shift
     sp_exec "$@"
     ;;
+  logs)
+    shift
+    sp_logs "$@"
+    ;;
   cleanup)
     shift
     sp_cleanup "$@"
     ;;
   *)
-    echo "Usage: $0 {up|down|exec <service> [command]|cleanup docker [options]}"
+    echo "Usage: $0 {up|down|exec <service> [command]|logs <service|container-name|all> [-f|--follow]|cleanup docker [options]}"
     exit 1
     ;;
 esac
