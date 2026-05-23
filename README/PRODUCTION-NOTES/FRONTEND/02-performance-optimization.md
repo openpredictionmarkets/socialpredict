@@ -1,4 +1,23 @@
+---
+title: Frontend Performance Optimization
+document_type: production-notes
+domain: frontend
+author: Patrick Delaney
+updated_at: 2026-05-23T00:00:00Z
+updated_at_display: "Saturday, May 23, 2026"
+update_reason: "Align performance work with frontend triage: measure the current Vite bundle before enforcing budgets or code-splitting programs."
+status: draft
+---
+
 # Performance Optimization Implementation Plan
+
+## Update Summary
+
+This note remains a backlog for performance improvements. For execution order, start with [00-TRIAGE.md](./00-TRIAGE.md).
+
+The May 23 triage defers broad performance architecture until after frontend CI, safe error handling, and auth/API boundary cleanup. The first performance slice should be measurement: record current production build output, identify obvious heavy or duplicate dependencies, and decide whether any bundle budget belongs in CI.
+
+Do not begin with route-based code splitting, PWA caching, or library replacement until the app has a reproducible frontend build signal and a baseline to compare against.
 
 ## Overview
 Implement comprehensive performance optimizations to ensure fast loading times, smooth user interactions, and efficient resource utilization across all devices and network conditions.

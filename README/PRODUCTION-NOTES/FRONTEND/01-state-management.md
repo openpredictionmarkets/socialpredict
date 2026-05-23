@@ -1,4 +1,23 @@
+---
+title: Frontend State Management and Architecture
+document_type: production-notes
+domain: frontend
+author: Patrick Delaney
+updated_at: 2026-05-23T00:00:00Z
+updated_at_display: "Saturday, May 23, 2026"
+update_reason: "Align state-management sequencing with frontend triage: auth/API boundary cleanup before broad Redux migration."
+status: draft
+---
+
 # State Management & Architecture Implementation Plan
+
+## Update Summary
+
+This note is currently broad backlog material. For execution order, start with [00-TRIAGE.md](./00-TRIAGE.md).
+
+The May 23 triage changes the immediate state-management direction: do not start with a full Redux or RTK Query migration. First, identify the auth/API/error boundary seams that make current state hard to reason about: `AuthContent`, direct `localStorage` token reads, direct `fetch(API_URL...)` calls from components and hooks, duplicated response-envelope parsing, and route-level access policy in `AppRoutes`.
+
+Redux or another global state library may still become useful later, but it should follow a smaller boundary cleanup and frontend CI baseline rather than lead the work.
 
 ## Overview
 Implement a scalable state management solution and establish proper frontend architecture patterns to handle complex application state, data flow, and component communication.

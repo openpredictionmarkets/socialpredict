@@ -1,4 +1,23 @@
+---
+title: Frontend Security
+document_type: production-notes
+domain: frontend
+author: Patrick Delaney
+updated_at: 2026-05-23T00:00:00Z
+updated_at_display: "Saturday, May 23, 2026"
+update_reason: "Align security sequencing with frontend triage: auth/API/session boundary cleanup before broad security-platform work."
+status: draft
+---
+
 # Security Implementation Plan
+
+## Update Summary
+
+This note is the broad frontend security backlog. For execution order, start with [00-TRIAGE.md](./00-TRIAGE.md).
+
+The immediate frontend security concern is not only `localStorage`; it is the scattered auth/API boundary. Token reads, authenticated headers, API transport, backend envelope parsing, route access checks, and public failure copy currently appear across helpers, hooks, pages, and components.
+
+The first security slice should inventory those call sites and introduce a small auth/API adapter seam. Full CSP policy, server-managed sessions, advanced auth flows, and browser security monitoring require separate backend/infra coordination and should not be bundled into the first frontend cleanup.
 
 ## Overview
 Implement comprehensive frontend security measures to protect against common web vulnerabilities, secure user authentication, and ensure data protection throughout the application lifecycle.

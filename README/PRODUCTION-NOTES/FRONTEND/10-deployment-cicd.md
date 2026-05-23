@@ -1,4 +1,23 @@
+---
+title: Frontend Deployment and CI/CD
+document_type: production-notes
+domain: frontend
+author: Patrick Delaney
+updated_at: 2026-05-23T00:00:00Z
+updated_at_display: "Saturday, May 23, 2026"
+update_reason: "Align deployment guidance with current GitHub workflow reality and the frontend CI baseline from triage."
+status: draft
+---
+
 # Deployment and CI/CD Implementation Plan
+
+## Update Summary
+
+This note is the broad frontend deployment backlog. For execution order, start with [00-TRIAGE.md](./00-TRIAGE.md).
+
+The current repo already has Docker image publishing through `.github/workflows/docker.yml`, including a frontend image build on release/manual paths. The missing baseline is a dedicated frontend PR feedback loop.
+
+The first deployment/CI slice should add a small frontend PR job that runs Node 22, `npm ci`, and `npm run build` from `frontend/`. Do not combine that first job with Playwright, Lighthouse, Terraform, rollback workflows, or production deployment redesign.
 
 ## Overview
 Implement comprehensive deployment strategies and CI/CD pipelines to ensure reliable, automated, and scalable application deployment with proper environment management, testing, and monitoring.

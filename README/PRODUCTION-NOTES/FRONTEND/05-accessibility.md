@@ -1,4 +1,23 @@
+---
+title: Frontend Accessibility
+document_type: production-notes
+domain: frontend
+author: Patrick Delaney
+updated_at: 2026-05-23T00:00:00Z
+updated_at_display: "Saturday, May 23, 2026"
+update_reason: "Align accessibility work with frontend triage: first pass should cover existing core workflows after CI is available."
+status: draft
+---
+
 # Accessibility Implementation Plan
+
+## Update Summary
+
+This note remains the accessibility backlog. For execution order, start with [00-TRIAGE.md](./00-TRIAGE.md).
+
+The first accessibility slice should improve the current UI rather than introduce a new component library. Focus on core workflows: browse markets, create market, buy exposure, sell exposure, resolve market, view profile/account, and view position.
+
+Automated accessibility checks should be added only after the frontend CI baseline exists, and they should start narrow enough to be stable.
 
 ## Overview
 Implement comprehensive accessibility features to ensure the application is usable by people with disabilities, meets WCAG 2.1 AA standards, and provides an inclusive user experience across all assistive technologies.

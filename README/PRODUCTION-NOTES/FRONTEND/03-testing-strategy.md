@@ -1,4 +1,23 @@
+---
+title: Frontend Testing Strategy
+document_type: production-notes
+domain: frontend
+author: Patrick Delaney
+updated_at: 2026-05-23T00:00:00Z
+updated_at_display: "Saturday, May 23, 2026"
+update_reason: "Replace greenfield Jest/E2E-first sequencing with a current Vite build and test-tooling baseline."
+status: draft
+---
+
 # Testing Strategy Implementation Plan
+
+## Update Summary
+
+This note is the broad testing backlog. For execution order, start with [00-TRIAGE.md](./00-TRIAGE.md).
+
+The current frontend does not have a declared `npm test` script. There is one visible Vitest-style test file, but `vitest` and `jsdom` are not declared in `frontend/package.json`. Therefore the first testing move is not Playwright, coverage gates, or visual regression.
+
+The first CI/testing slice should run Node 22, `npm ci`, and `npm run build` from `frontend/`. Add tests to CI only after declaring a reproducible test command and its dependencies.
 
 ## Overview
 Implement a comprehensive testing strategy covering unit tests, integration tests, end-to-end tests, and performance testing to ensure code quality, reliability, and maintainability.

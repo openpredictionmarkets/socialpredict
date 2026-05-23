@@ -1,4 +1,23 @@
+---
+title: Frontend Error Handling
+document_type: production-notes
+domain: frontend
+author: Patrick Delaney
+updated_at: 2026-05-23T00:00:00Z
+updated_at_display: "Saturday, May 23, 2026"
+update_reason: "Align error-handling sequencing with frontend triage: safe public error language before broad monitoring/reporting."
+status: draft
+---
+
 # Error Handling Implementation Plan
+
+## Update Summary
+
+This note is the broad frontend error-handling backlog. For execution order, start with [00-TRIAGE.md](./00-TRIAGE.md).
+
+The immediate issue is public safety of error display. The app has a global error boundary, but it currently renders `error.message`; several components also display or alert raw `err.message` values. The first error-handling slice should split diagnostic details from safe public recovery messages.
+
+Do not start with Sentry, browser APM, retry frameworks, or broad error-reporting infrastructure. First align public failure language with backend envelopes/reasons and make unexpected failures user-safe by default.
 
 ## Overview
 Implement comprehensive error handling strategies to gracefully manage errors, provide meaningful user feedback, and maintain application stability across all components and user interactions.
