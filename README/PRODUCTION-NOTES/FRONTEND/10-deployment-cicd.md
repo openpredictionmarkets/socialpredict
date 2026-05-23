@@ -22,7 +22,7 @@ Long-term maintenance and deployment-platform work lives in [FUTURE/10-long-term
 ## Current Baseline
 
 - `.github/workflows/docker.yml` builds/publishes frontend images on release/manual paths.
-- Frontend-only PRs do not yet have a dedicated install/build check.
+- [`.github/workflows/frontend.yml`](../../../.github/workflows/frontend.yml) now runs the first dedicated frontend PR install/build check.
 - Frontend test tooling is not yet declared.
 - Browser performance and bundle evidence are not yet CI artifacts.
 

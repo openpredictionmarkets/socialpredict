@@ -24,7 +24,7 @@ Long-term testing infrastructure ideas live in [FUTURE/03-long-term-test-infrast
 - One visible Vitest-style test file exists.
 - `frontend/package.json` does not declare a `test` script.
 - `vitest` and `jsdom` are not declared as frontend dependencies.
-- Backend workflows exist, but there is no dedicated frontend PR build check.
+- [`.github/workflows/frontend.yml`](../../../.github/workflows/frontend.yml) now provides the first dedicated frontend PR build check.
 
 ## Active Direction
 
