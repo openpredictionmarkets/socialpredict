@@ -12,6 +12,7 @@ import (
 	"time"
 
 	dbets "socialpredict/internal/domain/bets"
+	"socialpredict/internal/domain/boundary"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -112,6 +113,53 @@ func TestGormRepositoryPlaceBetTransactionPostgres(t *testing.T) {
 
 		assertUserBalance(t, db, "bettor", 50)
 		assertBetCount(t, db, "bettor", 103, 1)
+	})
+}
+
+func TestGormRepositorySellBetTransactionPostgres(t *testing.T) {
+	dsn, ok := postgresIntegrationDSN()
+	if !ok {
+		t.Skip("set SOCIALPREDICT_POSTGRES_TEST_DSN or POSTGRES_TEST_DSN to run real-Postgres sell transaction verification")
+	}
+
+	t.Run("rollsBackCreditWhenSaleBetCreateFails", func(t *testing.T) {
+		db := openPlaceBetPostgresDB(t, dsn)
+		seedSellRows(t, db, "creator", "seller", 1000, 301)
+
+		createErr := errors.New("forced postgres sale bet create failure")
+		if err := db.Callback().Create().Before("gorm:create").Register("fail_postgres_sale_bet_create", func(tx *gorm.DB) {
+			if _, ok := tx.Statement.Dest.(*models.Bet); ok {
+				tx.AddError(createErr)
+			}
+		}); err != nil {
+			t.Fatalf("register create callback: %v", err)
+		}
+
+		repo := NewGormRepository(db)
+		err := repo.SellBetTransaction(context.Background(), func(ctx context.Context, txRepo dbets.Repository, markets dbets.MarketService, users dbets.UserService) error {
+			if _, err := markets.GetMarket(ctx, 301); err != nil {
+				return err
+			}
+			if _, err := markets.GetUserPositionInMarket(ctx, 301, "seller"); err != nil {
+				return err
+			}
+			if err := users.ApplyTransaction(ctx, "seller", 25, dusers.TransactionSale); err != nil {
+				return err
+			}
+			return txRepo.Create(ctx, &boundary.Bet{
+				Username: "seller",
+				MarketID: 301,
+				Amount:   -2,
+				Outcome:  "YES",
+				PlacedAt: time.Date(2026, time.May, 11, 22, 30, 0, 0, time.UTC),
+			})
+		})
+		if !errors.Is(err, createErr) {
+			t.Fatalf("expected forced create error, got %v", err)
+		}
+
+		assertUserBalance(t, db, "seller", 1000)
+		assertBetCount(t, db, "seller", 301, 1)
 	})
 }
 
