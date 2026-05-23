@@ -5,7 +5,7 @@ domain: backend
 author: Patrick Delaney
 updated_at: 2026-05-12T00:00:00Z
 updated_at_display: "Tuesday, May 12, 2026"
-update_reason: "Record removal of the retired resolve-market handler that parsed JWTs directly and emitted raw auth failures."
+update_reason: "Record the first token-string auth service seam and the retired resolve-market handler cleanup."
 status: active
 ---
 
@@ -26,6 +26,8 @@ On Thursday, April 30, 2026, WAVE05 finished the first runtime-security ownershi
 | Private action routes now enforce `mustChangePassword` before domain handlers run. | [server.go](/workspace/socialpredict/backend/server/server.go), server tests, and a Docker smoke check showing `/v0/privateprofile` and `/v0/bet` return `PASSWORD_CHANGE_REQUIRED` before password change and succeed after password change. |
 
 On Tuesday, May 12, 2026, the retired standalone resolve-market handler was removed. The production resolve route already uses [handler.go](/workspace/socialpredict/backend/handlers/markets/handler.go) with injected auth and shared failure helpers, so the old direct `JWT_SIGNING_KEY` parsing path and its raw auth failures are no longer kept alive as an alternate handler surface.
+
+On Tuesday, May 12, 2026, `internal/service/auth` gained token-string and `context.Context` validation entry points. Existing request-shaped helpers remain as compatibility wrappers, but token parsing and user lookup now have a non-HTTP seam that future handler adapters can call after extracting bearer tokens at the request boundary.
 
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
@@ -144,7 +146,7 @@ The current auth helper layer now returns `AuthError` values from [auth.go](/wor
 
 That is cleaner than the earlier transport-shaped `HTTPError` seam, but auth is not fully centralized yet:
 
-- auth helpers still take `*http.Request`
+- auth helpers still expose `*http.Request` compatibility wrappers, though token-string validation entry points now exist underneath them
 - some legacy market paths still translate auth failures into raw `http.Error` responses
 
 At the same time, login already uses the shared envelope path in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go) through `handlers.WriteFailure`, so the live system is mixed rather than empty.
@@ -293,7 +295,7 @@ Those topics now belong in [FUTURE/01-long-term-security-hardening.md](/workspac
 The near-term security direction should align with the current design-plan waves rather than invent a separate security-platform track.
 
 1. Keep configuration and runtime ownership explicit so JWT key presence, CORS posture, and runtime-sensitive security settings are not hidden in ad hoc helpers.
-2. Keep the production resolve-market route on injected auth and shared failure helpers; do not reintroduce route-local JWT parsing.
+2. Keep production market routes on injected auth and shared failure helpers; do not reintroduce route-local JWT parsing, and continue migrating handler adapters toward HTTP-boundary token extraction plus `internal/service/auth` token-string validation.
 3. Use the active error-handling wave to converge remaining market handler failures and other sanitized boundary behavior on shared envelopes.
 4. Tighten CORS, proxy-trust, and header posture once deployment assumptions are explicit.
 5. Keep long-term identity and security-platform work deferred until the active production notes and current design-plan waves are complete.
