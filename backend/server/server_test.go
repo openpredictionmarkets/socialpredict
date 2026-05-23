@@ -662,24 +662,6 @@ func TestServerPreservesIncomingRequestIDHeader(t *testing.T) {
 	}
 }
 
-func TestRequestLoggingMiddlewareTreatsCanceledRequestsAsClientClosed(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/v0/markets", nil)
-	ctx, cancel := context.WithCancel(req.Context())
-	cancel()
-	req = req.WithContext(ctx)
-
-	rec := httptest.NewRecorder()
-	handler := logger.RequestLoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
-	}))
-
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected recorder to remain unwritten with default 200, got %d", rec.Code)
-	}
-}
-
 func buildTestHandlerWithConfig(t *testing.T, db *gorm.DB, econConfig any, readiness ...*appruntime.Readiness) http.Handler {
 	t.Helper()
 

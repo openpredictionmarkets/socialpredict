@@ -70,6 +70,9 @@ func ContextWithRequestCorrelation(ctx context.Context, requestID, traceparent s
 
 // RequestLoggingMiddleware logs one completion line per request and propagates
 // stable request/correlation identifiers at the runtime boundary.
+//
+// Deprecated: production HTTP wiring uses security.RequestBoundaryMiddleware.
+// Keep this helper for compatibility tests only; do not add it to server wiring.
 func RequestLoggingMiddleware(next http.Handler) http.Handler {
 	if next == nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

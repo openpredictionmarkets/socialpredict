@@ -252,8 +252,14 @@ func openPlaceBetPostgresDB(t *testing.T, dsn string) *gorm.DB {
 	if db.Dialector.Name() != "postgres" {
 		t.Fatalf("expected postgres dialector, got %q", db.Dialector.Name())
 	}
-	if err := db.AutoMigrate(&models.User{}, &models.Market{}, &models.Bet{}); err != nil {
-		t.Fatalf("migrate place-bet tables: %v", err)
+	if err := db.AutoMigrate(&models.User{}); err != nil {
+		t.Fatalf("migrate place-bet users table: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Market{}); err != nil {
+		t.Fatalf("migrate place-bet markets table: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Bet{}); err != nil {
+		t.Fatalf("migrate place-bet bets table: %v", err)
 	}
 
 	return db
