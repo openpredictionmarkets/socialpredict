@@ -72,33 +72,55 @@ function ChangePasswordLayout() {
             <h1 className="text-2xl font-bold mb-4">Change Password</h1>
             <p>Password change required. You will be automatically logged out after password has been changed.</p>
             <form onSubmit={handleSubmit} className="space-y-8">
+                <label htmlFor="current-password" className="block text-sm font-medium text-gray-300">
+                    Current Password
+                </label>
                 <RegularInput
+                    id="current-password"
+                    name="current-password"
                     type="password"
                     value={currentPassword}
                     onChange={handleCurrentPasswordChange}
                     placeholder="Current Password"
+                    autoComplete="current-password"
                     required
                 />
+                <label htmlFor="new-password" className="block text-sm font-medium text-gray-300">
+                    New Password
+                </label>
                 <RegularInput
+                    id="new-password"
+                    name="new-password"
                     type="password"
                     value={newPassword}
                     onChange={handleNewPasswordChange}
                     placeholder="New Password"
+                    autoComplete="new-password"
+                    ariaDescribedBy="new-password-requirements"
                     required
                 />
+                <p id="new-password-requirements" className="text-sm text-gray-300">
+                    Use 8-128 characters with uppercase, lowercase, and a digit.
+                </p>
+                <label htmlFor="confirm-new-password" className="block text-sm font-medium text-gray-300">
+                    Confirm New Password
+                </label>
                 <RegularInput
+                    id="confirm-new-password"
+                    name="confirm-new-password"
                     type="password"
                     value={confirmPassword}
                     onChange={handleConfirmPasswordChange}
                     placeholder="Confirm New Password"
+                    autoComplete="new-password"
                     required
                 />
                 <SiteButton type="submit">
                     Save New Password
                 </SiteButton>
             </form>
-            {success && <p className="text-green-500">{success}</p>}
-            {error && <p className="error">{error}</p>}
+            {success && <p className="text-green-500" role="status">{success}</p>}
+            {error && <p className="error" role="alert">{error}</p>}
         </div>
     );
 }
