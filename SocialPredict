@@ -75,6 +75,7 @@ Commands:
   up          Start SocialPredict containers
   down        Stop SocialPredict containers
   exec        Execute command on SocialPredict containers
+  logs        View logs from SocialPredict containers
   backup      Backup operations on SocialPredict
   cleanup     Cleanup unused Docker artifacts
 
@@ -110,6 +111,13 @@ case "$COMMAND" in
     export CALLED_FROM_SOCIALPREDICT=yes
     shift
     source "${SCRIPT_DIR}/scripts/docker-commands.sh" exec "$@"
+    unset CALLED_FROM_SOCIALPREDICT
+    ;;
+  logs)
+    init
+    export CALLED_FROM_SOCIALPREDICT=yes
+    shift
+    source "${SCRIPT_DIR}/scripts/docker-commands.sh" logs "$@"
     unset CALLED_FROM_SOCIALPREDICT
     ;;
   backup)
