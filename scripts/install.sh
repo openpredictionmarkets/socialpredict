@@ -48,7 +48,7 @@ check_if_running() {
         if [ -z "$(docker compose --env-file "${SCRIPT_DIR}/.env" -f "${SCRIPT_DIR}/scripts/docker-compose-prod.yaml" ps -q)" ]; then
           :
         elif [ "$FORCE" == "y" ]; then
-          docker compose --env-file "${SCRIPT_DIR}/.env" -f "${SCRIPT_DIR}/scripts/docker-compose-local.yaml" down -v
+          docker compose --env-file "${SCRIPT_DIR}/.env" -f "${SCRIPT_DIR}/scripts/docker-compose-prod.yaml" down -v
         else
           print_warning 'Application is already running.'
           print_error "Please stop it with './SocialPredict down' before proceeding with a new installation"
