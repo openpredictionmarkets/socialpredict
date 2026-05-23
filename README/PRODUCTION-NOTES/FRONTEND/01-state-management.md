@@ -21,8 +21,8 @@ Broad state-platform ideas now live in [FUTURE/01-long-term-state-platform.md](.
 
 ## Current Baseline
 
-- `AuthContent` owns React auth context, login transport, JWT decoding, browser persistence, and backend envelope parsing.
-- Some frontend code reads `localStorage` directly for tokens.
+- `AuthContent` now uses the first API/auth adapter seam for login transport, browser persistence, and backend envelope parsing.
+- Some frontend code still reads `localStorage` directly for tokens outside that seam.
 - Components and hooks still call `fetch(API_URL...)` directly.
 - `frontend/src/utils/apiResponse.js` exists, but duplicated response-unwrapping helpers remain.
 - `AppRoutes` embeds auth/access decisions directly in route JSX.
