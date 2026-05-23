@@ -8,13 +8,28 @@ import '../index.css';
 import Sidebar from './components/sidebar/Sidebar';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
+  const showDiagnosticDetails = import.meta.env.DEV && error?.message;
+
   return (
-    <div className='flex flex-col items-center justify-center min-h-screen bg-primary-background text-white'>
+    <div
+      className='flex flex-col items-center justify-center min-h-screen bg-primary-background text-white p-6 text-center'
+      role='alert'
+      aria-live='assertive'
+    >
       <h1 className='text-4xl font-bold mb-4'>Oops! Something went wrong.</h1>
       <p className='text-xl mb-8'>
-        We're sorry for the inconvenience. Please try again.
+        We could not load this part of SocialPredict. Please try again.
       </p>
-      <pre className='mb-8 p-4 bg-gray-800 rounded'>{error.message}</pre>
+      {showDiagnosticDetails && (
+        <details className='mb-8 max-w-2xl text-left'>
+          <summary className='cursor-pointer text-sm text-gray-300'>
+            Development error details
+          </summary>
+          <pre className='mt-3 overflow-auto rounded bg-gray-800 p-4 text-sm text-gray-100'>
+            {error.message}
+          </pre>
+        </details>
+      )}
       <button
         onClick={resetErrorBoundary}
         className='px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors'
