@@ -51,6 +51,9 @@ The backend implementation covers 14 critical areas for production deployment:
 ### 🎨 Frontend Production Readiness
 **Location**: [`FRONTEND/plan.md`](./FRONTEND/plan.md)
 
+For current frontend sequencing, start with the grounded triage index:
+[`FRONTEND/00-baseline-triage.md`](./FRONTEND/00-baseline-triage.md).
+
 The frontend implementation covers 12 essential areas for production deployment:
 
 1. **State Management** - Redux Toolkit, RTK Query, optimistic updates
