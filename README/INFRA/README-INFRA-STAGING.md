@@ -104,6 +104,12 @@ The generated `.env` on the host contains values such as `ADMIN_PASSWORD`.
 That value can change after a deployment because the install flow regenerates
 runtime secrets.
 
+Staging currently uses the same packaged local Docker Postgres topology as the
+production guide describes. `DB_REQUIRE_TLS=false` is appropriate for that
+local compose database. If staging is moved to an external managed database,
+review `DB_REQUIRE_TLS` and `DB_SSLMODE` instead of carrying the packaged local
+database setting forward automatically.
+
 ## Production / Model Office Difference
 
 Production is documented separately in
@@ -284,7 +290,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://kconfs.com/readyz
 The GitHub staging workflow now performs the `/health` and `/readyz` checks
 externally from GitHub Actions after the Ansible workflow completes. It polls
 every 30 seconds for up to 10 minutes and expects `/health` to return `live`
-and `/readyz` to return `ready`.
+and `/readyz` to return `ready`. The verification job writes a GitHub Actions
+job summary with the checked URLs, expected and last observed bodies, attempt
+count, timeout, interval, and final result. `/ops/status` remains an operator
+status endpoint and is not currently used as a staging deploy gate.
 
 A deploy is not zero-downtime today. Brief 404s or failed probes can occur
 while containers are stopped and restarted.

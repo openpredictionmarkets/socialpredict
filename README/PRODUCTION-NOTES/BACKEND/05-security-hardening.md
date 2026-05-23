@@ -3,9 +3,9 @@ title: Security Hardening
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-04-30T11:55:00Z
-updated_at_display: "Thursday, April 30, 2026 at 11:55 AM UTC"
-update_reason: "Record WAVE05 completion evidence, keep the remaining security future work scoped, and preserve the next precise auth-boundary seam."
+updated_at: 2026-05-12T00:00:00Z
+updated_at_display: "Tuesday, May 12, 2026"
+update_reason: "Record removal of the retired resolve-market handler that parsed JWTs directly and emitted raw auth failures."
 status: active
 ---
 
@@ -24,6 +24,8 @@ On Thursday, April 30, 2026, WAVE05 finished the first runtime-security ownershi
 | Runtime-owned `405` and `429` responses now use shared JSON failure envelopes. | [failures.go](/workspace/socialpredict/backend/security/failures.go), [server.go](/workspace/socialpredict/backend/server/server.go), and black-box checks for `METHOD_NOT_ALLOWED` and `LOGIN_RATE_LIMITED`. |
 | Login and admin-user request validation use the shared security service through application wiring. | [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go), [adduser.go](/workspace/socialpredict/backend/handlers/admin/adduser.go), and `go test ./internal/service/auth ./handlers/admin`. |
 | Private action routes now enforce `mustChangePassword` before domain handlers run. | [server.go](/workspace/socialpredict/backend/server/server.go), server tests, and a Docker smoke check showing `/v0/privateprofile` and `/v0/bet` return `PASSWORD_CHANGE_REQUIRED` before password change and succeed after password change. |
+
+On Tuesday, May 12, 2026, the retired standalone resolve-market handler was removed. The production resolve route already uses [handler.go](/workspace/socialpredict/backend/handlers/markets/handler.go) with injected auth and shared failure helpers, so the old direct `JWT_SIGNING_KEY` parsing path and its raw auth failures are no longer kept alive as an alternate handler surface.
 
 | Topic | Prior to April 26, 2026 | After April 26, 2026 |
 | --- | --- | --- |
@@ -144,7 +146,6 @@ That is cleaner than the earlier transport-shaped `HTTPError` seam, but auth is 
 
 - auth helpers still take `*http.Request`
 - some legacy market paths still translate auth failures into raw `http.Error` responses
-- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go) still parses JWTs directly and reads `JWT_SIGNING_KEY` instead of going through the auth service contract
 
 At the same time, login already uses the shared envelope path in [loggin.go](/workspace/socialpredict/backend/internal/service/auth/loggin.go) through `handlers.WriteFailure`, so the live system is mixed rather than empty.
 
@@ -196,14 +197,13 @@ WAVE05 hardened the active request-boundary security surface without reopening t
 
 On April 30, 2026, the running Docker backend at `http://localhost:8080` also passed black-box checks for `/health`, `/readyz`, security headers, request ID propagation, CORS behavior, shared `405`, login validation, login rate limiting with spoofed `X-Forwarded-For`, and the `mustChangePassword` route gate.
 
-The remaining security-specific exceptions after this wave are intentionally narrow:
+The remaining security-specific exceptions after the May 12, 2026 resolve-market cleanup are intentionally narrow:
 
-- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go) is the next auth-boundary migration seam because it still parses bearer tokens directly, reads `JWT_SIGNING_KEY` in the handler path, and emits raw `http.Error` auth and authorization failures instead of going through `AuthService` plus `authhttp`.
 - The remaining raw `http.Error` responses are concentrated in market handlers. They are a route-family boundary migration, not evidence that middleware or runtime security still lacks a shared failure contract.
 - Forwarded client identity remains spoofable unless production ingress scrubs untrusted `X-Forwarded-For` and `X-Real-IP` before enabling `TRUST_PROXY_HEADERS=true`. Until that deployment contract exists, the safe app default remains to ignore forwarded headers.
 - CORS still defaults to wildcard origins to preserve current behavior. Production must set explicit origins before treating the API as hardened for public traffic.
 
-The concrete follow-on queue slice should be: migrate `handlers/markets/resolvemarket.go` to the injected auth service and shared failure-envelope path, then carry the same pattern through the remaining market handler raw-error slices. That is a precise auth and boundary-hardening seam. It is not a prompt to activate MFA, RBAC, distributed rate limiting, request signing, session redesign, or compliance work.
+The concrete follow-on queue slice should carry the same injected-auth and shared-failure pattern through the remaining market handler raw-error slices. That is a precise auth and boundary-hardening seam. It is not a prompt to activate MFA, RBAC, distributed rate limiting, request signing, session redesign, or compliance work.
 
 ### `mustChangePassword` is already part of the live security policy
 
@@ -226,7 +226,6 @@ The remaining non-test raw `http.Error` calls are concentrated in market handler
 - [listmarkets.go](/workspace/socialpredict/backend/handlers/markets/listmarkets.go)
 - [getmarkets.go](/workspace/socialpredict/backend/handlers/markets/getmarkets.go)
 - [marketdetailshandler.go](/workspace/socialpredict/backend/handlers/markets/marketdetailshandler.go)
-- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go)
 - [searchmarkets.go](/workspace/socialpredict/backend/handlers/markets/searchmarkets.go)
 
 That overlap matters, but this note should not pretend that all route-family response cleanup belongs to a standalone security-platform initiative. It is tied directly to the active error-handling and auth-alignment work. The explicit remaining slice list is carried in [FUTURE/01-long-term-security-hardening.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/FUTURE/01-long-term-security-hardening.md).
@@ -294,7 +293,7 @@ Those topics now belong in [FUTURE/01-long-term-security-hardening.md](/workspac
 The near-term security direction should align with the current design-plan waves rather than invent a separate security-platform track.
 
 1. Keep configuration and runtime ownership explicit so JWT key presence, CORS posture, and runtime-sensitive security settings are not hidden in ad hoc helpers.
-2. Use the next auth-boundary slice to migrate [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go) away from direct JWT parsing and raw auth failures.
+2. Keep the production resolve-market route on injected auth and shared failure helpers; do not reintroduce route-local JWT parsing.
 3. Use the active error-handling wave to converge remaining market handler failures and other sanitized boundary behavior on shared envelopes.
 4. Tighten CORS, proxy-trust, and header posture once deployment assumptions are explicit.
 5. Keep long-term identity and security-platform work deferred until the active production notes and current design-plan waves are complete.

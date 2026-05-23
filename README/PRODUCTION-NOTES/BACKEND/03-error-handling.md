@@ -201,7 +201,7 @@ The remaining live migration surface is explicit:
 
 | Surface | Current live behavior | Examples | Next-wave seam |
 | --- | --- | --- | --- |
-| Legacy markets reads and writes | Several handlers still emit raw `http.Error`; some successful delete/resolve paths still intentionally write status-only `204` responses. | `marketdetailshandler.go`, `searchmarkets.go`, `getmarkets.go`, `createmarket.go`, `resolvemarket.go`, `handler.go`, `listmarkets.go` | Split into a markets route-family wave, starting with read-only routes (`list/search/details/status/projection`) before write-sensitive create/update/resolve paths. |
+| Legacy markets reads and writes | Several handlers still emit raw `http.Error`; some successful delete/resolve paths still intentionally write status-only `204` responses. | `marketdetailshandler.go`, `searchmarkets.go`, `getmarkets.go`, `createmarket.go`, `handler.go`, `listmarkets.go` | Split into a markets route-family wave, starting with read-only routes (`list/search/details/status/projection`) before write-sensitive create/update/resolve paths. |
 | Legacy logger fallback | `logger.RequestLoggingMiddleware` still has a raw `http.Error` fallback for a nil handler, but the main server build path now uses `security.RequestBoundaryMiddleware`. | `logger/middleware.go` | Retire or convert this fallback after confirming no live route wiring still wraps requests with the old logger middleware. |
 | `backend/errors` package | No live request-boundary import remains after WAVE03; the package is compatibility-only test-covered code. | `errors/httperror.go`, `errors/normalerror.go` | Package deletion is a separate cleanup after route-family migrations confirm no generated docs, tests, or legacy adapters still depend on it. |
 

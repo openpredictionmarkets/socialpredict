@@ -346,6 +346,63 @@ func TestHandlerGetDetails_NotFoundUsesFailureEnvelope(t *testing.T) {
 }
 
 func TestHandlerResolveMarket_MapsAuthAndStateFailures(t *testing.T) {
+	t.Run("success returns no content", func(t *testing.T) {
+		service := &contractServiceMock{
+			resolveFn: func(ctx context.Context, marketID int64, resolution string, username string) error {
+				if marketID != 5 || resolution != "YES" || username != "alice" {
+					t.Fatalf("unexpected resolve args: marketID=%d resolution=%q username=%q", marketID, resolution, username)
+				}
+				return nil
+			},
+		}
+		auth := &contractAuthMock{user: &dusers.User{Username: "alice"}}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"YES"}`)), map[string]string{"id": "5"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, auth).ResolveMarket(rr, req)
+
+		if rr.Code != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d body=%s", rr.Code, rr.Body.String())
+		}
+		if rr.Body.Len() != 0 {
+			t.Fatalf("expected empty body, got %q", rr.Body.String())
+		}
+	})
+
+	t.Run("invalid id uses invalid request reason", func(t *testing.T) {
+		service := &contractServiceMock{
+			resolveFn: func(ctx context.Context, marketID int64, resolution string, username string) error {
+				t.Fatalf("service should not be called for invalid id")
+				return nil
+			},
+		}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/not-an-id/resolve", bytes.NewBufferString(`{"resolution":"YES"}`)), map[string]string{"id": "not-an-id"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, nil).ResolveMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("malformed body uses invalid request reason", func(t *testing.T) {
+		service := &contractServiceMock{
+			resolveFn: func(ctx context.Context, marketID int64, resolution string, username string) error {
+				t.Fatalf("service should not be called for malformed body")
+				return nil
+			},
+		}
+		auth := &contractAuthMock{user: &dusers.User{Username: "alice"}}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{`)), map[string]string{"id": "5"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, auth).ResolveMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
 	t.Run("password change required uses auth reason", func(t *testing.T) {
 		service := &contractServiceMock{}
 		auth := &contractAuthMock{
@@ -377,6 +434,54 @@ func TestHandlerResolveMarket_MapsAuthAndStateFailures(t *testing.T) {
 		newContractHandler(service, auth).ResolveMarket(rr, req)
 
 		assertFailureEnvelope(t, rr, http.StatusConflict, handlers.ReasonMarketClosed)
+	})
+
+	t.Run("unauthorized creator uses authorization denied reason", func(t *testing.T) {
+		service := &contractServiceMock{
+			resolveFn: func(ctx context.Context, marketID int64, resolution string, username string) error {
+				return dmarkets.ErrUnauthorized
+			},
+		}
+		auth := &contractAuthMock{user: &dusers.User{Username: "other"}}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"YES"}`)), map[string]string{"id": "5"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, auth).ResolveMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusForbidden, handlers.ReasonAuthorizationDenied)
+	})
+
+	t.Run("missing market uses market not found reason", func(t *testing.T) {
+		service := &contractServiceMock{
+			resolveFn: func(ctx context.Context, marketID int64, resolution string, username string) error {
+				return dmarkets.ErrMarketNotFound
+			},
+		}
+		auth := &contractAuthMock{user: &dusers.User{Username: "alice"}}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"YES"}`)), map[string]string{"id": "5"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, auth).ResolveMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusNotFound, handlers.ReasonMarketNotFound)
+	})
+
+	t.Run("invalid resolution uses validation failed reason", func(t *testing.T) {
+		service := &contractServiceMock{
+			resolveFn: func(ctx context.Context, marketID int64, resolution string, username string) error {
+				return dmarkets.ErrInvalidInput
+			},
+		}
+		auth := &contractAuthMock{user: &dusers.User{Username: "alice"}}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/v0/markets/5/resolve", bytes.NewBufferString(`{"resolution":"MAYBE"}`)), map[string]string{"id": "5"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, auth).ResolveMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	})
 }
 

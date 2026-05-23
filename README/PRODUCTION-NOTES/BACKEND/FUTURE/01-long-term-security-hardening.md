@@ -58,7 +58,6 @@ The remaining risk is concentrated in places where security behavior depends on 
 - HSTS and TLS ownership are still a deployment decision across app, ingress, and reverse proxy.
 - Rate limiting is still process-local and in-memory, so it is not a complete abuse-control system across replicas or distributed clients.
 - Market handlers still contain the remaining raw `http.Error` response slices.
-- `resolvemarket.go` still parses JWTs directly and reads `JWT_SIGNING_KEY` outside the centralized auth path.
 - JWT signing-key presence and serving-path injection landed on April 30, 2026; rotation, multi-key validation, and secret-management policy remain future work.
 
 There is no single standard security score for an entire application. Useful measurement should use different standards for different questions:
@@ -84,7 +83,7 @@ The following ideas are reasonable future candidates, but they are not current a
 
 The following items remain from the active security-hardening note and should be carried forward deliberately rather than treated as completed:
 
-- retire remaining request-shaped auth seams, direct JWT parsing, and route-local auth failure translation
+- retire remaining request-shaped auth seams and route-local auth failure translation
 - tighten CORS defaults and document the intended production origin posture
 - decide HSTS ownership across application headers, ingress, and reverse proxy policy
 - document TLS termination and trusted proxy assumptions, including which deployments may set `TRUST_PROXY_HEADERS=true`, whether proxy IP allowlists are needed, and how forwarded headers are scrubbed before reaching the app
@@ -101,7 +100,6 @@ As of 2026-04-30, a non-test scan for `http.Error` under `backend/handlers`, `ba
 - [listmarkets.go](/workspace/socialpredict/backend/handlers/markets/listmarkets.go): `handleListMarkets` and `writeListMarketsError` still emit plain-text method, query-parameter, domain-error, and response-encoding failures.
 - [getmarkets.go](/workspace/socialpredict/backend/handlers/markets/getmarkets.go): `GetMarketsHandler` still emits plain-text query-parameter, invalid-input, and internal failures.
 - [marketdetailshandler.go](/workspace/socialpredict/backend/handlers/markets/marketdetailshandler.go): `MarketDetailsHandler` still emits plain-text invalid-ID, not-found, invalid-input, and internal failures.
-- [resolvemarket.go](/workspace/socialpredict/backend/handlers/markets/resolvemarket.go): `ResolveMarketHandler`, `parseResolveRequest`, `extractUsernameFromRequest`, and `writeResolveError` still emit plain-text parse, token, authorization, state, validation, and internal failures; it also reads `JWT_SIGNING_KEY` directly instead of using the centralized auth service path.
 - [searchmarkets.go](/workspace/socialpredict/backend/handlers/markets/searchmarkets.go): `handleSearchMarkets`, `writeSearchError`, and the local `httpError` parser path still emit plain-text method, search-parameter, validation, service-domain, and response-build failures.
 
 No remaining non-test `http.Error` calls were found outside the market handler family in that scan.
