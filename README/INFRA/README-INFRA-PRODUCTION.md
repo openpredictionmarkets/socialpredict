@@ -128,7 +128,10 @@ curl -sS https://brierfoxforecast.com/readyz
 The GitHub production deploy workflow now performs the `/health` and `/readyz`
 checks externally from GitHub Actions after the Ansible workflow completes. It
 polls every 30 seconds for up to 10 minutes and expects `/health` to return
-`live` and `/readyz` to return `ready`.
+`live` and `/readyz` to return `ready`. The verification job writes a GitHub
+Actions job summary with the checked URLs, expected and last observed bodies,
+attempt count, timeout, interval, and final result. `/ops/status` remains an
+operator status endpoint and is not currently used as a production deploy gate.
 
 ## Notes
 
