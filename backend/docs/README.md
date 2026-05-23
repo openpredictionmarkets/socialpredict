@@ -49,7 +49,8 @@ Current route-family notes:
 - Runtime middleware can return JSON `{ ok: false, reason }` for router-owned
   `405` and middleware-owned `429` failures.
 - Many newer or touched handlers return envelope-shaped success or failure
-  responses.
+  responses, and legacy market list/get/details/update failures now use shared
+  failure envelopes.
 - Some older market and public-user success contracts intentionally remain raw
   DTOs for compatibility.
 

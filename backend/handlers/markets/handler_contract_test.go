@@ -22,6 +22,8 @@ import (
 
 type contractServiceMock struct {
 	createFn       func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error)
+	getFn          func(ctx context.Context, id int64) (*dmarkets.Market, error)
+	setLabelsFn    func(ctx context.Context, marketID int64, yesLabel, noLabel string) error
 	listFn         func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
 	detailsFn      func(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error)
 	searchFn       func(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error)
@@ -39,10 +41,16 @@ func (m *contractServiceMock) CreateMarket(ctx context.Context, req dmarkets.Mar
 }
 
 func (m *contractServiceMock) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
+	if m.setLabelsFn != nil {
+		return m.setLabelsFn(ctx, marketID, yesLabel, noLabel)
+	}
 	return nil
 }
 
 func (m *contractServiceMock) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
+	if m.getFn != nil {
+		return m.getFn(ctx, id)
+	}
 	return nil, nil
 }
 
@@ -343,6 +351,56 @@ func TestHandlerGetDetails_NotFoundUsesFailureEnvelope(t *testing.T) {
 	newContractHandler(service, nil).GetDetails(rr, req)
 
 	assertFailureEnvelope(t, rr, http.StatusNotFound, handlers.ReasonMarketNotFound)
+}
+
+func TestHandlerGetMarketAndUpdateLabels_UseFailureEnvelope(t *testing.T) {
+	t.Run("get market invalid id", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/v0/markets/not-an-id", nil), map[string]string{"id": "not-an-id"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(&contractServiceMock{}, nil).GetMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("get market not found", func(t *testing.T) {
+		service := &contractServiceMock{
+			getFn: func(ctx context.Context, id int64) (*dmarkets.Market, error) {
+				return nil, dmarkets.ErrMarketNotFound
+			},
+		}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodGet, "/v0/markets/99", nil), map[string]string{"id": "99"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, nil).GetMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusNotFound, handlers.ReasonMarketNotFound)
+	})
+
+	t.Run("update labels malformed body", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPut, "/v0/markets/5/labels", bytes.NewBufferString(`{`)), map[string]string{"id": "5"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(&contractServiceMock{}, nil).UpdateLabels(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("update labels validation failure", func(t *testing.T) {
+		service := &contractServiceMock{
+			setLabelsFn: func(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
+				return dmarkets.ErrInvalidLabel
+			},
+		}
+
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodPut, "/v0/markets/5/labels", bytes.NewBufferString(`{"yesLabel":"","noLabel":"NO"}`)), map[string]string{"id": "5"})
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, nil).UpdateLabels(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusBadRequest, handlers.ReasonValidationFailed)
+	})
 }
 
 func TestHandlerResolveMarket_MapsAuthAndStateFailures(t *testing.T) {

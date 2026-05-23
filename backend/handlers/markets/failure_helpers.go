@@ -48,6 +48,25 @@ func writeListError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, dmarkets.ErrInvalidInput):
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
+	case errors.Is(err, dmarkets.ErrUnauthorized):
+		_ = handlers.WriteFailure(w, http.StatusForbidden, handlers.ReasonAuthorizationDenied)
+	default:
+		writeInternalError(w)
+	}
+}
+
+func writeMarketActionError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, dmarkets.ErrMarketNotFound):
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
+	case errors.Is(err, dmarkets.ErrUserNotFound):
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
+	case errors.Is(err, dmarkets.ErrUnauthorized):
+		_ = handlers.WriteFailure(w, http.StatusForbidden, handlers.ReasonAuthorizationDenied)
+	case errors.Is(err, dmarkets.ErrInsufficientBalance):
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
+	case isValidationError(err):
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:
 		writeInternalError(w)
 	}

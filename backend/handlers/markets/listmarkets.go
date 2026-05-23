@@ -63,11 +63,10 @@ func fetchMarkets(r *http.Request, svc dmarkets.ServiceInterface, params listMar
 }
 
 func writeListMarketsError(w http.ResponseWriter, err error) {
-	message, statusCode := listMarketsErrorResponse(err)
-	if statusCode == http.StatusInternalServerError {
+	if !isListMarketsKnownError(err) {
 		logger.LogError("ListMarkets", "FetchMarkets", err)
 	}
-	http.Error(w, message, statusCode)
+	writeListError(w, err)
 }
 
 func parseListPage(r *http.Request) dmarkets.Page {
@@ -106,26 +105,24 @@ func buildListMarketsResponse(r *http.Request, svc dmarkets.ServiceInterface, ma
 	}, nil
 }
 
-func listMarketsErrorResponse(err error) (string, int) {
+func isListMarketsKnownError(err error) bool {
 	switch err {
-	case dmarkets.ErrInvalidInput:
-		return "Invalid input parameters", http.StatusBadRequest
-	case dmarkets.ErrUnauthorized:
-		return "Unauthorized", http.StatusUnauthorized
+	case dmarkets.ErrInvalidInput, dmarkets.ErrUnauthorized:
+		return true
 	default:
-		return "Error fetching markets", http.StatusInternalServerError
+		return false
 	}
 }
 
 func handleListMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.ServiceInterface) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
 	params, parseErr := parseListMarketsParams(r)
 	if parseErr != nil {
-		http.Error(w, parseErr.Error(), http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
@@ -140,6 +137,6 @@ func handleListMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.Serv
 			return
 		}
 		logger.LogError("ListMarkets", "WriteResponse", err)
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		writeInternalError(w)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 )
@@ -167,6 +168,55 @@ func TestListMarketsHandlerFactoryUsesDefaultListingFilters(t *testing.T) {
 	if mockSvc.capturedFilters != expectedFilters {
 		t.Fatalf("expected filters %+v, got %+v", expectedFilters, mockSvc.capturedFilters)
 	}
+}
+
+func TestListMarketsHandlerFactoryUsesFailureEnvelope(t *testing.T) {
+	t.Run("invalid status", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets?status=maybe", nil)
+		res := httptest.NewRecorder()
+
+		ListMarketsHandlerFactory(&listMarketsServiceMock{})(res, req)
+
+		assertFailureEnvelope(t, res, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("domain validation", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets", nil)
+		res := httptest.NewRecorder()
+
+		ListMarketsHandlerFactory(&listMarketsServiceMock{listMarketsErr: dmarkets.ErrInvalidInput})(res, req)
+
+		assertFailureEnvelope(t, res, http.StatusBadRequest, handlers.ReasonValidationFailed)
+	})
+
+	t.Run("method not allowed", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v0/markets", nil)
+		res := httptest.NewRecorder()
+
+		ListMarketsHandlerFactory(&listMarketsServiceMock{})(res, req)
+
+		assertFailureEnvelope(t, res, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+	})
+}
+
+func TestGetMarketsHandlerUsesFailureEnvelope(t *testing.T) {
+	t.Run("invalid status", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/all?status=maybe", nil)
+		res := httptest.NewRecorder()
+
+		GetMarketsHandler(&listMarketsServiceMock{})(res, req)
+
+		assertFailureEnvelope(t, res, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+	})
+
+	t.Run("domain validation", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v0/markets/all", nil)
+		res := httptest.NewRecorder()
+
+		GetMarketsHandler(&listMarketsServiceMock{listMarketsErr: dmarkets.ErrInvalidInput})(res, req)
+
+		assertFailureEnvelope(t, res, http.StatusBadRequest, handlers.ReasonValidationFailed)
+	})
 }
 
 func TestBuildMarketOverviewResponsesIncludesMarketIDInError(t *testing.T) {

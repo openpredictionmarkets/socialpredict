@@ -113,4 +113,3 @@ This note does not introduce:
 
 Those may be valid later, but the current baseline is intentionally a narrow
 release-to-readiness feedback loop around the deployed public domain.
-
