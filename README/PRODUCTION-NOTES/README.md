@@ -52,7 +52,7 @@ The backend implementation covers 14 critical areas for production deployment:
 **Location**: [`FRONTEND/plan.md`](./FRONTEND/plan.md)
 
 For current frontend sequencing, start with the grounded triage index:
-[`FRONTEND/00-baseline-triage.md`](./FRONTEND/00-baseline-triage.md).
+[`FRONTEND/00-TRIAGE.md`](./FRONTEND/00-TRIAGE.md).
 
 The frontend implementation covers 12 essential areas for production deployment:
 

@@ -1,5 +1,11 @@
 # Frontend Production Readiness Plan
 
+> Sequencing note: this is a broad backlog document, not the current execution
+> order. Start with [00-TRIAGE.md](./00-TRIAGE.md) for the grounded frontend
+> baseline sequence. Several implementation links below are historical names
+> from the original plan and should be reconciled as individual frontend notes
+> are rewritten into the backend-style production-note format.
+
 This document outlines the development plan to make the SocialPredict frontend application production-ready, following React best practices, modern frontend architecture patterns, and performance optimization strategies.
 
 ## Overview
