@@ -54,54 +54,51 @@ The backend implementation covers 14 critical areas for production deployment:
 For current frontend sequencing, start with the grounded triage index:
 [`FRONTEND/00-TRIAGE.md`](./FRONTEND/00-TRIAGE.md).
 
-The frontend implementation covers 12 essential areas for production deployment:
+The active frontend notes are intentionally focused on baseline production-readiness work:
 
-1. **State Management** - Redux Toolkit, RTK Query, optimistic updates
-2. **Performance Optimization** - Code splitting, lazy loading, Core Web Vitals
-3. **Testing Strategy** - Jest, React Testing Library, Playwright E2E
-4. **Security Implementation** - XSS protection, CSP, secure authentication
-5. **Accessibility Standards** - WCAG 2.1 AA compliance, screen readers
-6. **Error Handling** - Error boundaries, fallback UI, error reporting
-7. **Internationalization** - Multi-language support, RTL, localization
-8. **PWA Features** - Service workers, offline support, push notifications
-9. **Analytics & Tracking** - User analytics, business metrics, A/B testing
-10. **Deployment & CI/CD** - Automated deployments, Docker, infrastructure
-11. **Monitoring & Observability** - APM, user experience monitoring, logging
-12. **Maintenance & Updates** - Dependency management, automated updates
+1. **State/API/Auth Boundary** - API/auth adapter seams before broad state-platform migration
+2. **Performance Baseline** - production build-size evidence before optimization programs
+3. **Verification Baseline** - frontend install/build PR feedback before broad test gates
+4. **Security Baseline** - auth/API/session-adjacent cleanup before platform security work
+5. **Accessibility Baseline** - current core workflow accessibility before program-level audits
+6. **Failure Presentation Baseline** - user-safe recovery copy before browser observability rollout
+7. **Deployment/CI Baseline** - visible frontend PR checks before deployment-platform expansion
 
-**Key Technologies**: React 18, Redux Toolkit, Vite, Tailwind CSS, PWA, Docker, Sentry, Google Analytics
+Deferred frontend platform topics are preserved under [`FRONTEND/FUTURE/`](./FRONTEND/FUTURE/): global state platforms, strict performance budgets, Playwright/visual regression, CSP/session platform work, full accessibility programs, i18n, PWA/offline, analytics/A-B testing, browser APM, and custom maintenance automation.
+
+**Key Technologies**: React 18, Vite, Tailwind CSS, React Router, Docker/GitHub Actions
 
 ## Implementation Priority
 
-### Phase 1: Critical Security & Stability (Weeks 1-4)
+### Phase 1: Critical Security & Stability
 **Priority: CRITICAL**
 - Backend: Security hardening, error handling, configuration management
-- Frontend: Security implementation, error handling, state management
+- Frontend: CI/build feedback, safe failure presentation, auth/API boundary cleanup
 - **Outcome**: Secure, stable application ready for controlled testing
 
-### Phase 2: Performance & Monitoring (Weeks 5-8)
+### Phase 2: Performance & Accessibility Evidence
 **Priority: HIGH**
 - Backend: Performance optimization, monitoring, logging
-- Frontend: Performance optimization, monitoring, PWA features
-- **Outcome**: Fast, observable application with comprehensive monitoring
+- Frontend: build-size baseline, core workflow accessibility, measured performance evidence
+- **Outcome**: Faster, more accessible application with evidence-based follow-up work
 
-### Phase 3: Testing & Quality (Weeks 9-12)
+### Phase 3: Testing & Quality
 **Priority: HIGH**
 - Backend: Complete testing strategy, data validation
-- Frontend: Complete testing strategy, accessibility compliance
-- **Outcome**: Well-tested, accessible application meeting quality standards
+- Frontend: declared frontend test tooling, targeted tests, selected accessibility checks
+- **Outcome**: Better-tested frontend without premature broad gates
 
-### Phase 4: Operations & Maintenance (Weeks 13-16)
+### Phase 4: Operations & Maintenance
 **Priority: MEDIUM**
 - Backend: Deployment infrastructure, background jobs
-- Frontend: Deployment CI/CD, maintenance automation
-- **Outcome**: Fully automated deployment and maintenance procedures
+- Frontend: CI evidence, dependency review, measured bundle/performance checks
+- **Outcome**: Maintainable deployment and review feedback without bespoke automation too early
 
-### Phase 5: Advanced Features (Weeks 17-20)
-**Priority: LOW**
+### Phase 5: Future Platform Capabilities
+**Priority: FUTURE**
 - Backend: Advanced API features, database optimization
-- Frontend: Internationalization, analytics, advanced PWA features
-- **Outcome**: Feature-complete application with advanced capabilities
+- Frontend: i18n, analytics, browser APM, PWA/offline, and broader platform work only after re-entry criteria are met
+- **Outcome**: Advanced capabilities added from product/ops evidence rather than generic checklists
 
 ## Resource Requirements
 
@@ -135,10 +132,10 @@ The frontend implementation covers 12 essential areas for production deployment:
 
 ### For Frontend Implementation
 1. Review the [Frontend Production Plan](./FRONTEND/plan.md)
-2. Begin with state management and security implementation
-3. Add comprehensive error handling and performance optimization
-4. Implement testing strategy and accessibility features
-5. Follow the step-by-step implementation guides for each area
+2. Begin with frontend CI/build feedback and auth/API boundary cleanup
+3. Add safe public failure presentation and measured performance evidence
+4. Improve accessibility on existing core workflows
+5. Revisit `FRONTEND/FUTURE/` only after the active baseline exposes a concrete need
 
 ### Development Workflow
 1. **Assessment**: Review current codebase against production requirements

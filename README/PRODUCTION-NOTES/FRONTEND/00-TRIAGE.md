@@ -25,23 +25,36 @@ The key conclusion from the three design-agent reviews is:
 
 ## Source Documents
 
-This triage synthesizes:
+This triage synthesizes active baseline notes and future platform notes. The active notes are the next queue; the `FUTURE/` notes preserve deferred ideas with re-entry criteria.
+
+Active baseline notes:
 
 | Source | Main theme |
 | --- | --- |
-| [plan.md](./plan.md) | Broad frontend production-readiness backlog |
-| [01-state-management.md](./01-state-management.md) | State architecture and data ownership |
-| [02-performance-optimization.md](./02-performance-optimization.md) | Bundle, rendering, caching, and performance measurement |
-| [03-testing-strategy.md](./03-testing-strategy.md) | Unit, component, integration, E2E, and performance testing |
-| [04-security.md](./04-security.md) | Frontend auth, validation, XSS, CSP, and API safety |
-| [05-accessibility.md](./05-accessibility.md) | Semantic HTML, keyboard navigation, forms, and visual accessibility |
-| [06-error-handling.md](./06-error-handling.md) | Error boundaries, API error handling, reporting, and recovery |
-| [07-internationalization.md](./07-internationalization.md) | i18n setup, formatting, and RTL support |
-| [08-pwa-features.md](./08-pwa-features.md) | Service worker, offline, push, and installability |
-| [09-analytics-tracking.md](./09-analytics-tracking.md) | Product analytics, funnels, A/B tests, and feature flags |
-| [10-deployment-cicd.md](./10-deployment-cicd.md) | Frontend deployment, environment handling, Docker, and CI/CD |
-| [11-monitoring-observability.md](./11-monitoring-observability.md) | APM, dashboards, browser logging, and alerting |
-| [12-maintenance-updates.md](./12-maintenance-updates.md) | Dependency maintenance, regression checks, and operational upkeep |
+| [plan.md](./plan.md) | Frontend production-note index |
+| [01-state-management.md](./01-state-management.md) | API/auth adapter and state boundary baseline |
+| [02-performance-optimization.md](./02-performance-optimization.md) | Build-size and performance measurement baseline |
+| [03-testing-strategy.md](./03-testing-strategy.md) | Frontend install/build verification baseline |
+| [04-security.md](./04-security.md) | Auth/API/session-adjacent security baseline |
+| [05-accessibility.md](./05-accessibility.md) | Core workflow accessibility baseline |
+| [06-error-handling.md](./06-error-handling.md) | Safe public failure presentation baseline |
+| [10-deployment-cicd.md](./10-deployment-cicd.md) | Frontend PR CI and deployment-feedback baseline |
+
+Future platform notes:
+
+| Source | Main theme |
+| --- | --- |
+| [FUTURE/00-baseline-triage.md](./FUTURE/00-baseline-triage.md) | Future frontend backlog index and re-entry framework |
+| [FUTURE/01-long-term-state-platform.md](./FUTURE/01-long-term-state-platform.md) | Redux, RTK Query, persisted store, offline sync |
+| [FUTURE/02-long-term-performance-platform.md](./FUTURE/02-long-term-performance-platform.md) | Code splitting, Web Vitals, strict budgets, caching platform |
+| [FUTURE/03-long-term-test-infrastructure.md](./FUTURE/03-long-term-test-infrastructure.md) | Playwright, coverage, visual regression, accessibility automation |
+| [FUTURE/04-long-term-security-platform.md](./FUTURE/04-long-term-security-platform.md) | CSP, server sessions, stronger auth, browser security monitoring |
+| [FUTURE/05-long-term-accessibility-program.md](./FUTURE/05-long-term-accessibility-program.md) | Full WCAG/accessibility program |
+| [FUTURE/06-long-term-i18n-localization.md](./FUTURE/06-long-term-i18n-localization.md) | i18n, localization, RTL |
+| [FUTURE/07-long-term-pwa-offline-platform.md](./FUTURE/07-long-term-pwa-offline-platform.md) | Service worker, offline, push, installability |
+| [FUTURE/08-long-term-analytics-experimentation.md](./FUTURE/08-long-term-analytics-experimentation.md) | Product analytics, funnels, A/B testing |
+| [FUTURE/09-long-term-browser-observability.md](./FUTURE/09-long-term-browser-observability.md) | Browser APM, replay, dashboards, log shipping |
+| [FUTURE/10-long-term-maintenance-automation.md](./FUTURE/10-long-term-maintenance-automation.md) | Dependency automation, regression platform, frontend recovery |
 
 ## Design-Agent Review Inputs
 
@@ -66,7 +79,7 @@ Recommended design-plan direction:
 - Narrow the existing design-plan out-of-scope language from broad frontend redesign to broad frontend visual/platform redesign, while keeping frontend published-language and API-contract alignment in scope.
 - Treat this `00-TRIAGE.md` as implementation sequencing and code-grounded readiness guidance, not as the canonical design authority.
 
-A likely design-plan addition is a `Frontend Experience Context`: downstream/conformist to backend published API language, owning display labels and interaction copy, but not owning market accounting, resolution, payout, session truth, or authorization policy.
+The canonical design plan now includes frontend extraction tags, a `Frontend Experience Context`, a `Frontend Visual System Boundary`, active frontend workstreams `W08` and `W09`, and ADR guardrails for deferring browser platform capabilities until baseline seams are stable.
 
 ## Current Code Snapshot
 
@@ -136,7 +149,7 @@ Primary sources:
 
 - [03-testing-strategy.md](./03-testing-strategy.md)
 - [10-deployment-cicd.md](./10-deployment-cicd.md)
-- [12-maintenance-updates.md](./12-maintenance-updates.md)
+- [FUTURE/10-long-term-maintenance-automation.md](./FUTURE/10-long-term-maintenance-automation.md)
 
 Why this is first for code:
 
@@ -199,7 +212,7 @@ Primary sources:
 
 - [06-error-handling.md](./06-error-handling.md)
 - [04-security.md](./04-security.md)
-- [11-monitoring-observability.md](./11-monitoring-observability.md)
+- [FUTURE/09-long-term-browser-observability.md](./FUTURE/09-long-term-browser-observability.md)
 
 Why this is third:
 
@@ -255,7 +268,7 @@ Primary sources:
 
 - [02-performance-optimization.md](./02-performance-optimization.md)
 - [10-deployment-cicd.md](./10-deployment-cicd.md)
-- [11-monitoring-observability.md](./11-monitoring-observability.md)
+- [FUTURE/09-long-term-browser-observability.md](./FUTURE/09-long-term-browser-observability.md)
 
 Why this is fifth:
 
@@ -294,14 +307,14 @@ These ideas may be valuable, but they should not be first moves:
 
 | Deferred area | Source documents | Reason to defer |
 | --- | --- | --- |
-| Full Redux or global state rewrite | [01-state-management.md](./01-state-management.md) | Auth/API boundaries can be cleaned up first without a large state migration. |
-| Playwright E2E suite | [03-testing-strategy.md](./03-testing-strategy.md) | Needs basic frontend CI and stable selectors first. |
-| Full CSP/security-header program | [04-security.md](./04-security.md) | CSP is partly deployment/proxy owned and should be coordinated with backend/infra. |
-| i18n and RTL support | [07-internationalization.md](./07-internationalization.md) | Useful product work, but not a current production-risk blocker without localization requirements. |
-| PWA/offline/push | [08-pwa-features.md](./08-pwa-features.md) | Adds caching and state complexity before test/CI/auth seams are stable. |
-| Product analytics and A/B testing | [09-analytics-tracking.md](./09-analytics-tracking.md) | Needs a privacy/product decision and stable event taxonomy. |
-| Browser APM dashboards and log shipping | [11-monitoring-observability.md](./11-monitoring-observability.md) | Should follow backend signal and frontend error-boundary cleanup. |
-| Automated backup/recovery from frontend docs | [12-maintenance-updates.md](./12-maintenance-updates.md) | Mostly backend/infra/data-ops owned, not a frontend baseline concern. |
+| Full Redux or global state rewrite | [FUTURE/01-long-term-state-platform.md](./FUTURE/01-long-term-state-platform.md) | Auth/API boundaries can be cleaned up first without a large state migration. |
+| Playwright E2E suite | [FUTURE/03-long-term-test-infrastructure.md](./FUTURE/03-long-term-test-infrastructure.md) | Needs basic frontend CI and stable selectors first. |
+| Full CSP/security-header program | [FUTURE/04-long-term-security-platform.md](./FUTURE/04-long-term-security-platform.md) | CSP is partly deployment/proxy owned and should be coordinated with backend/infra. |
+| i18n and RTL support | [FUTURE/06-long-term-i18n-localization.md](./FUTURE/06-long-term-i18n-localization.md) | Useful product work, but not a current production-risk blocker without localization requirements. |
+| PWA/offline/push | [FUTURE/07-long-term-pwa-offline-platform.md](./FUTURE/07-long-term-pwa-offline-platform.md) | Adds caching and state complexity before test/CI/auth seams are stable. |
+| Product analytics and A/B testing | [FUTURE/08-long-term-analytics-experimentation.md](./FUTURE/08-long-term-analytics-experimentation.md) | Needs a privacy/product decision and stable event taxonomy. |
+| Browser APM dashboards and log shipping | [FUTURE/09-long-term-browser-observability.md](./FUTURE/09-long-term-browser-observability.md) | Should follow backend signal and frontend error-boundary cleanup. |
+| Automated backup/recovery from frontend docs | [FUTURE/10-long-term-maintenance-automation.md](./FUTURE/10-long-term-maintenance-automation.md) | Mostly backend/infra/data-ops owned, not a frontend baseline concern. |
 
 ## Suggested First Five PRs
 
