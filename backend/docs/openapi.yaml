@@ -2369,13 +2369,11 @@ components:
       description: >
         Explicit migration-state schema for infra probe failures and untouched
         handler-owned plain text failures. The current inventory is /health and
-        /readyz probe transport plus older market compatibility entry points in
-        handlers/markets/resolvemarket.go and the disabled market-create
-        compatibility bridge in createmarket.go. It is not the target API
-        contract; the next migration seam is the markets route family, where
-        remaining still-routed failures should move to ReasonResponse and
-        unused compatibility entry points should be retired without introducing
-        a universal wrapper.
+        /readyz probe transport plus the disabled market-create compatibility
+        bridge in createmarket.go. It is not the target API contract; the next
+        migration seam is the markets route family, where remaining still-routed
+        failures should move to ReasonResponse and unused compatibility entry
+        points should be retired without introducing a universal wrapper.
 
     OperationalStatus:
       type: object
