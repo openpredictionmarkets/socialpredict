@@ -68,6 +68,8 @@ There is no single standard security score for an entire application. Useful mea
 - [OWASP SAMM](https://owasp.org/www-project-samm/) should be used if SocialPredict wants to measure the maturity of its secure development lifecycle.
 - [NIST SSDF](https://csrc.nist.gov/pubs/sp/800/218/final) should be used for secure software development and supply-chain practice alignment.
 
+The starter evidence packet lives in [READING/05-asvs-level-1-evidence.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/READING/05-asvs-level-1-evidence.md). It is not an ASVS compliance claim; it is the first place to collect code, config, test, and deployment evidence.
+
 The intended future metric is not a single percentage score. It should be a short security evidence packet with:
 
 - ASVS Level 1 requirements mapped to code, configuration, tests, or deployment controls
