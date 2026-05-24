@@ -22,8 +22,8 @@ Browser observability and reporting platform ideas now live in [FUTURE/09-long-t
 ## Current Baseline
 
 - `App.jsx` has a global error boundary fallback.
-- The fallback currently renders `error.message`.
-- Some components render or alert raw `err.message` values.
+- The fallback now uses a user-safe production recovery message and limits raw `error.message` detail to development builds.
+- Some components still render or alert raw `err.message` values.
 - Backend envelopes and public reasons are not consistently mapped into frontend recovery copy.
 
 ## Active Direction
@@ -48,7 +48,7 @@ The canonical design plan tracks this as:
 - Production UI does not render raw exception messages from the global fallback.
 - Expected business rejections do not read like runtime crashes.
 - Users receive a stable recovery path for unexpected failures.
-- Developers can still diagnose errors locally.
+- Developers can still diagnose errors locally through development-only details.
 
 ## Explicitly Deferred
 

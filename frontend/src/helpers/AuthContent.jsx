@@ -1,10 +1,6 @@
-import { API_URL } from './../config';
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-    getApiErrorMessage,
-    parseApiResponseText,
-    unwrapApiResponse,
-} from '../utils/apiResponse';
+import { apiRequest } from '../api/httpClient';
+import { authStorage } from '../api/authStorage';
 
 const decodeJwtPayload = (token) => {
     if (!token) return null;
@@ -23,9 +19,9 @@ const decodeJwtPayload = (token) => {
 };
 
 const getStoredAuthState = () => {
-    const token = localStorage.getItem('token');
+    const token = authStorage.getToken();
     const tokenPayload = decodeJwtPayload(token);
-    const storedUsername = localStorage.getItem('username');
+    const storedUsername = authStorage.getUsername();
     const normalizedUsername = storedUsername && storedUsername !== 'undefined'
         ? storedUsername
         : tokenPayload?.username || null;
@@ -34,7 +30,7 @@ const getStoredAuthState = () => {
         isLoggedIn: Boolean(token),
         token,
         username: normalizedUsername,
-        usertype: localStorage.getItem('usertype'),
+        usertype: authStorage.getUsertype(),
         changePasswordNeeded: false,
     };
 };
@@ -71,11 +67,11 @@ const AuthProvider = ({ children }) => {
     }, [authState.isLoggedIn, authState.usertype]);
 
     useEffect(() => {
-        localStorage.removeItem('changePasswordNeeded');
+        authStorage.clearLegacyPasswordChangeFlag();
         const storedState = getStoredAuthState();
         if (storedState.token) {
             if (storedState.username) {
-                localStorage.setItem('username', storedState.username);
+                authStorage.setUsername(storedState.username);
             }
             setAuthState(storedState);
         }
@@ -83,41 +79,25 @@ const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const response = await fetch(`${API_URL}/v0/login`, {
+            const authData = await apiRequest('/v0/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ username, password }),
+                fallbackMessage: 'Login failed. Please try again.',
+                reasonMessages: loginReasonMessages,
             });
 
-            // Read response as text first to handle both JSON and non-JSON responses
-            const text = await response.text();
-            const data = parseApiResponseText(text);
-
-            if (response.ok) {
-                const authData = unwrapApiResponse(data);
-
-                localStorage.setItem('token', authData.token);
-                localStorage.setItem('username', authData.username);
-                localStorage.setItem('usertype', authData.usertype);
-                setAuthState({
-                    isLoggedIn: true,
-                    token: authData.token,
-                    username: authData.username,
-                    usertype: authData.usertype,
-                    changePasswordNeeded: authData.mustChangePassword,
-                });
-                return { success: true, mustChangePassword: authData.mustChangePassword };
-            } else {
-                const errorMessage = getApiErrorMessage(
-                    response,
-                    data,
-                    `Login failed with status ${response.status}.`,
-                    loginReasonMessages,
-                );
-                throw new Error(errorMessage);
-            }
+            authStorage.saveLogin(authData);
+            setAuthState({
+                isLoggedIn: true,
+                token: authData.token,
+                username: authData.username,
+                usertype: authData.usertype,
+                changePasswordNeeded: authData.mustChangePassword,
+            });
+            return { success: true, mustChangePassword: authData.mustChangePassword };
         } catch (error) {
             console.error('Login error:', error);
             throw error;
@@ -126,10 +106,7 @@ const AuthProvider = ({ children }) => {
 
 
     const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
-        localStorage.removeItem('usertype');
-        localStorage.removeItem('changePasswordNeeded');
+        authStorage.clear();
         setAuthState({
             isLoggedIn: false,
             token: null,
