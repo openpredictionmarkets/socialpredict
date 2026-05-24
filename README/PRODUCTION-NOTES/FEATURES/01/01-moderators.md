@@ -19,6 +19,14 @@ Moderator mode adds a second game mode where market creation is limited to a mod
 
 This note is a feature-level spec. Backend and frontend implementation notes should reference it, but this document is intentionally not owned by either layer.
 
+## Feature Artifact Map
+
+This directory keeps the moderator-mode feature work together:
+
+- [01-moderators.md](./01-moderators.md): feature overview, product behavior, and acceptance criteria.
+- [DESIGN.md](./DESIGN.md): domain and architecture design artifact aligned with the canonical design plan.
+- [PLAN.md](./PLAN.md): implementation sequencing and PR slicing plan derived from the design.
+
 ## Game Mode Configuration
 
 Moderator mode should be configured through the game setup policy served by the setup service. The default mode must remain open so existing games keep their current behavior unless explicitly configured otherwise.
