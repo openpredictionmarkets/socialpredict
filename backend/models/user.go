@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -11,6 +13,7 @@ type User struct {
 	PublicUser
 	PrivateUser
 	MustChangePassword bool `json:"mustChangePassword" gorm:"default:true"`
+	ModeratorGovernance
 }
 
 type PublicUser struct {
@@ -31,6 +34,26 @@ type PrivateUser struct {
 	Email    string `json:"email" gorm:"unique;not null"`
 	APIKey   string `json:"apiKey,omitempty" gorm:"unique"`
 	Password string `json:"password,omitempty" gorm:"not null"`
+}
+
+type ModeratorGovernance struct {
+	ModeratorStatus           string     `json:"moderatorStatus,omitempty" gorm:"not null;default:none;index"`
+	ModeratorSuspensionReason string     `json:"-" gorm:"type:text"`
+	ModeratorSuspendedBy      string     `json:"-" gorm:"index"`
+	ModeratorSuspendedAt      *time.Time `json:"-"`
+}
+
+type ModeratorRoleAudit struct {
+	gorm.Model
+	ID                  int64  `json:"id" gorm:"primary_key"`
+	Username            string `json:"username" gorm:"not null;index"`
+	ActorUsername       string `json:"actorUsername" gorm:"not null;index"`
+	Action              string `json:"action" gorm:"not null;index"`
+	FromUserType        string `json:"fromUserType"`
+	ToUserType          string `json:"toUserType"`
+	FromModeratorStatus string `json:"fromModeratorStatus"`
+	ToModeratorStatus   string `json:"toModeratorStatus"`
+	Reason              string `json:"reason,omitempty" gorm:"type:text"`
 }
 
 // HashPassword hashes given password

@@ -36,12 +36,12 @@ Agents implementing this feature should mark checklist items as they complete th
 Frontend work must not begin until these backend-facing items are stable enough to consume:
 
 - [x] Setup/config exposes game-mode policy with default `open` behavior.
-- [ ] Users domain owns moderator role/status/suspension semantics.
+- [x] Users domain owns moderator role/status/suspension semantics.
 - [ ] Markets domain owns proposal, approval, rejection, publication, amendment, resolution, and cancellation lifecycle semantics.
 - [ ] Bets domain has only the necessary buy/sell guards for lifecycle/self-trade and any cancellation/refund accounting hooks that are actually required.
 - [ ] `backend/docs/openapi.yaml` describes the new or changed routes and reason values.
 - [ ] Go OpenAPI contract tests pass.
-- [ ] Migration and backend tests pass for the implemented backend slices.
+- [x] Migration and backend tests pass for the implemented backend slices.
 
 ## Progress Ledger
 
@@ -49,7 +49,7 @@ Backend design and contract baseline:
 
 - [x] 01. Feature artifact and design alignment
 - [x] 02. Game-mode configuration policy
-- [ ] 03. Participant role and moderator status baseline
+- [x] 03. Participant role and moderator status baseline
 - [ ] 04. Market lifecycle and proposal creation
 - [ ] 05. Admin approval and rejection backend API
 - [ ] 06. Moderator backend API and proposal views
@@ -122,26 +122,26 @@ Service ownership: users domain/service and users repository.
 
 Checklist:
 
-- [ ] Introduce stable role constants or typed values for `ADMIN`, `REGULAR`, and `MODERATOR` in the users domain.
-- [ ] Add moderator status representation with at least `active` and `suspended` semantics.
-- [ ] Add suspension reason, actor, and timestamp storage.
-- [ ] Add role/suspension audit records or an explicit audit seam.
-- [ ] Add a timestamped Go migration under `backend/migration/migrations` for any new user role/status/audit columns or tables.
-- [ ] Add a package-local migration test for the role/status schema change where practical.
-- [ ] Add user-domain use cases for promote, suspend, and unsuspend without broad dashboard work.
-- [ ] Add tests for role/status state transitions.
-- [ ] Add tests that suspended moderators are distinguishable from demoted or deleted users.
+- [x] Introduce stable role constants or typed values for `ADMIN`, `REGULAR`, and `MODERATOR` in the users domain.
+- [x] Add moderator status representation with at least `active` and `suspended` semantics.
+- [x] Add suspension reason, actor, and timestamp storage.
+- [x] Add role/suspension audit records or an explicit audit seam.
+- [x] Add a timestamped Go migration under `backend/migration/migrations` for any new user role/status/audit columns or tables.
+- [x] Add a package-local migration test for the role/status schema change where practical.
+- [x] Add user-domain use cases for promote, suspend, and unsuspend without broad dashboard work.
+- [x] Add tests for role/status state transitions.
+- [x] Add tests that suspended moderators are distinguishable from demoted or deleted users.
 
 Exit criteria:
 
-- [ ] Moderator status is represented in backend users policy, not only UI copy.
-- [ ] Suspended moderators are distinguishable from demoted or deleted users.
-- [ ] Role/suspension changes are auditable.
+- [x] Moderator status is represented in backend users policy, not only UI copy.
+- [x] Suspended moderators are distinguishable from demoted or deleted users.
+- [x] Role/suspension changes are auditable.
 
 Validation:
 
-- [ ] `cd backend && go test ./...`
-- [ ] `git diff --check`
+- [x] `cd backend && go test ./...`
+- [x] `git diff --check`
 
 ### 04. Market Lifecycle And Proposal Creation
 

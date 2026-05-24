@@ -44,4 +44,6 @@ var (
 	ErrUnauthorized UserError = newDomainError("unauthorized")
 	// ErrInvalidTransactionType indicates that no balance rule exists for the supplied transaction type.
 	ErrInvalidTransactionType UserError = newDomainError("invalid transaction type")
+	// ErrInvalidModeratorState indicates that a moderator-only role/status transition is invalid.
+	ErrInvalidModeratorState UserError = newDomainError("invalid moderator state")
 )
