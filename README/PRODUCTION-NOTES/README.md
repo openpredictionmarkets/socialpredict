@@ -1,6 +1,6 @@
 # Production Readiness Guide
 
-This directory contains comprehensive documentation and implementation plans for making the SocialPredict application production-ready. The documentation is organized into backend and frontend sections, each with detailed implementation guides covering all aspects of production deployment.
+This directory contains comprehensive documentation and implementation plans for making the SocialPredict application production-ready. The documentation is organized into backend, frontend, and feature sections, with implementation guides and feature-level specs covering production deployment and product behavior.
 
 ## Overview
 
@@ -67,6 +67,15 @@ The active frontend notes are intentionally focused on baseline production-readi
 Deferred frontend platform topics are preserved under [`FRONTEND/FUTURE/`](./FRONTEND/FUTURE/): global state platforms, strict performance budgets, Playwright/visual regression, CSP/session platform work, full accessibility programs, i18n, PWA/offline, analytics/A-B testing, browser APM, and custom maintenance automation.
 
 **Key Technologies**: React 18, Vite, Tailwind CSS, React Router, Docker/GitHub Actions
+
+### Feature Production Notes
+**Location**: [`FEATURES/`](./FEATURES/)
+
+Feature notes define product and game-mode behavior that cuts across backend, frontend, data, and operations. These documents should be used as the shared source of truth before splitting implementation into backend or frontend work.
+
+Current feature specs:
+
+1. **Moderator Mode** - [`FEATURES/01-moderators.md`](./FEATURES/01-moderators.md)
 
 ## Implementation Priority
 
