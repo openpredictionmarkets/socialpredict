@@ -19,6 +19,7 @@ const (
 	ReasonLoginRateLimited       FailureReason = "LOGIN_RATE_LIMITED"
 	ReasonUserNotFound           FailureReason = "USER_NOT_FOUND"
 	ReasonMarketNotFound         FailureReason = "MARKET_NOT_FOUND"
+	ReasonInvalidState           FailureReason = "INVALID_STATE"
 
 	ReasonValidationFailed    FailureReason = "VALIDATION_FAILED"
 	ReasonMarketClosed        FailureReason = "MARKET_CLOSED"
@@ -40,6 +41,7 @@ var publicFailureReasons = []FailureReason{
 	ReasonLoginRateLimited,
 	ReasonUserNotFound,
 	ReasonMarketNotFound,
+	ReasonInvalidState,
 	ReasonValidationFailed,
 	ReasonMarketClosed,
 	ReasonInsufficientBalance,

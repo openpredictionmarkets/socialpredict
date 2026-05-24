@@ -385,6 +385,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(usersService, container.GetConfigService(), authService, requestSecurityService)))).Methods("POST")
+	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
 
 	// homepage content routes
 	homepageRepo := homepage.NewGormRepository(db)

@@ -51,7 +51,7 @@ Backend design and contract baseline:
 - [x] 02. Game-mode configuration policy
 - [x] 03. Participant role and moderator status baseline
 - [x] 04. Market lifecycle and proposal creation
-- [ ] 05. Admin approval and rejection backend API
+- [x] 05. Admin approval and rejection backend API
 - [ ] 06. Moderator backend API and proposal views
 - [ ] 07. Trade eligibility guards and suspension enforcement
 - [ ] 08. Market contract immutability and backend amendments
@@ -178,33 +178,33 @@ Service ownership: markets domain/service for market state transitions; users do
 
 Checklist:
 
-- [ ] Add markets-domain use case for approving proposed markets.
-- [ ] Add markets-domain use case for rejecting proposed markets.
-- [ ] Add repository methods required by approval/rejection use cases.
-- [ ] Require confirmation semantics at the API/application boundary for approval.
-- [ ] Store approval actor and timestamp.
-- [ ] Store rejection actor, timestamp, and reason.
-- [ ] Add a timestamped Go migration under `backend/migration/migrations` if approval/rejection metadata needs new columns or tables.
-- [ ] Add a package-local migration test for approval/rejection schema defaults where practical.
-- [ ] Add authorization checks so non-admins cannot approve or reject.
-- [ ] Add or update admin/markets handlers for approval and rejection.
-- [ ] Update `backend/docs/openapi.yaml` for approval and rejection endpoints.
-- [ ] Add public reason responses for invalid state and unauthorized approval/rejection attempts.
-- [ ] Add tests for approve, reject, unauthorized, and wrong-state cases.
+- [x] Add markets-domain use case for approving proposed markets.
+- [x] Add markets-domain use case for rejecting proposed markets.
+- [x] Add repository methods required by approval/rejection use cases.
+- [x] Require confirmation semantics at the API/application boundary for approval.
+- [x] Store approval actor and timestamp.
+- [x] Store rejection actor, timestamp, and reason.
+- [x] Add a timestamped Go migration under `backend/migration/migrations` if approval/rejection metadata needs new columns or tables.
+- [x] Add a package-local migration test for approval/rejection schema defaults where practical.
+- [x] Add authorization checks so non-admins cannot approve or reject.
+- [x] Add or update admin/markets handlers for approval and rejection.
+- [x] Update `backend/docs/openapi.yaml` for approval and rejection endpoints.
+- [x] Add public reason responses for invalid state and unauthorized approval/rejection attempts.
+- [x] Add tests for approve, reject, unauthorized, and wrong-state cases.
 
 Exit criteria:
 
-- [ ] Admin can approve a proposed market into published/tradable state.
-- [ ] Admin can reject a proposal with reason.
-- [ ] Non-admins cannot approve or reject.
-- [ ] Approval/rejection history is preserved.
-- [ ] OpenAPI matches live routes and public reason values.
+- [x] Admin can approve a proposed market into published/tradable state.
+- [x] Admin can reject a proposal with reason.
+- [x] Non-admins cannot approve or reject.
+- [x] Approval/rejection history is preserved.
+- [x] OpenAPI matches live routes and public reason values.
 
 Validation:
 
-- [ ] `cd backend && go test ./...`
-- [ ] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'`
-- [ ] `git diff --check`
+- [x] `cd backend && go test ./...`
+- [x] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'`
+- [x] `git diff --check`
 
 ### 06. Moderator Backend API And Proposal Views
 

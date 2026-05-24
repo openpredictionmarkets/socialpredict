@@ -21,6 +21,11 @@ type Market struct {
 	NoLabel                 string
 	Status                  string
 	LifecycleStatus         string
+	ApprovedBy              string
+	ApprovedAt              *time.Time
+	RejectedBy              string
+	RejectedAt              *time.Time
+	RejectionReason         string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 	InitialProbability      float64

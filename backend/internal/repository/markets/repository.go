@@ -319,6 +319,50 @@ func (r *GormRepository) ResolveMarket(ctx context.Context, id int64, resolution
 	return nil
 }
 
+// ApproveMarket publishes a proposed market and records admin approval metadata.
+func (r *GormRepository) ApproveMarket(ctx context.Context, id int64, actorUsername string, approvedAt time.Time) error {
+	result := r.db.WithContext(ctx).Model(&models.Market{}).
+		Where("id = ? AND lifecycle_status = ?", id, dmarkets.MarketLifecycleProposed).
+		Updates(map[string]any{
+			"lifecycle_status": dmarkets.MarketLifecyclePublished,
+			"approved_by":      actorUsername,
+			"approved_at":      approvedAt,
+			"rejected_by":      "",
+			"rejected_at":      nil,
+			"rejection_reason": "",
+			"updated_at":       approvedAt,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return dmarkets.ErrInvalidState
+	}
+	return nil
+}
+
+// RejectMarket rejects a proposed market and records admin rejection metadata.
+func (r *GormRepository) RejectMarket(ctx context.Context, id int64, actorUsername string, rejectedAt time.Time, reason string) error {
+	result := r.db.WithContext(ctx).Model(&models.Market{}).
+		Where("id = ? AND lifecycle_status = ?", id, dmarkets.MarketLifecycleProposed).
+		Updates(map[string]any{
+			"lifecycle_status": dmarkets.MarketLifecycleRejected,
+			"rejected_by":      actorUsername,
+			"rejected_at":      rejectedAt,
+			"rejection_reason": reason,
+			"updated_at":       rejectedAt,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return dmarkets.ErrInvalidState
+	}
+	return nil
+}
+
 // ListBetsForMarket returns all bets for the specified market ordered by placement time.
 func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
 	var bets []models.Bet
@@ -430,6 +474,11 @@ func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 		NoLabel:                 market.NoLabel,
 		UTCOffset:               market.UTCOffset,
 		LifecycleStatus:         lifecycle,
+		ApprovedBy:              market.ApprovedBy,
+		ApprovedAt:              market.ApprovedAt,
+		RejectedBy:              market.RejectedBy,
+		RejectedAt:              market.RejectedAt,
+		RejectionReason:         market.RejectionReason,
 		IsResolved:              market.Status == dmarkets.MarketStatusResolved || lifecycle == dmarkets.MarketLifecycleResolved,
 		InitialProbability:      market.InitialProbability,
 	}
@@ -453,9 +502,22 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		NoLabel:                 dbMarket.NoLabel,
 		Status:                  status,
 		LifecycleStatus:         lifecycle,
+		ApprovedBy:              dbMarket.ApprovedBy,
+		ApprovedAt:              cloneTimePtr(dbMarket.ApprovedAt),
+		RejectedBy:              dbMarket.RejectedBy,
+		RejectedAt:              cloneTimePtr(dbMarket.RejectedAt),
+		RejectionReason:         dbMarket.RejectionReason,
 		CreatedAt:               dbMarket.CreatedAt,
 		UpdatedAt:               dbMarket.UpdatedAt,
 		InitialProbability:      dbMarket.InitialProbability,
 		UTCOffset:               dbMarket.UTCOffset,
 	}
+}
+
+func cloneTimePtr(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
