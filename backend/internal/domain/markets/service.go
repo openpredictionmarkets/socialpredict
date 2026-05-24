@@ -86,9 +86,11 @@ type UserService interface {
 
 // Config holds configuration for the markets service.
 type Config struct {
-	MinimumFutureHours float64
-	CreateMarketCost   int64
-	MaximumDebtAllowed int64
+	MinimumFutureHours     float64
+	CreateMarketCost       int64
+	MaximumDebtAllowed     int64
+	GameMode               string
+	MarketApprovalRequired bool
 }
 
 // CreationPolicy governs validation and construction of markets.

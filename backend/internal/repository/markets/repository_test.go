@@ -27,7 +27,8 @@ func TestGormRepositoryCreateAndGetByID(t *testing.T) {
 		CreatorUsername:         "creator",
 		YesLabel:                "YES",
 		NoLabel:                 "NO",
-		Status:                  "active",
+		Status:                  dmarkets.MarketStatusActive,
+		LifecycleStatus:         dmarkets.MarketLifecyclePublished,
 		CreatedAt:               now,
 		UpdatedAt:               now,
 		InitialProbability:      0.5,
@@ -45,7 +46,7 @@ func TestGormRepositoryCreateAndGetByID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID returned error: %v", err)
 	}
-	if got.QuestionTitle != market.QuestionTitle || got.CreatorUsername != market.CreatorUsername || got.YesLabel != "YES" || got.InitialProbability != 0.5 {
+	if got.QuestionTitle != market.QuestionTitle || got.CreatorUsername != market.CreatorUsername || got.YesLabel != "YES" || got.InitialProbability != 0.5 || got.LifecycleStatus != dmarkets.MarketLifecyclePublished {
 		t.Fatalf("unexpected market data: %+v", got)
 	}
 
@@ -306,5 +307,63 @@ func TestGormRepositoryPublicSearchStatusResolveAndDelete(t *testing.T) {
 	}
 	if err := repo.Delete(ctx, closed.ID); !errors.Is(err, dmarkets.ErrMarketNotFound) {
 		t.Fatalf("expected ErrMarketNotFound for repeated delete, got %v", err)
+	}
+}
+
+func TestGormRepositoryHidesNonPublicLifecycleMarketsFromPublicQueries(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("lifecycle_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	published := modelstesting.GenerateMarket(501, creator.Username)
+	published.QuestionTitle = "Published lifecycle market"
+	published.ResolutionDateTime = now.Add(24 * time.Hour)
+	published.LifecycleStatus = dmarkets.MarketLifecyclePublished
+
+	proposed := modelstesting.GenerateMarket(502, creator.Username)
+	proposed.QuestionTitle = "Proposed lifecycle market"
+	proposed.ResolutionDateTime = now.Add(24 * time.Hour)
+	proposed.LifecycleStatus = dmarkets.MarketLifecycleProposed
+
+	rejected := modelstesting.GenerateMarket(503, creator.Username)
+	rejected.QuestionTitle = "Rejected lifecycle market"
+	rejected.ResolutionDateTime = now.Add(24 * time.Hour)
+	rejected.LifecycleStatus = dmarkets.MarketLifecycleRejected
+
+	cancelled := modelstesting.GenerateMarket(504, creator.Username)
+	cancelled.QuestionTitle = "Cancelled lifecycle market"
+	cancelled.ResolutionDateTime = now.Add(24 * time.Hour)
+	cancelled.LifecycleStatus = dmarkets.MarketLifecycleCancelled
+
+	for _, market := range []*models.Market{&published, &proposed, &rejected, &cancelled} {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("seed market %d: %v", market.ID, err)
+		}
+	}
+
+	listed, err := repo.List(ctx, dmarkets.ListFilters{Limit: 10})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ID != published.ID {
+		t.Fatalf("expected only published market in public list, got %+v", listed)
+	}
+
+	searched, err := repo.Search(ctx, "lifecycle", dmarkets.SearchFilters{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search returned error: %v", err)
+	}
+	if len(searched) != 1 || searched[0].ID != published.ID {
+		t.Fatalf("expected only published market in public search, got %+v", searched)
+	}
+
+	if _, err := repo.GetPublicMarket(ctx, proposed.ID); !errors.Is(err, dmarkets.ErrMarketNotFound) {
+		t.Fatalf("expected proposed market to be hidden from public get, got %v", err)
 	}
 }

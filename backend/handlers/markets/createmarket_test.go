@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"socialpredict/handlers"
+	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/security"
@@ -278,5 +279,49 @@ func assertNoLegacyErrorText(t *testing.T, rr *httptest.ResponseRecorder) {
 		strings.Contains(rr.Body.String(), "<script>") ||
 		strings.Contains(rr.Body.String(), "market resolution time") {
 		t.Fatalf("failure body leaked legacy or parser text: %s", rr.Body.String())
+	}
+}
+
+func TestCreateMarketHandlerWithServiceReturnsProposedStatus(t *testing.T) {
+	auth := &contractAuthMock{user: &dusers.User{Username: "moderator"}}
+	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
+	service := &searchServiceMock{
+		createFn: func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+			if creatorUsername != "moderator" {
+				t.Fatalf("creatorUsername = %q, want moderator", creatorUsername)
+			}
+			return &dmarkets.Market{
+				ID:                 88,
+				QuestionTitle:      req.QuestionTitle,
+				Description:        req.Description,
+				OutcomeType:        req.OutcomeType,
+				ResolutionDateTime: req.ResolutionDateTime,
+				CreatorUsername:    creatorUsername,
+				YesLabel:           "YES",
+				NoLabel:            "NO",
+				Status:             dmarkets.MarketLifecycleProposed,
+				LifecycleStatus:    dmarkets.MarketLifecycleProposed,
+				CreatedAt:          now,
+			}, nil
+		},
+	}
+
+	handler := CreateMarketHandlerWithService(service, auth, nil, security.NewSecurityService())
+	req := httptest.NewRequest(http.MethodPost, "/v0/markets", bytes.NewBufferString(
+		`{"questionTitle":"Will the launch succeed?","description":"Market","outcomeType":"BINARY","resolutionDateTime":"2030-01-01T00:00:00Z"}`,
+	))
+	rr := httptest.NewRecorder()
+
+	handler(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rr.Code, rr.Body.String())
+	}
+	var response dto.CreateMarketResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Status != dmarkets.MarketLifecycleProposed {
+		t.Fatalf("response status = %q, want proposed", response.Status)
 	}
 }

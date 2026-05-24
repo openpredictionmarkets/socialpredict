@@ -76,7 +76,7 @@ func (g marketGate) Open(ctx context.Context, marketID int64) (*dmarkets.Market,
 }
 
 func ensureMarketOpen(market *dmarkets.Market, now time.Time) error {
-	if market.Status == "resolved" || now.After(market.ResolutionDateTime) {
+	if !market.IsTradableAt(now) {
 		return ErrMarketClosed
 	}
 	return nil

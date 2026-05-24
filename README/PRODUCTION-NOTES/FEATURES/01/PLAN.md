@@ -50,7 +50,7 @@ Backend design and contract baseline:
 - [x] 01. Feature artifact and design alignment
 - [x] 02. Game-mode configuration policy
 - [x] 03. Participant role and moderator status baseline
-- [ ] 04. Market lifecycle and proposal creation
+- [x] 04. Market lifecycle and proposal creation
 - [ ] 05. Admin approval and rejection backend API
 - [ ] 06. Moderator backend API and proposal views
 - [ ] 07. Trade eligibility guards and suspension enforcement
@@ -149,28 +149,28 @@ Service ownership: markets domain/service and markets repository.
 
 Checklist:
 
-- [ ] Add market lifecycle or approval state support for `proposed`, `rejected`, `published`, `closed`, `resolved`, and `cancelled` behavior.
-- [ ] Add a timestamped Go migration under `backend/migration/migrations` for lifecycle or approval-state storage.
-- [ ] Add a package-local migration test for lifecycle/default backfill behavior where practical.
-- [ ] Preserve compatibility with existing public statuses where needed.
-- [ ] In moderator mode, make `POST /v0/markets` create `proposed` markets for active moderators.
-- [ ] In open mode, preserve existing create-market behavior.
-- [ ] Prevent proposed markets from appearing as tradable public markets.
-- [ ] Prevent rejected markets from appearing as tradable public markets.
-- [ ] Prevent cancelled markets from appearing as tradable public markets.
-- [ ] Add domain tests for lifecycle transitions.
-- [ ] Add handler/API tests for open-mode and moderator-mode creation behavior.
+- [x] Add market lifecycle or approval state support for `proposed`, `rejected`, `published`, `closed`, `resolved`, and `cancelled` behavior.
+- [x] Add a timestamped Go migration under `backend/migration/migrations` for lifecycle or approval-state storage.
+- [x] Add a package-local migration test for lifecycle/default backfill behavior where practical.
+- [x] Preserve compatibility with existing public statuses where needed.
+- [x] In moderator mode, make `POST /v0/markets` create `proposed` markets for active moderators.
+- [x] In open mode, preserve existing create-market behavior.
+- [x] Prevent proposed markets from appearing as tradable public markets.
+- [x] Prevent rejected markets from appearing as tradable public markets.
+- [x] Prevent cancelled markets from appearing as tradable public markets.
+- [x] Add domain tests for lifecycle transitions.
+- [x] Add handler/API tests for open-mode and moderator-mode creation behavior.
 
 Exit criteria:
 
-- [ ] Proposed markets are not tradable.
-- [ ] Existing open-mode tests continue to pass.
-- [ ] Market lifecycle terminology is consistent with [DESIGN.md](./DESIGN.md).
+- [x] Proposed markets are not tradable.
+- [x] Existing open-mode tests continue to pass.
+- [x] Market lifecycle terminology is consistent with [DESIGN.md](./DESIGN.md).
 
 Validation:
 
-- [ ] `cd backend && go test ./...`
-- [ ] `git diff --check`
+- [x] `cd backend && go test ./...`
+- [x] `git diff --check`
 
 ### 05. Admin Approval And Rejection Backend API
 

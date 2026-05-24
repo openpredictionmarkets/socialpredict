@@ -2764,6 +2764,7 @@ components:
           type: string
         status:
           type: string
+          description: Public market status. Values are normally active, closed, or resolved; moderator-mode creation may return proposed before admin approval.
         isResolved:
           type: boolean
         resolutionResult:

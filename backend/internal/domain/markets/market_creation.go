@@ -2,7 +2,10 @@ package markets
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	users "socialpredict/internal/domain/users"
 )
 
 type labelPair struct {
@@ -26,18 +29,59 @@ func (s *Service) CreateMarket(ctx context.Context, req MarketCreateRequest, cre
 		return nil, err
 	}
 
-	if err := s.creationPolicy.EnsureCreateMarketBalance(ctx, s.userService, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
+	now := s.clock.Now()
+	market := s.creationPolicy.BuildMarketEntity(now, req, creatorUsername, labels)
+	if err := s.applyCreationLifecycle(ctx, market, creatorUsername); err != nil {
 		return nil, err
 	}
 
-	now := s.clock.Now()
-	market := s.creationPolicy.BuildMarketEntity(now, req, creatorUsername, labels)
+	if err := s.creationPolicy.EnsureCreateMarketBalance(ctx, s.userService, creatorUsername, s.config.CreateMarketCost, s.config.MaximumDebtAllowed); err != nil {
+		return nil, err
+	}
 
 	if err := s.repo.Create(ctx, market); err != nil {
 		return nil, err
 	}
 
 	return market, nil
+}
+
+func (s *Service) applyCreationLifecycle(ctx context.Context, market *Market, creatorUsername string) error {
+	if market == nil {
+		return ErrInvalidInput
+	}
+	if !s.moderatorModeEnabled() {
+		market.LifecycleStatus = MarketLifecyclePublished
+		market.Status = MarketStatusActive
+		return nil
+	}
+	if s.userService == nil {
+		return ErrUnauthorized
+	}
+
+	creator, err := s.userService.GetPublicUser(ctx, creatorUsername)
+	if err != nil {
+		return ErrUserNotFound
+	}
+	if creator == nil ||
+		users.NormalizeUserType(creator.UserType) != users.UserTypeModerator ||
+		creator.ModeratorStatus != users.ModeratorStatusActive {
+		return ErrUnauthorized
+	}
+
+	if s.config.MarketApprovalRequired {
+		market.LifecycleStatus = MarketLifecycleProposed
+		market.Status = MarketLifecycleProposed
+		return nil
+	}
+
+	market.LifecycleStatus = MarketLifecyclePublished
+	market.Status = MarketStatusActive
+	return nil
+}
+
+func (s *Service) moderatorModeEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(s.config.GameMode), "moderator")
 }
 
 // SetCustomLabels updates the custom labels for a market.

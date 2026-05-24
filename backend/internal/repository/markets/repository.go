@@ -56,7 +56,7 @@ func (r *GormRepository) GetByID(ctx context.Context, id int64) (*dmarkets.Marke
 // GetPublicMarket retrieves a market with public-facing attributes.
 func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
 	var market models.Market
-	if err := r.db.WithContext(ctx).First(&market, marketID).Error; err != nil {
+	if err := publicLifecycleScope(r.db.WithContext(ctx)).First(&market, marketID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, dmarkets.ErrMarketNotFound
 		}
@@ -78,6 +78,8 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
+		Status:                  r.modelToDomain(&market).Status,
+		LifecycleStatus:         dmarkets.NormalizeLifecycleStatus(market.LifecycleStatus),
 	}, nil
 }
 
@@ -148,14 +150,14 @@ func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
 
 func applyStatusByResolution(query *gorm.DB, status string, now time.Time) *gorm.DB {
 	switch status {
-	case "active":
-		return query.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
-	case "closed":
-		return query.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
-	case "resolved":
-		return query.Where("is_resolved = ?", true)
+	case dmarkets.MarketStatusActive:
+		return publicLifecycleScope(query).Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+	case dmarkets.MarketStatusClosed:
+		return publicLifecycleScope(query).Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+	case dmarkets.MarketStatusResolved:
+		return publicLifecycleScope(query).Where("is_resolved = ? OR lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
 	default:
-		return query
+		return publicLifecycleScope(query)
 	}
 }
 
@@ -183,21 +185,28 @@ func applySearchTerm(dbQuery *gorm.DB, query string) *gorm.DB {
 }
 
 func applyStatusFilter(dbQuery *gorm.DB, status string) *gorm.DB {
-	if status == "" || status == "all" {
-		return dbQuery
+	if status == "" || status == dmarkets.MarketStatusAll {
+		return publicLifecycleScope(dbQuery)
 	}
 
 	now := time.Now()
 	switch status {
-	case "active":
-		return dbQuery.Where("is_resolved = ? AND resolution_date_time > ?", false, now)
-	case "closed":
-		return dbQuery.Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
-	case "resolved":
-		return dbQuery.Where("is_resolved = ?", true)
+	case dmarkets.MarketStatusActive:
+		return publicLifecycleScope(dbQuery).Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+	case dmarkets.MarketStatusClosed:
+		return publicLifecycleScope(dbQuery).Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+	case dmarkets.MarketStatusResolved:
+		return publicLifecycleScope(dbQuery).Where("is_resolved = ? OR lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
 	default:
-		return dbQuery
+		return publicLifecycleScope(dbQuery)
 	}
+}
+
+func publicLifecycleScope(query *gorm.DB) *gorm.DB {
+	return query.Where("lifecycle_status = ? OR lifecycle_status = ? OR lifecycle_status = '' OR lifecycle_status IS NULL",
+		dmarkets.MarketLifecyclePublished,
+		dmarkets.MarketLifecycleResolved,
+	)
 }
 
 func applyPagination(dbQuery *gorm.DB, limit, offset int) *gorm.DB {
@@ -293,6 +302,7 @@ func (r *GormRepository) ResolveMarket(ctx context.Context, id int64, resolution
 		Where("id = ?", id).
 		Updates(map[string]any{
 			"is_resolved":                true,
+			"lifecycle_status":           dmarkets.MarketLifecycleResolved,
 			"resolution_result":          resolution,
 			"final_resolution_date_time": time.Now(),
 			"updated_at":                 time.Now(),
@@ -401,6 +411,12 @@ func mapModelBetsToBoundary(dbBets []models.Bet) []boundary.Bet {
 
 // domainToModel converts a domain market to a GORM model
 func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
+	lifecycle := market.LifecycleStatus
+	if lifecycle == "" {
+		lifecycle = dmarkets.LifecycleFromPublicStatus(market.Status)
+	}
+	lifecycle = dmarkets.NormalizeLifecycleStatus(lifecycle)
+
 	return models.Market{
 		ID:                      market.ID,
 		QuestionTitle:           market.QuestionTitle,
@@ -413,20 +429,16 @@ func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
 		UTCOffset:               market.UTCOffset,
-		IsResolved:              market.Status == "resolved",
+		LifecycleStatus:         lifecycle,
+		IsResolved:              market.Status == dmarkets.MarketStatusResolved || lifecycle == dmarkets.MarketLifecycleResolved,
 		InitialProbability:      market.InitialProbability,
 	}
 }
 
 // modelToDomain converts a GORM model to a domain market
 func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market {
-	status := "active"
-	switch {
-	case dbMarket.IsResolved:
-		status = "resolved"
-	case !dbMarket.ResolutionDateTime.After(time.Now()):
-		status = "closed"
-	}
+	lifecycle := dmarkets.NormalizeLifecycleStatus(dbMarket.LifecycleStatus)
+	status := dmarkets.PublicStatusFromLifecycle(lifecycle, dbMarket.IsResolved, dbMarket.ResolutionDateTime, time.Now())
 
 	return &dmarkets.Market{
 		ID:                      dbMarket.ID,
@@ -440,6 +452,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		YesLabel:                dbMarket.YesLabel,
 		NoLabel:                 dbMarket.NoLabel,
 		Status:                  status,
+		LifecycleStatus:         lifecycle,
 		CreatedAt:               dbMarket.CreatedAt,
 		UpdatedAt:               dbMarket.UpdatedAt,
 		InitialProbability:      dbMarket.InitialProbability,
