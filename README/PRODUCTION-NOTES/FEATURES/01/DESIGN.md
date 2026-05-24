@@ -254,6 +254,8 @@ Frontend work should follow the existing frontend design plan decisions:
 Persistence should support audit and rollback-free history:
 
 - Additive migrations, not destructive rewrites.
+- Database schema changes must use the repo's timestamped Go migration convention under `backend/migration/migrations`, such as `YYYYMMDD_HHMMSS_description.go`.
+- Each migration should register with the compact timestamp ID used by the migration package and include package-local migration tests where practical.
 - Explicit role/status fields or tables.
 - Market lifecycle fields that preserve compatibility where possible.
 - Separate change-record storage rather than overwriting market title/description history.

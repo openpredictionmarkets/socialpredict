@@ -100,6 +100,8 @@ Checklist:
 - [ ] Add moderator status representation with at least `active` and `suspended` semantics.
 - [ ] Add suspension reason, actor, and timestamp storage.
 - [ ] Add role/suspension audit records or an explicit audit seam.
+- [ ] Add a timestamped Go migration under `backend/migration/migrations` for any new user role/status/audit columns or tables.
+- [ ] Add a package-local migration test for the role/status schema change where practical.
 - [ ] Add admin-domain use cases for promote, suspend, and unsuspend without broad dashboard work.
 - [ ] Add tests for role/status state transitions.
 - [ ] Add tests that suspended moderators are distinguishable from demoted or deleted users.
@@ -120,6 +122,8 @@ Validation:
 Checklist:
 
 - [ ] Add market lifecycle or approval state support for `proposed`, `rejected`, `published`, `closed`, `resolved`, and `cancelled` behavior.
+- [ ] Add a timestamped Go migration under `backend/migration/migrations` for lifecycle or approval-state storage.
+- [ ] Add a package-local migration test for lifecycle/default backfill behavior where practical.
 - [ ] Preserve compatibility with existing public statuses where needed.
 - [ ] In moderator mode, make `POST /v0/markets` create `proposed` markets for active moderators.
 - [ ] In open mode, preserve existing create-market behavior.
@@ -150,6 +154,8 @@ Checklist:
 - [ ] Require confirmation semantics at the API/application boundary for approval.
 - [ ] Store approval actor and timestamp.
 - [ ] Store rejection actor, timestamp, and reason.
+- [ ] Add a timestamped Go migration under `backend/migration/migrations` if approval/rejection metadata needs new columns or tables.
+- [ ] Add a package-local migration test for approval/rejection schema defaults where practical.
 - [ ] Add authorization checks so non-admins cannot approve or reject.
 - [ ] Add OpenAPI entries for approval and rejection endpoints.
 - [ ] Add public reason responses for invalid state and unauthorized approval/rejection attempts.
@@ -248,6 +254,8 @@ Checklist:
 - [ ] Preserve original title without in-place overwrite.
 - [ ] Preserve original description without in-place overwrite.
 - [ ] Add append-only contract amendment records.
+- [ ] Add a timestamped Go migration under `backend/migration/migrations` for contract amendment/change-record storage.
+- [ ] Add a package-local migration test for amendment/change-record schema creation where practical.
 - [ ] Generate backend-owned change records.
 - [ ] Generate contract version references on approved amendments.
 - [ ] Require admin approval for published moderator-market amendments unless actor is admin.
@@ -276,6 +284,8 @@ Checklist:
 
 - [ ] Add admin cancellation/yank use case.
 - [ ] Store cancellation actor, reason, timestamp, and contract version reference.
+- [ ] Add a timestamped Go migration under `backend/migration/migrations` for cancellation metadata, cancellation/refund event linkage, or related ledger fields.
+- [ ] Add a package-local migration test for cancellation/refund schema changes where practical.
 - [ ] Move market into terminal `cancelled` state.
 - [ ] Generate cancellation refund ledger entries.
 - [ ] Commit cancellation state update and refund ledger entries atomically.
@@ -390,6 +400,23 @@ Reason:
 - Frontend dashboard work should wait for stable backend route/reason contracts.
 - Contract amendments can be developed after basic approve/reject behavior, but before relying on admin yanks for amendment abuse cases.
 
+## Migration Convention
+
+Moderator mode changes persistent data, so implementation PRs that add or alter storage must use the existing backend migration system.
+
+The repo convention is:
+
+- create timestamped Go migration files under `backend/migration/migrations`
+- name files with the readable timestamp pattern `YYYYMMDD_HHMMSS_description.go`
+- register migrations with the compact timestamp ID used by `backend/migration`
+- keep migrations additive and backward-compatible where possible
+- include package-local migration tests where practical, following the current migration test style
+
+Examples already in the repo:
+
+- `backend/migration/migrations/20251013_080000_core_models.go`
+- `backend/migration/migrations/20251020_140500_add_market_labels.go`
+
 ## Review Checklist
 
 Before merging a moderator-mode implementation PR, check:
@@ -399,7 +426,8 @@ Before merging a moderator-mode implementation PR, check:
 - [ ] Is public error/reason language stable and documented?
 - [ ] Does the PR avoid hard deletion for audit-relevant state?
 - [ ] Are financial writes transaction-scoped where required?
-- [ ] Are migrations additive and reviewable?
+- [ ] Are schema changes handled through additive timestamped Go migrations under `backend/migration/migrations`?
+- [ ] Do migrations include package-local tests where practical?
 - [ ] Does frontend terminology match backend/domain terminology?
 - [ ] Does the PR avoid introducing generic RBAC/workflow/platform abstractions ahead of need?
 
