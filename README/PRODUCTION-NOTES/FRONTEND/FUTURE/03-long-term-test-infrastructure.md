@@ -4,9 +4,9 @@ document_type: production-notes
 domain: frontend
 future: true
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Move broad frontend test-platform ideas behind the active install/build verification baseline."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Keep broad test infrastructure deferred after frontend CI until declared unit/component test tooling exists."
 status: future
 ---
 
@@ -14,7 +14,7 @@ status: future
 
 ## Purpose
 
-This note holds frontend test-platform ideas that should follow the first CI/build baseline.
+This note holds frontend test-platform ideas that should follow declared unit/component test tooling, not merely the first CI/build baseline.
 
 The active verification note is [../03-testing-strategy.md](../03-testing-strategy.md).
 
@@ -30,7 +30,7 @@ The active verification note is [../03-testing-strategy.md](../03-testing-strate
 
 ## Why Deferred
 
-The frontend currently lacks a declared `npm test` script and the dependencies needed by the visible Vitest-style test. A stable install/build check should land before broader testing infrastructure.
+The frontend now has a stable install/build check. It still lacks a declared `npm test` script and the dependencies needed by the visible Vitest-style test, so broad testing infrastructure remains premature.
 
 ## Entry Criteria
 

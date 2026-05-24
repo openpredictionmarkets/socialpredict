@@ -3,9 +3,9 @@ title: Frontend Production Readiness Notes Index
 document_type: production-notes
 domain: frontend
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Replace the broad greenfield plan with an index that separates active frontend baseline notes from FUTURE platform notes."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Update the index after the first frontend baseline stack landed into the main integration PR."
 status: draft
 ---
 
@@ -16,6 +16,8 @@ status: draft
 Use [00-TRIAGE.md](./00-TRIAGE.md) for the current frontend execution sequence.
 
 The active frontend queue is intentionally narrow. It follows the canonical design plan's `W08 Frontend Experience Boundary and CI Baseline` and `W09 Frontend Visual System Baseline` workstreams. Larger frontend platform programs are preserved under [FUTURE/](./FUTURE/).
+
+As of Sunday, May 24, 2026, the first frontend baseline stack has landed on the integration branch for PR #699: frontend CI, safe global fallback copy, an API/auth adapter seam, representative API migrations, accessibility fixes, and build-size reporting.
 
 ## Active Baseline Notes
 
@@ -46,13 +48,20 @@ The active frontend queue is intentionally narrow. It follows the canonical desi
 | [FUTURE/09-long-term-browser-observability.md](./FUTURE/09-long-term-browser-observability.md) | Browser APM, replay, dashboards, log shipping |
 | [FUTURE/10-long-term-maintenance-automation.md](./FUTURE/10-long-term-maintenance-automation.md) | Dependency automation, regression platform, frontend recovery |
 
-## Current First Five PRs
+## Completed Baseline Stack
 
 1. Document frontend published-language and API-contract alignment.
-2. Add frontend CI build check with Node 22, `npm ci`, and `npm run build`.
+2. Add frontend CI build check with Node 22, `npm ci`, and frontend build execution.
 3. Sanitize the global error-boundary fallback and define safe public failure copy.
 4. Add auth/API boundary discovery plus a small API client/auth-header seam.
-5. Migrate token/API call sites incrementally, then run an accessibility pass on core workflows.
+5. Migrate representative token/API call sites, add build-size reporting, and run an accessibility pass on current core workflows.
+
+## Next Active Work
+
+1. Inventory and migrate remaining direct `API_URL`, `fetch`, `localStorage`, and local `unwrapApiResponse` call sites.
+2. Add declared frontend test tooling before requiring `npm test` in CI.
+3. Continue accessibility review on buy, sell, resolve, profile/account, market-detail, and admin workflows.
+4. Review the build-size report for heavy dependencies before adding budgets or code splitting.
 
 ## Guardrail
 
