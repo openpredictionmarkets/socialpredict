@@ -213,6 +213,9 @@ x-route-family-migration-matrix:
     - family: admin-and-content
       paths:
         - /v0/admin/createuser
+        - /v0/admin/users
+        - /v0/admin/users/{username}/role
+        - /v0/admin/moderators/{username}/suspension
         - /v0/admin/markets/{id}/approve
         - /v0/admin/markets/{id}/reject
         - /v0/content/home
@@ -2078,6 +2081,211 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/users:
+    get:
+      tags: [Users]
+      operationId: listAdminUsers
+      summary: List users for admin governance
+      description: Admin-only user queue showing role and moderator approval status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 250
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - in: query
+          name: usertype
+          schema:
+            type: string
+            enum: [ADMIN, REGULAR, MODERATOR]
+      responses:
+        '200':
+          description: Admin user queue returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUsersEnvelopeResponse'
+        '400':
+          description: Invalid pagination or filter request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to list users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/users/{username}/role:
+    patch:
+      tags: [Users]
+      operationId: updateAdminUserRole
+      summary: Update a user role for moderator approval
+      description: Admin-only endpoint currently used to promote a regular user to MODERATOR.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRoleUpdateRequest'
+      responses:
+        '200':
+          description: User role updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserEnvelopeResponse'
+        '400':
+          description: Invalid username, role, or request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: User was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Requested role transition is invalid for the user state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to update user role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/moderators/{username}/suspension:
+    patch:
+      tags: [Users]
+      operationId: updateAdminModeratorSuspension
+      summary: Suspend or unsuspend a moderator
+      description: Admin-only endpoint for moderator suspension state changes.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminModeratorSuspensionRequest'
+      responses:
+        '200':
+          description: Moderator suspension state updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserEnvelopeResponse'
+        '400':
+          description: Invalid username, request body, or missing suspension reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Moderator user was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: User is not currently a moderator or transition is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to update moderator suspension.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/markets/{id}/approve:
     patch:
       tags: [Markets]
@@ -3358,6 +3566,98 @@ components:
           type: string
         usertype:
           type: string
+
+    AdminUserResponse:
+      type: object
+      required: [id, username, displayName, usertype, moderatorStatus, accountBalance, mustChangePassword]
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        displayName:
+          type: string
+        usertype:
+          type: string
+          enum: [ADMIN, REGULAR, MODERATOR]
+        moderatorStatus:
+          type: string
+          enum: [none, active, suspended]
+        accountBalance:
+          type: integer
+          format: int64
+        mustChangePassword:
+          type: boolean
+        moderatorSuspensionReason:
+          type: string
+        moderatorSuspendedBy:
+          type: string
+        moderatorSuspendedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminUsersResult:
+      type: object
+      required: [users, total, limit, offset]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUserResponse'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    AdminUsersEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/AdminUsersResult'
+
+    AdminUserEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/AdminUserResponse'
+
+    AdminRoleUpdateRequest:
+      type: object
+      required: [usertype]
+      properties:
+        usertype:
+          type: string
+          enum: [MODERATOR]
+        reason:
+          type: string
+          description: Admin-visible audit reason for the role change.
+
+    AdminModeratorSuspensionRequest:
+      type: object
+      required: [suspended]
+      properties:
+        suspended:
+          type: boolean
+        reason:
+          type: string
+          description: Admin-visible audit reason. Required when suspending a moderator.
 
     AdminApproveMarketRequest:
       type: object

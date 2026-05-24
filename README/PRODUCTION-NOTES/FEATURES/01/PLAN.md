@@ -450,24 +450,25 @@ Prerequisite: backend users-domain role/status APIs and OpenAPI completion.
 
 Checklist:
 
-- [ ] Add users dashboard capabilities for promote, suspend, and unsuspend.
-- [ ] Add moderators dashboard or moderator-filtered admin surface.
-- [ ] Show moderator status.
-- [ ] Show suspension reason and timestamp.
+- [x] Add users dashboard capabilities for promote, suspend, and unsuspend.
+- [x] Add moderators dashboard or moderator-filtered admin surface.
+- [x] Show moderator status.
+- [x] Show suspension reason and timestamp.
 - [ ] Show created-market counts by lifecycle state.
 - [ ] Preserve audit history access.
-- [ ] Add frontend states for loading, success, and failure.
-- [ ] Keep backend authorization authoritative.
+- [x] Add frontend states for loading, success, and failure.
+- [x] Keep backend authorization authoritative.
 
 Exit criteria:
 
-- [ ] Admin can manage moderators from UI.
+- [x] Admin can manage moderators from UI.
 - [ ] Moderator status changes are visible and auditable.
-- [ ] Dashboard does not bypass backend authorization.
+- [x] Dashboard does not bypass backend authorization.
 
 Validation:
 
-- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [x] `cd frontend && npm run build`
+- [x] `cd backend && go test ./...`
 - [ ] `git diff --check`
 
 ### 15. End-To-End Feature Verification
