@@ -1,5 +1,6 @@
 import React from 'react';
 import AdminAddUser from '../../components/layouts/admin/AddUser';
+import ModeratorMarketReview from '../../components/layouts/admin/ModeratorMarketReview';
 import HomeEditor from './HomeEditor';
 import SiteTabs from '../../components/tabs/SiteTabs';
 
@@ -12,6 +13,10 @@ function AdminDashboard() {
         { 
             label: 'Homepage Editor', 
             content: <HomeEditor /> 
+        },
+        {
+            label: 'Market Review',
+            content: <ModeratorMarketReview />
         }
     ];
 

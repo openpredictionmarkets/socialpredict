@@ -26,6 +26,7 @@ This directory keeps the moderator-mode feature work together:
 - [01-moderators.md](./01-moderators.md): feature overview, product behavior, and acceptance criteria.
 - [DESIGN.md](./DESIGN.md): domain and architecture design artifact aligned with the canonical design plan.
 - [PLAN.md](./PLAN.md): implementation sequencing and PR slicing plan derived from the design.
+- [FUTURE-GAME-ENGINE.md](./FUTURE-GAME-ENGINE.md): later game-engine triage note for when direct domain policy becomes too scattered.
 
 ## Game Mode Configuration
 

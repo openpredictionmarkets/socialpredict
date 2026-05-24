@@ -8,6 +8,11 @@ import RegularInputBox from '../../components/inputs/InputBox';
 import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
 import { API_URL } from '../../config';
+import {
+  getApiErrorMessage,
+  parseApiResponseText,
+  unwrapApiResponse,
+} from '../../utils/apiResponse';
 
 function Create() {
   const [questionTitle, setQuestionTitle] = useState('');
@@ -18,12 +23,14 @@ function Create() {
   const [yesLabel, setYesLabel] = useState('');
   const [noLabel, setNoLabel] = useState('');
   const [error, setError] = useState('');
+  const [createdMarket, setCreatedMarket] = useState(null);
   const { username } = useAuth();
   const history = useHistory();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    setCreatedMarket(null);
 
     // Validate custom labels
     const trimmedYesLabel = yesLabel.trim();
@@ -81,13 +88,24 @@ function Create() {
         body: JSON.stringify(marketData),
       });
 
+      const responseText = await response.text();
+      const responsePayload = parseApiResponseText(responseText);
+
       if (response.ok) {
-        const responseData = await response.json();
+        const responseData = unwrapApiResponse(responsePayload);
+        if (String(responseData.status || '').toLowerCase() === 'proposed') {
+          setCreatedMarket(responseData);
+          return;
+        }
         history.push(`/markets/${responseData.id}`);
       } else {
-        const errorText = await response.text();
-        console.error('Market creation failed:', errorText);
-        setError(`Market creation failed: ${errorText}`);
+        const errorMessage = getApiErrorMessage(
+          response,
+          responsePayload,
+          `Market creation failed with status ${response.status}.`,
+        );
+        console.error('Market creation failed:', responsePayload);
+        setError(errorMessage);
       }
     } catch (error) {
       console.error('Error during market creation:', error);
@@ -193,6 +211,31 @@ function Create() {
         {error && (
           <div className='bg-red-600 text-white p-3 rounded-md text-sm'>
             {error}
+          </div>
+        )}
+
+        {createdMarket && (
+          <div className='rounded-md border border-amber-500 bg-amber-950/40 p-4 text-amber-50'>
+            <p className='text-sm uppercase tracking-[0.18em] text-amber-300'>
+              Proposed market created
+            </p>
+            <h2 className='mt-2 text-lg font-semibold'>
+              {createdMarket.questionTitle}
+            </h2>
+            <div className='mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2'>
+              <p>
+                <span className='text-amber-200'>Market ID:</span>{' '}
+                <span className='font-mono'>{createdMarket.id}</span>
+              </p>
+              <p>
+                <span className='text-amber-200'>Status:</span>{' '}
+                <span className='font-mono'>{createdMarket.status}</span>
+              </p>
+            </div>
+            <p className='mt-3 text-sm text-amber-100'>
+              This moderator-mode proposal is not tradable until an admin approves it.
+              Give the market ID to an admin or use the admin Market Review tab.
+            </p>
           </div>
         )}
 

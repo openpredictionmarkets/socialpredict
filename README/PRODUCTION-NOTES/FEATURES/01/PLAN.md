@@ -66,6 +66,12 @@ Frontend after backend contract:
 - [ ] 14. Admin moderator management dashboard
 - [ ] 15. End-to-end feature verification
 
+Frontend smoke-test exception:
+
+- [x] Add a temporary admin market-review view that can approve or reject a known proposed market ID after the approval backend API exists.
+- [x] Update market creation UI so moderator-mode `proposed` responses display the proposal ID instead of redirecting into a possibly non-public market detail page.
+- [x] Keep this separate from the final proposal queue, because the moderator proposal list API is still planned in item 06.
+
 ## Implementation Checklist
 
 ### 01. Feature Artifact And Design Alignment
