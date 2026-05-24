@@ -3,9 +3,9 @@ title: Frontend Deployment and CI Baseline
 document_type: production-notes
 domain: frontend
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Keep active deployment guidance focused on frontend PR feedback and move broader platform deployment ideas into FUTURE."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Record the first frontend PR workflow and non-blocking build-size report."
 status: draft
 ---
 
@@ -13,9 +13,9 @@ status: draft
 
 ## Purpose
 
-This active note covers the frontend CI/deployment baseline.
+This active note covers the frontend CI/deployment baseline after the first frontend PR workflow.
 
-Start with [00-TRIAGE.md](./00-TRIAGE.md). The repository already has release/manual Docker image publishing that builds the frontend image. The missing near-term feedback loop is a dedicated frontend PR check.
+Start with [00-TRIAGE.md](./00-TRIAGE.md). The repository already has release/manual Docker image publishing that builds the frontend image. The missing near-term feedback loop was a dedicated frontend PR check; that baseline now exists.
 
 Long-term maintenance and deployment-platform work lives in [FUTURE/10-long-term-maintenance-automation.md](./FUTURE/10-long-term-maintenance-automation.md).
 
@@ -29,11 +29,12 @@ Long-term maintenance and deployment-platform work lives in [FUTURE/10-long-term
 
 ## Active Direction
 
-1. Add a frontend PR job or extend an existing workflow with a frontend job.
+1. Keep the frontend PR job small and stable.
 2. Use Node 22 unless the project deliberately chooses another supported runtime.
 3. Run `npm ci` from `frontend/`.
 4. Run `npm run build:report` from `frontend/` so CI shows the production build and informational size table.
 5. Add tests, accessibility checks, and enforceable bundle budgets only after tooling and thresholds are explicit.
+6. Decide later whether build-size output should become a stored artifact or remain workflow-log evidence.
 
 ## Design Plan Alignment
 
@@ -45,7 +46,7 @@ The canonical design plan tracks this as:
 
 ## Active Acceptance Criteria
 
-- Frontend PRs have a visible GitHub Actions check.
+- Frontend PRs have a visible GitHub Actions check on `main` and stacked `frontend/**` PRs.
 - Broken frontend builds fail before merge.
 - Frontend workflow logs include a non-blocking build-size report.
 - First job is small and stable.

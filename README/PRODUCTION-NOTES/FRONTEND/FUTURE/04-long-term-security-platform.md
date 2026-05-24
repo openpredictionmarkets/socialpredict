@@ -4,9 +4,9 @@ document_type: production-notes
 domain: frontend
 future: true
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Move broad CSP, session, and security-monitoring work behind the active auth/API boundary cleanup."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Keep CSP, server sessions, and security monitoring deferred after the first frontend auth/API seam."
 status: future
 ---
 
@@ -30,13 +30,13 @@ The active security note is [../04-security.md](../04-security.md).
 
 ## Why Deferred
 
-The immediate frontend security issue is scattered auth/API behavior. CSP, server-managed sessions, and stronger auth cannot be solved correctly by the frontend alone.
+The first frontend auth/API seam now exists, but scattered authenticated call sites remain. CSP, server-managed sessions, and stronger auth still cannot be solved correctly by the frontend alone.
 
 ## Entry Criteria
 
 Reconsider this when:
 
-- The frontend API/auth adapter seam is stable.
+- The frontend API/auth adapter seam is stable across the main authenticated workflows, not only representative flows.
 - Backend session/auth direction is explicit.
 - Deployment/proxy ownership for headers is clarified.
 - Security monitoring has a privacy/redaction and telemetry vocabulary.

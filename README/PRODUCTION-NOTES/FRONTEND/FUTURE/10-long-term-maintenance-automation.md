@@ -4,9 +4,9 @@ document_type: production-notes
 domain: frontend
 future: true
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Move custom dependency, regression, and recovery automation behind CI/build/bundle evidence."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Keep custom maintenance automation deferred after CI/build-size evidence until repeated maintenance pain appears."
 status: future
 ---
 
@@ -14,7 +14,7 @@ status: future
 
 ## Purpose
 
-This note holds frontend maintenance automation ideas that should not replace basic CI evidence.
+This note holds frontend maintenance automation ideas that should not replace ordinary CI and package-manager evidence.
 
 The active deployment/CI note is [../10-deployment-cicd.md](../10-deployment-cicd.md).
 
@@ -29,13 +29,13 @@ The active deployment/CI note is [../10-deployment-cicd.md](../10-deployment-cic
 
 ## Why Deferred
 
-The first maintenance baseline should be ordinary package-manager audit/update behavior plus frontend CI/build/bundle evidence. Backup and data recovery are mostly backend, infrastructure, and data-ops concerns unless a concrete static-asset or client-state recovery issue appears.
+The first maintenance baseline now has frontend CI/build/bundle evidence. Backup and data recovery are mostly backend, infrastructure, and data-ops concerns unless a concrete static-asset or client-state recovery issue appears.
 
 ## Entry Criteria
 
 Reconsider this when:
 
-- Frontend install/build CI exists.
+- Frontend install/build CI remains stable over several frontend PRs.
 - Dependency update pain appears repeatedly.
 - Bundle/performance baselines exist.
 - A concrete frontend-owned recovery problem is identified.

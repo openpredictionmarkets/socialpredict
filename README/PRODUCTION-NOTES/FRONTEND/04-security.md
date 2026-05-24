@@ -3,9 +3,9 @@ title: Frontend Security Baseline
 document_type: production-notes
 domain: frontend
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Keep active frontend security focused on auth/API/session-adjacent seams and move broader platform security into FUTURE."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Record the first auth/API storage and transport seam while keeping broader session and CSP work deferred."
 status: draft
 ---
 
@@ -13,27 +13,29 @@ status: draft
 
 ## Purpose
 
-This active note covers the near-term frontend security work.
+This active note covers the near-term frontend security work after the first auth/API adapter seam.
 
-Start with [00-TRIAGE.md](./00-TRIAGE.md). The immediate issue is not only that tokens have used browser storage. The broader issue is the scattered auth/API boundary: token reads, authenticated headers, transport, backend envelope parsing, route access checks, and public failure copy are split across frontend layers.
+Start with [00-TRIAGE.md](./00-TRIAGE.md). The immediate issue is not only that tokens use browser storage. The first adapter seam now reduces scattered login/auth transport behavior, but several authenticated calls still construct token headers and failure handling directly.
 
 Broader security-platform work now lives in [FUTURE/04-long-term-security-platform.md](./FUTURE/04-long-term-security-platform.md).
 
 ## Current Baseline
 
 - Login state now uses the first API/auth adapter seam from `AuthContent`.
-- Some code still reads tokens directly from browser storage outside that seam.
+- `authStorage.js` owns login/logout token storage for migrated flows.
+- Some profile, admin, market-detail, and trading code still reads tokens directly from browser storage outside that seam.
 - Create-market, change-password, homepage, and admin homepage flows now use the adapter; other components and hooks can still construct authenticated requests directly.
 - `mustChangePassword` persistence was removed from localStorage in a prior security fix.
+- The global error fallback now avoids raw runtime detail in production UI.
 - CSP, server-managed sessions, and advanced auth flows are not current frontend-only changes.
 
 ## Active Direction
 
-1. Inventory browser token reads/writes.
-2. Inventory authenticated request construction.
-3. Introduce or document the auth/API adapter seam.
+1. Inventory remaining browser token reads/writes.
+2. Inventory remaining authenticated request construction.
+3. Move additional authenticated requests through `authenticatedApiRequest` in small slices.
 4. Keep route access behavior equivalent while extracting helper decisions.
-5. Separate user-safe failure copy from raw diagnostic detail.
+5. Continue separating user-safe failure copy from raw diagnostic detail.
 6. Coordinate server-managed session ideas with backend/API design instead of treating them as a frontend-only refactor.
 
 ## Design Plan Alignment
@@ -47,8 +49,9 @@ The canonical design plan tracks this under:
 
 ## Active Acceptance Criteria
 
-- Token/storage access is isolated or inventoried.
-- Auth header construction has one preferred path.
+- Login/logout token storage access is isolated behind `authStorage`.
+- Remaining token/storage access is inventoried before migration.
+- Auth header construction has one preferred path for migrated callers.
 - Login/logout/must-change-password behavior remains stable.
 - Production UI does not expose raw runtime errors as user-facing security copy.
 - Future server-managed session work is explicitly marked backend/API coordinated.

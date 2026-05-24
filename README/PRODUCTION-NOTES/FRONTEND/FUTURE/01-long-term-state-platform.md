@@ -4,9 +4,9 @@ document_type: production-notes
 domain: frontend
 future: true
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Move full Redux, RTK Query, persisted store, and offline sync ideas behind the active API/auth adapter baseline."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Keep global state platforms deferred after the first API/auth adapter seam until remaining transport and state orchestration evidence accumulates."
 status: future
 ---
 
@@ -29,13 +29,13 @@ The active state note is [../01-state-management.md](../01-state-management.md).
 
 ## Why Deferred
 
-The current design problem is dependency direction, not store selection. `AuthContent`, direct token reads, direct `fetch(API_URL...)` calls, and duplicated envelope parsing should be cleaned up behind API/auth adapter seams before introducing a global state platform.
+The current design problem is still dependency direction, not store selection. The first `authStorage` and `httpClient` seams exist, but remaining direct token reads, direct `fetch(API_URL...)` calls, and duplicated envelope parsing should be reduced before introducing a global state platform.
 
 ## Entry Criteria
 
 Reconsider this when:
 
-- The API/auth adapter seam is stable.
+- The API/auth adapter seam has covered more than representative flows.
 - Direct transport and token-storage dependencies are reduced or documented.
 - Multiple workflows show repeated state orchestration that local hooks/adapters cannot handle cleanly.
 - Server freshness, auth/session behavior, and failure mapping are stable enough for caching decisions.
