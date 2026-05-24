@@ -5,7 +5,7 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-05-24T00:00:00Z
 updated_at_display: "Sunday, May 24, 2026"
-update_reason: "Convert the moderator-mode plan into an agent-usable implementation checklist."
+update_reason: "Clarify backend-first sequencing, API contract validation, service ownership, and migration expectations."
 status: draft
 ---
 
@@ -22,27 +22,49 @@ Agents implementing this feature should mark checklist items as they complete th
 ## Planning Principles
 
 - Preserve open-mode behavior by default.
+- Complete backend design and backend contract work before frontend implementation.
 - Put backend domain policy ahead of frontend affordances.
+- Keep user functionality in the users domain/service and market functionality in the markets domain/service.
+- Touch the bets domain only for trade eligibility guards and cancellation/refund accounting that actually crosses buy/sell paths.
 - Add explicit seams before broad migrations.
 - Keep accounting-sensitive behavior behind transaction-scoped use cases.
 - Add Postgres-backed tests only where SQLite cannot prove the behavior.
 - Keep every PR independently buildable and reviewable.
 
+## Backend-First Gate
+
+Frontend work must not begin until these backend-facing items are stable enough to consume:
+
+- [ ] Setup/config exposes game-mode policy with default `open` behavior.
+- [ ] Users domain owns moderator role/status/suspension semantics.
+- [ ] Markets domain owns proposal, approval, rejection, publication, amendment, resolution, and cancellation lifecycle semantics.
+- [ ] Bets domain has only the necessary buy/sell guards for lifecycle/self-trade and any cancellation/refund accounting hooks that are actually required.
+- [ ] `backend/docs/openapi.yaml` describes the new or changed routes and reason values.
+- [ ] Go OpenAPI contract tests pass.
+- [ ] Migration and backend tests pass for the implemented backend slices.
+
 ## Progress Ledger
+
+Backend design and contract baseline:
 
 - [x] 01. Feature artifact and design alignment
 - [ ] 02. Game-mode configuration policy
 - [ ] 03. Participant role and moderator status baseline
 - [ ] 04. Market lifecycle and proposal creation
-- [ ] 05. Admin approval and rejection use cases
-- [ ] 06. Moderator views and frontend proposal tracking
-- [ ] 07. Admin approval dashboard baseline
-- [ ] 08. Moderator self-trade and suspension enforcement
-- [ ] 09. Market contract immutability and amendments
-- [ ] 10. Admin yank and cancellation refund unit of work
-- [ ] 11. Postgres cancellation refund truth tests
-- [ ] 12. Admin moderator dashboard expansion
-- [ ] 13. End-to-end feature verification
+- [ ] 05. Admin approval and rejection backend API
+- [ ] 06. Moderator backend API and proposal views
+- [ ] 07. Trade eligibility guards and suspension enforcement
+- [ ] 08. Market contract immutability and backend amendments
+- [ ] 09. Admin yank and cancellation refund unit of work
+- [ ] 10. Postgres cancellation refund truth tests
+- [ ] 11. Backend API contract completion gate
+
+Frontend after backend contract:
+
+- [ ] 12. Moderator frontend proposal tracking
+- [ ] 13. Admin approval dashboard baseline
+- [ ] 14. Admin moderator management dashboard
+- [ ] 15. End-to-end feature verification
 
 ## Implementation Checklist
 
@@ -71,6 +93,8 @@ Validation:
 
 ### 02. Game-Mode Configuration Policy
 
+Service ownership: Configuration Service Slice.
+
 Checklist:
 
 - [ ] Extend setup/application policy with default `open` game mode.
@@ -89,35 +113,39 @@ Exit criteria:
 
 Validation:
 
-- [ ] `go test ./...`
+- [ ] `cd backend && go test ./...`
 - [ ] `git diff --check`
 
 ### 03. Participant Role And Moderator Status Baseline
 
+Service ownership: users domain/service and users repository.
+
 Checklist:
 
-- [ ] Introduce stable role constants or typed values for `ADMIN`, `REGULAR`, and `MODERATOR`.
+- [ ] Introduce stable role constants or typed values for `ADMIN`, `REGULAR`, and `MODERATOR` in the users domain.
 - [ ] Add moderator status representation with at least `active` and `suspended` semantics.
 - [ ] Add suspension reason, actor, and timestamp storage.
 - [ ] Add role/suspension audit records or an explicit audit seam.
 - [ ] Add a timestamped Go migration under `backend/migration/migrations` for any new user role/status/audit columns or tables.
 - [ ] Add a package-local migration test for the role/status schema change where practical.
-- [ ] Add admin-domain use cases for promote, suspend, and unsuspend without broad dashboard work.
+- [ ] Add user-domain use cases for promote, suspend, and unsuspend without broad dashboard work.
 - [ ] Add tests for role/status state transitions.
 - [ ] Add tests that suspended moderators are distinguishable from demoted or deleted users.
 
 Exit criteria:
 
-- [ ] Moderator status is represented in backend policy, not only UI copy.
+- [ ] Moderator status is represented in backend users policy, not only UI copy.
 - [ ] Suspended moderators are distinguishable from demoted or deleted users.
 - [ ] Role/suspension changes are auditable.
 
 Validation:
 
-- [ ] `go test ./...`
+- [ ] `cd backend && go test ./...`
 - [ ] `git diff --check`
 
 ### 04. Market Lifecycle And Proposal Creation
+
+Service ownership: markets domain/service and markets repository.
 
 Checklist:
 
@@ -141,15 +169,17 @@ Exit criteria:
 
 Validation:
 
-- [ ] `go test ./...`
+- [ ] `cd backend && go test ./...`
 - [ ] `git diff --check`
 
-### 05. Admin Approval And Rejection Use Cases
+### 05. Admin Approval And Rejection Backend API
+
+Service ownership: markets domain/service for market state transitions; users domain/service for actor authorization facts; handlers adapt HTTP only.
 
 Checklist:
 
-- [ ] Add admin use case for approving proposed markets.
-- [ ] Add admin use case for rejecting proposed markets.
+- [ ] Add markets-domain use case for approving proposed markets.
+- [ ] Add markets-domain use case for rejecting proposed markets.
 - [ ] Add repository methods required by approval/rejection use cases.
 - [ ] Require confirmation semantics at the API/application boundary for approval.
 - [ ] Store approval actor and timestamp.
@@ -157,7 +187,8 @@ Checklist:
 - [ ] Add a timestamped Go migration under `backend/migration/migrations` if approval/rejection metadata needs new columns or tables.
 - [ ] Add a package-local migration test for approval/rejection schema defaults where practical.
 - [ ] Add authorization checks so non-admins cannot approve or reject.
-- [ ] Add OpenAPI entries for approval and rejection endpoints.
+- [ ] Add or update admin/markets handlers for approval and rejection.
+- [ ] Update `backend/docs/openapi.yaml` for approval and rejection endpoints.
 - [ ] Add public reason responses for invalid state and unauthorized approval/rejection attempts.
 - [ ] Add tests for approve, reject, unauthorized, and wrong-state cases.
 
@@ -167,87 +198,75 @@ Exit criteria:
 - [ ] Admin can reject a proposal with reason.
 - [ ] Non-admins cannot approve or reject.
 - [ ] Approval/rejection history is preserved.
+- [ ] OpenAPI matches live routes and public reason values.
 
 Validation:
 
-- [ ] `go test ./...`
-- [ ] OpenAPI/contract checks if available for changed routes.
+- [ ] `cd backend && go test ./...`
+- [ ] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'`
 - [ ] `git diff --check`
 
-### 06. Moderator Views And Frontend Proposal Tracking
+### 06. Moderator Backend API And Proposal Views
+
+Service ownership: markets domain/service for moderator-created market queries; users domain/service for moderator identity/status facts.
 
 Checklist:
 
-- [ ] Add moderator API for markets created by the current moderator.
+- [ ] Add backend API for markets created by the current moderator.
 - [ ] Include proposed, rejected, published, closed, resolved, and cancelled markets in the appropriate moderator view.
-- [ ] Add frontend route or dashboard surface for moderator proposal tracking.
-- [ ] Use backend lifecycle terms in frontend copy.
-- [ ] Use the existing frontend API/auth adapter patterns.
-- [ ] Avoid direct token/API coupling in new frontend code.
-- [ ] Add focused frontend tests if the test baseline exists by this point.
+- [ ] Ensure backend response vocabulary uses market lifecycle terms from [DESIGN.md](./DESIGN.md).
+- [ ] Ensure non-moderators cannot access moderator-only proposal views.
+- [ ] Update `backend/docs/openapi.yaml` for moderator routes.
+- [ ] Add public reason responses for non-moderator or suspended-moderator access where applicable.
+- [ ] Add handler/domain tests for authorized and unauthorized moderator views.
 
 Exit criteria:
 
-- [ ] Moderators can see proposal status without admin dashboard access.
-- [ ] Frontend does not invent a separate lifecycle model.
-- [ ] Existing frontend CI/build remains green.
+- [ ] Moderators can retrieve proposal status without admin dashboard access.
+- [ ] Backend API owns the lifecycle model that frontend will consume later.
+- [ ] OpenAPI matches live routes and public reason values.
 
 Validation:
 
-- [ ] `go test ./...` if backend routes change.
-- [ ] Frontend build workflow or `npm run build:report` if frontend changes.
+- [ ] `cd backend && go test ./...`
+- [ ] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'`
 - [ ] `git diff --check`
 
-### 07. Admin Approval Dashboard Baseline
+### 07. Trade Eligibility Guards And Suspension Enforcement
+
+Service ownership: markets domain/service owns market lifecycle eligibility; users domain/service owns moderator status; bets domain/service owns buy/sell guard integration only.
 
 Checklist:
 
-- [ ] Add admin UI for proposed-market queue.
-- [ ] Show market title, description, labels, outcome type, and resolution time.
-- [ ] Show creator username, moderator status, and creation timestamp.
-- [ ] Show prior review history where available.
-- [ ] Add approve confirmation prompt.
-- [ ] Add reject reason flow.
-- [ ] Align the UI with Tailwind/styleguide direction.
-- [ ] Keep backend authorization authoritative.
-
-Exit criteria:
-
-- [ ] Admins can review, approve, and reject from UI.
-- [ ] Approval is two-step.
-- [ ] Rejection captures reason.
-
-Validation:
-
-- [ ] Frontend build workflow or `npm run build:report`.
-- [ ] `go test ./...` if backend route behavior changes.
-- [ ] `git diff --check`
-
-### 08. Moderator Self-Trade And Suspension Enforcement
-
-Checklist:
-
+- [ ] Enforce proposed/rejected/cancelled market restrictions before buy operations.
+- [ ] Enforce proposed/rejected/cancelled market restrictions before sell operations where needed.
 - [ ] Enforce self-trade guard for moderator-created markets on buy path.
-- [ ] Enforce self-trade guard for moderator-created markets on sell path.
+- [ ] Enforce self-trade guard for moderator-created markets on sell path only if current sell semantics could create forbidden exposure or recover value in a way policy disallows.
 - [ ] Enforce suspended-moderator restriction on market creation.
 - [ ] Enforce suspended-moderator restriction on amendment creation.
 - [ ] Enforce suspended-moderator restriction on resolution.
-- [ ] Add domain tests for buy/sell self-trade restrictions.
+- [ ] Add domain tests for lifecycle buy/sell restrictions.
+- [ ] Add domain tests for moderator self-trade restrictions.
 - [ ] Add handler/API tests proving clients cannot bypass UI restrictions.
 - [ ] Add public reason responses for forbidden self-trade and suspended moderator actions.
+- [ ] Update `backend/docs/openapi.yaml` if buy/sell or market action failure contracts change.
 
 Exit criteria:
 
 - [ ] API clients cannot bypass UI restrictions.
-- [ ] Buy and sell paths reject forbidden self-trade consistently.
+- [ ] Buy and sell paths reject forbidden actions consistently where policy requires.
 - [ ] Suspended moderators cannot perform moderator-only actions.
+- [ ] Bets code changes are limited to eligibility guard integration and necessary accounting seams, not a broad bets redesign.
 
 Validation:
 
-- [ ] `go test ./...`
+- [ ] `cd backend && go test ./...`
+- [ ] `cd backend && go test . -run 'TestOpenAPI|TestReasonResponse'` if API reason values change.
 - [ ] `git diff --check`
 
-### 09. Market Contract Immutability And Amendments
+### 08. Market Contract Immutability And Backend Amendments
+
+Service ownership: markets domain/service and markets repository.
 
 Checklist:
 
@@ -261,7 +280,7 @@ Checklist:
 - [ ] Require admin approval for published moderator-market amendments unless actor is admin.
 - [ ] Add API route or use case for creating amendments.
 - [ ] Add API route or use case for reading market change records.
-- [ ] Add collapsed frontend presentation for change record on market detail.
+- [ ] Update `backend/docs/openapi.yaml` for amendment and change-record routes.
 - [ ] Add tests for immutability, amendment approval, and contract version references.
 
 Exit criteria:
@@ -270,15 +289,17 @@ Exit criteria:
 - [ ] Original description is not overwritten in place.
 - [ ] Change records are backend-generated and ordered.
 - [ ] Contract version references are stable enough for audit and tests.
+- [ ] OpenAPI matches live routes and public reason values.
 
 Validation:
 
-- [ ] `go test ./...`
-- [ ] Frontend build workflow or `npm run build:report` if frontend changes.
-- [ ] OpenAPI/contract checks if routes change.
+- [ ] `cd backend && go test ./...`
+- [ ] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded'`
 - [ ] `git diff --check`
 
-### 10. Admin Yank And Cancellation Refund Unit Of Work
+### 09. Admin Yank And Cancellation Refund Unit Of Work
+
+Service ownership: markets domain/service owns cancellation state; bets/ledger repository owns refund accounting where existing ledger data is required; users domain/service owns account-balance mutation interface.
 
 Checklist:
 
@@ -294,20 +315,25 @@ Checklist:
 - [ ] Prevent amendment after cancellation.
 - [ ] Prevent resolution after cancellation.
 - [ ] Add tests for cancellation authorization, wrong-state cancellation, and post-cancellation action rejection.
+- [ ] Update `backend/docs/openapi.yaml` for cancellation/yank routes and failure reasons.
 
 Exit criteria:
 
 - [ ] Cancellation is not implemented as hard delete.
 - [ ] Cancellation is distinguishable from ordinary creator `N/A` resolution.
 - [ ] Cancellation state and refund ledger entries commit or roll back together.
+- [ ] OpenAPI matches live routes and public reason values.
 
 Validation:
 
-- [ ] `go test ./...`
+- [ ] `cd backend && go test ./...`
 - [ ] Targeted transaction/unit-of-work tests.
+- [ ] `cd backend && go test . -run 'TestOpenAPI|TestReasonResponse'` if API reason values change.
 - [ ] `git diff --check`
 
-### 11. Postgres Cancellation Refund Truth Tests
+### 10. Postgres Cancellation Refund Truth Tests
+
+Service ownership: repository/unit-of-work tests for accounting truth.
 
 Checklist:
 
@@ -328,11 +354,93 @@ Exit criteria:
 
 Validation:
 
-- [ ] Standard `go test ./...` skips DSN-gated tests when DSN is absent.
+- [ ] Standard `cd backend && go test ./...` skips DSN-gated tests when DSN is absent.
 - [ ] DSN-enabled Postgres test command passes where a local/test Postgres DSN is available.
 - [ ] `git diff --check`
 
-### 12. Admin Moderator Dashboard Expansion
+### 11. Backend API Contract Completion Gate
+
+Service ownership: API and Auth Contract Boundary.
+
+Checklist:
+
+- [ ] Confirm every new backend route is registered in `backend/server/server.go`.
+- [ ] Confirm every new backend route is documented in `backend/docs/openapi.yaml`.
+- [ ] Confirm `ReasonResponse` enum includes any new public reason values.
+- [ ] Confirm `x-route-family-migration-matrix` stays truthful for changed route families.
+- [ ] Confirm `backend/docs/README.md` still describes the source-of-truth order accurately.
+- [ ] Confirm generated or embedded OpenAPI assets still match the maintained YAML.
+- [ ] Run existing Go OpenAPI tests.
+- [ ] Decide separately whether to run external Schemathesis/Python runtime conformance from `spec-socialpredict-tasks-auto`; do not claim it is an in-repo requirement unless wired into this repo.
+
+Exit criteria:
+
+- [ ] Backend APIs are stable enough for frontend work to consume.
+- [ ] OpenAPI and live server routes are aligned.
+- [ ] Public failure reasons are documented and test-covered.
+
+Validation:
+
+- [ ] `cd backend && go test ./...`
+- [ ] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'`
+- [ ] `cd backend && go test ./server`
+- [ ] Optional external runtime conformance if configured: Schemathesis/Python tooling from `spec-socialpredict-tasks-auto`.
+- [ ] `git diff --check`
+
+### 12. Moderator Frontend Proposal Tracking
+
+Prerequisite: backend-first gate and backend API contract completion gate.
+
+Checklist:
+
+- [ ] Add frontend route or dashboard surface for moderator proposal tracking.
+- [ ] Use backend lifecycle terms in frontend copy.
+- [ ] Use the existing frontend API/auth adapter patterns.
+- [ ] Avoid direct token/API coupling in new frontend code.
+- [ ] Add frontend states for loading, empty, success, and failure.
+- [ ] Add collapsed or summarized proposal history where available.
+- [ ] Add focused frontend tests if the test baseline exists by this point.
+
+Exit criteria:
+
+- [ ] Moderators can see proposal status without admin dashboard access.
+- [ ] Frontend does not invent a separate lifecycle model.
+- [ ] Existing frontend CI/build remains green.
+
+Validation:
+
+- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [ ] `git diff --check`
+
+### 13. Admin Approval Dashboard Baseline
+
+Prerequisite: backend approval/rejection APIs and OpenAPI completion.
+
+Checklist:
+
+- [ ] Add admin UI for proposed-market queue.
+- [ ] Show market title, description, labels, outcome type, and resolution time.
+- [ ] Show creator username, moderator status, and creation timestamp.
+- [ ] Show prior review history where available.
+- [ ] Add approve confirmation prompt.
+- [ ] Add reject reason flow.
+- [ ] Align the UI with Tailwind/styleguide direction.
+- [ ] Keep backend authorization authoritative.
+
+Exit criteria:
+
+- [ ] Admins can review, approve, and reject from UI.
+- [ ] Approval is two-step.
+- [ ] Rejection captures reason.
+
+Validation:
+
+- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [ ] `git diff --check`
+
+### 14. Admin Moderator Management Dashboard
+
+Prerequisite: backend users-domain role/status APIs and OpenAPI completion.
 
 Checklist:
 
@@ -353,11 +461,12 @@ Exit criteria:
 
 Validation:
 
-- [ ] Frontend build workflow or `npm run build:report`.
-- [ ] `go test ./...` if backend APIs change.
+- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
 - [ ] `git diff --check`
 
-### 13. End-To-End Feature Verification
+### 15. End-To-End Feature Verification
+
+Prerequisite: backend and frontend baseline flows exist.
 
 Checklist:
 
@@ -365,7 +474,7 @@ Checklist:
 - [ ] Cover moderator proposes market.
 - [ ] Cover admin approves proposed market.
 - [ ] Cover published market becomes tradable.
-- [ ] Cover moderator self-trade is rejected.
+- [ ] Cover moderator self-trade is rejected if the policy applies to that path.
 - [ ] Cover admin rejects proposed market with reason.
 - [ ] Cover suspended moderator cannot create or resolve.
 - [ ] Cover admin yanks market and affected participants see cancellation/refund state.
@@ -394,11 +503,37 @@ Reason:
 
 ## Dependency Notes
 
+- Backend domain and API work should precede frontend work.
 - Role/status work should precede proposal creation enforcement.
 - Proposal lifecycle should precede admin dashboard work.
+- API routes and `backend/docs/openapi.yaml` updates should land with their backend behavior, not in a delayed frontend PR.
 - Cancellation refund design should wait until lifecycle and ledger seams are explicit.
 - Frontend dashboard work should wait for stable backend route/reason contracts.
 - Contract amendments can be developed after basic approve/reject behavior, but before relying on admin yanks for amendment abuse cases.
+
+## API Contract Testing Convention
+
+The current in-repo API contract baseline is Go-based:
+
+- `backend/docs/openapi.yaml` is the canonical OpenAPI file.
+- `backend/docs/README.md` defines the source-of-truth order and update rules.
+- `backend/openapi_test.go` uses `github.com/getkin/kin-openapi/openapi3` to validate the OpenAPI document, route/spec parity, embedded docs, public reason enums, and route-family migration matrix.
+- `backend/server/server_contract_test.go` covers backend-served docs publishing such as `/openapi.yaml` and `/swagger/`.
+
+Required command for API-affecting backend PRs:
+
+```bash
+cd backend && go test ./...
+```
+
+Focused API check when a narrower command is needed:
+
+```bash
+cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'
+cd backend && go test ./server
+```
+
+External Python/Schemathesis runtime conformance exists in the task/agent repository, but it is not currently an in-repo `socialpredict` command. If a future PR wires that into this repo or CI, update this plan and the API docs to make it a required validation step.
 
 ## Migration Convention
 
@@ -422,8 +557,13 @@ Examples already in the repo:
 Before merging a moderator-mode implementation PR, check:
 
 - [ ] Does open mode still behave as before?
-- [ ] Is the new rule enforced in backend policy rather than only UI?
+- [ ] Is backend domain/API work complete before any dependent frontend change?
+- [ ] Is users functionality owned by the users domain/service?
+- [ ] Is market functionality owned by the markets domain/service?
+- [ ] Are bets changes limited to necessary trade guards or accounting seams?
 - [ ] Is public error/reason language stable and documented?
+- [ ] Does the PR update `backend/docs/openapi.yaml` for any API behavior change?
+- [ ] Do the Go OpenAPI tests pass for API-affecting changes?
 - [ ] Does the PR avoid hard deletion for audit-relevant state?
 - [ ] Are financial writes transaction-scoped where required?
 - [ ] Are schema changes handled through additive timestamped Go migrations under `backend/migration/migrations`?

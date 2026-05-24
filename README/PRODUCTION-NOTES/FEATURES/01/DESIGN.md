@@ -39,6 +39,7 @@ Fowler/evolutionary lens:
 
 - Keep the default `open` behavior backward compatible.
 - Add seams in small increments: config policy, role/status policy, market lifecycle, approval use cases, then cancellation/refund behavior.
+- Complete backend domain/API contract work before frontend work consumes the feature.
 - Avoid a workflow-engine or RBAC-platform rewrite until the feature proves it needs those abstractions.
 
 Martin/clean-architecture lens:
@@ -98,9 +99,9 @@ This design does not introduce:
 | Design-plan boundary | Moderator-mode ownership |
 | --- | --- |
 | Configuration Service Slice | Owns typed game-mode policy loaded from setup assets, with default `open` behavior. |
-| Participant Account Context | Owns role constants, moderator status, suspension state, and participant-facing account policy. |
-| Prediction Market Context | Owns market lifecycle, approval state, publication eligibility, contract immutability, and resolution eligibility. |
-| Betting and Position Ledger Context | Owns buy/sell restrictions, self-trade guard impact, cancellation refund math, and net exposure policy. |
+| Participant Account Context | Owns user role constants, moderator status, suspension state, and participant-facing account policy. User functionality belongs in the users domain/service. |
+| Prediction Market Context | Owns market lifecycle, approval state, publication eligibility, contract immutability, and resolution eligibility. Market functionality belongs in the markets domain/service. |
+| Betting and Position Ledger Context | Owns only the buy/sell guard integration and accounting behavior that must occur on trade paths. Moderator mode should not cause a broad bets redesign unless cancellation/refund accounting proves it is needed. |
 | API and Auth Contract Boundary | Owns route-visible authorization failures, reason vocabulary, and OpenAPI alignment. |
 | Repository and Legacy Model Adapter Boundary | Owns persistence translation, migrations, and transaction-scoped data access. |
 | Frontend Experience Context | Owns participant/admin/moderator presentation while conforming to backend-owned domain language and policy. |
@@ -111,11 +112,23 @@ This design does not introduce:
 Moderator mode cuts across existing contexts but should not collapse them into one package.
 
 - Configuration Service Slice supplies immutable game-mode policy to business services.
-- Participant Account Context supplies actor role and moderator status facts.
-- Prediction Market Context decides whether a market can be proposed, published, amended, resolved, or cancelled.
-- Betting and Position Ledger Context decides whether a trade is allowed and how refunds affect balances and positions.
+- Participant Account Context supplies actor role and moderator status facts through the users domain/service.
+- Prediction Market Context decides whether a market can be proposed, published, amended, resolved, or cancelled through the markets domain/service.
+- Betting and Position Ledger Context checks market/user eligibility at buy/sell boundaries and owns only the accounting portions that genuinely require ledger data.
 - API handlers adapt HTTP requests to use cases and translate use-case outcomes into public responses.
 - Frontend screens present allowed actions and status, but backend policy remains authoritative.
+
+## Backend-First Design Rule
+
+Moderator mode must be designed and implemented backend-first.
+
+Backend-first means:
+
+- user role, moderator status, and suspension behavior are owned by users domain/service code before admin or moderator frontend screens are added
+- market proposal, approval, rejection, publication, amendment, resolution, and cancellation behavior are owned by markets domain/service code before frontend status displays are added
+- buy/sell restrictions are enforced through backend buy/sell paths when policy requires them
+- API routes, response schemas, and public failure reasons are documented in `backend/docs/openapi.yaml` before frontend code depends on them
+- frontend work consumes the backend contract instead of inventing its own feature state machine
 
 ## Core Domain Rules
 
@@ -238,6 +251,21 @@ Examples of reason categories to define before implementation:
 - `CANCELLATION_FORBIDDEN`
 
 These names are placeholders until aligned with the existing OpenAPI reason vocabulary. The durable requirement is that UI and API share stable public reasons rather than parsing raw error text.
+
+API-affecting moderator-mode PRs must update `backend/docs/openapi.yaml` in the same change as route or response behavior. The backend API notes define the source-of-truth order as `backend/server/server.go`, touched handlers/DTOs, `backend/docs/openapi.yaml`, and `backend/docs/README.md`.
+
+The current in-repo API contract tests are Go-based:
+
+- `backend/openapi_test.go` validates the OpenAPI document with `github.com/getkin/kin-openapi/openapi3`, route/spec parity, public reason enum alignment, embedded docs, and route-family migration metadata.
+- `backend/server/server_contract_test.go` covers backend-served docs publishing for `/openapi.yaml` and Swagger surfaces.
+
+Required validation for API-affecting moderator-mode PRs:
+
+```bash
+cd backend && go test ./...
+```
+
+Python/Schemathesis runtime conformance tooling exists in `spec-socialpredict-tasks-auto`, but it is not currently wired as an in-repo `socialpredict` validation command. Treat it as optional external conformance tooling until a PR adds it to this repo or CI.
 
 ## Frontend Design Posture
 
