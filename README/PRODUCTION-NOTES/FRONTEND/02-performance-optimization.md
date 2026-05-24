@@ -21,9 +21,10 @@ Broader performance-platform ideas now live in [FUTURE/02-long-term-performance-
 
 ## Current Baseline
 
-- Vite production builds exist, but frontend PRs do not yet have a dedicated build signal.
-- Build output size is not documented as a baseline.
-- Bundle budgets are not defined.
+- Vite production builds exist and frontend PRs now have a dedicated install/build signal.
+- `npm run build:report` runs the production build and prints an informational size table from `frontend/build`.
+- The current observed production build report totals roughly `1201 kB` raw and `326 kB` gzip, with the main JavaScript chunk at roughly `1101 kB` raw and `253 kB` gzip.
+- Bundle budgets are not defined and should not be strict until this baseline is reviewed against real product goals.
 - Route-level code splitting and dependency replacement have not been justified with current measurements.
 
 ## Active Direction
@@ -31,7 +32,7 @@ Broader performance-platform ideas now live in [FUTURE/02-long-term-performance-
 The first performance pass should be low-risk:
 
 1. Run a clean frontend production build.
-2. Record the current build output and major bundle contributors.
+2. Record the current build output and major bundle contributors using `npm run build:report`.
 3. Identify obvious duplicate or heavyweight dependencies, especially charting libraries.
 4. Decide whether a permissive build-size or bundle-report artifact belongs in CI.
 5. Avoid blocking unrelated work with strict budgets until the baseline is understood.
@@ -47,6 +48,7 @@ The canonical design plan tracks this under:
 ## Active Acceptance Criteria
 
 - Current production build size is recorded.
+- Frontend CI prints the build-size report after the production build.
 - Any CI budget starts permissive and evidence-based.
 - Future performance PRs have a baseline to compare against.
 - No route-splitting or dependency-replacement program starts before measurement.

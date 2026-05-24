@@ -22,17 +22,18 @@ Long-term maintenance and deployment-platform work lives in [FUTURE/10-long-term
 ## Current Baseline
 
 - `.github/workflows/docker.yml` builds/publishes frontend images on release/manual paths.
-- Frontend-only PRs do not yet have a dedicated install/build check.
+- [`.github/workflows/frontend.yml`](../../../.github/workflows/frontend.yml) now runs the first dedicated frontend PR install/build check.
 - Frontend test tooling is not yet declared.
-- Browser performance and bundle evidence are not yet CI artifacts.
+- Browser performance is not yet a CI artifact.
+- Bundle size evidence is now printed in the frontend workflow logs through `npm run build:report`.
 
 ## Active Direction
 
 1. Add a frontend PR job or extend an existing workflow with a frontend job.
 2. Use Node 22 unless the project deliberately chooses another supported runtime.
 3. Run `npm ci` from `frontend/`.
-4. Run `npm run build` from `frontend/`.
-5. Add tests, accessibility checks, and bundle budgets only after tooling and thresholds are explicit.
+4. Run `npm run build:report` from `frontend/` so CI shows the production build and informational size table.
+5. Add tests, accessibility checks, and enforceable bundle budgets only after tooling and thresholds are explicit.
 
 ## Design Plan Alignment
 
@@ -46,6 +47,7 @@ The canonical design plan tracks this as:
 
 - Frontend PRs have a visible GitHub Actions check.
 - Broken frontend builds fail before merge.
+- Frontend workflow logs include a non-blocking build-size report.
 - First job is small and stable.
 - Any later checks have declared dependencies and documented thresholds.
 

@@ -21,6 +21,8 @@ Long-term accessibility-program work lives in [FUTURE/05-long-term-accessibility
 
 ## Current Baseline
 
+Create-market, change-password, global fallback, and navigation controls now have a first pass of explicit labels, status/error announcements, and menu button names. The frontend still needs a broader workflow audit.
+
 The frontend has domain-critical workflows that must be usable without pointer-only or color-only interaction:
 
 - Browse markets.
@@ -52,6 +54,7 @@ The canonical design plan tracks this as:
 - Core forms have labels and usable focus behavior.
 - Primary navigation and domain workflows can be operated by keyboard.
 - Screen-reader users are not blocked by obvious missing semantic structure.
+- Error and success messages use status or alert semantics where they are introduced.
 - Market/trading state is not conveyed by color alone.
 - Any automated check added to CI is stable and scoped.
 
