@@ -1,6 +1,6 @@
 import React from 'react';
 
-const RegularInput = ({ value, onChange, placeholder, type = 'text', id, name, autoComplete }) => {
+const RegularInput = ({ value, onChange, placeholder, type = 'text', id, name, autoComplete, required, ariaDescribedBy }) => {
     return (
         <input
             type={type}
@@ -10,6 +10,8 @@ const RegularInput = ({ value, onChange, placeholder, type = 'text', id, name, a
             id={id}
             name={name}
             autoComplete={autoComplete}
+            required={required}
+            aria-describedby={ariaDescribedBy}
             className="w-full px-4 py-2 border-2 border-blue-500 rounded-md text-white bg-transparent focus:outline-none"
         />
     );
