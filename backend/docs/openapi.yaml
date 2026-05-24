@@ -2136,6 +2136,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected approval failure.
           content:
@@ -2197,6 +2203,12 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '409':
           description: Market is not currently proposed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
           content:
             application/json:
               schema:
