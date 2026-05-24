@@ -5,7 +5,7 @@ permissions:
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'frontend/**']
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend.yml'
@@ -35,6 +35,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Build frontend
+      - name: Build frontend and report size
         working-directory: frontend
-        run: npm run build
+        run: npm run build:report
