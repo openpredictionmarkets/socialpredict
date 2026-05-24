@@ -1,10 +1,9 @@
 import React, { useState, useContext } from 'react';
-import { API_URL } from '../../../config';
 import { useHistory } from 'react-router-dom';
 import SiteButton from '../../buttons/SiteButtons';
 import { RegularInput } from '../../inputs/InputBar';
 import { AuthContext } from '../../../helpers/AuthContent';
-import { getApiErrorMessage, parseApiResponseText } from '../../../utils/apiResponse';
+import { authenticatedApiRequest } from '../../../api/httpClient';
 
 function ChangePasswordLayout() {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -44,24 +43,15 @@ function ChangePasswordLayout() {
         }
 
         try {
-            const response = await fetch(`${API_URL}/v0/changepassword`, {
+            await authenticatedApiRequest('/v0/changepassword', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
-                body: JSON.stringify({ currentPassword, newPassword })
+                body: JSON.stringify({ currentPassword, newPassword }),
+                fallbackMessage: 'Failed to change password',
+                reasonMessages: changePasswordReasonMessages,
             });
-            if (!response.ok) {
-                const payload = parseApiResponseText(await response.text());
-                const errMsg = capitalizeFirstChar(getApiErrorMessage(
-                    response,
-                    payload,
-                    'Failed to change password',
-                    changePasswordReasonMessages,
-                ));
-                throw new Error(errMsg || 'Failed to change password');
-            }
 
             // Set success message
             setSuccess("Password changed successfully! Logging out. Please log in with your new password.");
@@ -73,7 +63,7 @@ function ChangePasswordLayout() {
             }, 2000);  // Delay of 2000 milliseconds (2 seconds)
         } catch (err) {
             console.error('Failed to change password:', err);
-            setError(err.message);
+            setError(capitalizeFirstChar(err.message || 'Failed to change password'));
         }
     };
 
@@ -82,33 +72,55 @@ function ChangePasswordLayout() {
             <h1 className="text-2xl font-bold mb-4">Change Password</h1>
             <p>Password change required. You will be automatically logged out after password has been changed.</p>
             <form onSubmit={handleSubmit} className="space-y-8">
+                <label htmlFor="current-password" className="block text-sm font-medium text-gray-300">
+                    Current Password
+                </label>
                 <RegularInput
+                    id="current-password"
+                    name="current-password"
                     type="password"
                     value={currentPassword}
                     onChange={handleCurrentPasswordChange}
                     placeholder="Current Password"
+                    autoComplete="current-password"
                     required
                 />
+                <label htmlFor="new-password" className="block text-sm font-medium text-gray-300">
+                    New Password
+                </label>
                 <RegularInput
+                    id="new-password"
+                    name="new-password"
                     type="password"
                     value={newPassword}
                     onChange={handleNewPasswordChange}
                     placeholder="New Password"
+                    autoComplete="new-password"
+                    ariaDescribedBy="new-password-requirements"
                     required
                 />
+                <p id="new-password-requirements" className="text-sm text-gray-300">
+                    Use 8-128 characters with uppercase, lowercase, and a digit.
+                </p>
+                <label htmlFor="confirm-new-password" className="block text-sm font-medium text-gray-300">
+                    Confirm New Password
+                </label>
                 <RegularInput
+                    id="confirm-new-password"
+                    name="confirm-new-password"
                     type="password"
                     value={confirmPassword}
                     onChange={handleConfirmPasswordChange}
                     placeholder="Confirm New Password"
+                    autoComplete="new-password"
                     required
                 />
                 <SiteButton type="submit">
                     Save New Password
                 </SiteButton>
             </form>
-            {success && <p className="text-green-500">{success}</p>}
-            {error && <p className="error">{error}</p>}
+            {success && <p className="text-green-500" role="status">{success}</p>}
+            {error && <p className="error" role="alert">{error}</p>}
         </div>
     );
 }

@@ -176,7 +176,12 @@ const Sidebar = () => {
       >
         <div className='flex items-center justify-between p-3 border-b border-gray-700'>
           <h2 className='text-lg font-bold'>SocialPredict</h2>
-          <button onClick={toggleSidebar} className='md:hidden'>
+          <button
+            onClick={toggleSidebar}
+            className='md:hidden'
+            aria-label={isSidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isSidebarOpen}
+          >
             {isSidebarOpen ? (
               <MenuShrinkSVG className='w-5 h-5' />
             ) : (
@@ -184,7 +189,7 @@ const Sidebar = () => {
             )}
           </button>
         </div>
-        <nav className='flex-grow overflow-y-auto px-2 py-3'>
+        <nav className='flex-grow overflow-y-auto px-2 py-3' aria-label='Primary navigation'>
           <ul className='space-y-1'>{renderLinks()}</ul>
         </nav>
         <footer className='border-t border-gray-700 p-2'>
@@ -203,27 +208,29 @@ const Sidebar = () => {
       </aside>
       {!isSidebarOpen && (
         <div className='fixed bottom-0 left-0 right-0 z-50 bg-gray-800 text-white flex justify-around items-center p-2 md:hidden'>
-          <Link to='/' className='text-gray-300 hover:text-white'>
+          <Link to='/' className='text-gray-300 hover:text-white' aria-label='Home'>
             <HomeSVG className='w-5 h-5' />
           </Link>
-          <Link to='/markets' className='text-gray-300 hover:text-white'>
+          <Link to='/markets' className='text-gray-300 hover:text-white' aria-label='Markets'>
             <MarketsSVG className='w-5 h-5' />
           </Link>
           {isLoggedIn ? (
-            <Link to='/create' className='text-gray-300 hover:text-white'>
+            <Link to='/create' className='text-gray-300 hover:text-white' aria-label='Create market'>
               <CreateSVG className='w-5 h-5' />
             </Link>
           ) : (
             <LoginModalButton iconOnly={true} />
           )}
           {isLoggedIn && (
-            <Link to='/profile' className='text-gray-300 hover:text-white'>
+            <Link to='/profile' className='text-gray-300 hover:text-white' aria-label='Profile'>
               <ProfileSVG className='w-5 h-5' />
             </Link>
           )}
           <button
             onClick={toggleSidebar}
             className='text-gray-300 hover:text-white'
+            aria-label='Open navigation menu'
+            aria-expanded={isSidebarOpen}
           >
             <MenuGrowSVG className='w-5 h-5' />
           </button>
