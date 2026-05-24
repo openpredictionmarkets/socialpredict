@@ -28,6 +28,7 @@
   "scripts": {
     "start": "vite --host",
     "build": "vite build",
+    "build:report": "npm run build && node scripts/report-build-size.mjs",
     "serve": "vite preview"
   },
   "eslintConfig": {
