@@ -35,7 +35,7 @@ Agents implementing this feature should mark checklist items as they complete th
 
 Frontend work must not begin until these backend-facing items are stable enough to consume:
 
-- [ ] Setup/config exposes game-mode policy with default `open` behavior.
+- [x] Setup/config exposes game-mode policy with default `open` behavior.
 - [ ] Users domain owns moderator role/status/suspension semantics.
 - [ ] Markets domain owns proposal, approval, rejection, publication, amendment, resolution, and cancellation lifecycle semantics.
 - [ ] Bets domain has only the necessary buy/sell guards for lifecycle/self-trade and any cancellation/refund accounting hooks that are actually required.
@@ -48,7 +48,7 @@ Frontend work must not begin until these backend-facing items are stable enough 
 Backend design and contract baseline:
 
 - [x] 01. Feature artifact and design alignment
-- [ ] 02. Game-mode configuration policy
+- [x] 02. Game-mode configuration policy
 - [ ] 03. Participant role and moderator status baseline
 - [ ] 04. Market lifecycle and proposal creation
 - [ ] 05. Admin approval and rejection backend API
@@ -97,24 +97,24 @@ Service ownership: Configuration Service Slice.
 
 Checklist:
 
-- [ ] Extend setup/application policy with default `open` game mode.
-- [ ] Add moderation config fields for approval-required and moderator trading policy.
-- [ ] Add typed moderation config in the Configuration Service Slice.
-- [ ] Expose game-mode policy to domain services through narrow interfaces.
-- [ ] Add tests proving missing config defaults to open mode.
-- [ ] Add tests proving moderator-mode config parses and is visible through typed policy.
-- [ ] Update related docs if the config shape changes from [01-moderators.md](./01-moderators.md).
+- [x] Extend setup/application policy with default `open` game mode.
+- [x] Add moderation config fields for approval-required and moderator trading policy.
+- [x] Add typed moderation config in the Configuration Service Slice.
+- [x] Expose game-mode policy to domain services through narrow interfaces.
+- [x] Add tests proving missing config defaults to open mode.
+- [x] Add tests proving moderator-mode config parses and is visible through typed policy.
+- [x] Update related docs if the config shape changes from [01-moderators.md](./01-moderators.md).
 
 Exit criteria:
 
-- [ ] Existing installs behave as open mode without setup changes.
-- [ ] Moderator-mode config can be parsed and read from typed config.
-- [ ] No frontend-only flag controls market creation policy.
+- [x] Existing installs behave as open mode without setup changes.
+- [x] Moderator-mode config can be parsed and read from typed config.
+- [x] No frontend-only flag controls market creation policy.
 
 Validation:
 
-- [ ] `cd backend && go test ./...`
-- [ ] `git diff --check`
+- [x] `cd backend && go test ./...`
+- [x] `git diff --check`
 
 ### 03. Participant Role And Moderator Status Baseline
 

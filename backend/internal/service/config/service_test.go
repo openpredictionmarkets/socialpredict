@@ -37,6 +37,9 @@ func TestNewServiceLoadsCurrentConfig(t *testing.T) {
 	if got := svc.ChartSigFigs(); got != 7 {
 		t.Fatalf("ChartSigFigs returned %d, want 7", got)
 	}
+	if got := svc.Game().Mode; got != GameModeOpen {
+		t.Fatalf("Game mode = %q, want %q", got, GameModeOpen)
+	}
 }
 
 func TestNewStaticServiceClonesInputSnapshot(t *testing.T) {
@@ -96,6 +99,73 @@ func TestFrontendReturnsDetachedValue(t *testing.T) {
 
 	if got := svc.ChartSigFigs(); got != 7 {
 		t.Fatalf("ChartSigFigs returned %d after frontend mutation, want frozen 7", got)
+	}
+}
+
+func TestGameReturnsDefaultOpenMode(t *testing.T) {
+	svc := NewStaticService(&AppConfig{})
+
+	game := svc.Game()
+	if game.Mode != GameModeOpen {
+		t.Fatalf("Game mode = %q, want %q", game.Mode, GameModeOpen)
+	}
+	if !game.Moderation.MarketApprovalRequired {
+		t.Fatalf("expected default moderator markets to require approval")
+	}
+	if !game.Moderation.ModeratorCanTrade {
+		t.Fatalf("expected default moderatorCanTrade to be true")
+	}
+	if game.Moderation.ModeratorCanTradeOwnMarkets {
+		t.Fatalf("expected default moderatorCanTradeOwnMarkets to be false")
+	}
+	if !game.Moderation.AdminCanYankMarkets {
+		t.Fatalf("expected default adminCanYankMarkets to be true")
+	}
+}
+
+func TestGameReturnsDetachedValue(t *testing.T) {
+	svc := NewStaticService(&AppConfig{
+		Game: Game{
+			Mode: GameModeModerator,
+			Moderation: Moderation{
+				MarketApprovalRequired:      true,
+				ModeratorCanTrade:           true,
+				ModeratorCanTradeOwnMarkets: false,
+				AdminCanYankMarkets:         true,
+			},
+		},
+	})
+
+	game := svc.Game()
+	game.Mode = GameModeOpen
+
+	if got := svc.Game().Mode; got != GameModeModerator {
+		t.Fatalf("Game mode returned %q after accessor mutation, want frozen moderator", got)
+	}
+}
+
+func TestDecodeYAMLParsesModeratorGamePolicy(t *testing.T) {
+	cfg, err := decodeYAML([]byte(`
+game:
+  mode: moderator
+  moderation:
+    marketApprovalRequired: true
+    moderatorCanTrade: true
+    moderatorCanTradeOwnMarkets: false
+    adminCanYankMarkets: true
+`))
+	if err != nil {
+		t.Fatalf("decodeYAML returned error: %v", err)
+	}
+
+	if cfg.Game.Mode != GameModeModerator {
+		t.Fatalf("Game mode = %q, want moderator", cfg.Game.Mode)
+	}
+	if !cfg.Game.Moderation.MarketApprovalRequired {
+		t.Fatalf("expected marketApprovalRequired true")
+	}
+	if cfg.Game.Moderation.ModeratorCanTradeOwnMarkets {
+		t.Fatalf("expected moderatorCanTradeOwnMarkets false")
 	}
 }
 func TestNewServicePropagatesLoaderError(t *testing.T) {
@@ -175,6 +245,15 @@ func TestSetupCompatibilityTranslation(t *testing.T) {
 		Frontend: setup.Frontend{
 			Charts: setup.FrontendCharts{SigFigs: 6},
 		},
+		Game: setup.Game{
+			Mode: GameModeModerator,
+			Moderation: setup.Moderation{
+				MarketApprovalRequired:      true,
+				ModeratorCanTrade:           true,
+				ModeratorCanTradeOwnMarkets: false,
+				AdminCanYankMarkets:         true,
+			},
+		},
 	}
 
 	owned := FromSetup(legacy)
@@ -184,6 +263,9 @@ func TestSetupCompatibilityTranslation(t *testing.T) {
 	if owned.Frontend.Charts.SigFigs != 6 {
 		t.Fatalf("owned sig figs = %d, want 6", owned.Frontend.Charts.SigFigs)
 	}
+	if owned.Game.Mode != GameModeModerator {
+		t.Fatalf("owned game mode = %q, want moderator", owned.Game.Mode)
+	}
 
 	roundTrip := owned.ToSetup()
 	if roundTrip.Economics.MarketIncentives.TraderBonus != 20 {
@@ -191,6 +273,9 @@ func TestSetupCompatibilityTranslation(t *testing.T) {
 	}
 	if roundTrip.Economics.Betting.BetFees.SellSharesFee != 4 {
 		t.Fatalf("round trip sell shares fee = %d, want 4", roundTrip.Economics.Betting.BetFees.SellSharesFee)
+	}
+	if roundTrip.Game.Mode != GameModeModerator {
+		t.Fatalf("round trip game mode = %q, want moderator", roundTrip.Game.Mode)
 	}
 }
 

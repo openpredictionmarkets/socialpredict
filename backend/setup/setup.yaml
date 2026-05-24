@@ -22,3 +22,11 @@ economics:
 frontend:
   charts:
     sigFigs: 2
+
+game:
+  mode: open
+  moderation:
+    marketApprovalRequired: true
+    moderatorCanTrade: true
+    moderatorCanTradeOwnMarkets: false
+    adminCanYankMarkets: true

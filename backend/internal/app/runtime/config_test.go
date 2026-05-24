@@ -22,6 +22,9 @@ func TestLoadConfigServiceUsesEmbeddedSource(t *testing.T) {
 	if got := service.ChartSigFigs(); got != 2 {
 		t.Fatalf("chart sig figs = %d, want 2", got)
 	}
+	if got := service.Game().Mode; got != configsvc.GameModeOpen {
+		t.Fatalf("game mode = %q, want %q", got, configsvc.GameModeOpen)
+	}
 }
 
 func TestLoadConfigServiceUsesExplicitSource(t *testing.T) {
@@ -34,6 +37,13 @@ economics:
 frontend:
   charts:
     sigFigs: 8
+game:
+  mode: moderator
+  moderation:
+    marketApprovalRequired: true
+    moderatorCanTrade: true
+    moderatorCanTradeOwnMarkets: false
+    adminCanYankMarkets: true
 `), nil
 	}))
 	if err != nil {
@@ -51,6 +61,9 @@ frontend:
 	}
 	if current.Frontend.Charts.SigFigs != 8 {
 		t.Fatalf("sig figs = %d, want 8", current.Frontend.Charts.SigFigs)
+	}
+	if current.Game.Mode != configsvc.GameModeModerator {
+		t.Fatalf("game mode = %q, want moderator", current.Game.Mode)
 	}
 }
 

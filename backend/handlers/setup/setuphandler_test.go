@@ -165,6 +165,10 @@ func (economicsOnlyConfigService) Frontend() configsvc.Frontend {
 	panic("Frontend should not be called")
 }
 
+func (economicsOnlyConfigService) Game() configsvc.Game {
+	panic("Game should not be called")
+}
+
 func (economicsOnlyConfigService) ChartSigFigs() int {
 	panic("ChartSigFigs should not be called")
 }
@@ -183,6 +187,10 @@ func (chartSigFigsOnlyConfigService) Economics() configsvc.Economics {
 
 func (chartSigFigsOnlyConfigService) Frontend() configsvc.Frontend {
 	panic("Frontend should not be called")
+}
+
+func (chartSigFigsOnlyConfigService) Game() configsvc.Game {
+	panic("Game should not be called")
 }
 
 func (s chartSigFigsOnlyConfigService) ChartSigFigs() int {

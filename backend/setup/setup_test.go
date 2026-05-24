@@ -52,6 +52,33 @@ frontend:
 	if cfg.Frontend.Charts.SigFigs != 5 {
 		t.Fatalf("sig figs = %d, want 5", cfg.Frontend.Charts.SigFigs)
 	}
+	if cfg.Game.Mode != "open" {
+		t.Fatalf("game mode = %q, want open", cfg.Game.Mode)
+	}
+	if !cfg.Game.Moderation.MarketApprovalRequired {
+		t.Fatalf("expected default market approval requirement")
+	}
+}
+
+func TestParseEconomicConfigParsesGamePolicy(t *testing.T) {
+	cfg, err := ParseEconomicConfig([]byte(`
+game:
+  mode: moderator
+  moderation:
+    marketApprovalRequired: true
+    moderatorCanTrade: true
+    moderatorCanTradeOwnMarkets: false
+    adminCanYankMarkets: true
+`))
+	if err != nil {
+		t.Fatalf("ParseEconomicConfig returned error: %v", err)
+	}
+	if cfg.Game.Mode != "moderator" {
+		t.Fatalf("game mode = %q, want moderator", cfg.Game.Mode)
+	}
+	if !cfg.Game.Moderation.AdminCanYankMarkets {
+		t.Fatalf("expected adminCanYankMarkets true")
+	}
 }
 
 func TestLoadEconomicsConfigSingleton(t *testing.T) {

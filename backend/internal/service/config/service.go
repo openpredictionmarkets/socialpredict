@@ -7,6 +7,7 @@ type Service interface {
 	Current() *AppConfig
 	Economics() Economics
 	Frontend() Frontend
+	Game() Game
 	ChartSigFigs() int
 }
 
@@ -45,7 +46,7 @@ func NewStaticService(cfg any) *RuntimeService {
 
 func (s *RuntimeService) Current() *AppConfig {
 	if s == nil || s.current == nil {
-		return &AppConfig{}
+		return Normalize(nil)
 	}
 	return s.current.Clone()
 }
@@ -64,6 +65,13 @@ func (s *RuntimeService) Frontend() Frontend {
 	return s.current.Frontend
 }
 
+func (s *RuntimeService) Game() Game {
+	if s == nil || s.current == nil {
+		return NormalizeGame(Game{})
+	}
+	return s.current.Game
+}
+
 func (s *RuntimeService) ChartSigFigs() int {
 	return ClampChartSigFigs(s.Frontend())
 }
@@ -71,16 +79,16 @@ func (s *RuntimeService) ChartSigFigs() int {
 func normalizeConfig(cfg any) *AppConfig {
 	switch typed := cfg.(type) {
 	case nil:
-		return &AppConfig{}
+		return Normalize(nil)
 	case *AppConfig:
-		return typed.Clone()
+		return Normalize(typed)
 	case AppConfig:
-		return typed.Clone()
+		return Normalize(&typed)
 	case *setup.EconomicConfig:
 		return FromSetup(typed)
 	case setup.EconomicConfig:
 		return FromSetup(&typed)
 	default:
-		return &AppConfig{}
+		return Normalize(nil)
 	}
 }
