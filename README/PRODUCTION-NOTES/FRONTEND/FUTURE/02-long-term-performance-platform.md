@@ -4,9 +4,9 @@ document_type: production-notes
 domain: frontend
 future: true
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Move broad performance optimization programs behind the active measurement baseline."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Keep broad performance programs deferred after recording the first build-size baseline."
 status: future
 ---
 
@@ -30,14 +30,14 @@ The active performance note is [../02-performance-optimization.md](../02-perform
 
 ## Why Deferred
 
-The current frontend needs a reproducible build signal and build-size baseline first. Without current measurements, code splitting or dependency replacement is speculative and risks adding complexity without a clear target.
+The current frontend now has a reproducible build signal and first build-size baseline. Code splitting or dependency replacement should still wait for repeated evidence, dependency analysis, or a product threshold rather than reacting to one informational large-chunk warning.
 
 ## Entry Criteria
 
 Reconsider this when:
 
-- Frontend PR build feedback exists.
-- Current production build size is recorded.
+- Frontend PR build feedback remains stable.
+- Current production build size is recorded and tracked across dependency-heavy changes.
 - A repeated performance issue appears in user or deploy evidence.
 - Heavy dependencies are identified with actual bundle data.
 - A permissive budget can be introduced without blocking unrelated work.
