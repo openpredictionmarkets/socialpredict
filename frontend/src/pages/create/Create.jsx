@@ -8,6 +8,7 @@ import RegularInputBox from '../../components/inputs/InputBox';
 import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
 import { API_URL } from '../../config';
+import { USER_CREDIT_REFRESH_EVENT } from '../../components/utils/userFinanceTools/FetchUserCredit';
 import {
   getApiErrorMessage,
   parseApiResponseText,
@@ -93,6 +94,7 @@ function Create() {
 
       if (response.ok) {
         const responseData = unwrapApiResponse(responsePayload);
+        window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
         if (String(responseData.status || '').toLowerCase() === 'proposed') {
           setCreatedMarket(responseData);
           return;
