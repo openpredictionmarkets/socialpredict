@@ -24,7 +24,7 @@ frontend:
     sigFigs: 2
 
 game:
-  mode: open
+  mode: moderator
   moderation:
     marketApprovalRequired: true
     moderatorCanTrade: true

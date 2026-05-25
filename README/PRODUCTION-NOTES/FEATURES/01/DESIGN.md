@@ -37,7 +37,7 @@ Evans/domain lens:
 
 Fowler/evolutionary lens:
 
-- Keep the default `open` behavior backward compatible.
+- Keep explicit `open` behavior backward compatible while making `moderator` the default project mode.
 - Add seams in small increments: config policy, role/status policy, market lifecycle, approval use cases, then cancellation/refund behavior.
 - Complete backend domain/API contract work before frontend work consumes the feature.
 - Avoid a workflow-engine or RBAC-platform rewrite until the feature proves it needs those abstractions.
@@ -98,7 +98,7 @@ This design does not introduce:
 
 | Design-plan boundary | Moderator-mode ownership |
 | --- | --- |
-| Configuration Service Slice | Owns typed game-mode policy loaded from setup assets, with default `open` behavior. |
+| Configuration Service Slice | Owns typed game-mode policy loaded from setup assets, with default `moderator` behavior. |
 | Participant Account Context | Owns user role constants, moderator status, suspension state, and participant-facing account policy. User functionality belongs in the users domain/service. |
 | Prediction Market Context | Owns market lifecycle, approval state, publication eligibility, contract immutability, and resolution eligibility. Market functionality belongs in the markets domain/service. |
 | Betting and Position Ledger Context | Owns only the buy/sell guard integration and accounting behavior that must occur on trade paths. Moderator mode should not cause a broad bets redesign unless cancellation/refund accounting proves it is needed. |
@@ -134,9 +134,9 @@ Backend-first means:
 
 Game-mode rules:
 
-- Default game mode is `open`.
+- Default game mode is `moderator`.
 - Moderator mode is enabled through setup/application policy, not frontend flags.
-- Open mode preserves existing market creation behavior unless explicitly changed by later design.
+- Explicit open mode preserves existing market creation behavior unless changed by later design.
 
 Role and suspension rules:
 

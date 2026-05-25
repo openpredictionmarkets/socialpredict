@@ -30,13 +30,13 @@ This directory keeps the moderator-mode feature work together:
 
 ## Game Mode Configuration
 
-Moderator mode should be configured through the game setup policy served by the setup service. The default mode must remain open so existing games keep their current behavior unless explicitly configured otherwise.
+Moderator mode should be configured through the game setup policy served by the setup service. The default project mode is now `moderator`; operators who want legacy creation behavior can explicitly set `open`.
 
 Proposed `setup.yaml` shape:
 
 ```yaml
 game:
-  mode: open # open | moderator
+  mode: moderator # open | moderator
   moderation:
     marketApprovalRequired: true
     moderatorCanTrade: true
@@ -418,7 +418,7 @@ Ledger data needs:
 
 ## Rollout Plan
 
-1. Add game-mode config to `setup.yaml`, setup parsing, and config-service translation with default `open` behavior.
+1. Add game-mode config to `setup.yaml`, setup parsing, and config-service translation with default `moderator` behavior.
 2. Introduce role constants, moderator status, and role/suspension audit records.
 3. Add market lifecycle support for proposed, rejected, published, resolved, and cancelled states.
 4. Add immutable market contract storage and append-only change records for title and description amendments.

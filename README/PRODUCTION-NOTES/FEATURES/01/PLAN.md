@@ -35,7 +35,7 @@ Agents implementing this feature should mark checklist items as they complete th
 
 Frontend work must not begin until these backend-facing items are stable enough to consume:
 
-- [x] Setup/config exposes game-mode policy with default `open` behavior.
+- [x] Setup/config exposes game-mode policy with default `moderator` behavior.
 - [x] Users domain owns moderator role/status/suspension semantics.
 - [ ] Markets domain owns proposal, approval, rejection, publication, amendment, resolution, and cancellation lifecycle semantics.
 - [ ] Bets domain has only the necessary buy/sell guards for lifecycle/self-trade and any cancellation/refund accounting hooks that are actually required.
@@ -103,17 +103,17 @@ Service ownership: Configuration Service Slice.
 
 Checklist:
 
-- [x] Extend setup/application policy with default `open` game mode.
+- [x] Extend setup/application policy with default `moderator` game mode.
 - [x] Add moderation config fields for approval-required and moderator trading policy.
 - [x] Add typed moderation config in the Configuration Service Slice.
 - [x] Expose game-mode policy to domain services through narrow interfaces.
-- [x] Add tests proving missing config defaults to open mode.
+- [x] Add tests proving missing config defaults to moderator mode.
 - [x] Add tests proving moderator-mode config parses and is visible through typed policy.
 - [x] Update related docs if the config shape changes from [01-moderators.md](./01-moderators.md).
 
 Exit criteria:
 
-- [x] Existing installs behave as open mode without setup changes.
+- [x] Explicit open-mode configs preserve legacy market creation behavior.
 - [x] Moderator-mode config can be parsed and read from typed config.
 - [x] No frontend-only flag controls market creation policy.
 
