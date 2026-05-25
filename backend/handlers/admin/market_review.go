@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -21,6 +22,10 @@ type marketReviewer interface {
 	RejectProposedMarket(ctx context.Context, marketID int64, actorUsername string, reason string) (*dmarkets.Market, error)
 }
 
+type marketReviewLister interface {
+	ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+}
+
 type approveMarketRequest struct {
 	Confirm bool `json:"confirm"`
 }
@@ -30,12 +35,25 @@ type rejectMarketRequest struct {
 }
 
 type marketReviewResponse struct {
-	ID              int64  `json:"id"`
-	Status          string `json:"status"`
-	LifecycleStatus string `json:"lifecycleStatus"`
-	ApprovedBy      string `json:"approvedBy,omitempty"`
-	RejectedBy      string `json:"rejectedBy,omitempty"`
-	RejectionReason string `json:"rejectionReason,omitempty"`
+	ID                 int64      `json:"id"`
+	QuestionTitle      string     `json:"questionTitle,omitempty"`
+	Description        string     `json:"description,omitempty"`
+	CreatorUsername    string     `json:"creatorUsername,omitempty"`
+	Status             string     `json:"status"`
+	LifecycleStatus    string     `json:"lifecycleStatus"`
+	ApprovedBy         string     `json:"approvedBy,omitempty"`
+	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy         string     `json:"rejectedBy,omitempty"`
+	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason    string     `json:"rejectionReason,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt,omitempty"`
+	UpdatedAt          time.Time  `json:"updatedAt,omitempty"`
+	ResolutionDateTime time.Time  `json:"resolutionDateTime,omitempty"`
+}
+
+type marketReviewListResponse struct {
+	Markets []marketReviewResponse `json:"markets"`
+	Total   int                    `json:"total"`
 }
 
 func ApproveMarketHandler(svc marketReviewer, auth authsvc.Authenticator) http.HandlerFunc {
@@ -68,6 +86,41 @@ func ApproveMarketHandler(svc marketReviewer, auth authsvc.Authenticator) http.H
 			return
 		}
 		_ = handlers.WriteResult(w, http.StatusOK, marketReviewResponseFromMarket(market))
+	}
+}
+
+func ListReviewMarketsHandler(svc marketReviewLister, auth authsvc.Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+			return
+		}
+		if _, ok := requireAdminForMarketReview(w, r, auth); !ok {
+			return
+		}
+		if svc == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+
+		filters, ok := parseAdminReviewMarketFilters(w, r)
+		if !ok {
+			return
+		}
+		markets, err := svc.ListLifecycleMarkets(r.Context(), filters)
+		if err != nil {
+			writeMarketReviewError(w, err)
+			return
+		}
+
+		response := marketReviewListResponse{
+			Markets: make([]marketReviewResponse, 0, len(markets)),
+			Total:   len(markets),
+		}
+		for _, market := range markets {
+			response.Markets = append(response.Markets, marketReviewResponseFromMarket(market))
+		}
+		_ = handlers.WriteResult(w, http.StatusOK, response)
 	}
 }
 
@@ -146,11 +199,56 @@ func marketReviewResponseFromMarket(market *dmarkets.Market) marketReviewRespons
 		return marketReviewResponse{}
 	}
 	return marketReviewResponse{
-		ID:              market.ID,
-		Status:          market.Status,
-		LifecycleStatus: market.LifecycleStatus,
-		ApprovedBy:      market.ApprovedBy,
-		RejectedBy:      market.RejectedBy,
-		RejectionReason: market.RejectionReason,
+		ID:                 market.ID,
+		QuestionTitle:      market.QuestionTitle,
+		Description:        market.Description,
+		CreatorUsername:    market.CreatorUsername,
+		Status:             market.Status,
+		LifecycleStatus:    market.LifecycleStatus,
+		ApprovedBy:         market.ApprovedBy,
+		ApprovedAt:         market.ApprovedAt,
+		RejectedBy:         market.RejectedBy,
+		RejectedAt:         market.RejectedAt,
+		RejectionReason:    market.RejectionReason,
+		CreatedAt:          market.CreatedAt,
+		UpdatedAt:          market.UpdatedAt,
+		ResolutionDateTime: market.ResolutionDateTime,
 	}
+}
+
+func parseAdminReviewMarketFilters(w http.ResponseWriter, r *http.Request) (dmarkets.ListFilters, bool) {
+	query := r.URL.Query()
+	status := dmarkets.NormalizeLifecycleStatus(query.Get("status"))
+	if status == "" {
+		status = dmarkets.MarketLifecycleProposed
+	}
+	switch status {
+	case dmarkets.MarketLifecycleProposed, dmarkets.MarketLifecyclePublished, dmarkets.MarketLifecycleRejected:
+	default:
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		return dmarkets.ListFilters{}, false
+	}
+
+	return dmarkets.ListFilters{
+		Status: status,
+		Limit:  boundedAdminReviewInt(query.Get("limit"), 50, 1, 100),
+		Offset: boundedAdminReviewInt(query.Get("offset"), 0, 0, 100000),
+	}, true
+}
+
+func boundedAdminReviewInt(value string, fallback int, min int, max int) int {
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	if parsed < min {
+		return min
+	}
+	if parsed > max {
+		return max
+	}
+	return parsed
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	markets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
 )
 
 func proposedMarket(id int64, now time.Time) *markets.Market {
@@ -71,6 +72,36 @@ func TestRejectProposedMarketRecordsReason(t *testing.T) {
 	}
 	if rejectedBy != "admin" || rejectionReason != "out of scope" || rejected.RejectionReason != "out of scope" {
 		t.Fatalf("rejection metadata mismatch: market=%+v repoBy=%q repoReason=%q", rejected, rejectedBy, rejectionReason)
+	}
+}
+
+func TestRejectProposedMarketRefundsCreationCost(t *testing.T) {
+	now := marketsTestTime()
+	market := proposedMarket(80, now)
+	market.CreatorUsername = "moderator"
+	repo := newProjectionRepo(withProjectionRepoMarket(market), func(repo *projectionRepo) {
+		repo.rejectMarketFunc = func(context.Context, int64, string, time.Time, string) error {
+			return nil
+		}
+	})
+	var refundedUsername string
+	var refundedAmount int64
+	var refundType string
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.applyTransactionFunc = func(_ context.Context, username string, amount int64, transactionType string) error {
+			refundedUsername = username
+			refundedAmount = amount
+			refundType = transactionType
+			return nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{CreateMarketCost: 10})
+
+	if _, err := service.RejectProposedMarket(context.Background(), market.ID, "admin", "duplicate"); err != nil {
+		t.Fatalf("RejectProposedMarket returned error: %v", err)
+	}
+	if refundedUsername != "moderator" || refundedAmount != 10 || refundType != dusers.TransactionRefund {
+		t.Fatalf("refund mismatch: username=%q amount=%d type=%q", refundedUsername, refundedAmount, refundType)
 	}
 }
 

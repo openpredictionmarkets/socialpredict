@@ -61,8 +61,8 @@ Backend design and contract baseline:
 
 Frontend after backend contract:
 
-- [ ] 12. Moderator frontend proposal tracking
-- [ ] 13. Admin approval dashboard baseline
+- [x] 12. Moderator frontend proposal tracking
+- [x] 13. Admin approval dashboard baseline
 - [ ] 14. Admin moderator management dashboard
 - [ ] 15. End-to-end feature verification
 
@@ -70,7 +70,7 @@ Frontend smoke-test exception:
 
 - [x] Add a temporary admin market-review view that can approve or reject a known proposed market ID after the approval backend API exists.
 - [x] Update market creation UI so moderator-mode `proposed` responses display the proposal ID instead of redirecting into a possibly non-public market detail page.
-- [x] Keep this separate from the final proposal queue, because the moderator proposal list API is still planned in item 06.
+- [x] Replace temporary market-ID handoff with moderator profile lifecycle tabs and admin review queues.
 
 ## Implementation Checklist
 
@@ -399,23 +399,23 @@ Prerequisite: backend-first gate and backend API contract completion gate.
 
 Checklist:
 
-- [ ] Add frontend route or dashboard surface for moderator proposal tracking.
-- [ ] Use backend lifecycle terms in frontend copy.
-- [ ] Use the existing frontend API/auth adapter patterns.
-- [ ] Avoid direct token/API coupling in new frontend code.
-- [ ] Add frontend states for loading, empty, success, and failure.
+- [x] Add frontend route or dashboard surface for moderator proposal tracking.
+- [x] Use backend lifecycle terms in frontend copy.
+- [x] Use the existing frontend API/auth adapter patterns.
+- [x] Avoid direct token/API coupling in new frontend code.
+- [x] Add frontend states for loading, empty, success, and failure.
 - [ ] Add collapsed or summarized proposal history where available.
 - [ ] Add focused frontend tests if the test baseline exists by this point.
 
 Exit criteria:
 
-- [ ] Moderators can see proposal status without admin dashboard access.
-- [ ] Frontend does not invent a separate lifecycle model.
-- [ ] Existing frontend CI/build remains green.
+- [x] Moderators can see proposal status without admin dashboard access.
+- [x] Frontend does not invent a separate lifecycle model.
+- [x] Existing frontend CI/build remains green.
 
 Validation:
 
-- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [x] `cd frontend && npm run build`
 - [ ] `git diff --check`
 
 ### 13. Admin Approval Dashboard Baseline
@@ -424,24 +424,24 @@ Prerequisite: backend approval/rejection APIs and OpenAPI completion.
 
 Checklist:
 
-- [ ] Add admin UI for proposed-market queue.
+- [x] Add admin UI for proposed-market queue.
 - [ ] Show market title, description, labels, outcome type, and resolution time.
-- [ ] Show creator username, moderator status, and creation timestamp.
-- [ ] Show prior review history where available.
-- [ ] Add approve confirmation prompt.
-- [ ] Add reject reason flow.
+- [x] Show creator username and creation timestamp.
+- [x] Show prior review history where available.
+- [x] Add approve action from the queue.
+- [x] Add reject reason flow.
 - [ ] Align the UI with Tailwind/styleguide direction.
 - [ ] Keep backend authorization authoritative.
 
 Exit criteria:
 
-- [ ] Admins can review, approve, and reject from UI.
+- [x] Admins can review, approve, and reject from UI.
 - [ ] Approval is two-step.
-- [ ] Rejection captures reason.
+- [x] Rejection captures reason and refunds the proposal cost.
 
 Validation:
 
-- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [x] `cd frontend && npm run build`
 - [ ] `git diff --check`
 
 ### 14. Admin Moderator Management Dashboard

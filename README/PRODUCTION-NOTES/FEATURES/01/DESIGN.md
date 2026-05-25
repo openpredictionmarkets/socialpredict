@@ -165,6 +165,7 @@ Contract rules:
 Accounting rules:
 
 - Moderator self-trade restrictions must be enforced on buy and sell paths, not only UI controls.
+- Rejected moderator proposals refund the market proposal creation cost to the creator.
 - Admin cancellation refunds net unrecovered exposure, not simply gross buys.
 - Cancellation state update and refund ledger entries must commit atomically.
 - Cancellation math that depends on buy/sell history requires Postgres-backed tests.
@@ -186,6 +187,7 @@ Moderator use cases:
 - Create proposed market.
 - View proposal status.
 - View rejected, published, closed, resolved, and cancelled markets they created.
+- Land on their private Proposed Markets tab after creating a proposal, rather than manually handing market IDs to admins.
 - Resolve their own published market when eligible.
 - Propose additive contract amendment where allowed.
 

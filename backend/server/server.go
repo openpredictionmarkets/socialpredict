@@ -370,6 +370,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 
 	// handle private user stuff, display sensitive profile information to customize
 	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")
+	router.Handle("/v0/profile/markets", securityMiddleware(marketshandlers.ListMyLifecycleMarketsHandler(marketsService, authService))).Methods("GET")
 
 	// changing profile stuff - apply security middleware
 	router.Handle("/v0/changepassword", securityMiddleware(usershandlers.ChangePasswordHandler(usersService))).Methods("POST")
@@ -388,6 +389,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/users", securityMiddleware(adminhandlers.ListAdminUsersHandler(usersService, authService))).Methods("GET")
 	router.Handle("/v0/admin/users/{username}/role", securityMiddleware(adminhandlers.UpdateAdminUserRoleHandler(usersService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/moderators/{username}/suspension", securityMiddleware(adminhandlers.UpdateAdminModeratorSuspensionHandler(usersService, authService, time.Now))).Methods("PATCH")
+	router.Handle("/v0/admin/markets", securityMiddleware(adminhandlers.ListReviewMarketsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
 

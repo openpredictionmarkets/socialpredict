@@ -1,139 +1,151 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../helpers/AuthContent';
+import SiteTabs from '../../tabs/SiteTabs';
+import MarketLifecycleTable from '../profile/MarketLifecycleTable';
+import LoadingSpinner from '../../loaders/LoadingSpinner';
 import {
   approveProposedMarket,
   rejectProposedMarket,
 } from '../../../api/moderationApi';
+import { listAdminLifecycleMarkets } from '../../../api/lifecycleMarketsApi';
 
-const DetailRow = ({ label, value }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-gray-700 py-2">
-    <dt className="text-sm text-gray-400">{label}</dt>
-    <dd className="font-mono text-sm text-white break-all">{value || 'n/a'}</dd>
-  </div>
-);
+const reviewTabs = [
+  { label: 'Proposed Markets', status: 'proposed' },
+  { label: 'Approved Markets', status: 'published' },
+  { label: 'Rejected Markets', status: 'rejected' },
+];
 
-function ModeratorMarketReview() {
+const AdminMarketQueue = ({ status }) => {
   const { token } = useAuth();
-  const [marketId, setMarketId] = useState('');
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [confirmApproval, setConfirmApproval] = useState(false);
-  const [reviewResult, setReviewResult] = useState(null);
+  const [markets, setMarkets] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rejectionReasons, setRejectionReasons] = useState({});
+  const [busyMarketId, setBusyMarketId] = useState(null);
 
-  const runReview = async (reviewAction) => {
+  const loadMarkets = async () => {
+    setLoading(true);
     setError('');
-    setReviewResult(null);
-    setIsSubmitting(true);
-
     try {
-      const result = reviewAction === 'approve'
-        ? await approveProposedMarket({ marketId, token })
-        : await rejectProposedMarket({ marketId, token, reason: rejectionReason });
-
-      setReviewResult(result);
-      if (reviewAction === 'reject') {
-        setRejectionReason('');
-      }
-      setConfirmApproval(false);
+      const data = await listAdminLifecycleMarkets({ token, status });
+      setMarkets(data.markets || []);
     } catch (err) {
-      setError(err.message || 'Market review failed.');
+      setError(err.message || 'Unable to load market queue.');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadMarkets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, token]);
+
+  const approveMarket = async (marketId) => {
+    setBusyMarketId(marketId);
+    setError('');
+    try {
+      await approveProposedMarket({ marketId, token });
+      await loadMarkets();
+    } catch (err) {
+      setError(err.message || 'Unable to approve market.');
+    } finally {
+      setBusyMarketId(null);
+    }
+  };
+
+  const rejectMarket = async (marketId) => {
+    const reason = rejectionReasons[marketId];
+    setBusyMarketId(marketId);
+    setError('');
+    try {
+      await rejectProposedMarket({ marketId, token, reason });
+      setRejectionReasons((current) => ({ ...current, [marketId]: '' }));
+      await loadMarkets();
+    } catch (err) {
+      setError(err.message || 'Unable to reject market.');
+    } finally {
+      setBusyMarketId(null);
+    }
+  };
+
+  const renderActions = (market) => {
+    if (status !== 'proposed') {
+      return null;
+    }
+
+    return (
+      <div className="grid min-w-[220px] gap-3">
+        <button
+          type="button"
+          disabled={busyMarketId === market.id}
+          onClick={() => approveMarket(market.id)}
+          className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Approve
+        </button>
+        <textarea
+          value={rejectionReasons[market.id] || ''}
+          onChange={(event) => setRejectionReasons((current) => ({
+            ...current,
+            [market.id]: event.target.value,
+          }))}
+          rows={3}
+          placeholder="Reason for rejection"
+          className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+        />
+        <button
+          type="button"
+          disabled={busyMarketId === market.id || !(rejectionReasons[market.id] || '').trim()}
+          onClick={() => rejectMarket(market.id)}
+          className="rounded-md bg-rose-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Reject and Refund
+        </button>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="grid gap-4">
+      {error && (
+        <div className="rounded-md bg-red-700 p-3 text-sm text-white">
+          {error}
+        </div>
+      )}
+      <MarketLifecycleTable
+        markets={markets}
+        emptyMessage={`No ${status} markets found.`}
+        showCreator
+        actions={status === 'proposed' ? renderActions : null}
+      />
+    </div>
+  );
+};
+
+function ModeratorMarketReview() {
+  const tabsData = reviewTabs.map((tab) => ({
+    label: tab.label,
+    content: <AdminMarketQueue status={tab.status} />,
+  }));
 
   return (
     <section className="p-6 bg-primary-background shadow-md rounded-lg text-white">
       <div className="mb-6">
         <p className="text-xs uppercase tracking-[0.22em] text-primary-pink">
-          Moderator mode smoke test
+          Moderator mode
         </p>
-        <h1 className="text-2xl font-bold mt-2">Review Proposed Market</h1>
+        <h1 className="text-2xl font-bold mt-2">Market Review Queue</h1>
         <p className="text-sm text-gray-300 mt-2 max-w-3xl">
-          Use this temporary admin surface to approve or reject a known proposed
-          market ID. It intentionally does not replace the future proposal queue.
+          Review proposed markets without manually entering IDs. Approved markets become published and tradable; rejected markets record the reason and refund the proposal cost.
         </p>
       </div>
 
-      <div className="grid gap-5">
-        <label className="grid gap-2">
-          <span className="text-sm font-medium text-gray-300">Market ID</span>
-          <input
-            type="number"
-            min="1"
-            value={marketId}
-            onChange={(event) => setMarketId(event.target.value)}
-            placeholder="Enter proposed market ID"
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          />
-        </label>
-
-        <label className="flex items-start gap-3 rounded-md border border-gray-700 bg-gray-800/70 p-3">
-          <input
-            type="checkbox"
-            checked={confirmApproval}
-            onChange={(event) => setConfirmApproval(event.target.checked)}
-            className="mt-1"
-          />
-          <span className="text-sm text-gray-300">
-            Confirm that this proposal should be published and become tradable.
-          </span>
-        </label>
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            type="button"
-            disabled={isSubmitting || !confirmApproval}
-            onClick={() => runReview('approve')}
-            className="rounded-md bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Approve Market
-          </button>
-        </div>
-
-        <label className="grid gap-2">
-          <span className="text-sm font-medium text-gray-300">Rejection Reason</span>
-          <textarea
-            value={rejectionReason}
-            onChange={(event) => setRejectionReason(event.target.value)}
-            placeholder="Briefly explain why the proposal is being rejected"
-            rows={4}
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          />
-        </label>
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            type="button"
-            disabled={isSubmitting || !rejectionReason.trim()}
-            onClick={() => runReview('reject')}
-            className="rounded-md bg-rose-700 px-4 py-2 font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Reject Market
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div className="mt-5 rounded-md bg-red-700 p-3 text-sm text-white">
-          {error}
-        </div>
-      )}
-
-      {reviewResult && (
-        <div className="mt-6 rounded-md border border-gray-700 bg-gray-900 p-4">
-          <h2 className="text-lg font-semibold text-white">Review Result</h2>
-          <dl className="mt-3">
-            <DetailRow label="Market ID" value={reviewResult.id} />
-            <DetailRow label="Public status" value={reviewResult.status} />
-            <DetailRow label="Lifecycle status" value={reviewResult.lifecycleStatus} />
-            <DetailRow label="Approved by" value={reviewResult.approvedBy} />
-            <DetailRow label="Rejected by" value={reviewResult.rejectedBy} />
-            <DetailRow label="Rejection reason" value={reviewResult.rejectionReason} />
-          </dl>
-        </div>
-      )}
+      <SiteTabs tabs={tabsData} defaultTab="Proposed Markets" />
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent';
 import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDateTimeTools';
@@ -25,8 +25,34 @@ function Create() {
   const [noLabel, setNoLabel] = useState('');
   const [error, setError] = useState('');
   const [createdMarket, setCreatedMarket] = useState(null);
+  const [marketCreationCost, setMarketCreationCost] = useState(null);
   const { username } = useAuth();
   const history = useHistory();
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadSetup = async () => {
+      try {
+        const response = await fetch(`${API_URL}/v0/setup`);
+        if (!response.ok) {
+          return;
+        }
+        const setup = await response.json();
+        const cost = setup?.marketincentives?.createMarketCost;
+        if (!ignore && cost !== undefined && cost !== null) {
+          setMarketCreationCost(cost);
+        }
+      } catch {
+        // The backend still enforces cost; this call only improves the UI.
+      }
+    };
+
+    loadSetup();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -97,6 +123,10 @@ function Create() {
         window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
         if (String(responseData.status || '').toLowerCase() === 'proposed') {
           setCreatedMarket(responseData);
+          history.push('/profile?tab=Proposed%20Markets', {
+            proposedMarket: responseData,
+            marketCreationCost,
+          });
           return;
         }
         history.push(`/markets/${responseData.id}`);
@@ -120,6 +150,18 @@ function Create() {
       <h1 className='text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6'>
         Create a Market
       </h1>
+
+      <div className='mb-5 rounded-lg border border-amber-500 bg-amber-950/40 p-4 text-amber-50'>
+        <p className='text-sm uppercase tracking-[0.18em] text-amber-300'>
+          Market proposal cost
+        </p>
+        <p className='mt-2 text-2xl font-bold'>
+          {marketCreationCost === null ? 'Loading...' : `${marketCreationCost} credits`}
+        </p>
+        <p className='mt-2 text-sm text-amber-100'>
+          This amount is deducted when you create the proposal. If an admin rejects the proposal, the proposal cost is refunded.
+        </p>
+      </div>
 
       <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
         <div>
@@ -235,8 +277,7 @@ function Create() {
               </p>
             </div>
             <p className='mt-3 text-sm text-amber-100'>
-              This moderator-mode proposal is not tradable until an admin approves it.
-              Give the market ID to an admin or use the admin Market Review tab.
+              This moderator-mode proposal is not tradable until an admin approves it. You will be redirected to your Proposed Markets tab.
             </p>
           </div>
         )}

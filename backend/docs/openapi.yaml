@@ -191,6 +191,7 @@ x-route-family-migration-matrix:
     - family: private-users
       paths:
         - /v0/privateprofile
+        - /v0/profile/markets
         - /v0/changepassword
         - /v0/profilechange/displayname
         - /v0/profilechange/emoji
@@ -216,6 +217,7 @@ x-route-family-migration-matrix:
         - /v0/admin/users
         - /v0/admin/users/{username}/role
         - /v0/admin/moderators/{username}/suspension
+        - /v0/admin/markets
         - /v0/admin/markets/{id}/approve
         - /v0/admin/markets/{id}/reject
         - /v0/content/home
@@ -703,6 +705,75 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/profile/markets:
+    get:
+      tags: [Markets]
+      operationId: listMyLifecycleMarkets
+      summary: List current user's lifecycle markets
+      description: >
+        Returns proposed, published, or rejected markets created by the authenticated
+        user. This private moderator profile queue includes lifecycle review
+        metadata that public market lists intentionally exclude.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          required: true
+          schema:
+            type: string
+            enum: [proposed, published, rejected]
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Current user's lifecycle markets returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketLifecycleListEnvelopeResponse'
+        '400':
+          description: Invalid lifecycle status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change required or authorization denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected lifecycle queue failure.
           content:
             application/json:
               schema:
@@ -2286,6 +2357,75 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/markets:
+    get:
+      tags: [Markets]
+      operationId: listAdminReviewMarkets
+      summary: List admin market review queues
+      description: >
+        Admin-only queue for proposed, published, and rejected moderator markets.
+        Responses include creator and review metadata so admins do not need to
+        manually enter market IDs.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          required: true
+          schema:
+            type: string
+            enum: [proposed, published, rejected]
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Admin review queue returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketReviewListEnvelopeResponse'
+        '400':
+          description: Invalid lifecycle status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected review queue failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/markets/{id}/approve:
     patch:
       tags: [Markets]
@@ -3120,6 +3260,21 @@ components:
         status:
           type: string
           description: Public market status. Values are normally active, closed, or resolved; moderator-mode creation may return proposed before admin approval.
+        lifecycleStatus:
+          type: string
+          enum: [proposed, rejected, published, closed, resolved, cancelled]
+        approvedBy:
+          type: string
+        approvedAt:
+          type: string
+          format: date-time
+        rejectedBy:
+          type: string
+        rejectedAt:
+          type: string
+          format: date-time
+        rejectionReason:
+          type: string
         isResolved:
           type: boolean
         resolutionResult:
@@ -3683,6 +3838,12 @@ components:
         id:
           type: integer
           format: int64
+        questionTitle:
+          type: string
+        description:
+          type: string
+        creatorUsername:
+          type: string
         status:
           type: string
         lifecycleStatus:
@@ -3690,10 +3851,67 @@ components:
           enum: [proposed, rejected, published, closed, resolved, cancelled]
         approvedBy:
           type: string
+        approvedAt:
+          type: string
+          format: date-time
         rejectedBy:
           type: string
+        rejectedAt:
+          type: string
+          format: date-time
         rejectionReason:
           type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        resolutionDateTime:
+          type: string
+          format: date-time
+
+    MarketLifecycleListResponse:
+      type: object
+      required: [markets, total]
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResponse'
+        total:
+          type: integer
+
+    MarketLifecycleListEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketLifecycleListResponse'
+
+    MarketReviewListResponse:
+      type: object
+      required: [markets, total]
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketReviewResponse'
+        total:
+          type: integer
+
+    MarketReviewListEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketReviewListResponse'
 
     MarketReviewEnvelopeResponse:
       type: object
