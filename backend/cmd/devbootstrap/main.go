@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultPassword  = "Password1"
+	defaultPassword  = "password"
 	defaultUserCount = 10
 	defaultPrefix    = "testuser"
 )

@@ -20,7 +20,7 @@ Created/updated users:
   ...
 
 Defaults:
-  password: Password1
+  password: password
   user count: 10
   username prefix: testuser
   must_change_password: true
@@ -37,7 +37,7 @@ Example:
 EOF
 }
 
-password="Password1"
+password="password"
 count="10"
 prefix="testuser"
 

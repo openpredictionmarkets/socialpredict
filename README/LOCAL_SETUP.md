@@ -60,7 +60,7 @@ This command refuses to run unless `.env` has `APP_ENV=development`. By default 
 - `admin`
 - `testuser01` through `testuser10`
 
-All bootstrapped users receive password `Password1` and `must_change_password=true`. You can customize the regular user count or prefix:
+All bootstrapped users receive password `password` and `must_change_password=true`. You can customize the regular user count or prefix:
 
 ```bash
 ./SocialPredict dev-bootstrap-users --count 20 --prefix player
