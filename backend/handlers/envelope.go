@@ -13,6 +13,7 @@ const (
 	ReasonInvalidRequest         FailureReason = "INVALID_REQUEST"
 	ReasonInvalidToken           FailureReason = "INVALID_TOKEN"
 	ReasonAuthorizationDenied    FailureReason = "AUTHORIZATION_DENIED"
+	ReasonUserNotApproved        FailureReason = "USER_NOT_APPROVED"
 	ReasonPasswordChangeRequired FailureReason = "PASSWORD_CHANGE_REQUIRED"
 	ReasonNotFound               FailureReason = "NOT_FOUND"
 	ReasonRateLimited            FailureReason = "RATE_LIMITED"
@@ -35,6 +36,7 @@ var publicFailureReasons = []FailureReason{
 	ReasonInvalidRequest,
 	ReasonInvalidToken,
 	ReasonAuthorizationDenied,
+	ReasonUserNotApproved,
 	ReasonPasswordChangeRequired,
 	ReasonNotFound,
 	ReasonRateLimited,

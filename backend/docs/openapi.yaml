@@ -48,6 +48,7 @@ x-route-family-migration-matrix:
     - INVALID_REQUEST
     - INVALID_TOKEN
     - AUTHORIZATION_DENIED
+    - USER_NOT_APPROVED
     - PASSWORD_CHANGE_REQUIRED
     - NOT_FOUND
     - RATE_LIMITED
@@ -408,7 +409,7 @@ paths:
       tags: [Config]
       operationId: getFrontendConfig
       summary: Get frontend configuration
-      description: Returns minimal configuration values needed by the frontend, such as chart precision.
+      description: Returns minimal configuration values needed by the frontend, such as chart precision and game mode.
       responses:
         '200':
           description: Frontend configuration returned.
@@ -567,7 +568,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '403':
-          description: Password change required before creating markets.
+          description: >
+            Password change required before creating markets, or the user is not approved
+            to create markets in the active game mode.
           content:
             application/json:
               schema:
@@ -2825,6 +2828,7 @@ components:
         - INVALID_REQUEST: malformed request body, path parameter, or query input.
         - INVALID_TOKEN: missing or invalid bearer token.
         - AUTHORIZATION_DENIED: supplied credentials are not accepted for the requested flow, or the authenticated caller lacks the required privileges.
+        - USER_NOT_APPROVED: authenticated caller is not approved for the requested game-mode action, such as market creation in moderator mode.
         - PASSWORD_CHANGE_REQUIRED: request blocked until the caller changes their password.
         - USER_NOT_FOUND, MARKET_NOT_FOUND, and NOT_FOUND: stable not-found outcomes for user, market, and generic content/resource lookups.
         - INVALID_STATE: the requested transition is not valid for the resource's current lifecycle state.
@@ -2844,6 +2848,7 @@ components:
             - INVALID_REQUEST
             - INVALID_TOKEN
             - AUTHORIZATION_DENIED
+            - USER_NOT_APPROVED
             - PASSWORD_CHANGE_REQUIRED
             - NOT_FOUND
             - USER_NOT_FOUND
@@ -4050,10 +4055,12 @@ components:
 
     FrontendConfig:
       type: object
-      required: [charts]
+      required: [charts, game]
       properties:
         charts:
           $ref: '#/components/schemas/FrontendCharts'
+        game:
+          $ref: '#/components/schemas/FrontendGame'
 
     FrontendCharts:
       type: object
@@ -4063,6 +4070,14 @@ components:
           type: integer
           minimum: 2
           maximum: 9
+
+    FrontendGame:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [open, moderator]
 
     GlobalLeaderboardEntry:
       type: object

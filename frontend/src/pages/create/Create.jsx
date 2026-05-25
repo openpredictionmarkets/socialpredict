@@ -29,6 +29,14 @@ function Create() {
   const { username } = useAuth();
   const history = useHistory();
 
+  const createMarketReasonMessages = {
+    USER_NOT_APPROVED: 'User does not have approval to create markets in moderator mode.',
+    AUTHORIZATION_DENIED: 'You are not allowed to create this market.',
+    INSUFFICIENT_BALANCE: 'You do not have enough credit to create this market.',
+    VALIDATION_FAILED: 'Check the market fields and try again.',
+    INVALID_REQUEST: 'Check the market fields and try again.',
+  };
+
   useEffect(() => {
     let ignore = false;
 
@@ -135,6 +143,7 @@ function Create() {
           response,
           responsePayload,
           `Market creation failed with status ${response.status}.`,
+          createMarketReasonMessages,
         );
         console.error('Market creation failed:', responsePayload);
         setError(errorMessage);
