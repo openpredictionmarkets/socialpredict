@@ -278,3 +278,62 @@ func TestGormRepositoryUpdateDeleteAndListUsers(t *testing.T) {
 		t.Fatalf("expected ErrUserNotFound for repeated delete, got %v", err)
 	}
 }
+
+func TestGormRepositoryModeratorGovernanceRoundTrip(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+	suspendedAt := time.Date(2026, 5, 24, 18, 0, 0, 0, time.UTC)
+
+	user := &dusers.User{
+		Username:                  "moderator_user",
+		DisplayName:               "Moderator User",
+		Email:                     "moderator@example.com",
+		APIKey:                    "api-moderator",
+		PasswordHash:              "hash",
+		UserType:                  string(dusers.UserTypeModerator),
+		ModeratorStatus:           dusers.ModeratorStatusSuspended,
+		ModeratorSuspensionReason: "policy review",
+		ModeratorSuspendedBy:      "admin",
+		ModeratorSuspendedAt:      &suspendedAt,
+	}
+	if err := repo.Create(ctx, user); err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+
+	got, err := repo.GetByUsername(ctx, user.Username)
+	if err != nil {
+		t.Fatalf("GetByUsername returned error: %v", err)
+	}
+	if got.UserType != string(dusers.UserTypeModerator) || got.ModeratorStatus != dusers.ModeratorStatusSuspended {
+		t.Fatalf("unexpected moderator state: %+v", got)
+	}
+	if got.ModeratorSuspendedAt == nil || !got.ModeratorSuspendedAt.Equal(suspendedAt) {
+		t.Fatalf("moderator suspension timestamp not preserved: %+v", got.ModeratorSuspendedAt)
+	}
+
+	audit := &dusers.ModeratorAuditRecord{
+		Username:            user.Username,
+		ActorUsername:       "admin",
+		Action:              dusers.ModeratorAuditActionSuspend,
+		FromUserType:        string(dusers.UserTypeModerator),
+		ToUserType:          string(dusers.UserTypeModerator),
+		FromModeratorStatus: dusers.ModeratorStatusActive,
+		ToModeratorStatus:   dusers.ModeratorStatusSuspended,
+		Reason:              "policy review",
+	}
+	if err := repo.CreateModeratorAudit(ctx, audit); err != nil {
+		t.Fatalf("CreateModeratorAudit returned error: %v", err)
+	}
+	if audit.ID == 0 || audit.CreatedAt.IsZero() {
+		t.Fatalf("expected audit ID and CreatedAt, got %+v", audit)
+	}
+
+	var stored models.ModeratorRoleAudit
+	if err := db.Where("username = ?", user.Username).First(&stored).Error; err != nil {
+		t.Fatalf("load moderator audit: %v", err)
+	}
+	if stored.Action != string(dusers.ModeratorAuditActionSuspend) || stored.ToModeratorStatus != string(dusers.ModeratorStatusSuspended) {
+		t.Fatalf("unexpected stored audit: %+v", stored)
+	}
+}

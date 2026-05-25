@@ -69,9 +69,22 @@ type Frontend struct {
 	Charts FrontendCharts `yaml:"charts" json:"charts"`
 }
 
+type Moderation struct {
+	MarketApprovalRequired      bool `yaml:"marketApprovalRequired" json:"marketApprovalRequired"`
+	ModeratorCanTrade           bool `yaml:"moderatorCanTrade" json:"moderatorCanTrade"`
+	ModeratorCanTradeOwnMarkets bool `yaml:"moderatorCanTradeOwnMarkets" json:"moderatorCanTradeOwnMarkets"`
+	AdminCanYankMarkets         bool `yaml:"adminCanYankMarkets" json:"adminCanYankMarkets"`
+}
+
+type Game struct {
+	Mode       string     `yaml:"mode" json:"mode"`
+	Moderation Moderation `yaml:"moderation" json:"moderation"`
+}
+
 type EconomicConfig struct {
 	Economics Economics `yaml:"economics" json:"economics"`
 	Frontend  Frontend  `yaml:"frontend" json:"frontend"`
+	Game      Game      `yaml:"game" json:"game"`
 }
 
 // Clone returns a defensive copy of the legacy startup snapshot.
@@ -101,12 +114,30 @@ var legacyLoadState struct {
 func ParseEconomicConfig(data []byte) (*EconomicConfig, error) {
 	cfg := &EconomicConfig{}
 	if len(data) == 0 {
-		return cfg, nil
+		return normalizeEconomicConfig(cfg), nil
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
-	return cfg, nil
+	return normalizeEconomicConfig(cfg), nil
+}
+
+func normalizeEconomicConfig(cfg *EconomicConfig) *EconomicConfig {
+	if cfg == nil {
+		cfg = &EconomicConfig{}
+	}
+	if cfg.Game.Mode == "" {
+		cfg.Game.Mode = "moderator"
+	}
+	if cfg.Game.Moderation == (Moderation{}) {
+		cfg.Game.Moderation = Moderation{
+			MarketApprovalRequired:      true,
+			ModeratorCanTrade:           true,
+			ModeratorCanTradeOwnMarkets: false,
+			AdminCanYankMarkets:         true,
+		}
+	}
+	return cfg
 }
 
 // LoadEconomicConfigFromSource loads the legacy config explicitly from the provided asset source.

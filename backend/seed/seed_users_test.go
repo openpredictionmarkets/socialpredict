@@ -24,6 +24,10 @@ func (s panicOnCurrentSeedConfigService) Frontend() configsvc.Frontend {
 	panic("Frontend should not be called")
 }
 
+func (s panicOnCurrentSeedConfigService) Game() configsvc.Game {
+	panic("Game should not be called")
+}
+
 func (s panicOnCurrentSeedConfigService) ChartSigFigs() int {
 	panic("ChartSigFigs should not be called")
 }

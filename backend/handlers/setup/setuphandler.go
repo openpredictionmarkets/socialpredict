@@ -27,8 +27,13 @@ type frontendChartsResponse struct {
 	SigFigs int `json:"sigFigs"`
 }
 
+type frontendGameResponse struct {
+	Mode string `json:"mode"`
+}
+
 type frontendConfigResponse struct {
 	Charts frontendChartsResponse `json:"charts"`
+	Game   frontendGameResponse   `json:"game"`
 }
 
 func GetFrontendSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +46,9 @@ func GetFrontendSetupHandler(configService configsvc.Service) func(w http.Respon
 		response := frontendConfigResponse{
 			Charts: frontendChartsResponse{
 				SigFigs: configService.ChartSigFigs(),
+			},
+			Game: frontendGameResponse{
+				Mode: configService.Game().Mode,
 			},
 		}
 
