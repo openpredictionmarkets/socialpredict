@@ -19,6 +19,7 @@ import (
 type marketReviewServiceMock struct {
 	approveFn func(context.Context, int64, string, bool) (*dmarkets.Market, error)
 	rejectFn  func(context.Context, int64, string, string) (*dmarkets.Market, error)
+	listFn    func(context.Context, dmarkets.ListFilters) ([]*dmarkets.Market, error)
 }
 
 func (m marketReviewServiceMock) ApproveProposedMarket(ctx context.Context, marketID int64, actorUsername string, confirmed bool) (*dmarkets.Market, error) {
@@ -27,6 +28,10 @@ func (m marketReviewServiceMock) ApproveProposedMarket(ctx context.Context, mark
 
 func (m marketReviewServiceMock) RejectProposedMarket(ctx context.Context, marketID int64, actorUsername string, reason string) (*dmarkets.Market, error) {
 	return m.rejectFn(ctx, marketID, actorUsername, reason)
+}
+
+func (m marketReviewServiceMock) ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	return m.listFn(ctx, filters)
 }
 
 type marketReviewAuthMock struct {
@@ -96,6 +101,39 @@ func TestRejectMarketHandlerRejectsProposal(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !envelope.OK || envelope.Result.LifecycleStatus != dmarkets.MarketLifecycleRejected || envelope.Result.RejectionReason != "duplicate" {
+		t.Fatalf("unexpected response: %+v", envelope)
+	}
+}
+
+func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
+	svc := marketReviewServiceMock{
+		listFn: func(_ context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+			if filters.Status != dmarkets.MarketLifecycleProposed || filters.Limit != 25 || filters.Offset != 5 {
+				t.Fatalf("unexpected filters: %+v", filters)
+			}
+			return []*dmarkets.Market{{
+				ID:              44,
+				QuestionTitle:   "Queue item",
+				CreatorUsername: "moderator",
+				Status:          dmarkets.MarketLifecycleProposed,
+				LifecycleStatus: dmarkets.MarketLifecycleProposed,
+			}}, nil
+		},
+	}
+	handler := ListReviewMarketsHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := httptest.NewRequest(http.MethodGet, "/v0/admin/markets?status=proposed&limit=25&offset=5", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketReviewListResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !envelope.OK || envelope.Result.Total != 1 || envelope.Result.Markets[0].CreatorUsername != "moderator" {
 		t.Fatalf("unexpected response: %+v", envelope)
 	}
 }

@@ -19,6 +19,30 @@ func (s *Service) ListMarkets(ctx context.Context, filters ListFilters) ([]*Mark
 	return s.repo.List(ctx, filters)
 }
 
+// ListLifecycleMarkets returns non-public lifecycle queues for owner/admin views.
+func (s *Service) ListLifecycleMarkets(ctx context.Context, filters ListFilters) ([]*Market, error) {
+	status := NormalizeLifecycleStatus(filters.Status)
+	switch status {
+	case MarketLifecycleProposed, MarketLifecyclePublished, MarketLifecycleRejected:
+	default:
+		return nil, ErrInvalidInput
+	}
+
+	filters.Status = status
+	repo, ok := s.repo.(LifecycleReadRepository)
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+	markets, err := repo.ListByLifecycle(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	if markets == nil {
+		return []*Market{}, nil
+	}
+	return markets, nil
+}
+
 // GetMarketOverviews returns enriched market data with calculations.
 func (s *Service) GetMarketOverviews(ctx context.Context, filters ListFilters) ([]*MarketOverview, error) {
 	markets, err := s.repo.List(ctx, filters)

@@ -137,6 +137,24 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 	return r.mapMarkets(dbMarkets), nil
 }
 
+// ListByLifecycle retrieves lifecycle queues that are intentionally excluded
+// from the public market listing scope.
+func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	query := r.db.WithContext(ctx).Model(&models.Market{}).
+		Where("lifecycle_status = ?", dmarkets.NormalizeLifecycleStatus(filters.Status))
+
+	query = applyCreatedByFilter(query, filters.CreatedBy)
+	query = applyPagination(query, filters.Limit, filters.Offset)
+	query = query.Order("created_at DESC")
+
+	var dbMarkets []models.Market
+	if err := query.Find(&dbMarkets).Error; err != nil {
+		return nil, err
+	}
+
+	return r.mapMarkets(dbMarkets), nil
+}
+
 func applyListStatusFilter(query *gorm.DB, status string) *gorm.DB {
 	return applyStatusByResolution(query, status, time.Now())
 }
