@@ -185,6 +185,22 @@ func TestHandlerCreateMarket_SuccessAndBusinessFailure(t *testing.T) {
 		assertFailureEnvelope(t, rr, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
 	})
 
+	t.Run("unapproved user uses stable reason", func(t *testing.T) {
+		service := &contractServiceMock{
+			createFn: func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
+				return nil, dmarkets.ErrUnauthorized
+			},
+		}
+
+		body := bytes.NewBufferString(`{"questionTitle":"Will BTC rise?","description":"Market","outcomeType":"BINARY","resolutionDateTime":"2030-01-01T00:00:00Z"}`)
+		req := httptest.NewRequest(http.MethodPost, "/v0/markets", body)
+		rr := httptest.NewRecorder()
+
+		newContractHandler(service, auth).CreateMarket(rr, req)
+
+		assertFailureEnvelope(t, rr, http.StatusForbidden, handlers.ReasonUserNotApproved)
+	})
+
 	t.Run("suspicious title rejects before service call", func(t *testing.T) {
 		service := &contractServiceMock{
 			createFn: func(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {

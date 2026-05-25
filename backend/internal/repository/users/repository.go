@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"errors"
+	"time"
 
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
@@ -349,6 +350,22 @@ func (r *GormRepository) UpdatePassword(ctx context.Context, username string, ha
 	return nil
 }
 
+// CreateModeratorAudit persists an audit event for moderator role/status transitions.
+func (r *GormRepository) CreateModeratorAudit(ctx context.Context, record *dusers.ModeratorAuditRecord) error {
+	if record == nil {
+		return dusers.ErrInvalidUserData
+	}
+
+	dbRecord := r.domainAuditToModel(record)
+	if err := r.db.WithContext(ctx).Create(&dbRecord).Error; err != nil {
+		return err
+	}
+
+	record.ID = dbRecord.ID
+	record.CreatedAt = dbRecord.CreatedAt
+	return nil
+}
+
 // domainToModel converts a domain user to a GORM model
 func (r *GormRepository) domainToModel(user *dusers.User) models.User {
 	return models.User{
@@ -376,30 +393,64 @@ func (r *GormRepository) domainToModel(user *dusers.User) models.User {
 			APIKey:   user.APIKey,
 			Password: user.PasswordHash,
 		},
+		ModeratorGovernance: models.ModeratorGovernance{
+			ModeratorStatus:           string(dusers.NormalizeModeratorStatus(user.UserType, string(user.ModeratorStatus))),
+			ModeratorSuspensionReason: user.ModeratorSuspensionReason,
+			ModeratorSuspendedBy:      user.ModeratorSuspendedBy,
+			ModeratorSuspendedAt:      user.ModeratorSuspendedAt,
+		},
 		MustChangePassword: user.MustChangePassword,
 	}
 }
 
 // modelToDomain converts a GORM model to a domain user
 func (r *GormRepository) modelToDomain(dbUser *models.User) *dusers.User {
-	return &dusers.User{
-		ID:                    int64(dbUser.ID),
-		Username:              dbUser.Username,
-		DisplayName:           dbUser.DisplayName,
-		Email:                 dbUser.Email,
-		PasswordHash:          dbUser.Password,
-		UserType:              dbUser.UserType,
-		InitialAccountBalance: dbUser.InitialAccountBalance,
-		AccountBalance:        dbUser.AccountBalance,
-		PersonalEmoji:         dbUser.PersonalEmoji,
-		Description:           dbUser.Description,
-		PersonalLink1:         dbUser.PersonalLink1,
-		PersonalLink2:         dbUser.PersonalLink2,
-		PersonalLink3:         dbUser.PersonalLink3,
-		PersonalLink4:         dbUser.PersonalLink4,
-		APIKey:                dbUser.APIKey,
-		MustChangePassword:    dbUser.MustChangePassword,
-		CreatedAt:             dbUser.CreatedAt,
-		UpdatedAt:             dbUser.UpdatedAt,
+	user := &dusers.User{
+		ID:                        int64(dbUser.ID),
+		Username:                  dbUser.Username,
+		DisplayName:               dbUser.DisplayName,
+		Email:                     dbUser.Email,
+		PasswordHash:              dbUser.Password,
+		UserType:                  dbUser.UserType,
+		InitialAccountBalance:     dbUser.InitialAccountBalance,
+		AccountBalance:            dbUser.AccountBalance,
+		PersonalEmoji:             dbUser.PersonalEmoji,
+		Description:               dbUser.Description,
+		PersonalLink1:             dbUser.PersonalLink1,
+		PersonalLink2:             dbUser.PersonalLink2,
+		PersonalLink3:             dbUser.PersonalLink3,
+		PersonalLink4:             dbUser.PersonalLink4,
+		APIKey:                    dbUser.APIKey,
+		MustChangePassword:        dbUser.MustChangePassword,
+		ModeratorStatus:           dusers.ModeratorStatus(dbUser.ModeratorStatus),
+		ModeratorSuspensionReason: dbUser.ModeratorSuspensionReason,
+		ModeratorSuspendedBy:      dbUser.ModeratorSuspendedBy,
+		ModeratorSuspendedAt:      cloneTimePtr(dbUser.ModeratorSuspendedAt),
+		CreatedAt:                 dbUser.CreatedAt,
+		UpdatedAt:                 dbUser.UpdatedAt,
 	}
+	user.NormalizeRoleState()
+	return user
+}
+
+func (r *GormRepository) domainAuditToModel(record *dusers.ModeratorAuditRecord) models.ModeratorRoleAudit {
+	return models.ModeratorRoleAudit{
+		ID:                  record.ID,
+		Username:            record.Username,
+		ActorUsername:       record.ActorUsername,
+		Action:              string(record.Action),
+		FromUserType:        record.FromUserType,
+		ToUserType:          record.ToUserType,
+		FromModeratorStatus: string(record.FromModeratorStatus),
+		ToModeratorStatus:   string(record.ToModeratorStatus),
+		Reason:              record.Reason,
+	}
+}
+
+func cloneTimePtr(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }

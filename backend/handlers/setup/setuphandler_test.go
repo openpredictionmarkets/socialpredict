@@ -91,6 +91,7 @@ func TestGetFrontendSetupHandler(t *testing.T) {
 
 	config := modelstesting.GenerateEconomicConfig()
 	config.Frontend.Charts.SigFigs = 1
+	config.Game.Mode = configsvc.GameModeModerator
 
 	handler := http.HandlerFunc(GetFrontendSetupHandler(configsvc.NewStaticService(config)))
 	handler.ServeHTTP(rr, req)
@@ -99,13 +100,23 @@ func TestGetFrontendSetupHandler(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 
-	var response map[string]map[string]int
+	var response struct {
+		Charts struct {
+			SigFigs int `json:"sigFigs"`
+		} `json:"charts"`
+		Game struct {
+			Mode string `json:"mode"`
+		} `json:"game"`
+	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if got := response["charts"]["sigFigs"]; got != 2 {
+	if got := response.Charts.SigFigs; got != 2 {
 		t.Fatalf("expected clamped sig figs 2, got %d", got)
+	}
+	if got := response.Game.Mode; got != configsvc.GameModeModerator {
+		t.Fatalf("expected game mode moderator, got %q", got)
 	}
 }
 
@@ -120,13 +131,23 @@ func TestGetFrontendSetupHandlerUsesChartSigFigsAccessor(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 
-	var response map[string]map[string]int
+	var response struct {
+		Charts struct {
+			SigFigs int `json:"sigFigs"`
+		} `json:"charts"`
+		Game struct {
+			Mode string `json:"mode"`
+		} `json:"game"`
+	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if got := response["charts"]["sigFigs"]; got != 9 {
+	if got := response.Charts.SigFigs; got != 9 {
 		t.Fatalf("expected sig figs 9, got %d", got)
+	}
+	if got := response.Game.Mode; got != configsvc.GameModeModerator {
+		t.Fatalf("expected game mode moderator, got %q", got)
 	}
 }
 
@@ -165,6 +186,10 @@ func (economicsOnlyConfigService) Frontend() configsvc.Frontend {
 	panic("Frontend should not be called")
 }
 
+func (economicsOnlyConfigService) Game() configsvc.Game {
+	panic("Game should not be called")
+}
+
 func (economicsOnlyConfigService) ChartSigFigs() int {
 	panic("ChartSigFigs should not be called")
 }
@@ -183,6 +208,10 @@ func (chartSigFigsOnlyConfigService) Economics() configsvc.Economics {
 
 func (chartSigFigsOnlyConfigService) Frontend() configsvc.Frontend {
 	panic("Frontend should not be called")
+}
+
+func (chartSigFigsOnlyConfigService) Game() configsvc.Game {
+	return configsvc.Game{Mode: configsvc.GameModeModerator}
 }
 
 func (s chartSigFigsOnlyConfigService) ChartSigFigs() int {

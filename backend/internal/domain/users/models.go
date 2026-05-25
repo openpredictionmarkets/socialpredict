@@ -13,24 +13,28 @@ type PersonalLinksTarget interface {
 
 // User represents the core user domain model
 type User struct {
-	ID                    int64
-	Username              string
-	DisplayName           string
-	Email                 string
-	PasswordHash          string
-	UserType              string
-	InitialAccountBalance int64
-	AccountBalance        int64
-	PersonalEmoji         string
-	Description           string
-	PersonalLink1         string
-	PersonalLink2         string
-	PersonalLink3         string
-	PersonalLink4         string
-	APIKey                string
-	MustChangePassword    bool
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID                        int64
+	Username                  string
+	DisplayName               string
+	Email                     string
+	PasswordHash              string
+	UserType                  string
+	InitialAccountBalance     int64
+	AccountBalance            int64
+	PersonalEmoji             string
+	Description               string
+	PersonalLink1             string
+	PersonalLink2             string
+	PersonalLink3             string
+	PersonalLink4             string
+	APIKey                    string
+	MustChangePassword        bool
+	ModeratorStatus           ModeratorStatus
+	ModeratorSuspensionReason string
+	ModeratorSuspendedBy      string
+	ModeratorSuspendedAt      *time.Time
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 }
 
 // ToPublicUser returns the public-safe projection of the user model.
@@ -61,6 +65,7 @@ func copyPublicUser(target *PublicUser, user *User) *PublicUser {
 		AccountBalance:        user.AccountBalance,
 		PersonalEmoji:         user.PersonalEmoji,
 		Description:           user.Description,
+		ModeratorStatus:       NormalizeModeratorStatus(user.UserType, string(user.ModeratorStatus)),
 	}
 	user.PersonalLinks().ApplyTo(target)
 	return target
@@ -81,19 +86,23 @@ func copyPrivateProfile(target *PrivateProfile, user *User) *PrivateProfile {
 	}
 
 	*target = PrivateProfile{
-		ID:                    user.ID,
-		Username:              user.Username,
-		DisplayName:           user.DisplayName,
-		UserType:              user.UserType,
-		InitialAccountBalance: user.InitialAccountBalance,
-		AccountBalance:        user.AccountBalance,
-		PersonalEmoji:         user.PersonalEmoji,
-		Description:           user.Description,
-		Email:                 user.Email,
-		APIKey:                user.APIKey,
-		MustChangePassword:    user.MustChangePassword,
-		CreatedAt:             user.CreatedAt,
-		UpdatedAt:             user.UpdatedAt,
+		ID:                        user.ID,
+		Username:                  user.Username,
+		DisplayName:               user.DisplayName,
+		UserType:                  user.UserType,
+		InitialAccountBalance:     user.InitialAccountBalance,
+		AccountBalance:            user.AccountBalance,
+		PersonalEmoji:             user.PersonalEmoji,
+		Description:               user.Description,
+		Email:                     user.Email,
+		APIKey:                    user.APIKey,
+		MustChangePassword:        user.MustChangePassword,
+		ModeratorStatus:           NormalizeModeratorStatus(user.UserType, string(user.ModeratorStatus)),
+		ModeratorSuspensionReason: user.ModeratorSuspensionReason,
+		ModeratorSuspendedBy:      user.ModeratorSuspendedBy,
+		ModeratorSuspendedAt:      user.ModeratorSuspendedAt,
+		CreatedAt:                 user.CreatedAt,
+		UpdatedAt:                 user.UpdatedAt,
 	}
 	user.PersonalLinks().ApplyTo(target)
 	return target
@@ -144,6 +153,7 @@ type PublicUser struct {
 	PersonalLink2         string
 	PersonalLink3         string
 	PersonalLink4         string
+	ModeratorStatus       ModeratorStatus
 }
 
 // UserCreateRequest represents the data needed to create a new user
@@ -157,7 +167,7 @@ type UserCreateRequest struct {
 
 // NewUser builds the default domain user entity for the request.
 func (r UserCreateRequest) NewUser() *User {
-	return &User{
+	user := &User{
 		Username:              r.Username,
 		DisplayName:           r.DisplayName,
 		Email:                 r.Email,
@@ -166,6 +176,8 @@ func (r UserCreateRequest) NewUser() *User {
 		AccountBalance:        0,
 		MustChangePassword:    true,
 	}
+	user.NormalizeRoleState()
+	return user
 }
 
 // UserUpdateRequest represents the data that can be updated for a user
@@ -327,21 +339,25 @@ type Credentials struct {
 
 // PrivateProfile combines public and private user information for authenticated views.
 type PrivateProfile struct {
-	ID                    int64
-	Username              string
-	DisplayName           string
-	UserType              string
-	InitialAccountBalance int64
-	AccountBalance        int64
-	PersonalEmoji         string
-	Description           string
-	PersonalLink1         string
-	PersonalLink2         string
-	PersonalLink3         string
-	PersonalLink4         string
-	Email                 string
-	APIKey                string
-	MustChangePassword    bool
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID                        int64
+	Username                  string
+	DisplayName               string
+	UserType                  string
+	InitialAccountBalance     int64
+	AccountBalance            int64
+	PersonalEmoji             string
+	Description               string
+	PersonalLink1             string
+	PersonalLink2             string
+	PersonalLink3             string
+	PersonalLink4             string
+	Email                     string
+	APIKey                    string
+	MustChangePassword        bool
+	ModeratorStatus           ModeratorStatus
+	ModeratorSuspensionReason string
+	ModeratorSuspendedBy      string
+	ModeratorSuspendedAt      *time.Time
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 }

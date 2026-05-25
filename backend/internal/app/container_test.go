@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"testing"
+	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
 	configsvc "socialpredict/internal/service/config"
@@ -64,5 +65,37 @@ func TestBuildApplicationRetainsCompatibilityWithRawConfig(t *testing.T) {
 	}
 	if container.GetConfigService() == nil {
 		t.Fatalf("expected config service to be initialized from raw config")
+	}
+}
+
+func TestBuildApplicationPassesGameModeToMarketsService(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	config := modelstesting.GenerateEconomicConfig()
+	config.Game.Mode = configsvc.GameModeModerator
+	config.Game.Moderation.MarketApprovalRequired = true
+
+	container := BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
+	if container == nil {
+		t.Fatalf("BuildApplicationWithConfigService returned nil container")
+	}
+
+	user := modelstesting.GenerateUser("moderator", 1000)
+	user.UserType = "MODERATOR"
+	user.ModeratorStatus = "active"
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create moderator: %v", err)
+	}
+
+	market, err := container.GetMarketsService().CreateMarket(context.Background(), dmarkets.MarketCreateRequest{
+		QuestionTitle:      "Will moderator mode create a proposal?",
+		Description:        "Container wiring test",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: container.clock.Now().Add(48 * time.Hour),
+	}, user.Username)
+	if err != nil {
+		t.Fatalf("CreateMarket returned error: %v", err)
+	}
+	if market.Status != dmarkets.MarketLifecycleProposed || market.LifecycleStatus != dmarkets.MarketLifecycleProposed {
+		t.Fatalf("expected proposed market from container wiring, got %+v", market)
 	}
 }
