@@ -11,7 +11,7 @@ Usage: ./SocialPredict dev-bootstrap-users [OPTIONS]
 Create or reset development-only login fixtures.
 
 This command refuses to run unless APP_ENV=development in .env.
-It runs inside the backend container and writes to the development database.
+It writes to the development database through the dev Docker network.
 
 Created/updated users:
   admin       ADMIN user
@@ -89,9 +89,47 @@ if ! docker ps --format '{{.Names}}' | grep -qx "${BACKEND_CONTAINER_NAME}"; the
 fi
 
 print_status "Bootstrapping development users in ${BACKEND_CONTAINER_NAME} ..."
-docker exec \
-  -e DEV_BOOTSTRAP_PASSWORD="${password}" \
-  -e DEV_BOOTSTRAP_USER_COUNT="${count}" \
-  -e DEV_BOOTSTRAP_USER_PREFIX="${prefix}" \
-  "${BACKEND_CONTAINER_NAME}" \
-  sh -lc 'cd /src && go run ./cmd/devbootstrap'
+
+run_dev_bootstrap_env=(
+  -e "DEV_BOOTSTRAP_PASSWORD=${password}"
+  -e "DEV_BOOTSTRAP_USER_COUNT=${count}"
+  -e "DEV_BOOTSTRAP_USER_PREFIX=${prefix}"
+)
+
+go_bootstrap_command='export PATH=/usr/local/go/bin:/go/bin:$PATH; cd /src && go run ./cmd/devbootstrap'
+
+if docker exec "${BACKEND_CONTAINER_NAME}" sh -lc 'export PATH=/usr/local/go/bin:/go/bin:$PATH; command -v go >/dev/null 2>&1'; then
+  docker exec "${run_dev_bootstrap_env[@]}" "${BACKEND_CONTAINER_NAME}" \
+    sh -lc "${go_bootstrap_command}"
+  return 0
+fi
+
+print_warning "Backend container does not have the Go toolchain; using a temporary Go runner container."
+
+network_name="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "${BACKEND_CONTAINER_NAME}" | head -n 1)"
+if [ -z "${network_name}" ]; then
+  print_error "Could not determine Docker network for ${BACKEND_CONTAINER_NAME}."
+  exit 1
+fi
+
+platform_args=()
+if [ -n "${FORCE_PLATFORM:-}" ]; then
+  platform_args=(--platform "${FORCE_PLATFORM}")
+fi
+
+docker run --rm \
+  "${platform_args[@]}" \
+  --network "${network_name}" \
+  -v "${SCRIPT_DIR}/backend:/src" \
+  -w /src \
+  -e "APP_ENV=${APP_ENV}" \
+  -e "DB_HOST=db" \
+  -e "DB_PORT=5432" \
+  -e "POSTGRES_USER=${POSTGRES_USER}" \
+  -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+  -e "POSTGRES_DATABASE=${POSTGRES_DATABASE}" \
+  -e "DB_REQUIRE_TLS=${DB_REQUIRE_TLS:-false}" \
+  -e "DB_SSLMODE=${DB_SSLMODE:-disable}" \
+  "${run_dev_bootstrap_env[@]}" \
+  golang:1.25.1-alpine3.22 \
+  sh -lc "${go_bootstrap_command}"
