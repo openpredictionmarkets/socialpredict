@@ -13,12 +13,11 @@ import {
   MarketsSVG,
   MenuGrowSVG,
   MenuShrinkSVG,
-  NotificationsSVG,
-  PollsSVG,
   ProfileSVG,
   CreateSVG,
   StatsSVG,
 } from '../../assets/components/SvgIcons';
+import useFrontendConfig from '../../hooks/useFrontendConfig';
 
 const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
   <li>
@@ -37,6 +36,9 @@ const Sidebar = () => {
   const { isLoggedIn, usertype, logout, changePasswordNeeded, username } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { userCredit, loading, error } = useUserCredit(username); // Correct destructuring
+  const { frontendConfig } = useFrontendConfig();
+  const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
+  const canCreateMarket = isLoggedIn && usertype !== 'ADMIN' && !changePasswordNeeded && (!isModeratorMode || usertype === 'MODERATOR');
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -79,9 +81,6 @@ const Sidebar = () => {
           <SidebarLink to='/markets' icon={MarketsSVG}>
             Markets
           </SidebarLink>
-          <SidebarLink to='/polls' icon={PollsSVG}>
-            Polls
-          </SidebarLink>
           <SidebarLink to='/about' icon={AboutSVG}>
             About
           </SidebarLink>
@@ -100,9 +99,6 @@ const Sidebar = () => {
           </SidebarLink>
           <SidebarLink to='/markets' icon={MarketsSVG}>
             Markets
-          </SidebarLink>
-          <SidebarLink to='/polls' icon={PollsSVG}>
-            Polls
           </SidebarLink>
           <SidebarLink to='/about' icon={AboutSVG}>
             About
@@ -144,15 +140,11 @@ const Sidebar = () => {
         <SidebarLink to='/markets' icon={MarketsSVG}>
           Markets
         </SidebarLink>
-        <SidebarLink to='/polls' icon={PollsSVG}>
-          Polls
-        </SidebarLink>
-        <SidebarLink to='/notifications' icon={NotificationsSVG}>
-          Alerts
-        </SidebarLink>
-        <SidebarLink to='/create' icon={CreateSVG}>
-          Create
-        </SidebarLink>
+        {canCreateMarket && (
+          <SidebarLink to='/create' icon={CreateSVG}>
+            Create
+          </SidebarLink>
+        )}
         <SidebarLink to='/about' icon={AboutSVG}>
           About
         </SidebarLink>
@@ -209,13 +201,13 @@ const Sidebar = () => {
           <Link to='/markets' className='text-gray-300 hover:text-white'>
             <MarketsSVG className='w-5 h-5' />
           </Link>
-          {isLoggedIn ? (
+          {canCreateMarket ? (
             <Link to='/create' className='text-gray-300 hover:text-white'>
               <CreateSVG className='w-5 h-5' />
             </Link>
-          ) : (
+          ) : !isLoggedIn ? (
             <LoginModalButton iconOnly={true} />
-          )}
+          ) : null}
           {isLoggedIn && (
             <Link to='/profile' className='text-gray-300 hover:text-white'>
               <ProfileSVG className='w-5 h-5' />

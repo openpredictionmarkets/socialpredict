@@ -22,8 +22,8 @@ func TestLoadConfigServiceUsesEmbeddedSource(t *testing.T) {
 	if got := service.ChartSigFigs(); got != 2 {
 		t.Fatalf("chart sig figs = %d, want 2", got)
 	}
-	if got := service.Game().Mode; got != configsvc.GameModeOpen {
-		t.Fatalf("game mode = %q, want %q", got, configsvc.GameModeOpen)
+	if got := service.Game().Mode; got != configsvc.GameModeModerator {
+		t.Fatalf("game mode = %q, want %q", got, configsvc.GameModeModerator)
 	}
 }
 

@@ -8,19 +8,24 @@ import (
 
 type Market struct {
 	gorm.Model
-	ID                      int64     `json:"id" gorm:"primary_key"`
-	QuestionTitle           string    `json:"questionTitle" gorm:"not null"`
-	Description             string    `json:"description" gorm:"not null"`
-	OutcomeType             string    `json:"outcomeType" gorm:"not null"`
-	ResolutionDateTime      time.Time `json:"resolutionDateTime" gorm:"not null"`
-	FinalResolutionDateTime time.Time `json:"finalResolutionDateTime"`
-	UTCOffset               int       `json:"utcOffset"`
-	IsResolved              bool      `json:"isResolved"`
-	ResolutionResult        string    `json:"resolutionResult"`
-	InitialProbability      float64   `json:"initialProbability" gorm:"not null"`
-	YesLabel                string    `json:"yesLabel" gorm:"default:YES"`
-	NoLabel                 string    `json:"noLabel" gorm:"default:NO"`
-	LifecycleStatus         string    `json:"lifecycleStatus" gorm:"not null;default:published;index"`
-	CreatorUsername         string    `json:"creatorUsername" gorm:"not null"`
-	Creator                 User      `gorm:"foreignKey:CreatorUsername;references:Username"`
+	ID                      int64      `json:"id" gorm:"primary_key"`
+	QuestionTitle           string     `json:"questionTitle" gorm:"not null"`
+	Description             string     `json:"description" gorm:"not null"`
+	OutcomeType             string     `json:"outcomeType" gorm:"not null"`
+	ResolutionDateTime      time.Time  `json:"resolutionDateTime" gorm:"not null"`
+	FinalResolutionDateTime time.Time  `json:"finalResolutionDateTime"`
+	UTCOffset               int        `json:"utcOffset"`
+	IsResolved              bool       `json:"isResolved"`
+	ResolutionResult        string     `json:"resolutionResult"`
+	InitialProbability      float64    `json:"initialProbability" gorm:"not null"`
+	YesLabel                string     `json:"yesLabel" gorm:"default:YES"`
+	NoLabel                 string     `json:"noLabel" gorm:"default:NO"`
+	LifecycleStatus         string     `json:"lifecycleStatus" gorm:"not null;default:published;index"`
+	ApprovedBy              string     `json:"approvedBy,omitempty" gorm:"index"`
+	ApprovedAt              *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy              string     `json:"rejectedBy,omitempty" gorm:"index"`
+	RejectedAt              *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason         string     `json:"rejectionReason,omitempty" gorm:"type:text"`
+	CreatorUsername         string     `json:"creatorUsername" gorm:"not null"`
+	Creator                 User       `gorm:"foreignKey:CreatorUsername;references:Username"`
 }

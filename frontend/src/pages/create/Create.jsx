@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent';
 import { getEndofDayDateTime } from '../../components/utils/dateTimeTools/FormDateTimeTools';
@@ -8,6 +8,12 @@ import RegularInputBox from '../../components/inputs/InputBox';
 import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
 import { API_URL } from '../../config';
+import { USER_CREDIT_REFRESH_EVENT } from '../../components/utils/userFinanceTools/FetchUserCredit';
+import {
+  getApiErrorMessage,
+  parseApiResponseText,
+  unwrapApiResponse,
+} from '../../utils/apiResponse';
 
 function Create() {
   const [questionTitle, setQuestionTitle] = useState('');
@@ -18,12 +24,48 @@ function Create() {
   const [yesLabel, setYesLabel] = useState('');
   const [noLabel, setNoLabel] = useState('');
   const [error, setError] = useState('');
+  const [createdMarket, setCreatedMarket] = useState(null);
+  const [marketCreationCost, setMarketCreationCost] = useState(null);
   const { username } = useAuth();
   const history = useHistory();
+
+  const createMarketReasonMessages = {
+    USER_NOT_APPROVED: 'User does not have approval to create markets in moderator mode.',
+    AUTHORIZATION_DENIED: 'You are not allowed to create this market.',
+    INSUFFICIENT_BALANCE: 'You do not have enough credit to create this market.',
+    VALIDATION_FAILED: 'Check the market fields and try again.',
+    INVALID_REQUEST: 'Check the market fields and try again.',
+  };
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadSetup = async () => {
+      try {
+        const response = await fetch(`${API_URL}/v0/setup`);
+        if (!response.ok) {
+          return;
+        }
+        const setup = await response.json();
+        const cost = setup?.marketincentives?.createMarketCost;
+        if (!ignore && cost !== undefined && cost !== null) {
+          setMarketCreationCost(cost);
+        }
+      } catch {
+        // The backend still enforces cost; this call only improves the UI.
+      }
+    };
+
+    loadSetup();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    setCreatedMarket(null);
 
     // Validate custom labels
     const trimmedYesLabel = yesLabel.trim();
@@ -81,13 +123,30 @@ function Create() {
         body: JSON.stringify(marketData),
       });
 
+      const responseText = await response.text();
+      const responsePayload = parseApiResponseText(responseText);
+
       if (response.ok) {
-        const responseData = await response.json();
+        const responseData = unwrapApiResponse(responsePayload);
+        window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
+        if (String(responseData.status || '').toLowerCase() === 'proposed') {
+          setCreatedMarket(responseData);
+          history.push('/profile?tab=Proposed%20Markets', {
+            proposedMarket: responseData,
+            marketCreationCost,
+          });
+          return;
+        }
         history.push(`/markets/${responseData.id}`);
       } else {
-        const errorText = await response.text();
-        console.error('Market creation failed:', errorText);
-        setError(`Market creation failed: ${errorText}`);
+        const errorMessage = getApiErrorMessage(
+          response,
+          responsePayload,
+          `Market creation failed with status ${response.status}.`,
+          createMarketReasonMessages,
+        );
+        console.error('Market creation failed:', responsePayload);
+        setError(errorMessage);
       }
     } catch (error) {
       console.error('Error during market creation:', error);
@@ -100,6 +159,18 @@ function Create() {
       <h1 className='text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6'>
         Create a Market
       </h1>
+
+      <div className='mb-5 rounded-lg border border-amber-500 bg-amber-950/40 p-4 text-amber-50'>
+        <p className='text-sm uppercase tracking-[0.18em] text-amber-300'>
+          Market proposal cost
+        </p>
+        <p className='mt-2 text-2xl font-bold'>
+          {marketCreationCost === null ? 'Loading...' : `${marketCreationCost} credits`}
+        </p>
+        <p className='mt-2 text-sm text-amber-100'>
+          This amount is deducted when you create the proposal. If an admin rejects the proposal, the proposal cost is refunded.
+        </p>
+      </div>
 
       <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
         <div>
@@ -193,6 +264,30 @@ function Create() {
         {error && (
           <div className='bg-red-600 text-white p-3 rounded-md text-sm'>
             {error}
+          </div>
+        )}
+
+        {createdMarket && (
+          <div className='rounded-md border border-amber-500 bg-amber-950/40 p-4 text-amber-50'>
+            <p className='text-sm uppercase tracking-[0.18em] text-amber-300'>
+              Proposed market created
+            </p>
+            <h2 className='mt-2 text-lg font-semibold'>
+              {createdMarket.questionTitle}
+            </h2>
+            <div className='mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2'>
+              <p>
+                <span className='text-amber-200'>Market ID:</span>{' '}
+                <span className='font-mono'>{createdMarket.id}</span>
+              </p>
+              <p>
+                <span className='text-amber-200'>Status:</span>{' '}
+                <span className='font-mono'>{createdMarket.status}</span>
+              </p>
+            </div>
+            <p className='mt-3 text-sm text-amber-100'>
+              This moderator-mode proposal is not tradable until an admin approves it. You will be redirected to your Proposed Markets tab.
+            </p>
           </div>
         )}
 

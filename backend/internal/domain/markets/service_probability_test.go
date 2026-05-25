@@ -25,6 +25,8 @@ type projectionRepo struct {
 	getByIDFunc                  func(context.Context, int64) (*markets.Market, error)
 	calculatePayoutPositionsFunc func(context.Context, int64) ([]*markets.PayoutPosition, error)
 	getPublicMarketFunc          func(context.Context, int64) (*markets.PublicMarket, error)
+	approveMarketFunc            func(context.Context, int64, string, time.Time) error
+	rejectMarketFunc             func(context.Context, int64, string, time.Time, string) error
 }
 
 func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
@@ -59,6 +61,12 @@ func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
 		},
 		getPublicMarketFunc: func(context.Context, int64) (*markets.PublicMarket, error) {
 			return nil, errUnexpectedMarketsTestCall
+		},
+		approveMarketFunc: func(context.Context, int64, string, time.Time) error {
+			return errUnexpectedMarketsTestCall
+		},
+		rejectMarketFunc: func(context.Context, int64, string, time.Time, string) error {
+			return errUnexpectedMarketsTestCall
 		},
 	}
 	for _, opt := range opts {
@@ -127,6 +135,20 @@ func (r *projectionRepo) ResolveMarket(ctx context.Context, id int64, outcome st
 		return errUnexpectedMarketsTestCall
 	}
 	return r.resolveMarketFunc(ctx, id, outcome)
+}
+
+func (r *projectionRepo) ApproveMarket(ctx context.Context, id int64, actorUsername string, approvedAt time.Time) error {
+	if r.approveMarketFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.approveMarketFunc(ctx, id, actorUsername, approvedAt)
+}
+
+func (r *projectionRepo) RejectMarket(ctx context.Context, id int64, actorUsername string, rejectedAt time.Time, reason string) error {
+	if r.rejectMarketFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.rejectMarketFunc(ctx, id, actorUsername, rejectedAt, reason)
 }
 func (r *projectionRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {
 	if r.getUserPositionFunc == nil {

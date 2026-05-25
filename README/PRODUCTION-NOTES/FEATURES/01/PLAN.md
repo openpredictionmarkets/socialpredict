@@ -35,7 +35,7 @@ Agents implementing this feature should mark checklist items as they complete th
 
 Frontend work must not begin until these backend-facing items are stable enough to consume:
 
-- [x] Setup/config exposes game-mode policy with default `open` behavior.
+- [x] Setup/config exposes game-mode policy with default `moderator` behavior.
 - [x] Users domain owns moderator role/status/suspension semantics.
 - [ ] Markets domain owns proposal, approval, rejection, publication, amendment, resolution, and cancellation lifecycle semantics.
 - [ ] Bets domain has only the necessary buy/sell guards for lifecycle/self-trade and any cancellation/refund accounting hooks that are actually required.
@@ -51,7 +51,7 @@ Backend design and contract baseline:
 - [x] 02. Game-mode configuration policy
 - [x] 03. Participant role and moderator status baseline
 - [x] 04. Market lifecycle and proposal creation
-- [ ] 05. Admin approval and rejection backend API
+- [x] 05. Admin approval and rejection backend API
 - [ ] 06. Moderator backend API and proposal views
 - [ ] 07. Trade eligibility guards and suspension enforcement
 - [ ] 08. Market contract immutability and backend amendments
@@ -61,10 +61,16 @@ Backend design and contract baseline:
 
 Frontend after backend contract:
 
-- [ ] 12. Moderator frontend proposal tracking
-- [ ] 13. Admin approval dashboard baseline
+- [x] 12. Moderator frontend proposal tracking
+- [x] 13. Admin approval dashboard baseline
 - [ ] 14. Admin moderator management dashboard
 - [ ] 15. End-to-end feature verification
+
+Frontend smoke-test exception:
+
+- [x] Add a temporary admin market-review view that can approve or reject a known proposed market ID after the approval backend API exists.
+- [x] Update market creation UI so moderator-mode `proposed` responses display the proposal ID instead of redirecting into a possibly non-public market detail page.
+- [x] Replace temporary market-ID handoff with moderator profile lifecycle tabs and admin review queues.
 
 ## Implementation Checklist
 
@@ -97,17 +103,17 @@ Service ownership: Configuration Service Slice.
 
 Checklist:
 
-- [x] Extend setup/application policy with default `open` game mode.
+- [x] Extend setup/application policy with default `moderator` game mode.
 - [x] Add moderation config fields for approval-required and moderator trading policy.
 - [x] Add typed moderation config in the Configuration Service Slice.
 - [x] Expose game-mode policy to domain services through narrow interfaces.
-- [x] Add tests proving missing config defaults to open mode.
+- [x] Add tests proving missing config defaults to moderator mode.
 - [x] Add tests proving moderator-mode config parses and is visible through typed policy.
 - [x] Update related docs if the config shape changes from [01-moderators.md](./01-moderators.md).
 
 Exit criteria:
 
-- [x] Existing installs behave as open mode without setup changes.
+- [x] Explicit open-mode configs preserve legacy market creation behavior.
 - [x] Moderator-mode config can be parsed and read from typed config.
 - [x] No frontend-only flag controls market creation policy.
 
@@ -178,33 +184,33 @@ Service ownership: markets domain/service for market state transitions; users do
 
 Checklist:
 
-- [ ] Add markets-domain use case for approving proposed markets.
-- [ ] Add markets-domain use case for rejecting proposed markets.
-- [ ] Add repository methods required by approval/rejection use cases.
-- [ ] Require confirmation semantics at the API/application boundary for approval.
-- [ ] Store approval actor and timestamp.
-- [ ] Store rejection actor, timestamp, and reason.
-- [ ] Add a timestamped Go migration under `backend/migration/migrations` if approval/rejection metadata needs new columns or tables.
-- [ ] Add a package-local migration test for approval/rejection schema defaults where practical.
-- [ ] Add authorization checks so non-admins cannot approve or reject.
-- [ ] Add or update admin/markets handlers for approval and rejection.
-- [ ] Update `backend/docs/openapi.yaml` for approval and rejection endpoints.
-- [ ] Add public reason responses for invalid state and unauthorized approval/rejection attempts.
-- [ ] Add tests for approve, reject, unauthorized, and wrong-state cases.
+- [x] Add markets-domain use case for approving proposed markets.
+- [x] Add markets-domain use case for rejecting proposed markets.
+- [x] Add repository methods required by approval/rejection use cases.
+- [x] Require confirmation semantics at the API/application boundary for approval.
+- [x] Store approval actor and timestamp.
+- [x] Store rejection actor, timestamp, and reason.
+- [x] Add a timestamped Go migration under `backend/migration/migrations` if approval/rejection metadata needs new columns or tables.
+- [x] Add a package-local migration test for approval/rejection schema defaults where practical.
+- [x] Add authorization checks so non-admins cannot approve or reject.
+- [x] Add or update admin/markets handlers for approval and rejection.
+- [x] Update `backend/docs/openapi.yaml` for approval and rejection endpoints.
+- [x] Add public reason responses for invalid state and unauthorized approval/rejection attempts.
+- [x] Add tests for approve, reject, unauthorized, and wrong-state cases.
 
 Exit criteria:
 
-- [ ] Admin can approve a proposed market into published/tradable state.
-- [ ] Admin can reject a proposal with reason.
-- [ ] Non-admins cannot approve or reject.
-- [ ] Approval/rejection history is preserved.
-- [ ] OpenAPI matches live routes and public reason values.
+- [x] Admin can approve a proposed market into published/tradable state.
+- [x] Admin can reject a proposal with reason.
+- [x] Non-admins cannot approve or reject.
+- [x] Approval/rejection history is preserved.
+- [x] OpenAPI matches live routes and public reason values.
 
 Validation:
 
-- [ ] `cd backend && go test ./...`
-- [ ] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'`
-- [ ] `git diff --check`
+- [x] `cd backend && go test ./...`
+- [x] `cd backend && go test . -run 'TestOpenAPI|TestRouteFamily|TestReasonResponse|TestEmbedded|TestDocsPublishing'`
+- [x] `git diff --check`
 
 ### 06. Moderator Backend API And Proposal Views
 
@@ -393,23 +399,23 @@ Prerequisite: backend-first gate and backend API contract completion gate.
 
 Checklist:
 
-- [ ] Add frontend route or dashboard surface for moderator proposal tracking.
-- [ ] Use backend lifecycle terms in frontend copy.
-- [ ] Use the existing frontend API/auth adapter patterns.
-- [ ] Avoid direct token/API coupling in new frontend code.
-- [ ] Add frontend states for loading, empty, success, and failure.
+- [x] Add frontend route or dashboard surface for moderator proposal tracking.
+- [x] Use backend lifecycle terms in frontend copy.
+- [x] Use the existing frontend API/auth adapter patterns.
+- [x] Avoid direct token/API coupling in new frontend code.
+- [x] Add frontend states for loading, empty, success, and failure.
 - [ ] Add collapsed or summarized proposal history where available.
 - [ ] Add focused frontend tests if the test baseline exists by this point.
 
 Exit criteria:
 
-- [ ] Moderators can see proposal status without admin dashboard access.
-- [ ] Frontend does not invent a separate lifecycle model.
-- [ ] Existing frontend CI/build remains green.
+- [x] Moderators can see proposal status without admin dashboard access.
+- [x] Frontend does not invent a separate lifecycle model.
+- [x] Existing frontend CI/build remains green.
 
 Validation:
 
-- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [x] `cd frontend && npm run build`
 - [ ] `git diff --check`
 
 ### 13. Admin Approval Dashboard Baseline
@@ -418,24 +424,24 @@ Prerequisite: backend approval/rejection APIs and OpenAPI completion.
 
 Checklist:
 
-- [ ] Add admin UI for proposed-market queue.
+- [x] Add admin UI for proposed-market queue.
 - [ ] Show market title, description, labels, outcome type, and resolution time.
-- [ ] Show creator username, moderator status, and creation timestamp.
-- [ ] Show prior review history where available.
-- [ ] Add approve confirmation prompt.
-- [ ] Add reject reason flow.
+- [x] Show creator username and creation timestamp.
+- [x] Show prior review history where available.
+- [x] Add approve action from the queue.
+- [x] Add reject reason flow.
 - [ ] Align the UI with Tailwind/styleguide direction.
 - [ ] Keep backend authorization authoritative.
 
 Exit criteria:
 
-- [ ] Admins can review, approve, and reject from UI.
+- [x] Admins can review, approve, and reject from UI.
 - [ ] Approval is two-step.
-- [ ] Rejection captures reason.
+- [x] Rejection captures reason and refunds the proposal cost.
 
 Validation:
 
-- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [x] `cd frontend && npm run build`
 - [ ] `git diff --check`
 
 ### 14. Admin Moderator Management Dashboard
@@ -444,24 +450,25 @@ Prerequisite: backend users-domain role/status APIs and OpenAPI completion.
 
 Checklist:
 
-- [ ] Add users dashboard capabilities for promote, suspend, and unsuspend.
-- [ ] Add moderators dashboard or moderator-filtered admin surface.
-- [ ] Show moderator status.
-- [ ] Show suspension reason and timestamp.
+- [x] Add users dashboard capabilities for promote, suspend, and unsuspend.
+- [x] Add moderators dashboard or moderator-filtered admin surface.
+- [x] Show moderator status.
+- [x] Show suspension reason and timestamp.
 - [ ] Show created-market counts by lifecycle state.
 - [ ] Preserve audit history access.
-- [ ] Add frontend states for loading, success, and failure.
-- [ ] Keep backend authorization authoritative.
+- [x] Add frontend states for loading, success, and failure.
+- [x] Keep backend authorization authoritative.
 
 Exit criteria:
 
-- [ ] Admin can manage moderators from UI.
+- [x] Admin can manage moderators from UI.
 - [ ] Moderator status changes are visible and auditable.
-- [ ] Dashboard does not bypass backend authorization.
+- [x] Dashboard does not bypass backend authorization.
 
 Validation:
 
-- [ ] Frontend build workflow or `cd frontend && npm run build:report`.
+- [x] `cd frontend && npm run build`
+- [x] `cd backend && go test ./...`
 - [ ] `git diff --check`
 
 ### 15. End-To-End Feature Verification

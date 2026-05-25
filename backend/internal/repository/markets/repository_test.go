@@ -367,3 +367,54 @@ func TestGormRepositoryHidesNonPublicLifecycleMarketsFromPublicQueries(t *testin
 		t.Fatalf("expected proposed market to be hidden from public get, got %v", err)
 	}
 }
+
+func TestGormRepositoryApproveAndRejectMarketPersistReviewMetadata(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("review_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+
+	approveTarget := modelstesting.GenerateMarket(601, creator.Username)
+	approveTarget.LifecycleStatus = dmarkets.MarketLifecycleProposed
+	rejectTarget := modelstesting.GenerateMarket(602, creator.Username)
+	rejectTarget.LifecycleStatus = dmarkets.MarketLifecycleProposed
+	published := modelstesting.GenerateMarket(603, creator.Username)
+	published.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	for _, market := range []*models.Market{&approveTarget, &rejectTarget, &published} {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("seed market %d: %v", market.ID, err)
+		}
+	}
+
+	approvedAt := time.Date(2026, 5, 24, 10, 0, 0, 0, time.UTC)
+	if err := repo.ApproveMarket(ctx, approveTarget.ID, "admin", approvedAt); err != nil {
+		t.Fatalf("ApproveMarket returned error: %v", err)
+	}
+	approved, err := repo.GetByID(ctx, approveTarget.ID)
+	if err != nil {
+		t.Fatalf("load approved market: %v", err)
+	}
+	if approved.LifecycleStatus != dmarkets.MarketLifecyclePublished || approved.ApprovedBy != "admin" || approved.ApprovedAt == nil || !approved.ApprovedAt.Equal(approvedAt) {
+		t.Fatalf("unexpected approved market: %+v", approved)
+	}
+
+	rejectedAt := approvedAt.Add(time.Hour)
+	if err := repo.RejectMarket(ctx, rejectTarget.ID, "admin", rejectedAt, "duplicate"); err != nil {
+		t.Fatalf("RejectMarket returned error: %v", err)
+	}
+	rejected, err := repo.GetByID(ctx, rejectTarget.ID)
+	if err != nil {
+		t.Fatalf("load rejected market: %v", err)
+	}
+	if rejected.LifecycleStatus != dmarkets.MarketLifecycleRejected || rejected.RejectedBy != "admin" || rejected.RejectionReason != "duplicate" || rejected.RejectedAt == nil || !rejected.RejectedAt.Equal(rejectedAt) {
+		t.Fatalf("unexpected rejected market: %+v", rejected)
+	}
+
+	if err := repo.ApproveMarket(ctx, published.ID, "admin", approvedAt); !errors.Is(err, dmarkets.ErrInvalidState) {
+		t.Fatalf("ApproveMarket wrong state error = %v, want ErrInvalidState", err)
+	}
+}
