@@ -47,6 +47,25 @@ chown -R $(whoami):staff data
 - Log back in with your new password
 - The new user will have an initial account balance and maximum debt as configured in `setup.yaml`. **You can configure `setup.yaml` yourself, but must do so prior to installing SocialPredict**.
 
+#### Optional Development Bootstrap Users
+
+After installing in Development mode and starting the containers with `./SocialPredict up`, you can reset a predictable local test login set:
+
+```bash
+./SocialPredict dev-bootstrap-users
+```
+
+This command refuses to run unless `.env` has `APP_ENV=development`. By default it creates or updates:
+
+- `admin`
+- `testuser01` through `testuser10`
+
+All bootstrapped users receive password `Password1` and `must_change_password=true`. You can customize the regular user count or prefix:
+
+```bash
+./SocialPredict dev-bootstrap-users --count 20 --prefix player
+```
+
 ### Shutting down the service:
 
 - To shut down the service, navigate to the `./socialpredict` root directory in your terminal.
