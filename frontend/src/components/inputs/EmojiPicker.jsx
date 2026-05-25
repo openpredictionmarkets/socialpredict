@@ -134,6 +134,8 @@ const EmojiPickerInput = ({
           onClick={toggleEmojiPicker}
           className="emoji-picker-button absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors p-1 rounded"
           title="Add emoji"
+          aria-label="Add emoji"
+          aria-expanded={showEmojiPicker}
         >
           😀
         </button>

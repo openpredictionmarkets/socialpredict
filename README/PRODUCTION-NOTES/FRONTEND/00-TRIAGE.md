@@ -3,9 +3,9 @@ title: Frontend Baseline Triage
 document_type: production-notes
 domain: frontend
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Ground frontend production-note sequencing with Evans/Fowler/Martin design-agent review and current frontend code evidence."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Record the landed frontend baseline stack and reset the next work around remaining call-site migration, tests, and broader workflow audits."
 status: draft
 ---
 
@@ -81,17 +81,33 @@ Recommended design-plan direction:
 
 The canonical design plan now includes frontend extraction tags, a `Frontend Experience Context`, a `Frontend Visual System Boundary`, active frontend workstreams `W08` and `W09`, and ADR guardrails for deferring browser platform capabilities until baseline seams are stable.
 
+## May 24 Baseline Update
+
+The first stacked frontend baseline has now landed on `frontend/baseline-ci-auth-error` for review into `main`.
+
+That stack includes:
+
+- a dedicated frontend PR workflow using Node 22, `npm ci`, and `npm run build:report`
+- a user-safe global error fallback with development-only diagnostic details
+- a first `authStorage` and `httpClient` API/auth adapter seam
+- representative migrations for login, create market, change password, homepage content, and admin homepage content
+- a first accessibility pass for create-market, change-password, navigation controls, status/error regions, and the datetime selector
+- an informational production build-size report
+
+This update does not mean the frontend platform work is complete. It means the baseline now has enough CI and adapter structure to continue smaller, lower-risk follow-up slices.
+
 ## Current Code Snapshot
 
 As of this triage pass, the frontend is a Vite React app under `frontend/` with:
 
 - React 18, Vite, Tailwind, React Router v5, charting libraries, and `react-error-boundary` in [package.json](../../../frontend/package.json).
 - App-level routing and auth context in [App.jsx](../../../frontend/src/App.jsx), [AppRoutes.jsx](../../../frontend/src/helpers/AppRoutes.jsx), and [AuthContent.jsx](../../../frontend/src/helpers/AuthContent.jsx).
-- A global error boundary in [App.jsx](../../../frontend/src/App.jsx), but the fallback currently renders `error.message` directly to the user.
-- Persistent auth state in `localStorage` from [AuthContent.jsx](../../../frontend/src/helpers/AuthContent.jsx), plus several direct `localStorage.getItem('token')` call sites across pages/components.
-- API transport and envelope handling spread across pages, hooks, and components; [axios.js](../../../frontend/src/api/axios.js) is a placeholder, while direct `fetch(API_URL...)` call sites and duplicated `unwrapApiResponse` functions remain.
+- A global error boundary in [App.jsx](../../../frontend/src/App.jsx) with user-safe production copy and development-only diagnostic details.
+- Persistent auth state still uses browser storage, but login/logout and stored auth state now go through [authStorage.js](../../../frontend/src/api/authStorage.js).
+- API transport and envelope handling now have a first preferred path in [httpClient.js](../../../frontend/src/api/httpClient.js), while direct `fetch(API_URL...)` call sites and duplicated `unwrapApiResponse` functions remain in several market, profile, stats, and trading surfaces.
 - One visible frontend test file, [useDocumentMeta.test.jsx](../../../frontend/src/test/useDocumentMeta.test.jsx), but [package.json](../../../frontend/package.json) has no `test` script and does not declare `vitest` or `jsdom`.
-- Backend and Docker workflows in `.github/workflows`, but no dedicated frontend PR CI workflow that runs install, build, lint, or tests for frontend-only changes. Release/manual Docker builds do build the frontend image through [docker.yml](../../../.github/workflows/docker.yml), but that is not the same as PR feedback.
+- Backend and Docker workflows exist, and [frontend.yml](../../../.github/workflows/frontend.yml) now adds a dedicated frontend PR install/build check with a non-blocking build-size report.
+- The current production build report is roughly `1201 kB` raw and `326 kB` gzip, with the main JavaScript chunk roughly `1101 kB` raw and `254 kB` gzip.
 - No current service worker, i18n runtime, product analytics runtime, browser APM client, or PWA installation surface in `frontend/src`.
 
 This means the immediate work should not start with Redux, PWA, analytics, Grafana, or a full design-system rewrite. The immediate work should make the existing app safer to change, easier to validate, and more consistent with canonical SocialPredict domain language.
@@ -153,17 +169,19 @@ Primary sources:
 
 Why this is first for code:
 
-The current frontend can be built locally, but the repo does not yet have a dedicated frontend CI signal comparable to the backend workflow. Before making larger UI, auth, accessibility, or performance changes, the branch should have a reliable GitHub check that proves the frontend still installs and builds.
+The current frontend now has a dedicated CI signal comparable to the backend smoke signal. This should remain small and reliable while later slices decide whether to add test, accessibility, or bundle-budget gates.
 
-Recommended first slice:
+Completed first slice:
 
-- Add a frontend PR workflow or extend an existing workflow with a frontend job.
 - Use Node 22 unless the project deliberately chooses another supported runtime.
 - Run `npm ci` from `frontend/`.
-- Run `npm run build` from `frontend/`.
+- Run `npm run build:report` from `frontend/`.
+
+Remaining verification work:
+
 - Do not claim test coverage until test tooling is declared. The current test imports Vitest, but `vitest`, `jsdom`, and a `test` script are not declared in [package.json](../../../frontend/package.json).
-- If tests are added in this slice, add an explicit `vitest --environment jsdom` script and the required dev dependencies.
-- Keep the first workflow intentionally small; do not introduce Playwright, Lighthouse, visual regression, or bundle budgets in the same slice.
+- If tests are added in the next verification slice, add an explicit `vitest --environment jsdom` script and the required dev dependencies.
+- Keep the workflow intentionally small; do not introduce Playwright, Lighthouse, visual regression, or strict bundle budgets without separate thresholds.
 
 Acceptance criteria:
 
@@ -182,19 +200,22 @@ Primary sources:
 
 Why this is second:
 
-The frontend still treats the browser as the auth state source of truth and stores bearer tokens in `localStorage`. A previous CodeQL finding already pushed one smaller fix around `mustChangePassword`; the broader risk remains that security-relevant auth state, transport, headers, backend envelope parsing, and user-facing error display are spread across helper, page, hook, and component call sites.
+The frontend still uses browser storage for bearer-token compatibility, but token access now has a first `authStorage` boundary and request/envelope handling now has a first `httpClient` boundary. The broader risk remains that several market, profile, stats, and trading surfaces still construct transport, headers, backend envelope parsing, and user-facing errors directly.
 
 This is not only a storage issue. It is a frontend boundary issue.
 
-Recommended first slice:
+Completed first slice:
+
+- Define a small API client port/adapter for authenticated requests.
+- Centralize auth header injection for migrated callers.
+- Centralize backend envelope parsing for migrated callers.
+- Preserve login/logout/runtime behavior while introducing the seam.
+
+Remaining cleanup:
 
 - Inventory every frontend token read/write call site.
 - Inventory direct `fetch(API_URL...)` call sites and duplicated `unwrapApiResponse` helpers.
-- Define a small API client port/adapter for authenticated requests.
-- Centralize auth header injection.
-- Centralize backend envelope parsing.
 - Keep React components dependent on use-case functions/hooks, not directly on `API_URL`, `fetch`, or `localStorage`.
-- Preserve current runtime behavior while reducing direct storage and transport coupling.
 - Document that server-managed sessions or memory-only token handling would require backend/session design, not just frontend refactoring.
 - Split implementation PRs if a branch changes more than the seam plus one or two representative call sites.
 
@@ -216,15 +237,18 @@ Primary sources:
 
 Why this is third:
 
-The app has an error boundary, which is a good start, but the fallback renders `error.message` to the user. That is useful during development and risky as a production default. Many components also render or alert raw `err.message` values. API error parsing exists, but user-facing error behavior is not yet a clearly owned contract.
+The app has an error boundary with safe production fallback copy and development-only diagnostics. Many components can still render or alert raw `err.message` values, and API reason mapping is still uneven across non-migrated call sites.
 
 Fowler sequencing note: the tiny global fallback leak can be fixed before broad auth/API migration because it is small, reversible, and low-risk.
 
-Recommended first slice:
+Completed first slice:
 
 - Make the global error fallback user-safe by default.
 - Split diagnostic errors from safe user-facing recovery messages.
-- Keep detailed errors in development-only console output, not production UI.
+- Keep detailed errors in development-only fallback details, not production UI.
+
+Remaining cleanup:
+
 - Map backend envelopes/reasons into user-safe copy without exposing raw runtime details.
 - Standardize API error display around backend response envelopes where practical.
 - Add at least one focused test for the safe fallback or API error formatter once frontend test tooling is available.
@@ -248,16 +272,22 @@ Why this is fourth:
 
 Accessibility improvements should start with the current UI, not with a new component library. The app has forms, navigation, tables, cards, tabs, charts, and domain-critical trading flows; those are enough to define a useful first accessibility baseline.
 
-Recommended first slice:
+Completed first slice:
 
-- Check browse markets, create market, buy exposure, sell exposure, resolve market, view profile/account, and view position flows.
-- Fix obvious label, focus, keyboard, and semantic structure issues.
-- Add lightweight accessibility checks only after the frontend CI baseline exists.
+- Add explicit labels and announcements in create-market and change-password flows.
+- Add accessible names and expanded-state semantics to navigation/menu controls.
+- Add datetime selector `id`/`label` support.
+
+Remaining cleanup:
+
+- Check browse markets, buy exposure, sell exposure, resolve market, view profile/account, admin content editing, and view position flows.
+- Fix remaining obvious label, focus, keyboard, and semantic structure issues.
+- Add lightweight accessibility checks only after frontend test tooling is declared.
 - Avoid broad visual redesign in the first accessibility slice.
 
 Acceptance criteria:
 
-- Core forms have labels and usable focus behavior.
+- Create-market and change-password forms have labels and usable focus behavior.
 - Navigation can be operated with a keyboard in the primary flows.
 - Market/trading workflows are not blocked for keyboard or screen-reader users by obvious structural issues.
 - Any automated accessibility check added to CI is narrow enough to be stable.
@@ -272,12 +302,15 @@ Primary sources:
 
 Why this is fifth:
 
-The frontend uses multiple charting libraries and a Vite build, but there is no visible performance baseline or PR build artifact check. Performance work should start by measuring the existing bundle before introducing code splitting or replacing libraries.
+The frontend uses multiple charting libraries and a Vite build. A first build-size baseline is now visible through `npm run build:report`; performance work should use that evidence before introducing code splitting or replacing libraries.
 
-Recommended first slice:
+Completed first slice:
 
 - Capture current production build output size.
-- Decide whether a simple bundle-size budget belongs in CI.
+- Print the build-size report in frontend CI as non-blocking evidence.
+
+Remaining cleanup:
+
 - Identify obvious duplicate/heavy dependencies, especially charting libraries.
 - Defer route-based code splitting until after the baseline is measured.
 - Keep any budget permissive at first. Do not let a new budget block unrelated work unexpectedly.
@@ -296,10 +329,10 @@ These are not all defects to fix in one PR. They are seams that should guide sma
 | --- | --- | --- |
 | `AuthContent` | Mixes React context, browser persistence, JWT decoding, login HTTP transport, backend envelope parsing, and auth state policy | Split storage, transport, and auth-state policy behind explicit helpers/adapters. |
 | `AppRoutes` | Embeds access-policy decisions directly in route JSX | Keep short-term, then move route guards toward auth/access decision helpers. |
-| Page/component fetches | Many components import `API_URL` and call `fetch` directly | Move authenticated and envelope-aware requests through an API client boundary. |
+| Page/component fetches | Representative flows use `httpClient`, but many market, profile, stats, and trading components still import `API_URL` and call `fetch` directly | Move authenticated and envelope-aware requests through the API client boundary. |
 | Duplicated `unwrapApiResponse` | Central helper exists, but local copies remain | Use one frontend API response helper unless a route has a documented exception. |
 | Route-coupled hooks | Hooks such as market details mix router detail, auth detail, transport, DTO normalization, and view calculation | Extract transport and normalization seams before broad state-library migration. |
-| Raw error display | Global boundary and component alerts can show raw exception/backend text | Split diagnostic details from public recovery messages. |
+| Raw error display | Global boundary is safe, but component alerts can still show raw exception/backend text | Split diagnostic details from public recovery messages. |
 
 ## Deferred Until Baselines Are Stable
 
@@ -308,23 +341,33 @@ These ideas may be valuable, but they should not be first moves:
 | Deferred area | Source documents | Reason to defer |
 | --- | --- | --- |
 | Full Redux or global state rewrite | [FUTURE/01-long-term-state-platform.md](./FUTURE/01-long-term-state-platform.md) | Auth/API boundaries can be cleaned up first without a large state migration. |
-| Playwright E2E suite | [FUTURE/03-long-term-test-infrastructure.md](./FUTURE/03-long-term-test-infrastructure.md) | Needs basic frontend CI and stable selectors first. |
+| Playwright E2E suite | [FUTURE/03-long-term-test-infrastructure.md](./FUTURE/03-long-term-test-infrastructure.md) | Needs declared unit/component test tooling and stable selectors first. |
 | Full CSP/security-header program | [FUTURE/04-long-term-security-platform.md](./FUTURE/04-long-term-security-platform.md) | CSP is partly deployment/proxy owned and should be coordinated with backend/infra. |
 | i18n and RTL support | [FUTURE/06-long-term-i18n-localization.md](./FUTURE/06-long-term-i18n-localization.md) | Useful product work, but not a current production-risk blocker without localization requirements. |
 | PWA/offline/push | [FUTURE/07-long-term-pwa-offline-platform.md](./FUTURE/07-long-term-pwa-offline-platform.md) | Adds caching and state complexity before test/CI/auth seams are stable. |
 | Product analytics and A/B testing | [FUTURE/08-long-term-analytics-experimentation.md](./FUTURE/08-long-term-analytics-experimentation.md) | Needs a privacy/product decision and stable event taxonomy. |
-| Browser APM dashboards and log shipping | [FUTURE/09-long-term-browser-observability.md](./FUTURE/09-long-term-browser-observability.md) | Should follow backend signal and frontend error-boundary cleanup. |
+| Browser APM dashboards and log shipping | [FUTURE/09-long-term-browser-observability.md](./FUTURE/09-long-term-browser-observability.md) | Safe fallback exists; telemetry vocabulary, privacy, sampling, and ownership still need design. |
 | Automated backup/recovery from frontend docs | [FUTURE/10-long-term-maintenance-automation.md](./FUTURE/10-long-term-maintenance-automation.md) | Mostly backend/infra/data-ops owned, not a frontend baseline concern. |
 
-## Suggested First Five PRs
+## Completed Baseline PR Stack
 
-A practical sequence would be:
+The first frontend baseline stack has now been executed as small stacked PRs:
 
 1. Document frontend published-language and API-contract alignment.
 2. Add frontend CI build check with Node 22, `npm ci`, and `npm run build`.
 3. Sanitize the global error-boundary fallback and define safe public failure copy.
 4. Add auth/API boundary discovery plus a small API client/auth-header seam.
-5. Migrate token/API call sites incrementally, starting with one or two representative flows, then run an accessibility pass on core workflows.
+5. Migrate representative token/API call sites, add build-size reporting, and run an accessibility pass on current core workflows.
+
+## Next Follow-Up Queue
+
+The next frontend work should stay incremental:
+
+1. Finish inventorying direct `API_URL`, `fetch`, `localStorage`, and local `unwrapApiResponse` call sites.
+2. Migrate the highest-risk remaining authenticated calls: profile editing, admin user creation, buy/sell, and resolve.
+3. Add declared frontend test tooling before requiring `npm test` in CI.
+4. Decide whether the build-size report should become an artifact or remain log-only.
+5. Continue accessibility review on buy, sell, resolve, profile/account, and market-detail workflows.
 
 If frontend tests are added before or during this sequence, make that an explicit tooling slice: add `vitest`, `jsdom`, and a reproducible `npm test` script before requiring test execution in CI.
 
@@ -334,6 +377,6 @@ Stop and re-triage if any of these are discovered:
 
 - The frontend cannot build reproducibly on a clean install.
 - The current auth model cannot be made safer without backend session changes.
-- A proposed dependency introduces significant bundle growth before a performance baseline exists.
+- A proposed dependency introduces significant bundle growth without checking the build-size baseline.
 - Accessibility fixes require a design-system decision rather than local component cleanup.
 - Deployment behavior differs materially between local, staging, and production frontend builds.

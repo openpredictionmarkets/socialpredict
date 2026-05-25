@@ -7,13 +7,8 @@ import { RegularInput } from '../../components/inputs/InputBar';
 import RegularInputBox from '../../components/inputs/InputBox';
 import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
-import { API_URL } from '../../config';
 import { USER_CREDIT_REFRESH_EVENT } from '../../components/utils/userFinanceTools/FetchUserCredit';
-import {
-  getApiErrorMessage,
-  parseApiResponseText,
-  unwrapApiResponse,
-} from '../../utils/apiResponse';
+import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
 
 function Create() {
   const [questionTitle, setQuestionTitle] = useState('');
@@ -42,11 +37,7 @@ function Create() {
 
     const loadSetup = async () => {
       try {
-        const response = await fetch(`${API_URL}/v0/setup`);
-        if (!response.ok) {
-          return;
-        }
-        const setup = await response.json();
+        const setup = await apiRequest('/v0/setup');
         const cost = setup?.marketincentives?.createMarketCost;
         if (!ignore && cost !== undefined && cost !== null) {
           setMarketCreationCost(cost);
@@ -94,12 +85,6 @@ function Create() {
       }
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Authentication token not found. Please log in again.');
-      return;
-    }
-
     try {
       const marketData = {
         questionTitle,
@@ -114,43 +99,29 @@ function Create() {
         noLabel: trimmedNoLabel || 'NO',
       };
 
-      const response = await fetch(`${API_URL}/v0/markets`, {
+      const responseData = await authenticatedApiRequest('/v0/markets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(marketData),
+        reasonMessages: createMarketReasonMessages,
+        fallbackMessage: 'Market creation failed. Please try again.',
       });
 
-      const responseText = await response.text();
-      const responsePayload = parseApiResponseText(responseText);
-
-      if (response.ok) {
-        const responseData = unwrapApiResponse(responsePayload);
-        window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
-        if (String(responseData.status || '').toLowerCase() === 'proposed') {
-          setCreatedMarket(responseData);
-          history.push('/profile?tab=Proposed%20Markets', {
-            proposedMarket: responseData,
-            marketCreationCost,
-          });
-          return;
-        }
-        history.push(`/markets/${responseData.id}`);
-      } else {
-        const errorMessage = getApiErrorMessage(
-          response,
-          responsePayload,
-          `Market creation failed with status ${response.status}.`,
-          createMarketReasonMessages,
-        );
-        console.error('Market creation failed:', responsePayload);
-        setError(errorMessage);
+      window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
+      if (String(responseData.status || '').toLowerCase() === 'proposed') {
+        setCreatedMarket(responseData);
+        history.push('/profile?tab=Proposed%20Markets', {
+          proposedMarket: responseData,
+          marketCreationCost,
+        });
+        return;
       }
+      history.push(`/markets/${responseData.id}`);
     } catch (error) {
       console.error('Error during market creation:', error);
-      setError(`Error during market creation: ${error.message}`);
+      setError(error.message || 'Market creation failed. Please try again.');
     }
   };
 
@@ -174,10 +145,11 @@ function Create() {
 
       <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
         <div>
-          <label className='block text-sm font-medium text-gray-300 mb-1'>
+          <label htmlFor='market-question-title' className='block text-sm font-medium text-gray-300 mb-1'>
             Question Title
           </label>
           <EmojiPickerInput
+            id='market-question-title'
             type='text'
             value={questionTitle}
             onChange={(e) => setQuestionTitle(e.target.value)}
@@ -187,10 +159,11 @@ function Create() {
         </div>
 
         <div>
-          <label className='block text-sm font-medium text-gray-300 mb-1'>
+          <label htmlFor='market-description' className='block text-sm font-medium text-gray-300 mb-1'>
             Description
           </label>
           <EmojiPickerInput
+            id='market-description'
             type='textarea'
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -201,42 +174,46 @@ function Create() {
 
         <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
           <div>
-            <label className='block text-sm font-medium text-gray-300 mb-1'>
+            <label htmlFor='market-yes-label' className='block text-sm font-medium text-gray-300 mb-1'>
               Yes Label (Optional)
             </label>
             <EmojiPickerInput
+              id='market-yes-label'
               type='text'
               value={yesLabel}
               onChange={(e) => setYesLabel(e.target.value)}
               placeholder='e.g., BULL 🚀, WIN, PASS'
               maxLength={20}
+              aria-describedby='market-yes-label-hint'
               className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
             />
-            <p className='text-xs text-gray-400 mt-1'>
+            <p id='market-yes-label-hint' className='text-xs text-gray-400 mt-1'>
               Custom label for positive outcome (defaults to "YES")
             </p>
           </div>
           
           <div>
-            <label className='block text-sm font-medium text-gray-300 mb-1'>
+            <label htmlFor='market-no-label' className='block text-sm font-medium text-gray-300 mb-1'>
               No Label (Optional)
             </label>
             <EmojiPickerInput
+              id='market-no-label'
               type='text'
               value={noLabel}
               onChange={(e) => setNoLabel(e.target.value)}
               placeholder='e.g., BEAR 📉, LOSE, FAIL'
               maxLength={20}
+              aria-describedby='market-no-label-hint'
               className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
             />
-            <p className='text-xs text-gray-400 mt-1'>
+            <p id='market-no-label-hint' className='text-xs text-gray-400 mt-1'>
               Custom label for negative outcome (defaults to "NO")
             </p>
           </div>
         </div>
 
         {(yesLabel.trim() || noLabel.trim()) && (
-          <div className='bg-gray-700 p-3 rounded-md'>
+          <div className='bg-gray-700 p-3 rounded-md' aria-label='Outcome label preview'>
             <p className='text-sm font-medium text-gray-300 mb-2'>Preview:</p>
             <div className='flex space-x-2'>
               <span className='px-3 py-1 bg-green-600 text-white text-sm rounded'>
@@ -251,10 +228,9 @@ function Create() {
         )}
 
         <div>
-          <label className='block text-sm font-medium text-gray-300 mb-1'>
-            Resolution Date Time
-          </label>
           <DatetimeSelector
+            id='market-resolution-date-time'
+            label='Resolution Date Time'
             value={resolutionDateTime}
             onChange={(e) => setResolutionDateTime(e.target.value)}
             className='w-full'
@@ -262,7 +238,7 @@ function Create() {
         </div>
 
         {error && (
-          <div className='bg-red-600 text-white p-3 rounded-md text-sm'>
+          <div className='bg-red-600 text-white p-3 rounded-md text-sm' role='alert'>
             {error}
           </div>
         )}

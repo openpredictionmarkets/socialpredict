@@ -4,9 +4,9 @@ document_type: production-notes
 domain: frontend
 future: true
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Move program-level accessibility work behind the active core-workflow accessibility baseline."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Keep program-level accessibility deferred after the first form/navigation pass until broader workflow findings are known."
 status: future
 ---
 
@@ -14,7 +14,7 @@ status: future
 
 ## Purpose
 
-This note holds accessibility-program work that should follow fixes to current core workflows.
+This note holds accessibility-program work that should follow the broader current-workflow accessibility audit.
 
 The active accessibility note is [../05-accessibility.md](../05-accessibility.md).
 
@@ -29,14 +29,14 @@ The active accessibility note is [../05-accessibility.md](../05-accessibility.md
 
 ## Why Deferred
 
-The first accessibility pass should make existing core market/account/auth workflows usable. A program-level rollout needs stable components, CI, and the visual-system baseline.
+The first accessibility pass improved create-market, change-password, navigation controls, and status/error announcements. A program-level rollout needs the remaining market, trade, resolve, profile/account, and admin workflows to be audited first.
 
 ## Entry Criteria
 
 Reconsider this when:
 
-- Frontend CI exists.
-- Core workflow accessibility issues have been fixed or documented.
+- Frontend CI and declared frontend test tooling are stable enough to host accessibility checks.
+- Core workflow accessibility issues have been fixed or documented beyond the first form/navigation pass.
 - Shared component contracts exist for common controls.
 - Automated checks can be scoped narrowly enough to avoid noisy failures.
 

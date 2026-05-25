@@ -1,35 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import {API_URL} from "../../config";
-
-const unwrapApiResponse = (payload) => {
-  if (payload && typeof payload === 'object' && 'ok' in payload) {
-    if (payload.ok === false) {
-      throw new Error(payload.reason || 'Request failed');
-    }
-
-    if (payload.ok === true && 'result' in payload) {
-      return payload.result;
-    }
-  }
-
-  return payload;
-};
+import { apiRequest } from '../../api/httpClient';
 
 function Home() {
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/v0/content/home`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Failed to load homepage content: ${response.status}`);
-        }
-
-        return response.json();
-      })
-      .then(data => {
-        const homeContent = unwrapApiResponse(data);
+    apiRequest('/v0/content/home', {
+      fallbackMessage: 'Failed to load homepage content.',
+    })
+      .then(homeContent => {
         setContent({
           title: homeContent.title,
           html: homeContent.html,

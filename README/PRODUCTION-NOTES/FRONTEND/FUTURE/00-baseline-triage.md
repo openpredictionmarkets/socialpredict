@@ -4,9 +4,9 @@ document_type: production-notes
 domain: frontend
 future: true
 author: Patrick Delaney
-updated_at: 2026-05-23T00:00:00Z
-updated_at_display: "Saturday, May 23, 2026"
-update_reason: "Separate deferred frontend platform programs from the active W08/W09 baseline sequence."
+updated_at: 2026-05-24T00:00:00Z
+updated_at_display: "Sunday, May 24, 2026"
+update_reason: "Refresh future re-entry criteria after the first frontend CI, API/auth, failure, accessibility, and build-size baseline stack."
 status: draft
 ---
 
@@ -16,7 +16,7 @@ status: draft
 
 This note indexes frontend work that is intentionally not first.
 
-The active frontend sequence lives one directory up in [../00-TRIAGE.md](../00-TRIAGE.md). That triage keeps the immediate queue focused on frontend published language, CI/build feedback, API/auth boundaries, safe failure presentation, accessibility on current workflows, and a measured performance baseline.
+The active frontend sequence lives one directory up in [../00-TRIAGE.md](../00-TRIAGE.md). The first baseline now exists for frontend CI/build feedback, API/auth boundaries, safe failure presentation, accessibility on current workflows, and measured build-size evidence. The immediate queue should now focus on finishing incremental migrations and adding declared test tooling before promoting larger platform programs.
 
 ## Current Active Workstreams
 
@@ -34,16 +34,16 @@ The design plan also records guardrails in:
 
 | Note | Topic | Why future |
 | --- | --- | --- |
-| [01-long-term-state-platform.md](./01-long-term-state-platform.md) | Redux, RTK Query, global store, offline sync | API/auth seams should come first. |
-| [02-long-term-performance-platform.md](./02-long-term-performance-platform.md) | Code splitting, Web Vitals, strict budgets, caching platform | Needs current build/bundle evidence first. |
-| [03-long-term-test-infrastructure.md](./03-long-term-test-infrastructure.md) | Playwright, coverage, visual regression, full accessibility automation | Needs reliable frontend CI and declared test tooling first. |
+| [01-long-term-state-platform.md](./01-long-term-state-platform.md) | Redux, RTK Query, global store, offline sync | First API/auth seam exists, but remaining call-site migration should come first. |
+| [02-long-term-performance-platform.md](./02-long-term-performance-platform.md) | Code splitting, Web Vitals, strict budgets, caching platform | Build-size evidence exists; strict budgets still need product thresholds. |
+| [03-long-term-test-infrastructure.md](./03-long-term-test-infrastructure.md) | Playwright, coverage, visual regression, full accessibility automation | Frontend CI exists, but declared unit/component test tooling should come first. |
 | [04-long-term-security-platform.md](./04-long-term-security-platform.md) | CSP, server-managed sessions, MFA, security monitoring | Requires backend/infra/API coordination. |
-| [05-long-term-accessibility-program.md](./05-long-term-accessibility-program.md) | Full WCAG program and assistive-tech matrix | First pass should fix current core workflows. |
+| [05-long-term-accessibility-program.md](./05-long-term-accessibility-program.md) | Full WCAG program and assistive-tech matrix | First pass has started; broader market/trade/profile workflow audit should come next. |
 | [06-long-term-i18n-localization.md](./06-long-term-i18n-localization.md) | i18n, locale formatting, RTL | Needs product/localization requirements and canonical-language decisions. |
 | [07-long-term-pwa-offline-platform.md](./07-long-term-pwa-offline-platform.md) | Service workers, offline, push, installability | Needs freshness and stale/read-only semantics. |
 | [08-long-term-analytics-experimentation.md](./08-long-term-analytics-experimentation.md) | Product analytics, funnels, A/B tests | Needs event taxonomy and privacy posture. |
-| [09-long-term-browser-observability.md](./09-long-term-browser-observability.md) | Browser APM, replay, dashboards, log shipping | Should follow safe failure presentation and telemetry vocabulary. |
-| [10-long-term-maintenance-automation.md](./10-long-term-maintenance-automation.md) | Dependency automation, regression platform, frontend recovery | Baseline should be package-manager and CI evidence first. |
+| [09-long-term-browser-observability.md](./09-long-term-browser-observability.md) | Browser APM, replay, dashboards, log shipping | Safe fallback exists; telemetry vocabulary and privacy posture still need design. |
+| [10-long-term-maintenance-automation.md](./10-long-term-maintenance-automation.md) | Dependency automation, regression platform, frontend recovery | CI/build-size evidence exists; custom automation needs repeated maintenance pain first. |
 
 ## Decision Framework
 
