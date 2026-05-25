@@ -102,7 +102,7 @@ func run() error {
 	fmt.Printf("Password: %s\n", password)
 	fmt.Printf("Admin: admin\n")
 	fmt.Printf("Users: %s01 through %s%02d\n", prefix, prefix, count)
-	fmt.Printf("MustChangePassword: true\n")
+	fmt.Printf("MustChangePassword: false\n")
 	return nil
 }
 
@@ -124,7 +124,7 @@ func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initi
 		ModeratorGovernance: models.ModeratorGovernance{
 			ModeratorStatus: "none",
 		},
-		MustChangePassword: true,
+		MustChangePassword: false,
 	}
 	if err := user.HashPassword(password); err != nil {
 		return fmt.Errorf("hash password for %s: %w", seed.username, err)
@@ -153,7 +153,7 @@ func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initi
 		"email":                   seed.email,
 		"api_key":                 seed.apiKey,
 		"password":                user.Password,
-		"must_change_password":    true,
+		"must_change_password":    false,
 		"moderator_status":        "none",
 	}
 	if err := db.Model(&models.User{}).Where("username = ?", seed.username).Updates(updates).Error; err != nil {

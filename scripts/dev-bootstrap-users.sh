@@ -23,7 +23,7 @@ Defaults:
   password: password
   user count: 10
   username prefix: testuser
-  must_change_password: true
+  must_change_password: false
 
 Options:
   --password VALUE   Password for every bootstrapped user
