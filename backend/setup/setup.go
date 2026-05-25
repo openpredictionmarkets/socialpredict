@@ -127,7 +127,7 @@ func normalizeEconomicConfig(cfg *EconomicConfig) *EconomicConfig {
 		cfg = &EconomicConfig{}
 	}
 	if cfg.Game.Mode == "" {
-		cfg.Game.Mode = "open"
+		cfg.Game.Mode = "moderator"
 	}
 	if cfg.Game.Moderation == (Moderation{}) {
 		cfg.Game.Moderation = Moderation{

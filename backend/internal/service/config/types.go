@@ -201,7 +201,7 @@ func Normalize(cfg *AppConfig) *AppConfig {
 // NormalizeGame applies safe defaults to game-mode policy.
 func NormalizeGame(game Game) Game {
 	if game.Mode == "" {
-		game.Mode = GameModeOpen
+		game.Mode = GameModeModerator
 	}
 
 	// These defaults are the intended moderator-mode posture if an operator

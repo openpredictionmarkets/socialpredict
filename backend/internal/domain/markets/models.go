@@ -20,6 +20,12 @@ type Market struct {
 	YesLabel                string
 	NoLabel                 string
 	Status                  string
+	LifecycleStatus         string
+	ApprovedBy              string
+	ApprovedAt              *time.Time
+	RejectedBy              string
+	RejectedAt              *time.Time
+	RejectionReason         string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 	InitialProbability      float64
@@ -39,7 +45,15 @@ func (m *Market) IsResolved() bool {
 	if m == nil {
 		return false
 	}
-	return strings.EqualFold(strings.TrimSpace(m.Status), "resolved")
+	return strings.EqualFold(strings.TrimSpace(m.Status), MarketStatusResolved)
+}
+
+// IsTradableAt reports whether normal buy/sell paths may interact with the market.
+func (m *Market) IsTradableAt(now time.Time) bool {
+	if m == nil {
+		return false
+	}
+	return PublicStatusFromLifecycle(m.LifecycleStatus, m.IsResolved(), m.ResolutionDateTime, now) == MarketStatusActive
 }
 
 // MarketCreateRequest represents the request to create a new market
@@ -154,6 +168,8 @@ type PublicMarket struct {
 	CreatedAt               time.Time
 	YesLabel                string
 	NoLabel                 string
+	Status                  string
+	LifecycleStatus         string
 }
 
 // Resolved reports whether the public market already has a terminal resolution.
@@ -185,6 +201,8 @@ func copyPublicMarket(target *PublicMarket, market *Market) *PublicMarket {
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
+		Status:                  market.Status,
+		LifecycleStatus:         market.LifecycleStatus,
 	}
 
 	return target
