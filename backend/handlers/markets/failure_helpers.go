@@ -37,6 +37,8 @@ func writeCreateError(w http.ResponseWriter, err error) {
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 	case errors.Is(err, dmarkets.ErrInsufficientBalance):
 		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
+	case errors.Is(err, dmarkets.ErrUnauthorized):
+		_ = handlers.WriteFailure(w, http.StatusForbidden, handlers.ReasonUserNotApproved)
 	case isValidationError(err):
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:

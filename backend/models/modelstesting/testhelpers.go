@@ -53,6 +53,7 @@ func GenerateMarket(id int64, creatorUsername string) models.Market {
 		OutcomeType:        "BINARY",
 		ResolutionDateTime: time.Now().Add(24 * time.Hour),
 		InitialProbability: 0.5,
+		LifecycleStatus:    "published",
 		CreatorUsername:    creatorUsername,
 	}
 }

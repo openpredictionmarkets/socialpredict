@@ -37,8 +37,8 @@ func TestNewServiceLoadsCurrentConfig(t *testing.T) {
 	if got := svc.ChartSigFigs(); got != 7 {
 		t.Fatalf("ChartSigFigs returned %d, want 7", got)
 	}
-	if got := svc.Game().Mode; got != GameModeOpen {
-		t.Fatalf("Game mode = %q, want %q", got, GameModeOpen)
+	if got := svc.Game().Mode; got != GameModeModerator {
+		t.Fatalf("Game mode = %q, want %q", got, GameModeModerator)
 	}
 }
 
@@ -102,12 +102,12 @@ func TestFrontendReturnsDetachedValue(t *testing.T) {
 	}
 }
 
-func TestGameReturnsDefaultOpenMode(t *testing.T) {
+func TestGameReturnsDefaultModeratorMode(t *testing.T) {
 	svc := NewStaticService(&AppConfig{})
 
 	game := svc.Game()
-	if game.Mode != GameModeOpen {
-		t.Fatalf("Game mode = %q, want %q", game.Mode, GameModeOpen)
+	if game.Mode != GameModeModerator {
+		t.Fatalf("Game mode = %q, want %q", game.Mode, GameModeModerator)
 	}
 	if !game.Moderation.MarketApprovalRequired {
 		t.Fatalf("expected default moderator markets to require approval")
