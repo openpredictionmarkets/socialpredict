@@ -165,7 +165,7 @@ Contract rules:
 Accounting rules:
 
 - Moderator self-trade restrictions must be enforced on buy and sell paths, not only UI controls.
-- Rejected moderator proposals refund the market proposal creation cost to the creator.
+- Rejected moderator proposals refund the market proposal creation cost recorded on that market to the creator.
 - Admin cancellation refunds net unrecovered exposure, not simply gross buys.
 - Cancellation state update and refund ledger entries must commit atomically.
 - Cancellation math that depends on buy/sell history requires Postgres-backed tests.

@@ -1,9 +1,4 @@
-import { API_URL } from '../config';
-import {
-  getApiErrorMessage,
-  parseApiResponseText,
-  unwrapApiResponse,
-} from '../utils/apiResponse';
+import { authenticatedApiRequest } from './httpClient';
 
 const marketReviewReasonMessages = {
   AUTHORIZATION_DENIED: 'Only admins can review proposed markets.',
@@ -22,28 +17,16 @@ const reviewMarket = async ({ marketId, token, action, body }) => {
     throw new Error('Admin authentication token is missing. Please log in again.');
   }
 
-  const response = await fetch(`${API_URL}/v0/admin/markets/${normalizedMarketId}/${action}`, {
+  return authenticatedApiRequest(`/v0/admin/markets/${normalizedMarketId}/${action}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),
+    authToken: token,
+    reasonMessages: marketReviewReasonMessages,
+    fallbackMessage: 'Market review failed. Please try again.',
   });
-
-  const text = await response.text();
-  const payload = parseApiResponseText(text);
-
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(
-      response,
-      payload,
-      `Market review failed with status ${response.status}.`,
-      marketReviewReasonMessages,
-    ));
-  }
-
-  return unwrapApiResponse(payload);
 };
 
 export const approveProposedMarket = ({ marketId, token }) => reviewMarket({

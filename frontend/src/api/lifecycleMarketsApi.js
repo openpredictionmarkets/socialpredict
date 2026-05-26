@@ -1,9 +1,4 @@
-import { API_URL } from '../config';
-import {
-  getApiErrorMessage,
-  parseApiResponseText,
-  unwrapApiResponse,
-} from '../utils/apiResponse';
+import { authenticatedApiRequest } from './httpClient';
 
 const lifecycleReasonMessages = {
   AUTHORIZATION_DENIED: 'You are not allowed to view this market queue.',
@@ -16,26 +11,14 @@ const lifecycleRequest = async ({ path, token }) => {
     throw new Error('Authentication token is missing. Please log in again.');
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  return authenticatedApiRequest(path, {
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
+    authToken: token,
+    reasonMessages: lifecycleReasonMessages,
+    fallbackMessage: 'Market queue request failed. Please try again.',
   });
-
-  const text = await response.text();
-  const payload = parseApiResponseText(text);
-
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(
-      response,
-      payload,
-      `Market queue request failed with status ${response.status}.`,
-      lifecycleReasonMessages,
-    ));
-  }
-
-  return unwrapApiResponse(payload);
 };
 
 const buildLifecycleQuery = ({ status, limit = 50, offset = 0 }) => {

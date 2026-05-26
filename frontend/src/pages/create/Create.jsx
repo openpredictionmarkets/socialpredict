@@ -111,10 +111,11 @@ function Create() {
 
       window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
       if (String(responseData.status || '').toLowerCase() === 'proposed') {
+        const proposalCost = responseData.proposalCost ?? marketCreationCost;
         setCreatedMarket(responseData);
         history.push('/profile?tab=Proposed%20Markets', {
           proposedMarket: responseData,
-          marketCreationCost,
+          marketCreationCost: proposalCost,
         });
         return;
       }

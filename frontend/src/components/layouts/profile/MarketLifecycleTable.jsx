@@ -57,6 +57,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
               </td>
               <td className="px-4 py-4 text-gray-300">{formatDate(market.createdAt)}</td>
               <td className="px-4 py-4 text-xs text-gray-300">
+                {market.proposalCost > 0 && <div>Proposal cost: {market.proposalCost} credits</div>}
                 {market.approvedBy && <div>Approved by {market.approvedBy} at {formatDate(market.approvedAt)}</div>}
                 {market.rejectedBy && <div>Rejected by {market.rejectedBy} at {formatDate(market.rejectedAt)}</div>}
                 {market.rejectionReason && <div className="mt-1 text-rose-200">Reason: {market.rejectionReason}</div>}

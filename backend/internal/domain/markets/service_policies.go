@@ -85,6 +85,7 @@ func (p defaultCreationPolicy) BuildMarketEntity(now time.Time, req MarketCreate
 		NoLabel:            labels.no,
 		Status:             MarketStatusActive,
 		LifecycleStatus:    MarketLifecyclePublished,
+		ProposalCost:       p.config.CreateMarketCost,
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}

@@ -21,6 +21,7 @@ type MarketResponse struct {
 	RejectedBy         string     `json:"rejectedBy,omitempty"`
 	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
 	RejectionReason    string     `json:"rejectionReason,omitempty"`
+	ProposalCost       int64      `json:"proposalCost,omitempty"`
 	IsResolved         bool       `json:"isResolved"`
 	ResolutionResult   string     `json:"resolutionResult"`
 	CreatedAt          time.Time  `json:"createdAt"`
@@ -38,6 +39,8 @@ type CreateMarketResponse struct {
 	YesLabel           string    `json:"yesLabel"`
 	NoLabel            string    `json:"noLabel"`
 	Status             string    `json:"status"`
+	LifecycleStatus    string    `json:"lifecycleStatus,omitempty"`
+	ProposalCost       int64     `json:"proposalCost,omitempty"`
 	CreatedAt          time.Time `json:"createdAt"`
 }
 
