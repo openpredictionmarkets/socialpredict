@@ -29,13 +29,15 @@ Agents implementing this feature should mark checklist items as they complete th
 - Keep GitHub workflows focused on dispatch, scheduling, and external verification.
 - Do not make GitHub workflows depend on local `HostOps` or laptop key paths.
 - Add public readiness checks after both deploy and reset.
+- Use an explicit demo guard before any destructive reset behavior.
+- Start with app-owned truncate-and-reseed reset mechanics; defer volume recreation or snapshot restore until there is evidence they are needed.
 - Avoid Terraform until the first manual DigitalOcean demo droplet proves the workflow shape.
 
 ## Repository Ownership
 
 SocialPredict repository:
 
-- App-level `./SocialPredict demo-reset` or equivalent command.
+- App-level `./SocialPredict demo-reset` or equivalent command guarded by demo-only configuration.
 - Local tests for reset/fixture behavior.
 - GitHub workflow that dispatches demo deploy/reset in the Ansible repository.
 - Documentation and public readiness expectations.
@@ -104,6 +106,7 @@ Checklist:
 - [ ] Create or designate a separate DigitalOcean droplet.
 - [ ] Confirm demo host does not share staging or production DB volumes.
 - [ ] Confirm demo host does not contain production secrets.
+- [ ] Configure remote app environment as demo, for example `APP_ENV=demo`.
 - [ ] Configure DNS to point at demo host.
 - [ ] Apply firewall/SSH policy consistent with staging/production hardening.
 - [ ] Record demo host conventions in infra docs.
@@ -127,11 +130,14 @@ Service ownership: SocialPredict app runtime and repository/data boundaries.
 Checklist:
 
 - [ ] Add `./SocialPredict demo-reset` or equivalent.
-- [ ] Require explicit demo environment guard before destructive behavior.
-- [ ] Run migrations or verify migrations are already applied.
-- [ ] Wipe mutable demo data or restore a clean seed snapshot.
+- [ ] Require explicit demo environment guard before destructive behavior, for example `APP_ENV=demo`.
+- [ ] Require a demo-only reset confirmation value from the remote workflow.
+- [ ] Run migrations or verify migrations are already applied through runtime/bootstrap orchestration.
+- [ ] Truncate app-owned mutable demo data.
+- [ ] Defer Docker volume recreation or snapshot restore unless truncate-and-reseed is insufficient.
 - [ ] Seed admin user with password `Password1`.
 - [ ] Set admin `must_change_password=false`.
+- [ ] Limit the demo admin to isolated demo-only effects; do not wire production secrets or privileged external integrations into demo.
 - [ ] Seed optional demo users and markets if needed.
 - [ ] Avoid printing secrets or password hashes.
 
@@ -155,8 +161,11 @@ Checklist:
 - [ ] Test deterministic admin username.
 - [ ] Test password hash validates `Password1`.
 - [ ] Test `must_change_password=false`.
+- [ ] Test demo guard refuses reset outside demo configuration.
+- [ ] Test reset confirmation is required.
 - [ ] Test reset clears user-created mutable demo data.
 - [ ] Test reset is idempotent.
+- [ ] Test seeded admin can exercise intended demo-only admin/moderation flows.
 
 Exit criteria:
 
@@ -176,7 +185,8 @@ Checklist:
 - [ ] Add demo environment variables/secrets.
 - [ ] Add demo inventory or target mapping.
 - [ ] Add demo deploy playbook/workflow.
-- [ ] Deploy newest approved app version to demo.
+- [ ] Deploy a workflow-selected image or release artifact built from a specific `main` commit.
+- [ ] Log selected commit SHA or image tag.
 - [ ] Preserve demo DB volume during deploy.
 - [ ] Run app migrations.
 - [ ] Restart only necessary app containers where practical.
@@ -198,6 +208,8 @@ Service ownership: `openpredictionmarkets/ansible_playbooks`.
 Checklist:
 
 - [ ] Add reset workflow/playbook that targets only demo.
+- [ ] Ensure target environment is fixed by workflow identity, not by a free-form environment input.
+- [ ] Pass demo-only reset confirmation to the app command.
 - [ ] Invoke the app-owned reset command remotely.
 - [ ] Log target host/domain clearly.
 - [ ] Avoid embedding SQL table knowledge in Ansible.
@@ -223,6 +235,7 @@ Checklist:
 - [ ] Add manual `workflow_dispatch` workflow for demo deploy.
 - [ ] Use the existing Ansible dispatch-token pattern.
 - [ ] Dispatch the Ansible demo deploy workflow.
+- [ ] Pass only the selected app version and fixed demo workflow target.
 - [ ] Wait for Ansible completion.
 - [ ] Run external readiness verification.
 
@@ -242,9 +255,10 @@ Service ownership: SocialPredict GitHub workflows.
 Checklist:
 
 - [ ] Add scheduled workflow for daily reset.
-- [ ] Decide UTC or project-local reset time.
+- [ ] Use UTC midnight unless the project explicitly chooses another timezone.
 - [ ] Allow manual reset trigger for maintainers.
 - [ ] Dispatch the Ansible demo reset workflow.
+- [ ] Pass the demo-only reset confirmation and no arbitrary target environment.
 - [ ] Wait for Ansible completion.
 - [ ] Run external readiness verification.
 
@@ -269,6 +283,7 @@ Checklist:
 - [ ] Check `/health` for live server response.
 - [ ] Check `/readyz` for app readiness.
 - [ ] Optionally check a public backend data endpoint after reset.
+- [ ] Confirm `admin` / `Password1` login works after reset without logging the password hash.
 - [ ] Use bounded retry intervals to avoid hammering the service.
 
 Exit criteria:
@@ -290,6 +305,9 @@ Checklist:
 - [ ] Document demo purpose and daily reset policy.
 - [ ] Document demo GitHub secrets in Ansible repo.
 - [ ] Document SocialPredict dispatch-token requirement if reused.
+- [ ] Document the demo guard and reset confirmation values.
+- [ ] Document that demo deploy uses a selected `main` commit image/release artifact.
+- [ ] Document that the first reset implementation truncates and reseeds app-owned mutable data.
 - [ ] Document how to disable scheduled reset.
 - [ ] Document how to rotate demo admin fixture password if needed.
 - [ ] Document how to destroy/rebuild demo host.

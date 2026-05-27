@@ -86,6 +86,7 @@ This design does not initially introduce:
 | Reset | Destructive demo-only operation that wipes or restores demo data and reseeds fixtures. | Deploy or rollback. |
 | Fixture | Deterministic user, market, or configuration data created by app-owned seed/reset logic. | Real user data. |
 | Demo admin | Public fixture admin account with known password in the isolated demo only. | Production admin. |
+| Demo guard | App/runtime confirmation that destructive reset is running only in demo. | Human memory or branch name. |
 | External readiness verification | GitHub-hosted check that reaches the public demo URL after deploy/reset. | Internal Ansible task success. |
 
 ## Bounded Context Alignment
@@ -119,10 +120,13 @@ Environment isolation rules:
 - Demo must use separate database volumes and secrets.
 - Demo reset workflows must not accept staging or production as implicit targets.
 - Demo should have explicit host/domain naming in workflow logs.
+- Destructive reset must require an app-visible demo guard such as `APP_ENV=demo` plus a demo-only confirmation value from the remote workflow.
 
 Deploy rules:
 
-- Manual demo deploy upgrades application code/images and runs migrations.
+- Manual demo deploy upgrades to a workflow-selected image or release artifact built from a specific `main` commit.
+- The selected commit SHA or image tag should be visible in workflow logs.
+- Manual demo deploy runs migrations.
 - Demo deploy should preserve the demo database unless the operator chose reset.
 - Deploy success is not enough; public readiness must pass externally.
 
@@ -131,15 +135,50 @@ Reset rules:
 - Demo reset is destructive by design.
 - Reset should be owned by an app command such as `./SocialPredict demo-reset`.
 - Reset should create deterministic fixtures, including the public demo admin.
-- Reset should run after migrations or restore a snapshot that is compatible with the current app version.
+- Reset should run or verify migrations first, then truncate app-owned mutable demo data and reseed fixtures.
+- The first reset implementation should not drop Docker volumes or restore external snapshots unless truncate-and-reseed proves insufficient.
 - Reset should be schedulable and manually triggerable.
 
 Fixture rules:
 
 - Demo admin password may be `Password1` only in the demo environment.
 - Demo admin must have `must_change_password=false`.
+- Demo admin may exercise demo-only admin and moderation flows, but must not have access to any production secrets, durable production data, or privileged external integrations.
 - Fixture creation should use the same password hashing and domain rules as normal app user creation where practical.
 - Fixture logic must not be implemented as duplicated SQL in Ansible.
+
+## Reset Use-Case Boundary
+
+The app-owned reset command should be a small use case with explicit ports instead of ad hoc shell or Ansible SQL.
+
+Suggested boundary:
+
+```text
+DemoResetUseCase
+  - verify demo guard
+  - verify or run migrations through runtime/bootstrap orchestration
+  - truncate mutable demo data through repository-owned reset ports
+  - seed deterministic fixtures through app/domain-owned fixture logic
+  - return a concise reset summary without secrets
+```
+
+Rules:
+
+- `./SocialPredict` may expose the command, but the command should delegate to app-owned reset and fixture logic.
+- Ansible may invoke the command remotely, but Ansible must not know table names, password hashes, or fixture internals.
+- Migration execution is runtime/bootstrap orchestration around the reset use case, not business policy embedded in the reset logic.
+- The reset summary should include counts and fixture usernames, not private keys, password hashes, tokens, or database credentials.
+
+## Cross-Repository Workflow Contract
+
+The SocialPredict and Ansible repositories should communicate through a narrow deployment contract:
+
+- SocialPredict dispatches either `demo deploy` or `demo reset`.
+- The target environment is fixed to demo by workflow identity, not by a free-form environment input.
+- Ansible owns demo host, port, user, private key, domain, and email secrets.
+- SocialPredict owns waiting for Ansible completion and external readiness verification from GitHub-hosted runners.
+- The Ansible workflow must log target host/domain and selected app version, then invoke app-owned commands on the demo host.
+- The SocialPredict workflow must turn red if Ansible fails or `/health` and `/readyz` do not pass within the configured timeout.
 
 ## Candidate Workflow Shape
 
@@ -147,12 +186,13 @@ Manual demo deploy:
 
 ```mermaid
 flowchart TD
-    Maintainer["Maintainer triggers SocialPredict demo deploy workflow"] --> Dispatch["Dispatch ansible_playbooks demo deploy"]
+    Maintainer["Maintainer triggers SocialPredict demo deploy workflow"] --> Version["Select main commit/image tag"]
+    Version --> Dispatch["Dispatch ansible_playbooks demo deploy"]
     Dispatch --> SSH["Ansible SSH to demo droplet"]
-    SSH --> Pull["Pull image or repo version for main"]
+    SSH --> Pull["Pull selected image or repo version"]
     Pull --> Migrate["Run migrations"]
     Migrate --> Restart["Restart necessary app containers"]
-    Restart --> Verify["External health/ready checks"]
+    Restart --> Verify["External /health and /readyz checks"]
 ```
 
 Scheduled demo reset:
@@ -161,9 +201,10 @@ Scheduled demo reset:
 flowchart TD
     Schedule["GitHub cron at midnight"] --> Dispatch["Dispatch ansible_playbooks demo reset"]
     Dispatch --> SSH["Ansible SSH to demo droplet"]
-    SSH --> Reset["Run ./SocialPredict demo-reset"]
+    SSH --> Guard["Verify APP_ENV=demo and reset confirmation"]
+    Guard --> Reset["Run ./SocialPredict demo-reset"]
     Reset --> Seed["Seed admin Password1 and demo fixtures"]
-    Seed --> Verify["External health/ready checks"]
+    Seed --> Verify["External /health and /readyz checks"]
 ```
 
 ## Security And Safety
@@ -178,12 +219,11 @@ Required safety properties:
 - Demo reset logs must not print private keys or hashed passwords.
 - Public docs and UI should state that demo data is reset regularly.
 - Firewall and SSH access should follow the existing DigitalOcean hardening pattern.
+- GitHub scheduled reset should use UTC unless the project explicitly chooses another timezone.
 
 ## Open Questions
 
 - What public domain should point at the demo droplet?
-- Should demo deploy from every `main` update, manual workflow only, or latest release only?
-- Should reset drop/recreate Docker volumes, truncate mutable tables, or restore a known clean snapshot?
 - Which fixture users and markets should exist beyond the public admin?
 - Should the demo show an in-app banner explaining daily reset behavior?
-- Should the reset time use UTC midnight or a project-local timezone?
+- Should demo deploy stay manual-only after the first version, or eventually run after every successful `main` deployment?
