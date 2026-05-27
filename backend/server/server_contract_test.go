@@ -227,6 +227,37 @@ func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 	}
 }
 
+func TestServerServesPublicMarketShareShell(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	t.Setenv("PUBLIC_BASE_URL", "https://kconfs.com")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	handler := buildTestHandler(t, db)
+	req := httptest.NewRequest(http.MethodGet, "/markets/1", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected share shell status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/html") {
+		t.Fatalf("expected HTML content type, got %q", got)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`<meta property="og:title"`,
+		`<meta property="og:url" content="https://kconfs.com/markets/1" />`,
+		`<script type="module" crossorigin src="/assets/index.js"></script>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("share shell missing %q in body:\n%s", want, body)
+		}
+	}
+}
+
 func TestSystemMetricsRouteRemainsApplicationReporting(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 

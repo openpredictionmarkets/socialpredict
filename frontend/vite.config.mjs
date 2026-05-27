@@ -13,6 +13,18 @@ export default defineConfig(() => {
       outDir: 'build',
       commonjsOptions: { transformMixedEsModules: true },
       chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: (assetInfo) => {
+            if (assetInfo.name && assetInfo.name.endsWith('.css')) {
+              return 'assets/[name][extname]';
+            }
+            return 'assets/[name]-[hash][extname]';
+          },
+        },
+      },
     },
     plugins: [react()],
     css: {

@@ -29,6 +29,7 @@ import (
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
 	appruntime "socialpredict/internal/app/runtime"
+	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/logger"
@@ -322,6 +323,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	registerApplicationReportingRoutes(router, configService, analyticsService, analyticsService, securityMiddleware)
 
 	// Markets routes - using new Handler instance
+	router.Handle("/markets/{id:[0-9]+}", securityMiddleware(marketshandlers.MarketShareShellHandler(marketsService, shareMetadataConfig(securityConfig.Share)))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
 	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
@@ -401,6 +403,14 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
+}
+
+func shareMetadataConfig(config appruntime.ShareConfig) dmarkets.ShareMetadataConfig {
+	return dmarkets.ShareMetadataConfig{
+		PublicBaseURL:   config.PublicBaseURL,
+		DefaultImageURL: config.DefaultImageURL,
+		SiteName:        config.SiteName,
+	}
 }
 
 type gracefulShutdowner interface {

@@ -1,6 +1,9 @@
 package runtime
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLoadSecurityConfigFromEnvRequiresJWTSigningKey(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "   ")
@@ -36,6 +39,15 @@ func TestLoadSecurityConfigFromEnvOwnsDefaults(t *testing.T) {
 	if config.Headers.StrictTransportSecurity != "" {
 		t.Fatalf("HSTS should default to disabled, got %q", config.Headers.StrictTransportSecurity)
 	}
+	if got := config.Headers.FrameOptions; got != "DENY" {
+		t.Fatalf("X-Frame-Options = %q, want DENY", got)
+	}
+	if got := config.Headers.CSP; !strings.Contains(got, "frame-ancestors 'none'") {
+		t.Fatalf("CSP missing default frame-ancestors: %q", got)
+	}
+	if config.Share.PublicBaseURL != "http://localhost" {
+		t.Fatalf("PublicBaseURL = %q", config.Share.PublicBaseURL)
+	}
 }
 
 func TestLoadSecurityConfigFromEnvOwnsProxyCORSAndHSTSOverrides(t *testing.T) {
@@ -48,6 +60,10 @@ func TestLoadSecurityConfigFromEnvOwnsProxyCORSAndHSTSOverrides(t *testing.T) {
 	t.Setenv("SECURITY_HSTS_MAX_AGE", "123")
 	t.Setenv("SECURITY_HSTS_INCLUDE_SUBDOMAINS", "true")
 	t.Setenv("SECURITY_HSTS_PRELOAD", "true")
+	t.Setenv("SECURITY_FRAME_ANCESTORS", "'self', https://partner.example")
+	t.Setenv("PUBLIC_BASE_URL", "https://kconfs.com")
+	t.Setenv("SHARE_DEFAULT_IMAGE_URL", "https://cdn.example/share.png")
+	t.Setenv("SHARE_SITE_NAME", "KConfs")
 
 	config, err := LoadSecurityConfigFromEnv()
 	if err != nil {
@@ -67,5 +83,14 @@ func TestLoadSecurityConfigFromEnvOwnsProxyCORSAndHSTSOverrides(t *testing.T) {
 	}
 	if got := config.Headers.StrictTransportSecurity; got != "max-age=123; includeSubDomains; preload" {
 		t.Fatalf("Strict-Transport-Security = %q", got)
+	}
+	if got := config.Headers.CSP; !strings.Contains(got, "frame-ancestors 'self' https://partner.example") {
+		t.Fatalf("CSP missing frame allowlist: %q", got)
+	}
+	if got := config.Headers.FrameOptions; got != "" {
+		t.Fatalf("X-Frame-Options should be omitted when CSP frame-ancestors allowlist is configured, got %q", got)
+	}
+	if config.Share.PublicBaseURL != "https://kconfs.com" || config.Share.DefaultImageURL != "https://cdn.example/share.png" || config.Share.SiteName != "KConfs" {
+		t.Fatalf("unexpected share config: %+v", config.Share)
 	}
 }

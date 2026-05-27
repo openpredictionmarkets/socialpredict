@@ -138,6 +138,40 @@ Rules:
 - Canonical URLs and image URLs must be absolute, public, and derived from environment-owned public base URL configuration.
 - Operators should expect social crawlers to cache metadata; stale preview behavior after market edits should be documented.
 
+## Operator Configuration
+
+The first implementation uses runtime-owned configuration:
+
+```text
+PUBLIC_BASE_URL
+SECURITY_FRAME_ANCESTORS
+SHARE_DEFAULT_IMAGE_URL
+SHARE_SITE_NAME
+```
+
+Expected defaults:
+
+- `PUBLIC_BASE_URL` falls back to `DOMAIN_URL`, then `http://localhost`.
+- `SECURITY_FRAME_ANCESTORS` defaults to `'none'`, which keeps iframe embedding denied.
+- When `SECURITY_FRAME_ANCESTORS` is set to an explicit allowlist, the backend emits `Content-Security-Policy: frame-ancestors ...` and omits `X-Frame-Options` because `X-Frame-Options` cannot express a multi-origin allowlist.
+- `SHARE_DEFAULT_IMAGE_URL` may be an absolute URL or a path under `PUBLIC_BASE_URL`; if unset, share cards use `/logo512.png`.
+- `SHARE_SITE_NAME` defaults to `SocialPredict`.
+
+Example allowlist:
+
+```text
+SECURITY_FRAME_ANCESTORS="'self', https://partner.example"
+```
+
+After deployment, operators should verify:
+
+```text
+curl -I https://example.com/markets/1
+curl https://example.com/markets/1 | grep 'og:title'
+```
+
+Social preview crawlers may cache Open Graph metadata. If a market title, description, or image changes, an external preview/debugger tool may be needed to refresh the cached card.
+
 ## Acceptance Criteria
 
 - Operators can configure whether SocialPredict pages may be embedded in iframes.
