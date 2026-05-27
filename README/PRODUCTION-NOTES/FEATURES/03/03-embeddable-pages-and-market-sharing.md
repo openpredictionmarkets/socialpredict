@@ -52,12 +52,15 @@ The user-facing goal is to allow the entire webpage to be embedded as an iframe.
 
 The safety interpretation is:
 
-- Public pages may be embeddable when operator policy permits it.
-- Authenticated pages should require explicit review before being embeddable.
-- Admin pages should not become embeddable by accident.
-- Trading and account-changing flows must be reviewed for clickjacking risk before broad iframe enablement.
+- Embedding is default-deny unless the operator explicitly configures allowed frame ancestors.
+- The first implementation should allow public, read-only pages only.
+- Authenticated pages should remain unembeddable unless a route is explicitly approved.
+- Admin pages should remain unembeddable by default.
+- Trading and account-changing flows must remain unembeddable until they pass a separate clickjacking review.
 
 If the product decision is literally site-wide iframe embedding, the implementation should still make the policy explicit through headers and configuration rather than removing protections silently.
+
+For the initial feature slice, "entire webpage" means the full SocialPredict public app shell can be framed on approved host domains. It does not mean every authenticated, admin, trading, or account-changing route is automatically frameable.
 
 ## Sharing Scope
 
@@ -90,6 +93,8 @@ Likely optional tags:
 
 Open Graph tags must reflect the canonical public market state, not private moderator/admin state.
 
+The first shareable market states should be the public market states already safe for public lists and public detail pages. Proposed, rejected, private, admin-only, or cancelled markets should return safe fallback or not-found behavior instead of market-specific share metadata. Resolved or closed markets may be shareable only if they are still public market detail pages in the product.
+
 ## Metadata Source Of Truth
 
 Market preview metadata should be generated from backend-visible public market data.
@@ -101,6 +106,8 @@ Required fields:
 - canonical public market URL
 - public market status if included in copy
 - market image URL or generated fallback image
+
+These fields should be exposed through an explicit public share metadata read model, such as `ShareMetadata`, owned by the Prediction Market/API boundary. Rendering code may consume that read model, but it must not duplicate market visibility rules.
 
 The frontend may render the market page, but social crawlers often do not execute the full React app reliably. The implementation must decide how metadata reaches crawlers before relying on client-side mutation of `<meta>` tags.
 
@@ -120,17 +127,23 @@ Iframe embedding and link previews are security-sensitive surfaces.
 Rules:
 
 - Embedding policy must be intentional and environment-configurable.
+- Runtime/proxy configuration should own the final browser-enforced frame headers.
+- Backend share shells or frontend routes must not silently override the runtime/proxy frame policy.
 - Headers such as `X-Frame-Options` and `Content-Security-Policy: frame-ancestors` must be reviewed together.
 - Allowing all ancestors with `frame-ancestors *` should be treated as a deliberate public-demo-style policy, not a default production posture.
 - Market previews must not expose private moderator, admin, account, or audit data.
 - Rejected/proposed moderator markets should not produce public share cards unless a separate private/admin sharing policy is designed.
 - Preview descriptions should be sanitized and length-bounded.
 - Preview images should not allow arbitrary external script or HTML injection.
+- Canonical URLs and image URLs must be absolute, public, and derived from environment-owned public base URL configuration.
+- Operators should expect social crawlers to cache metadata; stale preview behavior after market edits should be documented.
 
 ## Acceptance Criteria
 
 - Operators can configure whether SocialPredict pages may be embedded in iframes.
+- Embedding is default-deny unless an operator-configured allowlist or explicit public-demo policy permits it.
 - The embedding policy is visible in deployed response headers.
+- Admin, authenticated account-changing, and trading routes remain unembeddable unless explicitly approved.
 - Public market detail URLs emit Open Graph metadata with title, description, URL, type, and image.
 - Market metadata is based on public market data only.
 - Proposed, rejected, cancelled, private, or admin-only states do not leak through public Open Graph tags.

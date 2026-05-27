@@ -32,9 +32,11 @@ After #713 merges:
 ## Planning Principles
 
 - Treat embedding as an explicit operator/deployment policy, not a removed header by accident.
+- Use default-deny embedding unless a route and frame ancestor are explicitly allowed.
 - Treat public market metadata as backend/domain-owned public market language.
 - Do not leak proposed, rejected, admin-only, account, or audit data into public share tags.
 - Prefer initial HTML metadata over client-only metadata mutation unless crawler tests prove otherwise.
+- Add a small share metadata seam before adding HTML rendering so visibility rules stay in the market/API boundary.
 - Keep the first implementation narrow enough to ship without designing a widget SDK.
 - Add tests for both header policy and generated metadata.
 - Verify against at least one external Open Graph preview tool before calling the feature done.
@@ -83,11 +85,11 @@ Service ownership: Runtime Bootstrap and Infrastructure plus Release and Deploym
 
 Checklist:
 
-- [ ] Decide production default: disabled, allowlist, or all frame ancestors.
-- [ ] Decide staging/demo defaults separately if they differ from production.
+- [ ] Set production default to deny framing unless an explicit allowlist is configured.
+- [ ] Decide staging/demo allowlists separately if they differ from production.
 - [ ] Add typed config or deployment variables for allowed frame ancestors.
-- [ ] Document which routes are intended to be embeddable on the first pass.
-- [ ] Document if authenticated/admin pages are excluded.
+- [ ] Document first-pass route scope as public, read-only pages.
+- [ ] Document that authenticated, admin, trading, and account-changing pages are excluded unless separately approved.
 
 Exit criteria:
 
@@ -105,9 +107,10 @@ Service ownership: Runtime Bootstrap and Infrastructure.
 Checklist:
 
 - [ ] Locate current frame-related headers in app, nginx, Traefik, or deployment config.
-- [ ] Decide whether app or proxy owns `Content-Security-Policy: frame-ancestors`.
+- [ ] Make runtime/proxy configuration the owner of `Content-Security-Policy: frame-ancestors`.
 - [ ] Decide whether `X-Frame-Options` should be removed or adjusted when CSP frame policy is active.
 - [ ] Add header behavior for permitted environments.
+- [ ] Ensure backend share-shell responses do not override frame policy independently.
 - [ ] Add tests or smoke checks for final response headers.
 
 Exit criteria:
@@ -129,7 +132,7 @@ Checklist:
 - [ ] Inventory routes that can be framed.
 - [ ] Identify account-changing and trade-changing routes.
 - [ ] Decide whether market detail pages can be framed before trading forms are framed.
-- [ ] Decide whether admin routes remain unembeddable.
+- [ ] Keep admin routes unembeddable by default.
 - [ ] Add route-level or header-level exceptions if needed.
 
 Exit criteria:
@@ -148,11 +151,15 @@ Service ownership: Prediction Market Context and API/Auth Contract Boundary.
 
 Checklist:
 
-- [ ] Define public market metadata fields.
+- [ ] Define a `ShareMetadata` public read model or equivalent helper.
+- [ ] Define public market metadata fields on that seam.
 - [ ] Ensure metadata source uses public market visibility rules.
-- [ ] Add backend/API helper or response shape for share metadata if needed.
+- [ ] Define which market statuses are shareable.
+- [ ] Treat proposed, rejected, cancelled, private, and admin-only markets as not shareable.
+- [ ] Allow resolved or closed markets only if they remain public market detail pages.
 - [ ] Add not-found and non-public market behavior.
 - [ ] Sanitize and length-bound title/description output.
+- [ ] Source canonical URL and image URL from typed public base URL configuration.
 
 Exit criteria:
 
@@ -173,7 +180,7 @@ Checklist:
 - [ ] If using backend share shell, route `/markets/{id}` or an equivalent share route to HTML metadata.
 - [ ] Ensure the SPA still loads normally after metadata is emitted.
 - [ ] Ensure canonical URLs remain stable.
-- [ ] Avoid duplicating market visibility rules outside the public market API/domain seam.
+- [ ] Consume the share metadata seam rather than duplicating market visibility rules in rendering code.
 
 Exit criteria:
 
@@ -241,6 +248,7 @@ Checklist:
 - [ ] Add tests for non-public market metadata behavior.
 - [ ] Add deployment smoke checks for frame headers.
 - [ ] Add an external preview validation step or manual release checklist.
+- [ ] Document expected crawler cache/staleness behavior after market edits.
 - [ ] Record expected behavior in PR templates or release docs if needed.
 
 Exit criteria:
