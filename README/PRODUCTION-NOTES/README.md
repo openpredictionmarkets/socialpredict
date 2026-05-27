@@ -76,6 +76,7 @@ Feature notes define product and game-mode behavior that cuts across backend, fr
 Current feature specs:
 
 1. **Moderator Mode** - [`FEATURES/01/01-moderators.md`](./FEATURES/01/01-moderators.md), [`FEATURES/01/DESIGN.md`](./FEATURES/01/DESIGN.md), [`FEATURES/01/PLAN.md`](./FEATURES/01/PLAN.md)
+2. **Resettable Public Demo** - [`FEATURES/02/02-resettable-public-demo.md`](./FEATURES/02/02-resettable-public-demo.md), [`FEATURES/02/DESIGN.md`](./FEATURES/02/DESIGN.md), [`FEATURES/02/PLAN.md`](./FEATURES/02/PLAN.md)
 
 ## Implementation Priority
 
