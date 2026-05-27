@@ -201,6 +201,7 @@ func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 		"/v0/system/metrics",
 		"/v0/global/leaderboard",
 		"/v0/content/home",
+		"/v0/content/social-share",
 	}
 
 	for _, path := range tests {

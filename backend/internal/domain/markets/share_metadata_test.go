@@ -100,3 +100,29 @@ func TestGetShareMetadataBoundsDescription(t *testing.T) {
 		t.Fatalf("description too long: %d", len([]rune(metadata.Description)))
 	}
 }
+
+func TestGetShareMetadataUsesConfiguredDefaultDescription(t *testing.T) {
+	now := marketsTestTime()
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getPublicMarketFunc = func(_ context.Context, marketID int64) (*markets.PublicMarket, error) {
+			return &markets.PublicMarket{
+				ID:                 marketID,
+				QuestionTitle:      "A market",
+				Description:        "",
+				ResolutionDateTime: now.Add(time.Hour),
+				LifecycleStatus:    markets.MarketLifecyclePublished,
+			}, nil
+		}
+	})
+	service := markets.NewService(repo, nil, newFixedClock(now), markets.Config{})
+
+	metadata, err := service.GetShareMetadata(context.Background(), 10, markets.ShareMetadataConfig{
+		DefaultDescription: "CMS-managed description for public share previews.",
+	})
+	if err != nil {
+		t.Fatalf("GetShareMetadata returned error: %v", err)
+	}
+	if metadata.Description != "CMS-managed description for public share previews." {
+		t.Fatalf("Description = %q", metadata.Description)
+	}
+}

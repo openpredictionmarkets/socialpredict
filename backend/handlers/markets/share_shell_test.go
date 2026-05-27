@@ -35,6 +35,7 @@ func TestMarketShareShellHandlerEmitsOpenGraphHTML(t *testing.T) {
 			Description:  "A safe public description.",
 			CanonicalURL: "https://kconfs.com/markets/42",
 			ImageURL:     "https://kconfs.com/logo512.png",
+			ImageAlt:     "Market share preview",
 			PublicStatus: dmarkets.MarketStatusActive,
 			SiteName:     "SocialPredict",
 		},
@@ -51,6 +52,7 @@ func TestMarketShareShellHandlerEmitsOpenGraphHTML(t *testing.T) {
 		`<meta property="og:title" content="Will &#34;quoted&#34; markets share? | SocialPredict" />`,
 		`<meta property="og:url" content="https://kconfs.com/markets/42" />`,
 		`<meta property="og:image" content="https://kconfs.com/logo512.png" />`,
+		`<meta property="og:image:alt" content="Market share preview" />`,
 		`<script type="module" crossorigin src="/assets/index.js"></script>`,
 		`<link rel="stylesheet" crossorigin href="/assets/index.css" />`,
 	} {

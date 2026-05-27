@@ -172,7 +172,8 @@ Rules for the seam:
 
 - Prediction Market owns whether a market is public/shareable.
 - API/Auth owns exclusion of private, admin, moderator-queue, and account data.
-- Runtime/Configuration owns public base URL and image URL configuration.
+- Runtime/Configuration owns public base URL and deployment fallback values.
+- CMS Social Share settings own operator-editable site name, fallback description, default image URL, and image alt text.
 - Backend share-shell or proxy rendering consumes `ShareMetadata`; it does not inspect full market records directly.
 - Non-public or missing markets return a safe not-found/fallback result through the normal failure translation boundary.
 

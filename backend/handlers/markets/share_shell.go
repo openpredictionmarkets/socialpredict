@@ -15,11 +15,14 @@ type shareMetadataService interface {
 	GetShareMetadata(ctx context.Context, marketID int64, config dmarkets.ShareMetadataConfig) (*dmarkets.ShareMetadata, error)
 }
 
+type ShareMetadataConfigProvider func(ctx context.Context, fallback dmarkets.ShareMetadataConfig) dmarkets.ShareMetadataConfig
+
 type shareShellData struct {
 	Title        string
 	Description  string
 	CanonicalURL string
 	ImageURL     string
+	ImageAlt     string
 	SiteName     string
 	PublicStatus string
 	MarketID     int64
@@ -39,11 +42,13 @@ var marketShareShellTemplate = template.Must(template.New("market-share-shell").
   <meta property="og:url" content="{{ .CanonicalURL }}" />
   <meta property="og:description" content="{{ .Description }}" />
   <meta property="og:image" content="{{ .ImageURL }}" />
+  <meta property="og:image:alt" content="{{ .ImageAlt }}" />
   <meta property="og:site_name" content="{{ .SiteName }}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="{{ .Title }}" />
   <meta name="twitter:description" content="{{ .Description }}" />
   <meta name="twitter:image" content="{{ .ImageURL }}" />
+  <meta name="twitter:image:alt" content="{{ .ImageAlt }}" />
   <meta name="socialpredict:market_id" content="{{ .MarketID }}" />
   <meta name="socialpredict:public_status" content="{{ .PublicStatus }}" />
   <script src="/env-config.js"></script>
@@ -59,7 +64,7 @@ var marketShareShellTemplate = template.Must(template.New("market-share-shell").
 `))
 
 // MarketShareShellHandler serves initial HTML metadata for public market URLs.
-func MarketShareShellHandler(svc shareMetadataService, config dmarkets.ShareMetadataConfig) http.HandlerFunc {
+func MarketShareShellHandler(svc shareMetadataService, config dmarkets.ShareMetadataConfig, providers ...ShareMetadataConfigProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		id, err := strconv.ParseInt(vars["id"], 10, 64)
@@ -68,7 +73,14 @@ func MarketShareShellHandler(svc shareMetadataService, config dmarkets.ShareMeta
 			return
 		}
 
-		metadata, err := svc.GetShareMetadata(r.Context(), id, config)
+		resolvedConfig := config
+		for _, provider := range providers {
+			if provider != nil {
+				resolvedConfig = provider(r.Context(), resolvedConfig)
+			}
+		}
+
+		metadata, err := svc.GetShareMetadata(r.Context(), id, resolvedConfig)
 		if err != nil {
 			writeDetailsError(w, err)
 			return
@@ -82,6 +94,7 @@ func MarketShareShellHandler(svc shareMetadataService, config dmarkets.ShareMeta
 			Description:  metadata.Description,
 			CanonicalURL: metadata.CanonicalURL,
 			ImageURL:     metadata.ImageURL,
+			ImageAlt:     metadata.ImageAlt,
 			SiteName:     metadata.SiteName,
 			PublicStatus: metadata.PublicStatus,
 			MarketID:     metadata.MarketID,
