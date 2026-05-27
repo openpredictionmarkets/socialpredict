@@ -76,6 +76,7 @@ Feature notes define product and game-mode behavior that cuts across backend, fr
 Current feature specs:
 
 1. **Moderator Mode** - [`FEATURES/01/01-moderators.md`](./FEATURES/01/01-moderators.md), [`FEATURES/01/DESIGN.md`](./FEATURES/01/DESIGN.md), [`FEATURES/01/PLAN.md`](./FEATURES/01/PLAN.md)
+3. **Embeddable Pages And Market Sharing** - [`FEATURES/03/03-embeddable-pages-and-market-sharing.md`](./FEATURES/03/03-embeddable-pages-and-market-sharing.md), [`FEATURES/03/DESIGN.md`](./FEATURES/03/DESIGN.md), [`FEATURES/03/PLAN.md`](./FEATURES/03/PLAN.md)
 
 ## Implementation Priority
 
