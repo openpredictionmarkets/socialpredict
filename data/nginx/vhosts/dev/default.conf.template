@@ -19,6 +19,11 @@ server {
 		proxy_pass http://backend:8080/;
 	}
 
+	# Mirrors production crawler routing when using the local Nginx layer.
+	location ~ ^/markets/[0-9]+$ {
+		proxy_pass http://backend:8080;
+	}
+
 	location / {
 		proxy_pass http://frontend:5173/;
 	}

@@ -452,6 +452,9 @@ func loadServerOperationKeys(t *testing.T, serverPath string) map[string]struct{
 		if !ok {
 			return true
 		}
+		if !isOpenAPIBackedRoute(path) {
+			return true
+		}
 
 		for _, arg := range call.Args {
 			method, ok := stringLiteral(arg)
@@ -465,6 +468,18 @@ func loadServerOperationKeys(t *testing.T, serverPath string) map[string]struct{
 	})
 
 	return keys
+}
+
+func isOpenAPIBackedRoute(path string) bool {
+	if strings.HasPrefix(path, "/v0/") {
+		return true
+	}
+	switch path {
+	case "/health", "/readyz", "/ops/status", "/openapi.yaml", "/swagger", "/swagger/":
+		return true
+	default:
+		return false
+	}
 }
 
 func routePathFromMethodsReceiver(expr ast.Expr) (string, bool) {

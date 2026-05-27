@@ -136,3 +136,16 @@ func (m *MockService) CalculateMarketVolume(ctx context.Context, marketID int64)
 func (m *MockService) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
 	return &dmarkets.PublicMarket{ID: marketID}, nil
 }
+
+func (m *MockService) GetShareMetadata(ctx context.Context, marketID int64, config dmarkets.ShareMetadataConfig) (*dmarkets.ShareMetadata, error) {
+	return &dmarkets.ShareMetadata{
+		MarketID:     marketID,
+		Title:        "Test Market | SocialPredict",
+		Description:  "Test market description",
+		CanonicalURL: "https://example.test/markets/1",
+		ImageURL:     "https://example.test/logo512.png",
+		PublicStatus: dmarkets.MarketStatusActive,
+		SiteName:     "SocialPredict",
+		Shareable:    true,
+	}, nil
+}

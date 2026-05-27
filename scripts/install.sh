@@ -133,6 +133,16 @@ ensure_jwt_signing_key() {
   echo "Setting JWT Signing Key"
 }
 
+set_env_value() {
+  local key="$1"
+  local value="$2"
+  if grep -q "^${key}=" "${SCRIPT_DIR}/.env"; then
+    "${SED_INPLACE[@]}" "s|^${key}=.*|${key}=${value}|" "${SCRIPT_DIR}/.env"
+  else
+    printf "\n%s=%s\n" "${key}" "${value}" >> "${SCRIPT_DIR}/.env"
+  fi
+}
+
 # Check if Docker Image exists on the system
 check_image() {
   local image_name=$1
@@ -183,6 +193,7 @@ build_dev() {
   # Change the Domain settings:
   "${SED_INPLACE[@]}" "s|^DOMAIN=.*|DOMAIN='localhost'|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^DOMAIN_URL=.*|DOMAIN_URL='http://localhost'|" "${SCRIPT_DIR}/.env"
+  set_env_value "PUBLIC_BASE_URL" "'http://localhost'"
 
   # Remove unnecessary lines from .env
   "${SED_INPLACE[@]}" "/^TRAEFIK_CONTAINER_NAME=.*/d" "${SCRIPT_DIR}/.env"
@@ -228,6 +239,7 @@ build_local() {
   "${SED_INPLACE[@]}" "s|^DOMAIN=.*|DOMAIN='localhost'|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^DOMAIN_URL=.*|DOMAIN_URL='http://localhost'|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^API_URL=.*|API_URL=http://localhost/api|" "${SCRIPT_DIR}/.env"
+  set_env_value "PUBLIC_BASE_URL" "'http://localhost'"
 
   # Remove unnecessary lines from .env
   "${SED_INPLACE[@]}" "/^TRAEFIK_CONTAINER_NAME=.*/d" "${SCRIPT_DIR}/.env"
@@ -270,6 +282,7 @@ build_production() {
   "${SED_INPLACE[@]}" "s|^DOMAIN=.*|DOMAIN='$domain_answer'|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^DOMAIN_URL=.*|DOMAIN_URL='https://$domain_answer'|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^API_URL=.*|API_URL=https://$domain_answer/api|" "${SCRIPT_DIR}/.env"
+  set_env_value "PUBLIC_BASE_URL" "'https://$domain_answer'"
 
   echo "Setting DOMAIN to: $domain_answer"
 
@@ -330,6 +343,7 @@ build_production_args() {
   "${SED_INPLACE[@]}" "s|^DOMAIN=.*|DOMAIN='$1'|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^DOMAIN_URL=.*|DOMAIN_URL='https://$1'|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^API_URL=.*|API_URL=https://$1/api|" "${SCRIPT_DIR}/.env"
+  set_env_value "PUBLIC_BASE_URL" "'https://$1'"
 
   echo "Setting DOMAIN to: $1"
 
