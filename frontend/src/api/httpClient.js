@@ -30,10 +30,11 @@ export const apiRequest = async (
     fallbackMessage,
     unwrap = true,
     authenticated = false,
+    authToken,
     ...options
   } = {},
 ) => {
-  const token = authenticated ? authStorage.getToken() : null;
+  const token = authenticated ? (authToken || authStorage.getToken()) : null;
   const response = await fetch(buildUrl(path), {
     ...options,
     headers: mergeHeaders(headers, token),

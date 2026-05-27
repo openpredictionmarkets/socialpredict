@@ -382,6 +382,7 @@ func TestGormRepositoryApproveAndRejectMarketPersistReviewMetadata(t *testing.T)
 	approveTarget.LifecycleStatus = dmarkets.MarketLifecycleProposed
 	rejectTarget := modelstesting.GenerateMarket(602, creator.Username)
 	rejectTarget.LifecycleStatus = dmarkets.MarketLifecycleProposed
+	rejectTarget.ProposalCost = 7
 	published := modelstesting.GenerateMarket(603, creator.Username)
 	published.LifecycleStatus = dmarkets.MarketLifecyclePublished
 	for _, market := range []*models.Market{&approveTarget, &rejectTarget, &published} {
@@ -410,7 +411,7 @@ func TestGormRepositoryApproveAndRejectMarketPersistReviewMetadata(t *testing.T)
 	if err != nil {
 		t.Fatalf("load rejected market: %v", err)
 	}
-	if rejected.LifecycleStatus != dmarkets.MarketLifecycleRejected || rejected.RejectedBy != "admin" || rejected.RejectionReason != "duplicate" || rejected.RejectedAt == nil || !rejected.RejectedAt.Equal(rejectedAt) {
+	if rejected.LifecycleStatus != dmarkets.MarketLifecycleRejected || rejected.RejectedBy != "admin" || rejected.RejectionReason != "duplicate" || rejected.ProposalCost != 7 || rejected.RejectedAt == nil || !rejected.RejectedAt.Equal(rejectedAt) {
 		t.Fatalf("unexpected rejected market: %+v", rejected)
 	}
 

@@ -3280,6 +3280,10 @@ components:
           format: date-time
         rejectionReason:
           type: string
+        proposalCost:
+          type: integer
+          format: int64
+          description: Creation cost recorded on the market for proposal refund accounting.
         isResolved:
           type: boolean
         resolutionResult:
@@ -3866,6 +3870,10 @@ components:
           format: date-time
         rejectionReason:
           type: string
+        proposalCost:
+          type: integer
+          format: int64
+          description: Creation cost recorded on the market for proposal refund accounting.
         createdAt:
           type: string
           format: date-time

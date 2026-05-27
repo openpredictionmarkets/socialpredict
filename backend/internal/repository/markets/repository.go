@@ -497,6 +497,7 @@ func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 		RejectedBy:              market.RejectedBy,
 		RejectedAt:              market.RejectedAt,
 		RejectionReason:         market.RejectionReason,
+		ProposalCost:            market.ProposalCost,
 		IsResolved:              market.Status == dmarkets.MarketStatusResolved || lifecycle == dmarkets.MarketLifecycleResolved,
 		InitialProbability:      market.InitialProbability,
 	}
@@ -525,6 +526,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		RejectedBy:              dbMarket.RejectedBy,
 		RejectedAt:              cloneTimePtr(dbMarket.RejectedAt),
 		RejectionReason:         dbMarket.RejectionReason,
+		ProposalCost:            dbMarket.ProposalCost,
 		CreatedAt:               dbMarket.CreatedAt,
 		UpdatedAt:               dbMarket.UpdatedAt,
 		InitialProbability:      dbMarket.InitialProbability,

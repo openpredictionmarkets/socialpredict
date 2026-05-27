@@ -65,6 +65,7 @@ func marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
 		RejectedBy:         market.RejectedBy,
 		RejectedAt:         market.RejectedAt,
 		RejectionReason:    market.RejectionReason,
+		ProposalCost:       market.ProposalCost,
 		IsResolved:         strings.EqualFold(market.Status, "resolved"),
 		ResolutionResult:   market.ResolutionResult,
 		CreatedAt:          market.CreatedAt,

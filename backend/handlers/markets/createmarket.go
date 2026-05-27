@@ -221,6 +221,8 @@ func toCreateMarketResponse(market *dmarkets.Market) dto.CreateMarketResponse {
 		YesLabel:           market.YesLabel,
 		NoLabel:            market.NoLabel,
 		Status:             market.Status,
+		LifecycleStatus:    market.LifecycleStatus,
+		ProposalCost:       market.ProposalCost,
 		CreatedAt:          market.CreatedAt,
 	}
 }

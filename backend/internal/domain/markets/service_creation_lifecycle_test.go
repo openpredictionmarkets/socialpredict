@@ -60,6 +60,7 @@ func TestCreateMarketModeratorModeCreatesProposedMarketForActiveModerator(t *tes
 	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{
 		GameMode:               "moderator",
 		MarketApprovalRequired: true,
+		CreateMarketCost:       10,
 	})
 
 	market, err := service.CreateMarket(context.Background(), validCreateRequest(now), "moderator")
@@ -68,6 +69,9 @@ func TestCreateMarketModeratorModeCreatesProposedMarketForActiveModerator(t *tes
 	}
 	if market.Status != markets.MarketLifecycleProposed || market.LifecycleStatus != markets.MarketLifecycleProposed {
 		t.Fatalf("expected proposed lifecycle in moderator mode, got %+v", market)
+	}
+	if market.ProposalCost != 10 {
+		t.Fatalf("proposal cost = %d, want 10", market.ProposalCost)
 	}
 	if market.IsTradableAt(now) {
 		t.Fatalf("proposed market must not be tradable")

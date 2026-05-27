@@ -26,6 +26,7 @@ type Market struct {
 	RejectedBy              string
 	RejectedAt              *time.Time
 	RejectionReason         string
+	ProposalCost            int64
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 	InitialProbability      float64

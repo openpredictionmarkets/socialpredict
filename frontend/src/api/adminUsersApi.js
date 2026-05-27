@@ -1,9 +1,4 @@
-import { API_URL } from '../config';
-import {
-  getApiErrorMessage,
-  parseApiResponseText,
-  unwrapApiResponse,
-} from '../utils/apiResponse';
+import { authenticatedApiRequest } from './httpClient';
 
 const adminUserReasonMessages = {
   AUTHORIZATION_DENIED: 'Only admins can manage users.',
@@ -19,28 +14,16 @@ const adminRequest = async ({ path, token, method = 'GET', body }) => {
     throw new Error('Admin authentication token is missing. Please log in again.');
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  return authenticatedApiRequest(path, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
     body: body ? JSON.stringify(body) : undefined,
+    authToken: token,
+    reasonMessages: adminUserReasonMessages,
+    fallbackMessage: 'Admin user request failed. Please try again.',
   });
-
-  const text = await response.text();
-  const payload = parseApiResponseText(text);
-
-  if (!response.ok) {
-    throw new Error(getApiErrorMessage(
-      response,
-      payload,
-      `Admin user request failed with status ${response.status}.`,
-      adminUserReasonMessages,
-    ));
-  }
-
-  return unwrapApiResponse(payload);
 };
 
 export const listAdminUsers = ({ token, limit = 100, offset = 0 }) => {
