@@ -2828,6 +2828,21 @@ paths:
 
 
   /v0/content/social-share/image:
+    head:
+      tags: [Content]
+      operationId: headSocialShareImage
+      summary: Check uploaded social share image
+      description: Returns headers for the CMS-uploaded default Open Graph image when one has been uploaded and local image sharing is enabled.
+      responses:
+        '200':
+          description: Uploaded image headers returned successfully.
+        '404':
+          description: No CMS-uploaded image exists, or local image sharing is disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
     get:
       tags: [Content]
       operationId: getSocialShareImage

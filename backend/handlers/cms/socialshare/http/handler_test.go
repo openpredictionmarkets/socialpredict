@@ -143,6 +143,16 @@ func TestAdminUploadImageStoresPublicImageAndUpdatesSettings(t *testing.T) {
 	if !bytes.Equal(imageRec.Body.Bytes(), tinyPNG) {
 		t.Fatalf("served image bytes do not match upload")
 	}
+
+	headReq := httptest.NewRequest(http.MethodHead, "/v0/content/social-share/image", nil)
+	headRec := httptest.NewRecorder()
+	handler.PublicImage(headRec, headReq)
+	if headRec.Code != http.StatusOK {
+		t.Fatalf("expected HEAD image status 200, got %d: %s", headRec.Code, headRec.Body.String())
+	}
+	if got := headRec.Header().Get("Content-Type"); got != "image/png" {
+		t.Fatalf("HEAD Content-Type = %q", got)
+	}
 }
 
 func TestPublicImageReturnsNotFoundWhenImagesDisabled(t *testing.T) {
