@@ -8,7 +8,14 @@ const imageGuidance = 'Upload a PNG, JPEG, or WebP up to 5 MB. Recommended dimen
 const resolvePreviewImageUrl = (imageUrl) => {
   if (!imageUrl) return '';
   if (/^https?:\/\//.test(imageUrl)) return imageUrl;
-  return `${API_URL}${imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`}`;
+
+  const normalizedPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+  if (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/v0/')) {
+    return `${API_URL}${normalizedPath}`;
+  }
+
+  const frontendOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${frontendOrigin}${normalizedPath}`;
 };
 
 function SocialShareEditor() {
