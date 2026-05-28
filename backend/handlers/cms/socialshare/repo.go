@@ -9,6 +9,8 @@ import (
 type Repository interface {
 	GetBySlug(slug string) (*models.SocialShareSettings, error)
 	Save(item *models.SocialShareSettings) error
+	GetImageBySlug(slug string) (*models.SocialShareImage, error)
+	SaveImage(item *models.SocialShareImage) error
 }
 
 type GormRepository struct {
@@ -28,5 +30,17 @@ func (r *GormRepository) GetBySlug(slug string) (*models.SocialShareSettings, er
 }
 
 func (r *GormRepository) Save(item *models.SocialShareSettings) error {
+	return r.db.Save(item).Error
+}
+
+func (r *GormRepository) GetImageBySlug(slug string) (*models.SocialShareImage, error) {
+	var item models.SocialShareImage
+	if err := r.db.Where("slug = ?", slug).First(&item).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *GormRepository) SaveImage(item *models.SocialShareImage) error {
 	return r.db.Save(item).Error
 }

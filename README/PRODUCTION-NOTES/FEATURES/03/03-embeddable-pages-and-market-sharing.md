@@ -162,7 +162,8 @@ Expected defaults:
 - When `SECURITY_FRAME_ANCESTORS` is set to an explicit allowlist, the backend emits `Content-Security-Policy: frame-ancestors ...` and omits `X-Frame-Options` because `X-Frame-Options` cannot express a multi-origin allowlist.
 - `SHARE_DEFAULT_IMAGE_URL` may be an absolute URL or a path under `PUBLIC_BASE_URL`; if unset, share cards use `/logo512.png`.
 - `SHARE_SITE_NAME` defaults to `SocialPredict`.
-- The admin dashboard Social Share CMS tab can override `SHARE_DEFAULT_IMAGE_URL`, `SHARE_SITE_NAME`, fallback description, and image alt text without a deploy.
+- The admin dashboard Social Share CMS tab can upload a PNG, JPEG, or WebP image up to 5 MiB and points share cards at `/v0/content/social-share/image`.
+- The same tab can also override `SHARE_DEFAULT_IMAGE_URL`, `SHARE_SITE_NAME`, fallback description, and image alt text without a deploy.
 - The default Open Graph image should be public and close to 1200x630px.
 - The fallback description should usually be 110-160 characters; the backend allows up to 220 characters.
 
@@ -177,6 +178,7 @@ After deployment, operators should verify:
 ```text
 curl -I https://example.com/markets/1
 curl https://example.com/markets/1 | grep -E 'og:title|og:description|og:image|og:image:alt'
+curl -I https://example.com/v0/content/social-share/image
 ```
 
 Social preview crawlers may cache Open Graph metadata. If a market title, description, or image changes, an external preview/debugger tool may be needed to refresh the cached card.

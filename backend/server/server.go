@@ -429,7 +429,9 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
 	router.HandleFunc("/v0/content/social-share", socialShareHandler.PublicGet).Methods("GET")
+	router.HandleFunc("/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET")
 	router.Handle("/v0/admin/content/social-share", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUpdate))).Methods("PUT")
+	router.Handle("/v0/admin/content/social-share/image", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUploadImage))).Methods("POST")
 }
 
 func shareMetadataConfig(config appruntime.ShareConfig) dmarkets.ShareMetadataConfig {

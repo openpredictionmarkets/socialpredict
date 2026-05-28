@@ -24,4 +24,12 @@ func TestMigrateAddSocialShareSettingsCreatesTable(t *testing.T) {
 			t.Fatalf("expected %s column after migration", column)
 		}
 	}
+	if !db.Migrator().HasTable(&models.SocialShareImage{}) {
+		t.Fatalf("expected SocialShareImage table after migration")
+	}
+	for _, column := range []string{"Slug", "FileName", "ContentType", "SizeBytes", "Data", "UpdatedBy"} {
+		if !db.Migrator().HasColumn(&models.SocialShareImage{}, column) {
+			t.Fatalf("expected SocialShareImage.%s column after migration", column)
+		}
+	}
 }

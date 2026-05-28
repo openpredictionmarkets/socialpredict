@@ -224,7 +224,9 @@ x-route-family-migration-matrix:
         - /v0/content/home
         - /v0/admin/content/home
         - /v0/content/social-share
+        - /v0/content/social-share/image
         - /v0/admin/content/social-share
+        - /v0/admin/content/social-share/image
       success_contract: mixed raw JSON DTO and JSON `{ok:true,result}`
       failure_contract: ReasonResponse plus middleware 429 where wrapped
       migration_state: mixed_raw_success_reason_failure
@@ -2824,6 +2826,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+
+  /v0/content/social-share/image:
+    get:
+      tags: [Content]
+      operationId: getSocialShareImage
+      summary: Get uploaded social share image
+      description: Returns the CMS-uploaded default Open Graph image when one has been uploaded.
+      responses:
+        '200':
+          description: Uploaded image returned successfully.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: No CMS-uploaded image exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/content/social-share:
     put:
       tags: [Content]
@@ -2847,6 +2879,61 @@ paths:
                 $ref: '#/components/schemas/SocialShareSettingsEnvelopeResponse'
         '400':
           description: Invalid request body or validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required or password change is still required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+
+  /v0/admin/content/social-share/image:
+    post:
+      tags: [Content]
+      operationId: uploadSocialShareImage
+      summary: Upload social share image
+      description: Uploads a PNG, JPEG, or WebP image up to 5 MiB and points CMS social share settings at the public image route.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                imageAlt:
+                  type: string
+                  maxLength: 160
+      responses:
+        '200':
+          description: Image uploaded and social share settings updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialShareSettingsEnvelopeResponse'
+        '400':
+          description: Invalid upload or unsupported image.
           content:
             application/json:
               schema:

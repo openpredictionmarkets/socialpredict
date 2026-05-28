@@ -9,10 +9,24 @@ import (
 	"gorm.io/gorm"
 )
 
+var tinyPNG = []byte{
+	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+	0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+	0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+	0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+	0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41,
+	0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+	0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
+	0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+	0x42, 0x60, 0x82,
+}
+
 type mockRepository struct {
-	item    *models.SocialShareSettings
-	saveErr error
-	getErr  error
+	item     *models.SocialShareSettings
+	image    *models.SocialShareImage
+	saveErr  error
+	getErr   error
+	imageErr error
 }
 
 func (m *mockRepository) GetBySlug(slug string) (*models.SocialShareSettings, error) {
@@ -30,6 +44,24 @@ func (m *mockRepository) Save(item *models.SocialShareSettings) error {
 		return m.saveErr
 	}
 	m.item = item
+	return nil
+}
+
+func (m *mockRepository) GetImageBySlug(slug string) (*models.SocialShareImage, error) {
+	if m.imageErr != nil {
+		return nil, m.imageErr
+	}
+	if m.image == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return m.image, nil
+}
+
+func (m *mockRepository) SaveImage(item *models.SocialShareImage) error {
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	m.image = item
 	return nil
 }
 
@@ -70,6 +102,39 @@ func TestUpdateSettingsCreatesDefaultRowAndValidatesURL(t *testing.T) {
 	}
 	if repo.item == nil || repo.item.UpdatedBy != "admin" {
 		t.Fatalf("expected saved row with UpdatedBy admin, got %+v", repo.item)
+	}
+}
+
+func TestUploadImageStoresImageAndPointsSettingsAtImageRoute(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo)
+
+	settings, err := svc.UploadImage(UploadImageInput{
+		FileName:  "card.png",
+		Data:      tinyPNG,
+		ImageAlt:  "Uploaded share card",
+		UpdatedBy: "admin",
+	})
+	if err != nil {
+		t.Fatalf("UploadImage returned error: %v", err)
+	}
+	if repo.image == nil || repo.image.ContentType != "image/png" {
+		t.Fatalf("unexpected stored image: %+v", repo.image)
+	}
+	if settings.DefaultImageURL != UploadedImageURL {
+		t.Fatalf("DefaultImageURL = %q", settings.DefaultImageURL)
+	}
+	if settings.ImageAlt != "Uploaded share card" {
+		t.Fatalf("ImageAlt = %q", settings.ImageAlt)
+	}
+}
+
+func TestUploadImageRejectsUnsupportedContentType(t *testing.T) {
+	svc := NewService(&mockRepository{})
+
+	_, err := svc.UploadImage(UploadImageInput{Data: []byte("not an image")})
+	if err == nil {
+		t.Fatalf("expected validation error")
 	}
 }
 

@@ -1,8 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
+import { API_URL } from '../../config';
 
 const descriptionGuidance = 'Aim for 110-160 characters. The backend allows up to 220 characters.';
-const imageGuidance = 'Use a public 1200x630px image URL. Root-relative paths like /og/card.png are allowed.';
+const imageGuidance = 'Upload a PNG, JPEG, or WebP up to 5 MB. Recommended dimensions are 1200x630px.';
+
+const resolvePreviewImageUrl = (imageUrl) => {
+  if (!imageUrl) return '';
+  if (/^https?:\/\//.test(imageUrl)) return imageUrl;
+  return `${API_URL}${imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`}`;
+};
 
 function SocialShareEditor() {
   const [settings, setSettings] = useState({
@@ -14,6 +21,7 @@ function SocialShareEditor() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -27,6 +35,7 @@ function SocialShareEditor() {
     if (descriptionLength < 110 || descriptionLength > 160) return 'text-amber-300';
     return 'text-green-300';
   }, [descriptionLength]);
+  const previewImageUrl = useMemo(() => resolvePreviewImageUrl(settings.defaultImageUrl), [settings.defaultImageUrl]);
 
   const fetchSettings = async () => {
     try {
@@ -80,6 +89,41 @@ function SocialShareEditor() {
       setError(err.message || 'Error saving social share settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setMessage('');
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('imageAlt', settings.imageAlt || '');
+
+      const data = await authenticatedApiRequest('/v0/admin/content/social-share/image', {
+        method: 'POST',
+        body: formData,
+        fallbackMessage: 'Failed to upload social share image',
+      });
+
+      setSettings({
+        siteName: data.siteName || '',
+        defaultDescription: data.defaultDescription || '',
+        defaultImageUrl: data.defaultImageUrl || '',
+        imageAlt: data.imageAlt || '',
+        version: data.version || 0,
+      });
+      setMessage('Social share image uploaded successfully.');
+    } catch (err) {
+      setError(err.message || 'Error uploading social share image');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
     }
   };
 
@@ -147,7 +191,18 @@ function SocialShareEditor() {
             </div>
 
             <div>
-              <label className="block text-white font-semibold mb-2">Default Open Graph Image URL</label>
+              <label className="block text-white font-semibold mb-2">Default Open Graph Image</label>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleImageUpload}
+                disabled={uploading}
+                className="block w-full text-sm text-gray-300 file:mr-4 file:rounded file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-blue-700 disabled:opacity-50"
+              />
+              <p className="text-gray-400 text-sm mt-2">
+                {uploading ? 'Uploading image...' : imageGuidance}
+              </p>
+              <label className="block text-white font-semibold mt-4 mb-2">Current Image URL</label>
               <input
                 type="text"
                 maxLength={500}
@@ -156,7 +211,9 @@ function SocialShareEditor() {
                 className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
                 placeholder="/og/socialpredict-card.png"
               />
-              <p className="text-gray-400 text-sm mt-2">{imageGuidance}</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Advanced: paste an absolute URL or root-relative path instead of using the uploaded image.
+              </p>
             </div>
 
             <div>
@@ -187,9 +244,9 @@ function SocialShareEditor() {
             <h2 className="text-white font-semibold text-lg mb-4">Share Preview</h2>
             <div className="rounded-lg overflow-hidden border border-gray-700 bg-gray-950">
               <div className="aspect-[1200/630] bg-gray-800 flex items-center justify-center text-gray-400 text-sm">
-                {settings.defaultImageUrl ? (
+                {previewImageUrl ? (
                   <img
-                    src={settings.defaultImageUrl}
+                    src={previewImageUrl}
                     alt={settings.imageAlt || 'Social share preview'}
                     className="w-full h-full object-cover"
                   />
