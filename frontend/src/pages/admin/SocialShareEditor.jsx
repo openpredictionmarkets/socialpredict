@@ -23,12 +23,19 @@ const resolvePreviewImageUrl = (imageUrl) => {
   return `${frontendOrigin}${normalizedPath}`;
 };
 
+const appendPreviewCacheBust = (imageUrl, cacheKey) => {
+  if (!imageUrl || !cacheKey) return imageUrl;
+  const separator = imageUrl.includes('?') ? '&' : '?';
+  return `${imageUrl}${separator}previewVersion=${encodeURIComponent(cacheKey)}`;
+};
+
 function SocialShareEditor() {
   const [settings, setSettings] = useState({
     siteName: '',
     defaultDescription: '',
     defaultImageUrl: '',
     imageAlt: '',
+    updatedAt: '',
     version: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -47,7 +54,11 @@ function SocialShareEditor() {
     if (descriptionLength < 110 || descriptionLength > 160) return 'text-amber-300';
     return 'text-green-300';
   }, [descriptionLength]);
-  const previewImageUrl = useMemo(() => resolvePreviewImageUrl(settings.defaultImageUrl), [settings.defaultImageUrl]);
+  const previewCacheKey = settings.updatedAt || settings.version;
+  const previewImageUrl = useMemo(() => {
+    const resolvedUrl = resolvePreviewImageUrl(settings.defaultImageUrl);
+    return appendPreviewCacheBust(resolvedUrl, previewCacheKey);
+  }, [settings.defaultImageUrl, previewCacheKey]);
 
   const fetchSettings = async () => {
     try {
@@ -59,6 +70,7 @@ function SocialShareEditor() {
         defaultDescription: data.defaultDescription || '',
         defaultImageUrl: data.defaultImageUrl || '',
         imageAlt: data.imageAlt || '',
+        updatedAt: data.updatedAt || '',
         version: data.version || 0,
       });
     } catch (err) {
@@ -95,6 +107,7 @@ function SocialShareEditor() {
         defaultDescription: data.defaultDescription || '',
         defaultImageUrl: data.defaultImageUrl || '',
         imageAlt: data.imageAlt || '',
+        updatedAt: data.updatedAt || '',
         version: data.version || 0,
       });
       setMessage('Social share settings saved successfully.');
@@ -130,6 +143,7 @@ function SocialShareEditor() {
         defaultDescription: data.defaultDescription || '',
         defaultImageUrl: data.defaultImageUrl || '',
         imageAlt: data.imageAlt || '',
+        updatedAt: data.updatedAt || '',
         version: data.version || 0,
       });
       setMessage('Social share image uploaded successfully.');
@@ -260,6 +274,7 @@ function SocialShareEditor() {
               <div className="aspect-[1200/630] bg-gray-800 flex items-center justify-center text-gray-400 text-sm">
                 {previewImageUrl ? (
                   <img
+                    key={previewImageUrl}
                     src={previewImageUrl}
                     alt={settings.imageAlt || 'Social share preview'}
                     className="w-full h-full object-cover"
