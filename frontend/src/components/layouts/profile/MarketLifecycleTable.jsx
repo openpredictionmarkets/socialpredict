@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const formatDate = (value) => {
@@ -10,7 +10,34 @@ const formatDate = (value) => {
 
 const statusLabel = (market) => market.lifecycleStatus || market.status || 'unknown';
 
+const marketLabel = (value, fallback) => {
+  const label = String(value || '').trim();
+  return label || fallback;
+};
+
+const MarketLabels = ({ market }) => (
+  <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+    <div className="rounded-md border border-emerald-700/70 bg-emerald-950/40 px-3 py-2">
+      <div className="font-mono uppercase tracking-[0.16em] text-emerald-300">YES label</div>
+      <div className="mt-1 break-words font-semibold text-emerald-50">{marketLabel(market.yesLabel, 'YES')}</div>
+    </div>
+    <div className="rounded-md border border-rose-700/70 bg-rose-950/40 px-3 py-2">
+      <div className="font-mono uppercase tracking-[0.16em] text-rose-300">NO label</div>
+      <div className="mt-1 break-words font-semibold text-rose-50">{marketLabel(market.noLabel, 'NO')}</div>
+    </div>
+  </div>
+);
+
 const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, actions }) => {
+  const [expandedDescriptions, setExpandedDescriptions] = useState({});
+
+  const toggleDescription = (marketId) => {
+    setExpandedDescriptions((current) => ({
+      ...current,
+      [marketId]: !current[marketId],
+    }));
+  };
+
   if (!markets.length) {
     return (
       <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
@@ -39,8 +66,20 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
                 <div className="font-semibold text-white">{market.questionTitle}</div>
                 <div className="mt-1 font-mono text-xs text-gray-400">ID: {market.id}</div>
                 {market.description && (
-                  <div className="mt-2 max-w-xl text-xs text-gray-400 line-clamp-2">{market.description}</div>
+                  <div className="mt-2 max-w-xl text-xs text-gray-300">
+                    <div className={expandedDescriptions[market.id] ? 'whitespace-pre-wrap break-words' : 'line-clamp-2 break-words'}>
+                      {market.description}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleDescription(market.id)}
+                      className="mt-2 text-primary-pink hover:underline"
+                    >
+                      {expandedDescriptions[market.id] ? 'Show less description' : 'Show full description'}
+                    </button>
+                  </div>
                 )}
+                <MarketLabels market={market} />
                 {statusLabel(market) === 'published' && (
                   <Link className="mt-2 inline-block text-primary-pink hover:underline" to={`/markets/${market.id}`}>
                     View market
