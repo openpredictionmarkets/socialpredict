@@ -4,6 +4,11 @@ import { API_URL } from '../../config';
 
 const descriptionGuidance = 'Aim for 110-160 characters. The backend allows up to 220 characters.';
 const imageGuidance = 'Upload a PNG, JPEG, or WebP up to 5 MB. Recommended dimensions are 1200x630px.';
+const adminMutationReasonMessages = {
+  PASSWORD_CHANGE_REQUIRED: 'Your admin password must be changed before updating CMS social share settings.',
+  AUTHORIZATION_DENIED: 'Only admin users can update CMS social share settings.',
+  INVALID_TOKEN: 'Your session expired. Please log in again.',
+};
 
 const resolvePreviewImageUrl = (imageUrl) => {
   if (!imageUrl) return '';
@@ -82,6 +87,7 @@ function SocialShareEditor() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(settings),
+        reasonMessages: adminMutationReasonMessages,
         fallbackMessage: 'Failed to save social share settings',
       });
       setSettings({
@@ -115,6 +121,7 @@ function SocialShareEditor() {
       const data = await authenticatedApiRequest('/v0/admin/content/social-share/image', {
         method: 'POST',
         body: formData,
+        reasonMessages: adminMutationReasonMessages,
         fallbackMessage: 'Failed to upload social share image',
       });
 
