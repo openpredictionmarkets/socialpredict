@@ -223,6 +223,10 @@ x-route-family-migration-matrix:
         - /v0/admin/markets/{id}/reject
         - /v0/content/home
         - /v0/admin/content/home
+        - /v0/content/social-share
+        - /v0/content/social-share/image
+        - /v0/admin/content/social-share
+        - /v0/admin/content/social-share/image
       success_contract: mixed raw JSON DTO and JSON `{ok:true,result}`
       failure_contract: ReasonResponse plus middleware 429 where wrapped
       migration_state: mixed_raw_success_reason_failure
@@ -2802,6 +2806,173 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/content/social-share:
+    get:
+      tags: [Content]
+      operationId: getSocialShareSettings
+      summary: Get public social share settings
+      description: Retrieves CMS-configured defaults used for public Open Graph and Twitter share cards.
+      responses:
+        '200':
+          description: Social share settings returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialShareSettingsEnvelopeResponse'
+        '500':
+          description: Failed to load social share settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+
+  /v0/content/social-share/image:
+    head:
+      tags: [Content]
+      operationId: headSocialShareImage
+      summary: Check uploaded social share image
+      description: Returns headers for the CMS-uploaded default Open Graph image when one has been uploaded and local image sharing is enabled.
+      responses:
+        '200':
+          description: Uploaded image headers returned successfully.
+        '404':
+          description: No CMS-uploaded image exists, or local image sharing is disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+    get:
+      tags: [Content]
+      operationId: getSocialShareImage
+      summary: Get uploaded social share image
+      description: Returns the CMS-uploaded default Open Graph image when one has been uploaded and local image sharing is enabled.
+      responses:
+        '200':
+          description: Uploaded image returned successfully.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: No CMS-uploaded image exists, or local image sharing is disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+
+  /v0/admin/content/social-share:
+    put:
+      tags: [Content]
+      operationId: updateSocialShareSettings
+      summary: Update social share settings
+      description: Updates CMS-managed defaults for Open Graph image, description, and site-name settings.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocialShareSettingsUpdateRequest'
+      responses:
+        '200':
+          description: Social share settings updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialShareSettingsEnvelopeResponse'
+        '400':
+          description: Invalid request body or validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required or password change is still required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+
+  /v0/admin/content/social-share/image:
+    post:
+      tags: [Content]
+      operationId: uploadSocialShareImage
+      summary: Upload social share image
+      description: Uploads a PNG, JPEG, or WebP image up to 5 MiB and points CMS social share settings at the public image route.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                imageAlt:
+                  type: string
+                  maxLength: 160
+      responses:
+        '200':
+          description: Image uploaded and social share settings updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialShareSettingsEnvelopeResponse'
+        '400':
+          description: Invalid upload or unsupported image.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required or password change is still required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3086,6 +3257,16 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/HomeContent'
+      required: [ok, result]
+
+    SocialShareSettingsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/SocialShareSettings'
       required: [ok, result]
 
     StatsResponse:
@@ -3853,6 +4034,12 @@ components:
           type: string
         creatorUsername:
           type: string
+        yesLabel:
+          type: string
+          description: Proposed market YES-side display label for admin review.
+        noLabel:
+          type: string
+          description: Proposed market NO-side display label for admin review.
         status:
           type: string
         lifecycleStatus:
@@ -4223,6 +4410,62 @@ components:
           type: string
         html:
           type: string
+        version:
+          type: integer
+          format: int64
+
+    SocialShareSettings:
+      type: object
+      properties:
+        siteName:
+          type: string
+          maxLength: 80
+          example: SocialPredict
+        defaultDescription:
+          type: string
+          maxLength: 220
+          description: Default description when a public market has no usable description. Operators should aim for 110-160 characters for external preview quality.
+          example: Prediction markets for the social web
+        defaultImageUrl:
+          type: string
+          maxLength: 500
+          description: Absolute or root-relative URL for the default Open Graph image. Recommended image dimensions are 1200x630px.
+          example: /og/socialpredict-share.png
+        imageEnabled:
+          type: boolean
+          description: Whether public market share pages include Open Graph and Twitter image metadata. Disable this during high-traffic events if serving share images from this application overloads the host.
+          example: true
+        imageAlt:
+          type: string
+          maxLength: 160
+          example: SocialPredict share card
+        version:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+      required: [siteName, defaultDescription, defaultImageUrl, imageEnabled, imageAlt, version]
+
+    SocialShareSettingsUpdateRequest:
+      type: object
+      required: [siteName, defaultDescription, defaultImageUrl]
+      properties:
+        siteName:
+          type: string
+          maxLength: 80
+        defaultDescription:
+          type: string
+          maxLength: 220
+        defaultImageUrl:
+          type: string
+          maxLength: 500
+        imageEnabled:
+          type: boolean
+          description: Whether public market share pages include Open Graph and Twitter image metadata.
+        imageAlt:
+          type: string
+          maxLength: 160
         version:
           type: integer
           format: int64

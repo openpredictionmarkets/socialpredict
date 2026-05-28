@@ -50,7 +50,7 @@ After #713 merges:
 - [x] 05. Market share metadata source and response contract
 - [x] 06. Initial HTML metadata delivery path
 - [x] 07. Open Graph and Twitter card tag coverage
-- [ ] 08. Share-card image policy
+- [x] 08. Share-card image policy
 - [ ] 09. Verification tests and external preview validation
 - [x] 10. Operator and user documentation
 
@@ -231,24 +231,29 @@ Validation:
 
 ### 08. Share-Card Image Policy
 
-Service ownership: Frontend Visual System Boundary.
+Service ownership: Frontend Visual System Boundary plus CMS content operations.
+
+Status: complete for the CMS-managed default-image slice.
 
 Checklist:
 
-- [ ] Decide static default image vs generated per-market image.
-- [ ] Ensure image URL is absolute and publicly reachable.
-- [ ] Ensure image dimensions are suitable for common social previews.
-- [ ] Keep image generation separate from market domain policy.
-- [ ] Add fallback image for missing/invalid market images.
+- [x] Decide static default image vs generated per-market image.
+- [x] Ensure image URL is absolute and publicly reachable after share metadata expansion.
+- [x] Ensure image dimensions are suitable for common social previews.
+- [x] Keep image generation separate from market domain policy.
+- [x] Add fallback image for missing/invalid market images.
+- [x] Add admin CMS settings for site name, fallback description, default image URL, filesystem-backed image upload, image alt text, and the local image-sharing toggle.
 
 Exit criteria:
 
-- [ ] Every shareable market has a valid `og:image`.
-- [ ] Image policy is documented and testable.
+- [x] Every shareable market has a valid `og:image`.
+- [x] Image policy is documented and testable.
 
 Validation:
 
-- [ ] External request to image URL returns expected content type and success status.
+- [x] Backend tests cover CMS social-share settings, filesystem image upload/serving, and generated metadata.
+- [x] Frontend production build.
+- [ ] External request to image URL returns expected content type and success status after deployment when local image sharing is enabled, and `404` when disabled.
 
 ### 09. Verification Tests And External Preview Validation
 

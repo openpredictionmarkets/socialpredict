@@ -20,9 +20,12 @@ const (
 
 // ShareMetadataConfig carries runtime-owned values needed for public share cards.
 type ShareMetadataConfig struct {
-	PublicBaseURL   string
-	DefaultImageURL string
-	SiteName        string
+	PublicBaseURL      string
+	DefaultImageURL    string
+	DisableImage       bool
+	DefaultImageAlt    string
+	SiteName           string
+	DefaultDescription string
 }
 
 // ShareMetadata is the public read model consumed by link-preview rendering.
@@ -32,6 +35,7 @@ type ShareMetadata struct {
 	Description  string
 	CanonicalURL string
 	ImageURL     string
+	ImageAlt     string
 	PublicStatus string
 	SiteName     string
 	Creator      string
@@ -66,7 +70,14 @@ func (s *Service) GetShareMetadata(ctx context.Context, marketID int64, config S
 
 	description := truncateForShare(strings.TrimSpace(market.Description), maxShareDescriptionLength)
 	if description == "" {
-		description = defaultShareDescription
+		description = truncateForShare(strings.TrimSpace(config.DefaultDescription), maxShareDescriptionLength)
+		if description == "" {
+			description = defaultShareDescription
+		}
+	}
+	imageAlt := truncateForShare(strings.TrimSpace(config.DefaultImageAlt), maxShareTitleLength)
+	if imageAlt == "" {
+		imageAlt = siteName + " share card"
 	}
 
 	return &ShareMetadata{
@@ -74,13 +85,21 @@ func (s *Service) GetShareMetadata(ctx context.Context, marketID int64, config S
 		Title:        marketTitle + " | " + siteName,
 		Description:  description,
 		CanonicalURL: shareURL(config.PublicBaseURL, shareMarketCanonicalPrefix, market.ID),
-		ImageURL:     shareImageURL(config.PublicBaseURL, config.DefaultImageURL),
+		ImageURL:     shareImageURLUnlessDisabled(config.PublicBaseURL, config.DefaultImageURL, config.DisableImage),
+		ImageAlt:     imageAlt,
 		PublicStatus: status,
 		SiteName:     siteName,
 		Creator:      market.CreatorUsername,
 		MarketTitle:  marketTitle,
 		Shareable:    true,
 	}, nil
+}
+
+func shareImageURLUnlessDisabled(base string, image string, disabled bool) string {
+	if disabled {
+		return ""
+	}
+	return shareImageURL(base, image)
 }
 
 func shareablePublicStatus(status string) bool {

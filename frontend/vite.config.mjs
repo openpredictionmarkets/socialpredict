@@ -1,13 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://backend:8080';
+
 export default defineConfig(() => {
   return {
     server: {
       allowedHosts: [
         'frontend', // we need this to be able to access the app on localhost
-        'localhost'
-      ]
+        'localhost',
+      ],
+      proxy: {
+        '/api': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+        },
+      },
     },
     build: {
       outDir: 'build',

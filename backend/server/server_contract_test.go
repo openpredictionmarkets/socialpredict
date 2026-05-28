@@ -176,6 +176,25 @@ func TestServerSharedMethodNotAllowedFailureEnvelope(t *testing.T) {
 	assertServerFailureReason(t, rec, handlers.ReasonMethodNotAllowed)
 }
 
+func TestServerAllowsHeadForPublicSocialShareImage(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodHead, "/api/v0/content/social-share/image", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusMethodNotAllowed {
+		t.Fatalf("expected HEAD image route to be allowed, got 405: %s", rec.Body.String())
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected missing image to return 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
@@ -201,6 +220,7 @@ func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 		"/v0/system/metrics",
 		"/v0/global/leaderboard",
 		"/v0/content/home",
+		"/v0/content/social-share",
 	}
 
 	for _, path := range tests {

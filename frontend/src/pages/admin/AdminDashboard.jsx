@@ -3,6 +3,7 @@ import AdminAddUser from '../../components/layouts/admin/AddUser';
 import ModeratorMarketReview from '../../components/layouts/admin/ModeratorMarketReview';
 import UserQueue from '../../components/layouts/admin/UserQueue';
 import HomeEditor from './HomeEditor';
+import SocialShareEditor from './SocialShareEditor';
 import SiteTabs from '../../components/tabs/SiteTabs';
 
 function AdminDashboard() {
@@ -18,6 +19,10 @@ function AdminDashboard() {
         { 
             label: 'Homepage Editor', 
             content: <HomeEditor /> 
+        },
+        {
+            label: 'Social Share',
+            content: <SocialShareEditor />
         },
         {
             label: 'Market Review',
