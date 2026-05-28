@@ -4019,6 +4019,12 @@ components:
           type: string
         creatorUsername:
           type: string
+        yesLabel:
+          type: string
+          description: Proposed market YES-side display label for admin review.
+        noLabel:
+          type: string
+          description: Proposed market NO-side display label for admin review.
         status:
           type: string
         lifecycleStatus:

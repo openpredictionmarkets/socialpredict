@@ -39,6 +39,8 @@ type marketReviewResponse struct {
 	QuestionTitle      string     `json:"questionTitle,omitempty"`
 	Description        string     `json:"description,omitempty"`
 	CreatorUsername    string     `json:"creatorUsername,omitempty"`
+	YesLabel           string     `json:"yesLabel,omitempty"`
+	NoLabel            string     `json:"noLabel,omitempty"`
 	Status             string     `json:"status"`
 	LifecycleStatus    string     `json:"lifecycleStatus"`
 	ApprovedBy         string     `json:"approvedBy,omitempty"`
@@ -204,6 +206,8 @@ func marketReviewResponseFromMarket(market *dmarkets.Market) marketReviewRespons
 		QuestionTitle:      market.QuestionTitle,
 		Description:        market.Description,
 		CreatorUsername:    market.CreatorUsername,
+		YesLabel:           market.YesLabel,
+		NoLabel:            market.NoLabel,
 		Status:             market.Status,
 		LifecycleStatus:    market.LifecycleStatus,
 		ApprovedBy:         market.ApprovedBy,

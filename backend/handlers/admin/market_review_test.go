@@ -115,6 +115,8 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 				ID:              44,
 				QuestionTitle:   "Queue item",
 				CreatorUsername: "moderator",
+				YesLabel:        "BIG",
+				NoLabel:         "SMALL",
 				Status:          dmarkets.MarketLifecycleProposed,
 				LifecycleStatus: dmarkets.MarketLifecycleProposed,
 			}}, nil
@@ -135,6 +137,9 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 	}
 	if !envelope.OK || envelope.Result.Total != 1 || envelope.Result.Markets[0].CreatorUsername != "moderator" {
 		t.Fatalf("unexpected response: %+v", envelope)
+	}
+	if envelope.Result.Markets[0].YesLabel != "BIG" || envelope.Result.Markets[0].NoLabel != "SMALL" {
+		t.Fatalf("expected custom labels in admin queue response, got %+v", envelope.Result.Markets[0])
 	}
 }
 
