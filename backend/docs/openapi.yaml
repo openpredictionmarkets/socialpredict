@@ -2832,7 +2832,7 @@ paths:
       tags: [Content]
       operationId: getSocialShareImage
       summary: Get uploaded social share image
-      description: Returns the CMS-uploaded default Open Graph image when one has been uploaded.
+      description: Returns the CMS-uploaded default Open Graph image when one has been uploaded and local image sharing is enabled.
       responses:
         '200':
           description: Uploaded image returned successfully.
@@ -2850,7 +2850,7 @@ paths:
                 type: string
                 format: binary
         '404':
-          description: No CMS-uploaded image exists.
+          description: No CMS-uploaded image exists, or local image sharing is disabled.
           content:
             application/json:
               schema:

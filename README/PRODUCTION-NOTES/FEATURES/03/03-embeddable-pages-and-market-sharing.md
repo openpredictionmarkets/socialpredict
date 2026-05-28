@@ -163,7 +163,8 @@ Expected defaults:
 - `SHARE_DEFAULT_IMAGE_URL` may be an absolute URL or a path under `PUBLIC_BASE_URL`; if unset, share cards use `/og/socialpredict-share.png`.
 - `SHARE_SITE_NAME` defaults to `SocialPredict`.
 - The admin dashboard Social Share CMS tab can upload a PNG, JPEG, or WebP image up to 5 MiB and writes the file under the backend upload directory and points share cards at `/api/v0/content/social-share/image`.
-- The same tab can also override `SHARE_DEFAULT_IMAGE_URL`, `SHARE_SITE_NAME`, fallback description, and image alt text without a deploy.
+- The same tab can also override `SHARE_DEFAULT_IMAGE_URL`, `SHARE_SITE_NAME`, fallback description, image alt text, and whether local share-image metadata is enabled without a deploy.
+- When local share-image metadata is disabled, market pages still emit title, description, and URL metadata, but the uploaded image endpoint returns `404` so operators can stop local crawler image traffic quickly.
 - `SOCIAL_SHARE_UPLOAD_DIR` controls where uploaded share images are stored; production compose backs it with the `socialpredict_uploads` Docker volume.
 - The default Open Graph image should be public and close to 1200x630px.
 - The fallback description should usually be 110-160 characters; the backend allows up to 220 characters.
@@ -179,7 +180,7 @@ After deployment, operators should verify:
 ```text
 curl -I https://example.com/markets/1
 curl https://example.com/markets/1 | grep -E 'og:title|og:description|og:image|og:image:alt'
-curl -I https://example.com/api/v0/content/social-share/image
+curl -I https://example.com/api/v0/content/social-share/image # expect 200 only when local image sharing is enabled
 ```
 
 Social preview crawlers may cache Open Graph metadata. If a market title, description, or image changes, an external preview/debugger tool may be needed to refresh the cached card.

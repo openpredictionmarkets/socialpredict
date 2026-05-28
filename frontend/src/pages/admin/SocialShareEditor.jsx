@@ -30,16 +30,18 @@ const appendPreviewCacheBust = (imageUrl, cacheKey) => {
   return `${imageUrl}${separator}previewVersion=${encodeURIComponent(cacheKey)}`;
 };
 
+const normalizeSettings = (data = {}) => ({
+  siteName: data.siteName || '',
+  defaultDescription: data.defaultDescription || '',
+  defaultImageUrl: data.defaultImageUrl || '',
+  imageEnabled: data.imageEnabled !== false,
+  imageAlt: data.imageAlt || '',
+  updatedAt: data.updatedAt || '',
+  version: data.version || 0,
+});
+
 function SocialShareEditor() {
-  const [settings, setSettings] = useState({
-    siteName: '',
-    defaultDescription: '',
-    defaultImageUrl: '',
-    imageEnabled: true,
-    imageAlt: '',
-    updatedAt: '',
-    version: 0,
-  });
+  const [settings, setSettings] = useState(normalizeSettings());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -67,15 +69,7 @@ function SocialShareEditor() {
       const data = await apiRequest('/v0/content/social-share', {
         fallbackMessage: 'Failed to load social share settings',
       });
-      setSettings({
-        siteName: data.siteName || '',
-        defaultDescription: data.defaultDescription || '',
-        defaultImageUrl: data.defaultImageUrl || '',
-        imageEnabled: data.imageEnabled !== false,
-        imageAlt: data.imageAlt || '',
-        updatedAt: data.updatedAt || '',
-        version: data.version || 0,
-      });
+      setSettings(normalizeSettings(data));
     } catch (err) {
       setError(err.message || 'Error loading social share settings');
     } finally {
@@ -105,15 +99,7 @@ function SocialShareEditor() {
         reasonMessages: adminMutationReasonMessages,
         fallbackMessage: 'Failed to save social share settings',
       });
-      setSettings({
-        siteName: data.siteName || '',
-        defaultDescription: data.defaultDescription || '',
-        defaultImageUrl: data.defaultImageUrl || '',
-        imageEnabled: data.imageEnabled !== false,
-        imageAlt: data.imageAlt || '',
-        updatedAt: data.updatedAt || '',
-        version: data.version || 0,
-      });
+      setSettings(normalizeSettings(data));
       setMessage('Social share settings saved successfully.');
     } catch (err) {
       setError(err.message || 'Error saving social share settings');
@@ -142,15 +128,7 @@ function SocialShareEditor() {
         fallbackMessage: 'Failed to upload social share image',
       });
 
-      setSettings({
-        siteName: data.siteName || '',
-        defaultDescription: data.defaultDescription || '',
-        defaultImageUrl: data.defaultImageUrl || '',
-        imageEnabled: data.imageEnabled !== false,
-        imageAlt: data.imageAlt || '',
-        updatedAt: data.updatedAt || '',
-        version: data.version || 0,
-      });
+      setSettings(normalizeSettings(data));
       setMessage('Social share image uploaded successfully.');
     } catch (err) {
       setError(err.message || 'Error uploading social share image');

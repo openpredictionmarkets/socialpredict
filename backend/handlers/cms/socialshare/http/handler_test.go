@@ -44,12 +44,15 @@ func TestPublicGetReturnsDefaultSocialShareSettings(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	var resp handlers.SuccessEnvelope[map[string]interface{}]
+	var resp handlers.SuccessEnvelope[settingsResponse]
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Result["siteName"] != socialshare.DefaultSiteName {
-		t.Fatalf("expected default siteName, got %#v", resp.Result["siteName"])
+	if resp.Result.SiteName != socialshare.DefaultSiteName {
+		t.Fatalf("expected default siteName, got %q", resp.Result.SiteName)
+	}
+	if !resp.Result.ImageEnabled {
+		t.Fatalf("expected default imageEnabled=true")
 	}
 }
 
@@ -142,9 +145,43 @@ func TestAdminUploadImageStoresPublicImageAndUpdatesSettings(t *testing.T) {
 	}
 }
 
+func TestPublicImageReturnsNotFoundWhenImagesDisabled(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	store := socialshare.NewFileImageStore(t.TempDir())
+	handler := newTestHandlerWithStore(t, db, store)
+	if err := store.Save(tinyPNG, "image/png"); err != nil {
+		t.Fatalf("save test image: %v", err)
+	}
+	if err := db.Create(&models.SocialShareSettings{
+		Slug:               "default",
+		SiteName:           socialshare.DefaultSiteName,
+		DefaultDescription: socialshare.DefaultDescription,
+		DefaultImageURL:    socialshare.UploadedImageURL,
+		ImageEnabled:       false,
+		ImageAlt:           socialshare.DefaultImageAlt,
+		Version:            1,
+	}).Error; err != nil {
+		t.Fatalf("create disabled settings: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/content/social-share/image", nil)
+	rec := httptest.NewRecorder()
+
+	handler.PublicImage(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func newTestHandler(t *testing.T, db *gorm.DB) *Handler {
 	t.Helper()
-	svc := socialshare.NewService(socialshare.NewGormRepository(db), socialshare.NewFileImageStore(t.TempDir()))
+	return newTestHandlerWithStore(t, db, socialshare.NewFileImageStore(t.TempDir()))
+}
+
+func newTestHandlerWithStore(t *testing.T, db *gorm.DB, store socialshare.ImageStore) *Handler {
+	t.Helper()
+	svc := socialshare.NewService(socialshare.NewGormRepository(db), store)
 	auth := authsvc.NewAuthService(users.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer))
 	return NewHandler(svc, auth)
 }

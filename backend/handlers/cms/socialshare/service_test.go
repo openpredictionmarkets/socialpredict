@@ -122,6 +122,35 @@ func TestUploadImageStoresImageAndPointsSettingsAtImageRoute(t *testing.T) {
 	}
 }
 
+func TestUploadImagePreservesDisabledImageSetting(t *testing.T) {
+	repo := &mockRepository{item: &models.SocialShareSettings{
+		Slug:               settingsSlug,
+		SiteName:           DefaultSiteName,
+		DefaultDescription: DefaultDescription,
+		DefaultImageURL:    DefaultImageURL,
+		ImageEnabled:       false,
+		ImageAlt:           DefaultImageAlt,
+		Version:            2,
+	}}
+	svc := NewService(repo, NewFileImageStore(t.TempDir()))
+
+	settings, err := svc.UploadImage(UploadImageInput{
+		FileName:  "card.png",
+		Data:      tinyPNG,
+		ImageAlt:  "Uploaded share card",
+		UpdatedBy: "admin",
+	})
+	if err != nil {
+		t.Fatalf("UploadImage returned error: %v", err)
+	}
+	if settings.ImageEnabled {
+		t.Fatalf("ImageEnabled = true, want false")
+	}
+	if settings.DefaultImageURL != UploadedImageURL {
+		t.Fatalf("DefaultImageURL = %q", settings.DefaultImageURL)
+	}
+}
+
 func TestUploadImageRejectsUnsupportedContentType(t *testing.T) {
 	svc := NewService(&mockRepository{}, NewFileImageStore(t.TempDir()))
 

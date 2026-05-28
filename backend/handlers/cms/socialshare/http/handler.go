@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"socialpredict/handlers"
 	"socialpredict/handlers/authhttp"
@@ -32,6 +33,16 @@ func (h *Handler) PublicGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) PublicImage(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.svc.GetSettings()
+	if err != nil {
+		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+		return
+	}
+	if !settings.ImageEnabled {
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonNotFound)
+		return
+	}
+
 	image, err := h.svc.GetImage()
 	if err != nil {
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonNotFound)
@@ -54,6 +65,16 @@ type updateReq struct {
 	ImageEnabled       *bool  `json:"imageEnabled"`
 	ImageAlt           string `json:"imageAlt"`
 	Version            uint   `json:"version"`
+}
+
+type settingsResponse struct {
+	SiteName           string    `json:"siteName"`
+	DefaultDescription string    `json:"defaultDescription"`
+	DefaultImageURL    string    `json:"defaultImageUrl"`
+	ImageEnabled       bool      `json:"imageEnabled"`
+	ImageAlt           string    `json:"imageAlt"`
+	Version            uint      `json:"version"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }
 
 func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
@@ -136,15 +157,15 @@ func (h *Handler) requireAdmin(w http.ResponseWriter, r *http.Request) (*dusers.
 	return admin, true
 }
 
-func responseFromSettings(item *models.SocialShareSettings) map[string]interface{} {
-	return map[string]interface{}{
-		"siteName":           item.SiteName,
-		"defaultDescription": item.DefaultDescription,
-		"defaultImageUrl":    item.DefaultImageURL,
-		"imageEnabled":       item.ImageEnabled,
-		"imageAlt":           item.ImageAlt,
-		"version":            item.Version,
-		"updatedAt":          item.UpdatedAt,
+func responseFromSettings(item *models.SocialShareSettings) settingsResponse {
+	return settingsResponse{
+		SiteName:           item.SiteName,
+		DefaultDescription: item.DefaultDescription,
+		DefaultImageURL:    item.DefaultImageURL,
+		ImageEnabled:       item.ImageEnabled,
+		ImageAlt:           item.ImageAlt,
+		Version:            item.Version,
+		UpdatedAt:          item.UpdatedAt,
 	}
 }
 
