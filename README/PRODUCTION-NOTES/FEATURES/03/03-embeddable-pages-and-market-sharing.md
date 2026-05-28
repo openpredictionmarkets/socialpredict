@@ -160,7 +160,7 @@ Expected defaults:
 - `PUBLIC_BASE_URL` falls back to `DOMAIN_URL`, then `http://localhost`.
 - `SECURITY_FRAME_ANCESTORS` defaults to `'none'`, which keeps iframe embedding denied.
 - When `SECURITY_FRAME_ANCESTORS` is set to an explicit allowlist, the backend emits `Content-Security-Policy: frame-ancestors ...` and omits `X-Frame-Options` because `X-Frame-Options` cannot express a multi-origin allowlist.
-- `SHARE_DEFAULT_IMAGE_URL` may be an absolute URL or a path under `PUBLIC_BASE_URL`; if unset, share cards use `/logo512.png`.
+- `SHARE_DEFAULT_IMAGE_URL` may be an absolute URL or a path under `PUBLIC_BASE_URL`; if unset, share cards use `/og/socialpredict-share.png`.
 - `SHARE_SITE_NAME` defaults to `SocialPredict`.
 - The admin dashboard Social Share CMS tab can upload a PNG, JPEG, or WebP image up to 5 MiB and writes the file under the backend upload directory and points share cards at `/api/v0/content/social-share/image`.
 - The same tab can also override `SHARE_DEFAULT_IMAGE_URL`, `SHARE_SITE_NAME`, fallback description, and image alt text without a deploy.

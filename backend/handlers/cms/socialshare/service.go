@@ -14,7 +14,7 @@ const (
 	settingsSlug                      = "default"
 	DefaultSiteName                   = "SocialPredict"
 	DefaultDescription                = "Prediction markets for the social web"
-	DefaultImageURL                   = "/logo512.png"
+	DefaultImageURL                   = "/og/socialpredict-share.png"
 	DefaultImageAlt                   = "SocialPredict share card"
 	UploadedImageURL                  = "/api/v0/content/social-share/image"
 	MaxSiteNameLength                 = 80

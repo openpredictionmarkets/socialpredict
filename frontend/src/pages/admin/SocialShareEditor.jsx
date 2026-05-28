@@ -209,7 +209,7 @@ function SocialShareEditor() {
                 value={settings.defaultImageUrl}
                 onChange={(e) => handleInputChange('defaultImageUrl', e.target.value)}
                 className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
-                placeholder="/og/socialpredict-card.png"
+                placeholder="/og/socialpredict-share.png"
               />
               <p className="text-gray-400 text-sm mt-2">
                 Advanced: paste an absolute URL or root-relative path instead of using the uploaded image.

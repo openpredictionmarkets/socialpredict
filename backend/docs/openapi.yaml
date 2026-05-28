@@ -4409,7 +4409,7 @@ components:
           type: string
           maxLength: 500
           description: Absolute or root-relative URL for the default Open Graph image. Recommended image dimensions are 1200x630px.
-          example: /og/socialpredict-card.png
+          example: /og/socialpredict-share.png
         imageAlt:
           type: string
           maxLength: 160
