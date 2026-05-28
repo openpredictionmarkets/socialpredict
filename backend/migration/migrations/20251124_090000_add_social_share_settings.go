@@ -8,7 +8,7 @@ import (
 )
 
 func MigrateAddSocialShareSettings(db *gorm.DB) error {
-	return db.AutoMigrate(&models.SocialShareSettings{}, &models.SocialShareImage{})
+	return db.AutoMigrate(&models.SocialShareSettings{})
 }
 
 func init() {

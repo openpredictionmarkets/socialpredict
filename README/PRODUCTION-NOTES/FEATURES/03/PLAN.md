@@ -242,7 +242,7 @@ Checklist:
 - [x] Ensure image dimensions are suitable for common social previews.
 - [x] Keep image generation separate from market domain policy.
 - [x] Add fallback image for missing/invalid market images.
-- [x] Add admin CMS settings for site name, fallback description, default image URL, image upload, and image alt text.
+- [x] Add admin CMS settings for site name, fallback description, default image URL, filesystem-backed image upload, and image alt text.
 
 Exit criteria:
 
@@ -251,7 +251,7 @@ Exit criteria:
 
 Validation:
 
-- [x] Backend tests cover CMS social-share settings, image upload/serving, and generated metadata.
+- [x] Backend tests cover CMS social-share settings, filesystem image upload/serving, and generated metadata.
 - [x] Frontend production build.
 - [ ] External request to image URL returns expected content type and success status after deployment.
 

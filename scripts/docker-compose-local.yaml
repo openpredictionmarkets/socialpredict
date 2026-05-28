@@ -35,6 +35,9 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DATABASE}
       APP_ENV: ${APP_ENV}
+      SOCIAL_SHARE_UPLOAD_DIR: "/data/socialpredict/uploads/social-share"
+    volumes:
+      - socialpredict_uploads:/data/socialpredict/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -79,3 +82,4 @@ networks:
 
 volumes:
   pgdata: {}
+  socialpredict_uploads: {}

@@ -28,10 +28,13 @@ services:
       DB_MAX_IDLE_CONNS: "${DB_MAX_IDLE_CONNS:-5}"
       DB_CONN_MAX_LIFETIME: "${DB_CONN_MAX_LIFETIME:-30m}"
       DB_CONN_MAX_IDLE_TIME: "${DB_CONN_MAX_IDLE_TIME:-5m}"
+      SOCIAL_SHARE_UPLOAD_DIR: "/data/socialpredict/uploads/social-share"
     networks:
       - socialpredict_internal_network
     env_file:
       - ../.env
+    volumes:
+      - socialpredict_uploads:/data/socialpredict/uploads
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - \"http://127.0.0.1:$${BACKEND_PORT:-8080}/readyz\" | grep -qx ready"]
       interval: 30s
@@ -53,10 +56,13 @@ services:
       DB_MAX_IDLE_CONNS: "${DB_MAX_IDLE_CONNS:-5}"
       DB_CONN_MAX_LIFETIME: "${DB_CONN_MAX_LIFETIME:-30m}"
       DB_CONN_MAX_IDLE_TIME: "${DB_CONN_MAX_IDLE_TIME:-5m}"
+      SOCIAL_SHARE_UPLOAD_DIR: "/data/socialpredict/uploads/social-share"
     networks:
       - socialpredict_internal_network
     env_file:
       - ../.env
+    volumes:
+      - socialpredict_uploads:/data/socialpredict/uploads
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - \"http://127.0.0.1:$${BACKEND_PORT:-8080}/readyz\" | grep -qx ready"]
       interval: 30s
@@ -125,3 +131,6 @@ networks:
   socialpredict_external_network:
     name: socialpredict_external_network
     external: true
+
+volumes:
+  socialpredict_uploads: {}

@@ -22,11 +22,9 @@ var tinyPNG = []byte{
 }
 
 type mockRepository struct {
-	item     *models.SocialShareSettings
-	image    *models.SocialShareImage
-	saveErr  error
-	getErr   error
-	imageErr error
+	item    *models.SocialShareSettings
+	saveErr error
+	getErr  error
 }
 
 func (m *mockRepository) GetBySlug(slug string) (*models.SocialShareSettings, error) {
@@ -47,26 +45,8 @@ func (m *mockRepository) Save(item *models.SocialShareSettings) error {
 	return nil
 }
 
-func (m *mockRepository) GetImageBySlug(slug string) (*models.SocialShareImage, error) {
-	if m.imageErr != nil {
-		return nil, m.imageErr
-	}
-	if m.image == nil {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return m.image, nil
-}
-
-func (m *mockRepository) SaveImage(item *models.SocialShareImage) error {
-	if m.saveErr != nil {
-		return m.saveErr
-	}
-	m.image = item
-	return nil
-}
-
 func TestGetSettingsReturnsDefaultsWhenMissing(t *testing.T) {
-	svc := NewService(&mockRepository{})
+	svc := NewService(&mockRepository{}, NewFileImageStore(t.TempDir()))
 
 	settings, err := svc.GetSettings()
 	if err != nil {
@@ -82,7 +62,7 @@ func TestGetSettingsReturnsDefaultsWhenMissing(t *testing.T) {
 
 func TestUpdateSettingsCreatesDefaultRowAndValidatesURL(t *testing.T) {
 	repo := &mockRepository{}
-	svc := NewService(repo)
+	svc := NewService(repo, NewFileImageStore(t.TempDir()))
 
 	settings, err := svc.UpdateSettings(UpdateInput{
 		SiteName:           "KConfs",
@@ -107,7 +87,8 @@ func TestUpdateSettingsCreatesDefaultRowAndValidatesURL(t *testing.T) {
 
 func TestUploadImageStoresImageAndPointsSettingsAtImageRoute(t *testing.T) {
 	repo := &mockRepository{}
-	svc := NewService(repo)
+	store := NewFileImageStore(t.TempDir())
+	svc := NewService(repo, store)
 
 	settings, err := svc.UploadImage(UploadImageInput{
 		FileName:  "card.png",
@@ -118,8 +99,12 @@ func TestUploadImageStoresImageAndPointsSettingsAtImageRoute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UploadImage returned error: %v", err)
 	}
-	if repo.image == nil || repo.image.ContentType != "image/png" {
-		t.Fatalf("unexpected stored image: %+v", repo.image)
+	image, err := store.Load()
+	if err != nil {
+		t.Fatalf("load stored image: %v", err)
+	}
+	if image.ContentType != "image/png" {
+		t.Fatalf("ContentType = %q", image.ContentType)
 	}
 	if settings.DefaultImageURL != UploadedImageURL {
 		t.Fatalf("DefaultImageURL = %q", settings.DefaultImageURL)
@@ -130,7 +115,7 @@ func TestUploadImageStoresImageAndPointsSettingsAtImageRoute(t *testing.T) {
 }
 
 func TestUploadImageRejectsUnsupportedContentType(t *testing.T) {
-	svc := NewService(&mockRepository{})
+	svc := NewService(&mockRepository{}, NewFileImageStore(t.TempDir()))
 
 	_, err := svc.UploadImage(UploadImageInput{Data: []byte("not an image")})
 	if err == nil {
@@ -139,7 +124,7 @@ func TestUploadImageRejectsUnsupportedContentType(t *testing.T) {
 }
 
 func TestUpdateSettingsRejectsUnsafeImageURL(t *testing.T) {
-	svc := NewService(&mockRepository{})
+	svc := NewService(&mockRepository{}, NewFileImageStore(t.TempDir()))
 
 	_, err := svc.UpdateSettings(UpdateInput{
 		SiteName:           "SocialPredict",

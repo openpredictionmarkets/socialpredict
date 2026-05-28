@@ -2,7 +2,6 @@ package socialshare
 
 import (
 	"errors"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -13,12 +12,11 @@ import (
 
 const (
 	settingsSlug                      = "default"
-	imageSlug                         = "default"
 	DefaultSiteName                   = "SocialPredict"
 	DefaultDescription                = "Prediction markets for the social web"
 	DefaultImageURL                   = "/logo512.png"
 	DefaultImageAlt                   = "SocialPredict share card"
-	UploadedImageURL                  = "/v0/content/social-share/image"
+	UploadedImageURL                  = "/api/v0/content/social-share/image"
 	MaxSiteNameLength                 = 80
 	MaxDefaultDescriptionLength       = 220
 	MaxDefaultImageURLLength          = 500
@@ -26,18 +24,17 @@ const (
 	MaxUploadedImageBytes       int64 = 5 * 1024 * 1024
 )
 
-var allowedImageContentTypes = map[string]struct{}{
-	"image/jpeg": {},
-	"image/png":  {},
-	"image/webp": {},
-}
-
 type Service struct {
-	repo Repository
+	repo       Repository
+	imageStore ImageStore
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository, stores ...ImageStore) *Service {
+	store := ImageStore(NewDefaultImageStore())
+	if len(stores) > 0 && stores[0] != nil {
+		store = stores[0]
+	}
+	return &Service{repo: repo, imageStore: store}
 }
 
 type UpdateInput struct {
@@ -67,8 +64,8 @@ func (s *Service) GetSettings() (*models.SocialShareSettings, error) {
 	return nil, err
 }
 
-func (s *Service) GetImage() (*models.SocialShareImage, error) {
-	return s.repo.GetImageBySlug(imageSlug)
+func (s *Service) GetImage() (*UploadedImage, error) {
+	return s.imageStore.Load()
 }
 
 func (s *Service) UpdateSettings(in UpdateInput) (*models.SocialShareSettings, error) {
@@ -99,22 +96,11 @@ func (s *Service) UpdateSettings(in UpdateInput) (*models.SocialShareSettings, e
 }
 
 func (s *Service) UploadImage(in UploadImageInput) (*models.SocialShareSettings, error) {
-	image, err := s.getImageForUpdate()
-	if err != nil {
-		return nil, err
-	}
 	contentType, err := validateUploadedImage(in.Data)
 	if err != nil {
 		return nil, err
 	}
-
-	image.Slug = imageSlug
-	image.FileName = truncateFileName(in.FileName)
-	image.ContentType = contentType
-	image.SizeBytes = int64(len(in.Data))
-	image.Data = append(image.Data[:0], in.Data...)
-	image.UpdatedBy = strings.TrimSpace(in.UpdatedBy)
-	if err := s.repo.SaveImage(image); err != nil {
+	if err := s.imageStore.Save(in.Data, contentType); err != nil {
 		return nil, err
 	}
 
@@ -156,17 +142,6 @@ func (s *Service) getSettingsForUpdate() (*models.SocialShareSettings, error) {
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return DefaultSettings(), nil
-	}
-	return nil, err
-}
-
-func (s *Service) getImageForUpdate() (*models.SocialShareImage, error) {
-	item, err := s.repo.GetImageBySlug(imageSlug)
-	if err == nil {
-		return item, nil
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return &models.SocialShareImage{Slug: imageSlug}, nil
 	}
 	return nil, err
 }
@@ -237,23 +212,13 @@ func validateUploadedImage(data []byte) (string, error) {
 	if int64(len(data)) > MaxUploadedImageBytes {
 		return "", errors.New("image is too large")
 	}
-	contentType := http.DetectContentType(data)
-	if _, ok := allowedImageContentTypes[contentType]; !ok {
-		return "", errors.New("unsupported image content type")
+	contentType := DetectUploadedImageContentType(data)
+	for _, allowed := range supportedImageContentTypes() {
+		if contentType == allowed {
+			return contentType, nil
+		}
 	}
-	return contentType, nil
-}
-
-func truncateFileName(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "social-share-image"
-	}
-	runes := []rune(value)
-	if len(runes) > 255 {
-		return string(runes[:255])
-	}
-	return value
+	return "", errors.New("unsupported image content type")
 }
 
 func bumpSettingsVersion(item *models.SocialShareSettings) {

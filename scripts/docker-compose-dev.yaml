@@ -31,12 +31,14 @@ services:
       DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DATABASE}
       STARTUP_WRITER: "${STARTUP_WRITER:-true}"
+      SOCIAL_SHARE_UPLOAD_DIR: "/data/socialpredict/uploads/social-share"
     env_file:
       - ../.env
     ports:
       - "${BACKEND_PORT}:8080"
     volumes:
       - ../backend:/src                              # keep for live dev (air/nodemon etc.)
+      - socialpredict_uploads:/data/socialpredict/uploads
     networks:
       - socialpredict_dev_network
     depends_on:
@@ -67,3 +69,4 @@ networks:
 volumes:
   pgdata: {}
   socialpredict_dev_node_modules: {}
+  socialpredict_uploads: {}

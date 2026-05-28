@@ -134,7 +134,7 @@ func TestAdminUploadImageStoresPublicImageAndUpdatesSettings(t *testing.T) {
 
 func newTestHandler(t *testing.T, db *gorm.DB) *Handler {
 	t.Helper()
-	svc := socialshare.NewService(socialshare.NewGormRepository(db))
+	svc := socialshare.NewService(socialshare.NewGormRepository(db), socialshare.NewFileImageStore(t.TempDir()))
 	auth := authsvc.NewAuthService(users.NewService(rusers.NewGormRepository(db), nil, security.NewSecurityService().Sanitizer))
 	return NewHandler(svc, auth)
 }
