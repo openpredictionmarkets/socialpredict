@@ -4410,6 +4410,10 @@ components:
           maxLength: 500
           description: Absolute or root-relative URL for the default Open Graph image. Recommended image dimensions are 1200x630px.
           example: /og/socialpredict-share.png
+        imageEnabled:
+          type: boolean
+          description: Whether public market share pages include Open Graph and Twitter image metadata. Disable this during high-traffic events if serving share images from this application overloads the host.
+          example: true
         imageAlt:
           type: string
           maxLength: 160
@@ -4420,7 +4424,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [siteName, defaultDescription, defaultImageUrl, imageAlt, version]
+      required: [siteName, defaultDescription, defaultImageUrl, imageEnabled, imageAlt, version]
 
     SocialShareSettingsUpdateRequest:
       type: object
@@ -4435,6 +4439,9 @@ components:
         defaultImageUrl:
           type: string
           maxLength: 500
+        imageEnabled:
+          type: boolean
+          description: Whether public market share pages include Open Graph and Twitter image metadata.
         imageAlt:
           type: string
           maxLength: 160

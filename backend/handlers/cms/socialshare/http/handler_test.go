@@ -62,6 +62,7 @@ func TestAdminUpdateSocialShareSettings(t *testing.T) {
 		SiteName:           "KConfs",
 		DefaultDescription: "Share SocialPredict markets with a complete public preview card.",
 		DefaultImageURL:    "https://kconfs.com/og/socialpredict-card.png",
+		ImageEnabled:       boolPtr(false),
 		ImageAlt:           "SocialPredict market share card",
 	}
 	body, _ := json.Marshal(payload)
@@ -80,6 +81,9 @@ func TestAdminUpdateSocialShareSettings(t *testing.T) {
 	}
 	if stored.SiteName != payload.SiteName || stored.UpdatedBy != admin.Username {
 		t.Fatalf("unexpected stored settings: %+v", stored)
+	}
+	if stored.ImageEnabled {
+		t.Fatalf("expected ImageEnabled=false after admin update")
 	}
 }
 
@@ -159,4 +163,8 @@ func seedAdmin(t *testing.T, db *gorm.DB) models.User {
 		t.Fatalf("clear must_change_password: %v", err)
 	}
 	return admin
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }

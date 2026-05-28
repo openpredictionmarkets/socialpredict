@@ -58,16 +58,21 @@ func TestGetSettingsReturnsDefaultsWhenMissing(t *testing.T) {
 	if settings.DefaultImageURL != DefaultImageURL {
 		t.Fatalf("DefaultImageURL = %q", settings.DefaultImageURL)
 	}
+	if !settings.ImageEnabled {
+		t.Fatalf("ImageEnabled = false, want true")
+	}
 }
 
 func TestUpdateSettingsCreatesDefaultRowAndValidatesURL(t *testing.T) {
 	repo := &mockRepository{}
 	svc := NewService(repo, NewFileImageStore(t.TempDir()))
+	imageEnabled := false
 
 	settings, err := svc.UpdateSettings(UpdateInput{
 		SiteName:           "KConfs",
 		DefaultDescription: "A useful public share description for SocialPredict markets.",
 		DefaultImageURL:    "/assets/share-card.png",
+		ImageEnabled:       &imageEnabled,
 		ImageAlt:           "KConfs share card",
 		UpdatedBy:          "admin",
 	})
@@ -79,6 +84,9 @@ func TestUpdateSettingsCreatesDefaultRowAndValidatesURL(t *testing.T) {
 	}
 	if settings.Version != 1 {
 		t.Fatalf("Version = %d, want 1", settings.Version)
+	}
+	if settings.ImageEnabled {
+		t.Fatalf("ImageEnabled = true, want false")
 	}
 	if repo.item == nil || repo.item.UpdatedBy != "admin" {
 		t.Fatalf("expected saved row with UpdatedBy admin, got %+v", repo.item)

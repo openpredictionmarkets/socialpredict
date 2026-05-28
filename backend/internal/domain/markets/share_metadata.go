@@ -22,6 +22,7 @@ const (
 type ShareMetadataConfig struct {
 	PublicBaseURL      string
 	DefaultImageURL    string
+	DisableImage       bool
 	DefaultImageAlt    string
 	SiteName           string
 	DefaultDescription string
@@ -84,7 +85,7 @@ func (s *Service) GetShareMetadata(ctx context.Context, marketID int64, config S
 		Title:        marketTitle + " | " + siteName,
 		Description:  description,
 		CanonicalURL: shareURL(config.PublicBaseURL, shareMarketCanonicalPrefix, market.ID),
-		ImageURL:     shareImageURL(config.PublicBaseURL, config.DefaultImageURL),
+		ImageURL:     shareImageURLUnlessDisabled(config.PublicBaseURL, config.DefaultImageURL, config.DisableImage),
 		ImageAlt:     imageAlt,
 		PublicStatus: status,
 		SiteName:     siteName,
@@ -92,6 +93,13 @@ func (s *Service) GetShareMetadata(ctx context.Context, marketID int64, config S
 		MarketTitle:  marketTitle,
 		Shareable:    true,
 	}, nil
+}
+
+func shareImageURLUnlessDisabled(base string, image string, disabled bool) string {
+	if disabled {
+		return ""
+	}
+	return shareImageURL(base, image)
 }
 
 func shareablePublicStatus(status string) bool {

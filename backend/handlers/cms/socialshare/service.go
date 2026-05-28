@@ -41,6 +41,7 @@ type UpdateInput struct {
 	SiteName           string
 	DefaultDescription string
 	DefaultImageURL    string
+	ImageEnabled       *bool
 	ImageAlt           string
 	UpdatedBy          string
 	Version            uint
@@ -85,6 +86,9 @@ func (s *Service) UpdateSettings(in UpdateInput) (*models.SocialShareSettings, e
 	item.SiteName = siteName
 	item.DefaultDescription = description
 	item.DefaultImageURL = imageURL
+	if in.ImageEnabled != nil {
+		item.ImageEnabled = *in.ImageEnabled
+	}
 	item.ImageAlt = imageAlt
 	item.UpdatedBy = strings.TrimSpace(in.UpdatedBy)
 	bumpSettingsVersion(item)
@@ -130,6 +134,7 @@ func DefaultSettings() *models.SocialShareSettings {
 		SiteName:           DefaultSiteName,
 		DefaultDescription: DefaultDescription,
 		DefaultImageURL:    DefaultImageURL,
+		ImageEnabled:       true,
 		ImageAlt:           DefaultImageAlt,
 		Version:            1,
 	}

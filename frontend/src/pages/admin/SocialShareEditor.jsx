@@ -4,6 +4,7 @@ import { API_URL } from '../../config';
 
 const descriptionGuidance = 'Aim for 110-160 characters. The backend allows up to 220 characters.';
 const imageGuidance = 'Upload a PNG, JPEG, or WebP up to 5 MB. Recommended dimensions are 1200x630px.';
+const hostedImageGuidance = 'For high-traffic deployments, use a hosted image URL/CDN so social crawlers do not add avoidable load to this server.';
 const adminMutationReasonMessages = {
   PASSWORD_CHANGE_REQUIRED: 'Your admin password must be changed before updating CMS social share settings.',
   AUTHORIZATION_DENIED: 'Only admin users can update CMS social share settings.',
@@ -34,6 +35,7 @@ function SocialShareEditor() {
     siteName: '',
     defaultDescription: '',
     defaultImageUrl: '',
+    imageEnabled: true,
     imageAlt: '',
     updatedAt: '',
     version: 0,
@@ -69,6 +71,7 @@ function SocialShareEditor() {
         siteName: data.siteName || '',
         defaultDescription: data.defaultDescription || '',
         defaultImageUrl: data.defaultImageUrl || '',
+        imageEnabled: data.imageEnabled !== false,
         imageAlt: data.imageAlt || '',
         updatedAt: data.updatedAt || '',
         version: data.version || 0,
@@ -106,6 +109,7 @@ function SocialShareEditor() {
         siteName: data.siteName || '',
         defaultDescription: data.defaultDescription || '',
         defaultImageUrl: data.defaultImageUrl || '',
+        imageEnabled: data.imageEnabled !== false,
         imageAlt: data.imageAlt || '',
         updatedAt: data.updatedAt || '',
         version: data.version || 0,
@@ -142,6 +146,7 @@ function SocialShareEditor() {
         siteName: data.siteName || '',
         defaultDescription: data.defaultDescription || '',
         defaultImageUrl: data.defaultImageUrl || '',
+        imageEnabled: data.imageEnabled !== false,
         imageAlt: data.imageAlt || '',
         updatedAt: data.updatedAt || '',
         version: data.version || 0,
@@ -230,6 +235,20 @@ function SocialShareEditor() {
               <p className="text-gray-400 text-sm mt-2">
                 {uploading ? 'Uploading image...' : imageGuidance}
               </p>
+              <label className="flex items-start gap-3 mt-4 rounded border border-amber-500/40 bg-amber-950/40 p-3 text-sm text-amber-100">
+                <input
+                  type="checkbox"
+                  checked={settings.imageEnabled}
+                  onChange={(e) => handleInputChange('imageEnabled', e.target.checked)}
+                  className="mt-1 h-4 w-4"
+                />
+                <span>
+                  <span className="block font-semibold text-amber-50">Include image metadata on shared market pages</span>
+                  <span className="block mt-1">
+                    Turn this off if public link previews are creating too much image traffic. Market pages will still share title, description, and URL metadata.
+                  </span>
+                </span>
+              </label>
               <label className="block text-white font-semibold mt-4 mb-2">Current Image URL</label>
               <input
                 type="text"
@@ -239,8 +258,8 @@ function SocialShareEditor() {
                 className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
                 placeholder="/og/socialpredict-share.png"
               />
-              <p className="text-gray-400 text-sm mt-2">
-                Advanced: paste an absolute URL or root-relative path instead of using the uploaded image.
+              <p className="text-amber-200 text-sm mt-2">
+                {hostedImageGuidance}
               </p>
             </div>
 
@@ -272,7 +291,7 @@ function SocialShareEditor() {
             <h2 className="text-white font-semibold text-lg mb-4">Share Preview</h2>
             <div className="rounded-lg overflow-hidden border border-gray-700 bg-gray-950">
               <div className="aspect-[1200/630] bg-gray-800 flex items-center justify-center text-gray-400 text-sm">
-                {previewImageUrl ? (
+                {settings.imageEnabled && previewImageUrl ? (
                   <img
                     key={previewImageUrl}
                     src={previewImageUrl}
@@ -280,7 +299,7 @@ function SocialShareEditor() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  'No default image URL'
+                  settings.imageEnabled ? 'No default image URL' : 'Image metadata disabled'
                 )}
               </div>
               <div className="p-4">

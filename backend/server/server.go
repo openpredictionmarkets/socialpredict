@@ -344,6 +344,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 		if strings.TrimSpace(settings.DefaultImageURL) != "" {
 			fallback.DefaultImageURL = settings.DefaultImageURL
 		}
+		fallback.DisableImage = !settings.ImageEnabled
 		if strings.TrimSpace(settings.ImageAlt) != "" {
 			fallback.DefaultImageAlt = settings.ImageAlt
 		}

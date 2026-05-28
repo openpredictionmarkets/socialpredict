@@ -62,6 +62,36 @@ func TestMarketShareShellHandlerEmitsOpenGraphHTML(t *testing.T) {
 	}
 }
 
+func TestMarketShareShellHandlerOmitsImageMetadataWhenDisabled(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/markets/42", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "42"})
+	rec := httptest.NewRecorder()
+
+	MarketShareShellHandler(shareMetadataServiceStub{
+		metadata: &dmarkets.ShareMetadata{
+			MarketID:     42,
+			Title:        "Market without image | SocialPredict",
+			Description:  "A safe public description.",
+			CanonicalURL: "https://kconfs.com/markets/42",
+			PublicStatus: dmarkets.MarketStatusActive,
+			SiteName:     "SocialPredict",
+		},
+	}, dmarkets.ShareMetadataConfig{}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, unwanted := range []string{`property="og:image"`, `name="twitter:image"`} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("share shell unexpectedly emitted %q in body:\n%s", unwanted, body)
+		}
+	}
+	if !strings.Contains(body, `<meta name="twitter:card" content="summary" />`) {
+		t.Fatalf("expected summary twitter card when image is disabled:\n%s", body)
+	}
+}
+
 func TestMarketShareShellHandlerRejectsNonPublicMarket(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/markets/7", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "7"})

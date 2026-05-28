@@ -51,6 +51,7 @@ type updateReq struct {
 	SiteName           string `json:"siteName"`
 	DefaultDescription string `json:"defaultDescription"`
 	DefaultImageURL    string `json:"defaultImageUrl"`
+	ImageEnabled       *bool  `json:"imageEnabled"`
 	ImageAlt           string `json:"imageAlt"`
 	Version            uint   `json:"version"`
 }
@@ -71,6 +72,7 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		SiteName:           in.SiteName,
 		DefaultDescription: in.DefaultDescription,
 		DefaultImageURL:    in.DefaultImageURL,
+		ImageEnabled:       in.ImageEnabled,
 		ImageAlt:           in.ImageAlt,
 		Version:            in.Version,
 		UpdatedBy:          admin.Username,
@@ -139,6 +141,7 @@ func responseFromSettings(item *models.SocialShareSettings) map[string]interface
 		"siteName":           item.SiteName,
 		"defaultDescription": item.DefaultDescription,
 		"defaultImageUrl":    item.DefaultImageURL,
+		"imageEnabled":       item.ImageEnabled,
 		"imageAlt":           item.ImageAlt,
 		"version":            item.Version,
 		"updatedAt":          item.UpdatedAt,
