@@ -37,6 +37,10 @@ func (h *Handler) PublicImage(w http.ResponseWriter, r *http.Request) {
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonNotFound)
 		return
 	}
+	// This image is a public share-card asset, so local previews and external
+	// crawlers must be able to render it outside the backend origin.
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
 	w.Header().Set("Content-Type", image.ContentType)
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	w.Header().Set("Content-Length", stringInt64(image.SizeBytes))

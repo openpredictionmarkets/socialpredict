@@ -7,7 +7,13 @@ export default defineConfig(() => {
       allowedHosts: [
         'frontend', // we need this to be able to access the app on localhost
         'localhost'
-      ]
+      ],
+      proxy: {
+        '/api': {
+          target: 'http://backend:8080',
+          changeOrigin: true,
+        },
+      },
     },
     build: {
       outDir: 'build',

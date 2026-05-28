@@ -15,7 +15,7 @@ const resolvePreviewImageUrl = (imageUrl) => {
   if (/^https?:\/\//.test(imageUrl)) return imageUrl;
 
   const normalizedPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-  if (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/v0/')) {
+  if (normalizedPath.startsWith('/v0/')) {
     return `${API_URL}${normalizedPath}`;
   }
 

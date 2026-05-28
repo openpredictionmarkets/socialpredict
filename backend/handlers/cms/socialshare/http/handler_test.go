@@ -127,6 +127,12 @@ func TestAdminUploadImageStoresPublicImageAndUpdatesSettings(t *testing.T) {
 	if got := imageRec.Header().Get("Content-Type"); got != "image/png" {
 		t.Fatalf("Content-Type = %q", got)
 	}
+	if got := imageRec.Header().Get("Cross-Origin-Resource-Policy"); got != "cross-origin" {
+		t.Fatalf("Cross-Origin-Resource-Policy = %q", got)
+	}
+	if got := imageRec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("Access-Control-Allow-Origin = %q", got)
+	}
 	if !bytes.Equal(imageRec.Body.Bytes(), tinyPNG) {
 		t.Fatalf("served image bytes do not match upload")
 	}
