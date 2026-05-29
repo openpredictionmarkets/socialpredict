@@ -8,6 +8,7 @@ export const betsAttempted = new Counter('sp_bets_attempted');
 export const betsSucceeded = new Counter('sp_bets_succeeded');
 export const betsFailed = new Counter('sp_bets_failed');
 export const loginFailures = new Counter('sp_login_failures');
+export const marketReadFailures = new Counter('sp_market_read_failures');
 
 export const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
 export const API_PREFIX = normalizeApiPrefix(__ENV.API_PREFIX || '');
@@ -16,6 +17,9 @@ export const MARKETS_FILE = __ENV.MARKETS_FILE || 'loadtest/fixtures/markets.csv
 export const DEFAULT_PASSWORD = __ENV.LOADTEST_PASSWORD || '';
 export const BET_AMOUNT = Number(__ENV.BET_AMOUNT || '1');
 export const HOT_MARKET_WEIGHT = Number(__ENV.HOT_MARKET_WEIGHT || '8');
+export const FAILURE_LOG_LIMIT = Number(__ENV.FAILURE_LOG_LIMIT || '10');
+
+let failureLogCount = 0;
 
 function parseCsv(raw) {
   const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -62,6 +66,33 @@ function normalizeApiPrefix(prefix) {
 
 function apiUrl(path) {
   return `${BASE_URL}${API_PREFIX}${path}`;
+}
+
+function responseSnippet(response) {
+  if (!response || !response.body) return '';
+  return String(response.body).replace(/\s+/g, ' ').slice(0, 240);
+}
+
+function recordFailure(kind, response, context = {}) {
+  const status = response ? String(response.status) : 'unknown';
+  const tags = { kind, status };
+  if (context.reason) tags.reason = context.reason;
+  if (kind === 'login') {
+    loginFailures.add(1, tags);
+  } else if (kind === 'bet') {
+    betsFailed.add(1, tags);
+  } else if (kind === 'market_read') {
+    marketReadFailures.add(1, tags);
+  }
+
+  if (failureLogCount >= FAILURE_LOG_LIMIT) return;
+  failureLogCount += 1;
+
+  const details = Object.entries(context)
+    .filter(([, value]) => value !== undefined && value !== '')
+    .map(([key, value]) => `${key}=${value}`)
+    .join(' ');
+  console.warn(`[loadtest] ${kind} failed status=${status} ${details} body="${responseSnippet(response)}"`);
 }
 
 export function secureRandomFraction() {
@@ -123,7 +154,7 @@ export function login(user) {
     'login returned token': (r) => Boolean(r.json('result.token')),
   });
   if (!ok) {
-    loginFailures.add(1);
+    recordFailure('login', response, { user: user.username, url: apiUrl('/v0/login') });
     return '';
   }
 
@@ -137,7 +168,7 @@ export function placeBet({ hotOnly = false } = {}) {
   const market = pickMarket({ hotOnly });
   const token = login(user);
   if (!token) {
-    betsFailed.add(1);
+    betsFailed.add(1, { reason: 'login_failed' });
     return;
   }
 
@@ -155,23 +186,29 @@ export function placeBet({ hotOnly = false } = {}) {
   if (ok) {
     betsSucceeded.add(1);
   } else {
-    betsFailed.add(1);
+    recordFailure('bet', response, { marketId: market.id, outcome, url: apiUrl('/v0/bet') });
   }
 }
 
 export function readMarket() {
 	const market = pickMarket();
 	const response = http.get(apiUrl(`/v0/markets/${market.id}`));
-	check(response, {
+	const ok = check(response, {
 		'market detail returned 200': (r) => r.status === 200,
 	});
+	if (!ok) {
+		recordFailure('market_read', response, { marketId: market.id, url: apiUrl(`/v0/markets/${market.id}`) });
+	}
 }
 
 export function readMarketList() {
 	const response = http.get(apiUrl('/v0/markets'));
-	check(response, {
+	const ok = check(response, {
 		'market list returned 200': (r) => r.status === 200,
 	});
+	if (!ok) {
+		recordFailure('market_read', response, { url: apiUrl('/v0/markets') });
+	}
 }
 
 export function checkProbes() {

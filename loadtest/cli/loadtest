@@ -229,6 +229,7 @@ run_cmd() {
   fi
 
   echo "Running ${scenario} against ${base_url}"
+  echo "API prefix: ${api_prefix:-<none>}"
   (
     cd "$REPO_DIR"
     BASE_URL="$base_url" \
