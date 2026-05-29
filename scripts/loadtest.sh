@@ -74,6 +74,53 @@ require_integer() {
   fi
 }
 
+loadtest_compose_file() {
+  case "${APP_ENV:-development}" in
+    development)
+      echo "${SCRIPT_DIR}/scripts/docker-compose-dev.yaml"
+      ;;
+    localhost)
+      echo "${SCRIPT_DIR}/scripts/docker-compose-local.yaml"
+      ;;
+    production)
+      echo "${SCRIPT_DIR}/scripts/docker-compose-prod.yaml"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+resolve_loadtest_backend_container() {
+  local fixed_name="${BACKEND_CONTAINER_NAME:-}"
+  local compose_file=""
+  local container_id=""
+
+  if [ -n "${fixed_name}" ] && docker ps --format '{{.Names}}' | grep -qx "${fixed_name}"; then
+    echo "${fixed_name}"
+    return 0
+  fi
+
+  compose_file="$(loadtest_compose_file || true)"
+  if [ -n "${compose_file}" ] && [ -f "${compose_file}" ]; then
+    container_id="$(docker compose --env-file "${SCRIPT_DIR}/.env" -f "${compose_file}" ps -q backend 2>/dev/null | head -n 1 || true)"
+    if [ -n "${container_id}" ] && [ "$(docker inspect -f '{{.State.Running}}' "${container_id}" 2>/dev/null || true)" = "true" ]; then
+      echo "${container_id}"
+      return 0
+    fi
+  fi
+
+  container_id="$(docker ps \
+    --filter "label=com.docker.compose.service=backend" \
+    --format '{{.ID}}' | head -n 1 || true)"
+  if [ -n "${container_id}" ]; then
+    echo "${container_id}"
+    return 0
+  fi
+
+  return 1
+}
+
 run_loadtest_seed() {
   local users="10"
   local moderators="2"
@@ -162,15 +209,16 @@ run_loadtest_seed() {
     exit 1
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -qx "${BACKEND_CONTAINER_NAME}"; then
-    print_error "Backend container '${BACKEND_CONTAINER_NAME}' is not running. Start the app first with './SocialPredict up'."
+  local backend_container
+  if ! backend_container="$(resolve_loadtest_backend_container)"; then
+    print_error "Could not find a running backend service container. Start the app first with './SocialPredict up'."
     exit 1
   fi
 
   local network_name
-  network_name="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "${BACKEND_CONTAINER_NAME}" | head -n 1)"
+  network_name="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "${backend_container}" | head -n 1)"
   if [ -z "${network_name}" ]; then
-    print_error "Could not determine Docker network for ${BACKEND_CONTAINER_NAME}."
+    print_error "Could not determine Docker network for backend container '${backend_container}'."
     exit 1
   fi
 
@@ -187,7 +235,7 @@ run_loadtest_seed() {
     optional_env+=(-e "LOAD_TEST_BCRYPT_COST=${bcrypt_cost}")
   fi
 
-  print_status "Seeding load-test fixtures through Docker network '${network_name}' ..."
+  print_status "Seeding load-test fixtures through backend container '${backend_container}' on Docker network '${network_name}' ..."
 
   docker run --rm \
     "${platform_args[@]}" \
