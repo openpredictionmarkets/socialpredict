@@ -151,6 +151,15 @@ tools/loadtest/
     schema.example.json
 ```
 
+This should start inside the SocialPredict repository. A separate CLI repository is unnecessary until the load-test harness needs its own release cycle or is reused across multiple projects.
+
+Runner authentication is split by concern:
+
+- k6 uses normal SocialPredict fake-user credentials and `POST /v0/login` for API traffic.
+- HostOps or SSH can be used separately for host observation.
+- `doctl` can be used separately in the future to provision a load-generator droplet.
+- DigitalOcean credentials are never used to bypass SocialPredict betting authorization.
+
 The tool should run from a developer machine or from a separate DigitalOcean load-generator droplet. The load generator should not run on the same droplet as the app/database when measuring server capacity, because it would contaminate CPU/network results.
 
 ## Release Dossier Evidence

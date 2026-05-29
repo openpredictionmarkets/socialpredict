@@ -112,6 +112,37 @@ HostOps is for host and infrastructure operations: SSH, environment inspection, 
 
 Load testing is application/API verification. It should live under SocialPredict tooling or a dedicated `tools/loadtest` tree. HostOps can help an operator connect to a host for observation, but it should not own k6 scenarios or application seed semantics.
 
+### Keep The First CLI In This Repository
+
+The first load-test CLI should live in this repository, not a separate repository.
+
+Reasons:
+
+- The CLI depends on this app's OpenAPI contract, route names, fixture semantics, and release dossier shape.
+- Reviewing load-test scripts beside the API they exercise makes contract drift easier to catch.
+- Keeping the first implementation under `tools/loadtest` avoids a second repository before the harness proves it needs independent release/versioning.
+
+A separate repository can be reconsidered later if the load generator becomes a reusable product, needs a separate release cycle, or must be shared across multiple applications.
+
+### Runner Authentication And Operation
+
+The runner machine authenticates in two different ways depending on what it is doing.
+
+For application traffic:
+
+- k6 authenticates by logging in as fictional users through `POST /v0/login`.
+- k6 stores normal bearer tokens in memory for the test run.
+- k6 places bets through `/v0/bet` using those normal bearer tokens.
+- k6 does not need DigitalOcean credentials for normal API traffic.
+
+For host observation or load-generator setup:
+
+- an operator may use HostOps or SSH to inspect the staging host
+- an operator may use `doctl` to create a separate load-generator droplet in the future
+- DigitalOcean credentials are not part of the betting API path
+
+This preserves a clean split: DigitalOcean auth operates infrastructure, while SocialPredict fake-user auth exercises the product API.
+
 ### Keep Dossier Output Small And Durable
 
 Raw load-test output can be large. The release dossier should be a summarized evidence artifact with links or paths to raw results when needed.

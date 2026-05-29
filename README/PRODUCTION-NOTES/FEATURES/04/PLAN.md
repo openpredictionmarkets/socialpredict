@@ -32,6 +32,8 @@ Implementation PRs should stay small enough to review independently:
 - dossier builder/output schema
 - optional workflow/manual dispatch
 
+The first implementation should keep the CLI and k6 scripts in this repository under `tools/loadtest`. Do not create a separate repository unless the harness later needs independent versioning or reuse outside SocialPredict.
+
 ## Planning Principles
 
 - Treat load testing as release evidence, not as a product feature visible to normal users.
@@ -43,6 +45,7 @@ Implementation PRs should stay small enough to review independently:
 - Record deployment topology with every meaningful result.
 - Prefer k6 for the first API-load implementation before inventing custom tooling.
 - Keep HostOps as optional host observation support, not the owner of load scenarios.
+- Keep DigitalOcean authentication separate from SocialPredict fake-user API authentication.
 
 ## Progress Ledger
 
@@ -141,6 +144,9 @@ Status: planned.
 Checklist:
 
 - [ ] Decide whether k6 logs in during setup or consumes exported credentials/tokens.
+- [ ] Keep the first runner CLI under `tools/loadtest` in this repository.
+- [ ] Document that k6 needs only SocialPredict fake-user credentials for API traffic.
+- [ ] Document that DigitalOcean credentials are only for host observation or provisioning a separate load-generator droplet.
 - [ ] If exporting credentials, keep files out of git by default.
 - [ ] If exporting tokens, ensure they are short-lived or staging-only.
 - [ ] Ensure fictional passwords are not reused for real users.
