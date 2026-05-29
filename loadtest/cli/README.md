@@ -9,6 +9,8 @@ Seed fixture CSVs with `./SocialPredict load seed`, or provide files under `load
 ```bash
 LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --markets 5 --reset
 ./loadtest/cli/loadtest check
+./loadtest/cli/loadtest host rate-limits staging
+./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
 ./loadtest/cli/loadtest fixtures pull staging
 ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --duration 5m --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
@@ -22,19 +24,61 @@ k6 logs in with normal fake SocialPredict users from `users.csv` and uses normal
 
 No DigitalOcean credentials or betting god token are used by this CLI.
 
-## Remote Fixture Pull
+## Operator Runbook
 
-After running `./SocialPredict load seed` on a remote staging host, pull the generated fixture CSVs back to your load-generator machine:
+For a step-by-step staging sequence, including SSH key expectations and what an
+LLM agent should run in order, see [`OPERATING.md`](./OPERATING.md).
+
+## Remote Host Checks
+
+Show the active remote `RATE_LIMIT_*` values:
 
 ```bash
+./loadtest/cli/loadtest host rate-limits staging
+```
+
+Override the SSH target when needed:
+
+```bash
+./loadtest/cli/loadtest host rate-limits staging \
+  --host root@45.55.227.1 \
+  --key ~/.keys/socialpredict/staging/id_ed25519 \
+  --repo-path /opt/socialpredict
+```
+
+## Remote Fixture Seed And Pull
+
+Seed staging over SSH, then pull the generated fixture CSVs back to your
+load-generator machine:
+
+```bash
+./loadtest/cli/loadtest fixtures seed staging \
+  --users 100 \
+  --moderators 5 \
+  --markets 20 \
+  --hot-markets 2 \
+  --reset
+
 ./loadtest/cli/loadtest fixtures pull staging
 ```
 
-The staging defaults are `root@kconfs.com`, `~/.keys/socialpredict/staging/id_ed25519`, and `/opt/socialpredict/loadtest/fixtures`.
+The staging defaults are `root@kconfs.com`,
+`~/.keys/socialpredict/staging/id_ed25519`, `/opt/socialpredict`, and
+`/opt/socialpredict/loadtest/fixtures`.
 
 Override values when needed:
 
 ```bash
+./loadtest/cli/loadtest fixtures seed staging \
+  --host root@45.55.227.1 \
+  --key ~/.keys/socialpredict/staging/id_ed25519 \
+  --repo-path /opt/socialpredict \
+  --users 100 \
+  --moderators 5 \
+  --markets 20 \
+  --hot-markets 2 \
+  --reset
+
 ./loadtest/cli/loadtest fixtures pull staging \
   --host root@45.55.227.1 \
   --key ~/.keys/socialpredict/staging/id_ed25519 \

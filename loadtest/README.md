@@ -7,6 +7,7 @@ The boundary is intentionally portable. If the harness later needs independent v
 ## Directory Map
 
 - `cli/`: wrapper commands for running scenarios and generating dossier summaries.
+- `cli/OPERATING.md`: step-by-step operator/LLM runbook for staging load tests.
 - `k6/`: k6 API load-test scenarios.
 - `fixtures/`: generated or operator-provided users, credentials, and market IDs. Ignored by default.
 - `results/`: raw k6 outputs. Ignored by default.
@@ -114,6 +115,12 @@ cp loadtest/fixtures/markets.example.csv loadtest/fixtures/markets.csv
 Run a smoke scenario:
 
 ```bash
+./loadtest/cli/loadtest fixtures seed staging \
+  --users 100 \
+  --moderators 5 \
+  --markets 20 \
+  --hot-markets 2 \
+  --reset
 ./loadtest/cli/loadtest fixtures pull staging
 ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ```
