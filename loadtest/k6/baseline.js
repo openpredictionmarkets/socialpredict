@@ -1,5 +1,5 @@
 import { sleep } from 'k6';
-import { checkProbes, placeBet, readMarket, readMarketList, requireFixtures } from './lib/common.js';
+import { checkProbes, placeBet, readMarket, readMarketList, requireFixtures, secureRandomBoolean } from './lib/common.js';
 
 const duration = __ENV.DURATION || '5m';
 const browseRate = Number(__ENV.BROWSE_RATE || '20');
@@ -38,7 +38,7 @@ export function setup() {
 }
 
 export function browse() {
-  if (Math.random() < 0.5) {
+  if (secureRandomBoolean()) {
     readMarketList();
   } else {
     readMarket();

@@ -1,5 +1,5 @@
 import { sleep } from 'k6';
-import { checkProbes, placeBet, readMarket, readMarketList, requireFixtures } from './lib/common.js';
+import { checkProbes, placeBet, readMarket, readMarketList, requireFixtures, secureRandomFraction } from './lib/common.js';
 
 const duration = __ENV.DURATION || '30m';
 const rate = Number(__ENV.RATE || '10');
@@ -27,7 +27,7 @@ export function setup() {
 }
 
 export default function () {
-  const roll = Math.random();
+  const roll = secureRandomFraction();
   if (roll < 0.35) {
     readMarketList();
   } else if (roll < 0.7) {

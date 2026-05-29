@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import crypto from 'k6/crypto';
 import { SharedArray } from 'k6/data';
 import { Counter } from 'k6/metrics';
 
@@ -52,6 +53,16 @@ export const markets = new SharedArray('loadtest markets', () => {
 
 const tokenCache = {};
 
+export function secureRandomFraction() {
+  const bytes = new Uint8Array(crypto.randomBytes(4));
+  const value = ((bytes[0] << 24) >>> 0) + (bytes[1] << 16) + (bytes[2] << 8) + bytes[3];
+  return value / 0x100000000;
+}
+
+export function secureRandomBoolean() {
+  return secureRandomFraction() < 0.5;
+}
+
 export function requireFixtures() {
   if (users.length === 0) {
     throw new Error(`No load-test users found in ${USERS_FILE}`);
@@ -62,7 +73,7 @@ export function requireFixtures() {
 }
 
 export function pick(list) {
-  return list[Math.floor(Math.random() * list.length)];
+  return list[Math.floor(secureRandomFraction() * list.length)];
 }
 
 export function pickUser() {
@@ -72,7 +83,7 @@ export function pickUser() {
 export function pickMarket({ hotOnly = false } = {}) {
   const hotMarkets = markets.filter((market) => market.kind === 'hot');
   if (hotOnly && hotMarkets.length > 0) return pick(hotMarkets);
-  if (hotMarkets.length > 0 && Math.random() < HOT_MARKET_WEIGHT / (HOT_MARKET_WEIGHT + 1)) {
+  if (hotMarkets.length > 0 && secureRandomFraction() < HOT_MARKET_WEIGHT / (HOT_MARKET_WEIGHT + 1)) {
     return pick(hotMarkets);
   }
   return pick(markets);
@@ -120,7 +131,7 @@ export function placeBet({ hotOnly = false } = {}) {
   }
 
   betsAttempted.add(1);
-  const outcome = Math.random() < 0.5 ? 'YES' : 'NO';
+  const outcome = secureRandomBoolean() ? 'YES' : 'NO';
   const response = http.post(
     `${BASE_URL}/v0/bet`,
     JSON.stringify({ marketId: market.id, amount: BET_AMOUNT, outcome }),

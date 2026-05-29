@@ -109,7 +109,7 @@ func run() error {
 	fmt.Printf("Users: %d regular + %d moderators\n", cfg.UserCount, cfg.ModeratorCount)
 	fmt.Printf("Markets: %d (%d hot)\n", cfg.MarketCount, cfg.HotMarketCount)
 	fmt.Printf("Fixtures: %s\n", cfg.FixtureDir)
-	fmt.Printf("Password: %s\n", cfg.Password)
+	fmt.Printf("Password: [REDACTED]\n")
 	fmt.Printf("MustChangePassword: false\n")
 	return nil
 }
