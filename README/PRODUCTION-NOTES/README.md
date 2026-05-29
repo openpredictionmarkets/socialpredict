@@ -77,6 +77,7 @@ Current feature specs:
 
 1. **Moderator Mode** - [`FEATURES/01/01-moderators.md`](./FEATURES/01/01-moderators.md), [`FEATURES/01/DESIGN.md`](./FEATURES/01/DESIGN.md), [`FEATURES/01/PLAN.md`](./FEATURES/01/PLAN.md)
 3. **Embeddable Pages And Market Sharing** - [`FEATURES/03/03-embeddable-pages-and-market-sharing.md`](./FEATURES/03/03-embeddable-pages-and-market-sharing.md), [`FEATURES/03/DESIGN.md`](./FEATURES/03/DESIGN.md), [`FEATURES/03/PLAN.md`](./FEATURES/03/PLAN.md)
+4. **Load Testing And Release Dossier Evidence** - [`FEATURES/04/04-load-testing.md`](./FEATURES/04/04-load-testing.md), [`FEATURES/04/DESIGN.md`](./FEATURES/04/DESIGN.md), [`FEATURES/04/PLAN.md`](./FEATURES/04/PLAN.md)
 
 ## Implementation Priority
 
