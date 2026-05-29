@@ -1,0 +1,29 @@
+{
+  "release": "local-smoke",
+  "environment": "staging",
+  "baseUrl": "https://kconfs.com",
+  "appTopology": "single droplet app+postgres",
+  "databaseTopology": "local docker postgres",
+  "dropletSize": "unknown",
+  "loadGenerator": "macOS",
+  "scenario": "smoke",
+  "seed": {
+    "users": 2,
+    "moderators": 0,
+    "markets": 2,
+    "hotMarkets": 1
+  },
+  "traffic": {
+    "duration": "smoke",
+    "targetBetRatePerSecond": 0,
+    "readWriteMix": "smoke"
+  },
+  "infrastructureObservations": {
+    "appCpuPeakPercent": null,
+    "memoryPeakPercent": null,
+    "diskIoNotes": "",
+    "dbConnectionNotes": ""
+  },
+  "decision": "inconclusive",
+  "knownRisks": []
+}
