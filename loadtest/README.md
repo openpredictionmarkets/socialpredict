@@ -50,9 +50,33 @@ k6 uses normal SocialPredict fake-user credentials and `POST /v0/login` for API 
 
 HostOps, SSH, and `doctl` are separate infrastructure tools for observing or provisioning hosts.
 
-## Minimal Fixture Files
+## Fixture Generation
 
-The initial harness expects fixture CSVs to already exist. The guarded seed/reset command is a later implementation slice.
+Use the guarded SocialPredict seed command to create fake users, moderators, published markets, and the CSV files consumed by k6:
+
+```bash
+LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --markets 5 --hot-markets 1 --reset
+```
+
+For a larger staging exercise:
+
+```bash
+LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 50000 --moderators 100 --markets 1000 --hot-markets 10 --reset
+```
+
+Safety rules:
+
+- `LOAD_TEST_ENABLED=true` is required for every seed run.
+- `APP_ENV=production` is refused unless `LOAD_TEST_ALLOW_PRODUCTION=true` is also set.
+- `--reset` removes only data with the configured load-test prefixes before recreating fixtures.
+- Generated fixture CSVs are written to `loadtest/fixtures/` and are ignored by git.
+
+The generated fake users log in through the normal `/v0/login` API and have `must_change_password=false`.
+By default, each fake user starts with `1000000` credits so bet traffic is less likely to turn into balance-failure traffic. Override with `--user-balance N` when needed.
+
+## Manual Fixture Files
+
+For early smoke checks, you can still provide fixture CSVs manually.
 
 `fixtures/users.csv`:
 
@@ -72,17 +96,19 @@ market_id,kind
 
 ## Quick Start
 
-Copy or generate fixture files:
+Start the app, seed a small local fixture set, and check prerequisites:
+
+```bash
+./SocialPredict up
+LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --markets 5 --hot-markets 1 --reset
+./loadtest/cli/loadtest check
+```
+
+Or copy example fixture files without touching a database:
 
 ```bash
 cp loadtest/fixtures/users.example.csv loadtest/fixtures/users.csv
 cp loadtest/fixtures/markets.example.csv loadtest/fixtures/markets.csv
-```
-
-Then check prerequisites:
-
-```bash
-./loadtest/cli/loadtest check
 ```
 
 Run a smoke scenario:

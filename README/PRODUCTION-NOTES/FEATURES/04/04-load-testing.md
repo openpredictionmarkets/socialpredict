@@ -87,6 +87,8 @@ Load testing must be opt-in and environment-scoped.
 Required safety posture:
 
 - Load-test seed/reset commands must refuse to run unless an environment flag such as `LOAD_TEST_ENABLED=true` is present.
+- `./SocialPredict load seed` is the current seed/reset entrypoint; it writes generated credentials and market IDs under `loadtest/fixtures/`.
+- A representative staging seed command is `LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 50000 --moderators 100 --markets 1000 --hot-markets 10 --reset`.
 - The default production path must not expose test seeding or reset endpoints.
 - Fictional users should authenticate through the normal login path unless a short-lived staging-only fixture export is explicitly implemented.
 - Any admin or bootstrap token should be used only for seed/reset orchestration, not for placing bets.

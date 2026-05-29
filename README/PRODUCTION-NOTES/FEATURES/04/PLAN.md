@@ -127,8 +127,8 @@ Checklist:
 
 Exit criteria:
 
-- [ ] A staging operator can seed 50,000 users, 100 moderators, and 1,000 markets repeatably.
-- [ ] Fixture data is identifiable and removable.
+- [x] A staging operator can seed 50,000 users, 100 moderators, and 1,000 markets repeatably.
+- [x] Fixture data is identifiable and removable.
 
 Validation:
 
@@ -139,7 +139,7 @@ Validation:
 
 Service ownership: API and Auth Contract Boundary plus Participant Account Context.
 
-Status: scaffolded for fixture consumption. Guarded seed/export generation is still planned.
+Status: seeded fixture generation is implemented; token export remains intentionally deferred.
 
 Checklist:
 
@@ -151,7 +151,7 @@ Checklist:
 - [x] Document that k6 needs only SocialPredict fake-user credentials for API traffic.
 - [x] Document that DigitalOcean credentials are only for host observation or provisioning a separate load-generator droplet.
 - [x] If exporting credentials, keep files out of git by default.
-- [ ] If exporting tokens, ensure they are short-lived or staging-only.
+- [ ] If exporting tokens later, ensure they are short-lived or staging-only.
 - [x] Ensure fictional passwords are not reused for real users in documented examples.
 - [x] Document secure local paths for generated fixtures.
 
