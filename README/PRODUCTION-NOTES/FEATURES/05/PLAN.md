@@ -24,6 +24,7 @@ Checklist:
 - [x] Add install profile selection for production-like installs.
 - [x] Keep `secure-default` as the safe default.
 - [x] Add `small-droplet-staging` profile for the current $4/mo DigitalOcean target.
+- [x] Add `env-file` profile support for non-secret deploy env overlays.
 - [x] Add `custom` prompts for explicit values.
 - [x] Write resolved values into `.env`.
 - [x] Document how to change values after install.
@@ -54,17 +55,16 @@ Service ownership: release dossier and operations.
 Checklist:
 
 - [ ] Deploy env-configurable rate limits to `kconfs.com`.
-- [x] Land Ansible deploy support for selecting the `small-droplet-staging` profile on the current 512 MiB / 1 vCPU droplet.
+- [x] Land Ansible deploy support for sourcing environment-specific rate-limit overlays.
 - [ ] Run smoke after deployment.
 - [ ] Run a low baseline test.
 - [ ] Increment rates until the first clear bottleneck appears.
 - [ ] Record rate-limit settings and DigitalOcean host observations in the release dossier.
 
-Ansible note: `openpredictionmarkets/ansible_playbooks` now defaults staging to
-`RATE_LIMIT_PROFILE=small-droplet-staging` and production/model-office to
-`RATE_LIMIT_PROFILE=secure-default`, with optional
-`STAGING_RATE_LIMIT_PROFILE` and `PRODUCTION_RATE_LIMIT_PROFILE` secret
-overrides.
+Ansible note: `openpredictionmarkets/ansible_playbooks` sources
+`deploy/env/.env.staging` for staging and `deploy/env/.env.mo` for
+production/model-office. Optional `STAGING_RATE_LIMIT_ENV_FILE` and
+`PRODUCTION_RATE_LIMIT_ENV_FILE` secrets can point to different overlay paths.
 
 ## 05. Documentation
 

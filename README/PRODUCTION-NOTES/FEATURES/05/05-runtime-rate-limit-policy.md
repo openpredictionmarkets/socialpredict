@@ -88,6 +88,10 @@ small-droplet-staging
   Intended for the current $4/mo 512 MiB / 1 vCPU DigitalOcean droplet.
   Values are provisional and must be verified by load-test evidence.
 
+env-file
+  Non-interactive deployment mode.
+  Uses RATE_LIMIT_* values sourced from a non-secret deploy env overlay.
+
 custom
   Operator supplies explicit login/general rate and burst values.
 ```
@@ -96,25 +100,32 @@ The production install path defaults to `secure-default` unless the operator exp
 
 Development installs can keep secure defaults. Developers who need local load testing can override `.env` manually.
 
-## Initial Small-Droplet Staging Candidate
+## OpenPredictionMarkets Staging Overlay
 
-The first candidate values for the current `kconfs.com` staging machine should be conservative enough to avoid masking resource pressure but high enough to stop rate limiting from dominating low-volume k6 tests.
+OpenPredictionMarkets staging uses `deploy/env/.env.staging` as a non-secret
+overlay before running `./SocialPredict install`. It is intentionally high
+because single-source k6 testing from one Mac or one load-generator host would
+otherwise trip the per-IP limiter before the app, database, or host is stressed.
 
-Start with:
+Current staging overlay:
 
 ```bash
-RATE_LIMIT_LOGIN_RATE_PER_SECOND=5
-RATE_LIMIT_LOGIN_BURST=20
-RATE_LIMIT_GENERAL_RATE_PER_SECOND=25
-RATE_LIMIT_GENERAL_BURST=50
+RATE_LIMIT_PROFILE=env-file
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=50
+RATE_LIMIT_LOGIN_BURST=100
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=500
+RATE_LIMIT_GENERAL_BURST=1000
 RATE_LIMIT_CLEANUP_INTERVAL=5m
 ```
 
 These are not production capacity claims. They are a starting point for measurement on the $4/mo droplet.
 
-If this profile still rate-limits before CPU, memory, DB, or application latency becomes the bottleneck, raise it incrementally and record each run in the release dossier.
+If this overlay still rate-limits before CPU, memory, DB, or application latency becomes the bottleneck, raise it incrementally and record each run in the release dossier.
 
-If this profile causes resource pressure before the desired request volume, record the machine limit rather than hiding it with a larger droplet.
+If this overlay causes resource pressure before the desired request volume, record the machine limit rather than hiding it with a larger droplet.
+
+OpenPredictionMarkets production/model-office uses `deploy/env/.env.mo`, which
+keeps the conservative `secure-default` values.
 
 ## Load-Test Interaction
 

@@ -157,6 +157,30 @@ apply_rate_limit_values() {
   set_env_value "RATE_LIMIT_CLEANUP_INTERVAL" "${cleanup_interval}"
 }
 
+require_rate_limit_env_value() {
+  local key="$1"
+  local value="${!key:-}"
+  if [ -z "${value}" ]; then
+    print_error "RATE_LIMIT_PROFILE=env-file requires ${key} to be set by the sourced env overlay."
+    exit 1
+  fi
+}
+
+apply_rate_limit_env_file_values() {
+  require_rate_limit_env_value "RATE_LIMIT_LOGIN_RATE_PER_SECOND"
+  require_rate_limit_env_value "RATE_LIMIT_LOGIN_BURST"
+  require_rate_limit_env_value "RATE_LIMIT_GENERAL_RATE_PER_SECOND"
+  require_rate_limit_env_value "RATE_LIMIT_GENERAL_BURST"
+  require_rate_limit_env_value "RATE_LIMIT_CLEANUP_INTERVAL"
+
+  apply_rate_limit_values \
+    "${RATE_LIMIT_LOGIN_RATE_PER_SECOND}" \
+    "${RATE_LIMIT_LOGIN_BURST}" \
+    "${RATE_LIMIT_GENERAL_RATE_PER_SECOND}" \
+    "${RATE_LIMIT_GENERAL_BURST}" \
+    "${RATE_LIMIT_CLEANUP_INTERVAL}"
+}
+
 apply_rate_limit_profile() {
   local profile="${1:-secure-default}"
 
@@ -166,6 +190,9 @@ apply_rate_limit_profile() {
       ;;
     small-droplet-staging)
       apply_rate_limit_values "5" "20" "25" "50" "5m"
+      ;;
+    env-file)
+      apply_rate_limit_env_file_values
       ;;
     custom)
       local login_rate
@@ -181,7 +208,7 @@ apply_rate_limit_profile() {
       apply_rate_limit_values "${login_rate}" "${login_burst}" "${general_rate}" "${general_burst}" "${cleanup_interval}"
       ;;
     *)
-      print_error "Unknown rate-limit profile '${profile}'. Use secure-default, small-droplet-staging, or custom."
+      print_error "Unknown rate-limit profile '${profile}'. Use secure-default, small-droplet-staging, env-file, or custom."
       exit 1
       ;;
   esac
@@ -199,13 +226,15 @@ select_rate_limit_profile() {
   echo "### Select Rate Limit Profile:"
   echo "1) secure-default - conservative public defaults"
   echo "2) small-droplet-staging - initial load-test profile for 512 MiB / 1 vCPU DigitalOcean staging"
-  echo "3) custom - enter explicit values"
+  echo "3) env-file - use RATE_LIMIT_* values from the current shell environment"
+  echo "4) custom - enter explicit values"
   read -r -p "Please enter your choice [1]: " profile_choice
 
   case "${profile_choice:-1}" in
     1) apply_rate_limit_profile "secure-default" ;;
     2) apply_rate_limit_profile "small-droplet-staging" ;;
-    3) apply_rate_limit_profile "custom" ;;
+    3) apply_rate_limit_profile "env-file" ;;
+    4) apply_rate_limit_profile "custom" ;;
     *)
       print_error "Invalid rate-limit profile choice '${profile_choice}'."
       exit 1

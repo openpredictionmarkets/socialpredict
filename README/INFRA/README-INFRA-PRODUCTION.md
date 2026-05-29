@@ -94,19 +94,20 @@ provider-appropriate TLS mode, for example `DB_REQUIRE_TLS=true` with
 
 `./SocialPredict install` also writes runtime rate-limit values into `.env`.
 These values are operations/security policy, not game setup. The
-OpenPredictionMarkets production Ansible deploy now sets
-`RATE_LIMIT_PROFILE=secure-default` while invoking the installer. Production-like
-manual installs also default to the conservative `secure-default` profile unless
-the operator explicitly passes a different profile:
+OpenPredictionMarkets production Ansible deploy sources the non-secret overlay
+at `deploy/env/.env.mo` before invoking the installer. Production-like manual
+installs also default to the conservative `secure-default` profile unless the
+operator explicitly passes a different profile:
 
 ```bash
 ./SocialPredict install -e production -d brierfoxforecast.com -m ops@example.com
 ./SocialPredict install -e production -d brierfoxforecast.com -m ops@example.com -r custom
 ```
 
-The default production profile writes:
+The production/model-office overlay contains:
 
 ```text
+RATE_LIMIT_PROFILE=env-file
 RATE_LIMIT_LOGIN_RATE_PER_SECOND=0.1
 RATE_LIMIT_LOGIN_BURST=3
 RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
@@ -114,11 +115,15 @@ RATE_LIMIT_GENERAL_BURST=10
 RATE_LIMIT_CLEANUP_INTERVAL=5m
 ```
 
+`RATE_LIMIT_PROFILE=env-file` is consumed during install. The generated host
+`.env` stores the concrete `RATE_LIMIT_*` values.
+
 Do not use the staging/load-test profile for production unless the operator has
 fresh capacity evidence for that host size and deployment topology.
 
-The Ansible workflow accepts the optional `PRODUCTION_RATE_LIMIT_PROFILE` secret
-if an operator intentionally needs to override the default production profile.
+The Ansible workflow accepts the optional `PRODUCTION_RATE_LIMIT_ENV_FILE`
+secret if an operator intentionally needs to source a different non-secret
+overlay path.
 
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
 but the current production workflow does not pass it into the Ansible command.

@@ -138,7 +138,9 @@ Generate a release dossier from the k6 summary output:
 ```
 
 For capacity evidence, copy `loadtest/dossier/metadata.example.json` and record
-the active `RATE_LIMIT_*` values under `rateLimitPolicy`. The summarizer also
+the active `RATE_LIMIT_*` values under `rateLimitPolicy`. For
+OpenPredictionMarkets staging, those values are expected to come from
+`deploy/env/.env.staging` during single-source load tests. The summarizer also
 copies k6 counters for `sp_rate_limited` and `sp_login_rate_limited` into the
 dossier so rate-limit failures can be separated from app, database, or host
 pressure.

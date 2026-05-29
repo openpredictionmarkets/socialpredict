@@ -33,9 +33,13 @@ The install UI should prefer profiles over raw fields:
 
 - `secure-default`
 - `small-droplet-staging`
+- `env-file`
 - `custom`
 
-For `custom`, the installer prompts for explicit values. For profiles, the installer writes the resolved values so the operator can audit and change `.env` later.
+For `custom`, the installer prompts for explicit values. For `env-file`, the
+installer requires `RATE_LIMIT_*` values to already be present in the shell
+environment. For profiles, the installer writes the resolved values so the
+operator can audit and change `.env` later.
 
 Non-interactive production installs can pass the profile with:
 
@@ -44,6 +48,10 @@ Non-interactive production installs can pass the profile with:
 ```
 
 or by setting `RATE_LIMIT_PROFILE` before invoking the installer.
+
+OpenPredictionMarkets Ansible uses non-secret overlays under `deploy/env/`
+instead of committing full generated host `.env` files. The overlays only carry
+rate-limit posture. The host still runs from `/opt/socialpredict/.env`.
 
 ## Current Measurement Target
 

@@ -85,21 +85,24 @@ performs this high-level flow:
    ```
 
    The installer also owns runtime rate-limit values in `.env`. For
-   OpenPredictionMarkets staging, the `ansible_playbooks` deploy now sets
-   `RATE_LIMIT_PROFILE=small-droplet-staging` while invoking the installer so
-   the current 512 MiB / 1 vCPU DigitalOcean droplet uses the measurement
-   profile after this SocialPredict runtime support is deployed.
+   OpenPredictionMarkets staging, the `ansible_playbooks` deploy sources the
+   non-secret overlay at `deploy/env/.env.staging` before invoking the installer.
+   That overlay is intentionally high so one Mac/k6 source IP can hammer staging
+   without the per-IP limiter masking app/database/host capacity evidence.
 
    Equivalent manual command:
 
    ```bash
-   /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL" -r small-droplet-staging
+   set -a
+   . /opt/socialpredict/deploy/env/.env.staging
+   set +a
+   /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL"
    ```
 
    The Ansible workflow also accepts the optional
-   `STAGING_RATE_LIMIT_PROFILE` secret if an operator needs to override that
-   default. Without an explicit profile, production-like installs use
-   `secure-default`.
+   `STAGING_RATE_LIMIT_ENV_FILE` secret if an operator needs to source a
+   different non-secret overlay path. Without an overlay or explicit profile,
+   production-like installs use `secure-default`.
 
 6. Builds staging backend and frontend Docker images on the host.
 7. Writes staging image names into `/opt/socialpredict/.env`.
@@ -220,21 +223,25 @@ RATE_LIMIT_GENERAL_BURST=10
 RATE_LIMIT_CLEANUP_INTERVAL=5m
 ```
 
-The current `small-droplet-staging` profile for the 512 MiB / 1 vCPU staging
-Droplet writes:
+The current OpenPredictionMarkets `.env.staging` overlay for temporary
+single-source load testing contains:
 
 ```text
-RATE_LIMIT_LOGIN_RATE_PER_SECOND=5
-RATE_LIMIT_LOGIN_BURST=20
-RATE_LIMIT_GENERAL_RATE_PER_SECOND=25
-RATE_LIMIT_GENERAL_BURST=50
+RATE_LIMIT_PROFILE=env-file
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=50
+RATE_LIMIT_LOGIN_BURST=100
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=500
+RATE_LIMIT_GENERAL_BURST=1000
 RATE_LIMIT_CLEANUP_INTERVAL=5m
 ```
 
-These are starting values for measurement, not a production promise. If k6,
-DigitalOcean metrics, `/readyz`, or backend logs show CPU saturation, memory
-pressure, database contention, or `RATE_LIMITED`/`LOGIN_RATE_LIMITED` responses,
-record the evidence and tune the profile or host size deliberately.
+`RATE_LIMIT_PROFILE=env-file` is consumed during install. The generated host
+`.env` stores the concrete `RATE_LIMIT_*` values.
+
+These values are for staging capacity measurement from one source IP, not a
+production promise. If k6, DigitalOcean metrics, `/readyz`, or backend logs show
+CPU saturation, memory pressure, database contention, or app failures, record
+the evidence and tune the overlay or host size deliberately.
 
 `STAGING_PRIVATE_KEY` must be the private SSH key whose public key is already in
 the staging VPS user's `~/.ssh/authorized_keys`. `STAGING_PASSWORD` is used as
