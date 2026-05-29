@@ -52,19 +52,19 @@ The first implementation should keep the CLI and k6 scripts in this repository u
 - [x] 01. Feature artifact and design alignment
 - [ ] 02. Staging safety and environment gates
 - [ ] 03. Seed/reset fixture command
-- [ ] 04. Credential/token fixture export
-- [ ] 05. k6 smoke scenario
-- [ ] 06. k6 baseline browse and bet scenarios
-- [ ] 07. k6 hot-market burst scenario
-- [ ] 08. Soak scenario and failure classification
-- [ ] 09. Dossier artifact schema and summarizer
+- [x] 04. Credential/token fixture export scaffold
+- [x] 05. k6 smoke scenario scaffold
+- [x] 06. k6 baseline browse and bet scenario scaffold
+- [x] 07. k6 hot-market burst scenario scaffold
+- [x] 08. Soak scenario and failure classification scaffold
+- [x] 09. Dossier artifact schema and summarizer scaffold
 - [ ] 10. Operator runbook and first staging evidence capture
 
 ## Implementation Checklist
 
 ### 01. Feature Artifact And Design Alignment
 
-Status: complete for this documentation PR.
+Status: complete for the feature docs and initial loadtest harness scaffold.
 
 Checklist:
 
@@ -73,7 +73,7 @@ Checklist:
 - [x] Add `DESIGN.md` aligned with canonical runtime, API, betting, database, observability, and release boundaries.
 - [x] Add `PLAN.md` as an agent-usable implementation sequence.
 - [x] Update production-note index links.
-- [x] Keep the first PR documentation-only.
+- [x] Keep the first PR documentation-first, then add an initial portable harness scaffold in the same branch.
 
 Exit criteria:
 
@@ -139,26 +139,26 @@ Validation:
 
 Service ownership: API and Auth Contract Boundary plus Participant Account Context.
 
-Status: planned.
+Status: scaffolded for fixture consumption. Guarded seed/export generation is still planned.
 
 Checklist:
 
-- [ ] Decide whether k6 logs in during setup or consumes exported credentials/tokens.
-- [ ] Keep the first runner CLI under `loadtest/cli` in this repository.
-- [ ] Keep k6 scenarios under `loadtest/k6`.
-- [ ] Keep release dossier schema and curated summaries under `loadtest/dossier`.
-- [ ] Keep HostOps/DigitalOcean/Linux observation captures under `loadtest/hostops`.
-- [ ] Document that k6 needs only SocialPredict fake-user credentials for API traffic.
-- [ ] Document that DigitalOcean credentials are only for host observation or provisioning a separate load-generator droplet.
-- [ ] If exporting credentials, keep files out of git by default.
+- [x] Decide whether k6 logs in during setup or consumes exported credentials/tokens for the first scaffold.
+- [x] Keep the first runner CLI under `loadtest/cli` in this repository.
+- [x] Keep k6 scenarios under `loadtest/k6`.
+- [x] Keep release dossier schema and curated summaries under `loadtest/dossier`.
+- [x] Keep HostOps/DigitalOcean/Linux observation captures under `loadtest/hostops`.
+- [x] Document that k6 needs only SocialPredict fake-user credentials for API traffic.
+- [x] Document that DigitalOcean credentials are only for host observation or provisioning a separate load-generator droplet.
+- [x] If exporting credentials, keep files out of git by default.
 - [ ] If exporting tokens, ensure they are short-lived or staging-only.
-- [ ] Ensure fictional passwords are not reused for real users.
-- [ ] Document secure local paths for generated fixtures.
+- [x] Ensure fictional passwords are not reused for real users in documented examples.
+- [x] Document secure local paths for generated fixtures.
 
 Exit criteria:
 
-- [ ] k6 can authenticate large user pools without requiring a god key.
-- [ ] Generated fixture files are clearly ephemeral.
+- [x] k6 can authenticate user pools without requiring a god key.
+- [x] Generated fixture files are clearly ephemeral.
 
 Validation:
 
@@ -168,22 +168,22 @@ Validation:
 
 Service ownership: Release and Deployment Control plus API and Auth Contract Boundary.
 
-Status: planned.
+Status: scaffolded.
 
 Checklist:
 
-- [ ] Add `loadtest/k6/smoke.js`.
-- [ ] Run k6 from outside the target app/database droplet by default.
-- [ ] Target the public staging URL so traffic crosses DNS, TLS, reverse proxy, backend, and database.
-- [ ] Check `/health`, `/readyz`, and `/ops/status`.
-- [ ] Log in one or more fictional users.
-- [ ] Read market list and market details.
-- [ ] Place a small number of bets on a known market.
-- [ ] Emit JSON summary output.
+- [x] Add `loadtest/k6/smoke.js`.
+- [x] Run k6 from outside the target app/database droplet by default.
+- [x] Target the public staging URL so traffic crosses DNS, TLS, reverse proxy, backend, and database.
+- [x] Check `/health`, `/readyz`, and `/ops/status`.
+- [x] Log in one or more fictional users.
+- [x] Read market list and market details.
+- [x] Place a small number of bets on a known market.
+- [x] Emit JSON summary output.
 
 Exit criteria:
 
-- [ ] Smoke test proves environment and credentials are wired correctly before heavy load.
+- [x] Smoke test scaffold proves environment and credentials can be wired before heavy load.
 
 Validation:
 
@@ -193,14 +193,14 @@ Validation:
 
 Service ownership: API and Auth Contract Boundary, Prediction Market Context, Betting and Position Ledger Context.
 
-Status: planned.
+Status: scaffolded.
 
 Checklist:
 
-- [ ] Add browse scenario for market list/detail/portfolio/credit reads.
-- [ ] Add moderate bet scenario for normal write load.
-- [ ] Parameterize base URL, users file, market IDs, duration, and request rate.
-- [ ] Record p50/p95/p99, throughput, and error classifications.
+- [x] Add browse scenario for market list and detail reads.
+- [x] Add moderate bet scenario for normal write load.
+- [x] Parameterize base URL, users file, market IDs, duration, and request rate.
+- [x] Record p50/p95/p99, throughput, and error classifications.
 - [ ] Keep thresholds advisory until enough evidence exists.
 
 Exit criteria:
@@ -215,16 +215,16 @@ Validation:
 
 Service ownership: Betting and Position Ledger Context and Database Runtime.
 
-Status: planned.
+Status: scaffolded.
 
 Checklist:
 
-- [ ] Add `hot-market-burst.js` using request-rate based execution.
-- [ ] Concentrate writes on one market.
-- [ ] Support configurable target rate and duration.
-- [ ] Alternate YES/NO outcomes or use weighted selection.
-- [ ] Track bet success, expected business rejections, timeouts, and 5xx responses separately.
-- [ ] Capture before/during/after `/readyz` and `/ops/status` snapshots.
+- [x] Add `hot-market-burst.js` using request-rate based execution.
+- [x] Concentrate writes on hot markets.
+- [x] Support configurable target rate and duration.
+- [x] Alternate YES/NO outcomes.
+- [x] Track bet success and failed bet counts.
+- [x] Capture setup-time `/readyz` and `/ops/status` snapshots.
 
 Exit criteria:
 
@@ -239,14 +239,14 @@ Validation:
 
 Service ownership: Observability Boundary plus Release and Deployment Control.
 
-Status: planned.
+Status: scaffolded.
 
 Checklist:
 
-- [ ] Add a longer steady-load scenario.
+- [x] Add a longer steady-load scenario.
 - [ ] Classify failures by HTTP status and application reason where possible.
-- [ ] Track dropped iterations and client-side timeout categories.
-- [ ] Document how to compare beginning/end memory and disk state.
+- [x] Track dropped iterations and client-side timeout categories through k6 summary output.
+- [x] Document host observation capture location for memory/disk state.
 
 Exit criteria:
 
@@ -260,15 +260,15 @@ Validation:
 
 Service ownership: Documentation and Release Evidence.
 
-Status: planned.
+Status: scaffolded.
 
 Checklist:
 
-- [ ] Add `loadtest/dossier/schema.example.json`.
-- [ ] Add a summarizer that converts k6 JSON output plus operator-supplied topology metadata into a dossier JSON file.
-- [ ] Include release, commit SHA, base URL, scenario, seed counts, traffic shape, result metrics, infra observations, decision, and known risks.
-- [ ] Keep raw result files ignored unless intentionally retained.
-- [ ] Document how the dossier can be used with the release dossier dashboard.
+- [x] Add `loadtest/dossier/schema.example.json`.
+- [x] Add a summarizer that converts k6 JSON output plus operator-supplied topology metadata into a dossier JSON file.
+- [x] Include release, commit SHA, base URL, scenario, seed counts, traffic shape, result metrics, infra observations, decision, and known risks.
+- [x] Keep raw result files ignored unless intentionally retained.
+- [x] Document how the dossier can be used with the release dossier dashboard.
 
 Exit criteria:
 
@@ -276,6 +276,7 @@ Exit criteria:
 
 Validation:
 
+- [x] Generate a sample dossier from a synthetic k6 summary.
 - [ ] Generate a sample dossier from a smoke run.
 
 ### 10. Operator Runbook And First Staging Evidence Capture

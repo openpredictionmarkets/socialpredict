@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOADTEST_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_DIR="$(cd "${LOADTEST_DIR}/.." && pwd)"
+
+print_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest COMMAND [OPTIONS]
+
+Commands:
+  check                  Check local load-test prerequisites
+  run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, soak
+  dossier                Generate release dossier JSON from a k6 summary
+  help                   Show this help
+
+Run examples:
+  ./loadtest/cli/loadtest check
+  ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com
+  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 100 --duration 60s
+  ./loadtest/cli/loadtest dossier --summary loadtest/results/smoke-20260528T120000Z-summary.json --out loadtest/dossier/runs/smoke.json
+
+Fixture defaults:
+  users:   loadtest/fixtures/users.csv
+  markets: loadtest/fixtures/markets.csv
+
+This CLI does not use a god token. k6 logs in as normal fictional users.
+HELP
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    return 1
+  fi
+}
+
+iso_stamp() {
+  date -u +%Y%m%dT%H%M%SZ
+}
+
+scenario_path() {
+  case "$1" in
+    smoke|baseline|hot-market-burst|soak)
+      echo "${LOADTEST_DIR}/k6/$1.js"
+      ;;
+    *)
+      echo "Unknown scenario: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+check_cmd() {
+  local failed=0
+  require_command k6 || failed=1
+  require_command node || failed=1
+
+  if [ ! -f "${LOADTEST_DIR}/fixtures/users.csv" ]; then
+    echo "Missing fixture: ${LOADTEST_DIR}/fixtures/users.csv" >&2
+    failed=1
+  fi
+  if [ ! -f "${LOADTEST_DIR}/fixtures/markets.csv" ]; then
+    echo "Missing fixture: ${LOADTEST_DIR}/fixtures/markets.csv" >&2
+    failed=1
+  fi
+
+  if [ "$failed" -ne 0 ]; then
+    echo "Load-test prerequisites are not ready." >&2
+    exit 1
+  fi
+  echo "Load-test prerequisites look ready."
+}
+
+run_cmd() {
+  if [ "$#" -lt 1 ]; then
+    echo "Missing scenario." >&2
+    print_help
+    exit 1
+  fi
+  local scenario="$1"
+  shift
+  local base_url="${BASE_URL:-http://localhost:8080}"
+  local users_file="${USERS_FILE:-${LOADTEST_DIR}/fixtures/users.csv}"
+  local markets_file="${MARKETS_FILE:-${LOADTEST_DIR}/fixtures/markets.csv}"
+  local duration="${DURATION:-}"
+  local target_rate="${TARGET_RATE:-}"
+  local bet_rate="${BET_RATE:-}"
+  local browse_rate="${BROWSE_RATE:-}"
+  local out=""
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --base-url) base_url="$2"; shift 2 ;;
+      --users-file) users_file="$2"; shift 2 ;;
+      --markets-file) markets_file="$2"; shift 2 ;;
+      --duration) duration="$2"; shift 2 ;;
+      --target-rate) target_rate="$2"; shift 2 ;;
+      --bet-rate) bet_rate="$2"; shift 2 ;;
+      --browse-rate) browse_rate="$2"; shift 2 ;;
+      --out) out="$2"; shift 2 ;;
+      --help|-h) print_help; exit 0 ;;
+      *) echo "Unknown run option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  require_command k6
+  local script
+  script="$(scenario_path "$scenario")"
+  if [ ! -f "$users_file" ]; then
+    echo "Missing users fixture: $users_file" >&2
+    exit 1
+  fi
+  if [ ! -f "$markets_file" ]; then
+    echo "Missing markets fixture: $markets_file" >&2
+    exit 1
+  fi
+
+  mkdir -p "${LOADTEST_DIR}/results"
+  if [ -z "$out" ]; then
+    out="${LOADTEST_DIR}/results/${scenario}-$(iso_stamp)-summary.json"
+  fi
+
+  echo "Running ${scenario} against ${base_url}"
+  (
+    cd "$REPO_DIR"
+    BASE_URL="$base_url" \
+    USERS_FILE="$users_file" \
+    MARKETS_FILE="$markets_file" \
+    DURATION="$duration" \
+    TARGET_RATE="$target_rate" \
+    BET_RATE="$bet_rate" \
+    BROWSE_RATE="$browse_rate" \
+    k6 run --summary-export "$out" "$script"
+  )
+  echo "Summary: $out"
+}
+
+dossier_cmd() {
+  local summary=""
+  local out=""
+  local metadata=""
+  local decision=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --summary) summary="$2"; shift 2 ;;
+      --out) out="$2"; shift 2 ;;
+      --metadata) metadata="$2"; shift 2 ;;
+      --decision) decision="$2"; shift 2 ;;
+      --help|-h) print_help; exit 0 ;;
+      *) echo "Unknown dossier option: $1" >&2; exit 1 ;;
+    esac
+  done
+  if [ -z "$summary" ] || [ -z "$out" ]; then
+    echo "dossier requires --summary and --out" >&2
+    exit 1
+  fi
+  require_command node
+  local args=("${LOADTEST_DIR}/dossier/summarize.mjs" --summary "$summary" --out "$out")
+  if [ -n "$metadata" ]; then args+=(--metadata "$metadata"); fi
+  if [ -n "$decision" ]; then args+=(--decision "$decision"); fi
+  node "${args[@]}"
+}
+
+command="${1:-help}"
+shift || true
+case "$command" in
+  check) check_cmd "$@" ;;
+  run) run_cmd "$@" ;;
+  dossier) dossier_cmd "$@" ;;
+  help|--help|-h) print_help ;;
+  *) echo "Unknown command: $command" >&2; print_help; exit 1 ;;
+esac
