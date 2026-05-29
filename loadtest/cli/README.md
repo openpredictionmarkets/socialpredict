@@ -9,9 +9,10 @@ Seed fixture CSVs with `./SocialPredict load seed`, or provide files under `load
 ```bash
 LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --markets 5 --reset
 ./loadtest/cli/loadtest check
-./loadtest/cli/loadtest run smoke --base-url https://kconfs.com
-./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --duration 5m --browse-rate 20 --bet-rate 5
-./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 100 --duration 60s
+./loadtest/cli/loadtest fixtures pull staging
+./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
+./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --duration 5m --browse-rate 20 --bet-rate 5
+./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 100 --duration 60s
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --metadata loadtest/dossier/metadata.example.json --out loadtest/dossier/runs/<run>.json
 ```
 
@@ -20,3 +21,25 @@ LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --mar
 k6 logs in with normal fake SocialPredict users from `users.csv` and uses normal bearer tokens for `/v0/bet`.
 
 No DigitalOcean credentials or betting god token are used by this CLI.
+
+## Remote Fixture Pull
+
+After running `./SocialPredict load seed` on a remote staging host, pull the generated fixture CSVs back to your load-generator machine:
+
+```bash
+./loadtest/cli/loadtest fixtures pull staging
+```
+
+The staging defaults are `root@kconfs.com`, `~/.keys/socialpredict/staging/id_ed25519`, and `/opt/socialpredict/loadtest/fixtures`.
+
+Override values when needed:
+
+```bash
+./loadtest/cli/loadtest fixtures pull staging \
+  --host root@45.55.227.1 \
+  --key ~/.keys/socialpredict/staging/id_ed25519 \
+  --remote-path /opt/socialpredict/loadtest/fixtures \
+  --local-path loadtest/fixtures
+```
+
+Public staging/prod Nginx publishes API routes under `/api`, so use `--api-prefix /api` when running against `https://kconfs.com` or `https://brierfoxforecast.com`. Direct backend targets such as `http://localhost:8080` should omit the prefix.

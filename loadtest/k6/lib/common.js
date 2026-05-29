@@ -10,6 +10,7 @@ export const betsFailed = new Counter('sp_bets_failed');
 export const loginFailures = new Counter('sp_login_failures');
 
 export const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
+export const API_PREFIX = normalizeApiPrefix(__ENV.API_PREFIX || '');
 export const USERS_FILE = __ENV.USERS_FILE || 'loadtest/fixtures/users.csv';
 export const MARKETS_FILE = __ENV.MARKETS_FILE || 'loadtest/fixtures/markets.csv';
 export const DEFAULT_PASSWORD = __ENV.LOADTEST_PASSWORD || '';
@@ -52,6 +53,16 @@ export const markets = new SharedArray('loadtest markets', () => {
 });
 
 const tokenCache = {};
+
+function normalizeApiPrefix(prefix) {
+  const trimmed = String(prefix || '').trim();
+  if (!trimmed || trimmed === '/') return '';
+  return trimmed.startsWith('/') ? trimmed.replace(/\/$/, '') : `/${trimmed.replace(/\/$/, '')}`;
+}
+
+function apiUrl(path) {
+  return `${BASE_URL}${API_PREFIX}${path}`;
+}
 
 export function secureRandomFraction() {
   const bytes = new Uint8Array(crypto.randomBytes(4));
@@ -102,7 +113,7 @@ export function login(user) {
   if (tokenCache[user.username]) return tokenCache[user.username];
 
   const response = http.post(
-    `${BASE_URL}/v0/login`,
+    apiUrl('/v0/login'),
     JSON.stringify({ username: user.username, password: user.password }),
     { headers: { 'Content-Type': 'application/json' } },
   );
@@ -133,7 +144,7 @@ export function placeBet({ hotOnly = false } = {}) {
   betsAttempted.add(1);
   const outcome = secureRandomBoolean() ? 'YES' : 'NO';
   const response = http.post(
-    `${BASE_URL}/v0/bet`,
+    apiUrl('/v0/bet'),
     JSON.stringify({ marketId: market.id, amount: BET_AMOUNT, outcome }),
     authHeaders(token),
   );
@@ -150,14 +161,14 @@ export function placeBet({ hotOnly = false } = {}) {
 
 export function readMarket() {
 	const market = pickMarket();
-	const response = http.get(`${BASE_URL}/v0/markets/${market.id}`);
+	const response = http.get(apiUrl(`/v0/markets/${market.id}`));
 	check(response, {
 		'market detail returned 200': (r) => r.status === 200,
 	});
 }
 
 export function readMarketList() {
-	const response = http.get(`${BASE_URL}/v0/markets`);
+	const response = http.get(apiUrl('/v0/markets'));
 	check(response, {
 		'market list returned 200': (r) => r.status === 200,
 	});
