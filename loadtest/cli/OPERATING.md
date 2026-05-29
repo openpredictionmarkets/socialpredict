@@ -124,6 +124,27 @@ Smoke should pass before any baseline or burst test.
 
 7. Increase load gradually and record results in the release dossier.
 
+## Hot-Market Burst Sequence
+
+After smoke and a low baseline pass, isolate concentrated betting pressure with
+`hot-market-burst`. This scenario pre-authenticates users during k6 setup and
+reuses bearer tokens during the measured betting window, so it is intended to
+measure betting throughput rather than login churn.
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100
+```
+
+If `LOGIN_RATE_LIMITED` appears in this scenario, either increase
+`--preauth-users` only after confirming the staging login limit, or reseed/pull
+fresh fixtures and rerun. Do not interpret login-limit failures as pure betting
+capacity failures.
+
 ## Important Interpretation Notes
 
 - The app rate limiter is per client identity/IP, not a global server cap.

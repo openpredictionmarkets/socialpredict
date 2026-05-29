@@ -14,7 +14,7 @@ LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --mar
 ./loadtest/cli/loadtest fixtures pull staging
 ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --duration 5m --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
-./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 100 --duration 60s
+./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --metadata loadtest/dossier/metadata.example.json --out loadtest/dossier/runs/<run>.json
 ```
 
@@ -87,6 +87,21 @@ Override values when needed:
 ```
 
 Public staging/prod Nginx publishes API routes under `/api`, so use `--api-prefix /api` when running against `https://kconfs.com` or `https://brierfoxforecast.com`. Direct backend targets such as `http://localhost:8080` should omit the prefix.
+
+## Hot-Market Burst
+
+`hot-market-burst` pre-authenticates users during k6 `setup()` and then reuses
+those bearer tokens during the measured betting scenario. This keeps high-rate
+hot-market tests focused on betting throughput instead of measuring login churn.
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100
+```
 
 ## Low-Rate Runs
 

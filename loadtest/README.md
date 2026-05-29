@@ -138,6 +138,18 @@ Run a low baseline without fractional k6 rates:
   --bet-time-unit 20s
 ```
 
+Run a hot-market burst with setup-time pre-authentication so the measured
+scenario focuses on concentrated betting throughput:
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100
+```
+
 Generate a release dossier from the k6 summary output:
 
 ```bash
