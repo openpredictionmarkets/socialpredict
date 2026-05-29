@@ -3,13 +3,14 @@ import { checkProbes, placeBet, requireFixtures } from './lib/common.js';
 
 const duration = __ENV.DURATION || '60s';
 const targetRate = Number(__ENV.TARGET_RATE || '50');
+const targetTimeUnit = __ENV.TARGET_TIME_UNIT || '1s';
 
 export const options = {
   scenarios: {
     hot_market_burst: {
       executor: 'constant-arrival-rate',
       rate: targetRate,
-      timeUnit: '1s',
+      timeUnit: targetTimeUnit,
       duration,
       preAllocatedVUs: Number(__ENV.PREALLOCATED_VUS || '100'),
       maxVUs: Number(__ENV.MAX_VUS || '1000'),

@@ -3,13 +3,14 @@ import { checkProbes, placeBet, readMarket, readMarketList, requireFixtures, sec
 
 const duration = __ENV.DURATION || '30m';
 const rate = Number(__ENV.RATE || '10');
+const timeUnit = __ENV.TIME_UNIT || '1s';
 
 export const options = {
   scenarios: {
     soak: {
       executor: 'constant-arrival-rate',
       rate,
-      timeUnit: '1s',
+      timeUnit,
       duration,
       preAllocatedVUs: Number(__ENV.PREALLOCATED_VUS || '50'),
       maxVUs: Number(__ENV.MAX_VUS || '500'),

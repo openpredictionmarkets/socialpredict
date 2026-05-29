@@ -123,6 +123,12 @@ The betting path is the first critical write path because it touches authenticat
 
 The first implementation should prefer `k6` for API load generation because it supports scenario-based request-rate testing, JSON result output, and scripting realistic HTTP flows from a local Mac or separate load-generator host.
 
+Runtime rate limits are now tracked separately in
+[`../05/05-runtime-rate-limit-policy.md`](../05/05-runtime-rate-limit-policy.md).
+When a load test fails, the dossier should distinguish app/database/host
+pressure from explicit `RATE_LIMITED` or `LOGIN_RATE_LIMITED` responses before
+using the result as capacity evidence.
+
 k6 is not an in-server test runner for this feature. It is the external traffic generator. For end-to-end evidence, k6 should call the public staging URL, such as `https://kconfs.com`, through the same DNS, TLS, reverse proxy, backend, and Postgres path a real user would use.
 
 Valid runner locations:

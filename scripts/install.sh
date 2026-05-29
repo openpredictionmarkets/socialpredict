@@ -143,6 +143,105 @@ set_env_value() {
   fi
 }
 
+apply_rate_limit_values() {
+  local login_rate="$1"
+  local login_burst="$2"
+  local general_rate="$3"
+  local general_burst="$4"
+  local cleanup_interval="$5"
+
+  set_env_value "RATE_LIMIT_LOGIN_RATE_PER_SECOND" "${login_rate}"
+  set_env_value "RATE_LIMIT_LOGIN_BURST" "${login_burst}"
+  set_env_value "RATE_LIMIT_GENERAL_RATE_PER_SECOND" "${general_rate}"
+  set_env_value "RATE_LIMIT_GENERAL_BURST" "${general_burst}"
+  set_env_value "RATE_LIMIT_CLEANUP_INTERVAL" "${cleanup_interval}"
+}
+
+require_rate_limit_env_value() {
+  local key="$1"
+  local value="${!key:-}"
+  if [ -z "${value}" ]; then
+    print_error "RATE_LIMIT_PROFILE=env-file requires ${key} to be set by the sourced env overlay."
+    exit 1
+  fi
+}
+
+apply_rate_limit_env_file_values() {
+  require_rate_limit_env_value "RATE_LIMIT_LOGIN_RATE_PER_SECOND"
+  require_rate_limit_env_value "RATE_LIMIT_LOGIN_BURST"
+  require_rate_limit_env_value "RATE_LIMIT_GENERAL_RATE_PER_SECOND"
+  require_rate_limit_env_value "RATE_LIMIT_GENERAL_BURST"
+  require_rate_limit_env_value "RATE_LIMIT_CLEANUP_INTERVAL"
+
+  apply_rate_limit_values \
+    "${RATE_LIMIT_LOGIN_RATE_PER_SECOND}" \
+    "${RATE_LIMIT_LOGIN_BURST}" \
+    "${RATE_LIMIT_GENERAL_RATE_PER_SECOND}" \
+    "${RATE_LIMIT_GENERAL_BURST}" \
+    "${RATE_LIMIT_CLEANUP_INTERVAL}"
+}
+
+apply_rate_limit_profile() {
+  local profile="${1:-secure-default}"
+
+  case "${profile}" in
+    secure-default)
+      apply_rate_limit_values "0.1" "3" "1" "10" "5m"
+      ;;
+    small-droplet-staging)
+      apply_rate_limit_values "5" "20" "25" "50" "5m"
+      ;;
+    env-file)
+      apply_rate_limit_env_file_values
+      ;;
+    custom)
+      local login_rate
+      local login_burst
+      local general_rate
+      local general_burst
+      local cleanup_interval
+      read -r -p "Login rate limit, requests per second? " login_rate
+      read -r -p "Login rate limit burst? " login_burst
+      read -r -p "General API rate limit, requests per second? " general_rate
+      read -r -p "General API rate limit burst? " general_burst
+      read -r -p "Rate limiter cleanup interval, e.g. 5m? " cleanup_interval
+      apply_rate_limit_values "${login_rate}" "${login_burst}" "${general_rate}" "${general_burst}" "${cleanup_interval}"
+      ;;
+    *)
+      print_error "Unknown rate-limit profile '${profile}'. Use secure-default, small-droplet-staging, env-file, or custom."
+      exit 1
+      ;;
+  esac
+
+  echo "Setting Rate Limit Profile: ${profile}"
+}
+
+select_rate_limit_profile() {
+  local profile="${RATE_LIMIT_PROFILE:-}"
+  if [ -n "${profile}" ]; then
+    apply_rate_limit_profile "${profile}"
+    return
+  fi
+
+  echo "### Select Rate Limit Profile:"
+  echo "1) secure-default - conservative public defaults"
+  echo "2) small-droplet-staging - initial load-test profile for 512 MiB / 1 vCPU DigitalOcean staging"
+  echo "3) env-file - use RATE_LIMIT_* values from the current shell environment"
+  echo "4) custom - enter explicit values"
+  read -r -p "Please enter your choice [1]: " profile_choice
+
+  case "${profile_choice:-1}" in
+    1) apply_rate_limit_profile "secure-default" ;;
+    2) apply_rate_limit_profile "small-droplet-staging" ;;
+    3) apply_rate_limit_profile "env-file" ;;
+    4) apply_rate_limit_profile "custom" ;;
+    *)
+      print_error "Invalid rate-limit profile choice '${profile_choice}'."
+      exit 1
+      ;;
+  esac
+}
+
 # Check if Docker Image exists on the system
 check_image() {
   local image_name=$1
@@ -203,6 +302,8 @@ build_dev() {
   "${SED_INPLACE[@]}" "s|^BACKEND_IMAGE_NAME=.*|BACKEND_IMAGE_NAME=${BACKEND_IMAGE_NAME}|" "${SCRIPT_DIR}/.env"
   "${SED_INPLACE[@]}" "s|^FRONTEND_IMAGE_NAME=.*|FRONTEND_IMAGE_NAME=${FRONTEND_IMAGE_NAME}|" "${SCRIPT_DIR}/.env"
 
+  apply_rate_limit_profile "secure-default"
+
   ensure_jwt_signing_key
 
   print_status "Searching for Docker Images ..."
@@ -257,6 +358,8 @@ services:
 EOF
   echo "Wrote docker-compose.override.yml to pin platform = ${FORCE_PLATFORM:-linux/amd64}"
 
+  apply_rate_limit_profile "secure-default"
+
   ensure_jwt_signing_key
 
   docker compose \
@@ -300,6 +403,8 @@ build_production() {
   envsubst < "$template" > "$file"
 
   echo "Setting EMAIL to: $email_answer"
+
+  select_rate_limit_profile
 
   # Update Database User Password:
   # The packaged production compose topology uses local Docker Postgres.
@@ -354,6 +459,8 @@ build_production_args() {
   envsubst < "$template" > "$file"
 
   echo "Setting EMAIL to: $2"
+
+  apply_rate_limit_profile "${3:-${RATE_LIMIT_PROFILE:-secure-default}}"
 
   # Update Database User Password:
   # The packaged production compose topology uses local Docker Postgres.
@@ -432,7 +539,8 @@ if [ "$#" -eq 0 ]; then
     esac
   done
 else
-  while getopts ":e:d:m:" opt; do
+  rate_limit_profile="${RATE_LIMIT_PROFILE:-secure-default}"
+  while getopts ":e:d:m:r:" opt; do
     case $opt in
       e)
         if [ "$OPTARG" != "development" ] && [ "$OPTARG" != "localhost" ] && [ "$OPTARG" != "production" ]; then
@@ -448,6 +556,9 @@ else
         ;;
       m)
         email="$OPTARG"
+        ;;
+      r)
+        rate_limit_profile="$OPTARG"
         ;;
       \?)
         echo "Invalid option: -$OPTARG"
@@ -472,6 +583,6 @@ else
   elif [ "$env" == "localhost" ]; then
     build_local
   elif [ "$env" == "production" ]; then
-    build_production_args "$domain" "$email"
+    build_production_args "$domain" "$email" "$rate_limit_profile"
   fi
 fi

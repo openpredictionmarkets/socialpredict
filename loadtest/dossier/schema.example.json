@@ -29,7 +29,18 @@
     "httpReqDurationP99Ms": 0,
     "betsAttempted": 0,
     "betsSucceeded": 0,
-    "betsFailed": 0
+    "betsFailed": 0,
+    "rateLimited": 0,
+    "loginRateLimited": 0
+  },
+  "rateLimitPolicy": {
+    "profile": "env-file",
+    "source": "deploy/env/.env.staging",
+    "loginRatePerSecond": 50,
+    "loginBurst": 100,
+    "generalRatePerSecond": 500,
+    "generalBurst": 1000,
+    "cleanupInterval": "5m"
   },
   "infrastructureObservations": {
     "appCpuPeakPercent": null,

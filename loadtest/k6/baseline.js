@@ -3,14 +3,16 @@ import { checkProbes, placeBet, readMarket, readMarketList, requireFixtures, sec
 
 const duration = __ENV.DURATION || '5m';
 const browseRate = Number(__ENV.BROWSE_RATE || '20');
+const browseTimeUnit = __ENV.BROWSE_TIME_UNIT || '1s';
 const betRate = Number(__ENV.BET_RATE || '5');
+const betTimeUnit = __ENV.BET_TIME_UNIT || '1s';
 
 export const options = {
   scenarios: {
     browse: {
       executor: 'constant-arrival-rate',
       rate: browseRate,
-      timeUnit: '1s',
+      timeUnit: browseTimeUnit,
       duration,
       preAllocatedVUs: Number(__ENV.BROWSE_VUS || '20'),
       maxVUs: Number(__ENV.BROWSE_MAX_VUS || '200'),
@@ -19,7 +21,7 @@ export const options = {
     bet: {
       executor: 'constant-arrival-rate',
       rate: betRate,
-      timeUnit: '1s',
+      timeUnit: betTimeUnit,
       duration,
       preAllocatedVUs: Number(__ENV.BET_VUS || '20'),
       maxVUs: Number(__ENV.BET_MAX_VUS || '200'),

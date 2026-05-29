@@ -118,10 +118,31 @@ Run a smoke scenario:
 ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ```
 
+Run a low baseline without fractional k6 rates:
+
+```bash
+./loadtest/cli/loadtest run baseline \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --browse-rate 1 \
+  --browse-time-unit 5s \
+  --bet-rate 1 \
+  --bet-time-unit 20s
+```
+
 Generate a release dossier from the k6 summary output:
 
 ```bash
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --out loadtest/dossier/runs/<run>.json
 ```
+
+For capacity evidence, copy `loadtest/dossier/metadata.example.json` and record
+the active `RATE_LIMIT_*` values under `rateLimitPolicy`. For
+OpenPredictionMarkets staging, those values are expected to come from
+`deploy/env/.env.staging` during single-source load tests. The summarizer also
+copies k6 counters for `sp_rate_limited` and `sp_login_rate_limited` into the
+dossier so rate-limit failures can be separated from app, database, or host
+pressure.
 
 Run from a Mac or a separate load-generator droplet for meaningful capacity evidence. Running k6 on the app/database droplet is only valid for tiny smoke checks.
