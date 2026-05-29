@@ -136,8 +136,10 @@ Locust can be considered later if Python-based user-behavior modeling becomes mo
 Recommended first tool layout:
 
 ```text
-tools/loadtest/
+loadtest/
   README.md
+  cli/
+    README.md
   k6/
     smoke.js
     baseline.js
@@ -149,9 +151,22 @@ tools/loadtest/
     .gitignore
   dossier/
     schema.example.json
+    runs/
+      .gitignore
+  hostops/
+    README.md
 ```
 
-This should start inside the SocialPredict repository. A separate CLI repository is unnecessary until the load-test harness needs its own release cycle or is reused across multiple projects.
+This should start inside the SocialPredict repository only to keep early development close to the API, setup, and release-dossier contracts it depends on. The top-level `loadtest/` directory should be treated as a portable tool boundary so it can move to a separate repository later if the harness needs its own release cycle or is reused across multiple projects.
+
+Directory intent:
+
+- `loadtest/cli`: wrapper commands for seeding, running scenarios, and generating dossier summaries.
+- `loadtest/k6`: k6 scenario scripts.
+- `loadtest/fixtures`: generated users, credentials, token caches, and market ID files; ignored by default.
+- `loadtest/results`: raw k6 outputs; ignored by default unless explicitly promoted.
+- `loadtest/dossier`: compact release dossier schema and curated run summaries.
+- `loadtest/hostops`: notes or captured observations from HostOps, SSH, DigitalOcean metrics, and safe host commands.
 
 Runner authentication is split by concern:
 

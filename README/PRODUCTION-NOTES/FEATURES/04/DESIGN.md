@@ -110,19 +110,34 @@ A staging-only bootstrap token may be used to create/reset fixtures, but not to 
 
 HostOps is for host and infrastructure operations: SSH, environment inspection, log access, and future cloud orchestration.
 
-Load testing is application/API verification. It should live under SocialPredict tooling or a dedicated `tools/loadtest` tree. HostOps can help an operator connect to a host for observation, but it should not own k6 scenarios or application seed semantics.
+Load testing is application/API verification. It should live in a top-level `loadtest/` tree while the harness is young. HostOps can help an operator connect to a host for observation, but it should not own k6 scenarios or application seed semantics.
 
 ### Keep The First CLI In This Repository
 
-The first load-test CLI should live in this repository, not a separate repository.
+The first load-test CLI should live in this repository, not a separate repository, because early development needs tight feedback with SocialPredict's API and fixture behavior.
 
 Reasons:
 
 - The CLI depends on this app's OpenAPI contract, route names, fixture semantics, and release dossier shape.
 - Reviewing load-test scripts beside the API they exercise makes contract drift easier to catch.
-- Keeping the first implementation under `tools/loadtest` avoids a second repository before the harness proves it needs independent release/versioning.
+- Keeping the first implementation under `loadtest/` avoids a second repository before the harness proves it needs independent release/versioning.
+- A top-level `loadtest/` directory is easier to move later than scripts scattered through app, backend, or HostOps directories.
 
 A separate repository can be reconsidered later if the load generator becomes a reusable product, needs a separate release cycle, or must be shared across multiple applications.
+
+Proposed portable boundary:
+
+```text
+loadtest/
+  cli/       wrapper commands for seed/run/dossier workflows
+  k6/        API scenario scripts
+  fixtures/ generated local fixture files, ignored by default
+  results/  raw k6 outputs, ignored by default
+  dossier/  compact release dossier schema and curated summaries
+  hostops/  host observation notes and captured metrics
+```
+
+`loadtest/hostops` should store observations gathered via HostOps, SSH, DigitalOcean screenshots/exports, or safe Linux commands. It should not become HostOps itself.
 
 ### Runner Authentication And Operation
 

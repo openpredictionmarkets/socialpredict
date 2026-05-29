@@ -32,7 +32,7 @@ Implementation PRs should stay small enough to review independently:
 - dossier builder/output schema
 - optional workflow/manual dispatch
 
-The first implementation should keep the CLI and k6 scripts in this repository under `tools/loadtest`. Do not create a separate repository unless the harness later needs independent versioning or reuse outside SocialPredict.
+The first implementation should keep the CLI and k6 scripts in this repository under top-level `loadtest/`. This is an early-development convenience and contract-cohesion choice, not a permanent ownership claim. Do not create a separate repository unless the harness later needs independent versioning or reuse outside SocialPredict.
 
 ## Planning Principles
 
@@ -144,7 +144,10 @@ Status: planned.
 Checklist:
 
 - [ ] Decide whether k6 logs in during setup or consumes exported credentials/tokens.
-- [ ] Keep the first runner CLI under `tools/loadtest` in this repository.
+- [ ] Keep the first runner CLI under `loadtest/cli` in this repository.
+- [ ] Keep k6 scenarios under `loadtest/k6`.
+- [ ] Keep release dossier schema and curated summaries under `loadtest/dossier`.
+- [ ] Keep HostOps/DigitalOcean/Linux observation captures under `loadtest/hostops`.
 - [ ] Document that k6 needs only SocialPredict fake-user credentials for API traffic.
 - [ ] Document that DigitalOcean credentials are only for host observation or provisioning a separate load-generator droplet.
 - [ ] If exporting credentials, keep files out of git by default.
@@ -169,7 +172,7 @@ Status: planned.
 
 Checklist:
 
-- [ ] Add `tools/loadtest/k6/smoke.js`.
+- [ ] Add `loadtest/k6/smoke.js`.
 - [ ] Run k6 from outside the target app/database droplet by default.
 - [ ] Target the public staging URL so traffic crosses DNS, TLS, reverse proxy, backend, and database.
 - [ ] Check `/health`, `/readyz`, and `/ops/status`.
@@ -261,7 +264,7 @@ Status: planned.
 
 Checklist:
 
-- [ ] Add `tools/loadtest/dossier/schema.example.json`.
+- [ ] Add `loadtest/dossier/schema.example.json`.
 - [ ] Add a summarizer that converts k6 JSON output plus operator-supplied topology metadata into a dossier JSON file.
 - [ ] Include release, commit SHA, base URL, scenario, seed counts, traffic shape, result metrics, infra observations, decision, and known risks.
 - [ ] Keep raw result files ignored unless intentionally retained.
