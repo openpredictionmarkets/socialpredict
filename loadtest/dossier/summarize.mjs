@@ -24,7 +24,9 @@ function readJSON(file) {
 }
 
 function metric(summary, name, value, fallback = 0) {
-  return summary.metrics?.[name]?.values?.[value] ?? fallback;
+  const metricValue = summary.metrics?.[name];
+  if (!metricValue) return fallback;
+  return metricValue[value] ?? metricValue.values?.[value] ?? fallback;
 }
 
 function count(summary, name) {
@@ -32,11 +34,12 @@ function count(summary, name) {
 }
 
 function rate(summary, name) {
-  return metric(summary, name, 'rate', 0);
+  return metric(summary, name, 'rate', metric(summary, name, 'value', 0));
 }
 
 function percentile(summary, name, p) {
-  return metric(summary, name, `p(${p})`, 0);
+  const fallback = p === 50 ? metric(summary, name, 'med', 0) : 0;
+  return metric(summary, name, `p(${p})`, fallback);
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -72,7 +75,10 @@ const dossier = {
     betsSucceeded: count(summary, 'sp_bets_succeeded'),
     betsFailed: count(summary, 'sp_bets_failed'),
     loginFailures: count(summary, 'sp_login_failures'),
+    rateLimited: count(summary, 'sp_rate_limited'),
+    loginRateLimited: count(summary, 'sp_login_rate_limited'),
   },
+  rateLimitPolicy: metadata.rateLimitPolicy || {},
   infrastructureObservations: metadata.infrastructureObservations || {},
   decision: args.decision || metadata.decision || 'inconclusive',
   knownRisks: metadata.knownRisks || [],

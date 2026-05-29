@@ -20,6 +20,7 @@ Run examples:
   ./loadtest/cli/loadtest check
   ./loadtest/cli/loadtest fixtures pull staging
   ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
+  ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
   ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 100 --duration 60s
   ./loadtest/cli/loadtest dossier --summary loadtest/results/smoke-20260528T120000Z-summary.json --out loadtest/dossier/runs/smoke.json
 
@@ -40,6 +41,18 @@ require_command() {
 
 iso_stamp() {
   date -u +%Y%m%dT%H%M%SZ
+}
+
+require_positive_integer_value() {
+  local label="$1"
+  local value="$2"
+  if [ -z "$value" ]; then
+    return 0
+  fi
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "${label} must be a positive integer. For sub-1/sec rates, increase the time unit, e.g. --bet-rate 1 --bet-time-unit 20s." >&2
+    exit 1
+  fi
 }
 
 scenario_path() {
@@ -191,8 +204,13 @@ run_cmd() {
   local markets_file="${MARKETS_FILE:-${LOADTEST_DIR}/fixtures/markets.csv}"
   local duration="${DURATION:-}"
   local target_rate="${TARGET_RATE:-}"
+  local target_time_unit="${TARGET_TIME_UNIT:-}"
   local bet_rate="${BET_RATE:-}"
+  local bet_time_unit="${BET_TIME_UNIT:-}"
   local browse_rate="${BROWSE_RATE:-}"
+  local browse_time_unit="${BROWSE_TIME_UNIT:-}"
+  local rate="${RATE:-}"
+  local time_unit="${TIME_UNIT:-}"
   local out=""
 
   while [ "$#" -gt 0 ]; do
@@ -203,8 +221,13 @@ run_cmd() {
       --markets-file) markets_file="$2"; shift 2 ;;
       --duration) duration="$2"; shift 2 ;;
       --target-rate) target_rate="$2"; shift 2 ;;
+      --target-time-unit) target_time_unit="$2"; shift 2 ;;
       --bet-rate) bet_rate="$2"; shift 2 ;;
+      --bet-time-unit) bet_time_unit="$2"; shift 2 ;;
       --browse-rate) browse_rate="$2"; shift 2 ;;
+      --browse-time-unit) browse_time_unit="$2"; shift 2 ;;
+      --rate) rate="$2"; shift 2 ;;
+      --time-unit) time_unit="$2"; shift 2 ;;
       --out) out="$2"; shift 2 ;;
       --help|-h) print_help; exit 0 ;;
       *) echo "Unknown run option: $1" >&2; exit 1 ;;
@@ -222,6 +245,10 @@ run_cmd() {
     echo "Missing markets fixture: $markets_file" >&2
     exit 1
   fi
+  require_positive_integer_value "--target-rate" "$target_rate"
+  require_positive_integer_value "--bet-rate" "$bet_rate"
+  require_positive_integer_value "--browse-rate" "$browse_rate"
+  require_positive_integer_value "--rate" "$rate"
 
   mkdir -p "${LOADTEST_DIR}/results"
   if [ -z "$out" ]; then
@@ -238,8 +265,13 @@ run_cmd() {
     MARKETS_FILE="$markets_file" \
     DURATION="$duration" \
     TARGET_RATE="$target_rate" \
+    TARGET_TIME_UNIT="$target_time_unit" \
     BET_RATE="$bet_rate" \
+    BET_TIME_UNIT="$bet_time_unit" \
     BROWSE_RATE="$browse_rate" \
+    BROWSE_TIME_UNIT="$browse_time_unit" \
+    RATE="$rate" \
+    TIME_UNIT="$time_unit" \
     k6 run --summary-export "$out" "$script"
   )
   echo "Summary: $out"

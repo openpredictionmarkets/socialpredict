@@ -1,6 +1,6 @@
 # 05 Runtime Rate Limit Policy
 
-Status: proposed
+Status: implemented baseline
 Date: 2026-05-29
 
 ## Purpose
@@ -53,7 +53,7 @@ They should not be owned by:
 
 ## Proposed Runtime Environment Variables
 
-Add environment-driven configuration with safe defaults matching current behavior when unset:
+The backend reads environment-driven configuration with safe defaults matching current behavior when unset:
 
 ```bash
 RATE_LIMIT_LOGIN_RATE_PER_SECOND=0.1
@@ -69,11 +69,11 @@ Existing behavior should remain the fallback:
 - general API: one request per second, burst 10
 - cleanup interval: 5 minutes
 
-The implementation should parse these values during backend startup and pass them into `security.RateLimitConfig` before constructing runtime middleware.
+The implementation parses these values during backend startup and passes them into `security.RateLimitConfig` before constructing runtime middleware. Invalid configured values fail startup so an operator does not accidentally run with an unintended security posture.
 
 ## Install-Time Policy
 
-`./SocialPredict install` should set rate-limit values for production-like installs.
+`./SocialPredict install` sets rate-limit values for production-like installs.
 
 The install flow should not ask users to understand Go token-bucket internals. It should present a small number of profiles, then write explicit `.env` values.
 
@@ -92,7 +92,7 @@ custom
   Operator supplies explicit login/general rate and burst values.
 ```
 
-The production install path should default to `secure-default` unless the operator explicitly chooses a staging/load-test profile.
+The production install path defaults to `secure-default` unless the operator explicitly chooses a staging/load-test profile.
 
 Development installs can keep secure defaults. Developers who need local load testing can override `.env` manually.
 
@@ -126,13 +126,13 @@ For public staging and production URLs, k6 should use:
 ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ```
 
-For lower-than-one-request-per-second scenarios, the loadtest CLI should support k6 `timeUnit` values. k6 `constant-arrival-rate.rate` must be an integer, so this is invalid:
+For lower-than-one-request-per-second scenarios, the loadtest CLI supports k6 `timeUnit` values. k6 `constant-arrival-rate.rate` must be an integer, so this is invalid:
 
 ```bash
 --bet-rate 0.05
 ```
 
-The desired expression should be supported as:
+The desired expression is supported as:
 
 ```bash
 --bet-rate 1 --bet-time-unit 20s

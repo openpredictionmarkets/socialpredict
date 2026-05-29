@@ -92,6 +92,29 @@ packaged local compose database. For an external production database, set a
 provider-appropriate TLS mode, for example `DB_REQUIRE_TLS=true` with
 `DB_SSLMODE=verify-full` when certificate validation is configured.
 
+`./SocialPredict install` also writes runtime rate-limit values into `.env`.
+These values are operations/security policy, not game setup. Production-like
+installs default to the conservative `secure-default` profile unless the
+operator or Ansible workflow explicitly passes a different profile:
+
+```bash
+./SocialPredict install -e production -d brierfoxforecast.com -m ops@example.com
+./SocialPredict install -e production -d brierfoxforecast.com -m ops@example.com -r custom
+```
+
+The default production profile writes:
+
+```text
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=0.1
+RATE_LIMIT_LOGIN_BURST=3
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
+RATE_LIMIT_GENERAL_BURST=10
+RATE_LIMIT_CLEANUP_INTERVAL=5m
+```
+
+Do not use the staging/load-test profile for production unless the operator has
+fresh capacity evidence for that host size and deployment topology.
+
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
 but the current production workflow does not pass it into the Ansible command.
 It is only relevant if the workflow or a manual Ansible run supplies an

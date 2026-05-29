@@ -29,7 +29,17 @@
     "httpReqDurationP99Ms": 0,
     "betsAttempted": 0,
     "betsSucceeded": 0,
-    "betsFailed": 0
+    "betsFailed": 0,
+    "rateLimited": 0,
+    "loginRateLimited": 0
+  },
+  "rateLimitPolicy": {
+    "profile": "small-droplet-staging",
+    "loginRatePerSecond": 5,
+    "loginBurst": 20,
+    "generalRatePerSecond": 25,
+    "generalBurst": 50,
+    "cleanupInterval": "5m"
   },
   "infrastructureObservations": {
     "appCpuPeakPercent": null,

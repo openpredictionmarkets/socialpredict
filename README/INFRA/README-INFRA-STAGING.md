@@ -84,6 +84,19 @@ performs this high-level flow:
    /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL"
    ```
 
+   The installer also owns runtime rate-limit values in `.env`. If staging is
+   being used for load-test evidence on the current 512 MiB / 1 vCPU
+   DigitalOcean droplet, the Ansible command should select the staging profile:
+
+   ```bash
+   /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL" -r small-droplet-staging
+   ```
+
+   Equivalently, the Ansible workflow can export
+   `RATE_LIMIT_PROFILE=small-droplet-staging` before invoking the installer.
+   Without an explicit profile, production-like installs use
+   `secure-default`.
+
 6. Builds staging backend and frontend Docker images on the host.
 7. Writes staging image names into `/opt/socialpredict/.env`.
 8. Sets `DB_REQUIRE_TLS=false` for the staging local database topology.
@@ -189,6 +202,35 @@ STAGING_PORT=22
 STAGING_USER=root
 STAGING_DOMAIN=kconfs.com
 ```
+
+Runtime rate limits are not GitHub secrets. They are written into the host
+`.env` by `./SocialPredict install`.
+
+The current `secure-default` profile writes:
+
+```text
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=0.1
+RATE_LIMIT_LOGIN_BURST=3
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
+RATE_LIMIT_GENERAL_BURST=10
+RATE_LIMIT_CLEANUP_INTERVAL=5m
+```
+
+The current `small-droplet-staging` profile for the 512 MiB / 1 vCPU staging
+Droplet writes:
+
+```text
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=5
+RATE_LIMIT_LOGIN_BURST=20
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=25
+RATE_LIMIT_GENERAL_BURST=50
+RATE_LIMIT_CLEANUP_INTERVAL=5m
+```
+
+These are starting values for measurement, not a production promise. If k6,
+DigitalOcean metrics, `/readyz`, or backend logs show CPU saturation, memory
+pressure, database contention, or `RATE_LIMITED`/`LOGIN_RATE_LIMITED` responses,
+record the evidence and tune the profile or host size deliberately.
 
 `STAGING_PRIVATE_KEY` must be the private SSH key whose public key is already in
 the staging VPS user's `~/.ssh/authorized_keys`. `STAGING_PASSWORD` is used as

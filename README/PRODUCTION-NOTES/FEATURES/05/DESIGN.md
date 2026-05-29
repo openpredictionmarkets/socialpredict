@@ -1,6 +1,6 @@
 # Runtime Rate Limit Policy Design
 
-Status: proposed
+Status: implemented baseline
 Date: 2026-05-29
 
 ## Design Position
@@ -11,9 +11,9 @@ They are not game rules. Moving them into `setup.yaml` would couple infrastructu
 
 ## Configuration Shape
 
-The backend already constructs `security.RateLimitConfig` during server startup. The proposed implementation should add a small env parser before that construction and preserve existing defaults when env values are unset or invalid.
+The backend constructs `security.RateLimitConfig` during runtime startup. The baseline implementation now parses explicit environment values before server wiring and preserves existing defaults when values are unset. Invalid configured values fail startup rather than silently weakening or misrepresenting the runtime posture.
 
-Recommended names:
+Environment names:
 
 ```bash
 RATE_LIMIT_LOGIN_RATE_PER_SECOND
@@ -27,7 +27,7 @@ Use decimal parsing for rates so values such as `0.1` remain possible. Use integ
 
 ## Install Integration
 
-`./SocialPredict install` should write explicit `.env` values for production-like installs.
+`./SocialPredict install` writes explicit `.env` values for development, localhost, and production-like installs.
 
 The install UI should prefer profiles over raw fields:
 
@@ -35,7 +35,15 @@ The install UI should prefer profiles over raw fields:
 - `small-droplet-staging`
 - `custom`
 
-For `custom`, the installer can prompt for explicit values. For profiles, the installer should write the resolved values so the operator can audit and change `.env` later.
+For `custom`, the installer prompts for explicit values. For profiles, the installer writes the resolved values so the operator can audit and change `.env` later.
+
+Non-interactive production installs can pass the profile with:
+
+```bash
+./SocialPredict install -e production -d example.com -m ops@example.com -r small-droplet-staging
+```
+
+or by setting `RATE_LIMIT_PROFILE` before invoking the installer.
 
 ## Current Measurement Target
 
@@ -51,6 +59,8 @@ $4/mo
 ```
 
 The design goal is not to promise high traffic on this instance. The goal is to make the limit measurable and to avoid confusing rate-limit failures with actual application/database capacity failures.
+
+The current compose files do not intentionally constrain backend CPU with Docker `cpus`, `mem_limit`, or `deploy.resources` settings. On the current one-vCPU droplet, host CPU observations should therefore be treated as real capacity signals unless a future host-level or compose-level limit is added.
 
 ## Safety
 

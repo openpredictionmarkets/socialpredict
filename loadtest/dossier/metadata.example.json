@@ -18,6 +18,14 @@
     "targetBetRatePerSecond": 0,
     "readWriteMix": "smoke"
   },
+  "rateLimitPolicy": {
+    "profile": "secure-default",
+    "loginRatePerSecond": 0.1,
+    "loginBurst": 3,
+    "generalRatePerSecond": 1,
+    "generalBurst": 10,
+    "cleanupInterval": "5m"
+  },
   "infrastructureObservations": {
     "appCpuPeakPercent": null,
     "memoryPeakPercent": null,

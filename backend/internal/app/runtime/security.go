@@ -5,8 +5,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"socialpredict/security"
+
+	"golang.org/x/time/rate"
 )
 
 // CORSConfig describes the request-boundary CORS posture owned by runtime bootstrap.
@@ -27,6 +30,7 @@ type SecurityConfig struct {
 	CORS              CORSConfig
 	Headers           security.SecurityHeaders
 	Share             ShareConfig
+	RateLimit         security.RateLimitConfig
 }
 
 // ShareConfig describes public market sharing metadata owned by runtime config.
@@ -46,10 +50,16 @@ func LoadSecurityConfigFromEnv() (SecurityConfig, error) {
 	headers := security.DefaultSecurityHeaders()
 	headers.StrictTransportSecurity = strictTransportSecurityHeader()
 	applyFrameAncestors(&headers, getRuntimeListEnv("SECURITY_FRAME_ANCESTORS", "'none'"))
+	trustProxyHeaders := getRuntimeBoolEnv("TRUST_PROXY_HEADERS", false)
+	rateLimit, err := rateLimitConfigFromEnv()
+	if err != nil {
+		return SecurityConfig{}, err
+	}
+	rateLimit.TrustProxyHeaders = trustProxyHeaders
 
 	return SecurityConfig{
 		JWTSigningKey:     signingKey,
-		TrustProxyHeaders: getRuntimeBoolEnv("TRUST_PROXY_HEADERS", false),
+		TrustProxyHeaders: trustProxyHeaders,
 		CORS: CORSConfig{
 			Enabled:          getRuntimeBoolEnv("CORS_ENABLED", true),
 			AllowedOrigins:   getRuntimeListEnv("CORS_ALLOW_ORIGINS", "*"),
@@ -65,7 +75,31 @@ func LoadSecurityConfigFromEnv() (SecurityConfig, error) {
 			DefaultImageURL: strings.TrimSpace(os.Getenv("SHARE_DEFAULT_IMAGE_URL")),
 			SiteName:        getRuntimeStringEnv("SHARE_SITE_NAME", "SocialPredict"),
 		},
+		RateLimit: rateLimit,
 	}, nil
+}
+
+func rateLimitConfigFromEnv() (security.RateLimitConfig, error) {
+	config := security.DefaultRateLimitConfig()
+	var err error
+
+	if config.LoginRate, err = getRuntimeRateEnv("RATE_LIMIT_LOGIN_RATE_PER_SECOND", config.LoginRate); err != nil {
+		return security.RateLimitConfig{}, err
+	}
+	if config.LoginBurst, err = getRuntimePositiveIntEnv("RATE_LIMIT_LOGIN_BURST", config.LoginBurst); err != nil {
+		return security.RateLimitConfig{}, err
+	}
+	if config.GeneralRate, err = getRuntimeRateEnv("RATE_LIMIT_GENERAL_RATE_PER_SECOND", config.GeneralRate); err != nil {
+		return security.RateLimitConfig{}, err
+	}
+	if config.GeneralBurst, err = getRuntimePositiveIntEnv("RATE_LIMIT_GENERAL_BURST", config.GeneralBurst); err != nil {
+		return security.RateLimitConfig{}, err
+	}
+	if config.CleanupInterval, err = getRuntimePositiveDurationEnv("RATE_LIMIT_CLEANUP_INTERVAL", config.CleanupInterval); err != nil {
+		return security.RateLimitConfig{}, err
+	}
+
+	return config, nil
 }
 
 func applyFrameAncestors(headers *security.SecurityHeaders, ancestors []string) {
@@ -176,4 +210,40 @@ func getRuntimeIntEnv(key string, def int) int {
 		return def
 	}
 	return parsed
+}
+
+func getRuntimePositiveIntEnv(key string, def int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return def, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("security config: %s must be a positive integer", key)
+	}
+	return parsed, nil
+}
+
+func getRuntimeRateEnv(key string, def rate.Limit) (rate.Limit, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return def, nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("security config: %s must be a positive decimal requests-per-second value", key)
+	}
+	return rate.Limit(parsed), nil
+}
+
+func getRuntimePositiveDurationEnv(key string, def time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return def, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("security config: %s must be a positive Go duration, e.g. 5m", key)
+	}
+	return parsed, nil
 }

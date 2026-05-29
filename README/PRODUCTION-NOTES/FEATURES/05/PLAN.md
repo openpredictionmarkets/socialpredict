@@ -1,6 +1,6 @@
 # Runtime Rate Limit Policy Plan
 
-Status: proposed
+Status: implemented baseline; staging evidence remains pending
 Date: 2026-05-29
 
 ## 01. Backend Env Parsing
@@ -9,11 +9,11 @@ Service ownership: backend runtime and security middleware.
 
 Checklist:
 
-- [ ] Add env parsing for login/general rate and burst values.
-- [ ] Preserve current defaults when env values are unset.
-- [ ] Reject or safely fall back on invalid values with clear startup logging.
-- [ ] Unit test default behavior and env override behavior.
-- [ ] Confirm `TRUST_PROXY_HEADERS` behavior remains unchanged.
+- [x] Add env parsing for login/general rate and burst values.
+- [x] Preserve current defaults when env values are unset.
+- [x] Reject invalid values during security config startup.
+- [x] Unit test default behavior and env override behavior.
+- [x] Confirm `TRUST_PROXY_HEADERS` behavior remains unchanged.
 
 ## 02. Installer Profiles
 
@@ -21,12 +21,12 @@ Service ownership: `./SocialPredict install` and deployment documentation.
 
 Checklist:
 
-- [ ] Add install profile selection for production-like installs.
-- [ ] Keep `secure-default` as the safe default.
-- [ ] Add `small-droplet-staging` profile for the current $4/mo DigitalOcean target.
-- [ ] Add `custom` prompts for explicit values.
-- [ ] Write resolved values into `.env`.
-- [ ] Document how to change values after install.
+- [x] Add install profile selection for production-like installs.
+- [x] Keep `secure-default` as the safe default.
+- [x] Add `small-droplet-staging` profile for the current $4/mo DigitalOcean target.
+- [x] Add `custom` prompts for explicit values.
+- [x] Write resolved values into `.env`.
+- [x] Document how to change values after install.
 
 ## 03. Loadtest CLI Low-Rate Support
 
@@ -34,11 +34,18 @@ Service ownership: `loadtest/cli` and k6 scenario configuration.
 
 Checklist:
 
-- [ ] Add `--browse-time-unit` for baseline browse scenario.
-- [ ] Add `--bet-time-unit` for baseline bet scenario.
-- [ ] Add equivalent time-unit options where useful for hot-market and soak scenarios.
-- [ ] Document that k6 rates are integers and sub-1/sec traffic should use larger time units.
-- [ ] Validate a tiny public staging run without fractional-rate parse errors.
+- [x] Add `--browse-time-unit` for baseline browse scenario.
+- [x] Add `--bet-time-unit` for baseline bet scenario.
+- [x] Add equivalent time-unit options where useful for hot-market and soak scenarios.
+- [x] Document that k6 rates are integers and sub-1/sec traffic should use larger time units.
+- [ ] Validate a tiny public staging run with fresh fixtures and no threshold failures.
+
+Implementation note: a local 2026-05-29 k6 baseline run using
+`--browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s`
+initialized successfully and no longer hit the k6 fractional-rate parser error.
+It still failed thresholds against public staging because the local fixture CSVs
+were stale relative to the deployed staging database, so final staging evidence
+remains pending.
 
 ## 04. Staging Evidence Pass
 
@@ -57,10 +64,10 @@ Checklist:
 
 Checklist:
 
-- [ ] Update infra docs with the rate-limit env vars.
-- [ ] Update loadtest docs with the staging profile and time-unit examples.
-- [ ] Update release dossier schema/metadata guidance to include rate-limit settings.
-- [ ] Cross-link from FEATURE/04 load testing notes.
+- [x] Update infra docs with the rate-limit env vars.
+- [x] Update loadtest docs with the staging profile and time-unit examples.
+- [x] Update release dossier schema/metadata guidance to include rate-limit settings.
+- [x] Cross-link from FEATURE/04 load testing notes.
 
 ## Exit Criteria
 

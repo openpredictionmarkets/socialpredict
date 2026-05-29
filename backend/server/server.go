@@ -307,9 +307,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// This defines all functions starting with /api/
 
 	// Apply security middleware to all routes
-	rateLimitConfig := security.DefaultRateLimitConfig()
-	rateLimitConfig.TrustProxyHeaders = securityConfig.TrustProxyHeaders
-	securityService := security.NewRuntimeSecurityService(rateLimitConfig, securityConfig.Headers)
+	securityService := security.NewRuntimeSecurityService(securityConfig.RateLimit, securityConfig.Headers)
 	securityMiddleware := securityService.SecurityMiddleware()
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 	privateActionMiddleware := func(next http.Handler) http.Handler {

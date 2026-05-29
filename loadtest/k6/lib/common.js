@@ -9,6 +9,8 @@ export const betsSucceeded = new Counter('sp_bets_succeeded');
 export const betsFailed = new Counter('sp_bets_failed');
 export const loginFailures = new Counter('sp_login_failures');
 export const marketReadFailures = new Counter('sp_market_read_failures');
+export const rateLimited = new Counter('sp_rate_limited');
+export const loginRateLimited = new Counter('sp_login_rate_limited');
 
 export const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
 export const API_PREFIX = normalizeApiPrefix(__ENV.API_PREFIX || '');
@@ -73,10 +75,25 @@ function responseSnippet(response) {
   return String(response.body).replace(/\s+/g, ' ').slice(0, 240);
 }
 
+function responseReason(response) {
+  if (!response || !response.body) return '';
+  try {
+    return response.json('reason') || '';
+  } catch {
+    return '';
+  }
+}
+
 function recordFailure(kind, response, context = {}) {
   const status = response ? String(response.status) : 'unknown';
+  const reason = context.reason || responseReason(response);
   const tags = { kind, status };
-  if (context.reason) tags.reason = context.reason;
+  if (reason) tags.reason = reason;
+  if (reason === 'RATE_LIMITED') {
+    rateLimited.add(1, tags);
+  } else if (reason === 'LOGIN_RATE_LIMITED') {
+    loginRateLimited.add(1, tags);
+  }
   if (kind === 'login') {
     loginFailures.add(1, tags);
   } else if (kind === 'bet') {
@@ -88,7 +105,7 @@ function recordFailure(kind, response, context = {}) {
   if (failureLogCount >= FAILURE_LOG_LIMIT) return;
   failureLogCount += 1;
 
-  const details = Object.entries(context)
+  const details = Object.entries({ ...context, reason })
     .filter(([, value]) => value !== undefined && value !== '')
     .map(([key, value]) => `${key}=${value}`)
     .join(' ');
