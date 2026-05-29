@@ -1,9 +1,10 @@
 import { sleep } from 'k6';
-import { checkProbes, placeBet, requireFixtures } from './lib/common.js';
+import { checkProbes, placeBet, preAuthenticateUsers, requireFixtures } from './lib/common.js';
 
 const duration = __ENV.DURATION || '60s';
 const targetRate = Number(__ENV.TARGET_RATE || '50');
 const targetTimeUnit = __ENV.TARGET_TIME_UNIT || '1s';
+const preauthUsers = Number(__ENV.PREAUTH_USERS || '100');
 
 export const options = {
   scenarios: {
@@ -25,9 +26,12 @@ export const options = {
 export function setup() {
   requireFixtures();
   checkProbes();
+  return {
+    authenticatedUsers: preAuthenticateUsers(preauthUsers),
+  };
 }
 
-export default function () {
-  placeBet({ hotOnly: true });
+export default function (data) {
+  placeBet({ hotOnly: true, authenticatedUsers: data.authenticatedUsers });
   sleep(0.01);
 }

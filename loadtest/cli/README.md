@@ -9,10 +9,12 @@ Seed fixture CSVs with `./SocialPredict load seed`, or provide files under `load
 ```bash
 LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --markets 5 --reset
 ./loadtest/cli/loadtest check
+./loadtest/cli/loadtest host rate-limits staging
+./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
 ./loadtest/cli/loadtest fixtures pull staging
 ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --duration 5m --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
-./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 100 --duration 60s
+./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --metadata loadtest/dossier/metadata.example.json --out loadtest/dossier/runs/<run>.json
 ```
 
@@ -22,19 +24,61 @@ k6 logs in with normal fake SocialPredict users from `users.csv` and uses normal
 
 No DigitalOcean credentials or betting god token are used by this CLI.
 
-## Remote Fixture Pull
+## Operator Runbook
 
-After running `./SocialPredict load seed` on a remote staging host, pull the generated fixture CSVs back to your load-generator machine:
+For a step-by-step staging sequence, including SSH key expectations and what an
+LLM agent should run in order, see [`OPERATING.md`](./OPERATING.md).
+
+## Remote Host Checks
+
+Show the active remote `RATE_LIMIT_*` values:
 
 ```bash
+./loadtest/cli/loadtest host rate-limits staging
+```
+
+Override the SSH target when needed:
+
+```bash
+./loadtest/cli/loadtest host rate-limits staging \
+  --host root@45.55.227.1 \
+  --key ~/.keys/socialpredict/staging/id_ed25519 \
+  --repo-path /opt/socialpredict
+```
+
+## Remote Fixture Seed And Pull
+
+Seed staging over SSH, then pull the generated fixture CSVs back to your
+load-generator machine:
+
+```bash
+./loadtest/cli/loadtest fixtures seed staging \
+  --users 100 \
+  --moderators 5 \
+  --markets 20 \
+  --hot-markets 2 \
+  --reset
+
 ./loadtest/cli/loadtest fixtures pull staging
 ```
 
-The staging defaults are `root@kconfs.com`, `~/.keys/socialpredict/staging/id_ed25519`, and `/opt/socialpredict/loadtest/fixtures`.
+The staging defaults are `root@kconfs.com`,
+`~/.keys/socialpredict/staging/id_ed25519`, `/opt/socialpredict`, and
+`/opt/socialpredict/loadtest/fixtures`.
 
 Override values when needed:
 
 ```bash
+./loadtest/cli/loadtest fixtures seed staging \
+  --host root@45.55.227.1 \
+  --key ~/.keys/socialpredict/staging/id_ed25519 \
+  --repo-path /opt/socialpredict \
+  --users 100 \
+  --moderators 5 \
+  --markets 20 \
+  --hot-markets 2 \
+  --reset
+
 ./loadtest/cli/loadtest fixtures pull staging \
   --host root@45.55.227.1 \
   --key ~/.keys/socialpredict/staging/id_ed25519 \
@@ -43,6 +87,21 @@ Override values when needed:
 ```
 
 Public staging/prod Nginx publishes API routes under `/api`, so use `--api-prefix /api` when running against `https://kconfs.com` or `https://brierfoxforecast.com`. Direct backend targets such as `http://localhost:8080` should omit the prefix.
+
+## Hot-Market Burst
+
+`hot-market-burst` pre-authenticates users during k6 `setup()` and then reuses
+those bearer tokens during the measured betting scenario. This keeps high-rate
+hot-market tests focused on betting throughput instead of measuring login churn.
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100
+```
 
 ## Low-Rate Runs
 

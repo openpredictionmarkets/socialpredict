@@ -20,6 +20,7 @@ export const DEFAULT_PASSWORD = __ENV.LOADTEST_PASSWORD || '';
 export const BET_AMOUNT = Number(__ENV.BET_AMOUNT || '1');
 export const HOT_MARKET_WEIGHT = Number(__ENV.HOT_MARKET_WEIGHT || '8');
 export const FAILURE_LOG_LIMIT = Number(__ENV.FAILURE_LOG_LIMIT || '10');
+export const PREAUTH_USERS = Number(__ENV.PREAUTH_USERS || '100');
 
 let failureLogCount = 0;
 
@@ -180,10 +181,33 @@ export function login(user) {
   return token;
 }
 
-export function placeBet({ hotOnly = false } = {}) {
-  const user = pickUser();
+export function preAuthenticateUsers(limit = PREAUTH_USERS) {
+  const count = Math.min(Math.max(Number(limit) || 0, 0), users.length);
+  const authenticatedUsers = [];
+  for (const user of users.slice(0, count)) {
+    const token = login(user);
+    if (token) {
+      authenticatedUsers.push({ username: user.username, token });
+    }
+  }
+  if (authenticatedUsers.length === 0) {
+    throw new Error('No users could be pre-authenticated for load testing');
+  }
+  return authenticatedUsers;
+}
+
+export function pickAuthenticatedUser(authenticatedUsers) {
+  if (!authenticatedUsers || authenticatedUsers.length === 0) {
+    return null;
+  }
+  return pick(authenticatedUsers);
+}
+
+export function placeBet({ hotOnly = false, authenticatedUsers = null } = {}) {
+  const authenticatedUser = pickAuthenticatedUser(authenticatedUsers);
+  const user = authenticatedUser || pickUser();
   const market = pickMarket({ hotOnly });
-  const token = login(user);
+  const token = authenticatedUser ? authenticatedUser.token : login(user);
   if (!token) {
     betsFailed.add(1, { reason: 'login_failed' });
     return;

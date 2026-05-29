@@ -11,17 +11,21 @@ Usage: ./loadtest/cli/loadtest COMMAND [OPTIONS]
 
 Commands:
   check                  Check local load-test prerequisites
+  fixtures seed <env>    Seed load-test fixtures on a remote host over SSH
   fixtures pull <env>    Pull generated fixture CSVs from a remote host
+  host rate-limits <env> Show remote RATE_LIMIT_* values over SSH
   run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, soak
   dossier                Generate release dossier JSON from a k6 summary
   help                   Show this help
 
 Run examples:
   ./loadtest/cli/loadtest check
+  ./loadtest/cli/loadtest host rate-limits staging
+  ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
   ./loadtest/cli/loadtest fixtures pull staging
   ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
   ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
-  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 100 --duration 60s
+  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100
   ./loadtest/cli/loadtest dossier --summary loadtest/results/smoke-20260528T120000Z-summary.json --out loadtest/dossier/runs/smoke.json
 
 Fixture defaults:
@@ -51,6 +55,18 @@ require_positive_integer_value() {
   fi
   if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
     echo "${label} must be a positive integer. For sub-1/sec rates, increase the time unit, e.g. --bet-rate 1 --bet-time-unit 20s." >&2
+    exit 1
+  fi
+}
+
+require_nonnegative_integer_value() {
+  local label="$1"
+  local value="$2"
+  if [ -z "$value" ]; then
+    return 0
+  fi
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "${label} must be a non-negative integer." >&2
     exit 1
   fi
 }
@@ -100,6 +116,154 @@ fixture_host_for_env() {
       echo "root@$1"
       ;;
   esac
+}
+
+shell_quote() {
+  printf "%q" "$1"
+}
+
+fixtures_seed_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest fixtures seed <env> [OPTIONS]
+
+Seed load-test fixtures on a remote SocialPredict host over SSH.
+
+Defaults:
+  staging host:    root@kconfs.com
+  mo/prod host:    root@brierfoxforecast.com
+  key path:        ~/.keys/socialpredict/<env>/id_ed25519
+  SSH port:        22
+  remote repo:     /opt/socialpredict
+
+Seed defaults mirror './SocialPredict load seed':
+  users:           10
+  moderators:      2
+  markets:         5
+  hot markets:     1
+  password:        loadtest-password
+  user prefix:     loaduser
+  moderator prefix: loadmod
+  user balance:    1000000
+
+Options:
+  --host VALUE              SSH host, e.g. root@45.55.227.1 or root@kconfs.com
+  --key VALUE               SSH private key path
+  --port VALUE              SSH port; default 22
+  --repo-path VALUE         Remote SocialPredict repo path; default /opt/socialpredict
+  --users N                 Number of REGULAR test users
+  --moderators N            Number of MODERATOR test users
+  --markets N               Number of published fixture markets
+  --hot-markets N           Number of fixture markets marked hot in markets.csv
+  --password VALUE          Password for every load-test user
+  --user-prefix VALUE       Prefix for regular users
+  --moderator-prefix VALUE  Prefix for moderators
+  --user-balance N          Starting balance for each load-test user
+  --resolution-days N       Days until generated markets resolve
+  --bcrypt-cost N           Password hash cost
+  --reset                   Remove existing prefixed fixture users, markets, and bets first
+  --help                    Show this help
+
+Examples:
+  ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
+  ./loadtest/cli/loadtest fixtures seed staging --host root@45.55.227.1 --key ~/.keys/socialpredict/staging/id_ed25519 --reset
+HELP
+}
+
+fixtures_seed_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      fixtures_seed_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "fixtures seed requires <env>." >&2
+    fixtures_seed_help
+    exit 1
+  fi
+
+  local env_name="$1"
+  shift
+  local host
+  host="$(fixture_host_for_env "$env_name")"
+  local key="${HOME}/.keys/socialpredict/${env_name}/id_ed25519"
+  local port="22"
+  local repo_path="/opt/socialpredict"
+  local users="10"
+  local moderators="2"
+  local markets="5"
+  local hot_markets="1"
+  local password="loadtest-password"
+  local user_prefix="loaduser"
+  local moderator_prefix="loadmod"
+  local user_balance=""
+  local resolution_days=""
+  local bcrypt_cost=""
+  local reset="false"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host) host="$2"; shift 2 ;;
+      --key) key="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      --repo-path) repo_path="$2"; shift 2 ;;
+      --users) users="$2"; shift 2 ;;
+      --moderators) moderators="$2"; shift 2 ;;
+      --markets) markets="$2"; shift 2 ;;
+      --hot-markets) hot_markets="$2"; shift 2 ;;
+      --password) password="$2"; shift 2 ;;
+      --user-prefix) user_prefix="$2"; shift 2 ;;
+      --moderator-prefix) moderator_prefix="$2"; shift 2 ;;
+      --user-balance) user_balance="$2"; shift 2 ;;
+      --resolution-days) resolution_days="$2"; shift 2 ;;
+      --bcrypt-cost) bcrypt_cost="$2"; shift 2 ;;
+      --reset) reset="true"; shift ;;
+      --help|-h) fixtures_seed_help; exit 0 ;;
+      *) echo "Unknown fixtures seed option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  require_command ssh
+  if [ ! -f "$key" ]; then
+    echo "Missing SSH key: $key" >&2
+    exit 1
+  fi
+
+  require_positive_integer_value "--users" "$users"
+  require_positive_integer_value "--moderators" "$moderators"
+  require_positive_integer_value "--markets" "$markets"
+  require_nonnegative_integer_value "--hot-markets" "$hot_markets"
+  require_positive_integer_value "--user-balance" "$user_balance"
+  require_positive_integer_value "--resolution-days" "$resolution_days"
+  require_positive_integer_value "--bcrypt-cost" "$bcrypt_cost"
+
+  local seed_args=(
+    ./SocialPredict load seed
+    --users "$users"
+    --moderators "$moderators"
+    --markets "$markets"
+    --hot-markets "$hot_markets"
+    --password "$password"
+    --user-prefix "$user_prefix"
+    --moderator-prefix "$moderator_prefix"
+  )
+  if [ -n "$user_balance" ]; then seed_args+=(--user-balance "$user_balance"); fi
+  if [ -n "$resolution_days" ]; then seed_args+=(--resolution-days "$resolution_days"); fi
+  if [ -n "$bcrypt_cost" ]; then seed_args+=(--bcrypt-cost "$bcrypt_cost"); fi
+  if [ "$reset" = "true" ]; then seed_args+=(--reset); fi
+
+  local quoted_seed_cmd=""
+  local arg
+  for arg in "${seed_args[@]}"; do
+    quoted_seed_cmd+=" $(shell_quote "$arg")"
+  done
+
+  local remote_script
+  remote_script="cd $(shell_quote "$repo_path") && LOAD_TEST_ENABLED=true LOAD_TEST_ALLOW_PRODUCTION=true${quoted_seed_cmd}"
+
+  echo "Seeding load-test fixtures on ${host}:${repo_path}"
+  ssh -p "$port" -i "$key" "$host" "$remote_script"
 }
 
 fixtures_pull_help() {
@@ -180,13 +344,126 @@ fixtures_pull_cmd() {
   echo "  ${local_path}/markets.csv"
 }
 
+fixtures_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest fixtures <seed|pull> <env> [OPTIONS]
+
+Commands:
+  seed <env>   Seed load-test fixtures on a remote host over SSH
+  pull <env>   Pull generated fixture CSVs from a remote host
+
+Examples:
+  ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
+  ./loadtest/cli/loadtest fixtures pull staging
+
+Run command-specific help:
+  ./loadtest/cli/loadtest fixtures seed --help
+  ./loadtest/cli/loadtest fixtures pull --help
+HELP
+}
+
 fixtures_cmd() {
   local subcommand="${1:-help}"
   shift || true
   case "$subcommand" in
+    seed) fixtures_seed_cmd "$@" ;;
     pull) fixtures_pull_cmd "$@" ;;
-    --help|-h|help) fixtures_pull_help ;;
-    *) echo "Unknown fixtures command: $subcommand" >&2; fixtures_pull_help; exit 1 ;;
+    --help|-h|help) fixtures_help ;;
+    *) echo "Unknown fixtures command: $subcommand" >&2; fixtures_help; exit 1 ;;
+  esac
+}
+
+host_rate_limits_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest host rate-limits <env> [OPTIONS]
+
+Show remote RATE_LIMIT_* values from a SocialPredict host .env file over SSH.
+
+Defaults:
+  staging host:    root@kconfs.com
+  mo/prod host:    root@brierfoxforecast.com
+  key path:        ~/.keys/socialpredict/<env>/id_ed25519
+  SSH port:        22
+  remote repo:     /opt/socialpredict
+
+Options:
+  --host VALUE       SSH host, e.g. root@45.55.227.1 or root@kconfs.com
+  --key VALUE        SSH private key path
+  --port VALUE       SSH port; default 22
+  --repo-path VALUE  Remote SocialPredict repo path; default /opt/socialpredict
+  --help             Show this help
+
+Examples:
+  ./loadtest/cli/loadtest host rate-limits staging
+  ./loadtest/cli/loadtest host rate-limits staging --host root@45.55.227.1
+HELP
+}
+
+host_rate_limits_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      host_rate_limits_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "host rate-limits requires <env>." >&2
+    host_rate_limits_help
+    exit 1
+  fi
+
+  local env_name="$1"
+  shift
+  local host
+  host="$(fixture_host_for_env "$env_name")"
+  local key="${HOME}/.keys/socialpredict/${env_name}/id_ed25519"
+  local port="22"
+  local repo_path="/opt/socialpredict"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host) host="$2"; shift 2 ;;
+      --key) key="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      --repo-path) repo_path="$2"; shift 2 ;;
+      --help|-h) host_rate_limits_help; exit 0 ;;
+      *) echo "Unknown host rate-limits option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  require_command ssh
+  if [ ! -f "$key" ]; then
+    echo "Missing SSH key: $key" >&2
+    exit 1
+  fi
+
+  local remote_script
+  remote_script="cd $(shell_quote "$repo_path") && grep \"^RATE_LIMIT_\" .env"
+
+  echo "Reading remote rate limits from ${host}:${repo_path}/.env"
+  ssh -p "$port" -i "$key" "$host" "$remote_script"
+}
+
+host_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest host <rate-limits> <env> [OPTIONS]
+
+Commands:
+  rate-limits <env>  Show remote RATE_LIMIT_* values over SSH
+
+Examples:
+  ./loadtest/cli/loadtest host rate-limits staging
+HELP
+}
+
+host_cmd() {
+  local subcommand="${1:-help}"
+  shift || true
+  case "$subcommand" in
+    rate-limits) host_rate_limits_cmd "$@" ;;
+    --help|-h|help) host_help ;;
+    *) echo "Unknown host command: $subcommand" >&2; host_help; exit 1 ;;
   esac
 }
 
@@ -205,6 +482,7 @@ run_cmd() {
   local duration="${DURATION:-}"
   local target_rate="${TARGET_RATE:-}"
   local target_time_unit="${TARGET_TIME_UNIT:-}"
+  local preauth_users="${PREAUTH_USERS:-}"
   local bet_rate="${BET_RATE:-}"
   local bet_time_unit="${BET_TIME_UNIT:-}"
   local browse_rate="${BROWSE_RATE:-}"
@@ -222,6 +500,7 @@ run_cmd() {
       --duration) duration="$2"; shift 2 ;;
       --target-rate) target_rate="$2"; shift 2 ;;
       --target-time-unit) target_time_unit="$2"; shift 2 ;;
+      --preauth-users) preauth_users="$2"; shift 2 ;;
       --bet-rate) bet_rate="$2"; shift 2 ;;
       --bet-time-unit) bet_time_unit="$2"; shift 2 ;;
       --browse-rate) browse_rate="$2"; shift 2 ;;
@@ -246,6 +525,7 @@ run_cmd() {
     exit 1
   fi
   require_positive_integer_value "--target-rate" "$target_rate"
+  require_positive_integer_value "--preauth-users" "$preauth_users"
   require_positive_integer_value "--bet-rate" "$bet_rate"
   require_positive_integer_value "--browse-rate" "$browse_rate"
   require_positive_integer_value "--rate" "$rate"
@@ -266,6 +546,7 @@ run_cmd() {
     DURATION="$duration" \
     TARGET_RATE="$target_rate" \
     TARGET_TIME_UNIT="$target_time_unit" \
+    PREAUTH_USERS="$preauth_users" \
     BET_RATE="$bet_rate" \
     BET_TIME_UNIT="$bet_time_unit" \
     BROWSE_RATE="$browse_rate" \
@@ -308,6 +589,7 @@ shift || true
 case "$command" in
   check) check_cmd "$@" ;;
   fixtures) fixtures_cmd "$@" ;;
+  host) host_cmd "$@" ;;
   run) run_cmd "$@" ;;
   dossier) dossier_cmd "$@" ;;
   help|--help|-h) print_help ;;
