@@ -11,13 +11,15 @@ Usage: ./loadtest/cli/loadtest COMMAND [OPTIONS]
 
 Commands:
   check                  Check local load-test prerequisites
+  fixtures pull <env>    Pull generated fixture CSVs from a remote host
   run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, soak
   dossier                Generate release dossier JSON from a k6 summary
   help                   Show this help
 
 Run examples:
   ./loadtest/cli/loadtest check
-  ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com
+  ./loadtest/cli/loadtest fixtures pull staging
+  ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
   ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 100 --duration 60s
   ./loadtest/cli/loadtest dossier --summary loadtest/results/smoke-20260528T120000Z-summary.json --out loadtest/dossier/runs/smoke.json
 
@@ -73,6 +75,108 @@ check_cmd() {
   echo "Load-test prerequisites look ready."
 }
 
+fixture_host_for_env() {
+  case "$1" in
+    staging)
+      echo "root@kconfs.com"
+      ;;
+    mo|prod|production)
+      echo "root@brierfoxforecast.com"
+      ;;
+    *)
+      echo "root@$1"
+      ;;
+  esac
+}
+
+fixtures_pull_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest fixtures pull <env> [OPTIONS]
+
+Pull generated load-test fixture CSVs from a remote SocialPredict host.
+
+Defaults:
+  staging host:    root@kconfs.com
+  mo/prod host:    root@brierfoxforecast.com
+  key path:        ~/.keys/socialpredict/<env>/id_ed25519
+  remote path:     /opt/socialpredict/loadtest/fixtures
+  local path:      loadtest/fixtures
+  files:           users.csv, markets.csv
+
+Options:
+  --host VALUE          SSH host, e.g. root@45.55.227.1 or root@kconfs.com
+  --key VALUE           SSH private key path
+  --port VALUE          SSH port; default 22
+  --remote-path VALUE   Remote fixture directory
+  --local-path VALUE    Local fixture directory
+  --help                Show this help
+
+Examples:
+  ./loadtest/cli/loadtest fixtures pull staging
+  ./loadtest/cli/loadtest fixtures pull staging --host root@45.55.227.1
+HELP
+}
+
+fixtures_pull_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      fixtures_pull_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "fixtures pull requires <env>." >&2
+    fixtures_pull_help
+    exit 1
+  fi
+
+  local env_name="$1"
+  shift
+  local host
+  host="$(fixture_host_for_env "$env_name")"
+  local key="${HOME}/.keys/socialpredict/${env_name}/id_ed25519"
+  local port="22"
+  local remote_path="/opt/socialpredict/loadtest/fixtures"
+  local local_path="${LOADTEST_DIR}/fixtures"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host) host="$2"; shift 2 ;;
+      --key) key="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      --remote-path) remote_path="$2"; shift 2 ;;
+      --local-path) local_path="$2"; shift 2 ;;
+      --help|-h) fixtures_pull_help; exit 0 ;;
+      *) echo "Unknown fixtures pull option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  require_command scp
+  if [ ! -f "$key" ]; then
+    echo "Missing SSH key: $key" >&2
+    exit 1
+  fi
+
+  mkdir -p "$local_path"
+  echo "Pulling load-test fixtures from ${host}:${remote_path}"
+  scp -P "$port" -i "$key" "${host}:${remote_path}/users.csv" "${local_path}/users.csv"
+  scp -P "$port" -i "$key" "${host}:${remote_path}/markets.csv" "${local_path}/markets.csv"
+  echo "Fixtures pulled:"
+  echo "  ${local_path}/users.csv"
+  echo "  ${local_path}/markets.csv"
+}
+
+fixtures_cmd() {
+  local subcommand="${1:-help}"
+  shift || true
+  case "$subcommand" in
+    pull) fixtures_pull_cmd "$@" ;;
+    --help|-h|help) fixtures_pull_help ;;
+    *) echo "Unknown fixtures command: $subcommand" >&2; fixtures_pull_help; exit 1 ;;
+  esac
+}
+
 run_cmd() {
   if [ "$#" -lt 1 ]; then
     echo "Missing scenario." >&2
@@ -82,6 +186,7 @@ run_cmd() {
   local scenario="$1"
   shift
   local base_url="${BASE_URL:-http://localhost:8080}"
+  local api_prefix="${API_PREFIX:-}"
   local users_file="${USERS_FILE:-${LOADTEST_DIR}/fixtures/users.csv}"
   local markets_file="${MARKETS_FILE:-${LOADTEST_DIR}/fixtures/markets.csv}"
   local duration="${DURATION:-}"
@@ -93,6 +198,7 @@ run_cmd() {
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --base-url) base_url="$2"; shift 2 ;;
+      --api-prefix) api_prefix="$2"; shift 2 ;;
       --users-file) users_file="$2"; shift 2 ;;
       --markets-file) markets_file="$2"; shift 2 ;;
       --duration) duration="$2"; shift 2 ;;
@@ -123,9 +229,11 @@ run_cmd() {
   fi
 
   echo "Running ${scenario} against ${base_url}"
+  echo "API prefix: ${api_prefix:-<none>}"
   (
     cd "$REPO_DIR"
     BASE_URL="$base_url" \
+    API_PREFIX="$api_prefix" \
     USERS_FILE="$users_file" \
     MARKETS_FILE="$markets_file" \
     DURATION="$duration" \
@@ -167,6 +275,7 @@ command="${1:-help}"
 shift || true
 case "$command" in
   check) check_cmd "$@" ;;
+  fixtures) fixtures_cmd "$@" ;;
   run) run_cmd "$@" ;;
   dossier) dossier_cmd "$@" ;;
   help|--help|-h) print_help ;;
