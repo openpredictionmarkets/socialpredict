@@ -114,7 +114,8 @@ cp loadtest/fixtures/markets.example.csv loadtest/fixtures/markets.csv
 Run a smoke scenario:
 
 ```bash
-./loadtest/cli/loadtest run smoke --base-url https://kconfs.com
+./loadtest/cli/loadtest fixtures pull staging
+./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ```
 
 Generate a release dossier from the k6 summary output:
