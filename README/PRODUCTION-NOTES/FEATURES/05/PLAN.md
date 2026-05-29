@@ -54,11 +54,17 @@ Service ownership: release dossier and operations.
 Checklist:
 
 - [ ] Deploy env-configurable rate limits to `kconfs.com`.
-- [ ] Set the `small-droplet-staging` profile on the current 512 MiB / 1 vCPU droplet.
+- [x] Land Ansible deploy support for selecting the `small-droplet-staging` profile on the current 512 MiB / 1 vCPU droplet.
 - [ ] Run smoke after deployment.
 - [ ] Run a low baseline test.
 - [ ] Increment rates until the first clear bottleneck appears.
 - [ ] Record rate-limit settings and DigitalOcean host observations in the release dossier.
+
+Ansible note: `openpredictionmarkets/ansible_playbooks` now defaults staging to
+`RATE_LIMIT_PROFILE=small-droplet-staging` and production/model-office to
+`RATE_LIMIT_PROFILE=secure-default`, with optional
+`STAGING_RATE_LIMIT_PROFILE` and `PRODUCTION_RATE_LIMIT_PROFILE` secret
+overrides.
 
 ## 05. Documentation
 

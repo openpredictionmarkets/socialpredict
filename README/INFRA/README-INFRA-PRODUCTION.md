@@ -93,9 +93,11 @@ provider-appropriate TLS mode, for example `DB_REQUIRE_TLS=true` with
 `DB_SSLMODE=verify-full` when certificate validation is configured.
 
 `./SocialPredict install` also writes runtime rate-limit values into `.env`.
-These values are operations/security policy, not game setup. Production-like
-installs default to the conservative `secure-default` profile unless the
-operator or Ansible workflow explicitly passes a different profile:
+These values are operations/security policy, not game setup. The
+OpenPredictionMarkets production Ansible deploy now sets
+`RATE_LIMIT_PROFILE=secure-default` while invoking the installer. Production-like
+manual installs also default to the conservative `secure-default` profile unless
+the operator explicitly passes a different profile:
 
 ```bash
 ./SocialPredict install -e production -d brierfoxforecast.com -m ops@example.com
@@ -114,6 +116,9 @@ RATE_LIMIT_CLEANUP_INTERVAL=5m
 
 Do not use the staging/load-test profile for production unless the operator has
 fresh capacity evidence for that host size and deployment topology.
+
+The Ansible workflow accepts the optional `PRODUCTION_RATE_LIMIT_PROFILE` secret
+if an operator intentionally needs to override the default production profile.
 
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
 but the current production workflow does not pass it into the Ansible command.

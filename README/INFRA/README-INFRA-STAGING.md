@@ -84,17 +84,21 @@ performs this high-level flow:
    /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL"
    ```
 
-   The installer also owns runtime rate-limit values in `.env`. If staging is
-   being used for load-test evidence on the current 512 MiB / 1 vCPU
-   DigitalOcean droplet, the Ansible command should select the staging profile:
+   The installer also owns runtime rate-limit values in `.env`. For
+   OpenPredictionMarkets staging, the `ansible_playbooks` deploy now sets
+   `RATE_LIMIT_PROFILE=small-droplet-staging` while invoking the installer so
+   the current 512 MiB / 1 vCPU DigitalOcean droplet uses the measurement
+   profile after this SocialPredict runtime support is deployed.
+
+   Equivalent manual command:
 
    ```bash
    /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL" -r small-droplet-staging
    ```
 
-   Equivalently, the Ansible workflow can export
-   `RATE_LIMIT_PROFILE=small-droplet-staging` before invoking the installer.
-   Without an explicit profile, production-like installs use
+   The Ansible workflow also accepts the optional
+   `STAGING_RATE_LIMIT_PROFILE` secret if an operator needs to override that
+   default. Without an explicit profile, production-like installs use
    `secure-default`.
 
 6. Builds staging backend and frontend Docker images on the host.
