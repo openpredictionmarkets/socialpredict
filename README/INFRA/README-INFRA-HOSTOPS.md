@@ -22,6 +22,19 @@ This keeps app runtime logic and infra control-plane logic separated.
 
 If runtime behavior changes, update `./SocialPredict`; `./HostOps` should keep calling stable `./SocialPredict` interfaces.
 
+HostOps is also not the owner of release-to-readiness semantics. Public deploy
+verification lives in GitHub Actions and currently checks only the public
+`/health` and `/readyz` contracts for `kconfs.com` and
+`brierfoxforecast.com`. HostOps may help a human inspect a host after deploy,
+but it should not replace the external public verification boundary with
+host-internal checks.
+
+HostOps wording should stay aligned with the packaged production topology:
+`DB_REQUIRE_TLS=false` is for local Docker Postgres only, external production
+databases need an explicit TLS/SSL-mode decision, and exactly one startup
+mutation actor should run with `STARTUP_WRITER=true` unless the design plan
+chooses a dedicated migration job or DB-backed advisory lock.
+
 ## Current status
 
 Scaffold only.
@@ -203,7 +216,7 @@ HOSTOPS_KEY=~/.keys/socialpredict/mo/id_ed25519
 HOSTOPS_REPO_PATH=/opt/socialpredict
 ```
 
-Use shell syntax only: `KEY=value`, one setting per line. Do not commit this file.
+Use shell syntax only: `KEY=value`, one setting per line. Do not commit `hostops.env`.
 
 ## Per-command setup keys
 

@@ -3,9 +3,9 @@ title: Deployment Infrastructure Stage Test
 document_type: stage-test-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-03T12:19:07Z
-updated_at_display: "Sunday, May 03, 2026 at 12:19 PM UTC"
-update_reason: "Add staging verification checklist for the WAVE08 deployment health, readiness, startup-writer, proxy publishing, and shutdown contract."
+updated_at: 2026-05-14T10:23:25Z
+updated_at_display: "Thursday, May 14, 2026 at 10:23 AM UTC"
+update_reason: "Align staging checks with release-to-readiness feedback and current public environment examples."
 status: active
 ---
 
@@ -24,6 +24,10 @@ were applied together:
 - request-serving backend service runs with `STARTUP_WRITER=false`
 - nginx and frontend traffic target the non-writer `backend` service
 - `/health` and `/readyz` are publicly reachable at the host root
+- public release-to-readiness checks use `https://kconfs.com/health` and
+  `https://kconfs.com/readyz`
+- production uses the same public-boundary contract at
+  `https://brierfoxforecast.com`
 - Swagger UI and OpenAPI are publicly reachable at the host root
 - graceful shutdown closes readiness before the backend exits
 
@@ -41,6 +45,10 @@ were applied together:
 - [ ] Confirm production compose service healthchecks call `/readyz`.
 - [ ] Confirm public `https://STAGING_HOST/health` returns `200` and `live`.
 - [ ] Confirm public `https://STAGING_HOST/readyz` returns `200` and `ready`.
+- [ ] Confirm the public probe result is treated as release-to-readiness
+  evidence only, not a zero-downtime or business-correctness proof.
+- [ ] Confirm `/ops/status` is not required for the deploy gate unless a later
+  design-plan review promotes it.
 - [ ] Confirm public `https://STAGING_HOST/openapi.yaml` returns the OpenAPI document.
 - [ ] Confirm public `https://STAGING_HOST/swagger` redirects to `/swagger/`.
 - [ ] Confirm public `https://STAGING_HOST/swagger/` renders Swagger UI, not only a blank HTML shell.
@@ -62,6 +70,7 @@ Replace `STAGING_HOST` with the actual staging domain.
 ```bash
 curl -i https://STAGING_HOST/health
 curl -i https://STAGING_HOST/readyz
+curl -i https://STAGING_HOST/ops/status
 curl -i https://STAGING_HOST/openapi.yaml
 curl -I https://STAGING_HOST/swagger
 curl -i https://STAGING_HOST/swagger/
@@ -84,4 +93,5 @@ Staging passes WAVE08 deployment verification when the public host root exposes
 the expected probe and docs routes, public traffic is routed only to the
 non-writer backend service, the startup writer is the only service with
 `STARTUP_WRITER=true`, and shutdown readiness behavior is visible in logs or
-host-level checks.
+host-level checks. The required release gate remains `/health` body `live` and
+`/readyz` body `ready`.
