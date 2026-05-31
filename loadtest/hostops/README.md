@@ -5,6 +5,7 @@ This directory is for operator-captured observations gathered during load tests,
 - HostOps command notes.
 - `docker stats` snapshots.
 - `df -h` snapshots.
+- CSV telemetry from `./loadtest/cli/loadtest host monitor`.
 - DigitalOcean metric exports or screenshots notes.
 - Safe Postgres observation notes.
 

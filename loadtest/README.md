@@ -150,6 +150,23 @@ scenario focuses on concentrated betting throughput:
   --preauth-users 100
 ```
 
+Capture host CPU, RAM, disk, and Docker stats during a run:
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+The monitor writes a CSV under `loadtest/hostops/` by default. This is ignored
+by git and should be promoted into a curated dossier only after the run is
+interpreted.
+
 Generate a release dossier from the k6 summary output:
 
 ```bash

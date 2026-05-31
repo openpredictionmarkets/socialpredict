@@ -48,6 +48,10 @@
     "diskIoNotes": "",
     "dbConnectionNotes": ""
   },
+  "hostTelemetry": {
+    "csv": "loadtest/hostops/<scenario>-staging-<timestamp>-host.csv",
+    "captureCommand": "./loadtest/cli/loadtest run <scenario> ... --monitor-env staging"
+  },
   "decision": "pass | fail | inconclusive",
   "knownRisks": []
 }

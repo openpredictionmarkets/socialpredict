@@ -61,6 +61,19 @@ Expected body:
 ready
 ```
 
+Optional: inspect and clean staging disk before capacity runs:
+
+```bash
+./HostOps host disk staging
+./HostOps host cleanup staging
+./HostOps host cleanup staging --all-images
+./HostOps host disk staging
+```
+
+Do not use `--volumes` during routine cleanup unless you have confirmed the
+volumes are unused and safe to delete. The cleanup wrapper calls remote
+`./SocialPredict cleanup docker`; HostOps does not own Docker runtime behavior.
+
 2. Confirm staging rate limits:
 
 ```bash
@@ -122,7 +135,24 @@ Smoke should pass before any baseline or burst test.
   --bet-rate 2
 ```
 
-7. Increase load gradually and record results in the release dossier.
+7. Attach host telemetry when increasing load:
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+This writes a CSV under `loadtest/hostops/` with CPU, RAM, disk, and Docker
+stats sampled from the remote host over SSH. Use that CSV alongside the k6
+summary when producing a release dossier.
+
+8. Increase load gradually and record results in the release dossier.
 
 ## Hot-Market Burst Sequence
 
@@ -153,3 +183,31 @@ capacity failures.
 - Do not run heavy k6 tests on the app/database droplet itself; use a Mac or separate load-generator host.
 - If smoke fails with `AUTHORIZATION_DENIED` or `MARKET_NOT_FOUND`, reseed remote staging and pull fresh fixtures again.
 - If tests fail with `RATE_LIMITED` or `LOGIN_RATE_LIMITED`, confirm staging is using the high `.env.staging` rate-limit overlay.
+- If host telemetry shows available memory dropping below roughly `150 MiB`, p95 latency above `1s`, dropped iterations, or sustained error rates, stop increasing the target rate and capture that run as a capacity boundary.
+
+## Small-Droplet Max-Capacity Ladder
+
+For the current smallest staging Droplet, use a gradual hot-market ladder and
+capture host telemetry on every run:
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+Suggested sequence after smoke passes:
+
+- `50` bets/sec for `1m`
+- `75` bets/sec for `1m`
+- `100` bets/sec for `1m`
+- `125` bets/sec for `1m`
+- repeat the highest passing rate for `5m`
+
+Stop the ladder when any run shows errors, dropped iterations, p95 latency over
+the chosen service target, or host telemetry shows sustained memory pressure.

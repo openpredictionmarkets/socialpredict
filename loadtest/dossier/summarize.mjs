@@ -80,6 +80,7 @@ const dossier = {
   },
   rateLimitPolicy: metadata.rateLimitPolicy || {},
   infrastructureObservations: metadata.infrastructureObservations || {},
+  hostTelemetry: metadata.hostTelemetry || {},
   decision: args.decision || metadata.decision || 'inconclusive',
   knownRisks: metadata.knownRisks || [],
   source: {
