@@ -47,6 +47,29 @@ Override those when needed with:
 --repo-path /opt/socialpredict
 ```
 
+For temporary raw-IP load-test hosts, create an arbitrary HostOps environment
+directory such as:
+
+```text
+~/.keys/socialpredict/loadtest/
+```
+
+with `hostops.env` pointing at the temporary Droplet IP. The app install on that
+host should use production topology, load-test rate limits, and HTTP-only edge:
+
+```bash
+./SocialPredict install \
+  -e production \
+  -d 45.55.227.1 \
+  -r loadtest \
+  --tls-mode http
+
+./SocialPredict up
+```
+
+Run tests against `http://45.55.227.1`, not `https://...`, unless you attach a
+real DNS name and use the default `--tls-mode https`.
+
 ## Command Sequence For Staging
 
 1. Confirm public readiness:

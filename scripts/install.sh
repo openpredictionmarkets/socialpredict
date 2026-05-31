@@ -191,6 +191,9 @@ apply_rate_limit_profile() {
     small-droplet-staging)
       apply_rate_limit_values "5" "20" "25" "50" "5m"
       ;;
+    loadtest)
+      apply_rate_limit_values "100" "200" "1000" "2000" "5m"
+      ;;
     env-file)
       apply_rate_limit_env_file_values
       ;;
@@ -208,7 +211,7 @@ apply_rate_limit_profile() {
       apply_rate_limit_values "${login_rate}" "${login_burst}" "${general_rate}" "${general_burst}" "${cleanup_interval}"
       ;;
     *)
-      print_error "Unknown rate-limit profile '${profile}'. Use secure-default, small-droplet-staging, env-file, or custom."
+      print_error "Unknown rate-limit profile '${profile}'. Use secure-default, small-droplet-staging, loadtest, env-file, or custom."
       exit 1
       ;;
   esac
@@ -225,21 +228,130 @@ select_rate_limit_profile() {
 
   echo "### Select Rate Limit Profile:"
   echo "1) secure-default - conservative public defaults"
-  echo "2) small-droplet-staging - initial load-test profile for 512 MiB / 1 vCPU DigitalOcean staging"
-  echo "3) env-file - use RATE_LIMIT_* values from the current shell environment"
-  echo "4) custom - enter explicit values"
+  echo "2) small-droplet-staging - initial load-test profile for small DigitalOcean staging"
+  echo "3) loadtest - permissive profile for temporary single-source k6 hosts"
+  echo "4) env-file - use RATE_LIMIT_* values from the current shell environment"
+  echo "5) custom - enter explicit values"
   read -r -p "Please enter your choice [1]: " profile_choice
 
   case "${profile_choice:-1}" in
     1) apply_rate_limit_profile "secure-default" ;;
     2) apply_rate_limit_profile "small-droplet-staging" ;;
-    3) apply_rate_limit_profile "env-file" ;;
-    4) apply_rate_limit_profile "custom" ;;
+    3) apply_rate_limit_profile "loadtest" ;;
+    4) apply_rate_limit_profile "env-file" ;;
+    5) apply_rate_limit_profile "custom" ;;
     *)
       print_error "Invalid rate-limit profile choice '${profile_choice}'."
       exit 1
       ;;
   esac
+}
+
+validate_tls_mode() {
+  local tls_mode="${1:-https}"
+  case "${tls_mode}" in
+    https|http)
+      ;;
+    *)
+      print_error "Unknown TLS mode '${tls_mode}'. Use https or http."
+      exit 1
+      ;;
+  esac
+}
+
+configure_public_urls() {
+  local domain="$1"
+  local tls_mode="${2:-https}"
+  local scheme="https"
+
+  validate_tls_mode "${tls_mode}"
+  if [ "${tls_mode}" = "http" ]; then
+    scheme="http"
+  fi
+
+  "${SED_INPLACE[@]}" "s|^DOMAIN=.*|DOMAIN='${domain}'|" "${SCRIPT_DIR}/.env"
+  "${SED_INPLACE[@]}" "s|^DOMAIN_URL=.*|DOMAIN_URL='${scheme}://${domain}'|" "${SCRIPT_DIR}/.env"
+  "${SED_INPLACE[@]}" "s|^API_URL=.*|API_URL=${scheme}://${domain}/api|" "${SCRIPT_DIR}/.env"
+  set_env_value "PUBLIC_BASE_URL" "'${scheme}://${domain}'"
+  set_env_value "TLS_MODE" "${tls_mode}"
+
+  echo "Setting DOMAIN to: ${domain}"
+  echo "Setting TLS Mode to: ${tls_mode}"
+}
+
+render_traefik_config() {
+  local email="$1"
+  local tls_mode="${2:-https}"
+  local template
+  local file="${SCRIPT_DIR}/data/traefik/config/traefik.yaml"
+
+  validate_tls_mode "${tls_mode}"
+  if [ "${tls_mode}" = "http" ]; then
+    template="${SCRIPT_DIR}/data/traefik/config/traefik-http.template"
+    envsubst < "${template}" > "${file}"
+    echo "Setting Traefik edge to HTTP-only mode"
+    return
+  fi
+
+  if [ -z "${email}" ]; then
+    print_error "TLS mode https requires an email address for Let's Encrypt."
+    exit 1
+  fi
+
+  template="${SCRIPT_DIR}/data/traefik/config/traefik.template"
+  export EMAIL="${email}"
+  envsubst < "${template}" > "${file}"
+  echo "Setting EMAIL to: ${email}"
+}
+
+select_tls_mode() {
+  local tls_mode="${TLS_MODE:-https}"
+  echo "### Select Public Edge TLS Mode:" >&2
+  echo "1) https - domain-backed HTTPS with Let's Encrypt" >&2
+  echo "2) http - raw-IP HTTP mode for temporary load-test hosts" >&2
+  read -r -p "Please enter your choice [1]: " tls_choice
+
+  case "${tls_choice:-1}" in
+    1) tls_mode="https" ;;
+    2) tls_mode="http" ;;
+    *)
+      print_error "Invalid TLS mode choice '${tls_choice}'."
+      exit 1
+      ;;
+  esac
+
+  echo "${tls_mode}"
+}
+
+print_install_help() {
+  cat <<'EOF'
+Usage: ./SocialPredict install [OPTIONS]
+
+Initialize SocialPredict.
+
+Options:
+  -e VALUE              Environment: development, localhost, production
+  -d VALUE              Public domain or raw IP for production installs
+  -m VALUE              Email for Let's Encrypt when --tls-mode https
+  -r VALUE              Rate-limit profile
+  --tls-mode VALUE      Public edge mode: https or http
+  -h, --help            Show this help
+
+Rate-limit profiles:
+  secure-default        Conservative public defaults
+  small-droplet-staging Initial staging/load-test profile
+  loadtest              Permissive single-source k6 profile for temporary hosts
+  env-file              Read RATE_LIMIT_* values from the shell environment
+  custom                Prompt for explicit values in interactive production install
+
+Temporary raw-IP load-test example:
+  ./SocialPredict install -e production -d 45.55.227.1 -r loadtest --tls-mode http
+  ./SocialPredict up
+
+Production/domain example:
+  ./SocialPredict install -e production -d example.com -m ops@example.com
+  ./SocialPredict up
+EOF
 }
 
 # Check if Docker Image exists on the system
@@ -382,27 +494,21 @@ build_production() {
     read -r -p "What domain do you wish to use for the application? " domain_answer
   done
 
-  "${SED_INPLACE[@]}" "s|^DOMAIN=.*|DOMAIN='$domain_answer'|" "${SCRIPT_DIR}/.env"
-  "${SED_INPLACE[@]}" "s|^DOMAIN_URL=.*|DOMAIN_URL='https://$domain_answer'|" "${SCRIPT_DIR}/.env"
-  "${SED_INPLACE[@]}" "s|^API_URL=.*|API_URL=https://$domain_answer/api|" "${SCRIPT_DIR}/.env"
-  set_env_value "PUBLIC_BASE_URL" "'https://$domain_answer'"
-
-  echo "Setting DOMAIN to: $domain_answer"
+  tls_mode="$(select_tls_mode)"
+  configure_public_urls "${domain_answer}" "${tls_mode}"
 
   # Update Email Address
-  read -r -p "What email address do you wish to use for the SSL Certificate? " email_answer
-  while [ -z "$email_answer" ]
-  do
-    echo "You need to specify an email address."
+  email_answer=""
+  if [ "${tls_mode}" = "https" ]; then
     read -r -p "What email address do you wish to use for the SSL Certificate? " email_answer
-  done
+    while [ -z "$email_answer" ]
+    do
+      echo "You need to specify an email address."
+      read -r -p "What email address do you wish to use for the SSL Certificate? " email_answer
+    done
+  fi
 
-  template="${SCRIPT_DIR}/data/traefik/config/traefik.template"
-  file="${SCRIPT_DIR}/data/traefik/config/traefik.yaml"
-  export EMAIL="$email_answer"
-  envsubst < "$template" > "$file"
-
-  echo "Setting EMAIL to: $email_answer"
+  render_traefik_config "${email_answer}" "${tls_mode}"
 
   select_rate_limit_profile
 
@@ -444,21 +550,11 @@ build_production_args() {
   # Update APP_ENV
   "${SED_INPLACE[@]}" "s|^APP_ENV=.*|APP_ENV=production|" "${SCRIPT_DIR}/.env"
 
-  # Change the Domain settings:
-  "${SED_INPLACE[@]}" "s|^DOMAIN=.*|DOMAIN='$1'|" "${SCRIPT_DIR}/.env"
-  "${SED_INPLACE[@]}" "s|^DOMAIN_URL=.*|DOMAIN_URL='https://$1'|" "${SCRIPT_DIR}/.env"
-  "${SED_INPLACE[@]}" "s|^API_URL=.*|API_URL=https://$1/api|" "${SCRIPT_DIR}/.env"
-  set_env_value "PUBLIC_BASE_URL" "'https://$1'"
-
-  echo "Setting DOMAIN to: $1"
+  local tls_mode="${4:-${TLS_MODE:-https}}"
+  configure_public_urls "$1" "${tls_mode}"
 
   # Update Email Address
-  template="${SCRIPT_DIR}/data/traefik/config/traefik.template"
-  file="${SCRIPT_DIR}/data/traefik/config/traefik.yaml"
-  export EMAIL="$2"
-  envsubst < "$template" > "$file"
-
-  echo "Setting EMAIL to: $2"
+  render_traefik_config "$2" "${tls_mode}"
 
   apply_rate_limit_profile "${3:-${RATE_LIMIT_PROFILE:-secure-default}}"
 
@@ -539,35 +635,88 @@ if [ "$#" -eq 0 ]; then
     esac
   done
 else
+  env=""
+  domain=""
+  email=""
   rate_limit_profile="${RATE_LIMIT_PROFILE:-secure-default}"
-  while getopts ":e:d:m:r:" opt; do
-    case $opt in
-      e)
-        if [ "$OPTARG" != "development" ] && [ "$OPTARG" != "localhost" ] && [ "$OPTARG" != "production" ]; then
+  tls_mode="${TLS_MODE:-https}"
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -e)
+        if [ "$#" -lt 2 ]; then
+          print_error "Option -e requires an argument."
+          exit 1
+        fi
+        if [ "$2" != "development" ] && [ "$2" != "localhost" ] && [ "$2" != "production" ]; then
           print_error "Wrong environment selection."
           print_status "Acceptable environments: 'development', 'localhost', 'production'"
           exit 1
-        else
-          env="$OPTARG"
         fi
+        env="$2"
+        shift 2
         ;;
-      d)
-        domain="$OPTARG"
+      -d)
+        if [ "$#" -lt 2 ]; then
+          print_error "Option -d requires an argument."
+          exit 1
+        fi
+        domain="$2"
+        shift 2
         ;;
-      m)
-        email="$OPTARG"
+      -m)
+        if [ "$#" -lt 2 ]; then
+          print_error "Option -m requires an argument."
+          exit 1
+        fi
+        email="$2"
+        shift 2
         ;;
-      r)
-        rate_limit_profile="$OPTARG"
+      -r)
+        if [ "$#" -lt 2 ]; then
+          print_error "Option -r requires an argument."
+          exit 1
+        fi
+        rate_limit_profile="$2"
+        shift 2
         ;;
-      \?)
-        echo "Invalid option: -$OPTARG"
+      --tls-mode|-t)
+        if [ "$#" -lt 2 ]; then
+          print_error "Option $1 requires an argument."
+          exit 1
+        fi
+        tls_mode="$2"
+        validate_tls_mode "${tls_mode}"
+        shift 2
         ;;
-      :)
-        echo "Option -$OPTARG requires an argument."
+      --help|-h)
+        print_install_help
+        exit 0
+        ;;
+      *)
+        print_error "Invalid option: $1"
+        print_install_help
+        exit 1
         ;;
     esac
   done
+
+  if [ -z "${env}" ]; then
+    print_error "Missing required -e environment option."
+    print_install_help
+    exit 1
+  fi
+
+  if [ "$env" == "production" ]; then
+    if [ -z "${domain}" ]; then
+      print_error "Production install requires -d DOMAIN_OR_IP."
+      exit 1
+    fi
+    if [ "${tls_mode}" = "https" ] && [ -z "${email}" ]; then
+      print_error "Production HTTPS install requires -m EMAIL for Let's Encrypt."
+      exit 1
+    fi
+  fi
+
   FORCE="y"
   # Check if SocialPredict is running
   check_if_running
@@ -583,6 +732,6 @@ else
   elif [ "$env" == "localhost" ]; then
     build_local
   elif [ "$env" == "production" ]; then
-    build_production_args "$domain" "$email" "$rate_limit_profile"
+    build_production_args "$domain" "${email:-}" "$rate_limit_profile" "$tls_mode"
   fi
 fi
