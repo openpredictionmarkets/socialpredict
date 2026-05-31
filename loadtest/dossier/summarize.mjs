@@ -42,6 +42,40 @@ function percentile(summary, name, p) {
   return metric(summary, name, `p(${p})`, fallback);
 }
 
+function round(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function rateLimitEquivalentUsers(summary, metadata) {
+  const successfulBetsPerSecond = rate(summary, 'sp_bets_succeeded');
+  const normalPolicy = metadata.normalRateLimitPolicy || {
+    profile: 'secure-default',
+    loginRatePerSecond: 0.1,
+    loginBurst: 3,
+    generalRatePerSecond: 1,
+    generalBurst: 10,
+    cleanupInterval: '5m',
+  };
+  const generalRatePerSecond = Number(normalPolicy.generalRatePerSecond);
+  const oneBetPerTenSeconds = 0.1;
+
+  return {
+    note: 'Rate-limit equivalent users are client identities/IPs for the current in-process limiter. They are user-equivalent only when each user has a distinct limiter identity.',
+    formula: 'ceil(successful_bets_per_second / allowed_bets_per_second_per_client_identity)',
+    measuredSuccessfulBetsPerSecond: round(successfulBetsPerSecond),
+    normalRateLimitPolicy: normalPolicy,
+    normalGeneralLimitClientIdentities: generalRatePerSecond > 0
+      ? Math.ceil(successfulBetsPerSecond / generalRatePerSecond)
+      : null,
+    oneBetPerTenSecondsClientIdentities: Math.ceil(successfulBetsPerSecond / oneBetPerTenSeconds),
+    assumptions: {
+      normalGeneralLimitAllowedBetsPerSecondPerClientIdentity: generalRatePerSecond || null,
+      oneBetPerTenSecondsAllowedBetsPerSecondPerClientIdentity: oneBetPerTenSeconds,
+      burstIsIgnoredForSustainedHotWindowEstimate: true,
+    },
+  };
+}
+
 const args = parseArgs(process.argv.slice(2));
 if (!args.summary || !args.out) {
   console.error('Usage: node loadtest/dossier/summarize.mjs --summary FILE --out FILE [--metadata FILE] [--host-summary FILE] [--decision VALUE]');
@@ -80,6 +114,7 @@ const dossier = {
     loginRateLimited: count(summary, 'sp_login_rate_limited'),
   },
   rateLimitPolicy: metadata.rateLimitPolicy || {},
+  rateLimitEquivalents: rateLimitEquivalentUsers(summary, metadata),
   infrastructureObservations: metadata.infrastructureObservations || {},
   hostTelemetry: hostSummary ? {
     ...(metadata.hostTelemetry || {}),

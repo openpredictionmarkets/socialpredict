@@ -186,6 +186,18 @@ Attach the host summary JSON to a generated dossier when available:
   --out loadtest/dossier/runs/<run>.json
 ```
 
+Generated dossier JSON also includes `rateLimitEquivalents`, which converts the
+measured successful bet rate into equivalent normal-limit client identities:
+
+```text
+ceil(successful_bets_per_second / normal_general_rate_per_second)
+```
+
+For the current `secure-default`/model-office policy, the normal sustained
+general API limit is `1` request/second per client identity with burst `10`.
+These are client identity/IP equivalents for the current limiter, not guaranteed
+unique human users if many users share one NAT or proxy identity.
+
 For capacity evidence, copy `loadtest/dossier/metadata.example.json` and record
 the active `RATE_LIMIT_*` values under `rateLimitPolicy`. For
 OpenPredictionMarkets staging, those values are expected to come from

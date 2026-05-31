@@ -176,6 +176,25 @@ If `LOGIN_RATE_LIMITED` appears in this scenario, either increase
 fresh fixtures and rerun. Do not interpret login-limit failures as pure betting
 capacity failures.
 
+## Normal-Rate-Limit Equivalent
+
+OpenPredictionMarkets staging uses much higher per-IP limits than normal so a
+single Mac can generate useful capacity pressure. The normal/model-office
+general API limit is currently `1` request/second per client identity with burst
+`10`; login is `0.1` request/second with burst `3`.
+
+The dossier converts measured successful betting throughput into normal-limit
+client-identity equivalents with:
+
+```text
+ceil(successful_bets_per_second / normal_general_rate_per_second)
+```
+
+Example: a run that sustains `65.78` successful bets/second corresponds to
+`ceil(65.78 / 1) = 66` normal-limit client identities if each identity places
+one bet/second. If modeling one bet every ten seconds per identity, use
+`ceil(65.78 / 0.1) = 658`.
+
 ## Important Interpretation Notes
 
 - The app rate limiter is per client identity/IP, not a global server cap.

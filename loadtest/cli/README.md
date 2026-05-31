@@ -83,6 +83,19 @@ When `--monitor-env` is attached to a k6 run, the CLI automatically writes a
 sibling `<run>-host-summary.json` and prints the same summary after the k6
 output.
 
+## Rate-Limit Equivalent Users
+
+The dossier summarizer calculates a normal-rate-limit equivalent using:
+
+```text
+ceil(successful_bets_per_second / normal_general_rate_per_second)
+```
+
+The current normal/model-office general API limit is `1` request/second per
+client identity with burst `10`. Because the runtime limiter is keyed by client
+identity/IP, this value should be read as client-identity equivalents. It only
+equals unique users when each user has a distinct limiter identity.
+
 ## Remote Fixture Seed And Pull
 
 Seed staging over SSH, then pull the generated fixture CSVs back to your
