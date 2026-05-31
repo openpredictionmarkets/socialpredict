@@ -62,8 +62,6 @@ Check out our staging instance at [kconfs.com](https://kconfs.com/) to see the n
 
 Our model office / production-style release target is [brierfoxforecast.com](https://brierfoxforecast.com/). This environment is intended to track published releases rather than every merge to `main`.
 
-> Screenshot placeholder: staging or model-office home page
-
 ## Feature Highlights
 
 ### Moderator Mode
@@ -125,7 +123,7 @@ Highlights:
 - Host profile capture to record the exact tested Droplet shape and Docker/container limits
 - Release dossier tooling for turning load-test results into reviewable evidence
 
-> Screenshot placeholder: load-test terminal summary or release dossier dashboard
+Example dossier: [Staging Capacity Dossier, 2026-05-29](./loadtest/dossier/staging-capacity-2026-05-29.md). Look for the most recent dossier before making deployment or sizing decisions, because capacity results depend on the exact release, host size, database topology, and rate-limit configuration under test.
 
 ## Getting Started
 
