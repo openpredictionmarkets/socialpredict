@@ -15,6 +15,7 @@ Commands:
   fixtures pull <env>    Pull generated fixture CSVs from a remote host
   host rate-limits <env> Show remote RATE_LIMIT_* values over SSH
   host monitor <env>     Capture host CPU/RAM/disk/Docker telemetry over SSH
+  host summarize <csv>   Summarize host telemetry CSV
   run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, soak
   dossier                Generate release dossier JSON from a k6 summary
   help                   Show this help
@@ -23,6 +24,7 @@ Run examples:
   ./loadtest/cli/loadtest check
   ./loadtest/cli/loadtest host rate-limits staging
   ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
   ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
   ./loadtest/cli/loadtest fixtures pull staging
   ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
@@ -622,13 +624,17 @@ docker_totals() {
   '
 }
 
-echo "timestamp_utc,sample,load1,load5,load15,cpu_user_pct,cpu_system_pct,cpu_idle_pct,mem_total_mib,mem_used_mib,mem_available_mib,swap_used_mib,disk_used_pct,disk_used_mib,disk_available_mib,docker_cpu_pct_sum,docker_mem_mib_sum,container_count,backend_cpu_pct,postgres_cpu_pct,traefik_cpu_pct"
+echo "timestamp_utc,sample,load1,load5,load15,cpu_user_pct,cpu_system_pct,cpu_idle_pct,mem_total_mib,mem_used_mib,mem_available_mib,swap_used_mib,disk_used_pct,disk_used_mib,disk_available_mib,disk_read_kib_per_sec,disk_write_kib_per_sec,net_rx_kib_per_sec,net_tx_kib_per_sec,docker_cpu_pct_sum,docker_mem_mib_sum,container_count,backend_cpu_pct,postgres_cpu_pct,traefik_cpu_pct"
 
 while [ "$(date +%s)" -le "$end_at" ]; do
   sample=$((sample + 1))
   cpu_before="$(read_cpu)"
+  disk_io_before="$(awk '$3 !~ /^(loop|ram)/ { read += $6; write += $10 } END { printf "%d %d", read, write }' /proc/diskstats)"
+  net_io_before="$(awk -F'[: ]+' 'NR > 2 && $2 != "lo" { rx += $3; tx += $11 } END { printf "%d %d", rx, tx }' /proc/net/dev)"
   sleep 1
   cpu_after="$(read_cpu)"
+  disk_io_after="$(awk '$3 !~ /^(loop|ram)/ { read += $6; write += $10 } END { printf "%d %d", read, write }' /proc/diskstats)"
+  net_io_after="$(awk -F'[: ]+' 'NR > 2 && $2 != "lo" { rx += $3; tx += $11 } END { printf "%d %d", rx, tx }' /proc/net/dev)"
 
   cpu_values="$(
     awk -v before="$cpu_before" -v after="$cpu_after" '
@@ -645,6 +651,34 @@ while [ "$(date +%s)" -le "$end_at" ]; do
     '
   )"
 
+  disk_io_values="$(
+    awk -v before="$disk_io_before" -v after="$disk_io_after" '
+      BEGIN {
+        split(before, b, " ")
+        split(after, a, " ")
+        read_kib=(a[1]-b[1]) * 512 / 1024
+        write_kib=(a[2]-b[2]) * 512 / 1024
+        if (read_kib < 0) read_kib=0
+        if (write_kib < 0) write_kib=0
+        printf "%.2f,%.2f", read_kib, write_kib
+      }
+    '
+  )"
+
+  net_io_values="$(
+    awk -v before="$net_io_before" -v after="$net_io_after" '
+      BEGIN {
+        split(before, b, " ")
+        split(after, a, " ")
+        rx_kib=(a[1]-b[1]) / 1024
+        tx_kib=(a[2]-b[2]) / 1024
+        if (rx_kib < 0) rx_kib=0
+        if (tx_kib < 0) tx_kib=0
+        printf "%.2f,%.2f", rx_kib, tx_kib
+      }
+    '
+  )"
+
   load_values="$(awk '{ printf "%s,%s,%s", $1, $2, $3 }' /proc/loadavg)"
   mem_values="$(free -m | awk '/^Mem:/ { total=$2; used=$3; available=$7 } /^Swap:/ { swap_used=$3 } END { printf "%d,%d,%d,%d", total, used, available, swap_used }')"
   disk_values="$(df -Pm / | awk 'NR==2 { used_pct=$5; gsub(/%/, "", used_pct); printf "%d,%d,%d", used_pct, $3, $4 }')"
@@ -653,13 +687,15 @@ while [ "$(date +%s)" -le "$end_at" ]; do
     docker_values="0.00,0.00,0,0.00,0.00,0.00"
   fi
 
-  printf "%s,%d,%s,%s,%s,%s,%s\n" \
+  printf "%s,%d,%s,%s,%s,%s,%s,%s,%s\n" \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     "$sample" \
     "$load_values" \
     "$cpu_values" \
     "$mem_values" \
     "$disk_values" \
+    "$disk_io_values" \
+    "$net_io_values" \
     "$docker_values"
 
   if [ "$(date +%s)" -ge "$end_at" ]; then
@@ -672,17 +708,72 @@ REMOTE
   echo "Telemetry captured: ${out}" >&2
 }
 
+host_summarize_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest host summarize <csv> [OPTIONS]
+
+Summarize a host telemetry CSV produced by 'host monitor'.
+
+Options:
+  --out VALUE  Write JSON summary to this path
+  --help       Show this help
+
+Examples:
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/hot-market-burst-staging-host.csv
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/hot-market-burst-staging-host.csv --out loadtest/hostops/hot-market-burst-staging-host-summary.json
+HELP
+}
+
+host_summarize_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      host_summarize_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "host summarize requires <csv>." >&2
+    host_summarize_help
+    exit 1
+  fi
+
+  local csv="$1"
+  shift
+  local out=""
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --out) out="$2"; shift 2 ;;
+      --help|-h) host_summarize_help; exit 0 ;;
+      *) echo "Unknown host summarize option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  if [ ! -f "$csv" ]; then
+    echo "Host telemetry CSV not found: $csv" >&2
+    exit 1
+  fi
+
+  require_command node
+  local args=("${LOADTEST_DIR}/dossier/summarize-host.mjs" --csv "$csv")
+  if [ -n "$out" ]; then args+=(--out "$out"); fi
+  node "${args[@]}"
+}
+
 host_help() {
   cat <<'HELP'
-Usage: ./loadtest/cli/loadtest host <rate-limits|monitor> <env> [OPTIONS]
+Usage: ./loadtest/cli/loadtest host <rate-limits|monitor|summarize> [ARGS] [OPTIONS]
 
 Commands:
   rate-limits <env>  Show remote RATE_LIMIT_* values over SSH
   monitor <env>      Capture CPU/RAM/disk/Docker telemetry CSV over SSH
+  summarize <csv>    Summarize host telemetry CSV
 
 Examples:
   ./loadtest/cli/loadtest host rate-limits staging
   ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
 HELP
 }
 
@@ -692,6 +783,7 @@ host_cmd() {
   case "$subcommand" in
     rate-limits) host_rate_limits_cmd "$@" ;;
     monitor) host_monitor_cmd "$@" ;;
+    summarize) host_summarize_cmd "$@" ;;
     --help|-h|help) host_help ;;
     *) echo "Unknown host command: $subcommand" >&2; host_help; exit 1 ;;
   esac
@@ -816,6 +908,8 @@ run_cmd() {
   }
   trap cleanup_monitor EXIT INT TERM
 
+  local k6_status=0
+  set +e
   (
     cd "$REPO_DIR"
     BASE_URL="$base_url" \
@@ -834,26 +928,34 @@ run_cmd() {
     TIME_UNIT="$time_unit" \
     k6 run --summary-export "$out" "$script"
   )
+  k6_status="$?"
+  set -e
+
   if [ -n "$monitor_pid" ]; then
     kill "$monitor_pid" >/dev/null 2>&1 || true
     wait "$monitor_pid" >/dev/null 2>&1 || true
     monitor_pid=""
     echo "Host telemetry: $monitor_out"
+    local monitor_summary_out="${monitor_out%.csv}-summary.json"
+    "${BASH_SOURCE[0]}" host summarize "$monitor_out" --out "$monitor_summary_out" || true
   fi
   trap - EXIT INT TERM
   echo "Summary: $out"
+  return "$k6_status"
 }
 
 dossier_cmd() {
   local summary=""
   local out=""
   local metadata=""
+  local host_summary=""
   local decision=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --summary) summary="$2"; shift 2 ;;
       --out) out="$2"; shift 2 ;;
       --metadata) metadata="$2"; shift 2 ;;
+      --host-summary) host_summary="$2"; shift 2 ;;
       --decision) decision="$2"; shift 2 ;;
       --help|-h) print_help; exit 0 ;;
       *) echo "Unknown dossier option: $1" >&2; exit 1 ;;
@@ -866,6 +968,7 @@ dossier_cmd() {
   require_command node
   local args=("${LOADTEST_DIR}/dossier/summarize.mjs" --summary "$summary" --out "$out")
   if [ -n "$metadata" ]; then args+=(--metadata "$metadata"); fi
+  if [ -n "$host_summary" ]; then args+=(--host-summary "$host_summary"); fi
   if [ -n "$decision" ]; then args+=(--decision "$decision"); fi
   node "${args[@]}"
 }

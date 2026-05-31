@@ -149,8 +149,9 @@ Smoke should pass before any baseline or burst test.
 ```
 
 This writes a CSV under `loadtest/hostops/` with CPU, RAM, disk, and Docker
-stats sampled from the remote host over SSH. Use that CSV alongside the k6
-summary when producing a release dossier.
+stats sampled from the remote host over SSH. The CLI also writes a sibling
+host summary JSON and prints the after-run maxima/minima. Use that summary
+alongside the k6 summary when producing a release dossier.
 
 8. Increase load gradually and record results in the release dossier.
 
@@ -199,6 +200,16 @@ capture host telemetry on every run:
   --preauth-users 100 \
   --monitor-env staging \
   --monitor-interval 5
+```
+
+After the run, create a dossier that includes both the k6 result and the host
+summary:
+
+```bash
+./loadtest/cli/loadtest dossier \
+  --summary loadtest/results/<summary>.json \
+  --host-summary loadtest/hostops/<run>-host-summary.json \
+  --out loadtest/dossier/runs/<run>.json
 ```
 
 Suggested sequence after smoke passes:

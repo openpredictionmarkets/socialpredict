@@ -167,10 +167,23 @@ The monitor writes a CSV under `loadtest/hostops/` by default. This is ignored
 by git and should be promoted into a curated dossier only after the run is
 interpreted.
 
+The CLI also writes a sibling host summary JSON and prints the key after-run
+stats, including CPU, RAM, disk usage, disk IO, network IO, Docker aggregate
+CPU/RAM, and backend/Postgres/Traefik CPU slices.
+
 Generate a release dossier from the k6 summary output:
 
 ```bash
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --out loadtest/dossier/runs/<run>.json
+```
+
+Attach the host summary JSON to a generated dossier when available:
+
+```bash
+./loadtest/cli/loadtest dossier \
+  --summary loadtest/results/<summary>.json \
+  --host-summary loadtest/hostops/<run>-host-summary.json \
+  --out loadtest/dossier/runs/<run>.json
 ```
 
 For capacity evidence, copy `loadtest/dossier/metadata.example.json` and record

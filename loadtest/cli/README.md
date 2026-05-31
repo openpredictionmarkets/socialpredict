@@ -11,13 +11,14 @@ LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --mar
 ./loadtest/cli/loadtest check
 ./loadtest/cli/loadtest host rate-limits staging
 ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
+./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
 ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
 ./loadtest/cli/loadtest fixtures pull staging
 ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
 ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --duration 5m --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
 ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100
 ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100 --monitor-env staging
-./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --metadata loadtest/dossier/metadata.example.json --out loadtest/dossier/runs/<run>.json
+./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --host-summary loadtest/hostops/<run>-host-summary.json --metadata loadtest/dossier/metadata.example.json --out loadtest/dossier/runs/<run>.json
 ```
 
 ## Authentication
@@ -68,8 +69,19 @@ Or attach monitoring directly to a k6 run:
 ```
 
 The CSV is written to `loadtest/hostops/` by default. It includes host load,
-CPU user/system/idle percentages, memory, swap, root disk usage, summed Docker
-CPU/memory, and backend/Postgres/Traefik CPU slices.
+CPU user/system/idle percentages, memory, swap, root disk usage, disk read/write
+rates, network receive/transmit rates, summed Docker CPU/memory, and
+backend/Postgres/Traefik CPU slices.
+
+Summarize a telemetry CSV after the fact:
+
+```bash
+./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
+```
+
+When `--monitor-env` is attached to a k6 run, the CLI automatically writes a
+sibling `<run>-host-summary.json` and prints the same summary after the k6
+output.
 
 ## Remote Fixture Seed And Pull
 

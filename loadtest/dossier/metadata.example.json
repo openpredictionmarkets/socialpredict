@@ -34,6 +34,7 @@
   },
   "hostTelemetry": {
     "csv": "loadtest/hostops/<scenario>-staging-<timestamp>-host.csv",
+    "summaryJson": "loadtest/hostops/<scenario>-staging-<timestamp>-host-summary.json",
     "captureCommand": "./loadtest/cli/loadtest run <scenario> ... --monitor-env staging"
   },
   "decision": "inconclusive",

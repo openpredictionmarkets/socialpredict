@@ -44,12 +44,13 @@ function percentile(summary, name, p) {
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.summary || !args.out) {
-  console.error('Usage: node loadtest/dossier/summarize.mjs --summary FILE --out FILE [--metadata FILE] [--decision VALUE]');
+  console.error('Usage: node loadtest/dossier/summarize.mjs --summary FILE --out FILE [--metadata FILE] [--host-summary FILE] [--decision VALUE]');
   process.exit(1);
 }
 
 const summary = readJSON(args.summary);
 const metadata = args.metadata ? readJSON(args.metadata) : {};
+const hostSummary = args['host-summary'] ? readJSON(args['host-summary']) : null;
 const dossier = {
   schemaVersion: '0.1.0',
   generatedAt: new Date().toISOString(),
@@ -80,11 +81,15 @@ const dossier = {
   },
   rateLimitPolicy: metadata.rateLimitPolicy || {},
   infrastructureObservations: metadata.infrastructureObservations || {},
-  hostTelemetry: metadata.hostTelemetry || {},
+  hostTelemetry: hostSummary ? {
+    ...(metadata.hostTelemetry || {}),
+    summary: hostSummary,
+  } : metadata.hostTelemetry || {},
   decision: args.decision || metadata.decision || 'inconclusive',
   knownRisks: metadata.knownRisks || [],
   source: {
     k6Summary: args.summary,
+    hostSummary: args['host-summary'] || null,
     metadata: args.metadata || null,
   },
 };
