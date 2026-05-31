@@ -22,6 +22,13 @@ The current conservative capacity envelope for this specific staging Droplet is 
 - Upper observed clean hot-market write rate: about `35` bets/second.
 - Needs retest with pre-authenticated users: `50+` bets/second.
 
+May 31, 2026 update:
+
+- `50/sec` pre-authenticated hot-market run passed cleanly with `3001/3001` bets succeeded and HTTP p95 around `704ms`.
+- `75/sec` for `1m` passed functionally with `4412/4412` bets succeeded, but HTTP p95 rose to about `1.67s` and k6 dropped `89` iterations.
+- `75/sec` for `5m` was aborted under stress and is a failure/ceiling datapoint: `295` failed bets, HTTP p95 about `11.18s`, and minimum available RAM about `119 MiB`.
+- `100/sec` for `1m` was beyond the current tiny Droplet: `42.96%` HTTP failures, HTTP p95 about `21.04s`, and minimum available RAM about `82 MiB`.
+
 This dossier does not prove capacity for `10,000`, `30,000`, or `50,000` simultaneously active users. It translates those user counts into required request/write rates and proposes machine-size ranges to validate next.
 
 ## Fixture State
@@ -89,6 +96,10 @@ This means the actual machine under test behaved closer to a `1 vCPU / 1 GiB` ho
 | Hot market | `target=20/s`, `1m` | Pass | `1200/1200` | `38.77` | `63ms` | `122ms` | Clean hot-market write result. |
 | Hot market | `target=35/s`, `1m` | Pass with warning | `2101/2101` | `65.43` | `787ms` | `2.68s` | No failures, but tail latency is rising. |
 | Hot market | `target=50/s`, `1m` | Invalid for write ceiling | `2037/2081` succeeded | `71.16` | `11.04s` | `14.00s` | Login churn caused `204` login failures and `191` login rate-limit events. Retest with pre-auth is required. |
+| Hot market pre-auth | `target=50/s`, `1m` | Pass | `3001/3001` | `47.04` | `704ms` | `2.49s` | Cleanest current capacity-pass datapoint. |
+| Hot market pre-auth | `target=75/s`, `1m` | Pass with warning | `4412/4412` | `67.31` | `1.67s` | `3.86s` | No failed bets, but p95 crossed `1s` and k6 dropped `89` iterations. |
+| Hot market pre-auth | `target=75/s`, `5m` | Fail / aborted | `7619/8785` attempted | `59.62` | `11.18s` | `17.06s` | Aborted under pressure; `295` failed bets and `982` dropped iterations. |
+| Hot market pre-auth | `target=100/s`, `1m` | Fail / aborted | `1502/3297` attempted | `42.63` | `21.04s` | `30.47s` | Beyond current host capacity; `42.96%` HTTP failures. |
 
 ## Host Stats During 50/sec Contaminated Run
 
@@ -129,6 +140,58 @@ For a one-hour spread, the same volume is much easier:
 
 The risky scenario is not total daily or hourly volume. The risky scenario is a hot market where many users act inside a one-minute or sub-minute window.
 
+## Normal Rate-Limit Identity Matrix
+
+OpenPredictionMarkets staging uses intentionally high per-IP limits so a single
+Mac/k6 source can produce load:
+
+```env
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=500
+RATE_LIMIT_GENERAL_BURST=1000
+```
+
+The normal/model-office profile is conservative:
+
+```env
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=0.1
+RATE_LIMIT_LOGIN_BURST=3
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
+RATE_LIMIT_GENERAL_BURST=10
+```
+
+The current runtime limiter is keyed by client identity/IP and is in-process.
+Therefore, the matrix below estimates normal-limit **client identities**, not
+guaranteed unique human users if many users share one NAT/proxy identity.
+
+Formula:
+
+```text
+required_client_identities =
+  ceil(successful_bets_per_second / allowed_bets_per_second_per_client_identity)
+```
+
+The `1.0` bet/sec row is the normal sustained general API limit midpoint/anchor:
+one client identity using the full normal sustained allowance for one betting
+request per second. Slower rows model less aggressive users.
+
+| Assumed betting rate per client identity | `50/s` pass, `45.48` successful bets/s | `75/s` 1m warning, `65.78` successful bets/s | `75/s` 5m aborted, `56.66` successful bets/s | `100/s` aborted, `22.76` successful bets/s |
+| ---: | ---: | ---: | ---: | ---: |
+| `0.10` bet/s, 1 bet every 10s | `455` identities | `658` identities | `567` identities | `228` identities |
+| `0.25` bet/s, 1 bet every 4s | `182` identities | `264` identities | `227` identities | `92` identities |
+| `0.50` bet/s, 1 bet every 2s | `91` identities | `132` identities | `114` identities | `46` identities |
+| `1.00` bet/s, normal-limit anchor | `46` identities | `66` identities | `57` identities | `23` identities |
+
+Interpretation:
+
+- The clean `50/s` run corresponds to about `46` normal-limit client identities
+  if each identity places one bet per second, or about `455` identities if each
+  identity places one bet every ten seconds.
+- The `75/s` one-minute run corresponds to about `66` normal-limit client
+  identities at one bet per second, but the host already showed warning signs:
+  p95 latency above `1s` and dropped iterations.
+- The aborted `75/s` five-minute and `100/s` one-minute runs should be treated
+  as ceiling/failure evidence, not usable capacity targets.
+
 ## Machine-Size Estimate
 
 These are planning estimates, not validated production limits.
@@ -150,13 +213,13 @@ DigitalOcean's current Basic Droplet table lists relevant reference sizes includ
 
 For the next release dossier, report the current staging result as:
 
-> On a single small DigitalOcean staging Droplet with colocated Docker Postgres, SocialPredict passed `20` hot-market bets/second cleanly and passed `35` hot-market bets/second without request failures, though p95 latency rose to about `787ms`. A `50` bets/second run exposed login-rate-limit contamination and must be rerun with pre-authenticated users before it can be used as a write-capacity datapoint.
+> On a single small DigitalOcean staging Droplet with colocated Docker Postgres, SocialPredict passed a pre-authenticated `50/sec` hot-market burst with `3001/3001` bets succeeded, `0%` HTTP failures, and HTTP p95 around `704ms`. A `75/sec` one-minute burst also had no failed bets, but p95 rose to about `1.67s` and k6 dropped iterations. Sustained `75/sec` and `100/sec` runs crossed into failure/ceiling territory.
 
 For production-style planning:
 
 - Use the current smallest staging Droplet only as a functional staging target.
 - Treat `2 vCPU / 4 GiB` as the minimum serious single-node model-office target.
-- Treat `4 vCPU / 8 GiB` plus managed Postgres as the first credible target for hot-market load beyond `35` bets/second.
+- Treat `4 vCPU / 8 GiB` plus managed Postgres as the first credible target for hot-market load beyond the current `50-65` successful bets/second stressed envelope.
 - Treat `50,000` active users with one-minute hot windows as requiring a split app/database architecture, not a single small Droplet.
 
 ## Next Engineering Steps
@@ -189,9 +252,9 @@ ssh -i ~/.keys/socialpredict/staging/id_ed25519 root@kconfs.com '
 '
 ```
 
-5. If `50/sec` passes, test `75/sec`, then `100/sec`.
-6. If p95 exceeds `1s`, dropped iterations appear, or errors exceed `1%`, stop and capture the run as the current staging ceiling.
-7. Add a repeatable host-stat sampler to the load-test CLI so the release dossier can include synchronized k6 and host metrics.
+5. Use `50/sec` as the current clean reference run for this tiny Droplet.
+6. Treat `75/sec` one-minute as a warning-zone run, not a comfortable target.
+7. Treat sustained `75/sec` and `100/sec` as current ceiling/failure evidence unless host resources are increased.
 
 ## Known Gaps
 
