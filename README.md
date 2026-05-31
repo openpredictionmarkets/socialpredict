@@ -58,7 +58,74 @@ flowchart LR
 
 ## Staging
 
-Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.com/) to see what our software looks like in action. May be down if we are testing something.
+Check out our staging instance at [kconfs.com](https://kconfs.com/) to see the newest `main` branch deployment in action. This environment may be reset, load tested, or temporarily unavailable while we test deployment and capacity changes.
+
+Our model office / production-style release target is [brierfoxforecast.com](https://brierfoxforecast.com/). This environment is intended to track published releases rather than every merge to `main`.
+
+> Screenshot placeholder: staging or model-office home page
+
+## Feature Highlights
+
+### Moderator Mode
+
+SocialPredict now supports a moderator-driven market workflow. Approved moderators can propose markets, while admins retain final publishing control. Proposed markets are not tradable until an admin approves them.
+
+Highlights:
+
+- Moderator approval/status management
+- Proposed, published, and rejected market lifecycle states
+- Proposal cost accounting and refund behavior for rejected proposals
+- Moderator profile tabs for proposed, published, and rejected markets
+- Admin review queues for proposed, approved, and rejected markets
+- Full market descriptions and custom YES/NO labels shown during review
+
+> Screenshot placeholder: moderator profile with proposed/published/rejected market tabs
+
+> Screenshot placeholder: admin market review queue showing custom labels and full description controls
+
+### Admin and CMS Tools
+
+Admins have expanded operational controls for reviewing users, reviewing proposed markets, and managing public sharing metadata.
+
+Highlights:
+
+- Admin user queue for moderator eligibility/status review
+- Market review tools with approval, rejection, review trail, and refund behavior
+- CMS-managed social share title, description, image, and image-enable setting
+- Default OpenGraph/social share image support
+
+> Screenshot placeholder: admin dashboard user queue
+
+> Screenshot placeholder: admin social share / CMS settings tab
+
+### Sharing and Embeddable Markets
+
+Market pages now have a stronger sharing foundation, including OpenGraph and Twitter card metadata for link previews. The embeddable-market feature plan is documented so individual markets can be shared and embedded more cleanly as that work continues.
+
+Highlights:
+
+- Market-aware OpenGraph metadata
+- Social share image endpoint and default image
+- Security-header updates needed for controlled embedding
+- Feature planning for iframe-friendly market embeds
+
+> Screenshot placeholder: market detail page with share preview or social card validation
+
+### Load Testing and Release Dossiers
+
+The repository now includes an external load-testing harness under [`loadtest/`](./loadtest/README.md). It uses k6 from a separate load-generator machine and can seed remote staging fixtures, pull fixture CSVs, run smoke/baseline/hot-market tests, and capture host telemetry through HostOps.
+
+Current staging capacity evidence is summarized in the [staging load-test dossier](./loadtest/dossier/staging-capacity-2026-05-29.md).
+
+Highlights:
+
+- k6 smoke, baseline, hot-market burst, and soak scenarios
+- Remote staging fixture seeding and fixture pull commands
+- Host telemetry capture for CPU, RAM, disk, network, Docker, backend, Postgres, and Traefik
+- Host profile capture to record the exact tested Droplet shape and Docker/container limits
+- Release dossier tooling for turning load-test results into reviewable evidence
+
+> Screenshot placeholder: load-test terminal summary or release dossier dashboard
 
 ## Getting Started
 
@@ -66,6 +133,7 @@ Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.co
 
 - [Info on Local Setup](/README/LOCAL_SETUP.md)
 - [Info on How Economics Can Be Customized](/README/README-CONFIG.md)
+- Development fixture helpers are available through `./SocialPredict dev-bootstrap-users` for local smoke testing.
 
 ### Deploying to the Web
 
@@ -73,6 +141,20 @@ Check out our staging instance at [BrierFoxForecast](https://brierfoxforecast.co
 - [HostOps Scaffold and Infra Boundary Notes](/README/INFRA/README-INFRA-HOSTOPS.md)
 - [Staging Deployment Guide](/README/INFRA/README-INFRA-STAGING.md)
 - [Production Deployment Guide](/README/INFRA/README-INFRA-PRODUCTION.md)
+
+OpenPredictionMarkets deployment conventions:
+
+- Merges to `main` deploy staging at [kconfs.com](https://kconfs.com/).
+- Published GitHub releases deploy the model office / production-style target at [brierfoxforecast.com](https://brierfoxforecast.com/).
+- GitHub Actions dispatch Ansible-based deploys and then verify public `/health` and `/readyz`.
+- HostOps is a local convenience wrapper for host SSH, environment discovery, disk checks, cleanup, and load-test telemetry support.
+
+### API, Operations, and Load Testing
+
+- [Canonical Backend API documentation](/backend/docs/README.md)
+- [Load Testing Guide](/loadtest/README.md)
+- [Load Test CLI Runbook](/loadtest/cli/OPERATING.md)
+- [Current Staging Capacity Dossier](/loadtest/dossier/staging-capacity-2026-05-29.md)
 
 ### How Do Prediction Markets Work?
 
