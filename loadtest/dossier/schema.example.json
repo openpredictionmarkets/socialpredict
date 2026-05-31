@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "0.1.0",
+  "release": "vX.Y.Z or commit SHA",
+  "environment": "staging",
+  "baseUrl": "https://kconfs.com",
+  "appTopology": "single droplet app+postgres",
+  "databaseTopology": "local docker postgres",
+  "dropletSize": "example: 2 vCPU / 4 GB",
+  "loadGenerator": "macOS or separate DigitalOcean droplet",
+  "scenario": "hot-market-burst",
+  "seed": {
+    "users": 50000,
+    "moderators": 100,
+    "markets": 1000,
+    "hotMarkets": 10
+  },
+  "traffic": {
+    "duration": "60s",
+    "targetBetRatePerSecond": 1000,
+    "readWriteMix": "70/30"
+  },
+  "results": {
+    "requestsTotal": 0,
+    "iterationsTotal": 0,
+    "checksRate": 0,
+    "errorRate": 0,
+    "httpReqDurationP50Ms": 0,
+    "httpReqDurationP95Ms": 0,
+    "httpReqDurationP99Ms": 0,
+    "betsAttempted": 0,
+    "betsSucceeded": 0,
+    "betsFailed": 0,
+    "rateLimited": 0,
+    "loginRateLimited": 0
+  },
+  "rateLimitPolicy": {
+    "profile": "env-file",
+    "source": "deploy/env/.env.staging",
+    "loginRatePerSecond": 50,
+    "loginBurst": 100,
+    "generalRatePerSecond": 500,
+    "generalBurst": 1000,
+    "cleanupInterval": "5m"
+  },
+  "normalRateLimitPolicy": {
+    "profile": "secure-default",
+    "loginRatePerSecond": 0.1,
+    "loginBurst": 3,
+    "generalRatePerSecond": 1,
+    "generalBurst": 10,
+    "cleanupInterval": "5m"
+  },
+  "rateLimitEquivalents": {
+    "formula": "ceil(successful_bets_per_second / allowed_bets_per_second_per_client_identity)",
+    "measuredSuccessfulBetsPerSecond": 0,
+    "normalGeneralLimitClientIdentities": 0,
+    "oneBetPerTenSecondsClientIdentities": 0
+  },
+  "infrastructureObservations": {
+    "appCpuPeakPercent": null,
+    "memoryPeakPercent": null,
+    "diskIoNotes": "",
+    "dbConnectionNotes": ""
+  },
+  "hostTelemetry": {
+    "csv": "loadtest/hostops/<scenario>-staging-<timestamp>-host.csv",
+    "profileJson": "loadtest/hostops/<scenario>-staging-<timestamp>-host-profile.json",
+    "summaryJson": "loadtest/hostops/<scenario>-staging-<timestamp>-host-summary.json",
+    "captureCommand": "./loadtest/cli/loadtest run <scenario> ... --monitor-env staging"
+  },
+  "decision": "pass | fail | inconclusive",
+  "knownRisks": []
+}

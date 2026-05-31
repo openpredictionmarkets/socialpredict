@@ -39,6 +39,8 @@ type marketReviewResponse struct {
 	QuestionTitle      string     `json:"questionTitle,omitempty"`
 	Description        string     `json:"description,omitempty"`
 	CreatorUsername    string     `json:"creatorUsername,omitempty"`
+	YesLabel           string     `json:"yesLabel,omitempty"`
+	NoLabel            string     `json:"noLabel,omitempty"`
 	Status             string     `json:"status"`
 	LifecycleStatus    string     `json:"lifecycleStatus"`
 	ApprovedBy         string     `json:"approvedBy,omitempty"`
@@ -46,6 +48,7 @@ type marketReviewResponse struct {
 	RejectedBy         string     `json:"rejectedBy,omitempty"`
 	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
 	RejectionReason    string     `json:"rejectionReason,omitempty"`
+	ProposalCost       int64      `json:"proposalCost,omitempty"`
 	CreatedAt          time.Time  `json:"createdAt,omitempty"`
 	UpdatedAt          time.Time  `json:"updatedAt,omitempty"`
 	ResolutionDateTime time.Time  `json:"resolutionDateTime,omitempty"`
@@ -203,6 +206,8 @@ func marketReviewResponseFromMarket(market *dmarkets.Market) marketReviewRespons
 		QuestionTitle:      market.QuestionTitle,
 		Description:        market.Description,
 		CreatorUsername:    market.CreatorUsername,
+		YesLabel:           market.YesLabel,
+		NoLabel:            market.NoLabel,
 		Status:             market.Status,
 		LifecycleStatus:    market.LifecycleStatus,
 		ApprovedBy:         market.ApprovedBy,
@@ -210,6 +215,7 @@ func marketReviewResponseFromMarket(market *dmarkets.Market) marketReviewRespons
 		RejectedBy:         market.RejectedBy,
 		RejectedAt:         market.RejectedAt,
 		RejectionReason:    market.RejectionReason,
+		ProposalCost:       market.ProposalCost,
 		CreatedAt:          market.CreatedAt,
 		UpdatedAt:          market.UpdatedAt,
 		ResolutionDateTime: market.ResolutionDateTime,

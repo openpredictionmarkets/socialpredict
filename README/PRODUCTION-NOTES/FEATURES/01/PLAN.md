@@ -5,7 +5,7 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-05-24T00:00:00Z
 updated_at_display: "Sunday, May 24, 2026"
-update_reason: "Clarify backend-first sequencing, API contract validation, service ownership, and migration expectations."
+update_reason: "Clarify backend-first sequencing, API contract validation, service ownership, migration expectations, and the proposal-cost persistence alignment fix."
 status: draft
 ---
 
@@ -28,6 +28,7 @@ Agents implementing this feature should mark checklist items as they complete th
 - Touch the bets domain only for trade eligibility guards and cancellation/refund accounting that actually crosses buy/sell paths.
 - Add explicit seams before broad migrations.
 - Keep accounting-sensitive behavior behind transaction-scoped use cases.
+- Persist proposal-cost values on the market so rejection refunds use the recorded proposal accounting value rather than the current runtime config value.
 - Add Postgres-backed tests only where SQLite cannot prove the behavior.
 - Keep every PR independently buildable and reviewable.
 

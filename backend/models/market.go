@@ -26,6 +26,7 @@ type Market struct {
 	RejectedBy              string     `json:"rejectedBy,omitempty" gorm:"index"`
 	RejectedAt              *time.Time `json:"rejectedAt,omitempty"`
 	RejectionReason         string     `json:"rejectionReason,omitempty" gorm:"type:text"`
+	ProposalCost            int64      `json:"proposalCost" gorm:"not null;default:0"`
 	CreatorUsername         string     `json:"creatorUsername" gorm:"not null"`
 	Creator                 User       `gorm:"foreignKey:CreatorUsername;references:Username"`
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { API_URL } from '../config';
+import { apiRequest } from '../api/httpClient';
 
 const defaultFrontendConfig = {
   charts: { sigFigs: 2 },
@@ -18,11 +18,9 @@ const useFrontendConfig = () => {
       setLoading(true);
       setError('');
       try {
-        const response = await fetch(`${API_URL}/v0/setup/frontend`);
-        if (!response.ok) {
-          throw new Error(`Frontend config failed with status ${response.status}`);
-        }
-        const data = await response.json();
+        const data = await apiRequest('/v0/setup/frontend', {
+          fallbackMessage: 'Unable to load frontend config.',
+        });
         if (!ignore) {
           setFrontendConfig({
             ...defaultFrontendConfig,

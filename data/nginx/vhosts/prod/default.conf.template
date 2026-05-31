@@ -39,6 +39,12 @@ server {
 		proxy_pass http://backend:8080/;
 	}
 
+	# Public market pages are served by the backend share shell first so
+	# crawlers receive Open Graph metadata before the SPA hydrates.
+	location ~ ^/markets/[0-9]+$ {
+		proxy_pass http://backend:8080;
+	}
+
 	location / {
 		proxy_pass http://frontend:80;
 	}

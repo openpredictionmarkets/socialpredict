@@ -176,6 +176,25 @@ func TestServerSharedMethodNotAllowedFailureEnvelope(t *testing.T) {
 	assertServerFailureReason(t, rec, handlers.ReasonMethodNotAllowed)
 }
 
+func TestServerAllowsHeadForPublicSocialShareImage(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+
+	db := modelstesting.NewFakeDB(t)
+	handler := buildTestHandler(t, db)
+
+	req := httptest.NewRequest(http.MethodHead, "/api/v0/content/social-share/image", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusMethodNotAllowed {
+		t.Fatalf("expected HEAD image route to be allowed, got 405: %s", rec.Body.String())
+	}
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected missing image to return 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 
@@ -201,6 +220,7 @@ func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 		"/v0/system/metrics",
 		"/v0/global/leaderboard",
 		"/v0/content/home",
+		"/v0/content/social-share",
 	}
 
 	for _, path := range tests {
@@ -224,6 +244,37 @@ func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 				t.Fatalf("expected shared success envelope, got %+v", response)
 			}
 		})
+	}
+}
+
+func TestServerServesPublicMarketShareShell(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
+	t.Setenv("PUBLIC_BASE_URL", "https://kconfs.com")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+
+	handler := buildTestHandler(t, db)
+	req := httptest.NewRequest(http.MethodGet, "/markets/1", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected share shell status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/html") {
+		t.Fatalf("expected HTML content type, got %q", got)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`<meta property="og:title"`,
+		`<meta property="og:url" content="https://kconfs.com/markets/1" />`,
+		`<script type="module" crossorigin src="/assets/index.js"></script>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("share shell missing %q in body:\n%s", want, body)
+		}
 	}
 }
 

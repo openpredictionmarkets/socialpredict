@@ -72,8 +72,12 @@ func (s *Service) RejectProposedMarket(ctx context.Context, marketID int64, acto
 	if err := repo.RejectMarket(ctx, marketID, actorUsername, now, market.RejectionReason); err != nil {
 		return nil, err
 	}
-	if s.config.CreateMarketCost > 0 && s.userService != nil {
-		if err := s.userService.ApplyTransaction(ctx, market.CreatorUsername, s.config.CreateMarketCost, users.TransactionRefund); err != nil {
+	refundAmount := market.ProposalCost
+	if refundAmount == 0 {
+		refundAmount = s.config.CreateMarketCost
+	}
+	if refundAmount > 0 && s.userService != nil {
+		if err := s.userService.ApplyTransaction(ctx, market.CreatorUsername, refundAmount, users.TransactionRefund); err != nil {
 			return nil, err
 		}
 	}

@@ -79,6 +79,7 @@ func TestRejectProposedMarketRefundsCreationCost(t *testing.T) {
 	now := marketsTestTime()
 	market := proposedMarket(80, now)
 	market.CreatorUsername = "moderator"
+	market.ProposalCost = 7
 	repo := newProjectionRepo(withProjectionRepoMarket(market), func(repo *projectionRepo) {
 		repo.rejectMarketFunc = func(context.Context, int64, string, time.Time, string) error {
 			return nil
@@ -100,8 +101,34 @@ func TestRejectProposedMarketRefundsCreationCost(t *testing.T) {
 	if _, err := service.RejectProposedMarket(context.Background(), market.ID, "admin", "duplicate"); err != nil {
 		t.Fatalf("RejectProposedMarket returned error: %v", err)
 	}
-	if refundedUsername != "moderator" || refundedAmount != 10 || refundType != dusers.TransactionRefund {
+	if refundedUsername != "moderator" || refundedAmount != 7 || refundType != dusers.TransactionRefund {
 		t.Fatalf("refund mismatch: username=%q amount=%d type=%q", refundedUsername, refundedAmount, refundType)
+	}
+}
+
+func TestRejectProposedMarketFallsBackToConfigCostForLegacyProposals(t *testing.T) {
+	now := marketsTestTime()
+	market := proposedMarket(81, now)
+	market.CreatorUsername = "moderator"
+	repo := newProjectionRepo(withProjectionRepoMarket(market), func(repo *projectionRepo) {
+		repo.rejectMarketFunc = func(context.Context, int64, string, time.Time, string) error {
+			return nil
+		}
+	})
+	var refundedAmount int64
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.applyTransactionFunc = func(_ context.Context, _ string, amount int64, _ string) error {
+			refundedAmount = amount
+			return nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{CreateMarketCost: 10})
+
+	if _, err := service.RejectProposedMarket(context.Background(), market.ID, "admin", "duplicate"); err != nil {
+		t.Fatalf("RejectProposedMarket returned error: %v", err)
+	}
+	if refundedAmount != 10 {
+		t.Fatalf("fallback refund amount = %d, want 10", refundedAmount)
 	}
 }
 
