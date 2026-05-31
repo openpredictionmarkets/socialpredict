@@ -150,11 +150,66 @@ scenario focuses on concentrated betting throughput:
   --preauth-users 100
 ```
 
+Capture host CPU, RAM, disk, and Docker stats during a run:
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 50 \
+  --preauth-users 100 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+The monitor writes a CSV under `loadtest/hostops/` by default. This is ignored
+by git and should be promoted into a curated dossier only after the run is
+interpreted.
+
+The CLI also writes a sibling host summary JSON and prints the key after-run
+stats, including CPU, RAM, disk usage, disk IO, network IO, Docker aggregate
+CPU/RAM, and backend/Postgres/Traefik CPU slices.
+
+When `--monitor-env` is used, the CLI also captures a static host profile JSON
+before the run. That profile records the control variables for interpreting
+capacity evidence: OS/kernel, CPU count/model, RAM/swap, root disk size, Docker
+server/storage/cgroup settings, Docker-visible CPU/RAM, and whether running
+containers have explicit CPU or memory limits.
+
+Interpretation:
+
+- `cpu_user_pct`, `cpu_system_pct`, and `cpu_idle_pct` are whole-machine host CPU samples from `/proc/stat`.
+- `docker_cpu_pct_sum` is the sum of `docker stats` CPU percentages across containers.
+- On a `1 vCPU` host, Docker CPU near `100%` plus host idle near `0%` means the containers are effectively consuming the whole machine.
+- If the host profile shows zero explicit container CPU/memory limits, there is no Docker Compose cap to raise; more headroom requires a larger host, fewer services on the host, or architectural changes.
+
 Generate a release dossier from the k6 summary output:
 
 ```bash
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --out loadtest/dossier/runs/<run>.json
 ```
+
+Attach the host summary JSON to a generated dossier when available:
+
+```bash
+./loadtest/cli/loadtest dossier \
+  --summary loadtest/results/<summary>.json \
+  --host-summary loadtest/hostops/<run>-host-summary.json \
+  --out loadtest/dossier/runs/<run>.json
+```
+
+Generated dossier JSON also includes `rateLimitEquivalents`, which converts the
+measured successful bet rate into equivalent normal-limit client identities:
+
+```text
+ceil(successful_bets_per_second / normal_general_rate_per_second)
+```
+
+For the current `secure-default`/model-office policy, the normal sustained
+general API limit is `1` request/second per client identity with burst `10`.
+These are client identity/IP equivalents for the current limiter, not guaranteed
+unique human users if many users share one NAT or proxy identity.
 
 For capacity evidence, copy `loadtest/dossier/metadata.example.json` and record
 the active `RATE_LIMIT_*` values under `rateLimitPolicy`. For

@@ -26,11 +26,25 @@
     "generalBurst": 10,
     "cleanupInterval": "5m"
   },
+  "normalRateLimitPolicy": {
+    "profile": "secure-default",
+    "loginRatePerSecond": 0.1,
+    "loginBurst": 3,
+    "generalRatePerSecond": 1,
+    "generalBurst": 10,
+    "cleanupInterval": "5m"
+  },
   "infrastructureObservations": {
     "appCpuPeakPercent": null,
     "memoryPeakPercent": null,
     "diskIoNotes": "",
     "dbConnectionNotes": ""
+  },
+  "hostTelemetry": {
+    "csv": "loadtest/hostops/<scenario>-staging-<timestamp>-host.csv",
+    "profileJson": "loadtest/hostops/<scenario>-staging-<timestamp>-host-profile.json",
+    "summaryJson": "loadtest/hostops/<scenario>-staging-<timestamp>-host-summary.json",
+    "captureCommand": "./loadtest/cli/loadtest run <scenario> ... --monitor-env staging"
   },
   "decision": "inconclusive",
   "knownRisks": []

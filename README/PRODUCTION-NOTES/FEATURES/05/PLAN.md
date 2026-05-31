@@ -23,7 +23,7 @@ Checklist:
 
 - [x] Add install profile selection for production-like installs.
 - [x] Keep `secure-default` as the safe default.
-- [x] Add `small-droplet-staging` profile for the current $4/mo DigitalOcean target.
+- [x] Add `small-droplet-staging` profile for the current Basic `1 vCPU / 1 GiB / 25 GiB` DigitalOcean staging target.
 - [x] Add `env-file` profile support for non-secret deploy env overlays.
 - [x] Add `custom` prompts for explicit values.
 - [x] Write resolved values into `.env`.

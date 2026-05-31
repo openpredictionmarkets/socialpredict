@@ -33,6 +33,8 @@ Commands:
   env list                        List local environments under ~/.keys/socialpredict
   host ssh <env>                  Open SSH session to environment host
   host env get <env> <KEY>        Read remote .env key
+  host disk <env>                 Show host disk and Docker usage
+  host cleanup <env>              Run remote ./SocialPredict cleanup docker
   host logs <env> <service>       (Planned) Tail remote service logs
   deploy <env>                    (Planned) Orchestrate remote ./SocialPredict deploy
   tf <plan|apply|destroy> <env>   (Planned) Terraform wrapper
@@ -42,6 +44,8 @@ Current implementation:
   - env list is implemented
   - host ssh is implemented
   - host env get is implemented
+  - host disk is implemented
+  - host cleanup is implemented
   - all other commands are scaffold placeholders
 
 Environment directories:
@@ -92,6 +96,9 @@ Examples:
   ./HostOps env list
   ./HostOps host ssh staging
   ./HostOps host env get staging ADMIN_PASSWORD
+  ./HostOps host disk staging
+  ./HostOps host cleanup staging
+  ./HostOps host cleanup staging --all-images
 
 Example:
   # ~/.keys/socialpredict/staging/hostops.env
@@ -337,6 +344,86 @@ grep -E "^${REQUESTED_KEY}=" "$env_file" || {
 REMOTE
 }
 
+host_disk() {
+  local env="$1"
+
+  resolve_env_connection "$env"
+
+  ssh -i "$HOSTOPS_RESOLVED_KEY" \
+    -o BatchMode=yes \
+    -p "$HOSTOPS_RESOLVED_PORT" \
+    "${HOSTOPS_RESOLVED_USER}@${HOSTOPS_RESOLVED_HOST}" \
+    "REPO_PATH='$HOSTOPS_RESOLVED_REPO_PATH' bash -s" <<'REMOTE'
+set -euo pipefail
+echo "Host disk usage:"
+df -h /
+echo
+echo "Docker disk usage:"
+docker system df || true
+echo
+echo "Running containers:"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || true
+echo
+echo "Docker volumes:"
+docker volume ls || true
+REMOTE
+}
+
+host_cleanup() {
+  local env="$1"
+  shift || true
+
+  local cleanup_args=()
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --all-images|--volumes)
+        cleanup_args+=("$1")
+        ;;
+      --help|-h)
+        cat <<'EOF'
+Usage: ./HostOps host cleanup <env> [OPTIONS]
+
+Run remote './SocialPredict cleanup docker' on the selected host.
+
+Options:
+  --all-images   Remove all unused images, not just dangling images
+  --volumes      Also prune unused Docker volumes; use carefully on data hosts
+  --help         Show this help
+
+Examples:
+  ./HostOps host cleanup staging
+  ./HostOps host cleanup staging --all-images
+  ./HostOps host cleanup staging --all-images --volumes
+
+Boundary:
+  HostOps only connects to the host and invokes ./SocialPredict. The Docker
+  cleanup behavior remains owned by ./SocialPredict.
+EOF
+        return 0
+        ;;
+      *)
+        print_error "Unknown host cleanup option: $1"
+        exit 1
+        ;;
+    esac
+    shift
+  done
+
+  resolve_env_connection "$env"
+
+  local quoted_cleanup_args=""
+  local arg
+  for arg in "${cleanup_args[@]}"; do
+    quoted_cleanup_args+=" $(printf "%q" "$arg")"
+  done
+
+  ssh -i "$HOSTOPS_RESOLVED_KEY" \
+    -o BatchMode=yes \
+    -p "$HOSTOPS_RESOLVED_PORT" \
+    "${HOSTOPS_RESOLVED_USER}@${HOSTOPS_RESOLVED_HOST}" \
+    "cd $(printf "%q" "$HOSTOPS_RESOLVED_REPO_PATH") && ./SocialPredict cleanup docker${quoted_cleanup_args}"
+}
+
 main() {
   local cmd="${1:-help}"
 
@@ -386,6 +473,27 @@ main() {
               exit 1
               ;;
           esac
+          ;;
+        disk)
+          local env="${3:-}"
+          if [[ -z "$env" ]]; then
+            print_error "Usage: ./HostOps host disk <env>"
+            exit 1
+          fi
+          host_disk "$env"
+          ;;
+        cleanup)
+          local env="${3:-}"
+          if [[ "$env" == "--help" || "$env" == "-h" || "$env" == "help" ]]; then
+            host_cleanup "help" --help
+            exit 0
+          fi
+          if [[ -z "$env" ]]; then
+            print_error "Usage: ./HostOps host cleanup <env> [--all-images] [--volumes]"
+            exit 1
+          fi
+          shift 3
+          host_cleanup "$env" "$@"
           ;;
         get|logs|run)
           require_planned

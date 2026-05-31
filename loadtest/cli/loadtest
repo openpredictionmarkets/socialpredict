@@ -14,6 +14,9 @@ Commands:
   fixtures seed <env>    Seed load-test fixtures on a remote host over SSH
   fixtures pull <env>    Pull generated fixture CSVs from a remote host
   host rate-limits <env> Show remote RATE_LIMIT_* values over SSH
+  host profile <env>     Capture static host/Docker profile JSON over SSH
+  host monitor <env>     Capture host CPU/RAM/disk/Docker telemetry over SSH
+  host summarize <csv>   Summarize host telemetry CSV
   run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, soak
   dossier                Generate release dossier JSON from a k6 summary
   help                   Show this help
@@ -21,11 +24,15 @@ Commands:
 Run examples:
   ./loadtest/cli/loadtest check
   ./loadtest/cli/loadtest host rate-limits staging
+  ./loadtest/cli/loadtest host profile staging
+  ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
   ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
   ./loadtest/cli/loadtest fixtures pull staging
   ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
   ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
   ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100
+  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100 --monitor-env staging
   ./loadtest/cli/loadtest dossier --summary loadtest/results/smoke-20260528T120000Z-summary.json --out loadtest/dossier/runs/smoke.json
 
 Fixture defaults:
@@ -33,6 +40,9 @@ Fixture defaults:
   markets: loadtest/fixtures/markets.csv
 
 This CLI does not use a god token. k6 logs in as normal fictional users.
+
+Use --monitor-env <env> on run commands to capture host telemetry CSVs under
+loadtest/hostops/ while k6 is running.
 HELP
 }
 
@@ -69,6 +79,43 @@ require_nonnegative_integer_value() {
     echo "${label} must be a non-negative integer." >&2
     exit 1
   fi
+}
+
+duration_to_seconds() {
+  local value="$1"
+  if [ -z "$value" ]; then
+    echo "0"
+    return 0
+  fi
+
+  case "$value" in
+    *s)
+      value="${value%s}"
+      ;;
+    *m)
+      value="${value%m}"
+      require_positive_integer_value "duration minutes" "$value"
+      echo $((value * 60))
+      return 0
+      ;;
+    *h)
+      value="${value%h}"
+      require_positive_integer_value "duration hours" "$value"
+      echo $((value * 3600))
+      return 0
+      ;;
+  esac
+
+  require_positive_integer_value "duration seconds" "$value"
+  echo "$value"
+}
+
+resolve_host_defaults() {
+  local env_name="$1"
+  LOADTEST_HOST_RESOLVED_HOST="$(fixture_host_for_env "$env_name")"
+  LOADTEST_HOST_RESOLVED_KEY="${HOME}/.keys/socialpredict/${env_name}/id_ed25519"
+  LOADTEST_HOST_RESOLVED_PORT="22"
+  LOADTEST_HOST_RESOLVED_REPO_PATH="/opt/socialpredict"
 }
 
 scenario_path() {
@@ -445,15 +492,410 @@ host_rate_limits_cmd() {
   ssh -p "$port" -i "$key" "$host" "$remote_script"
 }
 
+host_monitor_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest host monitor <env> [OPTIONS]
+
+Capture host CPU, RAM, disk, and Docker container telemetry over SSH as CSV.
+
+Defaults:
+  staging host:    root@kconfs.com
+  mo/prod host:    root@brierfoxforecast.com
+  key path:        ~/.keys/socialpredict/<env>/id_ed25519
+  SSH port:        22
+  interval:        5 seconds
+  duration:        60 seconds
+  output:          loadtest/hostops/<env>-host-monitor-<timestamp>.csv
+
+Options:
+  --host VALUE       SSH host, e.g. root@45.55.227.1 or root@kconfs.com
+  --key VALUE        SSH private key path
+  --port VALUE       SSH port; default 22
+  --duration VALUE   Capture duration, e.g. 60s, 2m, 1h
+  --interval N       Seconds between samples
+  --out VALUE        Local CSV output path
+  --help             Show this help
+
+Examples:
+  ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
+  ./loadtest/cli/loadtest host monitor staging --out loadtest/hostops/staging-50rps.csv
+HELP
+}
+
+host_monitor_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      host_monitor_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "host monitor requires <env>." >&2
+    host_monitor_help
+    exit 1
+  fi
+
+  local env_name="$1"
+  shift
+  resolve_host_defaults "$env_name"
+  local host="$LOADTEST_HOST_RESOLVED_HOST"
+  local key="$LOADTEST_HOST_RESOLVED_KEY"
+  local port="$LOADTEST_HOST_RESOLVED_PORT"
+  local duration="60s"
+  local interval="5"
+  local out="${LOADTEST_DIR}/hostops/${env_name}-host-monitor-$(iso_stamp).csv"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host) host="$2"; shift 2 ;;
+      --key) key="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      --duration) duration="$2"; shift 2 ;;
+      --interval) interval="$2"; shift 2 ;;
+      --out) out="$2"; shift 2 ;;
+      --help|-h) host_monitor_help; exit 0 ;;
+      *) echo "Unknown host monitor option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  require_command ssh
+  if [ ! -f "$key" ]; then
+    echo "Missing SSH key: $key" >&2
+    exit 1
+  fi
+
+  local duration_seconds
+  duration_seconds="$(duration_to_seconds "$duration")"
+  require_positive_integer_value "--interval" "$interval"
+  if [ "$duration_seconds" -le 0 ]; then
+    echo "--duration must be greater than zero." >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$out")"
+  echo "Capturing host telemetry from ${host} every ${interval}s for ${duration_seconds}s." >&2
+  echo "Telemetry CSV: ${out}" >&2
+
+  ssh -p "$port" -i "$key" "$host" \
+    "LOADTEST_MONITOR_DURATION_SECONDS='$duration_seconds' LOADTEST_MONITOR_INTERVAL_SECONDS='$interval' bash -s" > "$out" <<'REMOTE'
+set -euo pipefail
+
+duration="${LOADTEST_MONITOR_DURATION_SECONDS}"
+interval="${LOADTEST_MONITOR_INTERVAL_SECONDS}"
+end_at=$(( $(date +%s) + duration ))
+sample=0
+
+read_cpu() {
+  awk '/^cpu / { print $2, $3, $4, $5, $6, $7, $8 }' /proc/stat
+}
+
+docker_totals() {
+  docker stats --no-stream --format '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}' 2>/dev/null | awk -F'|' '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    function to_mib(value, n) {
+      value = trim(value)
+      n = value
+      gsub(/[^0-9.]/, "", n)
+      if (value ~ /GiB/) return n * 1024
+      if (value ~ /MiB/) return n
+      if (value ~ /KiB/) return n / 1024
+      if (value ~ /kB/) return n / 1024
+      if (value ~ /MB/) return n
+      if (value ~ /GB/) return n * 1024
+      if (value ~ /B/) return n / 1048576
+      return n
+    }
+    {
+      name=$1
+      cpu=$2
+      mem=$3
+      sub(/%.*/, "", cpu)
+      split(mem, mem_parts, "/")
+      mem_mib=to_mib(mem_parts[1])
+      total_cpu += cpu + 0
+      total_mem += mem_mib
+      count += 1
+      if (name ~ /backend/ && name !~ /startup-writer/) backend_cpu += cpu + 0
+      if (name ~ /postgres/) postgres_cpu += cpu + 0
+      if (name ~ /traefik/) traefik_cpu += cpu + 0
+    }
+    END {
+      printf "%.2f,%.2f,%d,%.2f,%.2f,%.2f", total_cpu, total_mem, count, backend_cpu, postgres_cpu, traefik_cpu
+    }
+  '
+}
+
+echo "timestamp_utc,sample,load1,load5,load15,cpu_user_pct,cpu_system_pct,cpu_idle_pct,mem_total_mib,mem_used_mib,mem_available_mib,swap_used_mib,disk_used_pct,disk_used_mib,disk_available_mib,disk_read_kib_per_sec,disk_write_kib_per_sec,net_rx_kib_per_sec,net_tx_kib_per_sec,docker_cpu_pct_sum,docker_mem_mib_sum,container_count,backend_cpu_pct,postgres_cpu_pct,traefik_cpu_pct"
+
+while [ "$(date +%s)" -le "$end_at" ]; do
+  sample=$((sample + 1))
+  cpu_before="$(read_cpu)"
+  disk_io_before="$(awk '$3 !~ /^(loop|ram)/ { read += $6; write += $10 } END { printf "%d %d", read, write }' /proc/diskstats)"
+  net_io_before="$(awk -F'[: ]+' 'NR > 2 && $2 != "lo" { rx += $3; tx += $11 } END { printf "%d %d", rx, tx }' /proc/net/dev)"
+  sleep 1
+  cpu_after="$(read_cpu)"
+  disk_io_after="$(awk '$3 !~ /^(loop|ram)/ { read += $6; write += $10 } END { printf "%d %d", read, write }' /proc/diskstats)"
+  net_io_after="$(awk -F'[: ]+' 'NR > 2 && $2 != "lo" { rx += $3; tx += $11 } END { printf "%d %d", rx, tx }' /proc/net/dev)"
+
+  cpu_values="$(
+    awk -v before="$cpu_before" -v after="$cpu_after" '
+      BEGIN {
+        split(before, b, " ")
+        split(after, a, " ")
+        b_user=b[1]+b[2]; b_system=b[3]+b[6]+b[7]; b_idle=b[4]+b[5]
+        a_user=a[1]+a[2]; a_system=a[3]+a[6]+a[7]; a_idle=a[4]+a[5]
+        d_user=a_user-b_user; d_system=a_system-b_system; d_idle=a_idle-b_idle
+        total=d_user+d_system+d_idle
+        if (total <= 0) total=1
+        printf "%.2f,%.2f,%.2f", (d_user/total)*100, (d_system/total)*100, (d_idle/total)*100
+      }
+    '
+  )"
+
+  disk_io_values="$(
+    awk -v before="$disk_io_before" -v after="$disk_io_after" '
+      BEGIN {
+        split(before, b, " ")
+        split(after, a, " ")
+        read_kib=(a[1]-b[1]) * 512 / 1024
+        write_kib=(a[2]-b[2]) * 512 / 1024
+        if (read_kib < 0) read_kib=0
+        if (write_kib < 0) write_kib=0
+        printf "%.2f,%.2f", read_kib, write_kib
+      }
+    '
+  )"
+
+  net_io_values="$(
+    awk -v before="$net_io_before" -v after="$net_io_after" '
+      BEGIN {
+        split(before, b, " ")
+        split(after, a, " ")
+        rx_kib=(a[1]-b[1]) / 1024
+        tx_kib=(a[2]-b[2]) / 1024
+        if (rx_kib < 0) rx_kib=0
+        if (tx_kib < 0) tx_kib=0
+        printf "%.2f,%.2f", rx_kib, tx_kib
+      }
+    '
+  )"
+
+  load_values="$(awk '{ printf "%s,%s,%s", $1, $2, $3 }' /proc/loadavg)"
+  mem_values="$(free -m | awk '/^Mem:/ { total=$2; used=$3; available=$7 } /^Swap:/ { swap_used=$3 } END { printf "%d,%d,%d,%d", total, used, available, swap_used }')"
+  disk_values="$(df -Pm / | awk 'NR==2 { used_pct=$5; gsub(/%/, "", used_pct); printf "%d,%d,%d", used_pct, $3, $4 }')"
+  docker_values="$(docker_totals)"
+  if [ -z "$docker_values" ]; then
+    docker_values="0.00,0.00,0,0.00,0.00,0.00"
+  fi
+
+  printf "%s,%d,%s,%s,%s,%s,%s,%s,%s\n" \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$sample" \
+    "$load_values" \
+    "$cpu_values" \
+    "$mem_values" \
+    "$disk_values" \
+    "$disk_io_values" \
+    "$net_io_values" \
+    "$docker_values"
+
+  if [ "$(date +%s)" -ge "$end_at" ]; then
+    break
+  fi
+  sleep "$interval"
+done
+REMOTE
+
+  echo "Telemetry captured: ${out}" >&2
+}
+
+host_profile_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest host profile <env> [OPTIONS]
+
+Capture static host, Docker, and container resource-limit profile over SSH.
+
+Defaults:
+  staging host:    root@kconfs.com
+  mo/prod host:    root@brierfoxforecast.com
+  key path:        ~/.keys/socialpredict/<env>/id_ed25519
+  SSH port:        22
+  output:          loadtest/hostops/<env>-host-profile-<timestamp>.json
+
+Options:
+  --host VALUE       SSH host, e.g. root@45.55.227.1 or root@kconfs.com
+  --key VALUE        SSH private key path
+  --port VALUE       SSH port; default 22
+  --out VALUE        Local JSON output path
+  --help             Show this help
+
+Examples:
+  ./loadtest/cli/loadtest host profile staging
+  ./loadtest/cli/loadtest host profile staging --out loadtest/hostops/staging-profile.json
+HELP
+}
+
+host_profile_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      host_profile_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "host profile requires <env>." >&2
+    host_profile_help
+    exit 1
+  fi
+
+  local env_name="$1"
+  shift
+  resolve_host_defaults "$env_name"
+  local host="$LOADTEST_HOST_RESOLVED_HOST"
+  local key="$LOADTEST_HOST_RESOLVED_KEY"
+  local port="$LOADTEST_HOST_RESOLVED_PORT"
+  local out="${LOADTEST_DIR}/hostops/${env_name}-host-profile-$(iso_stamp).json"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host) host="$2"; shift 2 ;;
+      --key) key="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      --out) out="$2"; shift 2 ;;
+      --help|-h) host_profile_help; exit 0 ;;
+      *) echo "Unknown host profile option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  require_command ssh
+  require_command node
+  if [ ! -f "$key" ]; then
+    echo "Missing SSH key: $key" >&2
+    exit 1
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+  ssh -p "$port" -i "$key" "$host" "bash -s" > "$tmp" <<'REMOTE'
+set -euo pipefail
+
+kv() {
+  key="$1"
+  shift
+  value="$("$@" 2>/dev/null || true)"
+  value="$(printf "%s" "$value" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  printf '%s=%s\n' "$key" "$value"
+}
+
+kv timestamp_utc date -u +%Y-%m-%dT%H:%M:%SZ
+kv hostname hostname
+kv kernel uname -srmo
+if [ -f /etc/os-release ]; then
+  # shellcheck source=/dev/null
+  . /etc/os-release
+  printf 'os_pretty_name=%s\n' "${PRETTY_NAME:-unknown}"
+else
+  printf 'os_pretty_name=unknown\n'
+fi
+kv architecture uname -m
+kv cpu_count nproc
+printf 'cpu_model=%s\n' "$(awk -F': ' '/model name/ { print $2; exit }' /proc/cpuinfo 2>/dev/null || true)"
+awk '/^MemTotal:/ { printf "mem_total_mib=%d\n", $2 / 1024 } /^SwapTotal:/ { printf "swap_total_mib=%d\n", $2 / 1024 }' /proc/meminfo
+df -Pm / | awk 'NR==2 { used_pct=$5; gsub(/%/, "", used_pct); printf "root_disk_size_mib=%d\nroot_disk_used_mib=%d\nroot_disk_available_mib=%d\nroot_disk_used_pct=%d\n", $2, $3, $4, used_pct }'
+kv docker_server_version docker version --format '{{.Server.Version}}'
+kv docker_storage_driver docker info --format '{{.Driver}}'
+kv docker_cgroup_driver docker info --format '{{.CgroupDriver}}'
+kv docker_cgroup_version docker info --format '{{.CgroupVersion}}'
+kv docker_ncpu docker info --format '{{.NCPU}}'
+docker info --format '{{.MemTotal}}' 2>/dev/null | awk '{ printf "docker_mem_total_mib=%d\n", $1 / 1024 / 1024 }'
+kv docker_root_dir docker info --format '{{.DockerRootDir}}'
+kv docker_operating_system docker info --format '{{.OperatingSystem}}'
+kv docker_kernel_version docker info --format '{{.KernelVersion}}'
+
+docker ps --format '{{.ID}}' | while read -r id; do
+  [ -n "$id" ] || continue
+  docker inspect --format 'container={{.Name}}|{{index .Config.Labels "com.docker.compose.service"}}|{{.HostConfig.NanoCpus}}|{{.HostConfig.CpuQuota}}|{{.HostConfig.CpuPeriod}}|{{.HostConfig.CpusetCpus}}|{{.HostConfig.Memory}}|{{.HostConfig.MemorySwap}}' "$id" | sed 's#container=/#container=#'
+done
+REMOTE
+
+  node "${LOADTEST_DIR}/dossier/host-profile-from-kv.mjs" --input "$tmp" --out "$out"
+  rm -f "$tmp"
+}
+
+host_summarize_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest host summarize <csv> [OPTIONS]
+
+Summarize a host telemetry CSV produced by 'host monitor'.
+
+Options:
+  --profile VALUE  Host profile JSON from 'host profile'
+  --out VALUE      Write JSON summary to this path
+  --help           Show this help
+
+Examples:
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/hot-market-burst-staging-host.csv
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/hot-market-burst-staging-host.csv --out loadtest/hostops/hot-market-burst-staging-host-summary.json
+HELP
+}
+
+host_summarize_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      host_summarize_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "host summarize requires <csv>." >&2
+    host_summarize_help
+    exit 1
+  fi
+
+  local csv="$1"
+  shift
+  local out=""
+  local profile=""
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --profile) profile="$2"; shift 2 ;;
+      --out) out="$2"; shift 2 ;;
+      --help|-h) host_summarize_help; exit 0 ;;
+      *) echo "Unknown host summarize option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  if [ ! -f "$csv" ]; then
+    echo "Host telemetry CSV not found: $csv" >&2
+    exit 1
+  fi
+
+  require_command node
+  local args=("${LOADTEST_DIR}/dossier/summarize-host.mjs" --csv "$csv")
+  if [ -n "$profile" ]; then args+=(--profile "$profile"); fi
+  if [ -n "$out" ]; then args+=(--out "$out"); fi
+  node "${args[@]}"
+}
+
 host_help() {
   cat <<'HELP'
-Usage: ./loadtest/cli/loadtest host <rate-limits> <env> [OPTIONS]
+Usage: ./loadtest/cli/loadtest host <rate-limits|profile|monitor|summarize> [ARGS] [OPTIONS]
 
 Commands:
   rate-limits <env>  Show remote RATE_LIMIT_* values over SSH
+  profile <env>      Capture static host/Docker profile JSON over SSH
+  monitor <env>      Capture CPU/RAM/disk/Docker telemetry CSV over SSH
+  summarize <csv>    Summarize host telemetry CSV
 
 Examples:
   ./loadtest/cli/loadtest host rate-limits staging
+  ./loadtest/cli/loadtest host profile staging
+  ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
+  ./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
 HELP
 }
 
@@ -462,12 +904,22 @@ host_cmd() {
   shift || true
   case "$subcommand" in
     rate-limits) host_rate_limits_cmd "$@" ;;
+    profile) host_profile_cmd "$@" ;;
+    monitor) host_monitor_cmd "$@" ;;
+    summarize) host_summarize_cmd "$@" ;;
     --help|-h|help) host_help ;;
     *) echo "Unknown host command: $subcommand" >&2; host_help; exit 1 ;;
   esac
 }
 
 run_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      print_help
+      exit 0
+      ;;
+  esac
+
   if [ "$#" -lt 1 ]; then
     echo "Missing scenario." >&2
     print_help
@@ -489,6 +941,13 @@ run_cmd() {
   local browse_time_unit="${BROWSE_TIME_UNIT:-}"
   local rate="${RATE:-}"
   local time_unit="${TIME_UNIT:-}"
+  local monitor_env="${MONITOR_ENV:-}"
+  local monitor_host="${MONITOR_HOST:-}"
+  local monitor_key="${MONITOR_KEY:-}"
+  local monitor_port="${MONITOR_PORT:-}"
+  local monitor_interval="${MONITOR_INTERVAL:-5}"
+  local monitor_out="${MONITOR_OUT:-}"
+  local monitor_profile_out="${MONITOR_PROFILE_OUT:-}"
   local out=""
 
   while [ "$#" -gt 0 ]; do
@@ -507,6 +966,13 @@ run_cmd() {
       --browse-time-unit) browse_time_unit="$2"; shift 2 ;;
       --rate) rate="$2"; shift 2 ;;
       --time-unit) time_unit="$2"; shift 2 ;;
+      --monitor-env) monitor_env="$2"; shift 2 ;;
+      --monitor-host) monitor_host="$2"; shift 2 ;;
+      --monitor-key) monitor_key="$2"; shift 2 ;;
+      --monitor-port) monitor_port="$2"; shift 2 ;;
+      --monitor-interval) monitor_interval="$2"; shift 2 ;;
+      --monitor-out) monitor_out="$2"; shift 2 ;;
+      --monitor-profile-out) monitor_profile_out="$2"; shift 2 ;;
       --out) out="$2"; shift 2 ;;
       --help|-h) print_help; exit 0 ;;
       *) echo "Unknown run option: $1" >&2; exit 1 ;;
@@ -529,6 +995,7 @@ run_cmd() {
   require_positive_integer_value "--bet-rate" "$bet_rate"
   require_positive_integer_value "--browse-rate" "$browse_rate"
   require_positive_integer_value "--rate" "$rate"
+  require_positive_integer_value "--monitor-interval" "$monitor_interval"
 
   mkdir -p "${LOADTEST_DIR}/results"
   if [ -z "$out" ]; then
@@ -537,6 +1004,44 @@ run_cmd() {
 
   echo "Running ${scenario} against ${base_url}"
   echo "API prefix: ${api_prefix:-<none>}"
+
+  local monitor_pid=""
+  if [ -n "$monitor_env" ]; then
+    local monitor_duration_seconds
+    monitor_duration_seconds="$(duration_to_seconds "${duration:-60s}")"
+    monitor_duration_seconds=$((monitor_duration_seconds + monitor_interval + 5))
+    if [ -z "$monitor_out" ]; then
+      monitor_out="${LOADTEST_DIR}/hostops/${scenario}-${monitor_env}-$(iso_stamp)-host.csv"
+    fi
+    if [ -z "$monitor_profile_out" ]; then
+      monitor_profile_out="${monitor_out%.csv}-profile.json"
+    fi
+    local profile_args=(host profile "$monitor_env" --out "$monitor_profile_out")
+    local monitor_args=(host monitor "$monitor_env" --duration "${monitor_duration_seconds}s" --interval "$monitor_interval" --out "$monitor_out")
+    if [ -n "$monitor_host" ]; then profile_args+=(--host "$monitor_host"); monitor_args+=(--host "$monitor_host"); fi
+    if [ -n "$monitor_key" ]; then profile_args+=(--key "$monitor_key"); monitor_args+=(--key "$monitor_key"); fi
+    if [ -n "$monitor_port" ]; then profile_args+=(--port "$monitor_port"); monitor_args+=(--port "$monitor_port"); fi
+
+    "${BASH_SOURCE[0]}" "${profile_args[@]}"
+    echo "Host profile output: ${monitor_profile_out}"
+
+    "${BASH_SOURCE[0]}" "${monitor_args[@]}" &
+    monitor_pid="$!"
+    echo "Host telemetry monitor PID: ${monitor_pid}"
+    echo "Host telemetry output: ${monitor_out}"
+    sleep 2
+  fi
+
+  cleanup_monitor() {
+    if [ -n "${monitor_pid:-}" ]; then
+      kill "$monitor_pid" >/dev/null 2>&1 || true
+      wait "$monitor_pid" >/dev/null 2>&1 || true
+    fi
+  }
+  trap cleanup_monitor EXIT INT TERM
+
+  local k6_status=0
+  set +e
   (
     cd "$REPO_DIR"
     BASE_URL="$base_url" \
@@ -555,19 +1060,34 @@ run_cmd() {
     TIME_UNIT="$time_unit" \
     k6 run --summary-export "$out" "$script"
   )
+  k6_status="$?"
+  set -e
+
+  if [ -n "$monitor_pid" ]; then
+    kill "$monitor_pid" >/dev/null 2>&1 || true
+    wait "$monitor_pid" >/dev/null 2>&1 || true
+    monitor_pid=""
+    echo "Host telemetry: $monitor_out"
+    local monitor_summary_out="${monitor_out%.csv}-summary.json"
+    "${BASH_SOURCE[0]}" host summarize "$monitor_out" --profile "$monitor_profile_out" --out "$monitor_summary_out" || true
+  fi
+  trap - EXIT INT TERM
   echo "Summary: $out"
+  return "$k6_status"
 }
 
 dossier_cmd() {
   local summary=""
   local out=""
   local metadata=""
+  local host_summary=""
   local decision=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --summary) summary="$2"; shift 2 ;;
       --out) out="$2"; shift 2 ;;
       --metadata) metadata="$2"; shift 2 ;;
+      --host-summary) host_summary="$2"; shift 2 ;;
       --decision) decision="$2"; shift 2 ;;
       --help|-h) print_help; exit 0 ;;
       *) echo "Unknown dossier option: $1" >&2; exit 1 ;;
@@ -580,6 +1100,7 @@ dossier_cmd() {
   require_command node
   local args=("${LOADTEST_DIR}/dossier/summarize.mjs" --summary "$summary" --out "$out")
   if [ -n "$metadata" ]; then args+=(--metadata "$metadata"); fi
+  if [ -n "$host_summary" ]; then args+=(--host-summary "$host_summary"); fi
   if [ -n "$decision" ]; then args+=(--decision "$decision"); fi
   node "${args[@]}"
 }
