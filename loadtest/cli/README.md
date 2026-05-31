@@ -10,6 +10,7 @@ Seed fixture CSVs with `./SocialPredict load seed`, or provide files under `load
 LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --markets 5 --reset
 ./loadtest/cli/loadtest check
 ./loadtest/cli/loadtest host rate-limits staging
+./loadtest/cli/loadtest host profile staging
 ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
 ./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
 ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
@@ -52,6 +53,7 @@ Override the SSH target when needed:
 Capture CPU, RAM, disk, and Docker stats as CSV while you run a test:
 
 ```bash
+./loadtest/cli/loadtest host profile staging
 ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
 ```
 
@@ -80,8 +82,14 @@ Summarize a telemetry CSV after the fact:
 ```
 
 When `--monitor-env` is attached to a k6 run, the CLI automatically writes a
-sibling `<run>-host-summary.json` and prints the same summary after the k6
-output.
+sibling `<run>-host-profile.json`, `<run>-host-summary.json`, and prints the
+same summary after the k6 output.
+
+The profile answers whether Docker is capped below the host. If Docker reports
+the same CPU/RAM as the host and containers have no explicit CPU/memory limits,
+then `docker_cpu_pct_sum` near `100%` on a `1 vCPU` host means Docker is using
+essentially all available host CPU. There is no local Docker cap to raise in
+that case.
 
 ## Rate-Limit Equivalent Users
 

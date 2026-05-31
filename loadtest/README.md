@@ -171,6 +171,19 @@ The CLI also writes a sibling host summary JSON and prints the key after-run
 stats, including CPU, RAM, disk usage, disk IO, network IO, Docker aggregate
 CPU/RAM, and backend/Postgres/Traefik CPU slices.
 
+When `--monitor-env` is used, the CLI also captures a static host profile JSON
+before the run. That profile records the control variables for interpreting
+capacity evidence: OS/kernel, CPU count/model, RAM/swap, root disk size, Docker
+server/storage/cgroup settings, Docker-visible CPU/RAM, and whether running
+containers have explicit CPU or memory limits.
+
+Interpretation:
+
+- `cpu_user_pct`, `cpu_system_pct`, and `cpu_idle_pct` are whole-machine host CPU samples from `/proc/stat`.
+- `docker_cpu_pct_sum` is the sum of `docker stats` CPU percentages across containers.
+- On a `1 vCPU` host, Docker CPU near `100%` plus host idle near `0%` means the containers are effectively consuming the whole machine.
+- If the host profile shows zero explicit container CPU/memory limits, there is no Docker Compose cap to raise; more headroom requires a larger host, fewer services on the host, or architectural changes.
+
 Generate a release dossier from the k6 summary output:
 
 ```bash

@@ -71,7 +71,7 @@ function printLine(label, value, unit = '') {
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.csv) {
-  console.error('Usage: node loadtest/dossier/summarize-host.mjs --csv FILE [--out FILE]');
+  console.error('Usage: node loadtest/dossier/summarize-host.mjs --csv FILE [--profile FILE] [--out FILE]');
   process.exit(1);
 }
 
@@ -83,11 +83,13 @@ if (rows.length === 0) {
 
 const first = rows[0];
 const last = rows[rows.length - 1];
+const profile = args.profile ? JSON.parse(fs.readFileSync(args.profile, 'utf8')) : null;
 const summary = {
   schemaVersion: '0.1.0',
   generatedAt: new Date().toISOString(),
   source: {
     csv: args.csv,
+    profile: args.profile || null,
   },
   sampleCount: rows.length,
   startedAt: first.timestamp_utc || null,
@@ -120,6 +122,7 @@ const summary = {
     postgresCpuPct: stats(rows, 'postgres_cpu_pct'),
     traefikCpuPct: stats(rows, 'traefik_cpu_pct'),
   },
+  profile,
 };
 
 if (args.out) {
@@ -145,4 +148,12 @@ printLine('Max Docker RAM sum', summary.docker.memMiBSum?.max, ' MiB');
 printLine('Max backend CPU', summary.docker.backendCpuPct?.max, '%');
 printLine('Max Postgres CPU', summary.docker.postgresCpuPct?.max, '%');
 printLine('Max Traefik CPU', summary.docker.traefikCpuPct?.max, '%');
+if (summary.profile) {
+  printLine('Host CPU count', summary.profile.host?.cpu_count);
+  printLine('Host RAM total', summary.profile.host?.mem_total_mib, ' MiB');
+  printLine('Docker CPU count', summary.profile.docker?.ncpu);
+  printLine('Docker RAM total', summary.profile.docker?.mem_total_mib, ' MiB');
+  console.log(`Explicit container CPU limits: ${summary.profile.docker?.containersWithCpuLimits ?? 0}/${summary.profile.containers?.length ?? 0}`);
+  console.log(`Explicit container memory limits: ${summary.profile.docker?.containersWithMemoryLimits ?? 0}/${summary.profile.containers?.length ?? 0}`);
+}
 if (args.out) console.log(`Host summary JSON: ${args.out}`);

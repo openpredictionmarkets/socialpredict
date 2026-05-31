@@ -149,9 +149,13 @@ Smoke should pass before any baseline or burst test.
 ```
 
 This writes a CSV under `loadtest/hostops/` with CPU, RAM, disk, and Docker
-stats sampled from the remote host over SSH. The CLI also writes a sibling
-host summary JSON and prints the after-run maxima/minima. Use that summary
-alongside the k6 summary when producing a release dossier.
+stats sampled from the remote host over SSH. The CLI also writes sibling host
+profile and host summary JSON files and prints the after-run maxima/minima. Use
+that summary alongside the k6 summary when producing a release dossier.
+
+The host profile is the test-control record. It captures OS/kernel, CPU count,
+memory, root disk, Docker server/storage/cgroup settings, Docker-visible CPU and
+RAM, and whether containers have explicit CPU or memory limits.
 
 8. Increase load gradually and record results in the release dossier.
 
@@ -204,6 +208,8 @@ one bet/second. If modeling one bet every ten seconds per identity, use
 - If smoke fails with `AUTHORIZATION_DENIED` or `MARKET_NOT_FOUND`, reseed remote staging and pull fresh fixtures again.
 - If tests fail with `RATE_LIMITED` or `LOGIN_RATE_LIMITED`, confirm staging is using the high `.env.staging` rate-limit overlay.
 - If host telemetry shows available memory dropping below roughly `150 MiB`, p95 latency above `1s`, dropped iterations, or sustained error rates, stop increasing the target rate and capture that run as a capacity boundary.
+- If `docker_cpu_pct_sum` is near `100%` on a `1 vCPU` host while host CPU idle is near `0%`, Docker is not the bottleneck boundary; the whole host is CPU saturated.
+- If the host profile shows no explicit container CPU/memory limits, there is no Docker Compose resource cap to raise for more local headroom.
 
 ## Small-Droplet Max-Capacity Ladder
 

@@ -14,6 +14,7 @@ Commands:
   fixtures seed <env>    Seed load-test fixtures on a remote host over SSH
   fixtures pull <env>    Pull generated fixture CSVs from a remote host
   host rate-limits <env> Show remote RATE_LIMIT_* values over SSH
+  host profile <env>     Capture static host/Docker profile JSON over SSH
   host monitor <env>     Capture host CPU/RAM/disk/Docker telemetry over SSH
   host summarize <csv>   Summarize host telemetry CSV
   run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, soak
@@ -23,6 +24,7 @@ Commands:
 Run examples:
   ./loadtest/cli/loadtest check
   ./loadtest/cli/loadtest host rate-limits staging
+  ./loadtest/cli/loadtest host profile staging
   ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
   ./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
   ./loadtest/cli/loadtest fixtures seed staging --users 100 --moderators 5 --markets 20 --hot-markets 2 --reset
@@ -708,6 +710,120 @@ REMOTE
   echo "Telemetry captured: ${out}" >&2
 }
 
+host_profile_help() {
+  cat <<'HELP'
+Usage: ./loadtest/cli/loadtest host profile <env> [OPTIONS]
+
+Capture static host, Docker, and container resource-limit profile over SSH.
+
+Defaults:
+  staging host:    root@kconfs.com
+  mo/prod host:    root@brierfoxforecast.com
+  key path:        ~/.keys/socialpredict/<env>/id_ed25519
+  SSH port:        22
+  output:          loadtest/hostops/<env>-host-profile-<timestamp>.json
+
+Options:
+  --host VALUE       SSH host, e.g. root@45.55.227.1 or root@kconfs.com
+  --key VALUE        SSH private key path
+  --port VALUE       SSH port; default 22
+  --out VALUE        Local JSON output path
+  --help             Show this help
+
+Examples:
+  ./loadtest/cli/loadtest host profile staging
+  ./loadtest/cli/loadtest host profile staging --out loadtest/hostops/staging-profile.json
+HELP
+}
+
+host_profile_cmd() {
+  case "${1:-}" in
+    --help|-h|help)
+      host_profile_help
+      exit 0
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "host profile requires <env>." >&2
+    host_profile_help
+    exit 1
+  fi
+
+  local env_name="$1"
+  shift
+  resolve_host_defaults "$env_name"
+  local host="$LOADTEST_HOST_RESOLVED_HOST"
+  local key="$LOADTEST_HOST_RESOLVED_KEY"
+  local port="$LOADTEST_HOST_RESOLVED_PORT"
+  local out="${LOADTEST_DIR}/hostops/${env_name}-host-profile-$(iso_stamp).json"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host) host="$2"; shift 2 ;;
+      --key) key="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      --out) out="$2"; shift 2 ;;
+      --help|-h) host_profile_help; exit 0 ;;
+      *) echo "Unknown host profile option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  require_command ssh
+  require_command node
+  if [ ! -f "$key" ]; then
+    echo "Missing SSH key: $key" >&2
+    exit 1
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+  ssh -p "$port" -i "$key" "$host" "bash -s" > "$tmp" <<'REMOTE'
+set -euo pipefail
+
+kv() {
+  key="$1"
+  shift
+  value="$("$@" 2>/dev/null || true)"
+  value="$(printf "%s" "$value" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  printf '%s=%s\n' "$key" "$value"
+}
+
+kv timestamp_utc date -u +%Y-%m-%dT%H:%M:%SZ
+kv hostname hostname
+kv kernel uname -srmo
+if [ -f /etc/os-release ]; then
+  # shellcheck source=/dev/null
+  . /etc/os-release
+  printf 'os_pretty_name=%s\n' "${PRETTY_NAME:-unknown}"
+else
+  printf 'os_pretty_name=unknown\n'
+fi
+kv architecture uname -m
+kv cpu_count nproc
+printf 'cpu_model=%s\n' "$(awk -F': ' '/model name/ { print $2; exit }' /proc/cpuinfo 2>/dev/null || true)"
+awk '/^MemTotal:/ { printf "mem_total_mib=%d\n", $2 / 1024 } /^SwapTotal:/ { printf "swap_total_mib=%d\n", $2 / 1024 }' /proc/meminfo
+df -Pm / | awk 'NR==2 { used_pct=$5; gsub(/%/, "", used_pct); printf "root_disk_size_mib=%d\nroot_disk_used_mib=%d\nroot_disk_available_mib=%d\nroot_disk_used_pct=%d\n", $2, $3, $4, used_pct }'
+kv docker_server_version docker version --format '{{.Server.Version}}'
+kv docker_storage_driver docker info --format '{{.Driver}}'
+kv docker_cgroup_driver docker info --format '{{.CgroupDriver}}'
+kv docker_cgroup_version docker info --format '{{.CgroupVersion}}'
+kv docker_ncpu docker info --format '{{.NCPU}}'
+docker info --format '{{.MemTotal}}' 2>/dev/null | awk '{ printf "docker_mem_total_mib=%d\n", $1 / 1024 / 1024 }'
+kv docker_root_dir docker info --format '{{.DockerRootDir}}'
+kv docker_operating_system docker info --format '{{.OperatingSystem}}'
+kv docker_kernel_version docker info --format '{{.KernelVersion}}'
+
+docker ps --format '{{.ID}}' | while read -r id; do
+  [ -n "$id" ] || continue
+  docker inspect --format 'container={{.Name}}|{{index .Config.Labels "com.docker.compose.service"}}|{{.HostConfig.NanoCpus}}|{{.HostConfig.CpuQuota}}|{{.HostConfig.CpuPeriod}}|{{.HostConfig.CpusetCpus}}|{{.HostConfig.Memory}}|{{.HostConfig.MemorySwap}}' "$id" | sed 's#container=/#container=#'
+done
+REMOTE
+
+  node "${LOADTEST_DIR}/dossier/host-profile-from-kv.mjs" --input "$tmp" --out "$out"
+  rm -f "$tmp"
+}
+
 host_summarize_help() {
   cat <<'HELP'
 Usage: ./loadtest/cli/loadtest host summarize <csv> [OPTIONS]
@@ -715,8 +831,9 @@ Usage: ./loadtest/cli/loadtest host summarize <csv> [OPTIONS]
 Summarize a host telemetry CSV produced by 'host monitor'.
 
 Options:
-  --out VALUE  Write JSON summary to this path
-  --help       Show this help
+  --profile VALUE  Host profile JSON from 'host profile'
+  --out VALUE      Write JSON summary to this path
+  --help           Show this help
 
 Examples:
   ./loadtest/cli/loadtest host summarize loadtest/hostops/hot-market-burst-staging-host.csv
@@ -741,9 +858,11 @@ host_summarize_cmd() {
   local csv="$1"
   shift
   local out=""
+  local profile=""
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
+      --profile) profile="$2"; shift 2 ;;
       --out) out="$2"; shift 2 ;;
       --help|-h) host_summarize_help; exit 0 ;;
       *) echo "Unknown host summarize option: $1" >&2; exit 1 ;;
@@ -757,21 +876,24 @@ host_summarize_cmd() {
 
   require_command node
   local args=("${LOADTEST_DIR}/dossier/summarize-host.mjs" --csv "$csv")
+  if [ -n "$profile" ]; then args+=(--profile "$profile"); fi
   if [ -n "$out" ]; then args+=(--out "$out"); fi
   node "${args[@]}"
 }
 
 host_help() {
   cat <<'HELP'
-Usage: ./loadtest/cli/loadtest host <rate-limits|monitor|summarize> [ARGS] [OPTIONS]
+Usage: ./loadtest/cli/loadtest host <rate-limits|profile|monitor|summarize> [ARGS] [OPTIONS]
 
 Commands:
   rate-limits <env>  Show remote RATE_LIMIT_* values over SSH
+  profile <env>      Capture static host/Docker profile JSON over SSH
   monitor <env>      Capture CPU/RAM/disk/Docker telemetry CSV over SSH
   summarize <csv>    Summarize host telemetry CSV
 
 Examples:
   ./loadtest/cli/loadtest host rate-limits staging
+  ./loadtest/cli/loadtest host profile staging
   ./loadtest/cli/loadtest host monitor staging --duration 2m --interval 5
   ./loadtest/cli/loadtest host summarize loadtest/hostops/<run>-host.csv
 HELP
@@ -782,6 +904,7 @@ host_cmd() {
   shift || true
   case "$subcommand" in
     rate-limits) host_rate_limits_cmd "$@" ;;
+    profile) host_profile_cmd "$@" ;;
     monitor) host_monitor_cmd "$@" ;;
     summarize) host_summarize_cmd "$@" ;;
     --help|-h|help) host_help ;;
@@ -824,6 +947,7 @@ run_cmd() {
   local monitor_port="${MONITOR_PORT:-}"
   local monitor_interval="${MONITOR_INTERVAL:-5}"
   local monitor_out="${MONITOR_OUT:-}"
+  local monitor_profile_out="${MONITOR_PROFILE_OUT:-}"
   local out=""
 
   while [ "$#" -gt 0 ]; do
@@ -848,6 +972,7 @@ run_cmd() {
       --monitor-port) monitor_port="$2"; shift 2 ;;
       --monitor-interval) monitor_interval="$2"; shift 2 ;;
       --monitor-out) monitor_out="$2"; shift 2 ;;
+      --monitor-profile-out) monitor_profile_out="$2"; shift 2 ;;
       --out) out="$2"; shift 2 ;;
       --help|-h) print_help; exit 0 ;;
       *) echo "Unknown run option: $1" >&2; exit 1 ;;
@@ -888,10 +1013,17 @@ run_cmd() {
     if [ -z "$monitor_out" ]; then
       monitor_out="${LOADTEST_DIR}/hostops/${scenario}-${monitor_env}-$(iso_stamp)-host.csv"
     fi
+    if [ -z "$monitor_profile_out" ]; then
+      monitor_profile_out="${monitor_out%.csv}-profile.json"
+    fi
+    local profile_args=(host profile "$monitor_env" --out "$monitor_profile_out")
     local monitor_args=(host monitor "$monitor_env" --duration "${monitor_duration_seconds}s" --interval "$monitor_interval" --out "$monitor_out")
-    if [ -n "$monitor_host" ]; then monitor_args+=(--host "$monitor_host"); fi
-    if [ -n "$monitor_key" ]; then monitor_args+=(--key "$monitor_key"); fi
-    if [ -n "$monitor_port" ]; then monitor_args+=(--port "$monitor_port"); fi
+    if [ -n "$monitor_host" ]; then profile_args+=(--host "$monitor_host"); monitor_args+=(--host "$monitor_host"); fi
+    if [ -n "$monitor_key" ]; then profile_args+=(--key "$monitor_key"); monitor_args+=(--key "$monitor_key"); fi
+    if [ -n "$monitor_port" ]; then profile_args+=(--port "$monitor_port"); monitor_args+=(--port "$monitor_port"); fi
+
+    "${BASH_SOURCE[0]}" "${profile_args[@]}"
+    echo "Host profile output: ${monitor_profile_out}"
 
     "${BASH_SOURCE[0]}" "${monitor_args[@]}" &
     monitor_pid="$!"
@@ -937,7 +1069,7 @@ run_cmd() {
     monitor_pid=""
     echo "Host telemetry: $monitor_out"
     local monitor_summary_out="${monitor_out%.csv}-summary.json"
-    "${BASH_SOURCE[0]}" host summarize "$monitor_out" --out "$monitor_summary_out" || true
+    "${BASH_SOURCE[0]}" host summarize "$monitor_out" --profile "$monitor_profile_out" --out "$monitor_summary_out" || true
   fi
   trap - EXIT INT TERM
   echo "Summary: $out"
