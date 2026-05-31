@@ -106,7 +106,7 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 // UpdateLabels handles PUT /markets/{id}/labels
 func (h *Handler) UpdateLabels(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
@@ -114,20 +114,20 @@ func (h *Handler) UpdateLabels(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	if idStr == "" {
-		http.Error(w, "Market ID is required", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
 	// Parse request body
 	var req dto.UpdateLabelsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON in request body", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (h *Handler) UpdateLabels(w http.ResponseWriter, r *http.Request) {
 // GetMarket handles GET /markets/{id}
 func (h *Handler) GetMarket(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method is not supported.", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w)
 		return
 	}
 
@@ -152,13 +152,13 @@ func (h *Handler) GetMarket(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	if idStr == "" {
-		http.Error(w, "Market ID is required", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid market ID", http.StatusBadRequest)
+		writeInvalidRequest(w)
 		return
 	}
 
@@ -173,8 +173,7 @@ func (h *Handler) GetMarket(w http.ResponseWriter, r *http.Request) {
 	response := marketToResponse(market)
 
 	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = writeJSON(w, http.StatusOK, response)
 }
 
 // ListMarkets handles GET /markets
@@ -473,37 +472,7 @@ func (h *Handler) ProjectProbability(w http.ResponseWriter, r *http.Request) {
 
 // handleError maps domain errors to HTTP responses
 func (h *Handler) handleError(w http.ResponseWriter, err error) {
-	var statusCode int
-	var message string
-
-	switch err {
-	case dmarkets.ErrMarketNotFound:
-		statusCode = http.StatusNotFound
-		message = "Market not found"
-	case dmarkets.ErrInvalidQuestionLength, dmarkets.ErrInvalidDescriptionLength, dmarkets.ErrInvalidLabel, dmarkets.ErrInvalidResolutionTime:
-		statusCode = http.StatusBadRequest
-		message = err.Error()
-	case dmarkets.ErrUserNotFound:
-		statusCode = http.StatusNotFound
-		message = "User not found"
-	case dmarkets.ErrInsufficientBalance:
-		statusCode = http.StatusBadRequest
-		message = "Insufficient balance"
-	case dmarkets.ErrUnauthorized:
-		statusCode = http.StatusUnauthorized
-		message = "Unauthorized"
-	default:
-		statusCode = http.StatusInternalServerError
-		message = "Internal server error"
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	response := dto.ErrorResponse{
-		Error: message,
-	}
-	json.NewEncoder(w).Encode(response)
+	writeMarketActionError(w, err)
 }
 
 func parseStatusFromRequest(r *http.Request) (string, error) {

@@ -1,19 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {API_URL} from "../../config";
-
-const unwrapApiResponse = (payload) => {
-  if (payload && typeof payload === 'object' && 'ok' in payload) {
-    if (payload.ok === false) {
-      throw new Error(payload.reason || 'Request failed');
-    }
-
-    if (payload.ok === true && 'result' in payload) {
-      return payload.result;
-    }
-  }
-
-  return payload;
-};
+import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
 
 function HomeEditor() {
   const [content, setContent] = useState({
@@ -32,20 +18,16 @@ function HomeEditor() {
 
   const fetchContent = async () => {
     try {
-      const response = await fetch(`${API_URL}/v0/content/home`);
-      if (response.ok) {
-        const data = await response.json();
-        const homeContent = unwrapApiResponse(data);
-        setContent({
-          title: homeContent.title || '',
-          html: homeContent.html || '',
-          version: homeContent.version || 0
-        });
-      } else {
-        setError('Failed to load content');
-      }
+      const homeContent = await apiRequest('/v0/content/home', {
+        fallbackMessage: 'Failed to load content',
+      });
+      setContent({
+        title: homeContent.title || '',
+        html: homeContent.html || '',
+        version: homeContent.version || 0
+      });
     } catch (err) {
-      setError('Error loading content: ' + err.message);
+      setError(err.message || 'Error loading content');
     } finally {
       setLoading(false);
     }
@@ -57,36 +39,28 @@ function HomeEditor() {
     setError('');
 
     try {
-      const token = localStorage.getItem('token'); // Use correct token key from localStorage
-      const response = await fetch(`${API_URL}/v0/admin/content/home`, {
+      const homeContent = await authenticatedApiRequest('/v0/admin/content/home', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           title: content.title,
           format: 'html',
           html: content.html,
           version: content.version
-        })
+        }),
+        fallbackMessage: 'Failed to save content',
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const homeContent = unwrapApiResponse(data);
-        setContent(prev => ({
-          ...prev,
-          version: homeContent.version,
-          html: homeContent.html
-        }));
-        setMessage('Content saved successfully!');
-      } else {
-        const errorText = await response.text();
-        setError('Failed to save: ' + errorText);
-      }
+      setContent(prev => ({
+        ...prev,
+        version: homeContent.version,
+        html: homeContent.html
+      }));
+      setMessage('Content saved successfully!');
     } catch (err) {
-      setError('Error saving content: ' + err.message);
+      setError(err.message || 'Error saving content');
     } finally {
       setSaving(false);
     }

@@ -248,6 +248,41 @@ Example:
 ./HostOps host env get staging ADMIN_PASSWORD
 ```
 
+`./HostOps host disk <env>`:
+
+- Needs the same SSH keys as `host ssh`
+- Shows `df -h /`, `docker system df`, running containers, and Docker volumes
+- Does not delete anything
+- Use before and after cleanup to capture disk state
+
+Example:
+
+```bash
+./HostOps host disk staging
+```
+
+`./HostOps host cleanup <env>`:
+
+- Needs the same SSH keys as `host ssh`
+- Needs remote repo path via `HOSTOPS_REPO_PATH` or `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
+- Calls remote `./SocialPredict cleanup docker`
+- Does not reimplement Docker cleanup in HostOps
+- By default removes stopped containers, dangling images, and Docker build cache, but does not prune volumes
+- Optional `--all-images` removes all unused images
+- Optional `--volumes` prunes unused volumes and should only be used when data retention is understood
+
+Examples:
+
+```bash
+./HostOps host cleanup staging
+./HostOps host cleanup staging --all-images
+./HostOps host cleanup staging --all-images --volumes
+```
+
+Weekly cleanup automation should use the same boundary: the workflow or
+orchestrator may connect to the host, but it should invoke
+`./SocialPredict cleanup docker` rather than embedding raw Docker prune logic.
+
 `./HostOps host logs <env> <service>` (planned):
 
 - Needs the same SSH keys as `host ssh`

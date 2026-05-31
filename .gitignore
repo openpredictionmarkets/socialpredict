@@ -78,3 +78,6 @@ node_modules/
 .go-run-cache/
 .tmp/
 .config/go/
+
+# Runtime CMS uploads
+/backend/data/uploads/

@@ -69,13 +69,6 @@ The key boundary is:
 - `./HostOps` is a local operator convenience wrapper, not the staging deploy
   engine.
 
-The release-to-readiness boundary is public and external. After Ansible
-finishes, the application repo checks `https://kconfs.com/health` for exact
-body `live` and `https://kconfs.com/readyz` for exact body `ready` from GitHub
-Actions. Those probes prove public liveness and traffic readiness only; they do
-not prove zero-downtime rollout, business correctness, or monitoring-platform
-health.
-
 ## What Ansible Does On Staging
 
 The staging playbook in `openpredictionmarkets/ansible_playbooks` currently
@@ -90,6 +83,26 @@ performs this high-level flow:
    ```bash
    /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL"
    ```
+
+   The installer also owns runtime rate-limit values in `.env`. For
+   OpenPredictionMarkets staging, the `ansible_playbooks` deploy sources the
+   non-secret overlay at `deploy/env/.env.staging` before invoking the installer.
+   That overlay is intentionally high so one Mac/k6 source IP can hammer staging
+   without the per-IP limiter masking app/database/host capacity evidence.
+
+   Equivalent manual command:
+
+   ```bash
+   set -a
+   . /opt/socialpredict/deploy/env/.env.staging
+   set +a
+   /opt/socialpredict/SocialPredict install -e production -d "$STAGING_DOMAIN" -m "$STAGING_EMAIL"
+   ```
+
+   The Ansible workflow also accepts the optional
+   `STAGING_RATE_LIMIT_ENV_FILE` secret if an operator needs to source a
+   different non-secret overlay path. Without an overlay or explicit profile,
+   production-like installs use `secure-default`.
 
 6. Builds staging backend and frontend Docker images on the host.
 7. Writes staging image names into `/opt/socialpredict/.env`.
@@ -111,10 +124,11 @@ The generated `.env` on the host contains values such as `ADMIN_PASSWORD`.
 That value can change after a deployment because the install flow regenerates
 runtime secrets.
 
-`DB_REQUIRE_TLS=false` belongs to this packaged local Docker Postgres topology.
-If staging is changed to use an external database, `DB_REQUIRE_TLS` and
-`DB_SSLMODE` must be reviewed explicitly instead of inheriting the local-Docker
-exception.
+Staging currently uses the same packaged local Docker Postgres topology as the
+production guide describes. `DB_REQUIRE_TLS=false` is appropriate for that
+local compose database. If staging is moved to an external managed database,
+review `DB_REQUIRE_TLS` and `DB_SSLMODE` instead of carrying the packaged local
+database setting forward automatically.
 
 ## Production / Model Office Difference
 
@@ -195,6 +209,39 @@ STAGING_PORT=22
 STAGING_USER=root
 STAGING_DOMAIN=kconfs.com
 ```
+
+Runtime rate limits are not GitHub secrets. They are written into the host
+`.env` by `./SocialPredict install`.
+
+The current `secure-default` profile writes:
+
+```text
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=0.1
+RATE_LIMIT_LOGIN_BURST=3
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
+RATE_LIMIT_GENERAL_BURST=10
+RATE_LIMIT_CLEANUP_INTERVAL=5m
+```
+
+The current OpenPredictionMarkets `.env.staging` overlay for temporary
+single-source load testing contains:
+
+```text
+RATE_LIMIT_PROFILE=env-file
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=50
+RATE_LIMIT_LOGIN_BURST=100
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=500
+RATE_LIMIT_GENERAL_BURST=1000
+RATE_LIMIT_CLEANUP_INTERVAL=5m
+```
+
+`RATE_LIMIT_PROFILE=env-file` is consumed during install. The generated host
+`.env` stores the concrete `RATE_LIMIT_*` values.
+
+These values are for staging capacity measurement from one source IP, not a
+production promise. If k6, DigitalOcean metrics, `/readyz`, or backend logs show
+CPU saturation, memory pressure, database contention, or app failures, record
+the evidence and tune the overlay or host size deliberately.
 
 `STAGING_PRIVATE_KEY` must be the private SSH key whose public key is already in
 the staging VPS user's `~/.ssh/authorized_keys`. `STAGING_PASSWORD` is used as
@@ -296,11 +343,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://kconfs.com/readyz
 The GitHub staging workflow now performs the `/health` and `/readyz` checks
 externally from GitHub Actions after the Ansible workflow completes. It polls
 every 30 seconds for up to 10 minutes and expects `/health` to return `live`
-and `/readyz` to return `ready`.
-
-`/ops/status` is published for operator troubleshooting, but it is not a
-required staging deploy gate yet. If it is added later, record only safe summary
-fields and keep process-local counters separate from release readiness.
+and `/readyz` to return `ready`. The verification job writes a GitHub Actions
+job summary with the checked URLs, expected and last observed bodies, attempt
+count, timeout, interval, and final result. `/ops/status` remains an operator
+status endpoint and is not currently used as a staging deploy gate.
 
 A deploy is not zero-downtime today. Brief 404s or failed probes can occur
 while containers are stopped and restarted.

@@ -96,14 +96,15 @@ type CredentialsRepository interface {
 
 // ServiceDependencies exposes the storage collaborators required by the users service.
 type ServiceDependencies struct {
-	Reader      UserReader
-	BalanceRepo UserBalanceRepository
-	Writer      UserWriter
-	Uniqueness  UserUniquenessRepository
-	Lister      UserLister
-	Portfolio   UserPortfolioRepository
-	Markets     UserMarketsRepository
-	Credentials CredentialsRepository
+	Reader         UserReader
+	BalanceRepo    UserBalanceRepository
+	Writer         UserWriter
+	Uniqueness     UserUniquenessRepository
+	Lister         UserLister
+	Portfolio      UserPortfolioRepository
+	Markets        UserMarketsRepository
+	Credentials    CredentialsRepository
+	ModeratorAudit ModeratorAuditWriter
 }
 
 // ListFilters represents filters for listing users
@@ -129,16 +130,17 @@ type AnalyticsService interface {
 
 // Service implements the core user business logic
 type Service struct {
-	reader      UserReader
-	balanceRepo UserBalanceRepository
-	writer      UserWriter
-	uniqueness  UserUniquenessRepository
-	lister      UserLister
-	portfolio   UserPortfolioRepository
-	markets     UserMarketsRepository
-	credentials CredentialsRepository
-	analytics   AnalyticsService
-	sanitizer   Sanitizer
+	reader         UserReader
+	balanceRepo    UserBalanceRepository
+	writer         UserWriter
+	uniqueness     UserUniquenessRepository
+	lister         UserLister
+	portfolio      UserPortfolioRepository
+	markets        UserMarketsRepository
+	credentials    CredentialsRepository
+	moderatorAudit ModeratorAuditWriter
+	analytics      AnalyticsService
+	sanitizer      Sanitizer
 }
 
 type profileMutation func(*User) error
@@ -245,22 +247,26 @@ func NewService(repo Repository, analyticsSvc AnalyticsService, sanitizer Saniti
 	if uniqueness, ok := repo.(UserUniquenessRepository); ok {
 		deps.Uniqueness = uniqueness
 	}
+	if moderatorAudit, ok := repo.(ModeratorAuditWriter); ok {
+		deps.ModeratorAudit = moderatorAudit
+	}
 	return NewServiceWithDependencies(deps, analyticsSvc, sanitizer)
 }
 
 // NewServiceWithDependencies creates a new users service from explicit ports.
 func NewServiceWithDependencies(deps ServiceDependencies, analyticsSvc AnalyticsService, sanitizer Sanitizer) *Service {
 	return &Service{
-		reader:      deps.Reader,
-		balanceRepo: deps.BalanceRepo,
-		writer:      deps.Writer,
-		uniqueness:  deps.Uniqueness,
-		lister:      deps.Lister,
-		portfolio:   deps.Portfolio,
-		markets:     deps.Markets,
-		credentials: deps.Credentials,
-		analytics:   analyticsSvc,
-		sanitizer:   sanitizer,
+		reader:         deps.Reader,
+		balanceRepo:    deps.BalanceRepo,
+		writer:         deps.Writer,
+		uniqueness:     deps.Uniqueness,
+		lister:         deps.Lister,
+		portfolio:      deps.Portfolio,
+		markets:        deps.Markets,
+		credentials:    deps.Credentials,
+		moderatorAudit: deps.ModeratorAudit,
+		analytics:      analyticsSvc,
+		sanitizer:      sanitizer,
 	}
 }
 

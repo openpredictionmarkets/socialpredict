@@ -18,6 +18,8 @@ import (
 	sellbetshandlers "socialpredict/handlers/bets/selling"
 	"socialpredict/handlers/cms/homepage"
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
+	"socialpredict/handlers/cms/socialshare"
+	cmssocialhttp "socialpredict/handlers/cms/socialshare/http"
 	marketshandlers "socialpredict/handlers/markets"
 	metricshandlers "socialpredict/handlers/metrics"
 	positionshandlers "socialpredict/handlers/positions"
@@ -29,6 +31,7 @@ import (
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
 	appruntime "socialpredict/internal/app/runtime"
+	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/logger"
@@ -70,6 +73,9 @@ func buildHandler(openAPISpec []byte, swaggerUIFS fs.FS, db *gorm.DB, configServ
 		handler = c.Handler(handler)
 	}
 	handler = security.SecurityHeadersMiddleware(securityConfig.Headers)(handler)
+	// Canonical production request boundary: request IDs, panic recovery, and
+	// completion logging live here. Keep logger.RequestLoggingMiddleware out of
+	// server wiring to avoid duplicate request IDs and completion logs.
 	handler = security.RequestBoundaryMiddlewareWithProxyTrust(securityConfig.TrustProxyHeaders)(handler)
 	handler = operationalMetrics.Middleware(handler)
 
@@ -301,9 +307,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// This defines all functions starting with /api/
 
 	// Apply security middleware to all routes
-	rateLimitConfig := security.DefaultRateLimitConfig()
-	rateLimitConfig.TrustProxyHeaders = securityConfig.TrustProxyHeaders
-	securityService := security.NewRuntimeSecurityService(rateLimitConfig, securityConfig.Headers)
+	securityService := security.NewRuntimeSecurityService(securityConfig.RateLimit, securityConfig.Headers)
 	securityMiddleware := securityService.SecurityMiddleware()
 	loginSecurityMiddleware := securityService.LoginSecurityMiddleware()
 	privateActionMiddleware := func(next http.Handler) http.Handler {
@@ -318,7 +322,38 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
 	registerApplicationReportingRoutes(router, configService, analyticsService, analyticsService, securityMiddleware)
 
+	// CMS routes and services
+	homepageRepo := homepage.NewGormRepository(db)
+	homepageRenderer := homepage.NewDefaultRenderer()
+	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
+	homepageHandler := cmshomehttp.NewHandler(homepageSvc, authService)
+
+	socialShareRepo := socialshare.NewGormRepository(db)
+	socialShareSvc := socialshare.NewService(socialShareRepo)
+	socialShareHandler := cmssocialhttp.NewHandler(socialShareSvc, authService)
+	socialShareConfigProvider := func(_ context.Context, fallback dmarkets.ShareMetadataConfig) dmarkets.ShareMetadataConfig {
+		settings, err := socialShareSvc.GetSettings()
+		if err != nil || settings == nil {
+			return fallback
+		}
+		if strings.TrimSpace(settings.SiteName) != "" {
+			fallback.SiteName = settings.SiteName
+		}
+		if strings.TrimSpace(settings.DefaultImageURL) != "" {
+			fallback.DefaultImageURL = settings.DefaultImageURL
+		}
+		fallback.DisableImage = !settings.ImageEnabled
+		if strings.TrimSpace(settings.ImageAlt) != "" {
+			fallback.DefaultImageAlt = settings.ImageAlt
+		}
+		if strings.TrimSpace(settings.DefaultDescription) != "" {
+			fallback.DefaultDescription = settings.DefaultDescription
+		}
+		return fallback
+	}
+
 	// Markets routes - using new Handler instance
+	router.Handle("/markets/{id:[0-9]+}", securityMiddleware(marketshandlers.MarketShareShellHandler(marketsService, shareMetadataConfig(securityConfig.Share), socialShareConfigProvider))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
 	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
@@ -367,6 +402,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 
 	// handle private user stuff, display sensitive profile information to customize
 	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")
+	router.Handle("/v0/profile/markets", securityMiddleware(marketshandlers.ListMyLifecycleMarketsHandler(marketsService, authService))).Methods("GET")
 
 	// changing profile stuff - apply security middleware
 	router.Handle("/v0/changepassword", securityMiddleware(usershandlers.ChangePasswordHandler(usersService))).Methods("POST")
@@ -382,15 +418,30 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(usersService, container.GetConfigService(), authService, requestSecurityService)))).Methods("POST")
-
-	// homepage content routes
-	homepageRepo := homepage.NewGormRepository(db)
-	homepageRenderer := homepage.NewDefaultRenderer()
-	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
-	homepageHandler := cmshomehttp.NewHandler(homepageSvc, authService)
+	router.Handle("/v0/admin/users", securityMiddleware(adminhandlers.ListAdminUsersHandler(usersService, authService))).Methods("GET")
+	router.Handle("/v0/admin/users/{username}/role", securityMiddleware(adminhandlers.UpdateAdminUserRoleHandler(usersService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/moderators/{username}/suspension", securityMiddleware(adminhandlers.UpdateAdminModeratorSuspensionHandler(usersService, authService, time.Now))).Methods("PATCH")
+	router.Handle("/v0/admin/markets", securityMiddleware(adminhandlers.ListReviewMarketsHandler(marketsService, authService))).Methods("GET")
+	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
+	router.HandleFunc("/v0/content/social-share", socialShareHandler.PublicGet).Methods("GET")
+	router.HandleFunc("/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")
+	router.HandleFunc("/api/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")
+	router.Handle("/v0/admin/content/social-share", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUpdate))).Methods("PUT")
+	router.Handle("/v0/admin/content/social-share/image", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUploadImage))).Methods("POST")
+}
+
+func shareMetadataConfig(config appruntime.ShareConfig) dmarkets.ShareMetadataConfig {
+	return dmarkets.ShareMetadataConfig{
+		PublicBaseURL:      config.PublicBaseURL,
+		DefaultImageURL:    config.DefaultImageURL,
+		DefaultImageAlt:    socialshare.DefaultImageAlt,
+		SiteName:           config.SiteName,
+		DefaultDescription: socialshare.DefaultDescription,
+	}
 }
 
 type gracefulShutdowner interface {

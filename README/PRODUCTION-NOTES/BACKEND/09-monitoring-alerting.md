@@ -3,9 +3,9 @@ title: Monitoring and Alerting
 document_type: production-notes
 domain: backend
 author: Patrick Delaney
-updated_at: 2026-05-14T10:23:25Z
-updated_at_display: "Thursday, May 14, 2026 at 10:23 AM UTC"
-update_reason: "Align operator signal inventory with release-to-readiness policy and keep ops status out of the required deploy gate."
+updated_at: 2026-05-12T00:00:00Z
+updated_at_display: "Tuesday, May 12, 2026"
+update_reason: "Stabilize /ops/status as a cache-disabled JSON operator contract with explicit dbPool shape."
 status: active
 ---
 
@@ -21,12 +21,9 @@ On Saturday, May 2, 2026, this note was tightened into an explicit current-state
 
 On Sunday, May 3, 2026, the production nginx template was updated to publish `/ops/status` explicitly at the public host root alongside `/health` and `/readyz`. Early-startup status visibility remains deferred because the current backend starts listening only after startup mutation or verification completes and readiness opens.
 
-On Thursday, May 14, 2026, this note was aligned with the
-release-to-readiness policy in [08-deployment-infrastructure.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/08-deployment-infrastructure.md).
-`/health` and `/readyz` remain the required public deploy gate for
-`https://kconfs.com` and `https://brierfoxforecast.com`. `/ops/status` remains a
-runtime signal for operator troubleshooting or a later explicit smoke check,
-not a monitoring-platform rollout and not a required deploy gate.
+On Tuesday, May 12, 2026, `/ops/status` was tightened as a stable cache-disabled JSON operator contract. Server tests assert the top-level fields `live`, `ready`, `requestFailuresTotal`, and `dbPool`, plus the current SQL pool counter field names. The staging checklist and OpenAPI response headers now call out `Cache-Control: no-store`.
+
+Also on Tuesday, May 12, 2026, the request-boundary observability chain was made explicit. `security.RequestBoundaryMiddlewareWithProxyTrust` is the production owner for request IDs, trace correlation, completion logs, and panic recovery; `OperationalMetrics.Middleware` is the production owner for the first app-owned request-failure counter exposed through `/ops/status`.
 
 The staging verification checklist for this wave lives in [STAGETEST/09-monitoring-alerting.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/STAGETEST/09-monitoring-alerting.md).
 
@@ -121,6 +118,8 @@ The current backend signal contract is intentionally small:
 
 This inventory reflects the live server wiring in [server.go](/workspace/socialpredict/backend/server/server.go), startup order in [main.go](/workspace/socialpredict/backend/main.go), and runtime failure helpers in [security/failures.go](/workspace/socialpredict/backend/security/failures.go) and [security/requestboundary.go](/workspace/socialpredict/backend/security/requestboundary.go).
 
+The production request-boundary chain is intentionally singular: do not add `logger.RequestLoggingMiddleware` to `server.go`. Request completion logging belongs to `security.RequestBoundaryMiddlewareWithProxyTrust`, while the process-local failure counter belongs to `OperationalMetrics.Middleware`. Keeping those responsibilities separate avoids duplicate completion logs and keeps `/ops/status.requestFailuresTotal` tied to the same public response status an operator sees.
+
 ### First supported alert set
 
 The current backend can support only this first alert set:
@@ -213,7 +212,7 @@ The design-plan-aligned monitoring direction is:
 
 The remaining gaps should stay narrow and tied to runtime signals the backend can own:
 
-- Add request-boundary latency and duration fields before promising latency dashboards.
+- Add richer request-boundary latency and duration aggregation before promising latency dashboards.
 - Decide whether the next app-owned counter should classify failures by route family, stable reason, or status class before adding more counters.
 - Add process identity or start-time metadata if operators need to distinguish counter resets from real recovery.
 - Decide which traffic-volume and edge-failure signals belong in the backend versus nginx or Traefik before moving proxy observations into app docs.
@@ -226,8 +225,3 @@ These are signal-contract seams, not monitoring-platform backlog buckets.
 WAVE09 stops here. Prometheus exposition, Grafana dashboards, Alertmanager routing, centralized log-platform rollout, paging policy, formal SLOs, and error-budget programs remain deferred to future platform work after the owned runtime signal contract is stronger.
 
 Until then, the backend monitoring contract is the first alert set above plus the logging and trace-correlation direction owned by [02-logging-observability.md](/workspace/socialpredict/README/PRODUCTION-NOTES/BACKEND/02-logging-observability.md).
-
-Promoting `/ops/status` into deploy verification would be a release-policy
-change, not a monitoring-platform prerequisite. If that happens, the deploy
-summary should record only safe status fields and must not treat process-local
-counters as fleet-wide release truth.

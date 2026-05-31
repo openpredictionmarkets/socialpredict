@@ -76,7 +76,7 @@ func (g marketGate) Open(ctx context.Context, marketID int64) (*dmarkets.Market,
 }
 
 func ensureMarketOpen(market *dmarkets.Market, now time.Time) error {
-	if market.Status == "resolved" || now.After(market.ResolutionDateTime) {
+	if !market.IsTradableAt(now) {
 		return ErrMarketClosed
 	}
 	return nil
@@ -118,9 +118,5 @@ func (l betLedger) CreditSale(ctx context.Context, bet *boundary.Bet, saleValue 
 	if err := l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionSale); err != nil {
 		return err
 	}
-	if err := l.repo.Create(ctx, bet); err != nil {
-		_ = l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionBuy)
-		return err
-	}
-	return nil
+	return l.repo.Create(ctx, bet)
 }

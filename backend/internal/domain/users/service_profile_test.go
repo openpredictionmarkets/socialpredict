@@ -14,9 +14,10 @@ import (
 )
 
 type fakeRepository struct {
-	user         *users.User
-	passwordHash string
-	mustChange   bool
+	user           *users.User
+	passwordHash   string
+	mustChange     bool
+	moderatorAudit []users.ModeratorAuditRecord
 
 	getByUsernameFn     func(context.Context, string) (*users.User, error)
 	updateBalanceFn     func(context.Context, string, int64) error

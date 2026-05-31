@@ -78,6 +78,9 @@ Commands:
   logs        View logs from SocialPredict containers
   backup      Backup operations on SocialPredict
   cleanup     Cleanup unused Docker artifacts
+  load        Load-test operations
+  dev-bootstrap-users
+              Create/reset dev-only admin and test users
 
 Run './SocialPredict COMMAND --help' for more information on a command.
 
@@ -133,6 +136,20 @@ case "$COMMAND" in
     export CALLED_FROM_SOCIALPREDICT=yes
     shift
     source "${SCRIPT_DIR}/scripts/docker-commands.sh" cleanup "$@"
+    unset CALLED_FROM_SOCIALPREDICT
+    ;;
+  load)
+    init
+    export CALLED_FROM_SOCIALPREDICT=yes
+    shift
+    source "${SCRIPT_DIR}/scripts/loadtest.sh" "$@"
+    unset CALLED_FROM_SOCIALPREDICT
+    ;;
+  dev-bootstrap-users)
+    init
+    export CALLED_FROM_SOCIALPREDICT=yes
+    shift
+    source "${SCRIPT_DIR}/scripts/dev-bootstrap-users.sh" "$@"
     unset CALLED_FROM_SOCIALPREDICT
     ;;
   --help|-h|help)

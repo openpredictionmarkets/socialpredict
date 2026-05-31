@@ -6,19 +6,26 @@ import (
 
 // MarketResponse represents the HTTP response for a market
 type MarketResponse struct {
-	ID                 int64     `json:"id"`
-	QuestionTitle      string    `json:"questionTitle"`
-	Description        string    `json:"description"`
-	OutcomeType        string    `json:"outcomeType"`
-	ResolutionDateTime time.Time `json:"resolutionDateTime"`
-	CreatorUsername    string    `json:"creatorUsername"`
-	YesLabel           string    `json:"yesLabel"`
-	NoLabel            string    `json:"noLabel"`
-	Status             string    `json:"status"`
-	IsResolved         bool      `json:"isResolved"`
-	ResolutionResult   string    `json:"resolutionResult"`
-	CreatedAt          time.Time `json:"createdAt"`
-	UpdatedAt          time.Time `json:"updatedAt"`
+	ID                 int64      `json:"id"`
+	QuestionTitle      string     `json:"questionTitle"`
+	Description        string     `json:"description"`
+	OutcomeType        string     `json:"outcomeType"`
+	ResolutionDateTime time.Time  `json:"resolutionDateTime"`
+	CreatorUsername    string     `json:"creatorUsername"`
+	YesLabel           string     `json:"yesLabel"`
+	NoLabel            string     `json:"noLabel"`
+	Status             string     `json:"status"`
+	LifecycleStatus    string     `json:"lifecycleStatus,omitempty"`
+	ApprovedBy         string     `json:"approvedBy,omitempty"`
+	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy         string     `json:"rejectedBy,omitempty"`
+	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason    string     `json:"rejectionReason,omitempty"`
+	ProposalCost       int64      `json:"proposalCost,omitempty"`
+	IsResolved         bool       `json:"isResolved"`
+	ResolutionResult   string     `json:"resolutionResult"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
 }
 
 // CreateMarketResponse represents the HTTP response after creating a market
@@ -32,6 +39,8 @@ type CreateMarketResponse struct {
 	YesLabel           string    `json:"yesLabel"`
 	NoLabel            string    `json:"noLabel"`
 	Status             string    `json:"status"`
+	LifecycleStatus    string    `json:"lifecycleStatus,omitempty"`
+	ProposalCost       int64     `json:"proposalCost,omitempty"`
 	CreatedAt          time.Time `json:"createdAt"`
 }
 

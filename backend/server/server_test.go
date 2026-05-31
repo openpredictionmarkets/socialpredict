@@ -458,6 +458,25 @@ func TestOperationalStatusRouteExportsRuntimeSignalsOnly(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
 		t.Fatalf("decode /ops/status response: %v", err)
 	}
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode /ops/status raw payload: %v", err)
+	}
+	assertJSONKeySet(t, payload, []string{"live", "ready", "requestFailuresTotal", "dbPool"})
+	var dbPoolPayload map[string]json.RawMessage
+	if err := json.Unmarshal(payload["dbPool"], &dbPoolPayload); err != nil {
+		t.Fatalf("decode /ops/status dbPool payload: %v", err)
+	}
+	assertJSONKeySet(t, dbPoolPayload, []string{
+		"maxOpenConnections",
+		"openConnections",
+		"inUseConnections",
+		"idleConnections",
+		"waitCount",
+		"waitDurationNanoseconds",
+		"maxIdleClosedConnections",
+		"maxLifetimeClosedConnections",
+	})
 	if !status.Live || status.Ready || status.RequestFailuresTotal != 0 {
 		t.Fatalf("unexpected unready operational status: %+v", status)
 	}
@@ -484,6 +503,27 @@ func TestOperationalStatusRouteExportsRuntimeSignalsOnly(t *testing.T) {
 	if status.DBPool.OpenConnections < status.DBPool.InUseConnections {
 		t.Fatalf("expected DB pool status to expose coherent connection counts: %+v", status.DBPool)
 	}
+}
+
+func assertJSONKeySet(t *testing.T, payload map[string]json.RawMessage, want []string) {
+	t.Helper()
+
+	if len(payload) != len(want) {
+		t.Fatalf("expected JSON keys %v, got %v", want, jsonKeySet(payload))
+	}
+	for _, key := range want {
+		if _, ok := payload[key]; !ok {
+			t.Fatalf("expected JSON key %q in %v", key, jsonKeySet(payload))
+		}
+	}
+}
+
+func jsonKeySet(payload map[string]json.RawMessage) []string {
+	keys := make([]string, 0, len(payload))
+	for key := range payload {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func TestServerBlocksProtectedProfileRoutesWhenPasswordChangeRequiredWithSharedReason(t *testing.T) {
@@ -619,24 +659,6 @@ func TestServerPreservesIncomingRequestIDHeader(t *testing.T) {
 
 	if got := rec.Header().Get(logger.RequestIDHeader); got != "req-test-123" {
 		t.Fatalf("expected preserved request id %q, got %q", "req-test-123", got)
-	}
-}
-
-func TestRequestLoggingMiddlewareTreatsCanceledRequestsAsClientClosed(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/v0/markets", nil)
-	ctx, cancel := context.WithCancel(req.Context())
-	cancel()
-	req = req.WithContext(ctx)
-
-	rec := httptest.NewRecorder()
-	handler := logger.RequestLoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
-	}))
-
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected recorder to remain unwritten with default 200, got %d", rec.Code)
 	}
 }
 

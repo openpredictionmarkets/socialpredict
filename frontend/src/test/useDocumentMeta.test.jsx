@@ -7,9 +7,15 @@ function getMeta(property) {
   return el ? el.getAttribute('content') : null;
 }
 
+function getNameMeta(name) {
+  const el = document.querySelector(`meta[name="${name}"]`);
+  return el ? el.getAttribute('content') : null;
+}
+
 beforeEach(() => {
   // Remove any og: tags left from prior tests
   document.querySelectorAll('meta[property^="og:"]').forEach((el) => el.remove());
+  document.querySelectorAll('meta[name^="twitter:"]').forEach((el) => el.remove());
   document.title = 'SocialPredict';
 });
 
@@ -59,5 +65,22 @@ describe('useDocumentMeta', () => {
   it('uses site default description when none provided', () => {
     renderHook(() => useDocumentMeta({ title: 'Test' }));
     expect(getMeta('og:description')).toBe('Prediction markets for the social web');
+  });
+
+  it('sets image and twitter card metadata', () => {
+    renderHook(() =>
+      useDocumentMeta({
+        title: 'Market title',
+        description: 'Market description',
+        image: 'https://example.test/share.png',
+      })
+    );
+
+    expect(getMeta('og:image')).toBe('https://example.test/share.png');
+    expect(getMeta('og:site_name')).toBe('SocialPredict');
+    expect(getNameMeta('twitter:card')).toBe('summary_large_image');
+    expect(getNameMeta('twitter:title')).toBe('Market title');
+    expect(getNameMeta('twitter:description')).toBe('Market description');
+    expect(getNameMeta('twitter:image')).toBe('https://example.test/share.png');
   });
 });

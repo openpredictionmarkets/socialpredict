@@ -84,5 +84,5 @@ func decodeYAML(data []byte) (*AppConfig, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
-	return cfg, nil
+	return Normalize(cfg), nil
 }

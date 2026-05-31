@@ -83,7 +83,9 @@ func (p defaultCreationPolicy) BuildMarketEntity(now time.Time, req MarketCreate
 		CreatorUsername:    creatorUsername,
 		YesLabel:           labels.yes,
 		NoLabel:            labels.no,
-		Status:             "active",
+		Status:             MarketStatusActive,
+		LifecycleStatus:    MarketLifecyclePublished,
+		ProposalCost:       p.config.CreateMarketCost,
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
@@ -106,7 +108,7 @@ func (defaultResolutionPolicy) ValidateResolutionRequest(market *Market, usernam
 		return ErrUnauthorized
 	}
 
-	if market.Status == "resolved" {
+	if market.Status == MarketStatusResolved {
 		return ErrInvalidState
 	}
 
@@ -184,7 +186,7 @@ func (defaultProbabilityValidator) ValidateRequest(req ProbabilityProjectionRequ
 }
 
 func (defaultProbabilityValidator) ValidateMarket(market *Market, now time.Time) error {
-	if strings.EqualFold(market.Status, "resolved") {
+	if strings.EqualFold(market.Status, MarketStatusResolved) {
 		return ErrInvalidState
 	}
 
@@ -214,7 +216,7 @@ func (defaultSearchPolicy) NormalizeFilters(filters SearchFilters) SearchFilters
 }
 
 func (defaultSearchPolicy) ShouldFetchFallback(primary []*Market, status string) bool {
-	return len(primary) <= 5 && status != "" && status != "all"
+	return len(primary) <= 5 && status != "" && status != MarketStatusAll
 }
 
 func (defaultSearchPolicy) NewSearchResults(query string, status string, primary []*Market) *SearchResults {
@@ -281,7 +283,7 @@ type defaultStatusPolicy struct{}
 
 func (defaultStatusPolicy) ValidateStatus(status string) error {
 	switch status {
-	case "active", "closed", "resolved", "all":
+	case MarketStatusActive, MarketStatusClosed, MarketStatusResolved, MarketStatusAll:
 		return nil
 	default:
 		return ErrInvalidInput

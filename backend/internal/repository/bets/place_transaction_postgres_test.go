@@ -12,6 +12,7 @@ import (
 	"time"
 
 	dbets "socialpredict/internal/domain/bets"
+	"socialpredict/internal/domain/boundary"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -115,6 +116,53 @@ func TestGormRepositoryPlaceBetTransactionPostgres(t *testing.T) {
 	})
 }
 
+func TestGormRepositorySellBetTransactionPostgres(t *testing.T) {
+	dsn, ok := postgresIntegrationDSN()
+	if !ok {
+		t.Skip("set SOCIALPREDICT_POSTGRES_TEST_DSN or POSTGRES_TEST_DSN to run real-Postgres sell transaction verification")
+	}
+
+	t.Run("rollsBackCreditWhenSaleBetCreateFails", func(t *testing.T) {
+		db := openPlaceBetPostgresDB(t, dsn)
+		seedSellRows(t, db, "creator", "seller", 1000, 301)
+
+		createErr := errors.New("forced postgres sale bet create failure")
+		if err := db.Callback().Create().Before("gorm:create").Register("fail_postgres_sale_bet_create", func(tx *gorm.DB) {
+			if _, ok := tx.Statement.Dest.(*models.Bet); ok {
+				tx.AddError(createErr)
+			}
+		}); err != nil {
+			t.Fatalf("register create callback: %v", err)
+		}
+
+		repo := NewGormRepository(db)
+		err := repo.SellBetTransaction(context.Background(), func(ctx context.Context, txRepo dbets.Repository, markets dbets.MarketService, users dbets.UserService) error {
+			if _, err := markets.GetMarket(ctx, 301); err != nil {
+				return err
+			}
+			if _, err := markets.GetUserPositionInMarket(ctx, 301, "seller"); err != nil {
+				return err
+			}
+			if err := users.ApplyTransaction(ctx, "seller", 25, dusers.TransactionSale); err != nil {
+				return err
+			}
+			return txRepo.Create(ctx, &boundary.Bet{
+				Username: "seller",
+				MarketID: 301,
+				Amount:   -2,
+				Outcome:  "YES",
+				PlacedAt: time.Date(2026, time.May, 11, 22, 30, 0, 0, time.UTC),
+			})
+		})
+		if !errors.Is(err, createErr) {
+			t.Fatalf("expected forced create error, got %v", err)
+		}
+
+		assertUserBalance(t, db, "seller", 1000)
+		assertBetCount(t, db, "seller", 301, 1)
+	})
+}
+
 func applyPlacement(ctx context.Context, repo *GormRepository, marketID uint, username string, amount int64, fees int64) error {
 	return applyPlacementWithHook(ctx, repo, marketID, username, amount, fees, nil)
 }
@@ -204,8 +252,14 @@ func openPlaceBetPostgresDB(t *testing.T, dsn string) *gorm.DB {
 	if db.Dialector.Name() != "postgres" {
 		t.Fatalf("expected postgres dialector, got %q", db.Dialector.Name())
 	}
-	if err := db.AutoMigrate(&models.User{}, &models.Market{}, &models.Bet{}); err != nil {
-		t.Fatalf("migrate place-bet tables: %v", err)
+	if err := db.AutoMigrate(&models.User{}); err != nil {
+		t.Fatalf("migrate place-bet users table: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Market{}); err != nil {
+		t.Fatalf("migrate place-bet markets table: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Bet{}); err != nil {
+		t.Fatalf("migrate place-bet bets table: %v", err)
 	}
 
 	return db

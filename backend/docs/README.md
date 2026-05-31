@@ -45,11 +45,12 @@ of pretending the migration is complete.
 Current route-family notes:
 
 - Infra probes use plain text: `/health` and `/readyz`.
-- Operator status uses JSON: `/ops/status`.
+- Operator status uses cache-disabled JSON: `/ops/status`.
 - Runtime middleware can return JSON `{ ok: false, reason }` for router-owned
   `405` and middleware-owned `429` failures.
 - Many newer or touched handlers return envelope-shaped success or failure
-  responses.
+  responses, and legacy market list/get/details/update failures now use shared
+  failure envelopes.
 - Some older market and public-user success contracts intentionally remain raw
   DTOs for compatibility.
 
@@ -129,9 +130,10 @@ change. Avoid partial route/tag/schema renames in unrelated documentation work.
 ### Remaining Markets Boundary Cleanup
 
 Markets create/search now use shared security validation and bounded query
-parsing, but older market detail, resolve, projection, and compatibility methods
-still own some local path/action parsing and failure shaping.
+parsing, and the retired standalone resolve handler has been removed. Older
+market detail, projection, and compatibility methods still own some local
+path/action parsing and failure shaping.
 
 The next narrow migration seam is the remaining markets path/action helper gap:
-market ID, projection amount, resolution outcome, and related failure responses.
-Do not turn that into a generic validation registry or broad middleware rewrite.
+market ID, projection amount, and related failure responses. Do not turn that
+into a generic validation registry or broad middleware rewrite.

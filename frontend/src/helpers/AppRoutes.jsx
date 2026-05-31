@@ -1,11 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Route, Switch, Redirect } from 'react-router-dom';
 import { useAuth } from './AuthContent';
 import ChangePassword from '../pages/changepassword/ChangePassword';
 import Profile from '../pages/profile/Profile';
 import Markets from '../pages/markets/Markets';
-import Polls from '../pages/polls/Polls';
-import Notifications from '../pages/notifications/Notifications';
 import Create from '../pages/create/Create';
 import About from '../pages/about/About';
 import Stats from '../pages/stats/Stats';
@@ -15,12 +13,16 @@ import User from '../pages/user/User';
 import Style from '../pages/style/Style';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import NotFound from '../pages/notfound/NotFound';
+import useFrontendConfig from '../hooks/useFrontendConfig';
 
 const AppRoutes = () => {
   const auth = useAuth();
 
   const isLoggedIn = !!auth.username;
   const isRegularUser = isLoggedIn && auth.usertype !== 'ADMIN';
+  const { frontendConfig } = useFrontendConfig();
+  const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
+  const canCreateMarket = isRegularUser && (!isModeratorMode || auth.usertype === 'MODERATOR');
   const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
 
   return (
@@ -51,11 +53,7 @@ const AppRoutes = () => {
         )}
       </Route>
       <Route exact path='/polls'>
-        {isLoggedIn && mustChangePassword ? (
-          <Redirect to='/changepassword' />
-        ) : (
-          <Polls />
-        )}
+        <Redirect to='/' />
       </Route>
       <Route exact path='/user/:username'>
         {isLoggedIn && mustChangePassword ? (
@@ -81,22 +79,14 @@ const AppRoutes = () => {
           <Redirect to='/' />
         ) : mustChangePassword ? (
           <Redirect to='/changepassword' />
-        ) : isRegularUser ? (
+        ) : canCreateMarket ? (
           <Create />
         ) : (
           <Redirect to='/' />
         )}
       </Route>
       <Route exact path='/notifications'>
-        {!isLoggedIn ? (
-          <Redirect to='/' />
-        ) : mustChangePassword ? (
-          <Redirect to='/changepassword' />
-        ) : isRegularUser ? (
-          <Notifications />
-        ) : (
-          <Redirect to='/' />
-        )}
+        <Redirect to='/' />
       </Route>
       <Route exact path='/profile'>
         {isRegularUser ? <Profile /> : <Redirect to='/' />}

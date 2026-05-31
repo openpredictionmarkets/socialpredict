@@ -6,6 +6,9 @@ const (
 	minChartSigFigs     = 2
 	maxChartSigFigs     = 9
 	defaultChartSigFigs = 4
+
+	GameModeOpen      = "open"
+	GameModeModerator = "moderator"
 )
 
 type MarketCreation struct {
@@ -53,9 +56,22 @@ type Frontend struct {
 	Charts FrontendCharts `yaml:"charts" json:"charts"`
 }
 
+type Moderation struct {
+	MarketApprovalRequired      bool `yaml:"marketApprovalRequired" json:"marketApprovalRequired"`
+	ModeratorCanTrade           bool `yaml:"moderatorCanTrade" json:"moderatorCanTrade"`
+	ModeratorCanTradeOwnMarkets bool `yaml:"moderatorCanTradeOwnMarkets" json:"moderatorCanTradeOwnMarkets"`
+	AdminCanYankMarkets         bool `yaml:"adminCanYankMarkets" json:"adminCanYankMarkets"`
+}
+
+type Game struct {
+	Mode       string     `yaml:"mode" json:"mode"`
+	Moderation Moderation `yaml:"moderation" json:"moderation"`
+}
+
 type AppConfig struct {
 	Economics Economics `yaml:"economics" json:"economics"`
 	Frontend  Frontend  `yaml:"frontend" json:"frontend"`
+	Game      Game      `yaml:"game" json:"game"`
 }
 
 // Clone returns a detached copy of the application policy snapshot.
@@ -71,10 +87,10 @@ func (cfg *AppConfig) Clone() *AppConfig {
 // FromSetup converts the legacy setup snapshot into the owned config service types.
 func FromSetup(cfg *setup.EconomicConfig) *AppConfig {
 	if cfg == nil {
-		return &AppConfig{}
+		return Normalize(&AppConfig{})
 	}
 
-	return &AppConfig{
+	return Normalize(&AppConfig{
 		Economics: Economics{
 			MarketCreation: MarketCreation{
 				InitialMarketProbability:   cfg.Economics.MarketCreation.InitialMarketProbability,
@@ -106,13 +122,24 @@ func FromSetup(cfg *setup.EconomicConfig) *AppConfig {
 				SigFigs: cfg.Frontend.Charts.SigFigs,
 			},
 		},
-	}
+		Game: Game{
+			Mode: cfg.Game.Mode,
+			Moderation: Moderation{
+				MarketApprovalRequired:      cfg.Game.Moderation.MarketApprovalRequired,
+				ModeratorCanTrade:           cfg.Game.Moderation.ModeratorCanTrade,
+				ModeratorCanTradeOwnMarkets: cfg.Game.Moderation.ModeratorCanTradeOwnMarkets,
+				AdminCanYankMarkets:         cfg.Game.Moderation.AdminCanYankMarkets,
+			},
+		},
+	})
 }
 
 // ToSetup converts the owned snapshot into the legacy setup shape for unmigrated consumers.
 func (cfg *AppConfig) ToSetup() *setup.EconomicConfig {
 	if cfg == nil {
-		return &setup.EconomicConfig{}
+		cfg = Normalize(nil)
+	} else {
+		cfg = Normalize(cfg)
 	}
 
 	return &setup.EconomicConfig{
@@ -147,7 +174,48 @@ func (cfg *AppConfig) ToSetup() *setup.EconomicConfig {
 				SigFigs: cfg.Frontend.Charts.SigFigs,
 			},
 		},
+		Game: setup.Game{
+			Mode: cfg.Game.Mode,
+			Moderation: setup.Moderation{
+				MarketApprovalRequired:      cfg.Game.Moderation.MarketApprovalRequired,
+				ModeratorCanTrade:           cfg.Game.Moderation.ModeratorCanTrade,
+				ModeratorCanTradeOwnMarkets: cfg.Game.Moderation.ModeratorCanTradeOwnMarkets,
+				AdminCanYankMarkets:         cfg.Game.Moderation.AdminCanYankMarkets,
+			},
+		},
 	}
+}
+
+// Normalize applies default application policy values to a detached config snapshot.
+func Normalize(cfg *AppConfig) *AppConfig {
+	if cfg == nil {
+		cfg = &AppConfig{}
+	} else {
+		cfg = cfg.Clone()
+	}
+
+	cfg.Game = NormalizeGame(cfg.Game)
+	return cfg
+}
+
+// NormalizeGame applies safe defaults to game-mode policy.
+func NormalizeGame(game Game) Game {
+	if game.Mode == "" {
+		game.Mode = GameModeModerator
+	}
+
+	// These defaults are the intended moderator-mode posture if an operator
+	// enables moderator mode without spelling out every moderation flag.
+	if game.Moderation == (Moderation{}) {
+		game.Moderation = Moderation{
+			MarketApprovalRequired:      true,
+			ModeratorCanTrade:           true,
+			ModeratorCanTradeOwnMarkets: false,
+			AdminCanYankMarkets:         true,
+		}
+	}
+
+	return game
 }
 
 // ClampChartSigFigs bounds the frontend chart precision to the supported range.

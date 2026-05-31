@@ -30,16 +30,16 @@ export const getApiErrorMessage = (
   fallbackMessage,
   reasonMessages = {},
 ) => {
+  if (payload?.reason && reasonMessages[payload.reason]) {
+    return reasonMessages[payload.reason];
+  }
+
   if (payload?.message) {
     return payload.message;
   }
 
   if (payload?.error) {
     return payload.error;
-  }
-
-  if (payload?.reason && reasonMessages[payload.reason]) {
-    return reasonMessages[payload.reason];
   }
 
   if (typeof payload === 'string' && payload.trim()) {

@@ -29,6 +29,7 @@ func DefaultSecurityHeaders() SecurityHeaders {
 			"frame-src 'none'; " +
 			"worker-src 'none'; " +
 			"child-src 'none'; " +
+			"frame-ancestors 'none'; " +
 			"form-action 'self'; " +
 			"upgrade-insecure-requests",
 		XSSProtection:      "1; mode=block",

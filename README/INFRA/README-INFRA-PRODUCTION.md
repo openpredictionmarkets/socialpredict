@@ -45,13 +45,6 @@ github.event.workflow_run.event == 'release'
 
 This prevents a manual run of the Docker image workflow from accidentally deploying production.
 
-The release-to-readiness boundary is public and external. After Ansible
-finishes, the application repo checks `https://brierfoxforecast.com/health` for
-exact body `live` and `https://brierfoxforecast.com/readyz` for exact body
-`ready` from GitHub Actions. Those probes prove public liveness and traffic
-readiness only; they do not prove zero-downtime rollout, business correctness,
-or monitoring-platform health.
-
 ## Required GitHub Secrets
 
 In `openpredictionmarkets/socialpredict`, production deployment requires only:
@@ -93,16 +86,44 @@ The packaged production compose topology uses a local Docker Postgres service.
 For that topology, `./SocialPredict install -e production` writes
 `DB_REQUIRE_TLS=false` so the backend does not reject the in-container
 `sslmode=disable` connection. Operators who replace the local Docker database
-with an external production database must review `DB_REQUIRE_TLS` and
-`DB_SSLMODE` explicitly. The local-Docker exception is not a general production
-database policy.
+with an external production database should review `DB_REQUIRE_TLS` and
+`DB_SSLMODE` explicitly. In practice, keep `DB_REQUIRE_TLS=false` only for the
+packaged local compose database. For an external production database, set a
+provider-appropriate TLS mode, for example `DB_REQUIRE_TLS=true` with
+`DB_SSLMODE=verify-full` when certificate validation is configured.
 
-Production compose also relies on one startup mutation actor:
-`backend-startup-writer` runs with `STARTUP_WRITER=true`, while the
-request-serving `backend` runs with `STARTUP_WRITER=false` and verifies
-migrations before serving. Do not scale the startup-writer service to add
-serving capacity; scale only non-writer serving backends under an explicit
-topology review.
+`./SocialPredict install` also writes runtime rate-limit values into `.env`.
+These values are operations/security policy, not game setup. The
+OpenPredictionMarkets production Ansible deploy sources the non-secret overlay
+at `deploy/env/.env.mo` before invoking the installer. Production-like manual
+installs also default to the conservative `secure-default` profile unless the
+operator explicitly passes a different profile:
+
+```bash
+./SocialPredict install -e production -d brierfoxforecast.com -m ops@example.com
+./SocialPredict install -e production -d brierfoxforecast.com -m ops@example.com -r custom
+```
+
+The production/model-office overlay contains:
+
+```text
+RATE_LIMIT_PROFILE=env-file
+RATE_LIMIT_LOGIN_RATE_PER_SECOND=0.1
+RATE_LIMIT_LOGIN_BURST=3
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
+RATE_LIMIT_GENERAL_BURST=10
+RATE_LIMIT_CLEANUP_INTERVAL=5m
+```
+
+`RATE_LIMIT_PROFILE=env-file` is consumed during install. The generated host
+`.env` stores the concrete `RATE_LIMIT_*` values.
+
+Do not use the staging/load-test profile for production unless the operator has
+fresh capacity evidence for that host size and deployment topology.
+
+The Ansible workflow accepts the optional `PRODUCTION_RATE_LIMIT_ENV_FILE`
+secret if an operator intentionally needs to source a different non-secret
+overlay path.
 
 The `ansible_playbooks` repository may also contain an `ADMIN_PASSWORD` secret,
 but the current production workflow does not pass it into the Ansible command.
@@ -143,11 +164,10 @@ curl -sS https://brierfoxforecast.com/readyz
 The GitHub production deploy workflow now performs the `/health` and `/readyz`
 checks externally from GitHub Actions after the Ansible workflow completes. It
 polls every 30 seconds for up to 10 minutes and expects `/health` to return
-`live` and `/readyz` to return `ready`.
-
-`/ops/status` is published for operator troubleshooting, but it is not a
-required production deploy gate yet. If it is added later, record only safe
-summary fields and keep process-local counters separate from release readiness.
+`live` and `/readyz` to return `ready`. The verification job writes a GitHub
+Actions job summary with the checked URLs, expected and last observed bodies,
+attempt count, timeout, interval, and final result. `/ops/status` remains an
+operator status endpoint and is not currently used as a production deploy gate.
 
 ## Notes
 
