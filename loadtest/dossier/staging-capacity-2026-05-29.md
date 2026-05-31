@@ -27,7 +27,7 @@ May 31, 2026 update:
 - `50/sec` pre-authenticated hot-market run passed cleanly with `3001/3001` bets succeeded and HTTP p95 around `704ms`.
 - `75/sec` for `1m` passed functionally with `4412/4412` bets succeeded, but HTTP p95 rose to about `1.67s` and k6 dropped `89` iterations.
 - `75/sec` for `5m` was aborted under stress and is a failure/ceiling datapoint: `295` failed bets, HTTP p95 about `11.18s`, and minimum available RAM about `119 MiB`.
-- `100/sec` for `1m` was beyond the current tiny Droplet: `42.96%` HTTP failures, HTTP p95 about `21.04s`, and minimum available RAM about `82 MiB`.
+- `100/sec` for `1m` was beyond the current Basic `1 vCPU / 1 GiB` Droplet: `42.96%` HTTP failures, HTTP p95 about `21.04s`, and minimum available RAM about `82 MiB`.
 
 This dossier does not prove capacity for `10,000`, `30,000`, or `50,000` simultaneously active users. It translates those user counts into required request/write rates and proposes machine-size ranges to validate next.
 
@@ -71,20 +71,27 @@ These are intentionally permissive staging values. They should not be copied to 
 
 ## Machine Observed
 
-The user-reported target tier was the smallest DigitalOcean tier:
+The measured and DigitalOcean-reported staging tier is:
 
+- DigitalOcean Basic
 - `1 vCPU`
-- `512 MiB` RAM
-- `10 GiB` SSD
+- `1 GiB` RAM
+- `25 GiB` SSD
+- Pricing reference from the 2026-05-29 snapshot below: `$0.00893/hr`, `$6/mo`
 
-The actual runtime observations from `free -h` and Docker showed:
+Runtime host profile and Docker observations showed:
 
 - Host memory visible to Docker: about `957 MiB`
+- Docker-visible CPU: `1`
+- Docker-visible memory: about `957 MiB`
+- Root disk visible to the host: about `24,625 MiB`
 - Swap: `0B`
+- Explicit container CPU limits: none observed
+- Explicit container memory limits: none observed
 - App, database, proxy, and frontend all colocated on one host
 - Database: local Docker Postgres
 
-This means the actual machine under test behaved closer to a `1 vCPU / 1 GiB` host than a `512 MiB` host.
+This corrects the earlier draft assumption that the test target was the `512 MiB / 10 GiB` tier. The capacity results in this dossier apply to the current `1 vCPU / 1 GiB / 25 GiB` staging host. They should not be quoted as validated evidence for the smaller `512 MiB` tier.
 
 ## Test Results
 
@@ -196,16 +203,16 @@ Interpretation:
 
 These are planning estimates, not validated production limits.
 
-DigitalOcean's current Basic Droplet table lists relevant reference sizes including `512 MiB / 1 vCPU`, `4 GiB / 2 vCPUs`, `8 GiB / 4 vCPUs`, and `16 GiB / 8 vCPUs`. The table below uses those resource bands as sizing shorthand; it does not assert that Basic shared CPU is the right final production class for every tier.
+DigitalOcean's current Basic Droplet table lists relevant reference sizes including the tested `1 GiB / 1 vCPU / 25 GiB SSD` host, `4 GiB / 2 vCPUs`, `8 GiB / 4 vCPUs`, and `16 GiB / 8 vCPUs`. The table below uses those resource bands as sizing shorthand; it does not assert that Basic shared CPU is the right final production class for every tier.
 
-| Target | Traffic assumption | Estimated starting point | Why | Estimated DigitalOcean Droplet price |
-| --- | --- | --- | --- | --- |
-| `10,000` active users | Up to `10%` betting in a one-minute hot window, about `17` bets/s | `2 vCPU / 4 GiB` single node, or current node for staging only | Current staging passed `20` bets/s cleanly, but production needs memory headroom, deploy headroom, migrations, logs, and spikes. | Basic `4 GiB / 2 vCPU`: `$0.03571/hr`, `$24/mo`[^digitalocean-basic-pricing-2026-05-29] |
-| `10,000` active users | `25%` betting in one minute, about `42` bets/s | `4 vCPU / 8 GiB`, preferably with managed Postgres | This exceeds the conservative `20-35` bets/s envelope and enters the unvalidated `50/sec` range. | Basic `8 GiB / 4 vCPU`: `$0.07143/hr`, `$48/mo`[^digitalocean-basic-pricing-2026-05-29] |
-| `30,000` active users | `5-10%` betting in one minute, about `25-50` bets/s | `4 vCPU / 8 GiB` app host plus managed Postgres | The app may handle the low end, but colocated Postgres on a tiny host is the wrong production shape. | Basic app host `8 GiB / 4 vCPU`: `$0.07143/hr`, `$48/mo`; managed Postgres not included[^digitalocean-basic-pricing-2026-05-29] |
-| `30,000` active users | `25%` betting in one minute, about `125` bets/s | Multiple app nodes or `8 vCPU / 16 GiB` app tier plus managed Postgres | This is several times the validated envelope and needs horizontal app capacity and database tuning. | Basic `16 GiB / 8 vCPU`: `$0.14286/hr`, `$96/mo`; managed Postgres/load balancing not included[^digitalocean-basic-pricing-2026-05-29] |
-| `50,000` active users | `5-10%` betting in one minute, about `42-83` bets/s | `8 vCPU / 16 GiB` app tier plus managed Postgres | The low end is just beyond current clean validation; the high end requires dedicated database capacity. | Basic `16 GiB / 8 vCPU`: `$0.14286/hr`, `$96/mo`; managed Postgres not included[^digitalocean-basic-pricing-2026-05-29] |
-| `50,000` active users | `25-50%` betting in one minute, about `208-417` bets/s | Load-balanced app nodes, managed Postgres sized separately, connection pooling, observability, and possibly async/caching changes | This is not a single tiny-Droplet workload. It should be treated as a dedicated scale project. | At least multiple Basic `16 GiB / 8 vCPU` app nodes at `$96/mo` each, plus managed Postgres/load balancer costs not included[^digitalocean-basic-pricing-2026-05-29] |
+| Target | Traffic assumption | Estimated starting point | Scale vs tested host | Why | Estimated DigitalOcean Droplet price |
+| --- | --- | --- | --- | --- | --- |
+| `10,000` active users | Up to `10%` betting in a one-minute hot window, about `17` bets/s | `2 vCPU / 4 GiB` single node, or current node for staging only | `2x` vCPU, `4x` RAM, about `3.2x` disk | Current staging passed `20` bets/s cleanly, but production needs memory headroom, deploy headroom, migrations, logs, and spikes. | Basic `4 GiB / 2 vCPU`: `$0.03571/hr`, `$24/mo`[^digitalocean-basic-pricing-2026-05-29] |
+| `10,000` active users | `25%` betting in one minute, about `42` bets/s | `4 vCPU / 8 GiB`, preferably with managed Postgres | `4x` vCPU, `8x` RAM, about `6.4x` disk | This approaches the validated `50/sec` envelope, but production should not run at the edge of a colocated app/database host. | Basic `8 GiB / 4 vCPU`: `$0.07143/hr`, `$48/mo`[^digitalocean-basic-pricing-2026-05-29] |
+| `30,000` active users | `5-10%` betting in one minute, about `25-50` bets/s | `4 vCPU / 8 GiB` app host plus managed Postgres | `4x` vCPU, `8x` RAM, about `6.4x` disk for the app host | The app may handle the low end, but colocated Postgres on the tested host is the wrong production shape. | Basic app host `8 GiB / 4 vCPU`: `$0.07143/hr`, `$48/mo`; managed Postgres not included[^digitalocean-basic-pricing-2026-05-29] |
+| `30,000` active users | `25%` betting in one minute, about `125` bets/s | Multiple app nodes or `8 vCPU / 16 GiB` app tier plus managed Postgres | `8x` vCPU, `16x` RAM, about `12.8x` disk for one app host | This is several times the validated envelope and needs horizontal app capacity and database tuning. | Basic `16 GiB / 8 vCPU`: `$0.14286/hr`, `$96/mo`; managed Postgres/load balancing not included[^digitalocean-basic-pricing-2026-05-29] |
+| `50,000` active users | `5-10%` betting in one minute, about `42-83` bets/s | `8 vCPU / 16 GiB` app tier plus managed Postgres | `8x` vCPU, `16x` RAM, about `12.8x` disk for the app host | The low end is within the current warning range; the high end requires dedicated database capacity. | Basic `16 GiB / 8 vCPU`: `$0.14286/hr`, `$96/mo`; managed Postgres not included[^digitalocean-basic-pricing-2026-05-29] |
+| `50,000` active users | `25-50%` betting in one minute, about `208-417` bets/s | Load-balanced app nodes, managed Postgres sized separately, connection pooling, observability, and possibly async/caching changes | Multiple app hosts, each much larger than the tested host | This is not a single small-Droplet workload. It should be treated as a dedicated scale project. | At least multiple Basic `16 GiB / 8 vCPU` app nodes at `$96/mo` each, plus managed Postgres/load balancer costs not included[^digitalocean-basic-pricing-2026-05-29] |
 
 [^digitalocean-basic-pricing-2026-05-29]: DigitalOcean Basic Droplet pricing shown on 2026-05-29 from <https://www.digitalocean.com/pricing/droplets>: `512 MiB / 1 vCPU / 500 GiB transfer / 10 GiB SSD` at `$0.00595/hr`, `$4/mo`; `1 GiB / 1 vCPU / 1,000 GiB transfer / 25 GiB SSD` at `$0.00893/hr`, `$6/mo`; `2 GiB / 1 vCPU / 2,000 GiB transfer / 50 GiB SSD` at `$0.01786/hr`, `$12/mo`; `2 GiB / 2 vCPU / 3,000 GiB transfer / 60 GiB SSD` at `$0.02679/hr`, `$18/mo`; `4 GiB / 2 vCPU / 4,000 GiB transfer / 80 GiB SSD` at `$0.03571/hr`, `$24/mo`; `8 GiB / 4 vCPU / 5,000 GiB transfer / 160 GiB SSD` at `$0.07143/hr`, `$48/mo`; `16 GiB / 8 vCPU / 6,000 GiB transfer / 320 GiB SSD` at `$0.14286/hr`, `$96/mo`.
 
@@ -213,11 +220,11 @@ DigitalOcean's current Basic Droplet table lists relevant reference sizes includ
 
 For the next release dossier, report the current staging result as:
 
-> On a single small DigitalOcean staging Droplet with colocated Docker Postgres, SocialPredict passed a pre-authenticated `50/sec` hot-market burst with `3001/3001` bets succeeded, `0%` HTTP failures, and HTTP p95 around `704ms`. A `75/sec` one-minute burst also had no failed bets, but p95 rose to about `1.67s` and k6 dropped iterations. Sustained `75/sec` and `100/sec` runs crossed into failure/ceiling territory.
+> On a DigitalOcean Basic `1 vCPU / 1 GiB RAM / 25 GiB SSD` staging Droplet with colocated Docker Postgres, SocialPredict passed a pre-authenticated `50/sec` hot-market burst with `3001/3001` bets succeeded, `0%` HTTP failures, and HTTP p95 around `704ms`. A `75/sec` one-minute burst also had no failed bets, but p95 rose to about `1.67s` and k6 dropped iterations. Sustained `75/sec` and `100/sec` runs crossed into failure/ceiling territory.
 
 For production-style planning:
 
-- Use the current smallest staging Droplet only as a functional staging target.
+- Use the current `1 vCPU / 1 GiB` staging Droplet only as a functional staging target.
 - Treat `2 vCPU / 4 GiB` as the minimum serious single-node model-office target.
 - Treat `4 vCPU / 8 GiB` plus managed Postgres as the first credible target for hot-market load beyond the current `50-65` successful bets/second stressed envelope.
 - Treat `50,000` active users with one-minute hot windows as requiring a split app/database architecture, not a single small Droplet.
@@ -252,7 +259,7 @@ ssh -i ~/.keys/socialpredict/staging/id_ed25519 root@kconfs.com '
 '
 ```
 
-5. Use `50/sec` as the current clean reference run for this tiny Droplet.
+5. Use `50/sec` as the current clean reference run for this `1 vCPU / 1 GiB` Droplet.
 6. Treat `75/sec` one-minute as a warning-zone run, not a comfortable target.
 7. Treat sustained `75/sec` and `100/sec` as current ceiling/failure evidence unless host resources are increased.
 

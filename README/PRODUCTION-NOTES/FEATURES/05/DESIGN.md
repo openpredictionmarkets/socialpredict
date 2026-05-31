@@ -58,17 +58,17 @@ rate-limit posture. The host still runs from `/opt/socialpredict/.env`.
 The first staging target is intentionally small:
 
 ```text
-DigitalOcean regular CPU
-512 MiB memory
+DigitalOcean Basic regular CPU
+1 GiB memory
 1 vCPU
-500 GiB transfer
-10 GiB SSD
-$4/mo
+1,000 GiB transfer
+25 GiB SSD
+$6/mo in the 2026-05-29 pricing snapshot
 ```
 
 The design goal is not to promise high traffic on this instance. The goal is to make the limit measurable and to avoid confusing rate-limit failures with actual application/database capacity failures.
 
-The current compose files do not intentionally constrain backend CPU with Docker `cpus`, `mem_limit`, or `deploy.resources` settings. On the current one-vCPU droplet, host CPU observations should therefore be treated as real capacity signals unless a future host-level or compose-level limit is added.
+The current compose files do not intentionally constrain backend CPU with Docker `cpus`, `mem_limit`, or `deploy.resources` settings. On the current one-vCPU droplet, Docker sees the same `1` CPU and about `957 MiB` RAM that the host exposes. Host CPU and memory observations should therefore be treated as real capacity signals unless a future host-level or compose-level limit is added.
 
 ## Safety
 

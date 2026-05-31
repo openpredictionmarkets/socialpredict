@@ -213,8 +213,8 @@ one bet/second. If modeling one bet every ten seconds per identity, use
 
 ## Small-Droplet Max-Capacity Ladder
 
-For the current smallest staging Droplet, use a gradual hot-market ladder and
-capture host telemetry on every run:
+For the current Basic `1 vCPU / 1 GiB RAM / 25 GiB Disk` staging Droplet, use a
+gradual hot-market ladder and capture host telemetry on every run:
 
 ```bash
 ./loadtest/cli/loadtest run hot-market-burst \

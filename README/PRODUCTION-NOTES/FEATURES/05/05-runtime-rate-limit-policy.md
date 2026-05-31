@@ -11,12 +11,12 @@ This is not game setup. It should not live in `backend/setup/setup.yaml`, becaus
 
 The first measured target is the current staging DigitalOcean baseline:
 
-- Droplet class: regular CPU
-- Memory: 512 MiB
+- Droplet class: Basic regular CPU
+- Memory: 1 GiB
 - vCPU: 1
-- Transfer: 500 GiB
-- SSD: 10 GiB
-- Cost: about $0.00595/hr, $4/mo
+- Transfer: 1,000 GiB
+- SSD: 25 GiB
+- Cost: about $0.00893/hr, $6/mo in the 2026-05-29 pricing snapshot
 - Current staging domain: `kconfs.com`
 
 This feature should let operators record what this small machine can safely handle before larger instance sizing, database separation, Redis/distributed rate limiting, or proxy-level rate limiting are introduced.
@@ -85,7 +85,7 @@ secure-default
   Keeps current conservative defaults.
 
 small-droplet-staging
-  Intended for the current $4/mo 512 MiB / 1 vCPU DigitalOcean droplet.
+  Intended for the current $6/mo 1 GiB / 1 vCPU DigitalOcean droplet.
   Values are provisional and must be verified by load-test evidence.
 
 env-file
@@ -118,7 +118,7 @@ RATE_LIMIT_GENERAL_BURST=1000
 RATE_LIMIT_CLEANUP_INTERVAL=5m
 ```
 
-These are not production capacity claims. They are a starting point for measurement on the $4/mo droplet.
+These are not production capacity claims. They are a starting point for measurement on the current `$6/mo` Basic `1 vCPU / 1 GiB / 25 GiB` staging droplet.
 
 If this overlay still rate-limits before CPU, memory, DB, or application latency becomes the bottleneck, raise it incrementally and record each run in the release dossier.
 
@@ -167,7 +167,7 @@ Every capacity-oriented run should record:
 - CPU, memory, disk, and network observations
 - whether the run hit rate limits, application errors, DB pressure, or host pressure first
 
-For the current $4/mo droplet, the dossier should explicitly say that findings apply to the 512 MiB / 1 vCPU / 10 GiB SSD tier only.
+For the current staging droplet, the dossier should explicitly say that findings apply to the Basic `1 GiB / 1 vCPU / 25 GiB SSD` tier only. Earlier 512 MiB assumptions are not valid evidence for the measured runs.
 
 ## Non-Goals
 
