@@ -1,3 +1,4 @@
 *
 !.gitignore
 !README.md
+!cloud-init-docker-ubuntu2404.yml
