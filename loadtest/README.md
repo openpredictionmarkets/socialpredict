@@ -64,6 +64,9 @@ with load-test limits and an HTTP-only raw-IP edge:
 Then run k6 from a separate load generator against `http://45.55.227.1`.
 Destroy the temporary Droplet after testing to avoid ongoing cost.
 
+For the exact OpenPredictionMarkets `doctl` + GitHub secrets + Ansible workflow
+smoke sequence, see `loadtest/cli/OPERATING.md`.
+
 ## Authentication Model
 
 k6 uses normal SocialPredict fake-user credentials and `POST /v0/login` for API traffic. It does not use DigitalOcean credentials and it does not use a betting god key.
