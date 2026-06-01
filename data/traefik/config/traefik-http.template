@@ -1,0 +1,18 @@
+log:
+  filePath: "/logs/error.log"
+  format: json
+  level: WARN
+
+entryPoints:
+  web:
+    address: ":80"
+    asDefault: true
+
+providers:
+  docker:
+    # Temporary load-test hosts may use raw public IPs without Let's Encrypt.
+    # Path publishing for backend-owned /health, /readyz, /ops/status,
+    # /swagger/, and /openapi.yaml remains explicit in nginx.
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: socialpredict_external_network

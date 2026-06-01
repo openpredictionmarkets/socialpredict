@@ -33,6 +33,7 @@ The install UI should prefer profiles over raw fields:
 
 - `secure-default`
 - `small-droplet-staging`
+- `loadtest`
 - `env-file`
 - `custom`
 
@@ -48,6 +49,10 @@ Non-interactive production installs can pass the profile with:
 ```
 
 or by setting `RATE_LIMIT_PROFILE` before invoking the installer.
+
+Temporary raw-IP load-test hosts can use the more permissive `loadtest` profile
+with the HTTP-only edge mode documented in
+[`FEATURES/06`](../06/06-temporary-loadtest-droplets.md).
 
 OpenPredictionMarkets Ansible uses non-secret overlays under `deploy/env/`
 instead of committing full generated host `.env` files. The overlays only carry

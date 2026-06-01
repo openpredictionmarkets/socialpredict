@@ -88,6 +88,11 @@ small-droplet-staging
   Intended for the current $6/mo 1 GiB / 1 vCPU DigitalOcean droplet.
   Values are provisional and must be verified by load-test evidence.
 
+loadtest
+  Intended for temporary raw-IP capacity-test hosts.
+  Uses permissive values so one k6 load-generator IP can stress the host before
+  the app limiter becomes the bottleneck.
+
 env-file
   Non-interactive deployment mode.
   Uses RATE_LIMIT_* values sourced from a non-secret deploy env overlay.
