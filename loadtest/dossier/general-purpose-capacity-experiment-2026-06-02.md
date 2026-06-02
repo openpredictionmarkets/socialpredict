@@ -2,7 +2,7 @@
 
 Date opened: 2026-06-02
 
-Status: experimental setup drafted; data collection pending
+Status: first Basic AMD `8 vCPU / 32 GiB RAM` discovery and degradation analysis captured; fresh-reset confirmation still in progress
 
 Environment: `temporary-loadtest`
 
@@ -59,15 +59,15 @@ Observed before this experiment:
 
 ### Target Host State
 
-Planned target:
+Observed target after resize:
 
 - Size slug: `s-8vcpu-32gb-amd`
 - Class: DigitalOcean Basic AMD shared CPU
 - Memory: `32768 MiB`
 - vCPUs: `8`
-- Plan disk: `400 GiB`
-- Resize mode: CPU/RAM-only resize, without `--resize-disk`
-- Expected root disk after resize: remains approximately `25 GiB`
+- Plan disk if resized with disk: `400 GiB`
+- Resize mode used: CPU/RAM-only resize, without `--resize-disk`
+- Root disk after resize: remained approximately `25 GiB`
 - Price observed from `doctl` on 2026-06-02: `$0.250000/hr`, `$168/mo`
 - Approximate 48-hour test cost at target size: `$12.00`
 
@@ -381,19 +381,91 @@ Dossier generation command shape:
 
 ## Data
 
-Data collection pending.
+Initial data collection was performed against the resized Basic AMD host. The one-minute runs show clean burst behavior through `300` bets/sec. The five-minute runs show sustained degradation once the hot-market bet history has grown, with Postgres saturating the host CPU.
 
-| Run | Target bets/sec | Duration | Decision | Successful bets/sec | Failed bets | Dropped iterations | HTTP p95 | Host CPU notes | RAM notes |
-| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+The k6 rate columns in the raw summaries include setup/pre-auth time. The table below computes achieved bet throughput from successful bets divided by the scenario duration.
+
+| Run timestamp | Target bets/sec | Duration | Decision | Successful bets | Achieved bets/sec | Failed bets | Dropped iterations | HTTP p95 | Host CPU notes | RAM notes | Artifact paths |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
+| `20260602T033940Z` | `100` | `1m` | pass | `6001` | `100.0` | `0` | `0` | `39.15ms` | min idle `87.58%`; Docker CPU `94.42%`; Postgres `35.39%` | min available `31238 MiB` | `loadtest/results/hot-market-burst-20260602T033940Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T033940Z-host-summary.json`; raw CSV same prefix |
+| `20260602T034343Z` | `200` | `1m` | pass | `12001` | `200.0` | `0` | `0` | `40.76ms` | min idle `71.45%`; Docker CPU `218.38%`; Postgres `108.75%` | min available `31235 MiB` | `loadtest/results/hot-market-burst-20260602T034343Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T034343Z-host-summary.json`; raw CSV same prefix |
+| `20260602T034654Z` | `300` | `1m` | pass | `18001` | `300.0` | `0` | `0` | `72.65ms` | min idle `6.68%`; Docker CPU `633.07%`; Postgres `272.4%` | min available `31207 MiB` | `loadtest/results/hot-market-burst-20260602T034654Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T034654Z-host-summary.json`; raw CSV same prefix |
+| `20260602T035651Z` | `350` | `1m` | degraded | `20583` | `343.1` | `0` | `418` | `1.3s` | min idle `0%`; Docker CPU `783.4%`; Postgres `632.09%` | min available `31040 MiB` | `loadtest/results/hot-market-burst-20260602T035651Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T035651Z-host-summary.json`; raw CSV same prefix |
+| `20260602T035223Z` | `400` | `1m` | degraded | `23143` | `385.7` | `0` | `858` | `2.3s` | min idle `0%`; Docker CPU `786.93%`; Postgres `540.31%` | min available `31020 MiB` | `loadtest/results/hot-market-burst-20260602T035223Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T035223Z-host-summary.json`; raw CSV same prefix |
+| `20260602T040136Z` | `300` | `5m` | degraded | `85511` | `285.0` | `0` | `4490` | `4.96s` | min idle `0%`; Docker CPU `790.59%`; Postgres `664.07%` | min available `30753 MiB` | `loadtest/results/hot-market-burst-20260602T040136Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T040136Z-host-summary.json`; raw CSV same prefix |
+| `20260602T041807Z` | `200` | `5m` | degraded | `57542` | `191.8` | `0` | `2459` | `7.66s` | min idle `0%`; Docker CPU `795%`; Postgres `692.12%` | min available `30742 MiB` | `loadtest/results/hot-market-burst-20260602T041807Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T041807Z-host-summary.json`; raw CSV same prefix |
+| `20260602T042645Z` | `100` | `5m` | fail | `29952` | `99.8` | `48` | `0` | `88.05ms` expected responses; failed requests timed out at `1m0s` | min idle `2.68%`; Docker CPU `765.03%`; Postgres `696.55%` | min available `30925 MiB` | `loadtest/results/hot-market-burst-20260602T042645Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T042645Z-host-summary.json`; raw CSV same prefix |
+
+### Database Diagnostics After Cumulative Runs
+
+Read-only diagnostics after the degraded `100` bets/sec five-minute run showed:
+
+| Diagnostic | Observation |
+| --- | --- |
+| Total `bets` rows | `258785` |
+| Hot-market distribution | ten hot markets each had approximately `25603-26141` bets |
+| `bets` table total size | `35 MB` |
+| `bets` indexes observed | `bets_pkey`, `idx_bets_deleted_at` |
+| Missing write-path index | no composite index on `(market_id, username)` |
+| Autovacuum/analyze | `bets` had recent autovacuum and autoanalyze |
+| Active DB state after settling | no persistent active backlog observed |
+
+The placement path calls `UserHasBet` on every bet:
+
+```sql
+WHERE market_id = ? AND username = ?
+```
+
+Without a composite index on that predicate, the cost of each bet can grow as the `bets` table grows. This is the leading explanation for why the host could pass one-minute bursts on a fresher dataset but later timed out at only `100` bets/sec after the cumulative bet table reached roughly `259k` rows.
 
 ## Analysis
 
-Analysis pending data collection.
+The first one-minute ladder established a clear burst profile:
+
+- `100` and `200` bets/sec were clean with low latency and substantial CPU headroom.
+- `300` bets/sec was still a clean functional pass, but CPU idle dropped to `6.68%`, so it was already near the top of the clean burst envelope.
+- `350` and `400` bets/sec remained correct at the application level but degraded through dropped iterations, multi-second p95 latency, and host CPU saturation.
+
+The five-minute confirmation runs changed the interpretation:
+
+- `300` bets/sec for `5m` degraded: `4490` dropped iterations and HTTP p95 `4.96s`.
+- `200` bets/sec for `5m` also degraded: `2459` dropped iterations and HTTP p95 `7.66s`.
+- `100` bets/sec for `5m` then produced `48` timeout failures despite low p95 among successful responses.
+
+This pattern is not simply "the host cannot do 100 bets/sec." The earlier `100` and `200` one-minute runs were clean. The later sustained failures happened after cumulative test state had inserted hundreds of thousands of hot-market bets. The database diagnostic points to a data-growth-sensitive write-path query rather than RAM pressure:
+
+- RAM remained plentiful throughout the experiment.
+- Postgres CPU repeatedly saturated multiple cores during degraded runs.
+- The `bets` table was not huge in disk terms, but the hot predicate lacked an index.
+- The hot-market workload concentrates repeated writes and lookups against the same small set of markets, making it intentionally adversarial.
+
+The current evidence supports two separate claims:
+
+1. On this resized Basic AMD shared-CPU Droplet, fresh-ish one-minute burst capacity is clean up to `300` bets/sec and degraded by `350-400` bets/sec.
+2. Sustained capacity cannot be claimed yet because cumulative bet-history growth degrades the write path. The next engineering step is to add and test the missing bet-history indexes, then rerun the sustained ladder from a reset fixture state.
 
 ## Conclusion
 
-Conclusion pending data collection.
+Preliminary conclusion:
+
+- Do not claim `500` bets/sec on this host.
+- Do not claim sustained `300` or `200` bets/sec on the current schema.
+- The best current burst claim is `300` bets/sec for `1m` on a reset or low-history dataset.
+- Sustained claims should wait for an indexed bet-history migration and fresh five-minute confirmation runs.
+
+Recommended schema investigation:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_bets_market_id_username ON bets (market_id, username);
+```
+
+Likely follow-up index for market-history reads:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_bets_market_id_placed_at_id ON bets (market_id, placed_at, id);
+```
+
+The first index directly targets `UserHasBet`, which runs during bet placement. The second targets market-scoped ordered bet reads observed in analytics and position paths. These should be implemented through the project migration system before using them as production evidence.
 
 ## Deviations
 
@@ -401,4 +473,7 @@ Record deviations here as they happen.
 
 | Time UTC | Deviation | Reason | Impact |
 | --- | --- | --- | --- |
-| TBD | TBD | TBD | TBD |
+| `2026-06-02T03:28Z` | Initial `100` bets/sec run used `--preauth-users 2000` without enough k6 setup timeout | k6 default setup timeout is `60s` | Run timed out during setup and was not counted as capacity evidence |
+| `2026-06-02T03:37Z` | First post-timeout rerun captured insufficient host telemetry | Monitor duration did not include setup/pre-auth time | k6 result was useful, but host telemetry did not cover the full burst window |
+| `2026-06-02T03:39Z` | Host monitor duration was corrected to include setup timeout | Needed telemetry covering setup plus scenario execution | Later runs have usable host telemetry summaries |
+| `2026-06-02T04:26Z` | Later sustained runs were cumulative-state tests, not fresh-reset tests | Prior runs inserted hundreds of thousands of hot-market bets | Sustained degradation may reflect schema/data-growth behavior, not only raw host capacity |
