@@ -1010,8 +1010,10 @@ run_cmd() {
   local monitor_pid=""
   if [ -n "$monitor_env" ]; then
     local monitor_duration_seconds
+    local monitor_setup_timeout_seconds
     monitor_duration_seconds="$(duration_to_seconds "${duration:-60s}")"
-    monitor_duration_seconds=$((monitor_duration_seconds + monitor_interval + 5))
+    monitor_setup_timeout_seconds="$(duration_to_seconds "${setup_timeout:-5m}")"
+    monitor_duration_seconds=$((monitor_duration_seconds + monitor_setup_timeout_seconds + monitor_interval + 5))
     if [ -z "$monitor_out" ]; then
       monitor_out="${LOADTEST_DIR}/hostops/${scenario}-${monitor_env}-$(iso_stamp)-host.csv"
     fi
