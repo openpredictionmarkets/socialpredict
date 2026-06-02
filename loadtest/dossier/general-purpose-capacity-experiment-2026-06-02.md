@@ -2,7 +2,7 @@
 
 Date opened: 2026-06-02
 
-Status: first Basic AMD `8 vCPU / 32 GiB RAM` discovery and degradation analysis captured; fresh-reset confirmation still in progress
+Status: first Basic AMD `8 vCPU / 32 GiB RAM` discovery and degradation analysis captured; temporary Droplet destroyed after test window
 
 Environment: `temporary-loadtest`
 
@@ -11,6 +11,8 @@ Base URL: `http://161.35.177.38`
 Host: `socialpredict-loadtest-20260601`
 
 Droplet ID: `574624493`
+
+Final host lifecycle: destroyed on 2026-06-02 after the initial experiment window. Repeating this experiment requires creating a new temporary Droplet, updating the load-test workflow target IP, redeploying, reseeding fixtures, and pulling fresh fixtures.
 
 ## Research Question
 
@@ -98,6 +100,8 @@ gh workflow run deploy_loadtest.yml \
   -f tls_mode=http \
   -f domain_or_ip=161.35.177.38
 ```
+
+If the temporary Droplet has been destroyed, create a new load-test Droplet and run `deploy_loadtest.yml` with the new raw IP before repeating the test. The `domain_or_ip`, `--base-url`, `--monitor-host`, fixture seed/pull host, and local known-hosts entries must all be updated to the new IP.
 
 ### Interpretation Caveat
 
@@ -395,6 +399,8 @@ The k6 rate columns in the raw summaries include setup/pre-auth time. The table 
 | `20260602T040136Z` | `300` | `5m` | degraded | `85511` | `285.0` | `0` | `4490` | `4.96s` | min idle `0%`; Docker CPU `790.59%`; Postgres `664.07%` | min available `30753 MiB` | `loadtest/results/hot-market-burst-20260602T040136Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T040136Z-host-summary.json`; raw CSV same prefix |
 | `20260602T041807Z` | `200` | `5m` | degraded | `57542` | `191.8` | `0` | `2459` | `7.66s` | min idle `0%`; Docker CPU `795%`; Postgres `692.12%` | min available `30742 MiB` | `loadtest/results/hot-market-burst-20260602T041807Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T041807Z-host-summary.json`; raw CSV same prefix |
 | `20260602T042645Z` | `100` | `5m` | fail | `29952` | `99.8` | `48` | `0` | `88.05ms` expected responses; failed requests timed out at `1m0s` | min idle `2.68%`; Docker CPU `765.03%`; Postgres `696.55%` | min available `30925 MiB` | `loadtest/results/hot-market-burst-20260602T042645Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T042645Z-host-summary.json`; raw CSV same prefix |
+| `20260602T044554Z` | `300` | `1m` | near-clean post-reset probe | `17997` | `300.0` | `0` | `4` | `51.36ms` | min idle `30.58%`; Docker CPU `437.14%`; Postgres `134.43%` | min available `31179 MiB` | `loadtest/results/hot-market-burst-20260602T044554Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T044554Z-host-summary.json`; raw CSV same prefix |
+| `20260602T045057Z` | `300` | intended `5m` | invalid fixture mismatch | `0` valid bets | N/A | `1594` `MARKET_NOT_FOUND` responses | N/A | `39.35ms` | host mostly idle; min idle `96.28%`; Postgres `1.73%` | min available `31151 MiB` | `loadtest/results/hot-market-burst-20260602T045057Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260602T045057Z-host-summary.json`; raw CSV same prefix |
 
 ### Database Diagnostics After Cumulative Runs
 
@@ -417,6 +423,17 @@ WHERE market_id = ? AND username = ?
 ```
 
 Without a composite index on that predicate, the cost of each bet can grow as the `bets` table grows. This is the leading explanation for why the host could pass one-minute bursts on a fresher dataset but later timed out at only `100` bets/sec after the cumulative bet table reached roughly `259k` rows.
+
+### Post-Reset Probe
+
+After a fixture reset and pull, a `300` bets/sec one-minute probe improved materially:
+
+- p95 HTTP latency dropped to `51.36ms`.
+- Postgres max CPU dropped to `134.43%`.
+- Host min idle stayed at `30.58%`.
+- There were `4` dropped iterations, so this is recorded as near-clean rather than strict-clean.
+
+This supports the data-growth hypothesis: resetting the test state reduced Postgres pressure substantially. However, a following attempted five-minute `300` bets/sec run was invalid because k6 received `MARKET_NOT_FOUND` for market IDs such as `1023` and `1026` while the host was mostly idle. That run indicates a fixture mismatch between local `markets.csv` and the active server database, not application capacity degradation.
 
 ## Analysis
 
@@ -443,6 +460,7 @@ The current evidence supports two separate claims:
 
 1. On this resized Basic AMD shared-CPU Droplet, fresh-ish one-minute burst capacity is clean up to `300` bets/sec and degraded by `350-400` bets/sec.
 2. Sustained capacity cannot be claimed yet because cumulative bet-history growth degrades the write path. The next engineering step is to add and test the missing bet-history indexes, then rerun the sustained ladder from a reset fixture state.
+3. Fixture integrity is now a required precondition for long runs. A smoke test alone is not enough if the local hot-market fixture file can drift from the active server database.
 
 ## Conclusion
 
@@ -452,6 +470,7 @@ Preliminary conclusion:
 - Do not claim sustained `300` or `200` bets/sec on the current schema.
 - The best current burst claim is `300` bets/sec for `1m` on a reset or low-history dataset.
 - Sustained claims should wait for an indexed bet-history migration and fresh five-minute confirmation runs.
+- Any future five-minute run must first verify that local fixture market IDs exist on the server.
 
 Recommended schema investigation:
 
@@ -467,6 +486,27 @@ CREATE INDEX CONCURRENTLY idx_bets_market_id_placed_at_id ON bets (market_id, pl
 
 The first index directly targets `UserHasBet`, which runs during bet placement. The second targets market-scoped ordered bet reads observed in analytics and position paths. These should be implemented through the project migration system before using them as production evidence.
 
+Recommended fixture-integrity check before capacity runs:
+
+```bash
+ssh -i ~/.keys/socialpredict/loadtest/id_ed25519 root@<LOADTEST_IP> <<'REMOTE'
+PG=$(docker ps --format '{{.Names}}' | grep -E 'postgres' | head -1)
+docker exec -i "$PG" sh -lc '
+DB=${POSTGRES_DB:-${POSTGRES_DATABASE:-postgres}}
+U=${POSTGRES_USER:-postgres}
+psql -U "$U" -d "$DB" -v ON_ERROR_STOP=1 <<SQL
+SELECT min(id) AS min_market_id, max(id) AS max_market_id, count(*) AS markets FROM markets;
+SELECT count(*) AS bets FROM bets;
+SQL
+'
+REMOTE
+
+head -20 loadtest/fixtures/markets.csv
+tail -20 loadtest/fixtures/markets.csv
+```
+
+If local fixture IDs are not within the server market range, rerun fixture seed with `--reset`, then immediately pull fixtures again before running k6.
+
 ## Deviations
 
 Record deviations here as they happen.
@@ -477,3 +517,6 @@ Record deviations here as they happen.
 | `2026-06-02T03:37Z` | First post-timeout rerun captured insufficient host telemetry | Monitor duration did not include setup/pre-auth time | k6 result was useful, but host telemetry did not cover the full burst window |
 | `2026-06-02T03:39Z` | Host monitor duration was corrected to include setup timeout | Needed telemetry covering setup plus scenario execution | Later runs have usable host telemetry summaries |
 | `2026-06-02T04:26Z` | Later sustained runs were cumulative-state tests, not fresh-reset tests | Prior runs inserted hundreds of thousands of hot-market bets | Sustained degradation may reflect schema/data-growth behavior, not only raw host capacity |
+| `2026-06-02T04:45Z` | Post-reset `300` bets/sec one-minute probe was run | Needed to distinguish cumulative-state degradation from fresh-state host capacity | Improved latency and CPU data strengthened the bet-history growth hypothesis |
+| `2026-06-02T04:50Z` | Attempted post-reset `300` bets/sec five-minute run was invalid | k6 used market IDs not found by the server, producing `MARKET_NOT_FOUND` while host was idle | Not capacity evidence; fixture integrity check added as required precondition |
+| `2026-06-02T04:56Z` | Temporary load-test Droplet was powered off and destroyed | Avoid ongoing DigitalOcean hourly billing after experiment window | Future testing requires new Droplet/IP and workflow target update |
