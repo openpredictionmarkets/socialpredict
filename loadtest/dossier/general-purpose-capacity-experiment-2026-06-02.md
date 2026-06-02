@@ -296,7 +296,8 @@ for rate in 100 150 200 250 300 400 500; do
     --duration 1m \
     --target-rate "$rate" \
     --preauth-users 2000 \
-    --monitor-env loadtest-g4 \
+    --setup-timeout 5m \
+    --monitor-env loadtest-basic-amd \
     --monitor-host root@161.35.177.38 \
     --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
     --monitor-interval 5
@@ -314,7 +315,8 @@ If the first failure/degradation point appears, bisect around the boundary in `2
   --duration 5m \
   --target-rate <highest-clean-rate> \
   --preauth-users 5000 \
-  --monitor-env loadtest-g4 \
+  --setup-timeout 10m \
+  --monitor-env loadtest-basic-amd \
   --monitor-host root@161.35.177.38 \
   --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
   --monitor-interval 5
@@ -352,7 +354,7 @@ If the first failure/degradation point appears, bisect around the boundary in `2
 After each meaningful run:
 
 1. Pair the k6 summary with the host telemetry summary.
-2. Generate dossier JSON using `.context/loadtest/metadata-g4-loadtest.json`.
+2. Generate dossier JSON using `.context/loadtest/metadata-basic-amd-loadtest.json`.
 3. Classify the run as `pass`, `degraded`, or `fail`.
 4. Plot or tabulate:
    - target bets/sec
@@ -372,7 +374,7 @@ Dossier generation command shape:
 ./loadtest/cli/loadtest dossier \
   --summary loadtest/results/<summary>.json \
   --host-summary loadtest/hostops/<run>-host-summary.json \
-  --metadata .context/loadtest/metadata-g4-loadtest.json \
+  --metadata .context/loadtest/metadata-basic-amd-loadtest.json \
   --decision <pass|degraded|fail> \
   --out loadtest/dossier/runs/<run>-g4.json
 ```
