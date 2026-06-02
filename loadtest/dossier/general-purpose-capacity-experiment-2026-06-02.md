@@ -1,4 +1,4 @@
-# SocialPredict General Purpose Droplet Capacity Experiment
+# SocialPredict Large Basic AMD Droplet Capacity Experiment
 
 Date opened: 2026-06-02
 
@@ -14,11 +14,11 @@ Droplet ID: `574624493`
 
 ## Research Question
 
-What hot-market betting throughput can SocialPredict sustain on a larger single-node DigitalOcean General Purpose Droplet when app, Traefik, nginx, frontend, backend, and Postgres remain colocated in Docker?
+What hot-market betting throughput can SocialPredict sustain on a larger single-node DigitalOcean Basic AMD shared-CPU Droplet when app, Traefik, nginx, frontend, backend, and Postgres remain colocated in Docker?
 
 ## Hypothesis
 
-A General Purpose `4 vCPU / 16 GiB RAM` Droplet should sustain materially higher concentrated hot-market betting throughput than the previous Basic `1 vCPU / 1 GiB RAM` staging result.
+A Basic AMD shared-CPU `8 vCPU / 32 GiB RAM` Droplet should sustain materially higher concentrated hot-market betting throughput than the previous Basic `1 vCPU / 1 GiB RAM` staging result. Because this is a shared-CPU class, the result should be reported as observed Basic/shared-CPU evidence rather than dedicated General Purpose evidence.
 
 The prior staging dossier identified `50` bets/second as the cleanest supported pre-authenticated hot-market datapoint on the Basic `1 vCPU / 1 GiB` host, while `75` bets/second showed one-minute warning signs and five-minute degradation.
 
@@ -61,19 +61,20 @@ Observed before this experiment:
 
 Planned target:
 
-- Size slug: `g-4vcpu-16gb`
-- Memory: `16384 MiB`
-- vCPUs: `4`
-- Plan disk: `50 GiB`
+- Size slug: `s-8vcpu-32gb-amd`
+- Class: DigitalOcean Basic AMD shared CPU
+- Memory: `32768 MiB`
+- vCPUs: `8`
+- Plan disk: `400 GiB`
 - Resize mode: CPU/RAM-only resize, without `--resize-disk`
 - Expected root disk after resize: remains approximately `25 GiB`
-- Price observed from `doctl` on 2026-06-02: `$0.187500/hr`, `$126/mo`
-- Approximate 48-hour test cost at target size: `$9.00`
+- Price observed from `doctl` on 2026-06-02: `$0.250000/hr`, `$168/mo`
+- Approximate 48-hour test cost at target size: `$12.00`
 
 Resize command:
 
 ```bash
-doctl compute droplet-action resize 574624493 --size g-4vcpu-16gb --wait
+doctl compute droplet-action resize 574624493 --size s-8vcpu-32gb-amd --wait
 ```
 
 Do not pass `--resize-disk`. DigitalOcean CPU/RAM-only resize is reversible; disk increases are not.
@@ -97,6 +98,10 @@ gh workflow run deploy_loadtest.yml \
   -f tls_mode=http \
   -f domain_or_ip=161.35.177.38
 ```
+
+### Interpretation Caveat
+
+The target host is a Basic AMD shared-CPU Droplet. A successful run can prove that this observed host, during this test window, sustained the measured traffic. It should not be presented as dedicated-CPU or General Purpose evidence. If the final result is used for production planning, the dossier should explicitly state that CPU scheduling may be less predictable than a dedicated General Purpose or CPU-Optimized class.
 
 ## Constants
 
@@ -125,7 +130,7 @@ These are intentionally varied.
 
 | Variable | Planned Values |
 | --- | --- |
-| Droplet size | Current `s-1vcpu-1gb`, target `g-4vcpu-16gb` |
+| Droplet size | Current `s-1vcpu-1gb`, target `s-8vcpu-32gb-amd` |
 | Target betting rate | Discovery ladder: `100`, `150`, `200`, `250`, `300`, `400`, `500` bets/sec |
 | Confirmation target rate | Highest clean discovery rate, then adjusted downward if needed |
 | Confirmation duration | `5m` |
@@ -162,6 +167,7 @@ These are held constant to isolate the host-size and target-rate effects.
 - Same fixture prefixes and password policy.
 - Same load-test rate-limit profile.
 - Same local Mac load-generator unless a later deviation is recorded.
+- Same Basic/shared-CPU caveat recorded in the final interpretation.
 
 ## Rate-Limit Configuration
 
@@ -242,7 +248,7 @@ If `25%` of a `50000` user platform is active in hot markets, that is `12500` ac
 ### 1. Resize And Verify Host
 
 ```bash
-doctl compute droplet-action resize 574624493 --size g-4vcpu-16gb --wait
+doctl compute droplet-action resize 574624493 --size s-8vcpu-32gb-amd --wait
 
 doctl compute droplet get 574624493 \
   --format ID,Name,PublicIPv4,Status,Memory,VCPUs,Disk,Region,Tags
