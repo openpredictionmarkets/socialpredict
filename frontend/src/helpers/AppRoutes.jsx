@@ -23,7 +23,8 @@ const AppRoutes = () => {
   const { frontendConfig } = useFrontendConfig();
   const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
   const isActiveModerator = auth.usertype === 'MODERATOR' && auth.moderatorStatus === 'active';
-  const canCreateMarket = isRegularUser && (!isModeratorMode || isActiveModerator);
+  const isSuspendedModerator = auth.usertype === 'MODERATOR' && auth.moderatorStatus === 'suspended';
+  const canCreateMarket = isRegularUser && !isSuspendedModerator && (!isModeratorMode || isActiveModerator);
   const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
 
   return (

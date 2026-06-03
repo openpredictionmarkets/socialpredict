@@ -39,7 +39,8 @@ const Sidebar = () => {
   const { frontendConfig } = useFrontendConfig();
   const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
   const isActiveModerator = usertype === 'MODERATOR' && moderatorStatus === 'active';
-  const canCreateMarket = isLoggedIn && usertype !== 'ADMIN' && !changePasswordNeeded && (!isModeratorMode || isActiveModerator);
+  const isSuspendedModerator = usertype === 'MODERATOR' && moderatorStatus === 'suspended';
+  const canCreateMarket = isLoggedIn && usertype !== 'ADMIN' && !changePasswordNeeded && !isSuspendedModerator && (!isModeratorMode || isActiveModerator);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
