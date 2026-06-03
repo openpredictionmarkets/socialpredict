@@ -96,15 +96,17 @@ const Profile = () => {
 
   const proposedMarket = location.state?.proposedMarket;
   const marketCreationCost = location.state?.marketCreationCost;
-  const isModerator = String(userData?.usertype || '').toUpperCase() === 'MODERATOR';
-  const resolvedDefaultTab = isModerator ? defaultTab : 'User Info';
+  const isActiveModerator =
+    String(userData?.usertype || '').toUpperCase() === 'MODERATOR' &&
+    String(userData?.moderatorStatus || '').toLowerCase() === 'active';
+  const resolvedDefaultTab = isActiveModerator ? defaultTab : 'User Info';
 
   const profileTabs = [
     {
       label: 'User Info',
       content: <PrivateUserInfoLayout userData={userData} />,
     },
-    ...(isModerator ? [
+    ...(isActiveModerator ? [
       {
         label: lifecycleTabByStatus.proposed,
         content: <ProfileMarketLifecycleTab status='proposed' />,
@@ -137,7 +139,7 @@ const Profile = () => {
           <p className='mt-2 text-gray-400'>Manage your account, proposals, published markets, rejected markets, portfolio, and financial history.</p>
         </div>
 
-        {isModerator && proposedMarket && (
+        {isActiveModerator && proposedMarket && (
           <div className='mb-6 rounded-lg border border-amber-500 bg-amber-950/40 p-4 text-amber-50'>
             <p className='text-sm uppercase tracking-[0.18em] text-amber-300'>Proposed market created</p>
             <h2 className='mt-2 text-xl font-semibold'>{proposedMarket.questionTitle}</h2>

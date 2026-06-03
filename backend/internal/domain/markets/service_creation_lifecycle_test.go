@@ -29,7 +29,16 @@ func TestCreateMarketOpenModeCreatesPublishedActiveMarket(t *testing.T) {
 			return nil
 		}
 	})
-	service := markets.NewService(repo, newNoopUserService(), newFixedClock(now), markets.Config{})
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return &dusers.PublicUser{
+				Username:        username,
+				UserType:        string(dusers.UserTypeRegular),
+				ModeratorStatus: dusers.ModeratorStatusNone,
+			}, nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{})
 
 	market, err := service.CreateMarket(context.Background(), validCreateRequest(now), "alice")
 	if err != nil {
@@ -105,6 +114,14 @@ func TestCreateMarketModeratorModeRejectsRegularAndSuspendedModerators(t *testin
 				service.getPublicUserFunc = func(context.Context, string) (*dusers.PublicUser, error) {
 					return tt.user, nil
 				}
+				service.validateUserBalanceFunc = func(context.Context, string, int64, int64) error {
+					t.Fatalf("balance validation should not run for unauthorized creator")
+					return nil
+				}
+				service.deductBalanceFunc = func(context.Context, string, int64) error {
+					t.Fatalf("balance deduction should not run for unauthorized creator")
+					return nil
+				}
 			})
 			service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{GameMode: "moderator", MarketApprovalRequired: true})
 
@@ -113,6 +130,39 @@ func TestCreateMarketModeratorModeRejectsRegularAndSuspendedModerators(t *testin
 				t.Fatalf("CreateMarket error = %v, want ErrUnauthorized", err)
 			}
 		})
+	}
+}
+
+func TestCreateMarketRejectsSuspendedModeratorOutsideModeratorMode(t *testing.T) {
+	now := marketsTestTime()
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.createFunc = func(context.Context, *markets.Market) error {
+			t.Fatalf("repository create should not be called")
+			return nil
+		}
+	})
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(context.Context, string) (*dusers.PublicUser, error) {
+			return &dusers.PublicUser{
+				Username:        "moderator",
+				UserType:        string(dusers.UserTypeModerator),
+				ModeratorStatus: dusers.ModeratorStatusSuspended,
+			}, nil
+		}
+		service.validateUserBalanceFunc = func(context.Context, string, int64, int64) error {
+			t.Fatalf("balance validation should not run for suspended moderator")
+			return nil
+		}
+		service.deductBalanceFunc = func(context.Context, string, int64) error {
+			t.Fatalf("balance deduction should not run for suspended moderator")
+			return nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{})
+
+	_, err := service.CreateMarket(context.Background(), validCreateRequest(now), "moderator")
+	if !errors.Is(err, markets.ErrUnauthorized) {
+		t.Fatalf("CreateMarket error = %v, want ErrUnauthorized", err)
 	}
 }
 

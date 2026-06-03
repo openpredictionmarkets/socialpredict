@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models/modelstesting"
 )
@@ -97,5 +99,42 @@ func TestBuildApplicationPassesGameModeToMarketsService(t *testing.T) {
 	}
 	if market.Status != dmarkets.MarketLifecycleProposed || market.LifecycleStatus != dmarkets.MarketLifecycleProposed {
 		t.Fatalf("expected proposed market from container wiring, got %+v", market)
+	}
+}
+
+func TestSuspendedModeratorCannotCreateMarketUntilReinstated(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	config := modelstesting.GenerateEconomicConfig()
+	config.Game.Mode = configsvc.GameModeModerator
+	config.Game.Moderation.MarketApprovalRequired = true
+
+	container := BuildApplicationWithConfigService(db, configsvc.NewStaticService(config))
+	user := modelstesting.GenerateUser("moderator", 1000)
+	user.UserType = string(dusers.UserTypeModerator)
+	user.ModeratorStatus = string(dusers.ModeratorStatusSuspended)
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create suspended moderator: %v", err)
+	}
+
+	createReq := dmarkets.MarketCreateRequest{
+		QuestionTitle:      "Can suspended moderators create?",
+		Description:        "Suspended moderator policy regression test",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: container.clock.Now().Add(48 * time.Hour),
+	}
+	_, err := container.GetMarketsService().CreateMarket(context.Background(), createReq, user.Username)
+	if !errors.Is(err, dmarkets.ErrUnauthorized) {
+		t.Fatalf("CreateMarket for suspended moderator error = %v, want ErrUnauthorized", err)
+	}
+
+	if _, err := container.GetUsersService().UnsuspendModerator(context.Background(), user.Username, "admin", "reinstated"); err != nil {
+		t.Fatalf("unsuspend moderator: %v", err)
+	}
+	market, err := container.GetMarketsService().CreateMarket(context.Background(), createReq, user.Username)
+	if err != nil {
+		t.Fatalf("CreateMarket after reinstatement returned error: %v", err)
+	}
+	if market.LifecycleStatus != dmarkets.MarketLifecycleProposed {
+		t.Fatalf("expected reinstated moderator proposal, got %+v", market)
 	}
 }

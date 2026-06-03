@@ -33,12 +33,13 @@ const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
 );
 
 const Sidebar = () => {
-  const { isLoggedIn, usertype, logout, changePasswordNeeded, username } = useAuth();
+  const { isLoggedIn, usertype, moderatorStatus, logout, changePasswordNeeded, username } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { userCredit, loading, error } = useUserCredit(username); // Correct destructuring
   const { frontendConfig } = useFrontendConfig();
   const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
-  const canCreateMarket = isLoggedIn && usertype !== 'ADMIN' && !changePasswordNeeded && (!isModeratorMode || usertype === 'MODERATOR');
+  const isActiveModerator = usertype === 'MODERATOR' && moderatorStatus === 'active';
+  const canCreateMarket = isLoggedIn && usertype !== 'ADMIN' && !changePasswordNeeded && (!isModeratorMode || isActiveModerator);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 

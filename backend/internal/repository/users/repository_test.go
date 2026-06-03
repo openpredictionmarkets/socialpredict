@@ -182,7 +182,7 @@ func TestGormRepositoryIdentityAndCredentialPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindAuthenticatedUser returned error: %v", err)
 	}
-	if authUser.Username != user.Username || authUser.UserType != "admin" || authUser.PasswordHash != "hash-old" || !authUser.MustChangePassword {
+	if authUser.Username != user.Username || authUser.UserType != "admin" || authUser.ModeratorStatus != "none" || authUser.PasswordHash != "hash-old" || !authUser.MustChangePassword {
 		t.Fatalf("unexpected authenticated user: %+v", authUser)
 	}
 

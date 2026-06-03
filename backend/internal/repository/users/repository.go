@@ -21,6 +21,7 @@ type GormRepository struct {
 type authenticatedUserRow struct {
 	Username           string
 	UserType           string
+	ModeratorStatus    string
 	Password           string
 	MustChangePassword bool
 }
@@ -314,7 +315,7 @@ func (r *GormRepository) FindAuthenticatedUser(ctx context.Context, username str
 	var user authenticatedUserRow
 	if err := r.db.WithContext(ctx).
 		Table("users").
-		Select("username", "user_type", "password", "must_change_password").
+		Select("username", "user_type", "moderator_status", "password", "must_change_password").
 		Where("username = ?", username).
 		Take(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -326,6 +327,7 @@ func (r *GormRepository) FindAuthenticatedUser(ctx context.Context, username str
 	return &boundary.AuthenticatedUser{
 		Username:           user.Username,
 		UserType:           user.UserType,
+		ModeratorStatus:    string(dusers.NormalizeModeratorStatus(user.UserType, user.ModeratorStatus)),
 		PasswordHash:       user.Password,
 		MustChangePassword: user.MustChangePassword,
 	}, nil

@@ -36,6 +36,7 @@ func TestPrivateUserResponseJSONRoundTrip(t *testing.T) {
 		Username:              "tester",
 		DisplayName:           "Tester",
 		UserType:              "REGULAR",
+		ModeratorStatus:       "none",
 		InitialAccountBalance: 1000,
 		AccountBalance:        900,
 		PersonalEmoji:         "😀",

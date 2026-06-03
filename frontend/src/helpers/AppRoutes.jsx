@@ -22,7 +22,8 @@ const AppRoutes = () => {
   const isRegularUser = isLoggedIn && auth.usertype !== 'ADMIN';
   const { frontendConfig } = useFrontendConfig();
   const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
-  const canCreateMarket = isRegularUser && (!isModeratorMode || auth.usertype === 'MODERATOR');
+  const isActiveModerator = auth.usertype === 'MODERATOR' && auth.moderatorStatus === 'active';
+  const canCreateMarket = isRegularUser && (!isModeratorMode || isActiveModerator);
   const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
 
   return (

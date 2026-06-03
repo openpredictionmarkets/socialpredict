@@ -3389,7 +3389,7 @@ components:
 
     LoginResult:
       type: object
-      required: [token, username, usertype, mustChangePassword]
+      required: [token, username, usertype, moderatorStatus, mustChangePassword]
       properties:
         token:
           type: string
@@ -3397,6 +3397,9 @@ components:
           type: string
         usertype:
           type: string
+        moderatorStatus:
+          type: string
+          enum: [none, active, suspended]
         mustChangePassword:
           type: boolean
 
@@ -3803,6 +3806,9 @@ components:
           type: string
         usertype:
           type: string
+        moderatorStatus:
+          type: string
+          enum: [none, active, suspended]
         initialAccountBalance:
           type: integer
           format: int64

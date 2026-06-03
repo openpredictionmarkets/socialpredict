@@ -32,6 +32,7 @@ type loginResponse struct {
 	Token              string `json:"token"`
 	Username           string `json:"username"`
 	UserType           string `json:"usertype"`
+	ModeratorStatus    string `json:"moderatorStatus"`
 	MustChangePassword bool   `json:"mustChangePassword"`
 }
 
@@ -188,6 +189,7 @@ func writeLoginResponse(w http.ResponseWriter, user boundary.AuthenticatedUser, 
 		Token:              tokenString,
 		Username:           user.Username,
 		UserType:           user.UserType,
+		ModeratorStatus:    user.ModeratorStatus,
 		MustChangePassword: user.MustChangePassword,
 	})
 }

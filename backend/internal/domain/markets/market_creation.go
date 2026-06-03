@@ -50,11 +50,6 @@ func (s *Service) applyCreationLifecycle(ctx context.Context, market *Market, cr
 	if market == nil {
 		return ErrInvalidInput
 	}
-	if !s.moderatorModeEnabled() {
-		market.LifecycleStatus = MarketLifecyclePublished
-		market.Status = MarketStatusActive
-		return nil
-	}
 	if s.userService == nil {
 		return ErrUnauthorized
 	}
@@ -63,9 +58,23 @@ func (s *Service) applyCreationLifecycle(ctx context.Context, market *Market, cr
 	if err != nil {
 		return ErrUserNotFound
 	}
-	if creator == nil ||
-		users.NormalizeUserType(creator.UserType) != users.UserTypeModerator ||
-		creator.ModeratorStatus != users.ModeratorStatusActive {
+	if creator == nil {
+		return ErrUnauthorized
+	}
+
+	userType := users.NormalizeUserType(creator.UserType)
+	moderatorStatus := users.NormalizeModeratorStatus(creator.UserType, string(creator.ModeratorStatus))
+	if userType == users.UserTypeModerator && moderatorStatus == users.ModeratorStatusSuspended {
+		return ErrUnauthorized
+	}
+
+	if !s.moderatorModeEnabled() {
+		market.LifecycleStatus = MarketLifecyclePublished
+		market.Status = MarketStatusActive
+		return nil
+	}
+
+	if userType != users.UserTypeModerator || moderatorStatus != users.ModeratorStatusActive {
 		return ErrUnauthorized
 	}
 

@@ -41,6 +41,7 @@ func privateProfileResponse(profile *dusers.PrivateProfile) dto.PrivateUserRespo
 		Username:              profile.Username,
 		DisplayName:           profile.DisplayName,
 		UserType:              profile.UserType,
+		ModeratorStatus:       string(profile.ModeratorStatus),
 		InitialAccountBalance: profile.InitialAccountBalance,
 		AccountBalance:        profile.AccountBalance,
 		PersonalEmoji:         profile.PersonalEmoji,
