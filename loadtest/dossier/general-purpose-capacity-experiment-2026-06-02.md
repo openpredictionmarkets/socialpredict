@@ -2,7 +2,7 @@
 
 Date opened: 2026-06-02
 
-Status: first Basic AMD `8 vCPU / 32 GiB RAM` discovery and degradation analysis captured; temporary Droplet destroyed after test window
+Status: first Basic AMD `8 vCPU / 32 GiB RAM` discovery and degradation analysis captured; June 3 repeat run added with fresh-zero-bet precondition and Postgres CPU saturation finding
 
 Environment: `temporary-loadtest`
 
@@ -13,6 +13,19 @@ Host: `socialpredict-loadtest-20260601`
 Droplet ID: `574624493`
 
 Final host lifecycle: destroyed on 2026-06-02 after the initial experiment window. Repeating this experiment requires creating a new temporary Droplet, updating the load-test workflow target IP, redeploying, reseeding fixtures, and pulling fresh fixtures.
+
+Repeat host lifecycle: a second temporary load-test Droplet was created for the June 3 repeat run.
+
+- Droplet ID: `574903216`
+- Droplet name: `socialpredict-loadtest-20260602-220232`
+- Public IPv4: `161.35.135.167`
+- Size slug after resize: `s-8vcpu-32gb-amd`
+- CPU model observed: `DO-Premium-AMD`
+- vCPUs observed: `8`
+- RAM observed: `32095 MiB`
+- Root disk observed: approximately `25 GiB`
+- Base URL: `http://161.35.135.167`
+- Backend image revision verified before repeat: `c42bc34900659bcb5a7cbd251fd7ff021920d0f7`
 
 ## Research Question
 
@@ -507,6 +520,63 @@ tail -20 loadtest/fixtures/markets.csv
 
 If local fixture IDs are not within the server market range, rerun fixture seed with `--reset`, then immediately pull fixtures again before running k6.
 
+### June 3 Repeat Run On Fresh Fixtures
+
+The June 3 repeat used a new temporary load-test host at `161.35.135.167`. Before the run, fixtures were reseeded with `--reset`, pulled locally, and verified directly in Postgres:
+
+| Precondition | Value |
+| --- | ---: |
+| Regular load users | `10000` |
+| Load moderators | `100` |
+| Markets | `1000` |
+| Hot markets | `10` |
+| Bets before smoke | `0` |
+
+Smoke then passed against `http://161.35.135.167` with `3/3` smoke bets succeeding. The following sustained run was attempted:
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url http://161.35.135.167 \
+  --api-prefix /api \
+  --duration 5m \
+  --target-rate 300 \
+  --preauth-users 100 \
+  --setup-timeout 3m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@161.35.135.167 \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
+Result:
+
+| Run timestamp | Target bets/sec | Duration | Decision | Successful bets | Failed bets | Dropped iterations | HTTP p95 | Host CPU notes | RAM notes | Artifact paths |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
+| `20260603T034323Z` | `300` | interrupted at `4m30.5s` measured scenario time | fail for strict clean-run standard | `80266` | `288` | `563` | `226.83ms`; max included stalled failed requests | min idle `0.12%`; Docker CPU `775.15%`; backend `134.43%`; Postgres `568.27%`; Traefik `35.73%` | min available `31012 MiB` | `loadtest/results/hot-market-burst-20260603T034323Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260603T034323Z-host-summary.json`; raw CSV same prefix |
+| `20260603T035954Z` | `250` | `5m` | pass | `75001` | `0` | `0` | `153.72ms`; max `550.66ms` | min idle `0.86%`; Docker CPU `767.69%`; backend `166.81%`; Postgres `407.78%`; Traefik `40.69%` | min available `31092 MiB` | `loadtest/results/hot-market-burst-20260603T035954Z-summary.json`; `loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260603T035954Z-host-summary.json`; raw CSV same prefix |
+
+Post-run database state:
+
+| Measurement | Value |
+| --- | ---: |
+| Total `bets` rows after `300/sec` attempt | `80313` |
+| Markets with bets after `300/sec` attempt | `11` |
+| Hot-market distribution after `300/sec` attempt | ten hot markets each had approximately `7904-8179` bets |
+| Total `bets` rows after fresh `250/sec` confirmation | `75001` |
+| Markets with bets after fresh `250/sec` confirmation | `10` |
+| Hot-market distribution after fresh `250/sec` confirmation | ten hot markets each had approximately `7382-7642` bets |
+
+Interpretation:
+
+- This run started from a zero-bet load-test state, so it is not merely a cumulative-history artifact.
+- The `300/sec` repeat still failed the project's preferred strict standard because there were `288` failed bet requests and `563` dropped iterations.
+- The following fresh `250/sec` repeat passed the strict standard: `0` failed bets and `0` dropped iterations for the full `5m` scenario.
+- RAM was not stressed. The minimum available RAM stayed above `31 GiB`.
+- CPU saturated the host, with Postgres consuming the largest slice.
+- This establishes `250/sec for 5m` as the current best clean sustained datapoint on this Basic AMD `8 vCPU / 32 GiB` shared-CPU single-node host.
+- This also strengthens the conclusion that the next scaling constraint is CPU-bound Postgres/write-path behavior, not memory.
+- A CPU-optimized or dedicated-CPU host is a more relevant next hardware experiment than a RAM-optimized host, but schema/index work should still happen before relying on bigger hardware as the solution.
+
 ## Deviations
 
 Record deviations here as they happen.
@@ -518,5 +588,7 @@ Record deviations here as they happen.
 | `2026-06-02T03:39Z` | Host monitor duration was corrected to include setup timeout | Needed telemetry covering setup plus scenario execution | Later runs have usable host telemetry summaries |
 | `2026-06-02T04:26Z` | Later sustained runs were cumulative-state tests, not fresh-reset tests | Prior runs inserted hundreds of thousands of hot-market bets | Sustained degradation may reflect schema/data-growth behavior, not only raw host capacity |
 | `2026-06-02T04:45Z` | Post-reset `300` bets/sec one-minute probe was run | Needed to distinguish cumulative-state degradation from fresh-state host capacity | Improved latency and CPU data strengthened the bet-history growth hypothesis |
+| `2026-06-03T03:43Z` | Repeated `300` bets/sec five-minute test on a new host after zero-bet fixture reset | Needed to separate fresh-state host ceiling from cumulative bet-history degradation | Run still failed strict clean criteria with Postgres CPU saturation, indicating a CPU/write-path ceiling even before large cumulative history |
+| `2026-06-03T03:59Z` | Repeated `250` bets/sec five-minute test after another zero-bet fixture reset | Needed to find the clean sustained boundary below failed `300/sec` | Run passed cleanly with `75001` successful bets, `0` failed bets, and `0` dropped iterations, but CPU still approached saturation |
 | `2026-06-02T04:50Z` | Attempted post-reset `300` bets/sec five-minute run was invalid | k6 used market IDs not found by the server, producing `MARKET_NOT_FOUND` while host was idle | Not capacity evidence; fixture integrity check added as required precondition |
 | `2026-06-02T04:56Z` | Temporary load-test Droplet was powered off and destroyed | Avoid ongoing DigitalOcean hourly billing after experiment window | Future testing requires new Droplet/IP and workflow target update |

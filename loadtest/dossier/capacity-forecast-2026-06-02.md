@@ -2,7 +2,7 @@
 
 Date: 2026-06-02
 
-Status: draft planning dossier
+Status: draft planning dossier; June 3 fresh-state sustained test added
 
 Related dossiers:
 
@@ -16,15 +16,17 @@ SocialPredict has enough evidence to make a cautious near-term capacity forecast
 Current evidence supports three practical conclusions:
 
 - The current small staging shape, DigitalOcean Basic `1 vCPU / 1 GiB RAM`, is useful for functional staging and light model-office traffic, not for large hot-market events.
-- A larger DigitalOcean Basic AMD shared-CPU `8 vCPU / 32 GiB RAM` single-node host produced clean one-minute hot-market bursts through about `300` bets/sec, but `350-400` bets/sec degraded and no sustained five-minute claim is valid yet.
-- Sustained hot-market capacity is currently limited more by Postgres/write-path behavior than by RAM. The leading finding is a missing composite bet-history index for the placement-time `market_id + username` lookup.
+- A larger DigitalOcean Basic AMD shared-CPU `8 vCPU / 32 GiB RAM` single-node host produced clean one-minute hot-market bursts through about `300` bets/sec, and a clean five-minute sustained run at `250` bets/sec.
+- A June 3 repeat run started from zero fixture bets and still failed the strict clean-run standard at `300` bets/sec, with Postgres CPU peaking at `568%` and host CPU idle falling to `0.12%`.
+- Sustained hot-market capacity is currently limited more by Postgres/write-path CPU behavior than by RAM. The leading software finding remains the missing composite bet-history index for the placement-time `market_id + username` lookup.
 
 The user-capacity forecast depends on how many users act inside a short event window. If `50,000` registered users produce only routine traffic, the system is likely fine at modest machine sizes. If `25-50%` of those users place bets inside the same one-minute hot window, the workload becomes a database scaling problem.
 
 Recommended next decision:
 
 - Treat `300` bets/sec for `1m` on the `8 vCPU / 32 GiB` Basic AMD host as the best current burst datapoint.
-- Do not claim `300` bets/sec sustained for `5m`.
+- Treat `250` bets/sec for `5m` on the same host as the best current clean sustained datapoint.
+- Treat `300` bets/sec for `5m` as not cleanly supported on the current single-node shape and current write path.
 - Add the missing bet-history indexes through migrations, then rerun five-minute confirmation tests.
 - For a serious `50,000` user target, plan around split app/database architecture rather than a colocated single-Droplet topology.
 
@@ -87,6 +89,8 @@ Sustained five-minute evidence:
 - `300` bets/sec for `5m` degraded.
 - `200` bets/sec for `5m` degraded.
 - `100` bets/sec for `5m` later produced timeout failures after cumulative bet history grew.
+- A June 3 repeat at `300` bets/sec began from a verified zero-bet fixture state on a fresh temporary host and still produced `288` failed bets, `563` dropped iterations, host idle CPU as low as `0.12%`, and Postgres CPU as high as `568.27%`.
+- A June 3 fresh-state `250` bets/sec run passed for the full `5m`: `75001` successful bets, `0` failed bets, `0` dropped iterations, HTTP p95 `153.72ms`, Postgres CPU up to `407.78%`, and host idle CPU as low as `0.86%`.
 
 Important diagnostic:
 
@@ -98,7 +102,10 @@ Important diagnostic:
 Interpretation:
 
 - The larger host showed strong burst capacity.
-- Sustained capacity cannot be responsibly forecast until the bet-history indexing issue is fixed and retested.
+- Sustained `250/sec` capacity is cleanly supported by the June 3 fresh-state run on this single-node shared-CPU shape.
+- Sustained `300/sec` capacity is not cleanly supported on this single-node shared-CPU shape.
+- Sustained capacity cannot be responsibly forecast upward until the bet-history indexing issue is fixed and retested.
+- Because the fresh-state repeat saturated CPU while leaving more than `31 GiB` RAM available, a CPU-optimized or dedicated-CPU Droplet is a more relevant next hardware experiment than a RAM-optimized Droplet.
 
 ## Rate-Limit Model
 
@@ -197,7 +204,7 @@ Observed/tested costs:
 | Host shape | Observed role | Approximate price | Evidence-supported use |
 | --- | --- | ---: | --- |
 | Basic `1 vCPU / 1 GiB / 25 GiB` | staging/model-office floor | `$0.00893/hr`, `$6/mo` | Functional staging and light traffic; clean `50/sec` burst, not large hot events. |
-| Basic AMD `8 vCPU / 32 GiB / 25 GiB root disk observed` | temporary load-test host | `$0.250000/hr`, `$168/mo` | Clean `300/sec` one-minute burst; sustained proof blocked by schema/index issue. |
+| Basic AMD `8 vCPU / 32 GiB / 25 GiB root disk observed` | temporary load-test host | `$0.250000/hr`, `$168/mo` | Clean `300/sec` one-minute burst; clean `250/sec` five-minute sustained run; fresh-state `300/sec` five-minute repeat failed strict clean criteria under Postgres CPU saturation. |
 
 Recommendation by target:
 
@@ -209,6 +216,12 @@ Recommendation by target:
 | `30,000` users with hot events | Larger app host plus serious Postgres tuning; consider separating DB. | `25%` event requires `125/sec`, which should not rely on a tiny colocated DB. |
 | `50,000` users with `25%` one-minute hot participation | Larger app tier plus managed or separately tuned Postgres. | Requires about `208/sec`; current burst evidence says plausible, sustained evidence does not. |
 | `50,000` users with `50%` one-minute hot participation | Treat as a scale project, not a single-Droplet deployment. | Requires about `417/sec`; current large-host test degraded by `350-400/sec`. |
+
+Hardware interpretation:
+
+- The June 3 repeat indicates CPU, not RAM, is the binding resource for concentrated hot-market writes.
+- A CPU-optimized or dedicated-CPU Droplet is therefore the better next hardware comparison than a RAM-optimized Droplet.
+- Bigger hardware should not replace the schema work. The bet-placement write path still needs index/migration hardening before using larger-host results as production guidance.
 
 ## Recommendations
 
@@ -262,8 +275,9 @@ For serious `30,000-50,000` user planning, move the thinking away from one all-i
 The practical forecast today is:
 
 - `50/sec`: proven on small staging for `1m`; safe target for small/model-office traffic with headroom on larger hosts.
-- `100-200/sec`: likely feasible as event bursts on the larger host, but sustained proof should wait for index retest.
-- `300/sec`: proven as a one-minute burst on the larger host; not yet proven sustained.
+- `100-200/sec`: likely feasible as sustained hot-market traffic on the larger host, but still should be retested after index work.
+- `250/sec`: proven as a clean five-minute sustained hot-market run on the larger host.
+- `300/sec`: proven as a one-minute burst on the larger host; fresh-state five-minute repeat failed strict clean criteria.
 - `400/sec`: degraded on the larger host; not currently supported.
 - `500/sec`: not currently supported.
 
