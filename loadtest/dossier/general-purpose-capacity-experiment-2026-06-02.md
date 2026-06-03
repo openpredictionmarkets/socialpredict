@@ -547,6 +547,78 @@ The June 3 runs show CPU pressure concentrated in Postgres while RAM remains ple
 
 The right sequencing is: index migration, query-shape optimization, fresh five-minute load tests, then hardware/architecture comparison.
 
+7. Use Redis or another cache selectively for read-heavy, slightly stale views.
+
+Redis is an in-memory key-value store. In this context, "using Redis to cache Postgres" should not mean putting Redis in front of every database call or treating Redis as the source of truth. It means caching selected read results that are expensive to compute and safe to serve for a short time.
+
+Good candidates:
+
+| Candidate | Cache Shape | Likelihood | Notes |
+| --- | --- | --- | --- |
+| Global leaderboard | snapshot keyed by leaderboard version/query/page with short TTL | High | The analytics code already has a `GlobalLeaderboardSnapshot` seam, which is an appropriate cache boundary. |
+| System financial metrics | snapshot keyed by config/version with short TTL | Medium-High | Useful because these are diagnostic aggregates, not per-request transactional writes. |
+| Market summary cards | per-market summary with short TTL or write-through invalidation | Medium | Useful for list pages if cards repeatedly show probability, volume, bet count, and status. |
+| Market bet/position page counts | count/summary cache with short TTL | Medium | Can avoid repeated count queries on hot pages; detail rows should still be paginated. |
+| Public setup/config frontend policy | in-process or Redis cache with long TTL/version key | Medium | Config is mostly static after install; cache mainly reduces repeated serialization, not DB pressure. |
+
+Poor candidates:
+
+| Candidate | Why Not |
+| --- | --- |
+| Bet placement correctness | Bets must remain transactional in Postgres. Redis should not decide balances, duplicate-bet checks, or final financial correctness unless there is a much larger event-sourcing design. |
+| User balances during writes | Balance changes must be atomic with bet writes. A cache can display a recent balance, but Postgres must own the ledger. |
+| Full unpaginated histories | Caching huge payloads can move pressure from Postgres to Redis/network/memory rather than solving the shape problem. Paginate first. |
+
+Cache invalidation policy should be explicit:
+
+- Prefer short TTLs for analytics snapshots.
+- Include page/query parameters in cache keys.
+- Invalidate or version market summary keys after bet placement, market resolution, or market approval/rejection.
+- Keep cache failures non-fatal: if Redis is down, fall back to Postgres and log the miss/error.
+- Never let cached financial data become the ledger of record.
+
+Recommended Redis sequencing:
+
+1. Add indexes and pagination first.
+2. Add a cache interface behind analytics/repository boundaries.
+3. Start with global leaderboard and system stats snapshots.
+4. Add market summary caching only after summary contracts are explicit.
+5. Load test read-heavy browsing scenarios with cache on/off.
+
+## UX And API Demand-Shaping Checklist
+
+Not every capacity improvement needs to come from a faster database query. Some load can be avoided by changing default UI behavior so expensive data paths are opt-in, paginated, or progressively disclosed. These changes should be treated as product/API design work, not only frontend polish, because the backend endpoints must support the lighter access pattern.
+
+Likelihood estimates below mean "likelihood of reducing avoidable backend/database load during normal browsing." They are not a substitute for measurement.
+
+| Done | Idea | Likelihood | Reason |
+| --- | --- | --- | --- |
+| [ ] | Paginate market bet history on each market page. | High | `BetsActivity` currently fetches market bets as a full list. Hot markets can accumulate tens of thousands of rows, so pagination directly limits transfer, JSON encoding, sorting, and probability display work. |
+| [ ] | Paginate market positions on each market page. | High | `PositionsActivity` currently requests all market positions and filters/sorts client-side. Large markets can make this expensive even when users only inspect the first page. |
+| [ ] | Change market activity default tab away from heavy data. Prefer a lightweight `Comments`/overview tab once comments are real, or another cheap summary tab until then. | High | The current activity tab order starts with `Positions`, causing position fetches on market detail load. Defaulting to a cheap tab makes bets/positions user-initiated. |
+| [ ] | Lazy-load Bets, Positions, and Leaderboard tab contents only when the tab is opened. | High | Avoids paying for all market-adjacent views when a visitor only wants the market question/trade panel. |
+| [ ] | Add "Show bets" / "Show positions" buttons for expensive market detail sections. | High | Explicit disclosure is clearer than hidden automatic fetches and protects hot market pages during traffic spikes. |
+| [ ] | Make user financial positions opt-in behind a button on profile/user pages. | Medium-High | Public profile/portfolio/financial views can trigger multi-market position calculations; requiring a click prevents casual profile views from doing heavy accounting work. |
+| [ ] | Split simple user financial summary from complex financial statements. | Medium-High | Lightweight balances and totals can load first; high-cost derived financial/accounting views can be requested only by users who need them. |
+| [ ] | Paginate public portfolio positions. | Medium-High | User portfolios can grow with market count; pagination caps response size and client rendering cost. |
+| [ ] | Reorder Stats tabs to `Setup Configuration`, `System Financial Metrics`, then `Global Leaderboard`. | Medium | `Stats.jsx` currently defaults to Global Leaderboard, though it already requires a button click. Reordering communicates that setup config is the cheap/default view. |
+| [ ] | Keep Global Leaderboard behind an explicit "Calculate" button and add backend pagination. | Medium-High | The button already prevents automatic calculation, but once loaded the leaderboard should not require all rows at once. |
+| [ ] | Paginate global leaderboard results. | Medium-High | Global leaderboards can touch many users/markets and produce large result sets; pagination bounds response and render size. |
+| [ ] | Simplify System Financial Metrics by default and hide complex/derived metrics behind "Show advanced metrics." | Medium | Some system metrics are likely aggregate-heavy. Progressive disclosure prevents expensive diagnostics from being part of the default stats page. |
+| [ ] | Cache or snapshot system statistics with a short TTL. | Medium | System stats are read-style diagnostics and may not need exact real-time recomputation for every click. |
+| [ ] | Add endpoint-level `limit`, `cursor`/`offset`, and `sort` contracts to OpenAPI for bets, positions, and leaderboards. | High | UI pagination only reduces DB load if the API and repository actually page at the database boundary. |
+| [ ] | Return summary counts separately from full detail rows. | Medium | Pages often need "there are N bets/positions" before they need every row. Count/summary endpoints can be cheaper and cacheable. |
+| [ ] | Add load-test scenarios for browsing market detail pages with and without optional panels open. | Medium | Current hot-market tests focus on betting. A separate browsing scenario should measure whether pagination/lazy loading reduces read pressure. |
+
+Suggested implementation order:
+
+1. Add backend pagination contracts for market bets, market positions, and global leaderboard.
+2. Update market detail tabs so heavy tabs fetch only after user action.
+3. Default market detail activity to a cheap tab or placeholder until comments exist.
+4. Split profile/user financial views into summary-first and advanced-on-click.
+5. Reorder Stats tabs and keep leaderboard/system metrics explicit.
+6. Add load-test browsing scenarios to quantify read-path improvement.
+
 ## Conclusion
 
 Preliminary conclusion:
