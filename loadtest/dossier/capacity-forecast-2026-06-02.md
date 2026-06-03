@@ -347,3 +347,96 @@ The practical forecast today is:
 - `500/sec`: not currently supported.
 
 The most important next work is not buying a bigger machine. It is fixing the bet-history query path, then repeating five-minute sustained tests.
+
+## Future Snapshot Cache Plan
+
+The goal of snapshot caching is to keep expensive read-side analytics fast without making Redis responsible for financial correctness. Postgres remains authoritative for bets, balances, market state, and the financial ledger.
+
+### Snapshot Rules
+
+- Every cached snapshot should include `generatedAt`, `expiresAt`, and enough cache-key context to explain what it represents.
+- UI should show `Last updated at ...` for cached analytics.
+- If Redis is unavailable, handlers should fall back to Postgres and log the cache failure.
+- Cached snapshots should be safe to delete at any time.
+- Do not cache write-path decisions such as duplicate-bet checks, balance updates, or payout correctness.
+
+### First Snapshot Candidates
+
+| Snapshot | Refresh Strategy | Suggested Freshness | Why |
+| --- | --- | --- | --- |
+| Global leaderboard | Scheduled refresh plus manual admin refresh | `15m-1h` | Expensive aggregate; users can tolerate leaderboard staleness if timestamped. |
+| System financial metrics | Scheduled refresh plus manual admin refresh | `5m-15m` | Useful operational aggregate; exact values can be recomputed on demand. |
+| Market summary cards | TTL or scheduled refresh | `10s-60s` | Hot market cards are read often and can be slightly stale. |
+| Market bet count / position count | TTL cache | `30s-5m` | Counts help paginated UI without loading full detail rows. |
+| Public setup/config snapshot | Startup/in-process cache, optionally Redis version key | hours or release/version scoped | Config rarely changes after install; mostly avoids repeated serialization. |
+
+### Concrete Implementation Steps
+
+1. Define a cache interface inside the backend, not in handlers.
+
+Example shape:
+
+```go
+type SnapshotCache interface {
+    Get(ctx context.Context, key string, dest any) (bool, error)
+    Set(ctx context.Context, key string, value any, ttl time.Duration) error
+    Delete(ctx context.Context, key string) error
+}
+```
+
+2. Add a no-op/in-memory implementation first.
+
+This keeps local dev and tests simple and lets the service boundary stabilize before adding Redis infrastructure.
+
+3. Add Redis as an optional runtime dependency.
+
+Suggested environment shape:
+
+```env
+CACHE_BACKEND=none|redis
+REDIS_URL=redis://redis:6379/0
+CACHE_GLOBAL_LEADERBOARD_TTL=1h
+CACHE_SYSTEM_STATS_TTL=15m
+CACHE_MARKET_SUMMARY_TTL=30s
+```
+
+4. Cache global leaderboard snapshots behind the analytics boundary.
+
+The code already has `GlobalLeaderboardSnapshot`, which is the right seam. The HTTP handler should ask the analytics service for a snapshot; the analytics service can decide whether to return cached data or compute from Postgres.
+
+5. Add scheduled refresh jobs only after the cache read path works.
+
+A scheduled job can recompute snapshots every `15m` or `1h`. The endpoint can also refresh on cache miss. This avoids making every user request recompute a large leaderboard.
+
+6. Add manual admin refresh controls for expensive snapshots.
+
+Admin-only controls should be able to refresh global leaderboard and system metrics. This is useful before demos, after test resets, or after deployments.
+
+7. Add API metadata so clients know data freshness.
+
+Responses should include fields like:
+
+```json
+{
+  "generatedAt": "2026-06-03T04:00:00Z",
+  "expiresAt": "2026-06-03T05:00:00Z",
+  "source": "cache"
+}
+```
+
+8. Keep pagination as the default for detail rows.
+
+Redis snapshots should not become a way to serve huge unpaginated histories. Bets, positions, and leaderboards should still expose `limit`, `cursor` or `offset`, and explicit sorting.
+
+9. Test cache behavior in load tests.
+
+Add read-heavy scenarios that compare:
+
+- cache disabled
+- cache enabled with warm snapshots
+- cache enabled after expiry
+- Redis unavailable fallback
+
+10. Revisit invalidation only after TTL snapshots are useful.
+
+Start with TTL/scheduled snapshots. Add write-triggered invalidation later only where staleness is unacceptable and the complexity is justified.
