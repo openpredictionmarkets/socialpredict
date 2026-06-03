@@ -247,6 +247,36 @@ CREATE INDEX CONCURRENTLY idx_bets_market_id_placed_at_id ON bets (market_id, pl
 
 These must be implemented through SocialPredict's timestamped migration system and tested with the existing API/load-test tooling.
 
+### Future Optimization Recommendation
+
+After the first index migration, optimize in this order:
+
+1. Keep tuned persistence logic behind repository/domain-service boundaries.
+
+The current code already has GORM repositories for market and user persistence. That is the right boundary for custom SQL or GORM `Select(...)` projections. Handlers should not grow direct SQL.
+
+2. Replace full-history/full-row reads with narrower query shapes where behavior allows.
+
+High-traffic paths such as market bet history, market volume, probability projection, and market positions currently have paths that load market-scoped bet histories into Go. Future repository methods can use narrower projections or explicit SQL for common reads while preserving domain outputs.
+
+3. Push simple aggregates to Postgres.
+
+For example, market volume can eventually be backed by:
+
+```sql
+SELECT COALESCE(SUM(amount), 0) FROM bets WHERE market_id = $1;
+```
+
+That avoids transferring all bet rows only to sum them in Go.
+
+4. Consider summary state only after indexes and query-shape changes are measured.
+
+If hot-market tests still saturate Postgres CPU, introduce transactionally maintained summaries for current probability, market volume, bet counts, and per-user market positions. This is a larger design change because it moves selected values from computed-on-read to updated-on-write.
+
+5. Keep probability/game-engine changes explicit.
+
+If probability updates need to stop replaying full bet history on hot paths, that should be designed at the game-engine boundary: ledger replay for audit/debug paths, incremental state for hot writes, and optional reconciliation checks. It should not become an ad hoc persistence shortcut.
+
 ### Testing Recommendation
 
 After the index migration:

@@ -475,6 +475,78 @@ The current evidence supports two separate claims:
 2. Sustained capacity cannot be claimed yet because cumulative bet-history growth degrades the write path. The next engineering step is to add and test the missing bet-history indexes, then rerun the sustained ladder from a reset fixture state.
 3. Fixture integrity is now a required precondition for long runs. A smoke test alone is not enough if the local hot-market fixture file can drift from the active server database.
 
+## Future Optimization Analysis
+
+The current codebase already has repository boundaries around market and user persistence, so future Postgres optimizations should live behind those repositories and domain services rather than being scattered through handlers. The main candidates are:
+
+1. Add targeted indexes through timestamped migrations.
+
+The most immediate candidate remains:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_bets_market_id_username ON bets (market_id, username);
+```
+
+This targets the placement-time check for whether a user has already bet in a market. A second candidate is:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_bets_market_id_placed_at_id ON bets (market_id, placed_at, id);
+```
+
+This targets market-scoped history reads that need deterministic chronological order.
+
+2. Replace full-row GORM loads with narrow query projections where the domain only needs a subset of columns.
+
+Current repository paths such as `ListBetsForMarket` and `loadMarketData` load full bet rows before converting them into boundary/domain structs. That is appropriate for correctness-first implementation, but it can be wasteful under hot-market load. Candidate follow-up work:
+
+- use GORM `Select(...)` for known domain projections
+- use custom SQL through the repository for high-traffic read paths
+- avoid loading fields that are not consumed by probability, volume, position, or display calculations
+- add tests that preserve domain output while changing the persistence query shape
+
+3. Move common aggregates into explicit repository methods.
+
+`CalculateMarketVolume` currently asks the repository for all bets and then sums in Go. For larger histories, the repository can expose a database-backed aggregate such as:
+
+```sql
+SELECT COALESCE(SUM(amount), 0) FROM bets WHERE market_id = $1;
+```
+
+That keeps the domain service API clean while letting Postgres do the aggregate without transferring every bet row.
+
+4. Introduce market summary state for write-heavy hot paths if indexes and narrow reads are not enough.
+
+If sustained tests still show Postgres CPU saturation after indexing, add transactionally maintained summary tables or columns for:
+
+- current market probability
+- market volume
+- per-market bet count
+- per-user per-market position
+
+This is a larger design change because it shifts some values from computed-on-read to updated-on-write. It should only happen after index and query-shape changes are measured.
+
+5. Revisit the game/probability engine boundary.
+
+The probability engine currently operates over bet history. That is simple and auditable, but hot markets expose the cost of repeatedly replaying history. A future game-engine design can define whether probability is:
+
+- replayed from the event ledger for audit/debug paths
+- incrementally updated from the prior market state for hot write paths
+- periodically reconciled by a background consistency check
+
+This should be designed at the game-engine boundary rather than as an ad hoc Postgres shortcut.
+
+6. Separate Postgres or use managed Postgres before treating bigger app hosts as the only answer.
+
+The June 3 runs show CPU pressure concentrated in Postgres while RAM remains plentiful. A CPU-optimized or dedicated-CPU Droplet is a useful next hardware comparison, but a production-oriented architecture should also evaluate:
+
+- app/database separation
+- managed Postgres sizing
+- connection pooling
+- Postgres parameter tuning
+- backups and recovery posture
+
+The right sequencing is: index migration, query-shape optimization, fresh five-minute load tests, then hardware/architecture comparison.
+
 ## Conclusion
 
 Preliminary conclusion:
