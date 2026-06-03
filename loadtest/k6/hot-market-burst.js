@@ -5,8 +5,10 @@ const duration = __ENV.DURATION || '60s';
 const targetRate = Number(__ENV.TARGET_RATE || '50');
 const targetTimeUnit = __ENV.TARGET_TIME_UNIT || '1s';
 const preauthUsers = Number(__ENV.PREAUTH_USERS || '100');
+const setupTimeout = __ENV.SETUP_TIMEOUT || '5m';
 
 export const options = {
+  setupTimeout,
   scenarios: {
     hot_market_burst: {
       executor: 'constant-arrival-rate',

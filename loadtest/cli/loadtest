@@ -31,8 +31,8 @@ Run examples:
   ./loadtest/cli/loadtest fixtures pull staging
   ./loadtest/cli/loadtest run smoke --base-url https://kconfs.com --api-prefix /api
   ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
-  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100
-  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100 --monitor-env staging
+  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100 --setup-timeout 5m
+  ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100 --setup-timeout 5m --monitor-env staging
   ./loadtest/cli/loadtest dossier --summary loadtest/results/smoke-20260528T120000Z-summary.json --out loadtest/dossier/runs/smoke.json
 
 Fixture defaults:
@@ -935,6 +935,7 @@ run_cmd() {
   local target_rate="${TARGET_RATE:-}"
   local target_time_unit="${TARGET_TIME_UNIT:-}"
   local preauth_users="${PREAUTH_USERS:-}"
+  local setup_timeout="${SETUP_TIMEOUT:-}"
   local bet_rate="${BET_RATE:-}"
   local bet_time_unit="${BET_TIME_UNIT:-}"
   local browse_rate="${BROWSE_RATE:-}"
@@ -960,6 +961,7 @@ run_cmd() {
       --target-rate) target_rate="$2"; shift 2 ;;
       --target-time-unit) target_time_unit="$2"; shift 2 ;;
       --preauth-users) preauth_users="$2"; shift 2 ;;
+      --setup-timeout) setup_timeout="$2"; shift 2 ;;
       --bet-rate) bet_rate="$2"; shift 2 ;;
       --bet-time-unit) bet_time_unit="$2"; shift 2 ;;
       --browse-rate) browse_rate="$2"; shift 2 ;;
@@ -1008,8 +1010,10 @@ run_cmd() {
   local monitor_pid=""
   if [ -n "$monitor_env" ]; then
     local monitor_duration_seconds
+    local monitor_setup_timeout_seconds
     monitor_duration_seconds="$(duration_to_seconds "${duration:-60s}")"
-    monitor_duration_seconds=$((monitor_duration_seconds + monitor_interval + 5))
+    monitor_setup_timeout_seconds="$(duration_to_seconds "${setup_timeout:-5m}")"
+    monitor_duration_seconds=$((monitor_duration_seconds + monitor_setup_timeout_seconds + monitor_interval + 5))
     if [ -z "$monitor_out" ]; then
       monitor_out="${LOADTEST_DIR}/hostops/${scenario}-${monitor_env}-$(iso_stamp)-host.csv"
     fi
@@ -1052,6 +1056,7 @@ run_cmd() {
     TARGET_RATE="$target_rate" \
     TARGET_TIME_UNIT="$target_time_unit" \
     PREAUTH_USERS="$preauth_users" \
+    SETUP_TIMEOUT="$setup_timeout" \
     BET_RATE="$bet_rate" \
     BET_TIME_UNIT="$bet_time_unit" \
     BROWSE_RATE="$browse_rate" \
