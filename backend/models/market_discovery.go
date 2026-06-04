@@ -42,13 +42,14 @@ type MarketDiscoverySection struct {
 
 type MarketDiscoveryPin struct {
 	gorm.Model
-	ID           uint   `gorm:"primaryKey"`
-	ScopeType    string `gorm:"not null;index;size:32"`
-	ScopeID      uint   `gorm:"not null;index"`
-	PinType      string `gorm:"not null;index;size:32"`
-	MarketID     *int64 `gorm:"index"`
-	TargetPageID *uint  `gorm:"index"`
-	Label        string `gorm:"size:160"`
-	SortOrder    int    `gorm:"not null;default:0;index"`
-	CreatedBy    string `gorm:"size:64"`
+	ID             uint   `gorm:"primaryKey"`
+	ScopeType      string `gorm:"not null;index;size:32"`
+	ScopeID        uint   `gorm:"not null;index"`
+	PinType        string `gorm:"not null;index;size:32"`
+	MarketID       *int64 `gorm:"index"`
+	TargetPageID   *uint  `gorm:"index"`
+	TargetPageSlug string `gorm:"index;size:96"`
+	Label          string `gorm:"size:160"`
+	SortOrder      int    `gorm:"not null;default:0;index"`
+	CreatedBy      string `gorm:"size:64"`
 }

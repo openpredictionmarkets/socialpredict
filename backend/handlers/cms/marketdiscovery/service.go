@@ -21,8 +21,15 @@ const (
 
 	MaxTitleLength       = 160
 	MaxDescriptionLength = 500
+	MaxSlugLength        = 96
+	MaxSectionsPerPage   = 24
+	MaxPinsPerPage       = 48
 	MinRecommendation    = 1
 	MaxRecommendation    = 50
+
+	ScopeTypePage        = "page"
+	PinTypeMarket        = "market"
+	PinTypeDiscoveryPage = "discovery_page"
 )
 
 type Service struct {
@@ -49,6 +56,29 @@ type UpdateInput struct {
 	Version                    uint
 }
 
+type SectionInput struct {
+	Slug          string
+	Title         string
+	Description   string
+	TagFilterSlug string
+	SortOrder     int
+	IsActive      bool
+}
+
+type PinInput struct {
+	PinType        string
+	MarketID       int64
+	TargetPageSlug string
+	Label          string
+	SortOrder      int
+}
+
+type PageComposition struct {
+	Page     *models.MarketDiscoveryPage
+	Sections []models.MarketDiscoverySection
+	Pins     []models.MarketDiscoveryPin
+}
+
 func (s *Service) GetPage(slug string) (*models.MarketDiscoveryPage, error) {
 	slug = normalizeSlug(slug)
 	if slug == "" {
@@ -62,6 +92,25 @@ func (s *Service) GetPage(slug string) (*models.MarketDiscoveryPage, error) {
 		return DefaultPage(slug), nil
 	}
 	return nil, err
+}
+
+func (s *Service) GetComposition(slug string) (*PageComposition, error) {
+	page, err := s.GetPage(slug)
+	if err != nil {
+		return nil, err
+	}
+	if page.ID == 0 {
+		return &PageComposition{Page: page, Sections: []models.MarketDiscoverySection{}, Pins: []models.MarketDiscoveryPin{}}, nil
+	}
+	sections, err := s.repo.ListSections(page.ID)
+	if err != nil {
+		return nil, err
+	}
+	pins, err := s.repo.ListPins(page.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &PageComposition{Page: page, Sections: sections, Pins: pins}, nil
 }
 
 func (s *Service) UpdatePage(slug string, in UpdateInput) (*models.MarketDiscoveryPage, error) {
@@ -107,6 +156,64 @@ func (s *Service) UpdatePage(slug string, in UpdateInput) (*models.MarketDiscove
 	return page, nil
 }
 
+func (s *Service) ReplaceSections(slug string, inputs []SectionInput) (*PageComposition, error) {
+	if len(inputs) > MaxSectionsPerPage {
+		return nil, errors.New("too many sections")
+	}
+	page, err := s.ensurePersistedPage(slug)
+	if err != nil {
+		return nil, err
+	}
+	sections := make([]models.MarketDiscoverySection, 0, len(inputs))
+	for index, input := range inputs {
+		section, err := sectionFromInput(input, index)
+		if err != nil {
+			return nil, err
+		}
+		sections = append(sections, section)
+	}
+	if err := s.repo.ReplaceSections(page.ID, sections); err != nil {
+		return nil, err
+	}
+	return s.GetComposition(page.Slug)
+}
+
+func (s *Service) ReplacePins(slug string, inputs []PinInput, actorUsername string) (*PageComposition, error) {
+	if len(inputs) > MaxPinsPerPage {
+		return nil, errors.New("too many pins")
+	}
+	page, err := s.ensurePersistedPage(slug)
+	if err != nil {
+		return nil, err
+	}
+	pins := make([]models.MarketDiscoveryPin, 0, len(inputs))
+	for index, input := range inputs {
+		pin, err := pinFromInput(input, index, actorUsername)
+		if err != nil {
+			return nil, err
+		}
+		pins = append(pins, pin)
+	}
+	if err := s.repo.ReplacePins(page.ID, pins); err != nil {
+		return nil, err
+	}
+	return s.GetComposition(page.Slug)
+}
+
+func (s *Service) ensurePersistedPage(slug string) (*models.MarketDiscoveryPage, error) {
+	page, err := s.GetPage(slug)
+	if err != nil {
+		return nil, err
+	}
+	if page.ID != 0 {
+		return page, nil
+	}
+	if err := s.repo.SavePage(page); err != nil {
+		return nil, err
+	}
+	return page, nil
+}
+
 func DefaultPage(slug string) *models.MarketDiscoveryPage {
 	slug = normalizeSlug(slug)
 	page := &models.MarketDiscoveryPage{
@@ -132,6 +239,78 @@ func DefaultPage(slug string) *models.MarketDiscoveryPage {
 		page.SectionsEnabled = true
 	}
 	return page
+}
+
+func sectionFromInput(input SectionInput, index int) (models.MarketDiscoverySection, error) {
+	title := strings.Join(strings.Fields(strings.TrimSpace(input.Title)), " ")
+	if title == "" {
+		return models.MarketDiscoverySection{}, errors.New("section title is required")
+	}
+	if len([]rune(title)) > MaxTitleLength {
+		return models.MarketDiscoverySection{}, errors.New("section title is too long")
+	}
+	description := strings.Join(strings.Fields(strings.TrimSpace(input.Description)), " ")
+	if len([]rune(description)) > MaxDescriptionLength {
+		return models.MarketDiscoverySection{}, errors.New("section description is too long")
+	}
+	slug := normalizeSlug(input.Slug)
+	if slug == "" {
+		slug = slugFromTitle(title)
+	}
+	if len([]rune(slug)) > MaxSlugLength {
+		return models.MarketDiscoverySection{}, errors.New("section slug is too long")
+	}
+	sortOrder := input.SortOrder
+	if sortOrder == 0 {
+		sortOrder = index + 1
+	}
+	return models.MarketDiscoverySection{
+		Slug:          slug,
+		Title:         title,
+		Description:   description,
+		TagFilterSlug: normalizeSlug(input.TagFilterSlug),
+		SortOrder:     sortOrder,
+		IsActive:      input.IsActive,
+	}, nil
+}
+
+func pinFromInput(input PinInput, index int, actorUsername string) (models.MarketDiscoveryPin, error) {
+	pinType := strings.ToLower(strings.TrimSpace(input.PinType))
+	if pinType == "" {
+		pinType = PinTypeMarket
+	}
+	if pinType != PinTypeMarket && pinType != PinTypeDiscoveryPage {
+		return models.MarketDiscoveryPin{}, errors.New("invalid pin type")
+	}
+	label := strings.Join(strings.Fields(strings.TrimSpace(input.Label)), " ")
+	if len([]rune(label)) > MaxTitleLength {
+		return models.MarketDiscoveryPin{}, errors.New("pin label is too long")
+	}
+	sortOrder := input.SortOrder
+	if sortOrder == 0 {
+		sortOrder = index + 1
+	}
+	pin := models.MarketDiscoveryPin{
+		ScopeType: ScopeTypePage,
+		PinType:   pinType,
+		Label:     label,
+		SortOrder: sortOrder,
+		CreatedBy: strings.TrimSpace(actorUsername),
+	}
+	switch pinType {
+	case PinTypeMarket:
+		if input.MarketID <= 0 {
+			return models.MarketDiscoveryPin{}, errors.New("market pin requires market id")
+		}
+		pin.MarketID = &input.MarketID
+	case PinTypeDiscoveryPage:
+		targetPageSlug := normalizeSlug(input.TargetPageSlug)
+		if targetPageSlug == "" {
+			return models.MarketDiscoveryPin{}, errors.New("discovery page pin requires target page slug")
+		}
+		pin.TargetPageSlug = targetPageSlug
+	}
+	return pin, nil
 }
 
 func validateInput(slug string, in UpdateInput) (string, string, string, string, string, int, int, error) {
@@ -180,4 +359,22 @@ func clampRecommendationLimit(value int, fallback int) int {
 
 func normalizeSlug(value string) string {
 	return strings.Trim(strings.ToLower(strings.TrimSpace(value)), "-")
+}
+
+func slugFromTitle(title string) string {
+	title = strings.ToLower(strings.TrimSpace(title))
+	var builder strings.Builder
+	lastHyphen := false
+	for _, r := range title {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			builder.WriteRune(r)
+			lastHyphen = false
+			continue
+		}
+		if !lastHyphen {
+			builder.WriteRune('-')
+			lastHyphen = true
+		}
+	}
+	return normalizeSlug(builder.String())
 }

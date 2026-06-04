@@ -10,9 +10,11 @@ import (
 )
 
 type mockRepository struct {
-	page    *models.MarketDiscoveryPage
-	saveErr error
-	getErr  error
+	page     *models.MarketDiscoveryPage
+	sections []models.MarketDiscoverySection
+	pins     []models.MarketDiscoveryPin
+	saveErr  error
+	getErr   error
 }
 
 func (m *mockRepository) GetPageBySlug(string) (*models.MarketDiscoveryPage, error) {
@@ -29,7 +31,28 @@ func (m *mockRepository) SavePage(page *models.MarketDiscoveryPage) error {
 	if m.saveErr != nil {
 		return m.saveErr
 	}
+	if page.ID == 0 {
+		page.ID = 1
+	}
 	m.page = page
+	return nil
+}
+
+func (m *mockRepository) ListSections(uint) ([]models.MarketDiscoverySection, error) {
+	return m.sections, nil
+}
+
+func (m *mockRepository) ReplaceSections(_ uint, sections []models.MarketDiscoverySection) error {
+	m.sections = sections
+	return nil
+}
+
+func (m *mockRepository) ListPins(uint) ([]models.MarketDiscoveryPin, error) {
+	return m.pins, nil
+}
+
+func (m *mockRepository) ReplacePins(_ uint, pins []models.MarketDiscoveryPin) error {
+	m.pins = pins
 	return nil
 }
 
@@ -96,5 +119,53 @@ func TestUpdatePagePropagatesRepositoryError(t *testing.T) {
 	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("UpdatePage error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestReplaceSectionsPersistsOrderedSections(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo)
+
+	composition, err := svc.ReplaceSections(PageSlugMarkets, []SectionInput{{
+		Title:       "Politics",
+		Description: "Political markets",
+		IsActive:    true,
+	}})
+	if err != nil {
+		t.Fatalf("ReplaceSections returned error: %v", err)
+	}
+	if len(composition.Sections) != 1 || composition.Sections[0].Slug != "politics" || composition.Sections[0].SortOrder != 1 {
+		t.Fatalf("unexpected sections: %+v", composition.Sections)
+	}
+}
+
+func TestReplacePinsPersistsMarketAndTopicPins(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo)
+
+	composition, err := svc.ReplacePins(PageSlugMarkets, []PinInput{
+		{PinType: PinTypeMarket, MarketID: 42, Label: "Featured market"},
+		{PinType: PinTypeDiscoveryPage, TargetPageSlug: "politics", Label: "Politics"},
+	}, "admin")
+	if err != nil {
+		t.Fatalf("ReplacePins returned error: %v", err)
+	}
+	if len(composition.Pins) != 2 {
+		t.Fatalf("expected two pins, got %+v", composition.Pins)
+	}
+	if composition.Pins[0].MarketID == nil || *composition.Pins[0].MarketID != 42 {
+		t.Fatalf("expected market pin, got %+v", composition.Pins[0])
+	}
+	if composition.Pins[1].TargetPageSlug != "politics" || composition.Pins[1].CreatedBy != "admin" {
+		t.Fatalf("expected topic pin, got %+v", composition.Pins[1])
+	}
+}
+
+func TestReplacePinsRejectsInvalidMarketPin(t *testing.T) {
+	svc := NewService(&mockRepository{})
+
+	_, err := svc.ReplacePins(PageSlugMarkets, []PinInput{{PinType: PinTypeMarket}}, "admin")
+	if err == nil {
+		t.Fatalf("expected validation error")
 	}
 }

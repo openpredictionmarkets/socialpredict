@@ -5,7 +5,7 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-04T00:00:00Z
 updated_at_display: "Thursday, June 4, 2026"
-update_reason: "Track first implementation slice for market tag persistence, admin tag management, moderator selection, and tag display."
+update_reason: "Track implementation slices for tag persistence, market discovery layout persistence, and page-level CMS sections/pins."
 status: in-progress
 ---
 
@@ -64,7 +64,7 @@ Checklist:
 - [x] Include tag chips/data in admin market review payloads.
 - [ ] Allow admin adjustment of tags during proposal review if policy approves.
 - [x] Include tags in published market payloads.
-- [ ] Update `backend/docs/openapi.yaml`.
+- [x] Update `backend/docs/openapi.yaml`.
 - [x] Add handler/domain tests.
 - [ ] Run schemathesis/go-kin validation once OpenAPI is updated.
 
@@ -107,8 +107,9 @@ Checklist:
 - [ ] Support implicit `All` section when no sections exist.
 - [x] Add public page composition endpoint.
 - [x] Add admin page layout management API.
-- [ ] Add admin section management APIs.
-- [ ] Add tests for published/unpublished pages and section ordering.
+- [x] Add admin section management APIs.
+- [x] Add tests for page composition and section ordering.
+- [ ] Add tests for published/unpublished page visibility once secondary routes are public.
 
 ## 07. Pins And Featured Content
 
@@ -117,12 +118,13 @@ Service ownership: CMS/content context.
 Checklist:
 
 - [x] Add migration for `market_discovery_pins`.
-- [ ] Support pinned markets by page and section.
-- [ ] Support pinned secondary category pages on top-level page.
-- [ ] Add ordering controls.
+- [x] Support page-level pinned markets.
+- [ ] Support section-level pinned markets.
+- [x] Support pinned secondary category pages on top-level page.
+- [x] Add ordering controls.
 - [ ] Define behavior for cancelled/resolved/hidden pinned targets.
-- [ ] Add admin pin/unpin APIs.
-- [ ] Add tests for ordering and target validation.
+- [x] Add admin pin/unpin APIs.
+- [x] Add tests for ordering and target validation.
 
 ## 08. Recommendation Fallback
 
@@ -145,10 +147,10 @@ Checklist:
 
 - [x] Add admin CMS panel that distinguishes Home Page, Market Discovery Layout, and Social Share settings.
 - [x] Update `/markets` to consume composed top-level page model.
-- [ ] Preserve search-first layout.
-- [ ] Render compact recommendations when pinned content exists.
-- [ ] Render featured category cards.
-- [ ] Render featured market cards.
+- [x] Preserve search-first layout.
+- [x] Render compact recommendations when pinned content exists.
+- [x] Render featured category cards.
+- [x] Render featured market cards.
 - [x] Render tag chips in search/list cards.
 - [ ] Add secondary category page route/layout.
 - [ ] Scope secondary-page search to page tag/category by default.

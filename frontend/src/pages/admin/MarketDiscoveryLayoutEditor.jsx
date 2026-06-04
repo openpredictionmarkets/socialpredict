@@ -49,7 +49,11 @@ const defaultPageState = {
   recommendationLimit: 20,
   isPublished: true,
   version: 0,
+  sections: [],
+  pins: [],
 };
+
+const sortBySortOrder = (items = []) => [...items].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 
 const normalizePage = (page = {}, modeKey = 'top') => {
   const mode = layoutModes[modeKey];
@@ -73,8 +77,12 @@ const normalizePage = (page = {}, modeKey = 'top') => {
     recommendationLimit: hasCuratedBlocks ? curatedRecommendationLimit : defaultRecommendationLimit,
     isPublished: page.isPublished !== false,
     version: Number(page.version || 0),
+    sections: sortBySortOrder(page.sections || []),
+    pins: sortBySortOrder(page.pins || []),
   };
 };
+
+const nextSortOrder = (items = []) => items.reduce((max, item) => Math.max(max, Number(item.sortOrder || 0)), 0) + 1;
 
 const ToggleCard = ({ title, description, checked, onChange }) => (
   <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${
@@ -100,6 +108,15 @@ const Pill = ({ children }) => (
     {children}
   </span>
 );
+
+const Field = ({ label, children, className = '' }) => (
+  <label className={`grid gap-2 text-sm text-gray-300 ${className}`}>
+    {label}
+    {children}
+  </label>
+);
+
+const textInputClass = 'rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40';
 
 const LayoutPreview = ({ mode, state }) => {
   const hasCuratedBlocks = state.featuredTopicsEnabled || state.featuredMarketsEnabled || state.sectionsEnabled;
@@ -134,19 +151,19 @@ const LayoutPreview = ({ mode, state }) => {
         {state.featuredTopicsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
             <div className="text-sm font-semibold text-white">Featured topic/category cards</div>
-            <div className="mt-1 text-xs text-gray-400">Pinned secondary pages appear after compact recommendations.</div>
+            <div className="mt-1 text-xs text-gray-400">{state.pins.filter((pin) => pin.pinType === 'discovery_page').length} page pins configured.</div>
           </div>
         )}
         {state.featuredMarketsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
             <div className="text-sm font-semibold text-white">Featured market cards</div>
-            <div className="mt-1 text-xs text-gray-400">Admin-pinned markets appear in configured order.</div>
+            <div className="mt-1 text-xs text-gray-400">{state.pins.filter((pin) => pin.pinType === 'market').length} market pins configured.</div>
           </div>
         )}
         {state.sectionsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
             <div className="text-sm font-semibold text-white">Sections</div>
-            <div className="mt-1 text-xs text-gray-400">Explicit sections render after pins; otherwise the page has an implicit All section.</div>
+            <div className="mt-1 text-xs text-gray-400">{state.sections.length} named sections configured; otherwise the page has an implicit All section.</div>
           </div>
         )}
       </div>
@@ -162,6 +179,8 @@ function MarketDiscoveryLayoutEditor() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingSections, setSavingSections] = useState(false);
+  const [savingPins, setSavingPins] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -202,6 +221,16 @@ function MarketDiscoveryLayoutEditor() {
 
   const mode = layoutModes[selectedMode];
   const state = layoutState[selectedMode];
+  const topicPins = state.pins.filter((pin) => pin.pinType === 'discovery_page');
+  const marketPins = state.pins.filter((pin) => pin.pinType === 'market');
+
+  const replaceSelectedState = (saved) => {
+    setLayoutState((current) => ({
+      ...current,
+      [selectedMode]: normalizePage(saved, selectedMode),
+    }));
+  };
+
   const updateState = (updates) => {
     setLayoutState((current) => ({
       ...current,
@@ -210,6 +239,22 @@ function MarketDiscoveryLayoutEditor() {
         ...updates,
       },
     }));
+  };
+
+  const updateSection = (index, updates) => {
+    updateState({
+      sections: state.sections.map((section, currentIndex) => (
+        currentIndex === index ? { ...section, ...updates } : section
+      )),
+    });
+  };
+
+  const updatePin = (index, updates) => {
+    updateState({
+      pins: state.pins.map((pin, currentIndex) => (
+        currentIndex === index ? { ...pin, ...updates } : pin
+      )),
+    });
   };
 
   const selectedBlocks = useMemo(() => [
@@ -233,16 +278,84 @@ function MarketDiscoveryLayoutEditor() {
         }),
         fallbackMessage: 'Failed to save market discovery layout.',
       });
-      setLayoutState((current) => ({
-        ...current,
-        [selectedMode]: normalizePage(saved, selectedMode),
-      }));
+      replaceSelectedState(saved);
       setMessage(`${mode.label} saved. /markets will use the TOP layout immediately after refresh.`);
     } catch (err) {
       setError(err.message || 'Unable to save market discovery layout.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveSections = async () => {
+    setSavingSections(true);
+    setMessage('');
+    setError('');
+    try {
+      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${mode.slug}/sections`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections: state.sections }),
+        fallbackMessage: 'Failed to save discovery sections.',
+      });
+      replaceSelectedState(saved);
+      setMessage(`${mode.label} sections saved.`);
+    } catch (err) {
+      setError(err.message || 'Unable to save discovery sections.');
+    } finally {
+      setSavingSections(false);
+    }
+  };
+
+  const savePins = async () => {
+    setSavingPins(true);
+    setMessage('');
+    setError('');
+    try {
+      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${mode.slug}/pins`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pins: state.pins }),
+        fallbackMessage: 'Failed to save discovery pins.',
+      });
+      replaceSelectedState(saved);
+      setMessage(`${mode.label} pins saved.`);
+    } catch (err) {
+      setError(err.message || 'Unable to save discovery pins.');
+    } finally {
+      setSavingPins(false);
+    }
+  };
+
+  const addSection = () => {
+    updateState({
+      sections: [
+        ...state.sections,
+        {
+          slug: '',
+          title: 'New Section',
+          description: '',
+          tagFilterSlug: '',
+          sortOrder: nextSortOrder(state.sections),
+          isActive: true,
+        },
+      ],
+    });
+  };
+
+  const addPin = (pinType) => {
+    updateState({
+      pins: [
+        ...state.pins,
+        {
+          pinType,
+          marketId: pinType === 'market' ? '' : 0,
+          targetPageSlug: pinType === 'discovery_page' ? 'topic-template' : '',
+          label: pinType === 'market' ? 'Featured Market' : 'Featured Topic',
+          sortOrder: nextSortOrder(state.pins),
+        },
+      ],
+    });
   };
 
   if (loading) {
@@ -261,7 +374,7 @@ function MarketDiscoveryLayoutEditor() {
           <h1 className="mt-2 text-3xl font-bold text-white">Market Discovery Layout</h1>
           <p className="mt-2 max-w-3xl text-gray-300">
             Configure persisted TOP market page and SECONDARY topic page layout options from FEATURE/09.
-            The TOP record now controls the public /markets page title, description, fallback list size, and CMS block visibility.
+            The TOP record controls the public /markets page title, description, fallback list size, section cards, and featured pins.
           </p>
         </div>
 
@@ -319,58 +432,53 @@ function MarketDiscoveryLayoutEditor() {
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm text-gray-300">
-                  Page Title
+                <Field label="Page Title">
                   <input
                     value={state.title}
                     maxLength={160}
                     onChange={(event) => updateState({ title: event.target.value })}
-                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                    className={textInputClass}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-gray-300">
-                  Search Scope
+                </Field>
+                <Field label="Search Scope">
                   <select
                     value={state.searchScope}
                     onChange={(event) => updateState({ searchScope: event.target.value })}
-                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                    className={textInputClass}
                   >
                     <option value="all">All public markets</option>
                     <option value="tag">Current topic/tag by default</option>
                   </select>
-                </label>
-                <label className="grid gap-2 text-sm text-gray-300 md:col-span-2">
-                  Page Description
+                </Field>
+                <Field label="Page Description" className="md:col-span-2">
                   <textarea
                     value={state.description}
                     maxLength={500}
                     rows={3}
                     onChange={(event) => updateState({ description: event.target.value })}
-                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                    className={textInputClass}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-gray-300">
-                  Empty CMS Recommendation Limit
+                </Field>
+                <Field label="Empty CMS Recommendation Limit">
                   <input
                     type="number"
                     min="1"
                     max="50"
                     value={state.defaultRecommendationLimit}
                     onChange={(event) => updateState({ defaultRecommendationLimit: Number(event.target.value || 1) })}
-                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                    className={textInputClass}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-gray-300">
-                  Curated CMS Recommendation Limit
+                </Field>
+                <Field label="Curated CMS Recommendation Limit">
                   <input
                     type="number"
                     min="1"
                     max="50"
                     value={state.curatedRecommendationLimit}
                     onChange={(event) => updateState({ curatedRecommendationLimit: Number(event.target.value || 1) })}
-                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                    className={textInputClass}
                   />
-                </label>
+                </Field>
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -407,6 +515,105 @@ function MarketDiscoveryLayoutEditor() {
                     <li key={block}>{block}</li>
                   ))}
                 </ol>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Sections</h3>
+                  <p className="mt-1 text-sm text-gray-400">Named section cards can optionally point at a tag slug. Empty pages still use the implicit All section.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={addSection} className="rounded-md border border-sky-500/50 px-3 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/50">Add Section</button>
+                  <button type="button" disabled={savingSections} onClick={saveSections} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
+                    {savingSections ? 'Saving...' : 'Save Sections'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                {state.sections.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No explicit sections yet.</p>}
+                {state.sections.map((section, index) => (
+                  <div key={`${section.slug}-${index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[1fr_1fr_110px_auto]">
+                    <Field label="Title">
+                      <input value={section.title || ''} onChange={(event) => updateSection(index, { title: event.target.value })} className={textInputClass} />
+                    </Field>
+                    <Field label="Slug">
+                      <input value={section.slug || ''} onChange={(event) => updateSection(index, { slug: event.target.value })} placeholder="auto-from-title" className={textInputClass} />
+                    </Field>
+                    <Field label="Order">
+                      <input type="number" value={section.sortOrder || index + 1} onChange={(event) => updateSection(index, { sortOrder: Number(event.target.value || 0) })} className={textInputClass} />
+                    </Field>
+                    <label className="flex items-end gap-2 pb-2 text-sm text-gray-300">
+                      <input type="checkbox" checked={section.isActive !== false} onChange={(event) => updateSection(index, { isActive: event.target.checked })} className="h-4 w-4 accent-primary-pink" />
+                      Active
+                    </label>
+                    <Field label="Tag Filter Slug" className="md:col-span-2">
+                      <input value={section.tagFilterSlug || ''} onChange={(event) => updateSection(index, { tagFilterSlug: event.target.value })} placeholder="politics" className={textInputClass} />
+                    </Field>
+                    <Field label="Description" className="md:col-span-2">
+                      <input value={section.description || ''} onChange={(event) => updateSection(index, { description: event.target.value })} className={textInputClass} />
+                    </Field>
+                    <div className="md:col-span-4">
+                      <button type="button" onClick={() => updateState({ sections: state.sections.filter((_, currentIndex) => currentIndex !== index) })} className="text-sm font-semibold text-red-300 hover:text-red-200">
+                        Remove section
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Pins</h3>
+                  <p className="mt-1 text-sm text-gray-400">Page-level pins render as featured topic cards or featured market cards on /markets when their block is enabled.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => addPin('discovery_page')} className="rounded-md border border-sky-500/50 px-3 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/50">Add Topic Pin</button>
+                  <button type="button" onClick={() => addPin('market')} className="rounded-md border border-emerald-500/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/50">Add Market Pin</button>
+                  <button type="button" disabled={savingPins} onClick={savePins} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
+                    {savingPins ? 'Saving...' : 'Save Pins'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-400">
+                <Pill>{topicPins.length} topic pins</Pill>
+                <Pill>{marketPins.length} market pins</Pill>
+              </div>
+              <div className="mt-4 space-y-3">
+                {state.pins.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No page-level pins yet.</p>}
+                {state.pins.map((pin, index) => (
+                  <div key={`${pin.pinType}-${index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[170px_1fr_120px]">
+                    <Field label="Pin Type">
+                      <select value={pin.pinType || 'market'} onChange={(event) => updatePin(index, { pinType: event.target.value })} className={textInputClass}>
+                        <option value="market">Featured market</option>
+                        <option value="discovery_page">Featured topic page</option>
+                      </select>
+                    </Field>
+                    <Field label="Label">
+                      <input value={pin.label || ''} onChange={(event) => updatePin(index, { label: event.target.value })} className={textInputClass} />
+                    </Field>
+                    <Field label="Order">
+                      <input type="number" value={pin.sortOrder || index + 1} onChange={(event) => updatePin(index, { sortOrder: Number(event.target.value || 0) })} className={textInputClass} />
+                    </Field>
+                    {pin.pinType === 'discovery_page' ? (
+                      <Field label="Target Page Slug" className="md:col-span-2">
+                        <input value={pin.targetPageSlug || ''} onChange={(event) => updatePin(index, { targetPageSlug: event.target.value })} placeholder="topic-template" className={textInputClass} />
+                      </Field>
+                    ) : (
+                      <Field label="Market ID" className="md:col-span-2">
+                        <input type="number" min="1" value={pin.marketId || ''} onChange={(event) => updatePin(index, { marketId: Number(event.target.value || 0) })} className={textInputClass} />
+                      </Field>
+                    )}
+                    <div className="flex items-end">
+                      <button type="button" onClick={() => updateState({ pins: state.pins.filter((_, currentIndex) => currentIndex !== index) })} className="pb-2 text-sm font-semibold text-red-300 hover:text-red-200">
+                        Remove pin
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

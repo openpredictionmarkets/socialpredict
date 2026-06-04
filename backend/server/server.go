@@ -441,6 +441,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
 	router.HandleFunc("/v0/content/market-discovery/{slug}", marketDiscoveryHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/market-discovery/{slug}", securityMiddleware(http.HandlerFunc(marketDiscoveryHandler.AdminUpdate))).Methods("PUT")
+	router.Handle("/v0/admin/content/market-discovery/{slug}/sections", securityMiddleware(http.HandlerFunc(marketDiscoveryHandler.AdminReplaceSections))).Methods("PUT")
+	router.Handle("/v0/admin/content/market-discovery/{slug}/pins", securityMiddleware(http.HandlerFunc(marketDiscoveryHandler.AdminReplacePins))).Methods("PUT")
 	router.HandleFunc("/v0/content/social-share", socialShareHandler.PublicGet).Methods("GET")
 	router.HandleFunc("/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")
 	router.HandleFunc("/api/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")

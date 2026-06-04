@@ -27,6 +27,9 @@ func TestMigrateAddMarketDiscoveryCMSCreatesTables(t *testing.T) {
 	if !db.Migrator().HasIndex(&models.MarketDiscoveryPage{}, "idx_market_discovery_pages_slug") {
 		t.Fatalf("expected market discovery page slug index")
 	}
+	if !db.Migrator().HasColumn(&models.MarketDiscoveryPin{}, "target_page_slug") {
+		t.Fatalf("expected market discovery pin target_page_slug column")
+	}
 }
 
 func TestMigrateAddMarketDiscoveryCMSIsIdempotent(t *testing.T) {
