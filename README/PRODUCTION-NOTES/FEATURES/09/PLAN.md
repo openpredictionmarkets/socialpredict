@@ -100,6 +100,7 @@ Service ownership: CMS/content context and composed read model.
 
 Checklist:
 
+- [x] Add admin CMS scaffold for TOP and SECONDARY market discovery layout options.
 - [ ] Add migration for `market_discovery_pages`.
 - [ ] Add migration for `market_discovery_sections`.
 - [ ] Add domain/read models for top-level and secondary category pages.
@@ -141,6 +142,7 @@ Service ownership: frontend experience context.
 
 Checklist:
 
+- [x] Add admin CMS panel that distinguishes Home Page, Market Discovery Layout, and Social Share settings.
 - [ ] Update `/markets` to consume composed top-level page model.
 - [ ] Preserve search-first layout.
 - [ ] Render compact recommendations when pinned content exists.
