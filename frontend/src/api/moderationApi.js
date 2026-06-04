@@ -5,6 +5,7 @@ const marketReviewReasonMessages = {
   INVALID_REQUEST: 'Check the market ID and request fields.',
   INVALID_STATE: 'This market is not in a state that can be reviewed.',
   MARKET_NOT_FOUND: 'No market was found for that ID.',
+  USER_NOT_FOUND: 'No active moderator was found for that steward username.',
   VALIDATION_FAILED: 'Check the review fields and try again.',
 };
 
