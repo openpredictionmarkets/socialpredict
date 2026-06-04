@@ -83,6 +83,29 @@ func TestRateLimitMiddleware(t *testing.T) {
 	})
 }
 
+func TestRateLimitMiddlewareBypassesOptionsPreflight(t *testing.T) {
+	rl := NewRateLimiter(rate.Every(time.Hour), 1, time.Minute)
+	wrappedHandler := RateLimitMiddleware(rl)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+	req.RemoteAddr = "192.168.1.10:12345"
+	for i := 0; i < 3; i += 1 {
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusNoContent {
+			t.Fatalf("OPTIONS preflight %d should bypass rate limit, got %d", i+1, rr.Code)
+		}
+	}
+
+	rr := httptest.NewRecorder()
+	wrappedHandler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/test", nil))
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("GET after OPTIONS preflights should still have burst budget, got %d", rr.Code)
+	}
+}
+
 func TestLoginRateLimitMiddleware(t *testing.T) {
 	// Create a stricter rate limiter for login
 	rl := NewRateLimiter(rate.Every(10*time.Second), 1, time.Minute)
@@ -129,6 +152,29 @@ func TestLoginRateLimitMiddleware(t *testing.T) {
 
 		assertRuntimeFailureReason(t, rr, RuntimeReasonLoginRateLimited)
 	})
+}
+
+func TestLoginRateLimitMiddlewareBypassesOptionsPreflight(t *testing.T) {
+	rl := NewRateLimiter(rate.Every(time.Hour), 1, time.Minute)
+	wrappedHandler := LoginRateLimitMiddleware(rl)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/login", nil)
+	req.RemoteAddr = "192.168.1.11:12345"
+	for i := 0; i < 3; i += 1 {
+		rr := httptest.NewRecorder()
+		wrappedHandler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusNoContent {
+			t.Fatalf("login OPTIONS preflight %d should bypass rate limit, got %d", i+1, rr.Code)
+		}
+	}
+
+	rr := httptest.NewRecorder()
+	wrappedHandler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/login", nil))
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("POST after OPTIONS preflights should still have burst budget, got %d", rr.Code)
+	}
 }
 
 func TestRateLimitMiddlewareUsesExplicitClientIdentityExtractor(t *testing.T) {

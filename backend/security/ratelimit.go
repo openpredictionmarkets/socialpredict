@@ -111,6 +111,11 @@ func RateLimitMiddlewareWithProxyTrust(limiter *RateLimiter, trustProxy bool) fu
 func RateLimitMiddlewareWithClientIdentity(limiter *RateLimiter, clientIdentity ClientIdentityExtractor) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if shouldBypassRateLimit(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			clientID := clientIdentity.Extract(r)
 
 			if !limiter.GetLimiter(clientID).Allow() {
@@ -137,6 +142,11 @@ func LoginRateLimitMiddlewareWithProxyTrust(limiter *RateLimiter, trustProxy boo
 func LoginRateLimitMiddlewareWithClientIdentity(limiter *RateLimiter, clientIdentity ClientIdentityExtractor) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if shouldBypassRateLimit(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			clientID := clientIdentity.Extract(r)
 
 			if !limiter.GetLimiter(clientID).Allow() {
@@ -147,6 +157,10 @@ func LoginRateLimitMiddlewareWithClientIdentity(limiter *RateLimiter, clientIden
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func shouldBypassRateLimit(r *http.Request) bool {
+	return r != nil && r.Method == http.MethodOptions
 }
 
 // ClientIdentityExtractor defines which request attributes may identify a client at the HTTP boundary.

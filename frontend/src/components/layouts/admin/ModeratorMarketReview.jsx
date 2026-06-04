@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../helpers/AuthContent';
 import SiteTabs from '../../tabs/SiteTabs';
 import MarketLifecycleTable from '../profile/MarketLifecycleTable';
@@ -136,6 +136,7 @@ const AdminMarketQueue = ({ status }) => {
 
 const MarketStewardshipQueue = () => {
   const { token } = useAuth();
+  const loadedToken = useRef('');
   const [marketsByStatus, setMarketsByStatus] = useState({});
   const [moderators, setModerators] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +169,10 @@ const MarketStewardshipQueue = () => {
   };
 
   useEffect(() => {
+    if (!token || loadedToken.current === token) {
+      return;
+    }
+    loadedToken.current = token;
     loadStewardshipData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
