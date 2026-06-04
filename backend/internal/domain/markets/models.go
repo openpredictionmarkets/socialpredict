@@ -32,6 +32,7 @@ type Market struct {
 	UpdatedAt               time.Time
 	InitialProbability      float64
 	UTCOffset               int
+	StewardshipAudits       []MarketStewardshipAuditRecord
 }
 
 // CreatedBy reports whether the market belongs to the supplied creator username.

@@ -44,24 +44,35 @@ type reassignMarketStewardRequest struct {
 }
 
 type marketReviewResponse struct {
-	ID                 int64      `json:"id"`
-	QuestionTitle      string     `json:"questionTitle,omitempty"`
-	Description        string     `json:"description,omitempty"`
-	CreatorUsername    string     `json:"creatorUsername,omitempty"`
-	StewardUsername    string     `json:"stewardUsername,omitempty"`
-	YesLabel           string     `json:"yesLabel,omitempty"`
-	NoLabel            string     `json:"noLabel,omitempty"`
-	Status             string     `json:"status"`
-	LifecycleStatus    string     `json:"lifecycleStatus"`
-	ApprovedBy         string     `json:"approvedBy,omitempty"`
-	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
-	RejectedBy         string     `json:"rejectedBy,omitempty"`
-	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
-	RejectionReason    string     `json:"rejectionReason,omitempty"`
-	ProposalCost       int64      `json:"proposalCost,omitempty"`
-	CreatedAt          time.Time  `json:"createdAt,omitempty"`
-	UpdatedAt          time.Time  `json:"updatedAt,omitempty"`
-	ResolutionDateTime time.Time  `json:"resolutionDateTime,omitempty"`
+	ID                 int64                            `json:"id"`
+	QuestionTitle      string                           `json:"questionTitle,omitempty"`
+	Description        string                           `json:"description,omitempty"`
+	CreatorUsername    string                           `json:"creatorUsername,omitempty"`
+	StewardUsername    string                           `json:"stewardUsername,omitempty"`
+	YesLabel           string                           `json:"yesLabel,omitempty"`
+	NoLabel            string                           `json:"noLabel,omitempty"`
+	Status             string                           `json:"status"`
+	LifecycleStatus    string                           `json:"lifecycleStatus"`
+	ApprovedBy         string                           `json:"approvedBy,omitempty"`
+	ApprovedAt         *time.Time                       `json:"approvedAt,omitempty"`
+	RejectedBy         string                           `json:"rejectedBy,omitempty"`
+	RejectedAt         *time.Time                       `json:"rejectedAt,omitempty"`
+	RejectionReason    string                           `json:"rejectionReason,omitempty"`
+	ProposalCost       int64                            `json:"proposalCost,omitempty"`
+	StewardshipAudits  []marketStewardshipAuditResponse `json:"stewardshipAudits,omitempty"`
+	CreatedAt          time.Time                        `json:"createdAt,omitempty"`
+	UpdatedAt          time.Time                        `json:"updatedAt,omitempty"`
+	ResolutionDateTime time.Time                        `json:"resolutionDateTime,omitempty"`
+}
+
+type marketStewardshipAuditResponse struct {
+	ID                  int64     `json:"id,omitempty"`
+	MarketID            int64     `json:"marketId"`
+	FromStewardUsername string    `json:"fromStewardUsername,omitempty"`
+	ToStewardUsername   string    `json:"toStewardUsername"`
+	ActorUsername       string    `json:"actorUsername"`
+	Reason              string    `json:"reason,omitempty"`
+	CreatedAt           time.Time `json:"createdAt,omitempty"`
 }
 
 type marketReviewListResponse struct {
@@ -262,10 +273,30 @@ func marketReviewResponseFromMarket(market *dmarkets.Market) marketReviewRespons
 		RejectedAt:         market.RejectedAt,
 		RejectionReason:    market.RejectionReason,
 		ProposalCost:       market.ProposalCost,
+		StewardshipAudits:  marketStewardshipAuditResponsesFromRecords(market.StewardshipAudits),
 		CreatedAt:          market.CreatedAt,
 		UpdatedAt:          market.UpdatedAt,
 		ResolutionDateTime: market.ResolutionDateTime,
 	}
+}
+
+func marketStewardshipAuditResponsesFromRecords(records []dmarkets.MarketStewardshipAuditRecord) []marketStewardshipAuditResponse {
+	if len(records) == 0 {
+		return nil
+	}
+	responses := make([]marketStewardshipAuditResponse, 0, len(records))
+	for _, record := range records {
+		responses = append(responses, marketStewardshipAuditResponse{
+			ID:                  record.ID,
+			MarketID:            record.MarketID,
+			FromStewardUsername: record.FromStewardUsername,
+			ToStewardUsername:   record.ToStewardUsername,
+			ActorUsername:       record.ActorUsername,
+			Reason:              record.Reason,
+			CreatedAt:           record.CreatedAt,
+		})
+	}
+	return responses
 }
 
 func parseAdminReviewMarketFilters(w http.ResponseWriter, r *http.Request) (dmarkets.ListFilters, bool) {

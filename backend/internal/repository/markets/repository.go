@@ -153,7 +153,11 @@ func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.L
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateStewardshipAudits(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 func applyListStatusFilter(query *gorm.DB, status string) *gorm.DB {
@@ -245,6 +249,50 @@ func (r *GormRepository) mapMarkets(dbMarkets []models.Market) []*dmarkets.Marke
 		markets[i] = r.modelToDomain(&dbMarket)
 	}
 	return markets
+}
+
+func (r *GormRepository) hydrateStewardshipAudits(ctx context.Context, markets []*dmarkets.Market) error {
+	if len(markets) == 0 {
+		return nil
+	}
+
+	marketIDs := make([]int64, 0, len(markets))
+	marketByID := make(map[int64]*dmarkets.Market, len(markets))
+	for _, market := range markets {
+		if market == nil {
+			continue
+		}
+		marketIDs = append(marketIDs, market.ID)
+		marketByID[market.ID] = market
+	}
+	if len(marketIDs) == 0 {
+		return nil
+	}
+
+	var dbAudits []models.MarketStewardshipAudit
+	if err := r.db.WithContext(ctx).
+		Where("market_id IN ?", marketIDs).
+		Order("created_at ASC, id ASC").
+		Find(&dbAudits).Error; err != nil {
+		return err
+	}
+
+	for _, dbAudit := range dbAudits {
+		market := marketByID[dbAudit.MarketID]
+		if market == nil {
+			continue
+		}
+		market.StewardshipAudits = append(market.StewardshipAudits, dmarkets.MarketStewardshipAuditRecord{
+			ID:                  dbAudit.ID,
+			MarketID:            dbAudit.MarketID,
+			FromStewardUsername: dbAudit.FromStewardUsername,
+			ToStewardUsername:   dbAudit.ToStewardUsername,
+			ActorUsername:       dbAudit.ActorUsername,
+			Reason:              dbAudit.Reason,
+			CreatedAt:           dbAudit.CreatedAt,
+		})
+	}
+	return nil
 }
 
 // GetUserPosition retrieves the aggregated position for a specific user in a market.

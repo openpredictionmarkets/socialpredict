@@ -470,3 +470,51 @@ func TestGormRepositoryReassignMarketStewardPersistsAudit(t *testing.T) {
 		t.Fatalf("missing market error = %v, want ErrMarketNotFound", err)
 	}
 }
+
+func TestGormRepositoryListByLifecycleHydratesStewardshipAudits(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("lifecycle_steward_creator", 1000)
+	backup := modelstesting.GenerateUser("lifecycle_steward_backup", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	if err := db.Create(&backup).Error; err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(702, creator.Username)
+	market.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	market.StewardUsername = backup.Username
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+
+	changedAt := time.Date(2026, 6, 4, 15, 0, 0, 0, time.UTC)
+	audit := models.MarketStewardshipAudit{
+		MarketID:            market.ID,
+		FromStewardUsername: creator.Username,
+		ToStewardUsername:   backup.Username,
+		ActorUsername:       "admin",
+		Reason:              "creator suspended",
+	}
+	audit.CreatedAt = changedAt
+	audit.UpdatedAt = changedAt
+	if err := db.Create(&audit).Error; err != nil {
+		t.Fatalf("seed audit: %v", err)
+	}
+
+	markets, err := repo.ListByLifecycle(ctx, dmarkets.ListFilters{Status: dmarkets.MarketLifecyclePublished, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListByLifecycle returned error: %v", err)
+	}
+	if len(markets) != 1 {
+		t.Fatalf("expected one market, got %d", len(markets))
+	}
+	audits := markets[0].StewardshipAudits
+	if len(audits) != 1 || audits[0].Reason != "creator suspended" || audits[0].FromStewardUsername != creator.Username || audits[0].ToStewardUsername != backup.Username || !audits[0].CreatedAt.Equal(changedAt) {
+		t.Fatalf("unexpected hydrated audits: %+v", audits)
+	}
+}

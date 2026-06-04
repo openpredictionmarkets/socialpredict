@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -111,6 +112,7 @@ func TestRejectMarketHandlerRejectsProposal(t *testing.T) {
 }
 
 func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
+	changedAt := time.Date(2026, 6, 4, 12, 0, 0, 0, time.UTC)
 	svc := marketReviewServiceMock{
 		listFn: func(_ context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
 			if filters.Status != dmarkets.MarketLifecycleProposed || filters.Limit != 25 || filters.Offset != 5 {
@@ -125,6 +127,15 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 				NoLabel:         "SMALL",
 				Status:          dmarkets.MarketLifecycleProposed,
 				LifecycleStatus: dmarkets.MarketLifecycleProposed,
+				StewardshipAudits: []dmarkets.MarketStewardshipAuditRecord{{
+					ID:                  9,
+					MarketID:            44,
+					FromStewardUsername: "moderator",
+					ToStewardUsername:   "backup",
+					ActorUsername:       "admin",
+					Reason:              "moderator inactive",
+					CreatedAt:           changedAt,
+				}},
 			}}, nil
 		},
 	}
@@ -150,15 +161,34 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 	if envelope.Result.Markets[0].YesLabel != "BIG" || envelope.Result.Markets[0].NoLabel != "SMALL" {
 		t.Fatalf("expected custom labels in admin queue response, got %+v", envelope.Result.Markets[0])
 	}
+	audits := envelope.Result.Markets[0].StewardshipAudits
+	if len(audits) != 1 || audits[0].Reason != "moderator inactive" || audits[0].FromStewardUsername != "moderator" || audits[0].ToStewardUsername != "backup" || !audits[0].CreatedAt.Equal(changedAt) {
+		t.Fatalf("expected stewardship audit in admin queue response, got %+v", audits)
+	}
 }
 
 func TestReassignMarketStewardHandlerReassignsSteward(t *testing.T) {
+	changedAt := time.Date(2026, 6, 4, 13, 0, 0, 0, time.UTC)
 	svc := marketReviewServiceMock{
 		reassignFn: func(_ context.Context, marketID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.Market, error) {
 			if marketID != 45 || newStewardUsername != "backup" || actorUsername != "admin" || reason != "moderator inactive" {
 				t.Fatalf("unexpected reassign args: id=%d steward=%q actor=%q reason=%q", marketID, newStewardUsername, actorUsername, reason)
 			}
-			return &dmarkets.Market{ID: marketID, CreatorUsername: "moderator", StewardUsername: newStewardUsername, Status: dmarkets.MarketStatusActive, LifecycleStatus: dmarkets.MarketLifecyclePublished}, nil
+			return &dmarkets.Market{
+				ID:              marketID,
+				CreatorUsername: "moderator",
+				StewardUsername: newStewardUsername,
+				Status:          dmarkets.MarketStatusActive,
+				LifecycleStatus: dmarkets.MarketLifecyclePublished,
+				StewardshipAudits: []dmarkets.MarketStewardshipAuditRecord{{
+					MarketID:            marketID,
+					FromStewardUsername: "moderator",
+					ToStewardUsername:   newStewardUsername,
+					ActorUsername:       actorUsername,
+					Reason:              reason,
+					CreatedAt:           changedAt,
+				}},
+			}, nil
 		},
 	}
 	handler := ReassignMarketStewardHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
@@ -176,6 +206,9 @@ func TestReassignMarketStewardHandlerReassignsSteward(t *testing.T) {
 	}
 	if !envelope.OK || envelope.Result.StewardUsername != "backup" || envelope.Result.CreatorUsername != "moderator" {
 		t.Fatalf("unexpected response: %+v", envelope)
+	}
+	if len(envelope.Result.StewardshipAudits) != 1 || envelope.Result.StewardshipAudits[0].Reason != "moderator inactive" {
+		t.Fatalf("expected stewardship audit in response, got %+v", envelope.Result.StewardshipAudits)
 	}
 }
 

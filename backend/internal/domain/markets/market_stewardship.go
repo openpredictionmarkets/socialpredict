@@ -57,6 +57,14 @@ func (s *Service) ReassignMarketSteward(ctx context.Context, marketID int64, new
 	}
 	market.StewardUsername = newStewardUsername
 	market.UpdatedAt = now
+	market.StewardshipAudits = append(market.StewardshipAudits, MarketStewardshipAuditRecord{
+		MarketID:            marketID,
+		FromStewardUsername: fromSteward,
+		ToStewardUsername:   newStewardUsername,
+		ActorUsername:       actorUsername,
+		Reason:              reason,
+		CreatedAt:           now,
+	})
 	return market, nil
 }
 

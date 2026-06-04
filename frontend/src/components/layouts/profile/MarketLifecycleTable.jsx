@@ -28,6 +28,27 @@ const MarketLabels = ({ market }) => (
   </div>
 );
 
+const StewardshipAuditTrail = ({ audits = [] }) => {
+  if (!audits.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {audits.map((audit, index) => (
+        <div key={audit.id || `${audit.createdAt || 'audit'}-${index}`} className="rounded-md border border-info-blue/30 bg-info-blue/10 px-3 py-2">
+          <div>
+            Steward reassigned from {audit.fromStewardUsername || 'n/a'} to {audit.toStewardUsername || 'n/a'}
+            {audit.actorUsername ? ` by ${audit.actorUsername}` : ''}
+            {audit.createdAt ? ` at ${formatDate(audit.createdAt)}` : ''}
+          </div>
+          {audit.reason && <div className="mt-1 text-info-blue">Reason: {audit.reason}</div>}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, showSteward = false, actions }) => {
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
 
@@ -104,7 +125,8 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
                 {market.approvedBy && <div>Approved by {market.approvedBy} at {formatDate(market.approvedAt)}</div>}
                 {market.rejectedBy && <div>Rejected by {market.rejectedBy} at {formatDate(market.rejectedAt)}</div>}
                 {market.rejectionReason && <div className="mt-1 text-rose-200">Reason: {market.rejectionReason}</div>}
-                {!market.approvedBy && !market.rejectedBy && <span className="text-gray-500">Awaiting admin review</span>}
+                <StewardshipAuditTrail audits={market.stewardshipAudits || []} />
+                {!market.approvedBy && !market.rejectedBy && !(market.stewardshipAudits || []).length && <span className="text-gray-500">Awaiting admin review</span>}
               </td>
               {actions && <td className="px-4 py-4">{actions(market)}</td>}
             </tr>
