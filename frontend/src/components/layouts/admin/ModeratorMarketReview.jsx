@@ -15,7 +15,7 @@ import {
   listAdminMarketTags,
   updateAdminMarketTag,
 } from '../../../api/marketTagsApi';
-import MarketTagChips from '../../markets/MarketTagChips';
+import MarketTagChips, { MARKET_TAG_COLOR_OPTIONS } from '../../markets/MarketTagChips';
 
 const reviewTabs = [
   { label: 'Proposed Markets', status: 'proposed' },
@@ -533,11 +533,11 @@ const MarketTaxonomyAdmin = () => {
               onChange={(event) => updateForm({ colorKey: event.target.value })}
               className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
             >
-              <option value="slate">Slate</option>
-              <option value="sky">Sky</option>
-              <option value="emerald">Emerald</option>
-              <option value="amber">Amber</option>
-              <option value="rose">Rose</option>
+              {MARKET_TAG_COLOR_OPTIONS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
           <label className="grid gap-1 text-sm text-gray-300">

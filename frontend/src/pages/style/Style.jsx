@@ -31,6 +31,7 @@ import { SharesBadge } from '../../components/buttons/trade/SellButtons';
 import ExpandableText from '../../components/utils/ExpandableText';
 import ExpandableLink from '../../components/utils/ExpandableLink';
 import TradeCTA from '../../components/TradeCTA';
+import MarketTagChips, { MARKET_TAG_COLOR_OPTIONS } from '../../components/markets/MarketTagChips';
 
 const Style = () => {
   const [isSelected, setIsSelected] = useState(false);
@@ -353,6 +354,29 @@ const Style = () => {
             <div className='text-white text-sm font-medium'>NO Probability</div>
             <div className='text-gray-400 text-xs'>red-btn: #D00000</div>
             <div className='text-gray-500 text-xs mt-1'>Used when showing dual probabilities</div>
+          </div>
+        </div>
+
+        {/* Market Tag Colors Section */}
+        <h3 className='text-xl font-bold text-white mb-4 mt-8'>Market Tag Colors</h3>
+        <div className='bg-gray-900 p-4 rounded-lg border border-gray-700 mb-8'>
+          <p className='text-gray-300 text-sm mb-4'>
+            Tag chips use color as a secondary cue. Keep the palette intentionally limited:
+            roughly 8-10 colors is the practical upper bound before users rely more on text than hue.
+          </p>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4'>
+            {MARKET_TAG_COLOR_OPTIONS.map((option) => (
+              <div key={option.key} className='rounded-lg border border-gray-700 bg-primary-background p-4'>
+                <MarketTagChips tags={[{
+                  slug: option.key,
+                  displayName: option.label,
+                  colorKey: option.key,
+                  description: option.guidance,
+                }]} />
+                <div className='mt-3 font-mono text-xs text-gray-400'>{option.key}</div>
+                <div className='mt-1 text-xs text-gray-500'>{option.guidance}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
