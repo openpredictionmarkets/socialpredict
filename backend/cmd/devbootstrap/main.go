@@ -67,6 +67,7 @@ func run() error {
 		return err
 	}
 	initialBalance := config.Economics().User.InitialAccountBalance
+	maximumDebtAllowed := config.Economics().User.MaximumDebtAllowed
 
 	users := []bootstrapUser{
 		{
@@ -102,6 +103,8 @@ func run() error {
 	fmt.Printf("Password: %s\n", password)
 	fmt.Printf("Admin: admin\n")
 	fmt.Printf("Users: %s01 through %s%02d\n", prefix, prefix, count)
+	fmt.Printf("InitialAccountBalance: %d\n", initialBalance)
+	fmt.Printf("CreditAvailableBeforeBets: %d\n", initialBalance+maximumDebtAllowed)
 	fmt.Printf("MustChangePassword: false\n")
 	return nil
 }

@@ -33,6 +33,9 @@ func TestUpsertBootstrapUserCreatesLoginReadyUser(t *testing.T) {
 	if !user.CheckPasswordHash(defaultPassword) {
 		t.Fatalf("created bootstrap user password should be %q", defaultPassword)
 	}
+	if user.InitialAccountBalance != 500 || user.AccountBalance != 500 {
+		t.Fatalf("created bootstrap user balances = initial %d account %d, want 500/500", user.InitialAccountBalance, user.AccountBalance)
+	}
 }
 
 func TestUpsertBootstrapUserUpdatesLoginReadyUser(t *testing.T) {
@@ -68,5 +71,8 @@ func TestUpsertBootstrapUserUpdatesLoginReadyUser(t *testing.T) {
 	}
 	if !user.CheckPasswordHash(defaultPassword) {
 		t.Fatalf("updated bootstrap user password should be reset to %q", defaultPassword)
+	}
+	if user.InitialAccountBalance != 500 || user.AccountBalance != 500 {
+		t.Fatalf("updated bootstrap user balances = initial %d account %d, want 500/500", user.InitialAccountBalance, user.AccountBalance)
 	}
 }
