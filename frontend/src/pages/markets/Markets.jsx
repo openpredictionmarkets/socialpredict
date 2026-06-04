@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import MarketsByStatusTable from '../../components/tables/MarketsByStatusTable';
@@ -93,6 +93,66 @@ const TopicNav = ({ topicPins = [] }) => {
     );
 };
 
+const FeaturedMarketSlider = ({ marketPins = [] }) => {
+    const sliderRef = useRef(null);
+    if (!marketPins.length) return null;
+
+    const scroll = (direction) => {
+        const slider = sliderRef.current;
+        if (!slider) return;
+        const amount = Math.max(320, Math.floor(slider.clientWidth * 0.86));
+        slider.scrollBy({ left: direction * amount, behavior: 'smooth' });
+    };
+
+    return (
+        <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-xl font-bold text-white">Featured markets</h2>
+                {marketPins.length > 1 && (
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => scroll(-1)}
+                            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-gray-200 transition hover:border-sky-400/70 hover:text-white"
+                            aria-label="Scroll featured markets left"
+                        >
+                            ‹
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => scroll(1)}
+                            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-gray-200 transition hover:border-sky-400/70 hover:text-white"
+                            aria-label="Scroll featured markets right"
+                        >
+                            ›
+                        </button>
+                    </div>
+                )}
+            </div>
+            <div
+                ref={sliderRef}
+                className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3"
+                aria-label="Featured market carousel"
+            >
+                {marketPins.map((pin) => (
+                    <div
+                        key={`market-${pin.id || pin.marketId || pin.sortOrder}`}
+                        className="min-w-[min(88vw,720px)] snap-start md:min-w-[560px] xl:min-w-[680px]"
+                    >
+                        <DiscoveryCard
+                            eyebrow="Pinned Market"
+                            title={pin.label || `Market #${pin.marketId}`}
+                            description={pin.marketId ? `Market ID: ${pin.marketId}` : 'Set a market ID in CMS.'}
+                            to={pin.marketId ? `/markets/${pin.marketId}` : undefined}
+                            tone="emerald"
+                        />
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+};
+
 const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
     if (!hasCuratedBlocks(layout)) return null;
 
@@ -105,23 +165,7 @@ const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
         <div className="mb-6 space-y-5 text-gray-200">
             {!isTopicPage && layout.featuredTopicsEnabled && <TopicNav topicPins={topicPins} />}
 
-            {layout.featuredMarketsEnabled && marketPins.length > 0 && (
-                <section>
-                    <h2 className="mb-3 text-xl font-bold text-white">Featured markets</h2>
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        {marketPins.map((pin) => (
-                            <DiscoveryCard
-                                key={`market-${pin.id || pin.marketId || pin.sortOrder}`}
-                                eyebrow="Pinned Market"
-                                title={pin.label || `Market #${pin.marketId}`}
-                                description={pin.marketId ? `Market ID: ${pin.marketId}` : 'Set a market ID in CMS.'}
-                                to={pin.marketId ? `/markets/${pin.marketId}` : undefined}
-                                tone="emerald"
-                            />
-                        ))}
-                    </div>
-                </section>
-            )}
+            {layout.featuredMarketsEnabled && <FeaturedMarketSlider marketPins={marketPins} />}
 
             {layout.sectionsEnabled && sections.length > 0 && (
                 <section>
@@ -189,9 +233,9 @@ function Markets() {
         };
     }, [isTopicPage, topicSlug]);
 
-    const tagScope = discoveryLayout.searchScope === 'tag'
+    const tagScope = isTopicPage
         ? (discoveryLayout.primaryTagSlug || topicSlug)
-        : '';
+        : (discoveryLayout.searchScope === 'tag' ? discoveryLayout.primaryTagSlug : '');
 
     const handleSearchResults = (results) => {
         setSearchResults(results);
