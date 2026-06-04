@@ -8,9 +8,13 @@ export const stewardUsernameFor = (market = {}, fallbackUsername = '') => (
   ?? ''
 );
 
-const StewardTag = ({ username, className = '' }) => {
+const StewardTag = ({ username, creatorUsername = '', className = '' }) => {
   const normalizedUsername = String(username || '').trim();
+  const normalizedCreatorUsername = String(creatorUsername || '').trim();
   if (!normalizedUsername || normalizedUsername === 'unknown') {
+    return null;
+  }
+  if (normalizedCreatorUsername && normalizedUsername === normalizedCreatorUsername) {
     return null;
   }
 

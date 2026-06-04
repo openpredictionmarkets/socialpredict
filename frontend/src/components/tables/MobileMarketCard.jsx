@@ -23,7 +23,11 @@ const MobileMarketCard = ({ marketData }) => {
               {marketData.creator.username} {marketData.creator.personalEmoji}
             </span>
           </Link>
-          <StewardTag username={stewardUsername} className='mt-2 max-w-full' />
+          <StewardTag
+            username={stewardUsername}
+            creatorUsername={marketData.creator.username}
+            className='mt-2 max-w-full'
+          />
         </div>
         {isMarketOpen ? (
           <Link

@@ -75,7 +75,10 @@ const MarketRow = ({ marketData }) => (
           </span>
           @{marketData.creator.username}
         </Link>
-        <StewardTag username={stewardUsernameFor(marketData.market, marketData.creator.username)} />
+        <StewardTag
+          username={stewardUsernameFor(marketData.market, marketData.creator.username)}
+          creatorUsername={marketData.creator.username}
+        />
       </div>
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>

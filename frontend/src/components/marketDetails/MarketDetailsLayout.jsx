@@ -88,7 +88,7 @@ function MarketDetailsTable({
             </span>
             @{creatorUsername}
           </a>
-          <StewardTag username={stewardUsername} />
+          <StewardTag username={stewardUsername} creatorUsername={creatorUsername} />
           <span>•</span>
           <span>🪙 {currentProbability.toFixed(2)}</span>
         </div>
