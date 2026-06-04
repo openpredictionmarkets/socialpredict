@@ -136,6 +136,9 @@ func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initi
 		if err := db.Create(&user).Error; err != nil {
 			return fmt.Errorf("create %s: %w", seed.username, err)
 		}
+		if err := db.Model(&models.User{}).Where("username = ?", seed.username).Update("must_change_password", false).Error; err != nil {
+			return fmt.Errorf("clear password-change flag for %s: %w", seed.username, err)
+		}
 		fmt.Printf("created %s (%s)\n", seed.username, seed.userType)
 		return nil
 	}
