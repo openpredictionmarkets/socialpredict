@@ -400,7 +400,7 @@ const ColorKeyPicker = ({ value, onChange }) => {
     slug: option.key,
     displayName: option.label,
     colorKey: option.key,
-    description: option.guidance,
+    description: option.label,
   });
 
   const chooseColor = (colorKey) => {
@@ -440,7 +440,7 @@ const ColorKeyPicker = ({ value, onChange }) => {
                 }`}
               >
                 <MarketTagChips tags={[previewTag(option)]} />
-                <span className="text-xs text-gray-500">{option.guidance}</span>
+                <span className="font-mono text-xs text-gray-500">{option.key}</span>
               </button>
             );
           })}

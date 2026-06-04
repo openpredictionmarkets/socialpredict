@@ -14,16 +14,16 @@ const colorClasses = {
 };
 
 export const MARKET_TAG_COLOR_OPTIONS = [
-  { key: 'slate', label: 'Slate', guidance: 'Default / general' },
-  { key: 'sky', label: 'Sky', guidance: 'Open questions / civic' },
-  { key: 'cyan', label: 'Cyan', guidance: 'Science / technology' },
-  { key: 'teal', label: 'Teal', guidance: 'Health / environment' },
-  { key: 'emerald', label: 'Emerald', guidance: 'Finance / growth' },
-  { key: 'lime', label: 'Lime', guidance: 'Sports / active events' },
-  { key: 'amber', label: 'Amber', guidance: 'Warnings / high attention' },
-  { key: 'orange', label: 'Orange', guidance: 'Culture / media' },
-  { key: 'rose', label: 'Rose', guidance: 'Politics / conflict' },
-  { key: 'violet', label: 'Violet', guidance: 'Meta / platform' },
+  { key: 'slate', label: 'Slate' },
+  { key: 'sky', label: 'Sky' },
+  { key: 'cyan', label: 'Cyan' },
+  { key: 'teal', label: 'Teal' },
+  { key: 'emerald', label: 'Emerald' },
+  { key: 'lime', label: 'Lime' },
+  { key: 'amber', label: 'Amber' },
+  { key: 'orange', label: 'Orange' },
+  { key: 'rose', label: 'Rose' },
+  { key: 'violet', label: 'Violet' },
 ];
 
 const chipClassFor = (tag) => {

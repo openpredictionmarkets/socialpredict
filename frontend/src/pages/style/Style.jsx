@@ -371,10 +371,10 @@ const Style = () => {
                   slug: option.key,
                   displayName: option.label,
                   colorKey: option.key,
-                  description: option.guidance,
+                  description: option.label,
                 }]} />
                 <div className='mt-3 font-mono text-xs text-gray-400'>{option.key}</div>
-                <div className='mt-1 text-xs text-gray-500'>{option.guidance}</div>
+                <div className='mt-1 text-xs text-gray-500'>Color key only</div>
               </div>
             ))}
           </div>
