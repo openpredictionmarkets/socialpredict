@@ -4,6 +4,7 @@ import formatResolutionDate from '../../helpers/formatResolutionDate';
 import MobileMarketCard from './MobileMarketCard';
 import ExpandableText from '../utils/ExpandableText';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
+import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -64,15 +65,18 @@ const MarketRow = ({ marketData }) => (
       {formatResolutionDate(marketData.market.resolutionDateTime)}
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
-      <Link
-        to={`/user/${marketData.creator.username}`}
-        className='flex items-center hover:text-blue-400 transition-colors duration-200'
-      >
-        <span role='img' aria-label='Creator' className='mr-2'>
-          {marketData.creator.personalEmoji}
-        </span>
-        @{marketData.creator.username}
-      </Link>
+      <div className='flex flex-col items-start gap-2'>
+        <Link
+          to={`/user/${marketData.creator.username}`}
+          className='flex items-center hover:text-blue-400 transition-colors duration-200'
+        >
+          <span role='img' aria-label='Creator' className='mr-2'>
+            {marketData.creator.personalEmoji}
+          </span>
+          @{marketData.creator.username}
+        </Link>
+        <StewardTag username={stewardUsernameFor(marketData.market, marketData.creator.username)} />
+      </div>
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
       {marketData.numUsers}

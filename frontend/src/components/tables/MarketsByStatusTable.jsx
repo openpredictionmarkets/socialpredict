@@ -6,6 +6,7 @@ import MobileMarketCard from './MobileMarketCard';
 import LoadingSpinner from '../loaders/LoadingSpinner';
 import ExpandableLink from '../utils/ExpandableLink';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
+import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 
 const DEFAULT_LIMIT = 50;
 const DEFAULT_CREATOR_EMOJI = '👤';
@@ -84,6 +85,7 @@ const MarketRow = ({ marketData }) => {
   const creator = marketData?.creator ?? {};
   const creatorUsername = creator.username ?? market.creatorUsername ?? 'unknown';
   const creatorEmoji = creator.personalEmoji ?? DEFAULT_CREATOR_EMOJI;
+  const stewardUsername = stewardUsernameFor(market, creatorUsername);
   const probability = toNumber(marketData?.lastProbability);
   const probabilityDisplay = Number.isFinite(probability)
     ? probability.toFixed(2)
@@ -125,15 +127,18 @@ const MarketRow = ({ marketData }) => {
         {formatResolutionDate(resolutionDate)}
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
-        <Link
-          to={`/user/${creatorUsername}`}
-          className='flex items-center hover:text-blue-400 transition-colors duration-200'
-        >
-          <span role='img' aria-label='Creator' className='mr-2'>
-            {creatorEmoji}
-          </span>
-          @{creatorUsername}
-        </Link>
+        <div className='flex flex-col items-start gap-2'>
+          <Link
+            to={`/user/${creatorUsername}`}
+            className='flex items-center hover:text-blue-400 transition-colors duration-200'
+          >
+            <span role='img' aria-label='Creator' className='mr-2'>
+              {creatorEmoji}
+            </span>
+            @{creatorUsername}
+          </Link>
+          <StewardTag username={stewardUsername} />
+        </div>
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
         {numUsers}

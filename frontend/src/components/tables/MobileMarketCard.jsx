@@ -3,23 +3,28 @@ import { Link } from 'react-router-dom';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import ExpandableText from '../utils/ExpandableText';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
+import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 
 const MobileMarketCard = ({ marketData }) => {
   const isMarketOpen =
     !marketData.market.isResolved &&
     formatResolutionDate(marketData.market.resolutionDateTime) !== 'Closed';
+  const stewardUsername = stewardUsernameFor(marketData.market, marketData.creator.username);
 
   return (
     <div className='bg-gray-800 p-4 mb-4 rounded-lg'>
       <div className='grid grid-cols-[1fr,auto] gap-2 items-center mb-2'>
-        <Link
-          to={`/user/${marketData.creator.username}`}
-          className='text-gray-400 hover:text-blue-400 transition-colors duration-200 truncate'
-        >
-          <span>
-            {marketData.creator.username} {marketData.creator.personalEmoji}
-          </span>
-        </Link>
+        <div className='min-w-0'>
+          <Link
+            to={`/user/${marketData.creator.username}`}
+            className='block truncate text-gray-400 hover:text-blue-400 transition-colors duration-200'
+          >
+            <span>
+              {marketData.creator.username} {marketData.creator.personalEmoji}
+            </span>
+          </Link>
+          <StewardTag username={stewardUsername} className='mt-2 max-w-full' />
+        </div>
         {isMarketOpen ? (
           <Link
             to={`/markets/${marketData.market.id}`}

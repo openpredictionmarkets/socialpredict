@@ -236,23 +236,28 @@ const MarketStewardshipQueue = () => {
     const selectedSteward = String(form.stewardUsername || '').trim();
     const reason = String(form.reason || '').trim();
     const canSubmit = selectedSteward && reason && selectedSteward !== currentSteward;
+    const stewardListId = `steward-options-${market.id}`;
 
     return (
       <div className="grid min-w-[260px] gap-3">
         <label className="grid gap-1 text-xs text-gray-300">
           <span className="font-mono uppercase tracking-[0.14em] text-gray-400">New steward</span>
-          <select
+          <input
+            list={stewardListId}
             value={form.stewardUsername}
             onChange={(event) => updateStewardForm(market.id, { stewardUsername: event.target.value })}
+            placeholder="Search active moderators by username"
             className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          >
-            <option value="">Select active moderator</option>
+          />
+          <datalist id={stewardListId}>
             {moderators.map((moderator) => (
-              <option key={moderator.username} value={moderator.username}>
-                {moderator.username}
-              </option>
+              <option
+                key={moderator.username}
+                value={moderator.username}
+                label={moderator.displayName || moderator.username}
+              />
             ))}
-          </select>
+          </datalist>
         </label>
         <textarea
           value={form.reason}
