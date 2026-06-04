@@ -33,6 +33,7 @@ type Market struct {
 	InitialProbability      float64
 	UTCOffset               int
 	StewardshipAudits       []MarketStewardshipAuditRecord
+	Tags                    []MarketTag
 }
 
 // CreatedBy reports whether the market belongs to the supplied creator username.
@@ -87,6 +88,7 @@ type MarketCreateRequest struct {
 	ResolutionDateTime time.Time
 	YesLabel           string
 	NoLabel            string
+	TagSlugs           []string
 }
 
 // HasCustomLabels reports whether the create request includes either custom label.
@@ -194,6 +196,7 @@ type PublicMarket struct {
 	NoLabel                 string
 	Status                  string
 	LifecycleStatus         string
+	Tags                    []MarketTag
 }
 
 // Resolved reports whether the public market already has a terminal resolution.
@@ -228,6 +231,7 @@ func copyPublicMarket(target *PublicMarket, market *Market) *PublicMarket {
 		NoLabel:                 market.NoLabel,
 		Status:                  market.Status,
 		LifecycleStatus:         market.LifecycleStatus,
+		Tags:                    append([]MarketTag(nil), market.Tags...),
 	}
 
 	return target

@@ -153,6 +153,7 @@ x-route-family-migration-matrix:
         - /v0/markets/{id}/resolve
         - /v0/markets/{id}/leaderboard
         - /v0/markets/{id}/projection
+        - /v0/market-tags
         - /v0/marketprojection/{marketId}/{amount}/{outcome}
         - /v0/marketprojection/{marketId}/{amount}/{outcome}/
       success_contract: mixed raw JSON DTO, no-content action, and selected envelope results
@@ -222,6 +223,8 @@ x-route-family-migration-matrix:
         - /v0/admin/markets/{id}/approve
         - /v0/admin/markets/{id}/reject
         - /v0/admin/markets/{id}/steward
+        - /v0/admin/market-tags
+        - /v0/admin/market-tags/{slug}
         - /v0/content/home
         - /v0/admin/content/home
         - /v0/content/social-share
@@ -594,6 +597,32 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error during market creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-tags:
+    get:
+      tags: [Markets]
+      operationId: listMarketTags
+      summary: List active market tags
+      description: Returns active admin-managed market taxonomy tags available for moderator market creation and public display.
+      responses:
+        '200':
+          description: Active market tags returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketTagsEnvelopeResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error while listing tags.
           content:
             application/json:
               schema:
@@ -2644,6 +2673,164 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/market-tags:
+    get:
+      tags: [Markets]
+      operationId: listAdminMarketTags
+      summary: List admin market tags
+      description: Admin-only endpoint for listing active and inactive market taxonomy tags.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: includeInactive
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Market tags returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketTagsEnvelopeResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected tag listing failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+    post:
+      tags: [Markets]
+      operationId: createAdminMarketTag
+      summary: Create market tag
+      description: Admin-only endpoint for creating a market taxonomy tag.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminMarketTagRequest'
+      responses:
+        '201':
+          description: Market tag created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketTagEnvelopeResponse'
+        '400':
+          description: Invalid tag fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected tag creation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/market-tags/{slug}:
+    patch:
+      tags: [Markets]
+      operationId: updateAdminMarketTag
+      summary: Update or archive market tag
+      description: >
+        Admin-only endpoint for updating tag metadata or archiving/reactivating
+        a tag. Deactivation requires `confirmDeactivate: true`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminMarketTagRequest'
+      responses:
+        '200':
+          description: Market tag updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketTagEnvelopeResponse'
+        '400':
+          description: Invalid tag fields or missing deactivation confirmation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected tag update failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/portfolio/{username}:
     get:
       tags: [Users]
@@ -3493,6 +3680,90 @@ components:
         noLabel:
           type: string
           maxLength: 20
+        tagSlugs:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+
+    AdminMarketTagRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+          maxLength: 64
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+        displayName:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 500
+        colorKey:
+          type: string
+          maxLength: 40
+          pattern: '^[a-z0-9_-]*$'
+        sortOrder:
+          type: integer
+        isActive:
+          type: boolean
+        confirmDeactivate:
+          type: boolean
+          description: Required as true when setting `isActive` to false.
+
+    MarketTagResponse:
+      type: object
+      required: [id, slug, displayName, sortOrder, isActive]
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        colorKey:
+          type: string
+        sortOrder:
+          type: integer
+        isActive:
+          type: boolean
+        createdBy:
+          type: string
+
+    MarketTagsResponse:
+      type: object
+      required: [tags, total]
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketTagResponse'
+        total:
+          type: integer
+
+    MarketTagsEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketTagsResponse'
+
+    MarketTagEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketTagResponse'
 
     MarketResponse:
       type: object
@@ -3549,6 +3820,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketTagResponse'
 
     CreatorResponse:
       type: object
@@ -3647,6 +3922,10 @@ components:
           type: string
         noLabel:
           type: string
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketTagResponse'
 
     ProbabilityChange:
       type: object
@@ -4164,6 +4443,10 @@ components:
         resolutionDateTime:
           type: string
           format: date-time
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketTagResponse'
 
     MarketLifecycleListResponse:
       type: object

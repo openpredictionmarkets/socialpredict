@@ -386,6 +386,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/markets/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarket))).Methods("POST")
 	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
 	router.Handle("/v0/markets/{id}/projection", securityMiddleware(http.HandlerFunc(marketsHandler.ProjectProbability))).Methods("GET")
+	router.Handle("/v0/market-tags", securityMiddleware(marketshandlers.ListMarketTagsHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 
@@ -425,6 +426,9 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/steward", securityMiddleware(adminhandlers.ReassignMarketStewardHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.ListAdminMarketTagsHandler(marketsService, authService))).Methods("GET")
+	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.CreateAdminMarketTagHandler(marketsService, authService))).Methods("POST")
+	router.Handle("/v0/admin/market-tags/{slug}", securityMiddleware(adminhandlers.UpdateAdminMarketTagHandler(marketsService, authService))).Methods("PATCH")
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")

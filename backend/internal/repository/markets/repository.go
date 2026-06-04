@@ -50,7 +50,11 @@ func (r *GormRepository) GetByID(ctx context.Context, id int64) (*dmarkets.Marke
 		return nil, err
 	}
 
-	return r.modelToDomain(&dbMarket), nil
+	market := r.modelToDomain(&dbMarket)
+	if err := r.hydrateTagsForMarkets(ctx, []*dmarkets.Market{market}); err != nil {
+		return nil, err
+	}
+	return market, nil
 }
 
 // GetPublicMarket retrieves a market with public-facing attributes.
@@ -63,6 +67,10 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		return nil, err
 	}
 
+	domainMarket := r.modelToDomain(&market)
+	if err := r.hydrateTagsForMarkets(ctx, []*dmarkets.Market{domainMarket}); err != nil {
+		return nil, err
+	}
 	return &dmarkets.PublicMarket{
 		ID:                      market.ID,
 		QuestionTitle:           market.QuestionTitle,
@@ -75,12 +83,13 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		ResolutionResult:        market.ResolutionResult,
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
-		StewardUsername:         r.modelToDomain(&market).CurrentStewardUsername(),
+		StewardUsername:         domainMarket.CurrentStewardUsername(),
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
-		Status:                  r.modelToDomain(&market).Status,
+		Status:                  domainMarket.Status,
 		LifecycleStatus:         dmarkets.NormalizeLifecycleStatus(market.LifecycleStatus),
+		Tags:                    domainMarket.Tags,
 	}, nil
 }
 
@@ -119,7 +128,11 @@ func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters)
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 // ListByStatus retrieves markets filtered by status with pagination
@@ -135,7 +148,11 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 // ListByLifecycle retrieves lifecycle queues that are intentionally excluded
@@ -155,6 +172,9 @@ func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.L
 	}
 
 	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
 	if err := r.hydrateStewardshipAudits(ctx, markets); err != nil {
 		return nil, err
 	}
@@ -234,7 +254,11 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 func applySearchTerm(dbQuery *gorm.DB, query string) *gorm.DB {
@@ -647,6 +671,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		UpdatedAt:               dbMarket.UpdatedAt,
 		InitialProbability:      dbMarket.InitialProbability,
 		UTCOffset:               dbMarket.UTCOffset,
+		Tags:                    []dmarkets.MarketTag{},
 	}
 }
 

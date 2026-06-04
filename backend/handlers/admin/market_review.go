@@ -61,6 +61,7 @@ type marketReviewResponse struct {
 	RejectionReason    string                           `json:"rejectionReason,omitempty"`
 	ProposalCost       int64                            `json:"proposalCost,omitempty"`
 	StewardshipAudits  []marketStewardshipAuditResponse `json:"stewardshipAudits,omitempty"`
+	Tags               []marketTagResponse              `json:"tags,omitempty"`
 	CreatedAt          time.Time                        `json:"createdAt,omitempty"`
 	UpdatedAt          time.Time                        `json:"updatedAt,omitempty"`
 	ResolutionDateTime time.Time                        `json:"resolutionDateTime,omitempty"`
@@ -275,6 +276,7 @@ func marketReviewResponseFromMarket(market *dmarkets.Market) marketReviewRespons
 		RejectionReason:    market.RejectionReason,
 		ProposalCost:       market.ProposalCost,
 		StewardshipAudits:  marketStewardshipAuditResponsesFromRecords(market.StewardshipAudits),
+		Tags:               marketTagResponses(market.Tags),
 		CreatedAt:          market.CreatedAt,
 		UpdatedAt:          market.UpdatedAt,
 		ResolutionDateTime: market.ResolutionDateTime,

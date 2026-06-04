@@ -5,6 +5,7 @@ import MobileMarketCard from './MobileMarketCard';
 import ExpandableText from '../utils/ExpandableText';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketTagChips from '../markets/MarketTagChips';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -60,6 +61,7 @@ const MarketRow = ({ marketData }) => (
           expandIcon="📐"
         />
       </Link>
+      <MarketTagChips tags={marketData.market.tags || []} className="mt-2" />
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
       {formatResolutionDate(marketData.market.resolutionDateTime)}

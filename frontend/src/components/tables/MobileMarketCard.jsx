@@ -4,6 +4,7 @@ import formatResolutionDate from '../../helpers/formatResolutionDate';
 import ExpandableText from '../utils/ExpandableText';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketTagChips from '../markets/MarketTagChips';
 
 const MobileMarketCard = ({ marketData }) => {
   const isMarketOpen =
@@ -56,6 +57,7 @@ const MobileMarketCard = ({ marketData }) => {
           expandIcon="📐"
         />
       </Link>
+      <MarketTagChips tags={marketData.market.tags || []} className='mb-3' />
       <div className='grid grid-cols-3 text-sm text-gray-400'>
         <span className='truncate'>👤 {marketData.numUsers}</span>
         <span className='text-center'>

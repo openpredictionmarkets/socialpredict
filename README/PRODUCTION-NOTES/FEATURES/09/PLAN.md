@@ -5,8 +5,8 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-04T00:00:00Z
 updated_at_display: "Thursday, June 4, 2026"
-update_reason: "Create the implementation checklist for market tags, category pages, pinned content, and CMS-driven discovery."
-status: draft
+update_reason: "Track first implementation slice for market tag persistence, admin tag management, moderator selection, and tag display."
+status: in-progress
 ---
 
 # Market Taxonomy And Hierarchical Navigation Plan
@@ -44,13 +44,13 @@ Service ownership: prediction market context and repository/migration boundary.
 
 Checklist:
 
-- [ ] Add timestamped migration for `market_tags`.
-- [ ] Add timestamped migration for `market_tag_assignments`.
-- [ ] Add indexes for tag slug and market/tag assignment lookup.
-- [ ] Add domain models for tag and assignment.
-- [ ] Add repository mapping tests.
-- [ ] Add service policy for active tag validation.
-- [ ] Prefer archive/disable over destructive delete when assignments exist.
+- [x] Add timestamped migration for `market_tags`.
+- [x] Add timestamped migration for `market_tag_assignments`.
+- [x] Add indexes for tag slug and market/tag assignment lookup.
+- [x] Add domain models for tag and assignment.
+- [x] Add repository mapping tests.
+- [x] Add service policy for active tag validation.
+- [x] Prefer archive/disable over destructive delete when assignments exist.
 
 ## 03. Market Create And Admin Review Tag Flow
 
@@ -58,14 +58,14 @@ Service ownership: market creation/review use cases and API boundary.
 
 Checklist:
 
-- [ ] Add tag IDs/slugs to create-market request.
-- [ ] Validate moderator-selected tags exist and are active.
-- [ ] Persist moderator-proposed tag assignments.
-- [ ] Include tag chips/data in admin market review payloads.
+- [x] Add tag IDs/slugs to create-market request.
+- [x] Validate moderator-selected tags exist and are active.
+- [x] Persist moderator-proposed tag assignments.
+- [x] Include tag chips/data in admin market review payloads.
 - [ ] Allow admin adjustment of tags during proposal review if policy approves.
-- [ ] Include tags in published market payloads.
+- [x] Include tags in published market payloads.
 - [ ] Update `backend/docs/openapi.yaml`.
-- [ ] Add handler/domain tests.
+- [x] Add handler/domain tests.
 - [ ] Run schemathesis/go-kin validation once OpenAPI is updated.
 
 ## 04. Admin Tag Management
@@ -74,12 +74,12 @@ Service ownership: CMS/content context plus API/auth boundary.
 
 Checklist:
 
-- [ ] Add admin list/create/update/archive tag APIs.
-- [ ] Add guarded delete or archive-only policy.
+- [x] Add admin list/create/update/archive tag APIs.
+- [x] Add guarded delete or archive-only policy.
 - [ ] Show market count before destructive tag action.
-- [ ] Require confirmation for delete/archive.
-- [ ] Add admin dashboard tag management UI.
-- [ ] Add tests for admin-only access and validation.
+- [x] Require confirmation for delete/archive.
+- [x] Add admin dashboard tag management UI.
+- [x] Add tests for admin-only access and validation.
 
 ## 05. Search And Tag Filtering
 
@@ -89,7 +89,7 @@ Checklist:
 
 - [ ] Add optional tag filter to public market search.
 - [ ] Add optional tag filter to status-based market listing.
-- [ ] Include tags in search/list result DTOs.
+- [x] Include tags in search/list result DTOs.
 - [ ] Keep Active/Closed/Resolved/All behavior compatible.
 - [ ] Add query/index tests for tag-filtered search.
 - [ ] Verify performance posture for many tags/markets.
@@ -146,7 +146,7 @@ Checklist:
 - [ ] Render compact recommendations when pinned content exists.
 - [ ] Render featured category cards.
 - [ ] Render featured market cards.
-- [ ] Render tag chips in search/list cards.
+- [x] Render tag chips in search/list cards.
 - [ ] Add secondary category page route/layout.
 - [ ] Scope secondary-page search to page tag/category by default.
 - [ ] Keep status tabs familiar across top-level and secondary pages.
@@ -157,13 +157,13 @@ Service ownership: frontend moderator/admin workflows.
 
 Checklist:
 
-- [ ] Add tag selector to moderator create market form.
+- [x] Add tag selector to moderator create market form.
 - [ ] Use typeahead/search when tags exceed a small number.
-- [ ] Show selected tags before submit.
-- [ ] Show proposed tags in admin review table/details.
+- [x] Show selected tags before submit.
+- [x] Show proposed tags in admin review table/details.
 - [ ] Allow admin correction if backend policy supports it.
-- [ ] Add tag chips on market detail page.
-- [ ] Add tag chips on profile/admin lifecycle tables where useful.
+- [x] Add tag chips on market detail page.
+- [x] Add tag chips on profile/admin lifecycle tables where useful.
 
 ## Exit Criteria
 

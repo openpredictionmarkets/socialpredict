@@ -71,6 +71,7 @@ func marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
 		ResolutionResult:   market.ResolutionResult,
 		CreatedAt:          market.CreatedAt,
 		UpdatedAt:          market.UpdatedAt,
+		Tags:               marketTagResponsesFromDomain(market.Tags),
 	}
 }
 
@@ -105,6 +106,7 @@ func publicMarketResponseFromDomain(market *dmarkets.Market) dto.PublicMarketRes
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
+		Tags:                    marketTagResponsesFromDomain(market.Tags),
 	}
 }
 

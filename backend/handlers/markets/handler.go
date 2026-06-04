@@ -90,6 +90,7 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 		ResolutionDateTime: req.ResolutionDateTime,
 		YesLabel:           req.YesLabel,
 		NoLabel:            req.NoLabel,
+		TagSlugs:           req.TagSlugs,
 	}
 
 	market, err := h.service.CreateMarket(r.Context(), createReq, user.Username)

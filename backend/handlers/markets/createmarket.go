@@ -207,6 +207,7 @@ func toDomainCreateRequest(req dto.CreateMarketRequest) dmarkets.MarketCreateReq
 		ResolutionDateTime: req.ResolutionDateTime,
 		YesLabel:           req.YesLabel,
 		NoLabel:            req.NoLabel,
+		TagSlugs:           req.TagSlugs,
 	}
 }
 
@@ -225,6 +226,7 @@ func toCreateMarketResponse(market *dmarkets.Market) dto.CreateMarketResponse {
 		LifecycleStatus:    market.LifecycleStatus,
 		ProposalCost:       market.ProposalCost,
 		CreatedAt:          market.CreatedAt,
+		Tags:               marketTagResponsesFromDomain(market.Tags),
 	}
 }
 

@@ -563,3 +563,89 @@ func TestGormRepositoryListByLifecycleAllExcludesRejectedAndSearchesOperationalM
 		}
 	}
 }
+
+func TestGormRepositoryMarketTagsCreateListUpdateAssignAndHydrate(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("tag_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	market := modelstesting.GenerateMarket(801, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+
+	politics, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "politics", DisplayName: "Politics", IsActive: true, SortOrder: 2, CreatedBy: "admin"})
+	if err != nil {
+		t.Fatalf("CreateMarketTag politics: %v", err)
+	}
+	if _, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "sports", DisplayName: "Sports", IsActive: true, SortOrder: 1, CreatedBy: "admin"}); err != nil {
+		t.Fatalf("CreateMarketTag sports: %v", err)
+	}
+
+	activeTags, err := repo.ListMarketTags(ctx, false)
+	if err != nil {
+		t.Fatalf("ListMarketTags returned error: %v", err)
+	}
+	if len(activeTags) != 2 || activeTags[0].Slug != "sports" || activeTags[1].Slug != "politics" {
+		t.Fatalf("expected sorted active tags, got %+v", activeTags)
+	}
+
+	inactive := false
+	updated, err := repo.UpdateMarketTag(ctx, politics.Slug, dmarkets.MarketTagRequest{DisplayName: "Civic life", IsActive: &inactive})
+	if err != nil {
+		t.Fatalf("UpdateMarketTag returned error: %v", err)
+	}
+	if updated.DisplayName != "Civic life" || updated.IsActive {
+		t.Fatalf("unexpected updated tag: %+v", updated)
+	}
+
+	assigned, err := repo.SetMarketTags(ctx, market.ID, []string{"sports"}, creator.Username, dmarkets.MarketTagAssignmentSourceCreate, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SetMarketTags returned error: %v", err)
+	}
+	if len(assigned) != 1 || assigned[0].Slug != "sports" {
+		t.Fatalf("unexpected assigned tags: %+v", assigned)
+	}
+
+	got, err := repo.GetByID(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("GetByID returned error: %v", err)
+	}
+	if len(got.Tags) != 1 || got.Tags[0].Slug != "sports" {
+		t.Fatalf("expected hydrated tag on GetByID, got %+v", got.Tags)
+	}
+
+	listed, err := repo.List(ctx, dmarkets.ListFilters{Limit: 10})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(listed) != 1 || len(listed[0].Tags) != 1 || listed[0].Tags[0].Slug != "sports" {
+		t.Fatalf("expected hydrated tag on List, got %+v", listed)
+	}
+}
+
+func TestGormRepositorySetMarketTagsRejectsInactiveTags(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("inactive_tag_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	market := modelstesting.GenerateMarket(802, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+	if _, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "inactive", DisplayName: "Inactive", IsActive: false}); err != nil {
+		t.Fatalf("CreateMarketTag returned error: %v", err)
+	}
+
+	if _, err := repo.SetMarketTags(ctx, market.ID, []string{"inactive"}, creator.Username, dmarkets.MarketTagAssignmentSourceCreate, time.Now().UTC()); !errors.Is(err, dmarkets.ErrInvalidInput) {
+		t.Fatalf("SetMarketTags error = %v, want ErrInvalidInput", err)
+	}
+}

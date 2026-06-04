@@ -10,6 +10,12 @@ import {
 } from '../../../api/moderationApi';
 import { listAdminLifecycleMarkets } from '../../../api/lifecycleMarketsApi';
 import { listAdminUsers } from '../../../api/adminUsersApi';
+import {
+  createAdminMarketTag,
+  listAdminMarketTags,
+  updateAdminMarketTag,
+} from '../../../api/marketTagsApi';
+import MarketTagChips from '../../markets/MarketTagChips';
 
 const reviewTabs = [
   { label: 'Proposed Markets', status: 'proposed' },
@@ -378,6 +384,211 @@ const MarketStewardshipQueue = () => {
   );
 };
 
+const emptyTagForm = {
+  slug: '',
+  displayName: '',
+  description: '',
+  colorKey: 'slate',
+  sortOrder: 0,
+};
+
+const MarketTaxonomyAdmin = () => {
+  const { token } = useAuth();
+  const [tags, setTags] = useState([]);
+  const [form, setForm] = useState(emptyTagForm);
+  const [loading, setLoading] = useState(true);
+  const [busySlug, setBusySlug] = useState('');
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const loadTags = async () => {
+    if (!token) {
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const result = await listAdminMarketTags({ token, includeInactive: true });
+      setTags(result.tags || []);
+    } catch (err) {
+      setError(err.message || 'Unable to load market tags.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const updateForm = (updates) => {
+    setForm((current) => ({ ...current, ...updates }));
+  };
+
+  const createTag = async (event) => {
+    event.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    try {
+      const created = await createAdminMarketTag({ token, tag: form });
+      setTags((current) => [...current, created].sort((left, right) => (
+        (left.sortOrder - right.sortOrder) || String(left.displayName).localeCompare(String(right.displayName))
+      )));
+      setForm(emptyTagForm);
+      setSuccessMessage(`Created tag ${created.displayName}.`);
+    } catch (err) {
+      setError(err.message || 'Unable to create market tag.');
+    }
+  };
+
+  const setTagActive = async (tag, isActive) => {
+    setBusySlug(tag.slug);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const updated = await updateAdminMarketTag({
+        token,
+        slug: tag.slug,
+        tag: {
+          displayName: tag.displayName,
+          description: tag.description || '',
+          colorKey: tag.colorKey || 'slate',
+          sortOrder: tag.sortOrder || 0,
+          isActive,
+          confirmDeactivate: !isActive,
+        },
+      });
+      setTags((current) => current.map((item) => (item.slug === updated.slug ? updated : item)));
+      setSuccessMessage(`${updated.displayName} is now ${updated.isActive ? 'active' : 'inactive'}.`);
+    } catch (err) {
+      setError(err.message || 'Unable to update market tag.');
+    } finally {
+      setBusySlug('');
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="grid gap-6">
+      <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+        <h2 className="text-lg font-semibold text-white">Market Tags</h2>
+        <p className="mt-2 text-sm text-gray-300">
+          Admins define the tag vocabulary. Moderators can attach active tags during market creation; admins can review those tags before publication.
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-md bg-red-700 p-3 text-sm text-white">
+          {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">
+          {successMessage}
+        </div>
+      )}
+
+      <form onSubmit={createTag} className="grid gap-4 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="grid gap-1 text-sm text-gray-300">
+            Display name
+            <input
+              value={form.displayName}
+              onChange={(event) => updateForm({ displayName: event.target.value })}
+              required
+              maxLength={120}
+              className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+            />
+          </label>
+          <label className="grid gap-1 text-sm text-gray-300">
+            Slug (optional)
+            <input
+              value={form.slug}
+              onChange={(event) => updateForm({ slug: event.target.value })}
+              placeholder="auto-generated from display name"
+              maxLength={64}
+              className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+            />
+          </label>
+        </div>
+        <label className="grid gap-1 text-sm text-gray-300">
+          Description
+          <textarea
+            value={form.description}
+            onChange={(event) => updateForm({ description: event.target.value })}
+            rows={3}
+            maxLength={500}
+            className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+          />
+        </label>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="grid gap-1 text-sm text-gray-300">
+            Color key
+            <select
+              value={form.colorKey}
+              onChange={(event) => updateForm({ colorKey: event.target.value })}
+              className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+            >
+              <option value="slate">Slate</option>
+              <option value="sky">Sky</option>
+              <option value="emerald">Emerald</option>
+              <option value="amber">Amber</option>
+              <option value="rose">Rose</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-gray-300">
+            Sort order
+            <input
+              type="number"
+              value={form.sortOrder}
+              onChange={(event) => updateForm({ sortOrder: Number(event.target.value || 0) })}
+              className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+            />
+          </label>
+        </div>
+        <button
+          type="submit"
+          className="justify-self-start rounded-md bg-primary-pink px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-pink/80"
+        >
+          Create Tag
+        </button>
+      </form>
+
+      <div className="grid gap-3">
+        {tags.map((tag) => (
+          <div key={tag.slug} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-900/70 p-4 md:grid-cols-[1fr,auto] md:items-center">
+            <div>
+              <MarketTagChips tags={[tag]} />
+              <div className="mt-2 font-mono text-xs text-gray-500">{tag.slug}</div>
+              {tag.description && <p className="mt-2 text-sm text-gray-300">{tag.description}</p>}
+              {!tag.isActive && <p className="mt-2 text-xs text-amber-300">Inactive tags stay visible on historical markets but cannot be newly assigned.</p>}
+            </div>
+            <button
+              type="button"
+              disabled={busySlug === tag.slug}
+              onClick={() => setTagActive(tag, !tag.isActive)}
+              className={`rounded-md px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                tag.isActive ? 'bg-amber-700 hover:bg-amber-600' : 'bg-emerald-700 hover:bg-emerald-600'
+              }`}
+            >
+              {tag.isActive ? 'Deactivate' : 'Reactivate'}
+            </button>
+          </div>
+        ))}
+        {!tags.length && (
+          <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
+            No tags have been created yet.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 function ModeratorMarketReview() {
   const tabsData = [
     ...reviewTabs.map((tab) => ({
@@ -387,6 +598,10 @@ function ModeratorMarketReview() {
     {
       label: 'Stewardship',
       content: <MarketStewardshipQueue />,
+    },
+    {
+      label: 'Tags',
+      content: <MarketTaxonomyAdmin />,
     },
   ];
 
