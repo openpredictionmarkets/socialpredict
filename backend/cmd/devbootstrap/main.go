@@ -83,7 +83,7 @@ func run() error {
 		username := fmt.Sprintf("%s%02d", prefix, i)
 		users = append(users, bootstrapUser{
 			username:    username,
-			displayName: fmt.Sprintf("Dev Test User %02d", i),
+			displayName: fmt.Sprintf("Dev %s User %02d", prefix, i),
 			email:       fmt.Sprintf("%s%02d@example.com", prefix, i),
 			apiKey:      fmt.Sprintf("dev-%s%02d-api-key", prefix, i),
 			userType:    "REGULAR",
