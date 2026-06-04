@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -306,14 +307,21 @@ func parseAdminReviewMarketFilters(w http.ResponseWriter, r *http.Request) (dmar
 		status = dmarkets.MarketLifecycleProposed
 	}
 	switch status {
-	case dmarkets.MarketLifecycleProposed, dmarkets.MarketLifecyclePublished, dmarkets.MarketLifecycleRejected:
+	case dmarkets.MarketStatusAll, dmarkets.MarketLifecycleProposed, dmarkets.MarketLifecyclePublished, dmarkets.MarketLifecycleRejected, dmarkets.MarketLifecycleClosed, dmarkets.MarketLifecycleResolved:
 	default:
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		return dmarkets.ListFilters{}, false
+	}
+
+	searchQuery := strings.TrimSpace(query.Get("query"))
+	if len(searchQuery) > 100 {
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
 		return dmarkets.ListFilters{}, false
 	}
 
 	return dmarkets.ListFilters{
 		Status: status,
+		Query:  searchQuery,
 		Limit:  boundedAdminReviewInt(query.Get("limit"), 50, 1, 100),
 		Offset: boundedAdminReviewInt(query.Get("offset"), 0, 0, 100000),
 	}, true

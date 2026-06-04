@@ -518,3 +518,48 @@ func TestGormRepositoryListByLifecycleHydratesStewardshipAudits(t *testing.T) {
 		t.Fatalf("unexpected hydrated audits: %+v", audits)
 	}
 }
+
+func TestGormRepositoryListByLifecycleAllExcludesRejectedAndSearchesOperationalMarkets(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("lifecycle_search_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+
+	published := modelstesting.GenerateMarket(703, creator.Username)
+	published.QuestionTitle = "Orchard published market"
+	published.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	rejected := modelstesting.GenerateMarket(704, creator.Username)
+	rejected.QuestionTitle = "Orchard rejected market"
+	rejected.LifecycleStatus = dmarkets.MarketLifecycleRejected
+	resolved := modelstesting.GenerateMarket(705, creator.Username)
+	resolved.QuestionTitle = "Orchard resolved market"
+	resolved.LifecycleStatus = dmarkets.MarketLifecycleResolved
+	resolved.IsResolved = true
+
+	for _, market := range []models.Market{published, rejected, resolved} {
+		if err := db.Create(&market).Error; err != nil {
+			t.Fatalf("seed market %q: %v", market.QuestionTitle, err)
+		}
+	}
+
+	markets, err := repo.ListByLifecycle(ctx, dmarkets.ListFilters{
+		Status: dmarkets.MarketStatusAll,
+		Query:  "orchard",
+		Limit:  10,
+	})
+	if err != nil {
+		t.Fatalf("ListByLifecycle returned error: %v", err)
+	}
+	if len(markets) != 2 {
+		t.Fatalf("expected published and resolved markets only, got %d: %+v", len(markets), markets)
+	}
+	for _, market := range markets {
+		if market.LifecycleStatus == dmarkets.MarketLifecycleRejected {
+			t.Fatalf("rejected market should not be included in all stewardship list: %+v", market)
+		}
+	}
+}

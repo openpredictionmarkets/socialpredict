@@ -164,6 +164,7 @@ type StatusPolicy interface {
 // ListFilters represents filters for listing markets.
 type ListFilters struct {
 	Status    string
+	Query     string
 	CreatedBy string
 	Limit     int
 	Offset    int

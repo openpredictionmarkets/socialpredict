@@ -136,15 +136,15 @@ const AdminMarketQueue = ({ status }) => {
 
 const MarketStewardshipQueue = () => {
   const { token } = useAuth();
-  const [marketsByStatus, setMarketsByStatus] = useState({});
+  const [markets, setMarkets] = useState([]);
   const [moderators, setModerators] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [moderatorsLoading, setModeratorsLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [busyMarketId, setBusyMarketId] = useState(null);
   const [stewardForms, setStewardForms] = useState({});
-
-  const markets = reviewTabs.flatMap((tab) => marketsByStatus[tab.status] || []);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!token) {
@@ -153,39 +153,67 @@ const MarketStewardshipQueue = () => {
 
     let ignore = false;
 
-    const loadStewardshipData = async () => {
-      setLoading(true);
-      setError('');
+    const loadModerators = async () => {
+      setModeratorsLoading(true);
       try {
-        const [usersResult, ...marketResults] = await Promise.all([
-          listAdminUsers({ token, limit: 250 }),
-          ...reviewTabs.map((tab) => listAdminLifecycleMarkets({ token, status: tab.status, limit: 100 })),
-        ]);
-
+        const usersResult = await listAdminUsers({ token, limit: 250 });
         if (!ignore) {
           setModerators((usersResult.users || []).filter(isActiveModerator));
-          setMarketsByStatus(reviewTabs.reduce((acc, tab, index) => {
-            acc[tab.status] = marketResults[index]?.markets || [];
-            return acc;
-          }, {}));
         }
       } catch (err) {
         if (!ignore) {
-          setError(err.message || 'Unable to load stewardship data.');
+          setError(err.message || 'Unable to load active moderators.');
+        }
+      } finally {
+        if (!ignore) {
+          setModeratorsLoading(false);
+        }
+      }
+    };
+
+    loadModerators();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    let ignore = false;
+    const timeoutId = window.setTimeout(async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const result = await listAdminLifecycleMarkets({
+          token,
+          status: 'all',
+          query: searchQuery,
+          limit: 100,
+        });
+
+        if (!ignore) {
+          setMarkets(result.markets || []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Unable to load stewardship markets.');
         }
       } finally {
         if (!ignore) {
           setLoading(false);
         }
       }
-    };
-
-    loadStewardshipData();
+    }, 300);
 
     return () => {
       ignore = true;
+      window.clearTimeout(timeoutId);
     };
-  }, [token]);
+  }, [token, searchQuery]);
 
   const updateStewardForm = (marketId, updates) => {
     setStewardForms((current) => ({
@@ -207,14 +235,9 @@ const MarketStewardshipQueue = () => {
   };
 
   const updateMarketInQueues = (updatedMarket) => {
-    setMarketsByStatus((current) => Object.fromEntries(
-      Object.entries(current).map(([status, statusMarkets]) => [
-        status,
-        statusMarkets.map((market) => (
-          market.id === updatedMarket.id ? { ...market, ...updatedMarket } : market
-        )),
-      ]),
-    ));
+    setMarkets((current) => current.map((market) => (
+      market.id === updatedMarket.id ? { ...market, ...updatedMarket } : market
+    )));
   };
 
   const reassignSteward = async (market) => {
@@ -296,7 +319,7 @@ const MarketStewardshipQueue = () => {
     );
   };
 
-  if (loading) {
+  if (loading && !markets.length) {
     return <LoadingSpinner />;
   }
 
@@ -306,6 +329,27 @@ const MarketStewardshipQueue = () => {
         <p className="text-sky-100/80">
           Creator stays immutable. Reassign a market steward when a moderator is suspended,
           unavailable, conflicted, or no longer responsible for resolving the market.
+        </p>
+      </div>
+      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+        <label htmlFor="stewardship-market-search" className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
+          Search stewardship markets
+        </label>
+        <div className="relative">
+          <input
+            id="stewardship-market-search"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search title or description across proposed, published, closed, and resolved markets"
+            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+          />
+          {loading && (
+            <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
+          )}
+        </div>
+        <p className="text-xs text-gray-500">
+          Rejected and cancelled markets are excluded from stewardship governance.
         </p>
       </div>
       {error && (
@@ -318,7 +362,7 @@ const MarketStewardshipQueue = () => {
           {successMessage}
         </div>
       )}
-      {moderators.length === 0 && (
+      {!moderatorsLoading && moderators.length === 0 && (
         <div className="rounded-md bg-amber-700 p-3 text-sm text-white">
           No active moderators are available for stewardship reassignment.
         </div>

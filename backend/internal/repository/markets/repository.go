@@ -141,9 +141,10 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 // ListByLifecycle retrieves lifecycle queues that are intentionally excluded
 // from the public market listing scope.
 func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
-	query := r.db.WithContext(ctx).Model(&models.Market{}).
-		Where("lifecycle_status = ?", dmarkets.NormalizeLifecycleStatus(filters.Status))
+	query := r.db.WithContext(ctx).Model(&models.Market{})
 
+	query = applyLifecycleAdminStatusFilter(query, filters.Status)
+	query = applyLifecycleSearchTerm(query, filters.Query)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
 	query = applyPagination(query, filters.Limit, filters.Offset)
 	query = query.Order("created_at DESC")
@@ -158,6 +159,41 @@ func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.L
 		return nil, err
 	}
 	return markets, nil
+}
+
+func applyLifecycleAdminStatusFilter(query *gorm.DB, status string) *gorm.DB {
+	normalized := dmarkets.NormalizeLifecycleStatus(status)
+	switch normalized {
+	case dmarkets.MarketStatusAll:
+		return query.Where(
+			"lifecycle_status IN ? OR lifecycle_status = '' OR lifecycle_status IS NULL",
+			[]string{
+				dmarkets.MarketLifecycleProposed,
+				dmarkets.MarketLifecyclePublished,
+				dmarkets.MarketLifecycleClosed,
+				dmarkets.MarketLifecycleResolved,
+			},
+		)
+	case dmarkets.MarketLifecycleClosed:
+		return query.Where("lifecycle_status = ? OR (lifecycle_status = ? AND is_resolved = ? AND resolution_date_time <= ?)",
+			dmarkets.MarketLifecycleClosed,
+			dmarkets.MarketLifecyclePublished,
+			false,
+			time.Now(),
+		)
+	case dmarkets.MarketLifecycleResolved:
+		return query.Where("is_resolved = ? OR lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
+	default:
+		return query.Where("lifecycle_status = ?", normalized)
+	}
+}
+
+func applyLifecycleSearchTerm(query *gorm.DB, value string) *gorm.DB {
+	term := strings.TrimSpace(value)
+	if term == "" {
+		return query
+	}
+	return applySearchTerm(query, term)
 }
 
 func applyListStatusFilter(query *gorm.DB, status string) *gorm.DB {

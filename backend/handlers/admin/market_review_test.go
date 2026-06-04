@@ -167,6 +167,39 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 	}
 }
 
+func TestListReviewMarketsHandlerSupportsAllStatusSearch(t *testing.T) {
+	svc := marketReviewServiceMock{
+		listFn: func(_ context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+			if filters.Status != dmarkets.MarketStatusAll || filters.Query != "orchard" || filters.Limit != 100 || filters.Offset != 0 {
+				t.Fatalf("unexpected filters: %+v", filters)
+			}
+			return []*dmarkets.Market{{
+				ID:              45,
+				QuestionTitle:   "Orchard market",
+				CreatorUsername: "moderator",
+				Status:          dmarkets.MarketStatusResolved,
+				LifecycleStatus: dmarkets.MarketLifecycleResolved,
+			}}, nil
+		},
+	}
+	handler := ListReviewMarketsHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := httptest.NewRequest(http.MethodGet, "/v0/admin/markets?status=all&query=orchard&limit=100", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketReviewListResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !envelope.OK || envelope.Result.Total != 1 || envelope.Result.Markets[0].LifecycleStatus != dmarkets.MarketLifecycleResolved {
+		t.Fatalf("unexpected response: %+v", envelope)
+	}
+}
+
 func TestReassignMarketStewardHandlerReassignsSteward(t *testing.T) {
 	changedAt := time.Date(2026, 6, 4, 13, 0, 0, 0, time.UTC)
 	svc := marketReviewServiceMock{

@@ -23,7 +23,7 @@ func (s *Service) ListMarkets(ctx context.Context, filters ListFilters) ([]*Mark
 func (s *Service) ListLifecycleMarkets(ctx context.Context, filters ListFilters) ([]*Market, error) {
 	status := NormalizeLifecycleStatus(filters.Status)
 	switch status {
-	case MarketLifecycleProposed, MarketLifecyclePublished, MarketLifecycleRejected:
+	case MarketStatusAll, MarketLifecycleProposed, MarketLifecyclePublished, MarketLifecycleRejected, MarketLifecycleClosed, MarketLifecycleResolved, MarketLifecycleCancelled:
 	default:
 		return nil, ErrInvalidInput
 	}
