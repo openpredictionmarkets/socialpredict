@@ -8,6 +8,7 @@ import (
 	"time"
 
 	markets "socialpredict/internal/domain/markets"
+	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 
 	"gorm.io/gorm"
@@ -27,6 +28,27 @@ func seedSearchMarkets(t *testing.T, db *gorm.DB, username string) {
 		if err := db.Create(market).Error; err != nil {
 			t.Fatalf("seed market: %v", err)
 		}
+	}
+}
+
+func assignSearchMarketTag(t *testing.T, db *gorm.DB, marketID int64, slug string) {
+	t.Helper()
+
+	tag := models.MarketTag{
+		Slug:        slug,
+		DisplayName: slug,
+		IsActive:    true,
+	}
+	if err := db.Create(&tag).Error; err != nil {
+		t.Fatalf("create market tag: %v", err)
+	}
+	assignment := models.MarketTagAssignment{
+		MarketID: marketID,
+		TagID:    tag.ID,
+		Source:   markets.MarketTagAssignmentSourceAdmin,
+	}
+	if err := db.Create(&assignment).Error; err != nil {
+		t.Fatalf("create market tag assignment: %v", err)
 	}
 }
 
@@ -125,6 +147,43 @@ func TestServiceSearchMarketsFiltersByStatus(t *testing.T) {
 				t.Fatalf("expected fallback results, got none")
 			}
 		})
+	}
+}
+
+func TestServiceSearchAndListMarketsFilterByTagSlug(t *testing.T) {
+	service, db, _ := setupServiceWithDB(t)
+
+	user := modelstesting.GenerateUser("tag_filter_user", 0)
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	seedSearchMarkets(t, db, user.Username)
+	assignSearchMarketTag(t, db, 1, "bitcoin")
+	assignSearchMarketTag(t, db, 4, "stocks")
+
+	searchResult, err := service.SearchMarkets(context.Background(), "bitcoin", markets.SearchFilters{
+		Status:  "all",
+		TagSlug: "bitcoin",
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("SearchMarkets returned error: %v", err)
+	}
+	if len(searchResult.PrimaryResults) != 1 || searchResult.PrimaryResults[0].ID != 1 {
+		t.Fatalf("expected only bitcoin-tagged search result, got %+v", searchResult.PrimaryResults)
+	}
+
+	listResult, err := service.ListMarkets(context.Background(), markets.ListFilters{
+		Status:  "active",
+		TagSlug: "stocks",
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("ListMarkets returned error: %v", err)
+	}
+	if len(listResult) != 1 || listResult[0].ID != 4 {
+		t.Fatalf("expected only stocks-tagged list result, got %+v", listResult)
 	}
 }
 

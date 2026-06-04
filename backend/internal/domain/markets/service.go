@@ -166,15 +166,17 @@ type ListFilters struct {
 	Status    string
 	Query     string
 	CreatedBy string
+	TagSlug   string
 	Limit     int
 	Offset    int
 }
 
 // SearchFilters represents filters for searching markets.
 type SearchFilters struct {
-	Status string
-	Limit  int
-	Offset int
+	Status  string
+	TagSlug string
+	Limit   int
+	Offset  int
 }
 
 // SearchResults represents the result of a market search with fallback.

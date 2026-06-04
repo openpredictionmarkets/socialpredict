@@ -237,6 +237,14 @@ func DefaultPage(slug string) *models.MarketDiscoveryPage {
 		page.SearchScope = SearchScopeTag
 		page.FeaturedMarketsEnabled = true
 		page.SectionsEnabled = true
+	} else if slug != PageSlugMarkets {
+		page.Title = titleFromSlug(slug)
+		page.Description = "Browse and search markets in this topic."
+		page.PageType = PageTypeSecondary
+		page.PrimaryTagSlug = slug
+		page.SearchScope = SearchScopeTag
+		page.FeaturedMarketsEnabled = true
+		page.SectionsEnabled = true
 	}
 	return page
 }
@@ -377,4 +385,17 @@ func slugFromTitle(title string) string {
 		}
 	}
 	return normalizeSlug(builder.String())
+}
+
+func titleFromSlug(slug string) string {
+	parts := strings.Fields(strings.ReplaceAll(normalizeSlug(slug), "-", " "))
+	for i, part := range parts {
+		if len(part) > 0 {
+			parts[i] = strings.ToUpper(part[:1]) + part[1:]
+		}
+	}
+	if len(parts) == 0 {
+		return "Topic Markets"
+	}
+	return strings.Join(parts, " ")
 }

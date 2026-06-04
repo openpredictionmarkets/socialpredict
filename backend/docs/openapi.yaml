@@ -507,6 +507,12 @@ paths:
           schema:
             type: string
         - in: query
+          name: tagSlug
+          required: false
+          description: Only include markets assigned to the given market tag slug.
+          schema:
+            type: string
+        - in: query
           name: limit
           required: false
           description: Maximum number of markets to return.
@@ -666,6 +672,12 @@ paths:
           schema:
             type: string
             enum: [active, closed, resolved, all]
+        - in: query
+          name: tagSlug
+          required: false
+          description: Only search markets assigned to the given market tag slug.
+          schema:
+            type: string
         - in: query
           name: limit
           required: false
@@ -3152,9 +3164,9 @@ paths:
         - in: path
           name: slug
           required: true
+          description: "`markets` for the TOP page, `topic-template` for the default secondary layout, or any topic/tag slug for a secondary page."
           schema:
             type: string
-            enum: [markets, topic-template]
       responses:
         '200':
           description: Market discovery page layout returned successfully.
@@ -5084,7 +5096,6 @@ components:
       properties:
         slug:
           type: string
-          enum: [markets, topic-template]
         title:
           type: string
           maxLength: 160

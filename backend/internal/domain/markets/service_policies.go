@@ -235,9 +235,10 @@ func (defaultSearchPolicy) NewSearchResults(query string, status string, primary
 
 func (defaultSearchPolicy) BuildFallbackFilters(primary SearchFilters) SearchFilters {
 	return SearchFilters{
-		Status: "",
-		Limit:  primary.Limit * 2,
-		Offset: 0,
+		Status:  "",
+		TagSlug: primary.TagSlug,
+		Limit:   primary.Limit * 2,
+		Offset:  0,
 	}
 }
 

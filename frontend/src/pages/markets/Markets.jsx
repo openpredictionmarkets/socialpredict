@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import MarketsByStatusTable from '../../components/tables/MarketsByStatusTable';
 import GlobalSearchBar from '../../components/search/GlobalSearchBar';
@@ -14,6 +14,8 @@ const defaultDiscoveryLayout = {
     featuredMarketsEnabled: false,
     sectionsEnabled: false,
     recommendationLimit: 20,
+    primaryTagSlug: '',
+    searchScope: 'all',
     sections: [],
     pins: [],
 };
@@ -23,6 +25,20 @@ const hasCuratedBlocks = (layout) => (
 );
 
 const sortBySortOrder = (items = []) => [...items].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+
+const slugTitle = (slug = '') => slug
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const normalizeDiscoveryLayout = (layout, fallback = {}) => ({
+    ...defaultDiscoveryLayout,
+    ...fallback,
+    ...layout,
+    sections: sortBySortOrder(layout?.sections || []),
+    pins: sortBySortOrder(layout?.pins || []),
+});
 
 const DiscoveryBadge = ({ children, tone = 'sky' }) => {
     const tones = {
@@ -57,7 +73,7 @@ const DiscoveryCard = ({ eyebrow, title, description, children, to, tone = 'sky'
     return content;
 };
 
-const DiscoveryPanel = ({ layout }) => {
+const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
     if (!hasCuratedBlocks(layout)) return null;
 
     const pins = sortBySortOrder(layout.pins || []);
@@ -78,12 +94,12 @@ const DiscoveryPanel = ({ layout }) => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-                {layout.featuredTopicsEnabled && <DiscoveryBadge>Featured topics</DiscoveryBadge>}
+                {layout.featuredTopicsEnabled && !isTopicPage && <DiscoveryBadge>Featured topics</DiscoveryBadge>}
                 {layout.featuredMarketsEnabled && <DiscoveryBadge tone="emerald">Featured markets</DiscoveryBadge>}
                 {layout.sectionsEnabled && <DiscoveryBadge tone="amber">Sections</DiscoveryBadge>}
             </div>
 
-            {layout.featuredTopicsEnabled && topicPins.length > 0 && (
+            {!isTopicPage && layout.featuredTopicsEnabled && topicPins.length > 0 && (
                 <section>
                     <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-300">Featured Topics</h3>
                     <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -91,12 +107,11 @@ const DiscoveryPanel = ({ layout }) => {
                             <DiscoveryCard
                                 key={`topic-${pin.id || pin.targetPageSlug || pin.sortOrder}`}
                                 eyebrow="Topic"
-                                title={pin.label || pin.targetPageSlug || 'Topic'}
+                                title={pin.label || slugTitle(pin.targetPageSlug) || 'Topic'}
                                 description={pin.targetPageSlug ? `Topic slug: ${pin.targetPageSlug}` : 'CMS-managed topic page'}
+                                to={pin.targetPageSlug ? `/markets/topic/${pin.targetPageSlug}` : undefined}
                                 tone="sky"
-                            >
-                                <p className="mt-3 text-xs text-sky-200">Secondary route support is planned next.</p>
-                            </DiscoveryCard>
+                            />
                         ))}
                     </div>
                 </section>
@@ -130,6 +145,7 @@ const DiscoveryPanel = ({ layout }) => {
                                 eyebrow="Section"
                                 title={section.title}
                                 description={section.description || 'Curated CMS section'}
+                                to={section.tagFilterSlug ? `/markets/topic/${section.tagFilterSlug}` : undefined}
                                 tone="sky"
                             >
                                 {section.tagFilterSlug && (
@@ -147,6 +163,9 @@ const DiscoveryPanel = ({ layout }) => {
 };
 
 function Markets() {
+    const { slug: topicSlugParam } = useParams();
+    const topicSlug = topicSlugParam || '';
+    const isTopicPage = !!topicSlug;
     const [searchResults, setSearchResults] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
     const [activeTab, setActiveTab] = useState('Active');
@@ -154,30 +173,44 @@ function Markets() {
 
     useEffect(() => {
         let ignore = false;
+        const discoverySlug = isTopicPage ? topicSlug : 'markets';
+        const fallback = isTopicPage
+            ? {
+                title: slugTitle(topicSlug) || 'Topic Markets',
+                description: 'Browse and search markets in this topic.',
+                primaryTagSlug: topicSlug,
+                searchScope: 'tag',
+                featuredMarketsEnabled: true,
+                sectionsEnabled: true,
+                recommendationLimit: 5,
+            }
+            : {};
 
-        apiRequest('/v0/content/market-discovery/markets', {
+        setSearchResults(null);
+        setIsSearching(false);
+
+        apiRequest(`/v0/content/market-discovery/${discoverySlug}`, {
             fallbackMessage: 'Failed to load market discovery layout',
         })
             .then((layout) => {
                 if (!ignore) {
-                    setDiscoveryLayout({
-                        ...defaultDiscoveryLayout,
-                        ...layout,
-                        sections: sortBySortOrder(layout.sections || []),
-                        pins: sortBySortOrder(layout.pins || []),
-                    });
+                    setDiscoveryLayout(normalizeDiscoveryLayout(layout, fallback));
                 }
             })
             .catch(() => {
                 if (!ignore) {
-                    setDiscoveryLayout(defaultDiscoveryLayout);
+                    setDiscoveryLayout(normalizeDiscoveryLayout({}, fallback));
                 }
             });
 
         return () => {
             ignore = true;
         };
-    }, []);
+    }, [isTopicPage, topicSlug]);
+
+    const tagScope = discoveryLayout.searchScope === 'tag'
+        ? (discoveryLayout.primaryTagSlug || topicSlug)
+        : '';
 
     const handleSearchResults = (results) => {
         setSearchResults(results);
@@ -193,28 +226,28 @@ function Markets() {
             label: 'Active', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="active" limit={discoveryLayout.recommendationLimit} />,
+                <MarketsByStatusTable status="active" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('Active')
         },
         { 
             label: 'Closed', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="closed" limit={discoveryLayout.recommendationLimit} />,
+                <MarketsByStatusTable status="closed" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('Closed')
         },
         { 
             label: 'Resolved', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="resolved" limit={discoveryLayout.recommendationLimit} />,
+                <MarketsByStatusTable status="resolved" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('Resolved')
         },
         { 
             label: 'All', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="all" limit={discoveryLayout.recommendationLimit} />,
+                <MarketsByStatusTable status="all" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('All')
         },
     ];
@@ -223,9 +256,19 @@ function Markets() {
         <div className='App'>
             <div className='Center-content'>
                 <div className='Center-content-header'>
+                    {isTopicPage && (
+                        <Link to="/markets" className="mb-3 inline-flex text-sm font-semibold text-sky-300 hover:text-sky-200">
+                            Back to all markets
+                        </Link>
+                    )}
                     <h1 className='text-2xl font-semibold text-gray-300 mb-2'>{discoveryLayout.title || 'Markets'}</h1>
                     {discoveryLayout.description && (
-                        <p className="mb-6 max-w-3xl text-sm text-gray-400">{discoveryLayout.description}</p>
+                        <p className="mb-3 max-w-3xl text-sm text-gray-400">{discoveryLayout.description}</p>
+                    )}
+                    {tagScope && (
+                        <div className="mb-6">
+                            <DiscoveryBadge>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                        </div>
                     )}
                 </div>
                 <div className='Center-content-table'>
@@ -234,8 +277,9 @@ function Markets() {
                         currentStatus={TAB_TO_STATUS[activeTab]}
                         isSearching={isSearching}
                         setIsSearching={setIsSearching}
+                        tagSlug={tagScope}
                     />
-                    {!isSearching && <DiscoveryPanel layout={discoveryLayout} />}
+                    {!isSearching && <DiscoveryPanel layout={discoveryLayout} isTopicPage={isTopicPage} />}
                     
                     <SiteTabs 
                         tabs={tabsData} 

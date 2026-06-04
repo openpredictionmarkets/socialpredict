@@ -164,7 +164,7 @@ const MarketRow = ({ marketData }) => {
   );
 };
 
-function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT }) {
+function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
   const [marketsData, setMarketsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -185,6 +185,9 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT }) {
         }
 
         params.set('limit', String(limit || DEFAULT_LIMIT));
+        if (tagSlug) {
+          params.set('tagSlug', tagSlug);
+        }
         url.search = params.toString();
 
         const response = await fetch(url.toString(), { signal: controller.signal });
@@ -214,7 +217,7 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT }) {
     fetchMarkets();
 
     return () => controller.abort();
-  }, [status, limit]);
+  }, [status, limit, tagSlug]);
 
   if (loading)
     return (

@@ -120,8 +120,9 @@ func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters)
 
 	query = applyListStatusFilter(query, filters.Status)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
+	query = applyTagSlugFilter(query, filters.TagSlug)
 	query = applyPagination(query, filters.Limit, filters.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
@@ -141,7 +142,7 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 
 	query = applyStatusByResolution(query, status, time.Now())
 	query = applyPagination(query, p.Limit, p.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
@@ -164,7 +165,7 @@ func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.L
 	query = applyLifecycleSearchTerm(query, filters.Query)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
 	query = applyPagination(query, filters.Limit, filters.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
@@ -227,6 +228,18 @@ func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
 	return query.Where("creator_username = ?", createdBy)
 }
 
+func applyTagSlugFilter(query *gorm.DB, tagSlug string) *gorm.DB {
+	tagSlug = strings.Trim(strings.ToLower(strings.TrimSpace(tagSlug)), "-")
+	if tagSlug == "" {
+		return query
+	}
+	return query.
+		Joins("JOIN market_tag_assignments ON market_tag_assignments.market_id = markets.id AND market_tag_assignments.deleted_at IS NULL").
+		Joins("JOIN market_tags ON market_tags.id = market_tag_assignments.tag_id AND market_tags.deleted_at IS NULL").
+		Where("market_tags.slug = ?", tagSlug).
+		Distinct("markets.*")
+}
+
 func applyStatusByResolution(query *gorm.DB, status string, now time.Time) *gorm.DB {
 	switch status {
 	case dmarkets.MarketStatusActive:
@@ -246,8 +259,9 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 
 	dbQuery = applySearchTerm(dbQuery, query)
 	dbQuery = applyStatusFilter(dbQuery, filters.Status)
+	dbQuery = applyTagSlugFilter(dbQuery, filters.TagSlug)
 	dbQuery = applyPagination(dbQuery, filters.Limit, filters.Offset)
-	dbQuery = dbQuery.Order("created_at DESC")
+	dbQuery = dbQuery.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := dbQuery.Find(&dbMarkets).Error; err != nil {
@@ -264,7 +278,7 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 func applySearchTerm(dbQuery *gorm.DB, query string) *gorm.DB {
 	searchTerm := strings.ToLower(query)
 	searchPattern := "%" + searchTerm + "%"
-	return dbQuery.Where("(LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?)", searchPattern, searchPattern)
+	return dbQuery.Where("(LOWER(markets.question_title) LIKE ? OR LOWER(markets.description) LIKE ?)", searchPattern, searchPattern)
 }
 
 func applyStatusFilter(dbQuery *gorm.DB, status string) *gorm.DB {

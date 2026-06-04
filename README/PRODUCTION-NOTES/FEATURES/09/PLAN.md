@@ -5,7 +5,7 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-04T00:00:00Z
 updated_at_display: "Thursday, June 4, 2026"
-update_reason: "Track implementation slices for tag persistence, market discovery layout persistence, and page-level CMS sections/pins."
+update_reason: "Track implementation slices for tag persistence, market discovery layout persistence, page-level CMS sections/pins, secondary routes, and tag-scoped discovery."
 status: in-progress
 ---
 
@@ -87,11 +87,11 @@ Service ownership: market search/read model.
 
 Checklist:
 
-- [ ] Add optional tag filter to public market search.
-- [ ] Add optional tag filter to status-based market listing.
+- [x] Add optional tag filter to public market search.
+- [x] Add optional tag filter to status-based market listing.
 - [x] Include tags in search/list result DTOs.
-- [ ] Keep Active/Closed/Resolved/All behavior compatible.
-- [ ] Add query/index tests for tag-filtered search.
+- [x] Keep Active/Closed/Resolved/All behavior compatible.
+- [x] Add query/index tests for tag-filtered search.
 - [ ] Verify performance posture for many tags/markets.
 
 ## 06. Discovery Pages And Sections
@@ -152,9 +152,9 @@ Checklist:
 - [x] Render featured category cards.
 - [x] Render featured market cards.
 - [x] Render tag chips in search/list cards.
-- [ ] Add secondary category page route/layout.
-- [ ] Scope secondary-page search to page tag/category by default.
-- [ ] Keep status tabs familiar across top-level and secondary pages.
+- [x] Add secondary category page route/layout.
+- [x] Scope secondary-page search to page tag/category by default.
+- [x] Keep status tabs familiar across top-level and secondary pages.
 
 ## 10. Moderator And Admin Frontend UX
 
