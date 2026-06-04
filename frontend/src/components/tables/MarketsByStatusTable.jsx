@@ -7,6 +7,7 @@ import LoadingSpinner from '../loaders/LoadingSpinner';
 import ExpandableLink from '../utils/ExpandableLink';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketTagChips from '../markets/MarketTagChips';
 
 const DEFAULT_LIMIT = 50;
 const DEFAULT_CREATOR_EMOJI = '👤';
@@ -113,15 +114,18 @@ const MarketRow = ({ marketData }) => {
         {probabilityDisplay}
       </td>
       <td className='px-6 py-4 text-sm font-medium text-gray-300'>
-        <ExpandableLink
-          text={questionTitle}
-          to={marketId ? `/markets/${marketId}` : '#'}
-          maxLength={45}
-          className=''
-          linkClassName='hover:text-blue-400 transition-colors duration-200'
-          buttonClassName='text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1'
-          expandIcon='📐'
-        />
+        <div className='flex max-w-md flex-wrap items-center gap-2'>
+          <ExpandableLink
+            text={questionTitle}
+            to={marketId ? `/markets/${marketId}` : '#'}
+            maxLength={45}
+            className=''
+            linkClassName='hover:text-blue-400 transition-colors duration-200'
+            buttonClassName='text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1'
+            expandIcon='📐'
+          />
+          <MarketTagChips tags={market.tags || []} />
+        </div>
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
         {formatResolutionDate(resolutionDate)}
