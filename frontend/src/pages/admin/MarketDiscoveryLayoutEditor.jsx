@@ -1,47 +1,80 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
 
 const layoutModes = {
   top: {
+    slug: 'markets',
     label: 'Market page layout (TOP)',
     route: '/markets',
     purpose: 'Search-first discovery page for all public markets.',
-    defaultRecommendationLimit: 20,
-    curatedRecommendationLimit: 5,
+    pageType: 'top',
     fixedBlocks: [
       'Search bar',
       'Status tabs: Active, Closed, Resolved, All',
       'Recommendation fallback',
     ],
-    optionalBlocks: [
-      'Featured topic/category cards',
-      'Featured market cards',
-      'CMS sections',
-    ],
   },
   secondary: {
+    slug: 'topic-template',
     label: 'Topic page layout (SECONDARY)',
     route: '/markets/topic/:slug',
     purpose: 'Tag-scoped market discovery page for a CMS-managed topic.',
-    defaultRecommendationLimit: 20,
-    curatedRecommendationLimit: 5,
+    pageType: 'secondary',
     fixedBlocks: [
       'Topic title and description',
       'Search bar filtered by topic tag',
       'Status tabs: Active, Closed, Resolved, All',
     ],
-    optionalBlocks: [
-      'Pinned markets for this topic',
-      'Topic sections',
-      'Section-specific featured markets',
-    ],
   },
 };
 
-const plannedPersistence = [
+const persistedTables = [
   'market_discovery_pages',
   'market_discovery_sections',
   'market_discovery_pins',
 ];
+
+const defaultPageState = {
+  slug: 'markets',
+  title: 'Markets',
+  description: 'Browse and search prediction markets.',
+  pageType: 'top',
+  primaryTagSlug: '',
+  searchScope: 'all',
+  featuredTopicsEnabled: false,
+  featuredMarketsEnabled: false,
+  sectionsEnabled: false,
+  defaultRecommendationLimit: 20,
+  curatedRecommendationLimit: 5,
+  recommendationLimit: 20,
+  isPublished: true,
+  version: 0,
+};
+
+const normalizePage = (page = {}, modeKey = 'top') => {
+  const mode = layoutModes[modeKey];
+  const hasCuratedBlocks = !!(page.featuredTopicsEnabled || page.featuredMarketsEnabled || page.sectionsEnabled);
+  const defaultRecommendationLimit = Number(page.defaultRecommendationLimit || 20);
+  const curatedRecommendationLimit = Number(page.curatedRecommendationLimit || 5);
+
+  return {
+    ...defaultPageState,
+    slug: page.slug || mode.slug,
+    title: page.title || (modeKey === 'secondary' ? 'Topic Markets' : 'Markets'),
+    description: page.description || (modeKey === 'secondary' ? 'Browse and search markets in this topic.' : 'Browse and search prediction markets.'),
+    pageType: page.pageType || mode.pageType,
+    primaryTagSlug: page.primaryTagSlug || '',
+    searchScope: page.searchScope || (modeKey === 'secondary' ? 'tag' : 'all'),
+    featuredTopicsEnabled: !!page.featuredTopicsEnabled,
+    featuredMarketsEnabled: !!page.featuredMarketsEnabled,
+    sectionsEnabled: !!page.sectionsEnabled,
+    defaultRecommendationLimit,
+    curatedRecommendationLimit,
+    recommendationLimit: hasCuratedBlocks ? curatedRecommendationLimit : defaultRecommendationLimit,
+    isPublished: page.isPublished !== false,
+    version: Number(page.version || 0),
+  };
+};
 
 const ToggleCard = ({ title, description, checked, onChange }) => (
   <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${
@@ -69,17 +102,18 @@ const Pill = ({ children }) => (
 );
 
 const LayoutPreview = ({ mode, state }) => {
-  const hasCuratedBlocks = state.featuredTopics || state.featuredMarkets || state.sections;
+  const hasCuratedBlocks = state.featuredTopicsEnabled || state.featuredMarketsEnabled || state.sectionsEnabled;
   const recommendationLimit = hasCuratedBlocks
-    ? mode.curatedRecommendationLimit
-    : mode.defaultRecommendationLimit;
+    ? state.curatedRecommendationLimit
+    : state.defaultRecommendationLimit;
 
   return (
     <div className="rounded-xl border border-gray-700 bg-gray-950 p-5 shadow-lg">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-sky-300">Preview Contract</p>
-          <h3 className="mt-2 text-xl font-bold text-white">{mode.label}</h3>
+          <h3 className="mt-2 text-xl font-bold text-white">{state.title}</h3>
+          {state.description && <p className="mt-1 text-sm text-gray-400">{state.description}</p>}
         </div>
         <Pill>{mode.route}</Pill>
       </div>
@@ -97,19 +131,19 @@ const LayoutPreview = ({ mode, state }) => {
             Show {recommendationLimit} fallback markets when CMS content is {hasCuratedBlocks ? 'present' : 'empty'}.
           </div>
         </div>
-        {state.featuredTopics && (
+        {state.featuredTopicsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
             <div className="text-sm font-semibold text-white">Featured topic/category cards</div>
             <div className="mt-1 text-xs text-gray-400">Pinned secondary pages appear after compact recommendations.</div>
           </div>
         )}
-        {state.featuredMarkets && (
+        {state.featuredMarketsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
             <div className="text-sm font-semibold text-white">Featured market cards</div>
             <div className="mt-1 text-xs text-gray-400">Admin-pinned markets appear in configured order.</div>
           </div>
         )}
-        {state.sections && (
+        {state.sectionsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
             <div className="text-sm font-semibold text-white">Sections</div>
             <div className="mt-1 text-xs text-gray-400">Explicit sections render after pins; otherwise the page has an implicit All section.</div>
@@ -123,19 +157,48 @@ const LayoutPreview = ({ mode, state }) => {
 function MarketDiscoveryLayoutEditor() {
   const [selectedMode, setSelectedMode] = useState('top');
   const [layoutState, setLayoutState] = useState({
-    top: {
-      searchScope: 'all',
-      featuredTopics: true,
-      featuredMarkets: true,
-      sections: false,
-    },
-    secondary: {
-      searchScope: 'tag',
-      featuredTopics: false,
-      featuredMarkets: true,
-      sections: true,
-    },
+    top: normalizePage({}, 'top'),
+    secondary: normalizePage({}, 'secondary'),
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadPages = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [topPage, secondaryPage] = await Promise.all([
+          apiRequest('/v0/content/market-discovery/markets', { fallbackMessage: 'Failed to load TOP layout.' }),
+          apiRequest('/v0/content/market-discovery/topic-template', { fallbackMessage: 'Failed to load SECONDARY layout.' }),
+        ]);
+        if (!ignore) {
+          setLayoutState({
+            top: normalizePage(topPage, 'top'),
+            secondary: normalizePage(secondaryPage, 'secondary'),
+          });
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Unable to load market discovery layouts.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadPages();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const mode = layoutModes[selectedMode];
   const state = layoutState[selectedMode];
@@ -151,10 +214,44 @@ function MarketDiscoveryLayoutEditor() {
 
   const selectedBlocks = useMemo(() => [
     ...mode.fixedBlocks,
-    ...(state.featuredTopics ? ['Featured topic/category cards'] : []),
-    ...(state.featuredMarkets ? ['Featured market cards'] : []),
-    ...(state.sections ? ['CMS sections'] : []),
+    ...(state.featuredTopicsEnabled ? ['Featured topic/category cards'] : []),
+    ...(state.featuredMarketsEnabled ? ['Featured market cards'] : []),
+    ...(state.sectionsEnabled ? ['CMS sections'] : []),
   ], [mode, state]);
+
+  const saveLayout = async () => {
+    setSaving(true);
+    setMessage('');
+    setError('');
+    try {
+      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${mode.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...state,
+          pageType: mode.pageType,
+        }),
+        fallbackMessage: 'Failed to save market discovery layout.',
+      });
+      setLayoutState((current) => ({
+        ...current,
+        [selectedMode]: normalizePage(saved, selectedMode),
+      }));
+      setMessage(`${mode.label} saved. /markets will use the TOP layout immediately after refresh.`);
+    } catch (err) {
+      setError(err.message || 'Unable to save market discovery layout.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-primary-background p-8 text-white">
+        Loading market discovery layouts...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-primary-background p-8">
@@ -163,15 +260,13 @@ function MarketDiscoveryLayoutEditor() {
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-300">CMS</p>
           <h1 className="mt-2 text-3xl font-bold text-white">Market Discovery Layout</h1>
           <p className="mt-2 max-w-3xl text-gray-300">
-            Scaffold the TOP market page and SECONDARY topic page layout options from FEATURE/09.
-            This panel defines the admin-facing CMS shape before page/section/pin persistence is added.
+            Configure persisted TOP market page and SECONDARY topic page layout options from FEATURE/09.
+            The TOP record now controls the public /markets page title, description, fallback list size, and CMS block visibility.
           </p>
         </div>
 
-        <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-4 text-sm text-amber-100">
-          These controls are a planning scaffold only. Saving will be enabled after backend CMS tables
-          and APIs are added for discovery pages, sections, and pins.
-        </div>
+        {message && <div className="rounded-lg bg-emerald-700 p-4 text-sm text-white">{message}</div>}
+        {error && <div className="rounded-lg bg-red-700 p-4 text-sm text-white">{error}</div>}
 
         <div className="grid gap-6 lg:grid-cols-[320px,minmax(0,1fr)]">
           <div className="space-y-4">
@@ -197,9 +292,9 @@ function MarketDiscoveryLayoutEditor() {
             </div>
 
             <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-4">
-              <h2 className="font-semibold text-white">Planned Backend Tables</h2>
+              <h2 className="font-semibold text-white">Persisted Backend Tables</h2>
               <div className="mt-3 flex flex-wrap gap-2">
-                {plannedPersistence.map((table) => (
+                {persistedTables.map((table) => (
                   <Pill key={table}>{table}</Pill>
                 ))}
               </div>
@@ -215,50 +310,94 @@ function MarketDiscoveryLayoutEditor() {
                 </div>
                 <button
                   type="button"
-                  disabled
-                  className="rounded-md bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-400 disabled:cursor-not-allowed"
-                  title="Backend persistence is planned in FEATURE/09 sections 06 and 07."
+                  disabled={saving}
+                  onClick={saveLayout}
+                  className="rounded-md bg-primary-pink px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-pink/80 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Save Layout Later
+                  {saving ? 'Saving...' : 'Save Layout'}
                 </button>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm text-gray-300">
+                  Page Title
+                  <input
+                    value={state.title}
+                    maxLength={160}
+                    onChange={(event) => updateState({ title: event.target.value })}
+                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm text-gray-300">
+                  Search Scope
+                  <select
+                    value={state.searchScope}
+                    onChange={(event) => updateState({ searchScope: event.target.value })}
+                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                  >
+                    <option value="all">All public markets</option>
+                    <option value="tag">Current topic/tag by default</option>
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm text-gray-300 md:col-span-2">
+                  Page Description
+                  <textarea
+                    value={state.description}
+                    maxLength={500}
+                    rows={3}
+                    onChange={(event) => updateState({ description: event.target.value })}
+                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm text-gray-300">
+                  Empty CMS Recommendation Limit
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={state.defaultRecommendationLimit}
+                    onChange={(event) => updateState({ defaultRecommendationLimit: Number(event.target.value || 1) })}
+                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm text-gray-300">
+                  Curated CMS Recommendation Limit
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={state.curatedRecommendationLimit}
+                    onChange={(event) => updateState({ curatedRecommendationLimit: Number(event.target.value || 1) })}
+                    className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                  />
+                </label>
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <ToggleCard
                   title="Featured topic/category cards"
                   description="Show pinned SECONDARY pages on the TOP page. Usually disabled inside SECONDARY topic pages."
-                  checked={state.featuredTopics}
-                  onChange={(checked) => updateState({ featuredTopics: checked })}
+                  checked={state.featuredTopicsEnabled}
+                  onChange={(checked) => updateState({ featuredTopicsEnabled: checked })}
                 />
                 <ToggleCard
                   title="Featured market cards"
                   description="Show manually pinned markets before long fallback lists."
-                  checked={state.featuredMarkets}
-                  onChange={(checked) => updateState({ featuredMarkets: checked })}
+                  checked={state.featuredMarketsEnabled}
+                  onChange={(checked) => updateState({ featuredMarketsEnabled: checked })}
                 />
                 <ToggleCard
                   title="CMS sections"
                   description="Allow named sections beyond the implicit All section."
-                  checked={state.sections}
-                  onChange={(checked) => updateState({ sections: checked })}
+                  checked={state.sectionsEnabled}
+                  onChange={(checked) => updateState({ sectionsEnabled: checked })}
                 />
-                <div className="rounded-lg border border-gray-700 bg-gray-950 p-4">
-                  <label className="block font-semibold text-white" htmlFor="search-scope">
-                    Search Scope
-                  </label>
-                  <select
-                    id="search-scope"
-                    value={state.searchScope}
-                    onChange={(event) => updateState({ searchScope: event.target.value })}
-                    className="mt-3 w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-                  >
-                    <option value="all">All public markets</option>
-                    <option value="tag">Current topic/tag by default</option>
-                  </select>
-                  <p className="mt-2 text-sm text-gray-400">
-                    TOP should usually use all markets; SECONDARY should usually use topic/tag scope.
-                  </p>
-                </div>
+                <ToggleCard
+                  title="Published"
+                  description="Unpublished secondary layouts stay editable but should not appear publicly once topic routes are added."
+                  checked={state.isPublished}
+                  onChange={(checked) => updateState({ isPublished: checked })}
+                />
               </div>
 
               <div className="mt-6 rounded-lg border border-gray-700 bg-gray-950 p-4">

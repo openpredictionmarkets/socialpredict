@@ -18,6 +18,8 @@ import (
 	sellbetshandlers "socialpredict/handlers/bets/selling"
 	"socialpredict/handlers/cms/homepage"
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
+	"socialpredict/handlers/cms/marketdiscovery"
+	cmsdiscoveryhttp "socialpredict/handlers/cms/marketdiscovery/http"
 	"socialpredict/handlers/cms/socialshare"
 	cmssocialhttp "socialpredict/handlers/cms/socialshare/http"
 	marketshandlers "socialpredict/handlers/markets"
@@ -328,6 +330,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
 	homepageHandler := cmshomehttp.NewHandler(homepageSvc, authService)
 
+	marketDiscoveryRepo := marketdiscovery.NewGormRepository(db)
+	marketDiscoverySvc := marketdiscovery.NewService(marketDiscoveryRepo)
+	marketDiscoveryHandler := cmsdiscoveryhttp.NewHandler(marketDiscoverySvc, authService)
+
 	socialShareRepo := socialshare.NewGormRepository(db)
 	socialShareSvc := socialshare.NewService(socialShareRepo)
 	socialShareHandler := cmssocialhttp.NewHandler(socialShareSvc, authService)
@@ -433,6 +439,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
+	router.HandleFunc("/v0/content/market-discovery/{slug}", marketDiscoveryHandler.PublicGet).Methods("GET")
+	router.Handle("/v0/admin/content/market-discovery/{slug}", securityMiddleware(http.HandlerFunc(marketDiscoveryHandler.AdminUpdate))).Methods("PUT")
 	router.HandleFunc("/v0/content/social-share", socialShareHandler.PublicGet).Methods("GET")
 	router.HandleFunc("/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")
 	router.HandleFunc("/api/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")

@@ -164,7 +164,7 @@ const MarketRow = ({ marketData }) => {
   );
 };
 
-function MarketsByStatusTable({ status }) {
+function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT }) {
   const [marketsData, setMarketsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -184,7 +184,7 @@ function MarketsByStatusTable({ status }) {
           params.set('status', status.toUpperCase());
         }
 
-        params.set('limit', String(DEFAULT_LIMIT));
+        params.set('limit', String(limit || DEFAULT_LIMIT));
         url.search = params.toString();
 
         const response = await fetch(url.toString(), { signal: controller.signal });
@@ -214,7 +214,7 @@ function MarketsByStatusTable({ status }) {
     fetchMarkets();
 
     return () => controller.abort();
-  }, [status]);
+  }, [status, limit]);
 
   if (loading)
     return (

@@ -228,6 +228,8 @@ x-route-family-migration-matrix:
         - /v0/admin/market-tags/{slug}
         - /v0/content/home
         - /v0/admin/content/home
+        - /v0/content/market-discovery/{slug}
+        - /v0/admin/content/market-discovery/{slug}
         - /v0/content/social-share
         - /v0/content/social-share/image
         - /v0/admin/content/social-share
@@ -3138,6 +3140,85 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/content/market-discovery/{slug}:
+    get:
+      tags: [Content]
+      operationId: getMarketDiscoveryPage
+      summary: Get public market discovery page layout
+      description: Retrieves CMS-configured TOP or SECONDARY market discovery layout settings.
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+            enum: [markets, topic-template]
+      responses:
+        '200':
+          description: Market discovery page layout returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDiscoveryPageEnvelopeResponse'
+        '400':
+          description: Invalid page slug.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/content/market-discovery/{slug}:
+    put:
+      tags: [Content]
+      operationId: updateMarketDiscoveryPage
+      summary: Update market discovery page layout
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+            enum: [markets, topic-template]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketDiscoveryPageUpdateRequest'
+      responses:
+        '200':
+          description: Market discovery page layout updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDiscoveryPageEnvelopeResponse'
+        '400':
+          description: Invalid request body or update failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required or password change is still required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/content/social-share:
     get:
       tags: [Content]
@@ -3589,6 +3670,16 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/HomeContent'
+      required: [ok, result]
+
+    MarketDiscoveryPageEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketDiscoveryPage'
       required: [ok, result]
 
     SocialShareSettingsEnvelopeResponse:
@@ -4875,6 +4966,89 @@ components:
           type: string
         html:
           type: string
+        version:
+          type: integer
+          format: int64
+
+    MarketDiscoveryPage:
+      type: object
+      properties:
+        slug:
+          type: string
+          enum: [markets, topic-template]
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 500
+        pageType:
+          type: string
+          enum: [top, secondary]
+        primaryTagSlug:
+          type: string
+        searchScope:
+          type: string
+          enum: [all, tag]
+        featuredTopicsEnabled:
+          type: boolean
+        featuredMarketsEnabled:
+          type: boolean
+        sectionsEnabled:
+          type: boolean
+        defaultRecommendationLimit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        curatedRecommendationLimit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        recommendationLimit:
+          type: integer
+          description: Effective fallback market list size for the current layout.
+        isPublished:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+
+    MarketDiscoveryPageUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 500
+        pageType:
+          type: string
+          enum: [top, secondary]
+        primaryTagSlug:
+          type: string
+        searchScope:
+          type: string
+          enum: [all, tag]
+        featuredTopicsEnabled:
+          type: boolean
+        featuredMarketsEnabled:
+          type: boolean
+        sectionsEnabled:
+          type: boolean
+        defaultRecommendationLimit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        curatedRecommendationLimit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        isPublished:
+          type: boolean
         version:
           type: integer
           format: int64
