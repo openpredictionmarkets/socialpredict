@@ -71,3 +71,16 @@ export const reassignMarketSteward = ({ marketId, token, stewardUsername, reason
     },
   });
 };
+
+export const updateMarketTags = ({ marketId, token, tagSlugs }) => {
+  if (!Array.isArray(tagSlugs)) {
+    throw new Error('Market tags must be provided as a list.');
+  }
+
+  return reviewMarket({
+    marketId,
+    token,
+    action: 'tags',
+    body: { tagSlugs },
+  });
+};

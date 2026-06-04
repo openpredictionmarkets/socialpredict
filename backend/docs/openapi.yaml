@@ -223,6 +223,7 @@ x-route-family-migration-matrix:
         - /v0/admin/markets/{id}/approve
         - /v0/admin/markets/{id}/reject
         - /v0/admin/markets/{id}/steward
+        - /v0/admin/markets/{id}/tags
         - /v0/admin/market-tags
         - /v0/admin/market-tags/{slug}
         - /v0/content/home
@@ -2673,6 +2674,81 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/markets/{id}/tags:
+    patch:
+      tags: [Markets]
+      operationId: updateAdminMarketTags
+      summary: Update market tag assignments
+      description: >
+        Admin-only endpoint that rewrites active tag assignments for proposed
+        or published markets. This adjusts market taxonomy without changing the
+        tag vocabulary itself.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateMarketTagsRequest'
+      responses:
+        '200':
+          description: Market tag assignments updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketReviewEnvelopeResponse'
+        '400':
+          description: Invalid market ID, malformed request, unknown tag, inactive tag, or too many tags.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market is not proposed or published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected tag assignment update failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/market-tags:
     get:
       tags: [Markets]
@@ -4391,6 +4467,18 @@ components:
           type: string
           minLength: 1
           description: Admin-visible audit reason for stewardship reassignment.
+
+    AdminUpdateMarketTagsRequest:
+      type: object
+      required: [tagSlugs]
+      properties:
+        tagSlugs:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          description: Active market tag slugs to assign; an empty list removes all tag assignments.
 
     MarketReviewResponse:
       type: object

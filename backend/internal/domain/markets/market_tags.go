@@ -15,6 +15,7 @@ const (
 	MaxMarketTagColorKeyLength      = 40
 	MaxMarketTagsPerMarket          = 5
 	MarketTagAssignmentSourceCreate = "moderator_create"
+	MarketTagAssignmentSourceAdmin  = "admin_adjust"
 )
 
 var (
@@ -95,6 +96,38 @@ func (s *Service) UpdateMarketTag(ctx context.Context, slug string, req MarketTa
 		return nil, err
 	}
 	return repo.UpdateMarketTag(ctx, slug, req)
+}
+
+func (s *Service) UpdateMarketTags(ctx context.Context, marketID int64, tagSlugs []string, actorUsername string) (*Market, error) {
+	if marketID <= 0 || strings.TrimSpace(actorUsername) == "" {
+		return nil, ErrInvalidInput
+	}
+
+	market, err := s.GetMarket(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+
+	switch NormalizeLifecycleStatus(market.LifecycleStatus) {
+	case MarketLifecycleProposed, MarketLifecyclePublished:
+	default:
+		return nil, ErrInvalidState
+	}
+
+	normalized, err := s.validateCreateTagSlugs(ctx, tagSlugs)
+	if err != nil {
+		return nil, err
+	}
+	repo, err := s.marketTagRepository()
+	if err != nil {
+		return nil, err
+	}
+	tags, err := repo.SetMarketTags(ctx, marketID, normalized, actorUsername, MarketTagAssignmentSourceAdmin, s.clock.Now())
+	if err != nil {
+		return nil, err
+	}
+	market.Tags = tags
+	return market, nil
 }
 
 func (s *Service) assignTagsToMarket(ctx context.Context, market *Market, tagSlugs []string, assignedBy string) error {

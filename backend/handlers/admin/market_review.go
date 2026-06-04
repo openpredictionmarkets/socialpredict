@@ -31,6 +31,10 @@ type marketStewardReassigner interface {
 	ReassignMarketSteward(ctx context.Context, marketID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.Market, error)
 }
 
+type marketTagAdjuster interface {
+	UpdateMarketTags(ctx context.Context, marketID int64, tagSlugs []string, actorUsername string) (*dmarkets.Market, error)
+}
+
 type approveMarketRequest struct {
 	Confirm bool `json:"confirm"`
 }
@@ -42,6 +46,10 @@ type rejectMarketRequest struct {
 type reassignMarketStewardRequest struct {
 	StewardUsername string `json:"stewardUsername"`
 	Reason          string `json:"reason"`
+}
+
+type updateMarketTagsRequest struct {
+	TagSlugs []string `json:"tagSlugs"`
 }
 
 type marketReviewResponse struct {
@@ -208,6 +216,39 @@ func ReassignMarketStewardHandler(svc marketStewardReassigner, auth authsvc.Auth
 		}
 
 		market, err := svc.ReassignMarketSteward(r.Context(), marketID, req.StewardUsername, admin.Username, req.Reason)
+		if err != nil {
+			writeMarketReviewError(w, err)
+			return
+		}
+		_ = handlers.WriteResult(w, http.StatusOK, marketReviewResponseFromMarket(market))
+	}
+}
+
+func UpdateMarketTagsHandler(svc marketTagAdjuster, auth authsvc.Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+			return
+		}
+		admin, ok := requireAdminForMarketReview(w, r, auth)
+		if !ok {
+			return
+		}
+		if svc == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		marketID, ok := marketIDFromRequest(w, r)
+		if !ok {
+			return
+		}
+		var req updateMarketTagsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+			return
+		}
+
+		market, err := svc.UpdateMarketTags(r.Context(), marketID, req.TagSlugs, admin.Username)
 		if err != nil {
 			writeMarketReviewError(w, err)
 			return

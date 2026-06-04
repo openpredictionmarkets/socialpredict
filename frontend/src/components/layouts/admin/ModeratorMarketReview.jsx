@@ -7,6 +7,7 @@ import {
   approveProposedMarket,
   rejectProposedMarket,
   reassignMarketSteward,
+  updateMarketTags,
 } from '../../../api/moderationApi';
 import { listAdminLifecycleMarkets } from '../../../api/lifecycleMarketsApi';
 import { listAdminUsers } from '../../../api/adminUsersApi';
@@ -23,17 +24,33 @@ const reviewTabs = [
   { label: 'Rejected Markets', status: 'rejected' },
 ];
 
+const maxMarketTagsPerMarket = 5;
+
 const isActiveModerator = (user) => (
   user?.usertype === 'MODERATOR' && (user.moderatorStatus || 'active') === 'active'
+);
+
+const marketTagSlugs = (market) => (market.tags || [])
+  .map((tag) => tag.slug)
+  .filter(Boolean)
+  .sort();
+
+const sameTagSlugs = (left, right) => (
+  JSON.stringify([...left].sort()) === JSON.stringify([...right].sort())
 );
 
 const AdminMarketQueue = ({ status }) => {
   const { token } = useAuth();
   const [markets, setMarkets] = useState([]);
+  const [activeTags, setActiveTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [rejectionReasons, setRejectionReasons] = useState({});
+  const [tagForms, setTagForms] = useState({});
   const [busyMarketId, setBusyMarketId] = useState(null);
+
+  const tagEditingEnabled = status === 'proposed' || status === 'published';
 
   const loadMarkets = async () => {
     setLoading(true);
@@ -53,9 +70,36 @@ const AdminMarketQueue = ({ status }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, token]);
 
+  useEffect(() => {
+    if (!token || !tagEditingEnabled) {
+      return;
+    }
+
+    let ignore = false;
+    const loadActiveTags = async () => {
+      try {
+        const result = await listAdminMarketTags({ token, includeInactive: false });
+        if (!ignore) {
+          setActiveTags(result.tags || []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Unable to load active market tags.');
+        }
+      }
+    };
+
+    loadActiveTags();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token, tagEditingEnabled]);
+
   const approveMarket = async (marketId) => {
     setBusyMarketId(marketId);
     setError('');
+    setSuccessMessage('');
     try {
       await approveProposedMarket({ marketId, token });
       await loadMarkets();
@@ -70,6 +114,7 @@ const AdminMarketQueue = ({ status }) => {
     const reason = rejectionReasons[marketId];
     setBusyMarketId(marketId);
     setError('');
+    setSuccessMessage('');
     try {
       await rejectProposedMarket({ marketId, token, reason });
       setRejectionReasons((current) => ({ ...current, [marketId]: '' }));
@@ -81,39 +126,147 @@ const AdminMarketQueue = ({ status }) => {
     }
   };
 
+  const updateMarketInQueue = (updatedMarket) => {
+    setMarkets((current) => current.map((market) => (
+      market.id === updatedMarket.id ? { ...market, ...updatedMarket } : market
+    )));
+  };
+
+  const tagSlugsForForm = (market) => tagForms[market.id] || marketTagSlugs(market);
+
+  const toggleMarketTag = (market, slug) => {
+    setTagForms((current) => {
+      const selected = current[market.id] || marketTagSlugs(market);
+      const next = selected.includes(slug)
+        ? selected.filter((item) => item !== slug)
+        : [...selected, slug].sort();
+      return { ...current, [market.id]: next };
+    });
+  };
+
+  const saveMarketTags = async (market) => {
+    const tagSlugs = tagSlugsForForm(market);
+    setBusyMarketId(market.id);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const updatedMarket = await updateMarketTags({ marketId: market.id, token, tagSlugs });
+      updateMarketInQueue(updatedMarket);
+      setTagForms((current) => {
+        const next = { ...current };
+        delete next[market.id];
+        return next;
+      });
+      setSuccessMessage(`Updated tags for market ${updatedMarket.id}.`);
+    } catch (err) {
+      setError(err.message || 'Unable to update market tags.');
+    } finally {
+      setBusyMarketId(null);
+    }
+  };
+
+  const renderTagEditor = (market) => {
+    if (!tagEditingEnabled) {
+      return null;
+    }
+    const activeBySlug = new Map(activeTags.map((tag) => [tag.slug, tag]));
+    const tagChoices = [
+      ...activeTags,
+      ...(market.tags || []).filter((tag) => tag.slug && !activeBySlug.has(tag.slug)),
+    ];
+    const selectedSlugs = tagSlugsForForm(market);
+    const originalSlugs = marketTagSlugs(market);
+    const changed = !sameTagSlugs(selectedSlugs, originalSlugs);
+    const atLimit = selectedSlugs.length >= maxMarketTagsPerMarket;
+
+    return (
+      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/80 p-3">
+        <div>
+          <div className="font-mono text-xs uppercase tracking-[0.14em] text-gray-400">
+            Admin tag adjustment
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Add or remove active tags before or after publication.
+          </p>
+        </div>
+        {tagChoices.length ? (
+          <div className="flex max-w-[280px] flex-wrap gap-2">
+            {tagChoices.map((tag) => {
+              const selected = selectedSlugs.includes(tag.slug);
+              const disabled = !selected && (atLimit || !tag.isActive);
+              return (
+                <button
+                  key={tag.slug}
+                  type="button"
+                  disabled={disabled || busyMarketId === market.id}
+                  onClick={() => toggleMarketTag(market, tag.slug)}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    selected
+                      ? 'border-primary-pink bg-primary-pink/20 text-white'
+                      : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-400'
+                  }`}
+                  title={disabled ? `A market can have up to ${maxMarketTagsPerMarket} active tags.` : tag.description || tag.displayName}
+                >
+                  {selected ? '✓ ' : ''}
+                  {tag.displayName || tag.slug}
+                  {!tag.isActive ? ' (inactive)' : ''}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-amber-200">Create active tags in the Tags tab before assigning them to markets.</p>
+        )}
+        <button
+          type="button"
+          disabled={busyMarketId === market.id || !changed}
+          onClick={() => saveMarketTags(market)}
+          className="justify-self-start rounded-md bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Save Tags
+        </button>
+      </div>
+    );
+  };
+
   const renderActions = (market) => {
-    if (status !== 'proposed') {
+    if (!tagEditingEnabled) {
       return null;
     }
 
     return (
       <div className="grid min-w-[220px] gap-3">
-        <button
-          type="button"
-          disabled={busyMarketId === market.id}
-          onClick={() => approveMarket(market.id)}
-          className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Approve
-        </button>
-        <textarea
-          value={rejectionReasons[market.id] || ''}
-          onChange={(event) => setRejectionReasons((current) => ({
-            ...current,
-            [market.id]: event.target.value,
-          }))}
-          rows={3}
-          placeholder="Reason for rejection"
-          className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-        />
-        <button
-          type="button"
-          disabled={busyMarketId === market.id || !(rejectionReasons[market.id] || '').trim()}
-          onClick={() => rejectMarket(market.id)}
-          className="rounded-md bg-rose-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Reject and Refund
-        </button>
+        {renderTagEditor(market)}
+        {status === 'proposed' && (
+          <>
+            <button
+              type="button"
+              disabled={busyMarketId === market.id}
+              onClick={() => approveMarket(market.id)}
+              className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Approve
+            </button>
+            <textarea
+              value={rejectionReasons[market.id] || ''}
+              onChange={(event) => setRejectionReasons((current) => ({
+                ...current,
+                [market.id]: event.target.value,
+              }))}
+              rows={3}
+              placeholder="Reason for rejection"
+              className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+            />
+            <button
+              type="button"
+              disabled={busyMarketId === market.id || !(rejectionReasons[market.id] || '').trim()}
+              onClick={() => rejectMarket(market.id)}
+              className="rounded-md bg-rose-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Reject and Refund
+            </button>
+          </>
+        )}
       </div>
     );
   };
@@ -129,12 +282,17 @@ const AdminMarketQueue = ({ status }) => {
           {error}
         </div>
       )}
+      {successMessage && (
+        <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">
+          {successMessage}
+        </div>
+      )}
       <MarketLifecycleTable
         markets={markets}
         emptyMessage={`No ${status} markets found.`}
         showCreator
         showSteward
-        actions={status === 'proposed' ? renderActions : null}
+        actions={tagEditingEnabled ? renderActions : null}
       />
     </div>
   );

@@ -131,6 +131,72 @@ func TestCreateAndUpdateMarketTagNormalizeAndValidate(t *testing.T) {
 	}
 }
 
+func TestUpdateMarketTagsRewritesProposedOrPublishedAssignments(t *testing.T) {
+	now := marketsTestTime()
+	var assignedMarketID int64
+	var assignedSlugs []string
+	var assignedBy string
+	var assignmentSource string
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getByIDFunc = func(_ context.Context, marketID int64) (*markets.Market, error) {
+			return &markets.Market{ID: marketID, LifecycleStatus: markets.MarketLifecyclePublished, Status: markets.MarketStatusActive}, nil
+		}
+		repo.listMarketTagsFunc = func(_ context.Context, includeInactive bool) ([]markets.MarketTag, error) {
+			if includeInactive {
+				t.Fatalf("admin market tag assignment validation should request active tags only")
+			}
+			return []markets.MarketTag{
+				{ID: 1, Slug: "policy", DisplayName: "Policy", IsActive: true},
+				{ID: 2, Slug: "sports", DisplayName: "Sports", IsActive: true},
+			}, nil
+		}
+		repo.setMarketTagsFunc = func(_ context.Context, marketID int64, tagSlugs []string, by string, source string, assignedAt time.Time) ([]markets.MarketTag, error) {
+			assignedMarketID = marketID
+			assignedSlugs = append([]string(nil), tagSlugs...)
+			assignedBy = by
+			assignmentSource = source
+			if !assignedAt.Equal(now) {
+				t.Fatalf("assignedAt = %s, want %s", assignedAt, now)
+			}
+			return []markets.MarketTag{{ID: 1, Slug: "policy", DisplayName: "Policy", IsActive: true}}, nil
+		}
+	})
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(now), markets.Config{})
+
+	market, err := service.UpdateMarketTags(context.Background(), 99, []string{"sports", "policy"}, "admin")
+	if err != nil {
+		t.Fatalf("UpdateMarketTags returned error: %v", err)
+	}
+	if assignedMarketID != 99 || assignedBy != "admin" || assignmentSource != markets.MarketTagAssignmentSourceAdmin {
+		t.Fatalf("unexpected assignment metadata id=%d by=%q source=%q", assignedMarketID, assignedBy, assignmentSource)
+	}
+	if !reflect.DeepEqual(assignedSlugs, []string{"policy", "sports"}) {
+		t.Fatalf("assigned slugs = %+v", assignedSlugs)
+	}
+	if len(market.Tags) != 1 || market.Tags[0].Slug != "policy" {
+		t.Fatalf("expected returned market tags, got %+v", market.Tags)
+	}
+}
+
+func TestUpdateMarketTagsRejectsRejectedMarkets(t *testing.T) {
+	now := marketsTestTime()
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getByIDFunc = func(_ context.Context, marketID int64) (*markets.Market, error) {
+			return &markets.Market{ID: marketID, LifecycleStatus: markets.MarketLifecycleRejected, Status: markets.MarketLifecycleRejected}, nil
+		}
+		repo.listMarketTagsFunc = func(context.Context, bool) ([]markets.MarketTag, error) {
+			t.Fatalf("rejected market should fail before tag validation")
+			return nil, nil
+		}
+	})
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(now), markets.Config{})
+
+	_, err := service.UpdateMarketTags(context.Background(), 99, []string{"policy"}, "admin")
+	if !errors.Is(err, markets.ErrInvalidState) {
+		t.Fatalf("UpdateMarketTags error = %v, want ErrInvalidState", err)
+	}
+}
+
 func TestNormalizeMarketTagSlugsRejectsTooManyOrInvalidSlugs(t *testing.T) {
 	if _, err := markets.NormalizeMarketTagSlugs([]string{"valid", "not valid"}); !errors.Is(err, markets.ErrInvalidInput) {
 		t.Fatalf("invalid slug error = %v, want ErrInvalidInput", err)
