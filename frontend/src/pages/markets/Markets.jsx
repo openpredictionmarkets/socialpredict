@@ -73,6 +73,26 @@ const DiscoveryCard = ({ eyebrow, title, description, children, to, tone = 'sky'
     return content;
 };
 
+const TopicNav = ({ topicPins = [] }) => {
+    if (!topicPins.length) return null;
+
+    return (
+        <nav className="mb-5 overflow-x-auto border-b border-gray-800 pb-3" aria-label="Market topics">
+            <div className="flex min-w-max items-center gap-2">
+                {topicPins.map((pin) => (
+                    <Link
+                        key={`topic-${pin.id || pin.targetPageSlug || pin.sortOrder}`}
+                        to={pin.targetPageSlug ? `/markets/topic/${pin.targetPageSlug}` : '#'}
+                        className="rounded-full border border-gray-700 bg-gray-900/80 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:border-sky-400/70 hover:bg-sky-950/40 hover:text-white"
+                    >
+                        {pin.label || slugTitle(pin.targetPageSlug) || 'Topic'}
+                    </Link>
+                ))}
+            </div>
+        </nav>
+    );
+};
+
 const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
     if (!hasCuratedBlocks(layout)) return null;
 
@@ -82,45 +102,13 @@ const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
     const marketPins = pins.filter((pin) => pin.pinType === 'market');
 
     return (
-        <div className="mb-6 space-y-5 rounded-xl border border-gray-700 bg-gray-900/70 p-4 text-gray-200">
-            <div>
-                <p className="font-mono text-xs uppercase tracking-[0.18em] text-sky-300">
-                    CMS Market Discovery
-                </p>
-                <h2 className="mt-2 text-lg font-semibold text-white">Curated discovery</h2>
-                <p className="mt-1 text-sm text-gray-400">
-                    Recommendations below are compacted to {layout.recommendationLimit} markets when curated blocks are enabled.
-                </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-                {layout.featuredTopicsEnabled && !isTopicPage && <DiscoveryBadge>Featured topics</DiscoveryBadge>}
-                {layout.featuredMarketsEnabled && <DiscoveryBadge tone="emerald">Featured markets</DiscoveryBadge>}
-                {layout.sectionsEnabled && <DiscoveryBadge tone="amber">Sections</DiscoveryBadge>}
-            </div>
-
-            {!isTopicPage && layout.featuredTopicsEnabled && topicPins.length > 0 && (
-                <section>
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-300">Featured Topics</h3>
-                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {topicPins.map((pin) => (
-                            <DiscoveryCard
-                                key={`topic-${pin.id || pin.targetPageSlug || pin.sortOrder}`}
-                                eyebrow="Topic"
-                                title={pin.label || slugTitle(pin.targetPageSlug) || 'Topic'}
-                                description={pin.targetPageSlug ? `Topic slug: ${pin.targetPageSlug}` : 'CMS-managed topic page'}
-                                to={pin.targetPageSlug ? `/markets/topic/${pin.targetPageSlug}` : undefined}
-                                tone="sky"
-                            />
-                        ))}
-                    </div>
-                </section>
-            )}
+        <div className="mb-6 space-y-5 text-gray-200">
+            {!isTopicPage && layout.featuredTopicsEnabled && <TopicNav topicPins={topicPins} />}
 
             {layout.featuredMarketsEnabled && marketPins.length > 0 && (
                 <section>
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-300">Featured Markets</h3>
-                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <h2 className="mb-3 text-xl font-bold text-white">Featured markets</h2>
+                    <div className="grid gap-4 lg:grid-cols-2">
                         {marketPins.map((pin) => (
                             <DiscoveryCard
                                 key={`market-${pin.id || pin.marketId || pin.sortOrder}`}
@@ -137,23 +125,16 @@ const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
 
             {layout.sectionsEnabled && sections.length > 0 && (
                 <section>
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-300">Sections</h3>
-                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="flex flex-wrap gap-2" aria-label="Market discovery sections">
                         {sections.map((section) => (
-                            <DiscoveryCard
+                            <Link
                                 key={`section-${section.id || section.slug || section.sortOrder}`}
-                                eyebrow="Section"
-                                title={section.title}
-                                description={section.description || 'Curated CMS section'}
-                                to={section.tagFilterSlug ? `/markets/topic/${section.tagFilterSlug}` : undefined}
-                                tone="sky"
+                                to={section.tagFilterSlug ? `/markets/topic/${section.tagFilterSlug}` : '#'}
+                                className="rounded-full border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:bg-amber-900/30"
+                                title={section.description || section.title}
                             >
-                                {section.tagFilterSlug && (
-                                    <div className="mt-3">
-                                        <DiscoveryBadge>{section.tagFilterSlug}</DiscoveryBadge>
-                                    </div>
-                                )}
-                            </DiscoveryCard>
+                                {section.title}
+                            </Link>
                         ))}
                     </div>
                 </section>
