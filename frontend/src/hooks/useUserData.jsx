@@ -1,20 +1,6 @@
 import { useState, useEffect } from 'react';
-import { API_URL } from '../config';
+import { apiRequest } from '../api/httpClient';
 import { useAuth } from '../helpers/AuthContent';
-
-const unwrapApiResponse = (payload) => {
-  if (payload && typeof payload === 'object' && 'ok' in payload) {
-    if (payload.ok === false) {
-      throw new Error(payload.reason || 'Request failed');
-    }
-
-    if (payload.ok === true && 'result' in payload) {
-      return payload.result;
-    }
-  }
-
-  return payload;
-};
 
 const useUserData = (username, usePrivateProfile = false) => {
   const [userData, setUserData] = useState(null);
@@ -23,50 +9,45 @@ const useUserData = (username, usePrivateProfile = false) => {
   const { token } = useAuth();
 
   useEffect(() => {
+    let ignore = false;
+
     const fetchUserData = async () => {
       try {
-        let url, headers = {};
-        
-        if (usePrivateProfile) {
-          // Use private profile endpoint for authenticated user's own profile
-          url = `${API_URL}/v0/privateprofile`;
-          headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          };
-        } else {
-          // Use public user endpoint for viewing other users' profiles
-          url = `${API_URL}/v0/userinfo/${username}`;
-          if (token) {
-            headers = {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            };
-          }
+        const path = usePrivateProfile ? '/v0/privateprofile' : `/v0/userinfo/${username}`;
+        const data = await apiRequest(path, {
+          authenticated: true,
+          authToken: token,
+          fallbackMessage: 'Failed to fetch user data',
+        });
+        if (!ignore) {
+          setUserData(data);
         }
-
-        const response = await fetch(url, { headers });
-        if (!response.ok) {
-          throw new Error('Failed to fetch user data');
-        }
-        const data = unwrapApiResponse(await response.json());
-        setUserData(data);
       } catch (error) {
         console.error('Error fetching user data:', error);
-        setUserError(error.toString());
+        if (!ignore) {
+          setUserError(error.toString());
+        }
       } finally {
-        setUserLoading(false);
+        if (!ignore) {
+          setUserLoading(false);
+        }
       }
     };
 
     if (!token) {
       setUserLoading(false);
-      return;
+      return () => {
+        ignore = true;
+      };
     }
 
     if (username || usePrivateProfile) {
       fetchUserData();
     }
+
+    return () => {
+      ignore = true;
+    };
   }, [username, usePrivateProfile, token]);
 
   return { userData, userLoading, userError };

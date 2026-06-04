@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../helpers/AuthContent';
 import SiteTabs from '../../tabs/SiteTabs';
 import MarketLifecycleTable from '../profile/MarketLifecycleTable';
@@ -136,7 +136,6 @@ const AdminMarketQueue = ({ status }) => {
 
 const MarketStewardshipQueue = () => {
   const { token } = useAuth();
-  const loadedToken = useRef('');
   const [marketsByStatus, setMarketsByStatus] = useState({});
   const [moderators, setModerators] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -147,34 +146,45 @@ const MarketStewardshipQueue = () => {
 
   const markets = reviewTabs.flatMap((tab) => marketsByStatus[tab.status] || []);
 
-  const loadStewardshipData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [usersResult, ...marketResults] = await Promise.all([
-        listAdminUsers({ token, limit: 250 }),
-        ...reviewTabs.map((tab) => listAdminLifecycleMarkets({ token, status: tab.status, limit: 100 })),
-      ]);
-
-      setModerators((usersResult.users || []).filter(isActiveModerator));
-      setMarketsByStatus(reviewTabs.reduce((acc, tab, index) => {
-        acc[tab.status] = marketResults[index]?.markets || [];
-        return acc;
-      }, {}));
-    } catch (err) {
-      setError(err.message || 'Unable to load stewardship data.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (!token || loadedToken.current === token) {
+    if (!token) {
       return;
     }
-    loadedToken.current = token;
+
+    let ignore = false;
+
+    const loadStewardshipData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [usersResult, ...marketResults] = await Promise.all([
+          listAdminUsers({ token, limit: 250 }),
+          ...reviewTabs.map((tab) => listAdminLifecycleMarkets({ token, status: tab.status, limit: 100 })),
+        ]);
+
+        if (!ignore) {
+          setModerators((usersResult.users || []).filter(isActiveModerator));
+          setMarketsByStatus(reviewTabs.reduce((acc, tab, index) => {
+            acc[tab.status] = marketResults[index]?.markets || [];
+            return acc;
+          }, {}));
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Unable to load stewardship data.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadStewardshipData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      ignore = true;
+    };
   }, [token]);
 
   const updateStewardForm = (marketId, updates) => {
