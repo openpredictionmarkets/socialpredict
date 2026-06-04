@@ -283,8 +283,7 @@ const MarketStewardshipQueue = () => {
   return (
     <div className="grid gap-4">
       <div className="rounded-lg border border-sky-800/70 bg-sky-950/30 p-4 text-sm text-sky-100">
-        <p className="font-semibold">Stewardship governs operational responsibility, not attribution.</p>
-        <p className="mt-1 text-sky-100/80">
+        <p className="text-sky-100/80">
           Creator stays immutable. Reassign a market steward when a moderator is suspended,
           unavailable, conflicted, or no longer responsible for resolving the market.
         </p>
