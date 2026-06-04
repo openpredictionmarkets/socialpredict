@@ -81,6 +81,7 @@ func (p defaultCreationPolicy) BuildMarketEntity(now time.Time, req MarketCreate
 		OutcomeType:        req.OutcomeType,
 		ResolutionDateTime: req.ResolutionDateTime,
 		CreatorUsername:    creatorUsername,
+		StewardUsername:    creatorUsername,
 		YesLabel:           labels.yes,
 		NoLabel:            labels.no,
 		Status:             MarketStatusActive,
@@ -104,7 +105,7 @@ func (defaultResolutionPolicy) NormalizeResolution(resolution string) (string, e
 }
 
 func (defaultResolutionPolicy) ValidateResolutionRequest(market *Market, username string) error {
-	if market.CreatorUsername != username {
+	if !market.StewardedBy(username) {
 		return ErrUnauthorized
 	}
 

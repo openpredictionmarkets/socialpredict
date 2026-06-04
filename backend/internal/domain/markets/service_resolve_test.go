@@ -210,7 +210,9 @@ func newResolveUserService(opts ...func(*resolveUserService)) *resolveUserServic
 		validateUserBalanceFunc: func(context.Context, string, int64, int64) error { return nil },
 		deductBalanceFunc:       func(context.Context, string, int64) error { return nil },
 		applyTransactionFunc:    func(context.Context, string, int64, string) error { return nil },
-		getPublicUserFunc:       func(context.Context, string) (*users.PublicUser, error) { return nil, nil },
+		getPublicUserFunc: func(_ context.Context, username string) (*users.PublicUser, error) {
+			return &users.PublicUser{Username: username, UserType: string(users.UserTypeRegular), ModeratorStatus: users.ModeratorStatusNone}, nil
+		},
 	}
 	for _, opt := range opts {
 		opt(service)

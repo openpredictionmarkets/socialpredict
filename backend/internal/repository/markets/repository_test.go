@@ -25,6 +25,7 @@ func TestGormRepositoryCreateAndGetByID(t *testing.T) {
 		FinalResolutionDateTime: now.Add(48 * time.Hour),
 		ResolutionResult:        "",
 		CreatorUsername:         "creator",
+		StewardUsername:         "creator",
 		YesLabel:                "YES",
 		NoLabel:                 "NO",
 		Status:                  dmarkets.MarketStatusActive,
@@ -46,7 +47,7 @@ func TestGormRepositoryCreateAndGetByID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID returned error: %v", err)
 	}
-	if got.QuestionTitle != market.QuestionTitle || got.CreatorUsername != market.CreatorUsername || got.YesLabel != "YES" || got.InitialProbability != 0.5 || got.LifecycleStatus != dmarkets.MarketLifecyclePublished {
+	if got.QuestionTitle != market.QuestionTitle || got.CreatorUsername != market.CreatorUsername || got.CurrentStewardUsername() != "creator" || got.YesLabel != "YES" || got.InitialProbability != 0.5 || got.LifecycleStatus != dmarkets.MarketLifecyclePublished {
 		t.Fatalf("unexpected market data: %+v", got)
 	}
 
@@ -417,5 +418,55 @@ func TestGormRepositoryApproveAndRejectMarketPersistReviewMetadata(t *testing.T)
 
 	if err := repo.ApproveMarket(ctx, published.ID, "admin", approvedAt); !errors.Is(err, dmarkets.ErrInvalidState) {
 		t.Fatalf("ApproveMarket wrong state error = %v, want ErrInvalidState", err)
+	}
+}
+
+func TestGormRepositoryReassignMarketStewardPersistsAudit(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("steward_creator", 1000)
+	backup := modelstesting.GenerateUser("steward_backup", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	if err := db.Create(&backup).Error; err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(701, creator.Username)
+	market.StewardUsername = creator.Username
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+
+	changedAt := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)
+	if err := repo.ReassignMarketSteward(ctx, market.ID, creator.Username, backup.Username, "admin", "creator inactive", changedAt); err != nil {
+		t.Fatalf("ReassignMarketSteward returned error: %v", err)
+	}
+
+	updated, err := repo.GetByID(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("load market: %v", err)
+	}
+	if updated.CurrentStewardUsername() != backup.Username {
+		t.Fatalf("steward = %q, want %q", updated.CurrentStewardUsername(), backup.Username)
+	}
+
+	var audits []models.MarketStewardshipAudit
+	if err := db.Where("market_id = ?", market.ID).Find(&audits).Error; err != nil {
+		t.Fatalf("load audits: %v", err)
+	}
+	if len(audits) != 1 {
+		t.Fatalf("expected one audit, got %d", len(audits))
+	}
+	audit := audits[0]
+	if audit.FromStewardUsername != creator.Username || audit.ToStewardUsername != backup.Username || audit.ActorUsername != "admin" || audit.Reason != "creator inactive" {
+		t.Fatalf("unexpected audit: %+v", audit)
+	}
+
+	if err := repo.ReassignMarketSteward(ctx, market.ID+999, creator.Username, backup.Username, "admin", "missing", changedAt); !errors.Is(err, dmarkets.ErrMarketNotFound) {
+		t.Fatalf("missing market error = %v, want ErrMarketNotFound", err)
 	}
 }

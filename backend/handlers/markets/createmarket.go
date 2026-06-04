@@ -218,6 +218,7 @@ func toCreateMarketResponse(market *dmarkets.Market) dto.CreateMarketResponse {
 		OutcomeType:        market.OutcomeType,
 		ResolutionDateTime: market.ResolutionDateTime,
 		CreatorUsername:    market.CreatorUsername,
+		StewardUsername:    market.CurrentStewardUsername(),
 		YesLabel:           market.YesLabel,
 		NoLabel:            market.NoLabel,
 		Status:             market.Status,

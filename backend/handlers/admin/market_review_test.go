@@ -17,9 +17,10 @@ import (
 )
 
 type marketReviewServiceMock struct {
-	approveFn func(context.Context, int64, string, bool) (*dmarkets.Market, error)
-	rejectFn  func(context.Context, int64, string, string) (*dmarkets.Market, error)
-	listFn    func(context.Context, dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	approveFn  func(context.Context, int64, string, bool) (*dmarkets.Market, error)
+	rejectFn   func(context.Context, int64, string, string) (*dmarkets.Market, error)
+	listFn     func(context.Context, dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	reassignFn func(context.Context, int64, string, string, string) (*dmarkets.Market, error)
 }
 
 func (m marketReviewServiceMock) ApproveProposedMarket(ctx context.Context, marketID int64, actorUsername string, confirmed bool) (*dmarkets.Market, error) {
@@ -32,6 +33,10 @@ func (m marketReviewServiceMock) RejectProposedMarket(ctx context.Context, marke
 
 func (m marketReviewServiceMock) ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
 	return m.listFn(ctx, filters)
+}
+
+func (m marketReviewServiceMock) ReassignMarketSteward(ctx context.Context, marketID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.Market, error) {
+	return m.reassignFn(ctx, marketID, newStewardUsername, actorUsername, reason)
 }
 
 type marketReviewAuthMock struct {
@@ -115,6 +120,7 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 				ID:              44,
 				QuestionTitle:   "Queue item",
 				CreatorUsername: "moderator",
+				StewardUsername: "backup",
 				YesLabel:        "BIG",
 				NoLabel:         "SMALL",
 				Status:          dmarkets.MarketLifecycleProposed,
@@ -138,8 +144,38 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 	if !envelope.OK || envelope.Result.Total != 1 || envelope.Result.Markets[0].CreatorUsername != "moderator" {
 		t.Fatalf("unexpected response: %+v", envelope)
 	}
+	if envelope.Result.Markets[0].StewardUsername != "backup" {
+		t.Fatalf("expected steward in admin queue response, got %+v", envelope.Result.Markets[0])
+	}
 	if envelope.Result.Markets[0].YesLabel != "BIG" || envelope.Result.Markets[0].NoLabel != "SMALL" {
 		t.Fatalf("expected custom labels in admin queue response, got %+v", envelope.Result.Markets[0])
+	}
+}
+
+func TestReassignMarketStewardHandlerReassignsSteward(t *testing.T) {
+	svc := marketReviewServiceMock{
+		reassignFn: func(_ context.Context, marketID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.Market, error) {
+			if marketID != 45 || newStewardUsername != "backup" || actorUsername != "admin" || reason != "moderator inactive" {
+				t.Fatalf("unexpected reassign args: id=%d steward=%q actor=%q reason=%q", marketID, newStewardUsername, actorUsername, reason)
+			}
+			return &dmarkets.Market{ID: marketID, CreatorUsername: "moderator", StewardUsername: newStewardUsername, Status: dmarkets.MarketStatusActive, LifecycleStatus: dmarkets.MarketLifecyclePublished}, nil
+		},
+	}
+	handler := ReassignMarketStewardHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := mux.SetURLVars(httptest.NewRequest(http.MethodPatch, "/v0/admin/markets/45/steward", bytes.NewBufferString(`{"stewardUsername":"backup","reason":"moderator inactive"}`)), map[string]string{"id": "45"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketReviewResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !envelope.OK || envelope.Result.StewardUsername != "backup" || envelope.Result.CreatorUsername != "moderator" {
+		t.Fatalf("unexpected response: %+v", envelope)
 	}
 }
 

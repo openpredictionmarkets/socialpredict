@@ -75,6 +75,7 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		ResolutionResult:        market.ResolutionResult,
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
+		StewardUsername:         r.modelToDomain(&market).CurrentStewardUsername(),
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
@@ -381,6 +382,35 @@ func (r *GormRepository) RejectMarket(ctx context.Context, id int64, actorUserna
 	return nil
 }
 
+// ReassignMarketSteward updates the current steward and records an audit fact atomically.
+func (r *GormRepository) ReassignMarketSteward(ctx context.Context, marketID int64, fromStewardUsername string, toStewardUsername string, actorUsername string, reason string, changedAt time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.Market{}).
+			Where("id = ?", marketID).
+			Updates(map[string]any{
+				"steward_username": toStewardUsername,
+				"updated_at":       changedAt,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return dmarkets.ErrMarketNotFound
+		}
+
+		audit := models.MarketStewardshipAudit{
+			MarketID:            marketID,
+			FromStewardUsername: fromStewardUsername,
+			ToStewardUsername:   toStewardUsername,
+			ActorUsername:       actorUsername,
+			Reason:              reason,
+		}
+		audit.CreatedAt = changedAt
+		audit.UpdatedAt = changedAt
+		return tx.Create(&audit).Error
+	})
+}
+
 // ListBetsForMarket returns all bets for the specified market ordered by placement time.
 func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
 	var bets []models.Bet
@@ -488,6 +518,7 @@ func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 		FinalResolutionDateTime: market.FinalResolutionDateTime,
 		ResolutionResult:        market.ResolutionResult,
 		CreatorUsername:         market.CreatorUsername,
+		StewardUsername:         market.CurrentStewardUsername(),
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
 		UTCOffset:               market.UTCOffset,
@@ -517,6 +548,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		FinalResolutionDateTime: dbMarket.FinalResolutionDateTime,
 		ResolutionResult:        dbMarket.ResolutionResult,
 		CreatorUsername:         dbMarket.CreatorUsername,
+		StewardUsername:         dbMarket.StewardUsername,
 		YesLabel:                dbMarket.YesLabel,
 		NoLabel:                 dbMarket.NoLabel,
 		Status:                  status,

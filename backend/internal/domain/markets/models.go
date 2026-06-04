@@ -17,6 +17,7 @@ type Market struct {
 	FinalResolutionDateTime time.Time
 	ResolutionResult        string
 	CreatorUsername         string
+	StewardUsername         string
 	YesLabel                string
 	NoLabel                 string
 	Status                  string
@@ -39,6 +40,26 @@ func (m *Market) CreatedBy(username string) bool {
 		return false
 	}
 	return strings.TrimSpace(m.CreatorUsername) == strings.TrimSpace(username)
+}
+
+// CurrentStewardUsername returns the current market steward, falling back to
+// creator for legacy rows created before stewardship existed.
+func (m *Market) CurrentStewardUsername() string {
+	if m == nil {
+		return ""
+	}
+	if steward := strings.TrimSpace(m.StewardUsername); steward != "" {
+		return steward
+	}
+	return strings.TrimSpace(m.CreatorUsername)
+}
+
+// StewardedBy reports whether username is the current market steward.
+func (m *Market) StewardedBy(username string) bool {
+	if m == nil {
+		return false
+	}
+	return m.CurrentStewardUsername() == strings.TrimSpace(username)
 }
 
 // IsResolved reports whether the market is in the resolved state.
@@ -166,6 +187,7 @@ type PublicMarket struct {
 	ResolutionResult        string
 	InitialProbability      float64
 	CreatorUsername         string
+	StewardUsername         string
 	CreatedAt               time.Time
 	YesLabel                string
 	NoLabel                 string
@@ -199,6 +221,7 @@ func copyPublicMarket(target *PublicMarket, market *Market) *PublicMarket {
 		ResolutionResult:        market.ResolutionResult,
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
+		StewardUsername:         market.CurrentStewardUsername(),
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,

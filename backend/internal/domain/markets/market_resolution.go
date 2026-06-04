@@ -21,7 +21,15 @@ func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution 
 		return ErrMarketNotFound
 	}
 
-	if err := s.resolutionPolicy.ValidateResolutionRequest(market, username); err != nil {
+	if err := s.ensureMarketGovernanceActor(ctx, market, username); err != nil {
+		return err
+	}
+
+	resolverUsername := username
+	if !market.StewardedBy(username) {
+		resolverUsername = market.CurrentStewardUsername()
+	}
+	if err := s.resolutionPolicy.ValidateResolutionRequest(market, resolverUsername); err != nil {
 		return err
 	}
 

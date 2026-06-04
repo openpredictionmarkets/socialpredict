@@ -424,6 +424,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/markets", securityMiddleware(adminhandlers.ListReviewMarketsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/steward", securityMiddleware(adminhandlers.ReassignMarketStewardHandler(marketsService, authService))).Methods("PATCH")
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")

@@ -27,6 +27,7 @@ type projectionRepo struct {
 	getPublicMarketFunc          func(context.Context, int64) (*markets.PublicMarket, error)
 	approveMarketFunc            func(context.Context, int64, string, time.Time) error
 	rejectMarketFunc             func(context.Context, int64, string, time.Time, string) error
+	reassignMarketStewardFunc    func(context.Context, int64, string, string, string, string, time.Time) error
 }
 
 func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
@@ -66,6 +67,9 @@ func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
 			return errUnexpectedMarketsTestCall
 		},
 		rejectMarketFunc: func(context.Context, int64, string, time.Time, string) error {
+			return errUnexpectedMarketsTestCall
+		},
+		reassignMarketStewardFunc: func(context.Context, int64, string, string, string, string, time.Time) error {
 			return errUnexpectedMarketsTestCall
 		},
 	}
@@ -150,6 +154,14 @@ func (r *projectionRepo) RejectMarket(ctx context.Context, id int64, actorUserna
 	}
 	return r.rejectMarketFunc(ctx, id, actorUsername, rejectedAt, reason)
 }
+
+func (r *projectionRepo) ReassignMarketSteward(ctx context.Context, id int64, fromStewardUsername string, toStewardUsername string, actorUsername string, reason string, changedAt time.Time) error {
+	if r.reassignMarketStewardFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.reassignMarketStewardFunc(ctx, id, fromStewardUsername, toStewardUsername, actorUsername, reason, changedAt)
+}
+
 func (r *projectionRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {
 	if r.getUserPositionFunc == nil {
 		return nil, errUnexpectedMarketsTestCall

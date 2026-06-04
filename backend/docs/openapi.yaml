@@ -221,6 +221,7 @@ x-route-family-migration-matrix:
         - /v0/admin/markets
         - /v0/admin/markets/{id}/approve
         - /v0/admin/markets/{id}/reject
+        - /v0/admin/markets/{id}/steward
         - /v0/content/home
         - /v0/admin/content/home
         - /v0/content/social-share
@@ -2575,6 +2576,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/markets/{id}/steward:
+    patch:
+      tags: [Markets]
+      operationId: reassignMarketSteward
+      summary: Reassign market steward
+      description: Admin-only endpoint that assigns operational market stewardship to an active moderator without changing immutable creator attribution.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReassignMarketStewardRequest'
+      responses:
+        '200':
+          description: Market steward reassigned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketReviewEnvelopeResponse'
+        '400':
+          description: Invalid market ID, malformed request, missing steward, or missing reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required or target steward is not an active moderator.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market or target steward user was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected stewardship reassignment failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/portfolio/{username}:
     get:
       tags: [Users]
@@ -3442,6 +3508,8 @@ components:
           format: date-time
         creatorUsername:
           type: string
+        stewardUsername:
+          type: string
         yesLabel:
           type: string
         noLabel:
@@ -3566,6 +3634,8 @@ components:
           type: number
           format: float
         creatorUsername:
+          type: string
+        stewardUsername:
           type: string
         createdAt:
           type: string
@@ -4027,6 +4097,19 @@ components:
           minLength: 1
           description: Admin-visible reason for rejecting the proposal.
 
+    AdminReassignMarketStewardRequest:
+      type: object
+      required: [stewardUsername, reason]
+      properties:
+        stewardUsername:
+          type: string
+          minLength: 1
+          description: Active moderator username that should steward the market.
+        reason:
+          type: string
+          minLength: 1
+          description: Admin-visible audit reason for stewardship reassignment.
+
     MarketReviewResponse:
       type: object
       required: [id, status, lifecycleStatus]
@@ -4039,6 +4122,8 @@ components:
         description:
           type: string
         creatorUsername:
+          type: string
+        stewardUsername:
           type: string
         yesLabel:
           type: string

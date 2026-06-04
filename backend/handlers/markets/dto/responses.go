@@ -12,6 +12,7 @@ type MarketResponse struct {
 	OutcomeType        string     `json:"outcomeType"`
 	ResolutionDateTime time.Time  `json:"resolutionDateTime"`
 	CreatorUsername    string     `json:"creatorUsername"`
+	StewardUsername    string     `json:"stewardUsername"`
 	YesLabel           string     `json:"yesLabel"`
 	NoLabel            string     `json:"noLabel"`
 	Status             string     `json:"status"`
@@ -36,6 +37,7 @@ type CreateMarketResponse struct {
 	OutcomeType        string    `json:"outcomeType"`
 	ResolutionDateTime time.Time `json:"resolutionDateTime"`
 	CreatorUsername    string    `json:"creatorUsername"`
+	StewardUsername    string    `json:"stewardUsername"`
 	YesLabel           string    `json:"yesLabel"`
 	NoLabel            string    `json:"noLabel"`
 	Status             string    `json:"status"`
@@ -74,6 +76,7 @@ type PublicMarketResponse struct {
 	ResolutionResult        string    `json:"resolutionResult"`
 	InitialProbability      float64   `json:"initialProbability"`
 	CreatorUsername         string    `json:"creatorUsername"`
+	StewardUsername         string    `json:"stewardUsername"`
 	CreatedAt               time.Time `json:"createdAt"`
 	YesLabel                string    `json:"yesLabel"`
 	NoLabel                 string    `json:"noLabel"`

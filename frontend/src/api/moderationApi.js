@@ -49,3 +49,24 @@ export const rejectProposedMarket = ({ marketId, token, reason }) => {
     body: { reason: normalizedReason },
   });
 };
+
+export const reassignMarketSteward = ({ marketId, token, stewardUsername, reason }) => {
+  const normalizedStewardUsername = String(stewardUsername || '').trim();
+  const normalizedReason = String(reason || '').trim();
+  if (!normalizedStewardUsername) {
+    throw new Error('A steward username is required.');
+  }
+  if (!normalizedReason) {
+    throw new Error('A reassignment reason is required.');
+  }
+
+  return reviewMarket({
+    marketId,
+    token,
+    action: 'steward',
+    body: {
+      stewardUsername: normalizedStewardUsername,
+      reason: normalizedReason,
+    },
+  });
+};

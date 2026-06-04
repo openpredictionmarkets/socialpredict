@@ -21,6 +21,7 @@ type PublicResponseMarket struct {
 	ResolutionResult        string    `json:"resolutionResult"`
 	InitialProbability      float64   `json:"initialProbability"`
 	CreatorUsername         string    `json:"creatorUsername"`
+	StewardUsername         string    `json:"stewardUsername"`
 	CreatedAt               time.Time `json:"createdAt"`
 	YesLabel                string    `json:"yesLabel"`
 	NoLabel                 string    `json:"noLabel"`
@@ -49,6 +50,7 @@ func GetPublicResponseMarket(ctx context.Context, svc dmarkets.ServiceInterface,
 		ResolutionResult:        market.ResolutionResult,
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
+		StewardUsername:         market.StewardUsername,
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,

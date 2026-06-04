@@ -28,7 +28,7 @@ const MarketLabels = ({ market }) => (
   </div>
 );
 
-const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, actions }) => {
+const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, showSteward = false, actions }) => {
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
 
   const toggleDescription = (marketId) => {
@@ -53,6 +53,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
           <tr>
             <th className="px-4 py-3 text-left">Market</th>
             {showCreator && <th className="px-4 py-3 text-left">Creator</th>}
+            {showSteward && <th className="px-4 py-3 text-left">Steward</th>}
             <th className="px-4 py-3 text-left">Status</th>
             <th className="px-4 py-3 text-left">Created</th>
             <th className="px-4 py-3 text-left">Review Trail</th>
@@ -88,6 +89,9 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
               </td>
               {showCreator && (
                 <td className="px-4 py-4 font-mono text-gray-300">{market.creatorUsername || 'n/a'}</td>
+              )}
+              {showSteward && (
+                <td className="px-4 py-4 font-mono text-gray-300">{market.stewardUsername || market.creatorUsername || 'n/a'}</td>
               )}
               <td className="px-4 py-4">
                 <span className="rounded-full bg-gray-700 px-3 py-1 font-mono text-xs text-white">

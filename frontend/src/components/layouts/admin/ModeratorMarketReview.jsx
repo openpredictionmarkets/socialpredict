@@ -121,6 +121,7 @@ const AdminMarketQueue = ({ status }) => {
         markets={markets}
         emptyMessage={`No ${status} markets found.`}
         showCreator
+        showSteward
         actions={status === 'proposed' ? renderActions : null}
       />
     </div>
