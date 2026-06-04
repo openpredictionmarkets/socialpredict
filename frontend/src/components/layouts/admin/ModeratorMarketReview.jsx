@@ -392,6 +392,64 @@ const emptyTagForm = {
   sortOrder: 0,
 };
 
+const ColorKeyPicker = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const selectedOption = MARKET_TAG_COLOR_OPTIONS.find((option) => option.key === value)
+    || MARKET_TAG_COLOR_OPTIONS[0];
+  const previewTag = (option) => ({
+    slug: option.key,
+    displayName: option.label,
+    colorKey: option.key,
+    description: option.guidance,
+  });
+
+  const chooseColor = (colorKey) => {
+    onChange(colorKey);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-left text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+      >
+        <MarketTagChips tags={[previewTag(selectedOption)]} />
+        <span className="text-xs text-gray-400">▾</span>
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          aria-label="Market tag color key"
+          className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-gray-700 bg-gray-950 p-2 shadow-xl"
+        >
+          {MARKET_TAG_COLOR_OPTIONS.map((option) => {
+            const selected = option.key === selectedOption.key;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => chooseColor(option.key)}
+                className={`grid w-full gap-1 rounded-md px-3 py-2 text-left transition hover:bg-gray-800 ${
+                  selected ? 'bg-gray-800 ring-1 ring-primary-pink/60' : ''
+                }`}
+              >
+                <MarketTagChips tags={[previewTag(option)]} />
+                <span className="text-xs text-gray-500">{option.guidance}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MarketTaxonomyAdmin = () => {
   const { token } = useAuth();
   const [tags, setTags] = useState([]);
@@ -528,17 +586,10 @@ const MarketTaxonomyAdmin = () => {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-1 text-sm text-gray-300">
             Color key
-            <select
+            <ColorKeyPicker
               value={form.colorKey}
-              onChange={(event) => updateForm({ colorKey: event.target.value })}
-              className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-            >
-              {MARKET_TAG_COLOR_OPTIONS.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              onChange={(colorKey) => updateForm({ colorKey })}
+            />
           </label>
           <label className="grid gap-1 text-sm text-gray-300">
             Sort order
