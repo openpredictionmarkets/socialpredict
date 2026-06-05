@@ -22,7 +22,7 @@ function CmsDashboard() {
 
   return (
     <section className="bg-primary-background text-white">
-      <div className="p-6 pb-0">
+      <div className="p-6 pb-5">
         <p className="text-xs uppercase tracking-[0.22em] text-primary-pink">Admin CMS</p>
         <h1 className="mt-2 text-2xl font-bold">Content And Discovery Management</h1>
         <p className="mt-2 max-w-3xl text-sm text-gray-300">

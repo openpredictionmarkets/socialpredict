@@ -643,10 +643,6 @@ function MarketDiscoveryLayoutEditor() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-300">CMS</p>
           <h1 className="mt-2 text-3xl font-bold text-white">Market Discovery Layout</h1>
-          <p className="mt-2 max-w-3xl text-gray-300">
-            Configure persisted TOP market page and SECONDARY topic page layout options from FEATURE/09.
-            The TOP record controls the public /markets page title, description, fallback list size, section cards, and featured pins.
-          </p>
         </div>
 
         {message && <div className="rounded-lg bg-emerald-700 p-4 text-sm text-white">{message}</div>}
