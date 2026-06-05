@@ -141,7 +141,7 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
     if (!pinnedMarkets.length) return null;
 
     return (
-        <section className="flex flex-wrap gap-3" aria-label="Pinned markets">
+        <section className="grid gap-3" aria-label="Pinned markets">
             {pinnedMarkets.map(({ pin, details }) => {
                 const market = details.market || {};
                 const marketId = market.id || pin.marketId;
@@ -151,12 +151,12 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
                     <Link
                         key={`market-${pin.id || marketId || pin.sortOrder}`}
                         to={marketId ? `/markets/${marketId}` : '#'}
-                        className="block w-full max-w-sm rounded-xl border border-gray-700 bg-gray-950/80 p-3 no-underline shadow-lg transition hover:border-sky-400/60 hover:bg-gray-900 sm:w-[320px]"
+                        className="block w-full rounded-xl border border-gray-700 bg-gray-950/80 p-3 no-underline shadow-lg transition hover:border-sky-400/60 hover:bg-gray-900"
                     >
                         <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 text-white">
                             {market.questionTitle || pin.label || `Market #${marketId}`}
                         </h3>
-                        <div className="h-28 overflow-hidden rounded-lg border border-gray-800 bg-gray-900/60">
+                        <div className="h-36 overflow-hidden rounded-lg border border-gray-800 bg-gray-900/60 sm:h-44">
                             <MarketChart
                                 data={probabilityChanges}
                                 currentProbability={currentProbability}
@@ -167,7 +167,7 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
                                 noLabel={market.noLabel || 'NO'}
                                 showHeader={false}
                                 compact
-                                height={112}
+                                height={176}
                             />
                         </div>
                     </Link>
