@@ -162,7 +162,7 @@ const PinnedMarketSparkline = ({ details }) => {
             <polygon points={areaPoints} fill="url(#pinned-market-area)" />
             <polyline points={linePoints} fill="none" stroke="#22d3ee" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
             <circle cx={lastX} cy={lastPoint[1] || height / 2} r="10" fill="#22d3ee" />
-            <text x={width - 28} y="42" textAnchor="end" fill="#e2e8f0" fontSize="28" fontWeight="700">
+            <text x={width - 28} y="58" textAnchor="end" fill="#e2e8f0" fontSize="24" fontWeight="700">
                 {(currentProbability * 100).toFixed(0)}%
             </text>
         </svg>
@@ -208,7 +208,7 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
     if (!pinnedMarkets.length) return null;
 
     return (
-        <section className="grid gap-3" aria-label="Pinned markets">
+        <section className="grid gap-3 lg:grid-cols-2" aria-label="Pinned markets">
             {pinnedMarkets.map(({ pin, details }) => {
                 const market = details.market || {};
                 const marketId = market.id || pin.marketId;
