@@ -104,7 +104,7 @@ func (r *GormRepository) SetMarketTags(ctx context.Context, marketID int64, tagS
 	}
 
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("market_id = ?", marketID).Delete(&models.MarketTagAssignment{}).Error; err != nil {
+		if err := tx.Unscoped().Where("market_id = ?", marketID).Delete(&models.MarketTagAssignment{}).Error; err != nil {
 			return err
 		}
 		for _, tag := range tags {

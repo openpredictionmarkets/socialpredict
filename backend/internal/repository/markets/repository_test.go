@@ -585,12 +585,15 @@ func TestGormRepositoryMarketTagsCreateListUpdateAssignAndHydrate(t *testing.T) 
 	if _, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "sports", DisplayName: "Sports", IsActive: true, SortOrder: 1, CreatedBy: "admin"}); err != nil {
 		t.Fatalf("CreateMarketTag sports: %v", err)
 	}
+	if _, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "economy", DisplayName: "Economy", IsActive: true, SortOrder: 3, CreatedBy: "admin"}); err != nil {
+		t.Fatalf("CreateMarketTag economy: %v", err)
+	}
 
 	activeTags, err := repo.ListMarketTags(ctx, false)
 	if err != nil {
 		t.Fatalf("ListMarketTags returned error: %v", err)
 	}
-	if len(activeTags) != 2 || activeTags[0].Slug != "sports" || activeTags[1].Slug != "politics" {
+	if len(activeTags) != 3 || activeTags[0].Slug != "sports" || activeTags[1].Slug != "politics" || activeTags[2].Slug != "economy" {
 		t.Fatalf("expected sorted active tags, got %+v", activeTags)
 	}
 
@@ -625,6 +628,28 @@ func TestGormRepositoryMarketTagsCreateListUpdateAssignAndHydrate(t *testing.T) 
 	}
 	if len(listed) != 1 || len(listed[0].Tags) != 1 || listed[0].Tags[0].Slug != "sports" {
 		t.Fatalf("expected hydrated tag on List, got %+v", listed)
+	}
+
+	assigned, err = repo.SetMarketTags(ctx, market.ID, []string{"sports", "economy"}, creator.Username, dmarkets.MarketTagAssignmentSourceAdmin, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SetMarketTags with two tags returned error: %v", err)
+	}
+	if len(assigned) != 2 {
+		t.Fatalf("expected two assigned tags, got %+v", assigned)
+	}
+	assigned, err = repo.SetMarketTags(ctx, market.ID, []string{"sports"}, creator.Username, dmarkets.MarketTagAssignmentSourceAdmin, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SetMarketTags removing one retained tag returned error: %v", err)
+	}
+	if len(assigned) != 1 || assigned[0].Slug != "sports" {
+		t.Fatalf("expected only retained sports tag, got %+v", assigned)
+	}
+	got, err = repo.GetByID(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("GetByID after replacing tags returned error: %v", err)
+	}
+	if len(got.Tags) != 1 || got.Tags[0].Slug != "sports" {
+		t.Fatalf("expected hydrated retained tag after replacement, got %+v", got.Tags)
 	}
 }
 

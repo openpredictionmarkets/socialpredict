@@ -63,11 +63,15 @@ const DiscoveryBadge = ({ children, tone = 'sky' }) => {
 };
 
 const TopicNav = ({ topicPins = [] }) => {
-    if (!topicPins.length) return null;
-
     return (
         <nav className="mb-5 overflow-x-auto border-b border-gray-800 pb-3" aria-label="Market topics">
             <div className="flex min-w-max items-center gap-2">
+                <Link
+                    to="/markets"
+                    className="rounded-full border border-sky-500/50 bg-sky-950/40 px-4 py-2 text-sm font-semibold text-sky-100 transition hover:border-sky-300/70 hover:bg-sky-900/50 hover:text-white"
+                >
+                    Markets
+                </Link>
                 {topicPins.map((pin) => (
                     <Link
                         key={`topic-${pin.id || pin.targetPageSlug || pin.sortOrder}`}
