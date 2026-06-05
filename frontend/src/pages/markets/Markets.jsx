@@ -267,17 +267,20 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
     );
 };
 
-const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
-    if (!hasCuratedBlocks(layout)) return null;
-
+const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true }) => {
     const pins = sortBySortOrder(layout.pins || []);
     const sections = sortBySortOrder(layout.sections || []).filter((section) => section.isActive !== false);
-    const topicPins = pins.filter((pin) => pin.pinType === 'discovery_page');
+    const topicPins = persistentTopicPins.length > 0
+        ? persistentTopicPins
+        : (useLayoutTopicPins ? pins.filter((pin) => pin.pinType === 'discovery_page') : []);
     const marketPins = pins.filter((pin) => pin.pinType === 'market');
+    const hasTopicNav = topicPins.length > 0;
+
+    if (!hasCuratedBlocks(layout) && !hasTopicNav) return null;
 
     return (
         <div className="mb-6 space-y-5 text-gray-200">
-            {!isTopicPage && layout.featuredTopicsEnabled && <TopicNav topicPins={topicPins} />}
+            {hasTopicNav && <TopicNav topicPins={topicPins} />}
 
             {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} />}
 
@@ -309,6 +312,7 @@ function Markets() {
     const [isSearching, setIsSearching] = useState(false);
     const [activeTab, setActiveTab] = useState('Active');
     const [discoveryLayout, setDiscoveryLayout] = useState(defaultDiscoveryLayout);
+    const [persistentTopicPins, setPersistentTopicPins] = useState([]);
 
     useEffect(() => {
         let ignore = false;
@@ -328,19 +332,39 @@ function Markets() {
         setSearchResults(null);
         setIsSearching(false);
 
-        apiRequest(`/v0/content/market-discovery/${discoverySlug}`, {
-            fallbackMessage: 'Failed to load market discovery layout',
-        })
-            .then((layout) => {
+        const loadDiscovery = async () => {
+            try {
+                const [layout, topLayout] = await Promise.all([
+                    apiRequest(`/v0/content/market-discovery/${discoverySlug}`, {
+                        fallbackMessage: 'Failed to load market discovery layout',
+                    }),
+                    isTopicPage
+                        ? apiRequest('/v0/content/market-discovery/markets', {
+                            fallbackMessage: 'Failed to load market topic navigation',
+                        })
+                        : Promise.resolve(null),
+                ]);
                 if (!ignore) {
-                    setDiscoveryLayout(normalizeDiscoveryLayout(layout, fallback));
+                    const normalizedLayout = normalizeDiscoveryLayout(layout, fallback);
+                    const topNavLayout = isTopicPage
+                        ? normalizeDiscoveryLayout(topLayout || {}, {})
+                        : normalizedLayout;
+                    const topTopicPins = topNavLayout.featuredTopicsEnabled
+                        ? sortBySortOrder(topNavLayout.pins || []).filter((pin) => pin.pinType === 'discovery_page')
+                        : [];
+
+                    setDiscoveryLayout(normalizedLayout);
+                    setPersistentTopicPins(topTopicPins);
                 }
-            })
-            .catch(() => {
+            } catch {
                 if (!ignore) {
                     setDiscoveryLayout(normalizeDiscoveryLayout({}, fallback));
+                    setPersistentTopicPins([]);
                 }
-            });
+            }
+        };
+
+        loadDiscovery();
 
         return () => {
             ignore = true;
@@ -418,7 +442,7 @@ function Markets() {
                         setIsSearching={setIsSearching}
                         tagSlug={tagScope}
                     />
-                    {!isSearching && <DiscoveryPanel layout={discoveryLayout} isTopicPage={isTopicPage} />}
+                    {!isSearching && <DiscoveryPanel layout={discoveryLayout} persistentTopicPins={persistentTopicPins} useLayoutTopicPins={!isTopicPage} />}
                     
                     <SiteTabs 
                         tabs={tabsData} 

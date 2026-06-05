@@ -718,7 +718,7 @@ function MarketDiscoveryLayoutEditor() {
                     </select>
                   </Field>
                   <p className="mt-3 text-xs text-sky-100/80">
-                    Secondary pages are stored per active tag. Market pins here are independent from the TOP /markets page pins and are searched within this topic.
+                    Secondary pages are stored per active tag. The topic nav is inherited from the TOP /markets page; market pins here are independent and searched within this topic.
                   </p>
                   {loadingSecondary && <p className="mt-2 text-xs text-gray-300">Loading selected topic page...</p>}
                 </div>
@@ -779,7 +779,7 @@ function MarketDiscoveryLayoutEditor() {
                 {selectedMode === 'top' && (
                   <ToggleCard
                     title="Topic Pins"
-                    description="Create the topic navigation bar by pinning active topic tags. Usually enabled on the TOP markets page and disabled inside individual topic pages."
+                    description="Create the persistent topic navigation bar. TOP Topic Pins appear on /markets and every secondary topic page."
                     checked={state.featuredTopicsEnabled}
                     onChange={(checked) => updateState({ featuredTopicsEnabled: checked })}
                   />
@@ -881,7 +881,7 @@ function MarketDiscoveryLayoutEditor() {
                 <div>
                   <h3 className="text-xl font-bold text-white">Topic Pins</h3>
                   <p className="mt-1 text-sm text-gray-400">
-                    Topic pins build the /markets topic nav bar. Each entry points to an active tag and filters /markets/topic/:slug.
+                    Topic pins build the persistent market topic nav bar. Each entry points to an active tag and appears on /markets and every /markets/topic/:slug page.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
