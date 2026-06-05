@@ -267,7 +267,7 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
     );
 };
 
-const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true }) => {
+const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true, showBackToMarkets = false }) => {
     const pins = sortBySortOrder(layout.pins || []);
     const sections = sortBySortOrder(layout.sections || []).filter((section) => section.isActive !== false);
     const topicPins = persistentTopicPins.length > 0
@@ -281,6 +281,11 @@ const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins =
     return (
         <div className="mb-6 space-y-5 text-gray-200">
             {hasTopicNav && <TopicNav topicPins={topicPins} />}
+            {showBackToMarkets && (
+                <Link to="/markets" className="-mt-3 inline-flex text-sm font-semibold text-sky-300 hover:text-sky-200">
+                    Back to all markets
+                </Link>
+            )}
 
             {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} />}
 
@@ -419,19 +424,32 @@ function Markets() {
         <div className='App'>
             <div className='Center-content'>
                 <div className='Center-content-header'>
-                    {isTopicPage && (
-                        <Link to="/markets" className="mb-3 inline-flex text-sm font-semibold text-sky-300 hover:text-sky-200">
-                            Back to all markets
-                        </Link>
-                    )}
-                    <h1 className='text-2xl font-semibold text-gray-300 mb-2'>{discoveryLayout.title || 'Markets'}</h1>
-                    {discoveryLayout.description && (
-                        <p className="mb-3 max-w-3xl text-sm text-gray-400">{discoveryLayout.description}</p>
-                    )}
-                    {tagScope && (
-                        <div className="mb-6">
-                            <DiscoveryBadge>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                    {isTopicPage ? (
+                        <div className="mb-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-start">
+                            <h1 className='text-2xl font-semibold text-gray-300'>{discoveryLayout.title || 'Markets'}</h1>
+                            <div className="space-y-2 md:text-right">
+                                {discoveryLayout.description && (
+                                    <p className="text-sm text-gray-400">{discoveryLayout.description}</p>
+                                )}
+                                {tagScope && (
+                                    <div className="md:flex md:justify-end">
+                                        <DiscoveryBadge>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                                    </div>
+                                )}
+                            </div>
                         </div>
+                    ) : (
+                        <>
+                            <h1 className='text-2xl font-semibold text-gray-300 mb-2'>{discoveryLayout.title || 'Markets'}</h1>
+                            {discoveryLayout.description && (
+                                <p className="mb-3 max-w-3xl text-sm text-gray-400">{discoveryLayout.description}</p>
+                            )}
+                            {tagScope && (
+                                <div className="mb-6">
+                                    <DiscoveryBadge>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
                 <div className='Center-content-table'>
@@ -442,7 +460,14 @@ function Markets() {
                         setIsSearching={setIsSearching}
                         tagSlug={tagScope}
                     />
-                    {!isSearching && <DiscoveryPanel layout={discoveryLayout} persistentTopicPins={persistentTopicPins} useLayoutTopicPins={!isTopicPage} />}
+                    {!isSearching && (
+                        <DiscoveryPanel
+                            layout={discoveryLayout}
+                            persistentTopicPins={persistentTopicPins}
+                            useLayoutTopicPins={!isTopicPage}
+                            showBackToMarkets={isTopicPage}
+                        />
+                    )}
                     
                     <SiteTabs 
                         tabs={tabsData} 
