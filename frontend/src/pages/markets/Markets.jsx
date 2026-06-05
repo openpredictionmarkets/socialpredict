@@ -4,7 +4,6 @@ import SiteTabs from '../../components/tabs/SiteTabs';
 import MarketsByStatusTable from '../../components/tables/MarketsByStatusTable';
 import GlobalSearchBar from '../../components/search/GlobalSearchBar';
 import SearchResultsTable from '../../components/tables/SearchResultsTable';
-import MarketChart from '../../components/charts/MarketChart';
 import { TAB_TO_STATUS } from '../../utils/statusMap';
 import { apiRequest } from '../../api/httpClient';
 
@@ -102,6 +101,74 @@ const currentProbabilityFromDetails = (details) => {
     return toNumber(details?.lastProbability ?? details?.LastProbability ?? details?.market?.initialProbability);
 };
 
+const chartPointsFromDetails = (details) => {
+    const changes = normalizeProbabilityChanges(details?.probabilityChanges ?? details?.ProbabilityChanges);
+    const currentProbability = currentProbabilityFromDetails(details);
+    const points = changes.length > 0
+        ? changes.map((change) => toNumber(change.probability, currentProbability))
+        : [currentProbability];
+
+    if (points.length === 1) {
+        return [points[0], points[0]];
+    }
+
+    return points;
+};
+
+const pointsToPolyline = (points, width, height, inset) => {
+    const usableWidth = width - inset * 2;
+    const usableHeight = height - inset * 2;
+    const maxIndex = Math.max(points.length - 1, 1);
+
+    return points
+        .map((probability, index) => {
+            const x = inset + (index / maxIndex) * usableWidth;
+            const y = inset + (1 - Math.max(0, Math.min(1, probability))) * usableHeight;
+            return `${x.toFixed(2)},${y.toFixed(2)}`;
+        })
+        .join(' ');
+};
+
+const PinnedMarketSparkline = ({ details }) => {
+    const width = 960;
+    const height = 260;
+    const inset = 18;
+    const points = chartPointsFromDetails(details);
+    const linePoints = pointsToPolyline(points, width, height, inset);
+    const linePointPairs = linePoints.split(' ');
+    const lastPoint = linePointPairs[linePointPairs.length - 1]?.split(',') || [];
+    const firstX = inset;
+    const lastX = width - inset;
+    const floorY = height - inset;
+    const areaPoints = `${firstX},${floorY} ${linePoints} ${lastX},${floorY}`;
+    const currentProbability = currentProbabilityFromDetails(details);
+
+    return (
+        <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="h-full w-full"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label={`Pinned market probability ${(currentProbability * 100).toFixed(0)} percent`}
+        >
+            <defs>
+                <linearGradient id="pinned-market-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.58" />
+                    <stop offset="100%" stopColor="#0e7490" stopOpacity="0.16" />
+                </linearGradient>
+            </defs>
+            <rect width={width} height={height} rx="18" fill="#101827" />
+            <line x1="0" x2={width} y1={height / 2} y2={height / 2} stroke="#334155" strokeWidth="2" strokeDasharray="10 12" opacity="0.45" />
+            <polygon points={areaPoints} fill="url(#pinned-market-area)" />
+            <polyline points={linePoints} fill="none" stroke="#22d3ee" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={lastX} cy={lastPoint[1] || height / 2} r="10" fill="#22d3ee" />
+            <text x={width - 28} y="42" textAnchor="end" fill="#e2e8f0" fontSize="28" fontWeight="700">
+                {(currentProbability * 100).toFixed(0)}%
+            </text>
+        </svg>
+    );
+};
+
 const FeaturedMarketPins = ({ marketPins = [] }) => {
     const [pinnedMarkets, setPinnedMarkets] = useState([]);
     const pinKey = marketPins
@@ -145,8 +212,6 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
             {pinnedMarkets.map(({ pin, details }) => {
                 const market = details.market || {};
                 const marketId = market.id || pin.marketId;
-                const probabilityChanges = normalizeProbabilityChanges(details.probabilityChanges);
-                const currentProbability = currentProbabilityFromDetails(details);
                 return (
                     <Link
                         key={`market-${pin.id || marketId || pin.sortOrder}`}
@@ -156,19 +221,8 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
                         <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 text-white">
                             {market.questionTitle || pin.label || `Market #${marketId}`}
                         </h3>
-                        <div className="h-36 overflow-hidden rounded-lg border border-gray-800 bg-gray-900/60 sm:h-44">
-                            <MarketChart
-                                data={probabilityChanges}
-                                currentProbability={currentProbability}
-                                title=""
-                                className="h-full w-full"
-                                closeDateTime={market.resolutionDateTime}
-                                yesLabel={market.yesLabel || 'YES'}
-                                noLabel={market.noLabel || 'NO'}
-                                showHeader={false}
-                                compact
-                                height={176}
-                            />
+                        <div className="h-36 overflow-hidden rounded-lg border border-gray-800 bg-gray-900/60 sm:h-52">
+                            <PinnedMarketSparkline details={details} />
                         </div>
                     </Link>
                 );
