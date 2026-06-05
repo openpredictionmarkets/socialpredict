@@ -430,11 +430,13 @@ function Markets() {
                 <div className='Center-content-header'>
                     {isTopicPage ? (
                         <div className="mb-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-start">
-                            <h1 className='text-2xl font-semibold text-gray-300'>{discoveryLayout.title || 'Markets'}</h1>
-                            <div className="space-y-2 md:text-right">
+                            <div>
+                                <h1 className='text-2xl font-semibold text-gray-300 mb-2'>{discoveryLayout.title || 'Markets'}</h1>
                                 {discoveryLayout.description && (
-                                    <p className="text-sm text-gray-400">{discoveryLayout.description}</p>
+                                    <p className="max-w-3xl text-sm text-gray-400">{discoveryLayout.description}</p>
                                 )}
+                            </div>
+                            <div className="space-y-2 md:text-right">
                                 {tagScope && (
                                     <div className="md:flex md:justify-end">
                                         <DiscoveryBadge>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
