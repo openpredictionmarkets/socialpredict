@@ -81,7 +81,6 @@ func TestUpdatePagePersistsLayout(t *testing.T) {
 		FeaturedMarketsEnabled:     true,
 		DefaultRecommendationLimit: 30,
 		CuratedRecommendationLimit: 7,
-		IsPublished:                true,
 		UpdatedBy:                  "admin",
 	})
 	if err != nil {

@@ -109,7 +109,6 @@ Checklist:
 - [x] Add admin page layout management API.
 - [x] Add admin section management APIs.
 - [x] Add tests for page composition and section ordering.
-- [ ] Add tests for published/unpublished page visibility once secondary routes are public.
 
 ## 07. Pins And Featured Content
 

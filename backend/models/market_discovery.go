@@ -20,7 +20,6 @@ type MarketDiscoveryPage struct {
 	SectionsEnabled            bool   `gorm:"not null;default:false"`
 	DefaultRecommendationLimit int    `gorm:"not null;default:20"`
 	CuratedRecommendationLimit int    `gorm:"not null;default:5"`
-	IsPublished                bool   `gorm:"not null;default:true;index"`
 	SortOrder                  int    `gorm:"not null;default:0;index"`
 	Version                    uint   `gorm:"not null;default:1"`
 	UpdatedBy                  string `gorm:"size:64"`

@@ -49,7 +49,6 @@ const defaultPageState = {
   defaultRecommendationLimit: 20,
   curatedRecommendationLimit: 5,
   recommendationLimit: 20,
-  isPublished: true,
   version: 0,
   sections: [],
   pins: [],
@@ -77,7 +76,6 @@ const normalizePage = (page = {}, modeKey = 'top') => {
     defaultRecommendationLimit,
     curatedRecommendationLimit,
     recommendationLimit: hasCuratedBlocks ? curatedRecommendationLimit : defaultRecommendationLimit,
-    isPublished: page.isPublished !== false,
     version: Number(page.version || 0),
     sections: sortBySortOrder(page.sections || []),
     pins: sortBySortOrder(page.pins || []),
@@ -333,6 +331,7 @@ const LayoutPreview = ({ mode, state }) => {
 function MarketDiscoveryLayoutEditor() {
   const [selectedMode, setSelectedMode] = useState('top');
   const [selectedSecondarySlug, setSelectedSecondarySlug] = useState('');
+  const [activeEditorTab, setActiveEditorTab] = useState('layout');
   const [layoutState, setLayoutState] = useState({
     top: normalizePage({}, 'top'),
     secondary: normalizePage({}, 'secondary'),
@@ -472,6 +471,32 @@ function MarketDiscoveryLayoutEditor() {
     ))
   ), [activeTags]);
   const firstActiveTagSlug = activeTagOptions[0]?.slug || '';
+  const editorTabs = useMemo(() => {
+    const layoutTab = {
+      key: 'layout',
+      label: selectedMode === 'secondary' ? 'Topic page pins (SECONDARY)' : 'Market page layout (TOP)',
+    };
+    if (selectedMode === 'secondary') {
+      return [
+        layoutTab,
+        { key: 'marketPins', label: 'Market Pins' },
+        { key: 'preview', label: 'Preview' },
+      ];
+    }
+    return [
+      layoutTab,
+      { key: 'sections', label: 'Sections' },
+      { key: 'topicPins', label: 'Topic Pins' },
+      { key: 'marketPins', label: 'Market Pins' },
+      { key: 'preview', label: 'Preview' },
+    ];
+  }, [selectedMode]);
+
+  useEffect(() => {
+    if (!editorTabs.some((tab) => tab.key === activeEditorTab)) {
+      setActiveEditorTab(editorTabs[0]?.key || 'layout');
+    }
+  }, [activeEditorTab, editorTabs]);
 
   const replaceSelectedState = (saved) => {
     setLayoutState((current) => ({
@@ -682,7 +707,25 @@ function MarketDiscoveryLayoutEditor() {
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
+            <div className="flex flex-wrap gap-2 rounded-xl border border-gray-700 bg-gray-900/80 p-3">
+              {editorTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveEditorTab(tab.key)}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    activeEditorTab === tab.key
+                      ? 'bg-primary-pink text-white'
+                      : 'border border-gray-700 bg-gray-950 text-gray-300 hover:border-gray-500 hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {activeEditorTab === 'layout' && (
+              <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold text-white">{selectedPageLabel}</h2>
@@ -794,12 +837,6 @@ function MarketDiscoveryLayoutEditor() {
                     onChange={(checked) => updateState({ sectionsEnabled: checked })}
                   />
                 )}
-                <ToggleCard
-                  title="Published"
-                  description="Unpublished secondary layouts stay editable but should not appear publicly once topic routes are added."
-                  checked={state.isPublished}
-                  onChange={(checked) => updateState({ isPublished: checked })}
-                />
               </div>
 
               <div className="mt-6 rounded-lg border border-gray-700 bg-gray-950 p-4">
@@ -811,8 +848,9 @@ function MarketDiscoveryLayoutEditor() {
                 </ol>
               </div>
             </div>
+            )}
 
-            {selectedMode === 'top' && (
+            {selectedMode === 'top' && activeEditorTab === 'sections' && (
               <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -871,7 +909,7 @@ function MarketDiscoveryLayoutEditor() {
             </div>
             )}
 
-            {selectedMode === 'top' && (
+            {selectedMode === 'top' && activeEditorTab === 'topicPins' && (
               <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -935,6 +973,7 @@ function MarketDiscoveryLayoutEditor() {
             </div>
             )}
 
+            {activeEditorTab === 'marketPins' && (
             <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -972,8 +1011,9 @@ function MarketDiscoveryLayoutEditor() {
                 ))}
               </div>
             </div>
+            )}
 
-            <LayoutPreview mode={{ ...mode, route: selectedRoute }} state={state} />
+            {activeEditorTab === 'preview' && <LayoutPreview mode={{ ...mode, route: selectedRoute }} state={state} />}
           </div>
         </div>
       </div>

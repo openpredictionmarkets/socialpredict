@@ -110,14 +110,13 @@ Candidate fields:
 - `page_type`: top, category
 - `primary_tag_id` nullable
 - `query_mode`: tag, tag_set, custom, all
-- `is_published`
 - `sort_order`
 
 Rules:
 
 - top page can be represented as one special page or as a conventional read model for `/markets`
 - secondary pages usually have a primary tag
-- inactive/unpublished pages should not appear publicly
+- page edits publish immediately in the current CMS model
 
 ### Section
 

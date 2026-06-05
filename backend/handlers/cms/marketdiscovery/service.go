@@ -51,7 +51,6 @@ type UpdateInput struct {
 	SectionsEnabled            bool
 	DefaultRecommendationLimit int
 	CuratedRecommendationLimit int
-	IsPublished                bool
 	UpdatedBy                  string
 	Version                    uint
 }
@@ -142,7 +141,6 @@ func (s *Service) UpdatePage(slug string, in UpdateInput) (*models.MarketDiscove
 	page.SectionsEnabled = in.SectionsEnabled
 	page.DefaultRecommendationLimit = defaultLimit
 	page.CuratedRecommendationLimit = curatedLimit
-	page.IsPublished = in.IsPublished
 	page.UpdatedBy = strings.TrimSpace(in.UpdatedBy)
 	if page.ID == 0 {
 		page.Version = 1
@@ -227,7 +225,6 @@ func DefaultPage(slug string) *models.MarketDiscoveryPage {
 		SectionsEnabled:            false,
 		DefaultRecommendationLimit: 20,
 		CuratedRecommendationLimit: 5,
-		IsPublished:                true,
 		Version:                    1,
 	}
 	if slug == PageSlugTopicTemplate {

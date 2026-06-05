@@ -5127,8 +5127,6 @@ components:
         recommendationLimit:
           type: integer
           description: Effective fallback market list size for the current layout.
-        isPublished:
-          type: boolean
         version:
           type: integer
           format: int64
@@ -5218,8 +5216,6 @@ components:
           type: integer
           minimum: 1
           maximum: 50
-        isPublished:
-          type: boolean
         version:
           type: integer
           format: int64

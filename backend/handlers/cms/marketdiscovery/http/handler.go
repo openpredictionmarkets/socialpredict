@@ -34,7 +34,6 @@ type updateReq struct {
 	SectionsEnabled            bool   `json:"sectionsEnabled"`
 	DefaultRecommendationLimit int    `json:"defaultRecommendationLimit"`
 	CuratedRecommendationLimit int    `json:"curatedRecommendationLimit"`
-	IsPublished                bool   `json:"isPublished"`
 	Version                    uint   `json:"version"`
 }
 
@@ -76,7 +75,6 @@ type pageResponse struct {
 	DefaultRecommendationLimit int               `json:"defaultRecommendationLimit"`
 	CuratedRecommendationLimit int               `json:"curatedRecommendationLimit"`
 	RecommendationLimit        int               `json:"recommendationLimit"`
-	IsPublished                bool              `json:"isPublished"`
 	Version                    uint              `json:"version"`
 	UpdatedAt                  string            `json:"updatedAt,omitempty"`
 	Sections                   []sectionResponse `json:"sections"`
@@ -138,7 +136,6 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		SectionsEnabled:            in.SectionsEnabled,
 		DefaultRecommendationLimit: in.DefaultRecommendationLimit,
 		CuratedRecommendationLimit: in.CuratedRecommendationLimit,
-		IsPublished:                in.IsPublished,
 		Version:                    in.Version,
 		UpdatedBy:                  admin.Username,
 	})
@@ -221,7 +218,6 @@ func responseFromPage(page *models.MarketDiscoveryPage, sections []models.Market
 		SectionsEnabled:            page.SectionsEnabled,
 		DefaultRecommendationLimit: page.DefaultRecommendationLimit,
 		CuratedRecommendationLimit: page.CuratedRecommendationLimit,
-		IsPublished:                page.IsPublished,
 		Version:                    page.Version,
 		Sections:                   sectionResponses(sections),
 		Pins:                       pinResponses(pins),
