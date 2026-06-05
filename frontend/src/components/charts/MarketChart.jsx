@@ -75,12 +75,9 @@ const MarketChart = ({
     animationEnabled: !compact,
     backgroundColor: 'transparent',
     zoomEnabled: !compact,
-    height,
     axisX: {
       valueFormatString: 'DD MMM YY HH:mm',
       labelFontColor: compact ? 'transparent' : '#708090',
-      tickLength: compact ? 0 : undefined,
-      lineThickness: compact ? 0 : undefined,
     },
     axisY: {
       includeZero: true,
@@ -89,12 +86,19 @@ const MarketChart = ({
       labelFontColor: compact ? 'transparent' : '#708090',
       suffix: '',
       valueFormatString: '0.00',
-      tickLength: compact ? 0 : undefined,
-      lineThickness: compact ? 0 : undefined,
-      gridThickness: compact ? 0 : undefined,
     },
     data: generateChartData(),
   };
+  if (height) {
+    options.height = height;
+  }
+  if (compact) {
+    options.axisX.tickLength = 0;
+    options.axisX.lineThickness = 0;
+    options.axisY.tickLength = 0;
+    options.axisY.lineThickness = 0;
+    options.axisY.gridThickness = 0;
+  }
 
   return (
     <div className={`rounded-lg shadow ${compact ? 'p-0' : 'p-4'} ${className} overflow-hidden`}>
