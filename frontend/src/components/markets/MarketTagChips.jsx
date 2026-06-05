@@ -26,7 +26,7 @@ export const MARKET_TAG_COLOR_OPTIONS = [
   { key: 'violet', label: 'Violet' },
 ];
 
-const chipClassFor = (tag) => {
+export const marketTagChipClassFor = (tag) => {
   const key = String(tag?.colorKey || 'slate').toLowerCase();
   return colorClasses[key] || colorClasses.slate;
 };
@@ -42,7 +42,7 @@ const MarketTagChips = ({ tags = [], className = '' }) => {
       {visibleTags.map((tag) => (
         <span
           key={tag.slug || tag.displayName}
-          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${chipClassFor(tag)}`}
+          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${marketTagChipClassFor(tag)}`}
           title={tag.description || tag.displayName || tag.slug}
         >
           {tag.displayName || tag.slug}

@@ -4,8 +4,10 @@ import SiteTabs from '../../components/tabs/SiteTabs';
 import MarketsByStatusTable from '../../components/tables/MarketsByStatusTable';
 import GlobalSearchBar from '../../components/search/GlobalSearchBar';
 import SearchResultsTable from '../../components/tables/SearchResultsTable';
+import { marketTagChipClassFor } from '../../components/markets/MarketTagChips';
 import { TAB_TO_STATUS } from '../../utils/statusMap';
 import { apiRequest } from '../../api/httpClient';
+import { listMarketTags } from '../../api/marketTagsApi';
 
 const defaultDiscoveryLayout = {
     title: 'Markets',
@@ -48,15 +50,14 @@ const normalizeDiscoveryLayout = (layout, fallback = {}) => ({
     pins: sortBySortOrder(layout?.pins || []),
 });
 
-const DiscoveryBadge = ({ children, tone = 'sky' }) => {
+const DiscoveryBadge = ({ children, tag }) => {
     const tones = {
         sky: 'border-sky-500/40 bg-sky-950/40 text-sky-100',
-        emerald: 'border-emerald-500/40 bg-emerald-950/40 text-emerald-100',
-        amber: 'border-amber-500/40 bg-amber-950/40 text-amber-100',
     };
+    const className = tag ? marketTagChipClassFor(tag) : tones.sky;
 
     return (
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tones[tone] || tones.sky}`}>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${className}`}>
             {children}
         </span>
     );
@@ -76,7 +77,8 @@ const TopicNav = ({ topicPins = [] }) => {
                     <Link
                         key={`topic-${pin.id || pin.targetPageSlug || pin.sortOrder}`}
                         to={pin.targetPageSlug ? `/markets/topic/${pin.targetPageSlug}` : '#'}
-                        className="rounded-full border border-gray-700 bg-gray-900/80 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:border-sky-400/70 hover:bg-sky-950/40 hover:text-white"
+                        className={`rounded-full border px-4 py-2 text-sm font-semibold transition hover:brightness-125 ${marketTagChipClassFor(pin.tag)}`}
+                        title={pin.tag?.description || pin.label || pin.targetPageSlug}
                     >
                         {pin.label || slugTitle(pin.targetPageSlug) || 'Topic'}
                     </Link>
@@ -317,6 +319,32 @@ function Markets() {
     const [activeTab, setActiveTab] = useState('Active');
     const [discoveryLayout, setDiscoveryLayout] = useState(defaultDiscoveryLayout);
     const [persistentTopicPins, setPersistentTopicPins] = useState([]);
+    const [marketTagsBySlug, setMarketTagsBySlug] = useState({});
+
+    useEffect(() => {
+        let ignore = false;
+
+        listMarketTags()
+            .then((result) => {
+                if (ignore) return;
+                const bySlug = {};
+                (result.tags || []).forEach((tag) => {
+                    if (tag.slug) {
+                        bySlug[tag.slug] = tag;
+                    }
+                });
+                setMarketTagsBySlug(bySlug);
+            })
+            .catch(() => {
+                if (!ignore) {
+                    setMarketTagsBySlug({});
+                }
+            });
+
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     useEffect(() => {
         let ignore = false;
@@ -354,7 +382,9 @@ function Markets() {
                         ? normalizeDiscoveryLayout(topLayout || {}, {})
                         : normalizedLayout;
                     const topTopicPins = topNavLayout.featuredTopicsEnabled
-                        ? sortBySortOrder(topNavLayout.pins || []).filter((pin) => pin.pinType === 'discovery_page')
+                        ? sortBySortOrder(topNavLayout.pins || [])
+                            .filter((pin) => pin.pinType === 'discovery_page')
+                            .map((pin) => ({ ...pin, tag: marketTagsBySlug[pin.targetPageSlug] }))
                         : [];
 
                     setDiscoveryLayout(normalizedLayout);
@@ -373,7 +403,7 @@ function Markets() {
         return () => {
             ignore = true;
         };
-    }, [isTopicPage, topicSlug]);
+    }, [isTopicPage, topicSlug, marketTagsBySlug]);
 
     const tagScope = isTopicPage
         ? topicSlug
@@ -434,7 +464,7 @@ function Markets() {
                             <div className="space-y-2 md:text-right">
                                 {tagScope && (
                                     <div className="md:flex md:justify-end">
-                                        <DiscoveryBadge>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                                        <DiscoveryBadge tag={marketTagsBySlug[tagScope]}>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
                                     </div>
                                 )}
                             </div>
@@ -447,7 +477,7 @@ function Markets() {
                             )}
                             {tagScope && (
                                 <div className="mb-6">
-                                    <DiscoveryBadge>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                                    <DiscoveryBadge tag={marketTagsBySlug[tagScope]}>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
                                 </div>
                             )}
                         </>
