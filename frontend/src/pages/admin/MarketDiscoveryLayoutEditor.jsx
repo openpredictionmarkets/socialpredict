@@ -117,7 +117,7 @@ const Field = ({ label, children, className = '' }) => (
   </label>
 );
 
-const textInputClass = 'rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40';
+const textInputClass = 'w-full min-w-0 rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40';
 
 const tagOptionLabel = (tag) => `${tag.displayName || tag.slug} (${tag.slug})`;
 
@@ -653,7 +653,7 @@ function MarketDiscoveryLayoutEditor() {
               <div className="mt-4 space-y-3">
                 {state.pins.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No page-level pins yet.</p>}
                 {state.pins.map((pin, index) => (
-                  <div key={`${pin.pinType}-${index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[170px_1fr_120px]">
+                  <div key={`${pin.pinType}-${index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,90px)]">
                     <Field label="Pin Type">
                       <select
                         value={pin.pinType || 'market'}
