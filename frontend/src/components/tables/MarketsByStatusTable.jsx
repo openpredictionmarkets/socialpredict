@@ -181,7 +181,7 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
         const params = new URLSearchParams();
 
         if (status && status.toLowerCase() !== 'all') {
-          params.set('status', status.toUpperCase());
+          params.set('status', status.toLowerCase());
         }
 
         params.set('limit', String(limit || DEFAULT_LIMIT));
