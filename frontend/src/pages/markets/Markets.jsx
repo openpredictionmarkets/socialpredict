@@ -408,6 +408,7 @@ function Markets() {
     const tagScope = isTopicPage
         ? topicSlug
         : (discoveryLayout.searchScope === 'tag' ? discoveryLayout.primaryTagSlug : '');
+    const tagScopeLabel = marketTagsBySlug[tagScope]?.displayName || slugTitle(tagScope) || tagScope;
 
     const handleSearchResults = (results) => {
         setSearchResults(results);
@@ -464,7 +465,7 @@ function Markets() {
                             <div className="space-y-2 md:text-right">
                                 {tagScope && (
                                     <div className="md:flex md:justify-end">
-                                        <DiscoveryBadge tag={marketTagsBySlug[tagScope]}>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                                        <DiscoveryBadge tag={marketTagsBySlug[tagScope]}>{tagScopeLabel}</DiscoveryBadge>
                                     </div>
                                 )}
                             </div>
@@ -477,7 +478,7 @@ function Markets() {
                             )}
                             {tagScope && (
                                 <div className="mb-6">
-                                    <DiscoveryBadge tag={marketTagsBySlug[tagScope]}>{`Filtered by tag: ${tagScope}`}</DiscoveryBadge>
+                                    <DiscoveryBadge tag={marketTagsBySlug[tagScope]}>{tagScopeLabel}</DiscoveryBadge>
                                 </div>
                             )}
                         </>
