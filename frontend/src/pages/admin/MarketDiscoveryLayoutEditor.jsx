@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
+import { searchMarkets } from '../../api/marketsApi';
 import { listAdminMarketTags } from '../../api/marketTagsApi';
 
 const layoutModes = {
@@ -137,6 +138,103 @@ const tagOptionsWithCurrent = (tags, currentSlug) => {
   ];
 };
 
+const marketOverviewTitle = (overview) => (
+  overview?.market?.questionTitle
+  || overview?.questionTitle
+  || `Market #${overview?.market?.id || overview?.id || 'unknown'}`
+);
+
+const marketOverviewId = (overview) => overview?.market?.id || overview?.id || overview?.marketId || 0;
+
+const MarketPinSearch = ({ pin, onSelect }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setSearchError('');
+      return undefined;
+    }
+
+    let ignore = false;
+    const timeoutId = setTimeout(async () => {
+      setSearching(true);
+      setSearchError('');
+      try {
+        const response = await searchMarkets(trimmed, 'active', 8);
+        if (!ignore) {
+          setResults(response.primaryResults || []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setSearchError(err.message || 'Unable to search active markets.');
+          setResults([]);
+        }
+      } finally {
+        if (!ignore) {
+          setSearching(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      ignore = true;
+      clearTimeout(timeoutId);
+    };
+  }, [query]);
+
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-3">
+        <div className="font-mono text-xs uppercase tracking-[0.14em] text-gray-400">Selected Market</div>
+        <div className="mt-1 text-sm text-white">
+          {Number(pin.marketId) > 0 ? `Market #${pin.marketId}` : 'No market selected yet.'}
+        </div>
+      </div>
+      <Field label="Search Active Markets">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Type at least 2 characters..."
+          className={textInputClass}
+        />
+      </Field>
+      {searching && <p className="text-xs text-gray-400">Searching active markets...</p>}
+      {searchError && <p className="text-xs text-red-300">{searchError}</p>}
+      {results.length > 0 && (
+        <div className="grid gap-2">
+          {results.map((overview) => {
+            const id = marketOverviewId(overview);
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  onSelect(id);
+                  setQuery('');
+                  setResults([]);
+                }}
+                className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
+                  Number(pin.marketId) === Number(id)
+                    ? 'border-primary-pink bg-primary-pink/15 text-white'
+                    : 'border-gray-700 bg-gray-800 text-gray-200 hover:border-sky-400/60'
+                }`}
+              >
+                <span className="block font-semibold">{marketOverviewTitle(overview)}</span>
+                <span className="mt-1 block text-xs text-gray-400">Active market #{id}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LayoutPreview = ({ mode, state }) => {
   const hasCuratedBlocks = state.featuredTopicsEnabled || state.featuredMarketsEnabled || state.sectionsEnabled;
   const recommendationLimit = hasCuratedBlocks
@@ -169,13 +267,13 @@ const LayoutPreview = ({ mode, state }) => {
         </div>
         {state.featuredTopicsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
-            <div className="text-sm font-semibold text-white">Featured topic/category cards</div>
+            <div className="text-sm font-semibold text-white">Topic Pins</div>
             <div className="mt-1 text-xs text-gray-400">{state.pins.filter((pin) => pin.pinType === 'discovery_page').length} page pins configured.</div>
           </div>
         )}
         {state.featuredMarketsEnabled && (
           <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
-            <div className="text-sm font-semibold text-white">Featured market cards</div>
+            <div className="text-sm font-semibold text-white">Market Pins</div>
             <div className="mt-1 text-xs text-gray-400">{state.pins.filter((pin) => pin.pinType === 'market').length} market pins configured.</div>
           </div>
         )}
@@ -264,8 +362,12 @@ function MarketDiscoveryLayoutEditor() {
 
   const mode = layoutModes[selectedMode];
   const state = layoutState[selectedMode];
-  const topicPins = state.pins.filter((pin) => pin.pinType === 'discovery_page');
-  const marketPins = state.pins.filter((pin) => pin.pinType === 'market');
+  const topicPins = state.pins
+    .map((pin, index) => ({ pin, index }))
+    .filter(({ pin }) => pin.pinType === 'discovery_page');
+  const marketPins = state.pins
+    .map((pin, index) => ({ pin, index }))
+    .filter(({ pin }) => pin.pinType === 'market');
   const activeTagOptions = useMemo(() => (
     [...activeTags].sort((left, right) => (
       (left.displayName || left.slug).localeCompare(right.displayName || right.slug)
@@ -308,8 +410,8 @@ function MarketDiscoveryLayoutEditor() {
 
   const selectedBlocks = useMemo(() => [
     ...mode.fixedBlocks,
-    ...(state.featuredTopicsEnabled ? ['Featured topic/category cards'] : []),
-    ...(state.featuredMarketsEnabled ? ['Featured market cards'] : []),
+    ...(state.featuredTopicsEnabled ? ['Topic Pins'] : []),
+    ...(state.featuredMarketsEnabled ? ['Market Pins'] : []),
     ...(state.sectionsEnabled ? ['CMS sections'] : []),
   ], [mode, state]);
 
@@ -400,11 +502,15 @@ function MarketDiscoveryLayoutEditor() {
           pinType,
           marketId: pinType === 'market' ? '' : 0,
           targetPageSlug: pinType === 'discovery_page' ? firstActiveTagSlug : '',
-          label: pinType === 'market' ? 'Featured Market' : 'Featured Topic',
+          label: pinType === 'market' ? '' : 'Featured Topic',
           sortOrder: nextSortOrder(state.pins),
         },
       ],
     });
+  };
+
+  const removePin = (index) => {
+    updateState({ pins: state.pins.filter((_, currentIndex) => currentIndex !== index) });
   };
 
   if (loading) {
@@ -532,14 +638,14 @@ function MarketDiscoveryLayoutEditor() {
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <ToggleCard
-                  title="Featured topic/category cards"
-                  description="Show pinned SECONDARY pages on the TOP page. Usually disabled inside SECONDARY topic pages."
+                  title="Topic Pins"
+                  description="Create the topic navigation bar by pinning active topic tags. Usually enabled on the TOP markets page and disabled inside individual topic pages."
                   checked={state.featuredTopicsEnabled}
                   onChange={(checked) => updateState({ featuredTopicsEnabled: checked })}
                 />
                 <ToggleCard
-                  title="Featured market cards"
-                  description="Show manually pinned markets before long fallback lists."
+                  title="Market Pins"
+                  description="Pin active markets as large chart cards before long fallback lists."
                   checked={state.featuredMarketsEnabled}
                   onChange={(checked) => updateState({ featuredMarketsEnabled: checked })}
                 />
@@ -627,8 +733,10 @@ function MarketDiscoveryLayoutEditor() {
             <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-bold text-white">Pins</h3>
-                  <p className="mt-1 text-sm text-gray-400">Topic pins point at active tag slugs. The selected tag drives /markets/topic/:slug filtering.</p>
+                  <h3 className="text-xl font-bold text-white">Topic Pins</h3>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Topic pins build the /markets topic nav bar. Each entry points to an active tag and filters /markets/topic/:slug.
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -640,7 +748,6 @@ function MarketDiscoveryLayoutEditor() {
                   >
                     Add Topic Pin
                   </button>
-                  <button type="button" onClick={() => addPin('market')} className="rounded-md border border-emerald-500/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/50">Add Market Pin</button>
                   <button type="button" disabled={savingPins} onClick={savePins} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
                     {savingPins ? 'Saving...' : 'Save Pins'}
                   </button>
@@ -648,60 +755,72 @@ function MarketDiscoveryLayoutEditor() {
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-400">
                 <Pill>{topicPins.length} topic pins</Pill>
-                <Pill>{marketPins.length} market pins</Pill>
               </div>
               <div className="mt-4 space-y-3">
-                {state.pins.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No page-level pins yet.</p>}
-                {state.pins.map((pin, index) => (
-                  <div key={`${pin.pinType}-${index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,90px)]">
-                    <Field label="Pin Type">
+                {topicPins.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No topic pins yet.</p>}
+                {topicPins.map(({ pin, index }) => (
+                  <div key={`topic-${pin.id || pin.targetPageSlug || index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,90px)]">
+                    <Field label="Nav Label">
+                      <input value={pin.label || ''} onChange={(event) => updatePin(index, { label: event.target.value })} className={textInputClass} />
+                    </Field>
+                    <Field label="Target Topic Tag">
                       <select
-                        value={pin.pinType || 'market'}
-                        onChange={(event) => {
-                          const pinType = event.target.value;
-                          updatePin(index, {
-                            pinType,
-                            marketId: pinType === 'market' ? (pin.marketId || '') : 0,
-                            targetPageSlug: pinType === 'discovery_page' ? (pin.targetPageSlug || firstActiveTagSlug) : '',
-                          });
-                        }}
+                        value={pin.targetPageSlug || ''}
+                        onChange={(event) => updatePin(index, { targetPageSlug: event.target.value })}
                         className={textInputClass}
                       >
-                        <option value="market">Featured market</option>
-                        <option value="discovery_page">Featured topic page</option>
+                        {activeTagOptions.length === 0 && !pin.targetPageSlug && (
+                          <option value="">Create an active tag first</option>
+                        )}
+                        {tagOptionsWithCurrent(activeTagOptions, pin.targetPageSlug).map((tag) => (
+                          <option key={tag.slug} value={tag.slug}>
+                            {tagOptionLabel(tag)}{tag.isActive === false ? ' - inactive or missing' : ''}
+                          </option>
+                        ))}
                       </select>
-                    </Field>
-                    <Field label="Label">
-                      <input value={pin.label || ''} onChange={(event) => updatePin(index, { label: event.target.value })} className={textInputClass} />
                     </Field>
                     <Field label="Order">
                       <input type="number" value={pin.sortOrder || index + 1} onChange={(event) => updatePin(index, { sortOrder: Number(event.target.value || 0) })} className={textInputClass} />
                     </Field>
-                    {pin.pinType === 'discovery_page' ? (
-                      <Field label="Target Topic Tag" className="md:col-span-2">
-                        <select
-                          value={pin.targetPageSlug || ''}
-                          onChange={(event) => updatePin(index, { targetPageSlug: event.target.value })}
-                          className={textInputClass}
-                        >
-                          {activeTagOptions.length === 0 && !pin.targetPageSlug && (
-                            <option value="">Create an active tag first</option>
-                          )}
-                          {tagOptionsWithCurrent(activeTagOptions, pin.targetPageSlug).map((tag) => (
-                            <option key={tag.slug} value={tag.slug}>
-                              {tagOptionLabel(tag)}{tag.isActive === false ? ' - inactive or missing' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    ) : (
-                      <Field label="Market ID" className="md:col-span-2">
-                        <input type="number" min="1" value={pin.marketId || ''} onChange={(event) => updatePin(index, { marketId: Number(event.target.value || 0) })} className={textInputClass} />
-                      </Field>
-                    )}
-                    <div className="flex items-end">
-                      <button type="button" onClick={() => updateState({ pins: state.pins.filter((_, currentIndex) => currentIndex !== index) })} className="pb-2 text-sm font-semibold text-red-300 hover:text-red-200">
-                        Remove pin
+                    <div className="md:col-span-3">
+                      <button type="button" onClick={() => removePin(index)} className="text-sm font-semibold text-red-300 hover:text-red-200">
+                        Remove topic pin
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Market Pins</h3>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Market pins render selected active markets as featured chart cards. Search active markets, select one, then save.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => addPin('market')} className="rounded-md border border-emerald-500/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/50">Add Market Pin</button>
+                  <button type="button" disabled={savingPins} onClick={savePins} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
+                    {savingPins ? 'Saving...' : 'Save Pins'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-400">
+                <Pill>{marketPins.length} market pins</Pill>
+              </div>
+              <div className="mt-4 space-y-3">
+                {marketPins.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No market pins yet.</p>}
+                {marketPins.map(({ pin, index }) => (
+                  <div key={`market-${pin.id || pin.marketId || index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,90px)]">
+                    <MarketPinSearch pin={pin} onSelect={(marketId) => updatePin(index, { marketId: Number(marketId), label: '' })} />
+                    <Field label="Order">
+                      <input type="number" value={pin.sortOrder || index + 1} onChange={(event) => updatePin(index, { sortOrder: Number(event.target.value || 0) })} className={textInputClass} />
+                    </Field>
+                    <div className="md:col-span-2">
+                      <button type="button" onClick={() => removePin(index)} className="text-sm font-semibold text-red-300 hover:text-red-200">
+                        Remove market pin
                       </button>
                     </div>
                   </div>
