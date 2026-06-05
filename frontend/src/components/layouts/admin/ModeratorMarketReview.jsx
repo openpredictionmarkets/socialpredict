@@ -659,6 +659,15 @@ const MarketTaxonomyAdmin = () => {
   };
 
   const setTagActive = async (tag, isActive) => {
+    if (!isActive) {
+      const confirmed = window.confirm(
+        `Deactivate "${tag.displayName}"?\n\nIt will stay visible on markets and existing layouts, but moderators/admins cannot newly assign it until reactivated.`,
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
     setBusySlug(tag.slug);
     setError('');
     setSuccessMessage('');
@@ -694,6 +703,9 @@ const MarketTaxonomyAdmin = () => {
         <h2 className="text-lg font-semibold text-white">Market Tags</h2>
         <p className="mt-2 text-sm text-gray-300">
           Admins define the tag vocabulary. Moderators can attach active tags during market creation; admins can review those tags before publication.
+        </p>
+        <p className="mt-2 text-xs text-amber-200">
+          Deactivating a tag does not remove it from existing markets or topic pins. It only prevents new assignments until the tag is reactivated.
         </p>
       </div>
 
@@ -774,7 +786,7 @@ const MarketTaxonomyAdmin = () => {
               <MarketTagChips tags={[tag]} />
               <div className="mt-2 font-mono text-xs text-gray-500">{tag.slug}</div>
               {tag.description && <p className="mt-2 text-sm text-gray-300">{tag.description}</p>}
-              {!tag.isActive && <p className="mt-2 text-xs text-amber-300">Inactive tags stay visible on historical markets but cannot be newly assigned.</p>}
+              {!tag.isActive && <p className="mt-2 text-xs text-amber-300">Inactive tags stay visible on historical markets and layouts but cannot be newly assigned.</p>}
             </div>
             <button
               type="button"
