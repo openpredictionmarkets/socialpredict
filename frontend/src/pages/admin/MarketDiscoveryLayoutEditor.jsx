@@ -18,9 +18,9 @@ const layoutModes = {
   },
   secondary: {
     slug: 'topic-template',
-    label: 'Topic page layout (SECONDARY)',
+    label: 'Topic page pins (SECONDARY)',
     route: '/markets/topic/:slug',
-    purpose: 'Tag-scoped market discovery page for a CMS-managed topic.',
+    purpose: 'Tag-scoped market discovery page with independent per-topic market pins.',
     pageType: 'secondary',
     fixedBlocks: [
       'Topic title and description',
@@ -146,7 +146,7 @@ const marketOverviewTitle = (overview) => (
 
 const marketOverviewId = (overview) => overview?.market?.id || overview?.id || overview?.marketId || 0;
 
-const MarketPinSearch = ({ pin, onSelect }) => {
+const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -199,7 +199,7 @@ const MarketPinSearch = ({ pin, onSelect }) => {
       setSearching(true);
       setSearchError('');
       try {
-        const response = await searchMarkets(trimmed, 'active', 8);
+        const response = await searchMarkets(trimmed, 'active', 8, tagSlug ? { tagSlug } : {});
         if (!ignore) {
           setResults(response.primaryResults || []);
         }
@@ -219,7 +219,7 @@ const MarketPinSearch = ({ pin, onSelect }) => {
       ignore = true;
       clearTimeout(timeoutId);
     };
-  }, [query]);
+  }, [query, tagSlug]);
 
   return (
     <div className="grid gap-3">
@@ -240,7 +240,7 @@ const MarketPinSearch = ({ pin, onSelect }) => {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Type at least 2 characters..."
+          placeholder={tagSlug ? `Search active ${tagSlug} markets...` : 'Type at least 2 characters...'}
           className={textInputClass}
         />
       </Field>
@@ -332,11 +332,13 @@ const LayoutPreview = ({ mode, state }) => {
 
 function MarketDiscoveryLayoutEditor() {
   const [selectedMode, setSelectedMode] = useState('top');
+  const [selectedSecondarySlug, setSelectedSecondarySlug] = useState('');
   const [layoutState, setLayoutState] = useState({
     top: normalizePage({}, 'top'),
     secondary: normalizePage({}, 'secondary'),
   });
   const [loading, setLoading] = useState(true);
+  const [loadingSecondary, setLoadingSecondary] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingSections, setSavingSections] = useState(false);
   const [savingPins, setSavingPins] = useState(false);
@@ -351,14 +353,11 @@ function MarketDiscoveryLayoutEditor() {
       setLoading(true);
       setError('');
       try {
-        const [topPage, secondaryPage] = await Promise.all([
-          apiRequest('/v0/content/market-discovery/markets', { fallbackMessage: 'Failed to load TOP layout.' }),
-          apiRequest('/v0/content/market-discovery/topic-template', { fallbackMessage: 'Failed to load SECONDARY layout.' }),
-        ]);
+        const topPage = await apiRequest('/v0/content/market-discovery/markets', { fallbackMessage: 'Failed to load TOP layout.' });
         if (!ignore) {
           setLayoutState({
             top: normalizePage(topPage, 'top'),
-            secondary: normalizePage(secondaryPage, 'secondary'),
+            secondary: normalizePage({}, 'secondary'),
           });
         }
       } catch (err) {
@@ -386,7 +385,9 @@ function MarketDiscoveryLayoutEditor() {
       try {
         const result = await listAdminMarketTags({ includeInactive: false });
         if (!ignore) {
-          setActiveTags(result.tags || []);
+          const tags = result.tags || [];
+          setActiveTags(tags);
+          setSelectedSecondarySlug((current) => current || tags[0]?.slug || '');
         }
       } catch (err) {
         if (!ignore) {
@@ -402,8 +403,63 @@ function MarketDiscoveryLayoutEditor() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedSecondarySlug) {
+      return undefined;
+    }
+
+    let ignore = false;
+
+    const loadSecondaryPage = async () => {
+      setLoadingSecondary(true);
+      setError('');
+      try {
+        const page = await apiRequest(`/v0/content/market-discovery/${selectedSecondarySlug}`, {
+          fallbackMessage: 'Failed to load topic page layout.',
+        });
+        if (!ignore) {
+          setLayoutState((current) => ({
+            ...current,
+            secondary: {
+              ...normalizePage(page, 'secondary'),
+              slug: selectedSecondarySlug,
+              primaryTagSlug: selectedSecondarySlug,
+              searchScope: 'tag',
+              featuredTopicsEnabled: false,
+              featuredMarketsEnabled: true,
+              sectionsEnabled: false,
+            },
+          }));
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Unable to load topic page layout.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoadingSecondary(false);
+        }
+      }
+    };
+
+    loadSecondaryPage();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedSecondarySlug]);
+
   const mode = layoutModes[selectedMode];
   const state = layoutState[selectedMode];
+  const selectedSecondaryTag = activeTags.find((tag) => tag.slug === selectedSecondarySlug);
+  const selectedPageSlug = selectedMode === 'secondary' ? selectedSecondarySlug : mode.slug;
+  const selectedPageLabel = selectedMode === 'secondary' && selectedSecondarySlug
+    ? `${mode.label}: ${tagOptionLabel(selectedSecondaryTag || { slug: selectedSecondarySlug })}`
+    : mode.label;
+  const selectedRoute = selectedMode === 'secondary' && selectedSecondarySlug
+    ? `/markets/topic/${selectedSecondarySlug}`
+    : mode.route;
+  const canEditSelectedPage = selectedMode !== 'secondary' || !!selectedSecondarySlug;
   const topicPins = state.pins
     .map((pin, index) => ({ pin, index }))
     .filter(({ pin }) => pin.pinType === 'discovery_page');
@@ -420,7 +476,17 @@ function MarketDiscoveryLayoutEditor() {
   const replaceSelectedState = (saved) => {
     setLayoutState((current) => ({
       ...current,
-      [selectedMode]: normalizePage(saved, selectedMode),
+      [selectedMode]: selectedMode === 'secondary'
+        ? {
+          ...normalizePage(saved, selectedMode),
+          slug: selectedSecondarySlug,
+          primaryTagSlug: selectedSecondarySlug,
+          searchScope: 'tag',
+          featuredTopicsEnabled: false,
+          featuredMarketsEnabled: true,
+          sectionsEnabled: false,
+        }
+        : normalizePage(saved, selectedMode),
     }));
   };
 
@@ -462,17 +528,22 @@ function MarketDiscoveryLayoutEditor() {
     setMessage('');
     setError('');
     try {
-      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${mode.slug}`, {
+      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${selectedPageSlug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...state,
           pageType: mode.pageType,
+          primaryTagSlug: selectedMode === 'secondary' ? selectedSecondarySlug : state.primaryTagSlug,
+          searchScope: selectedMode === 'secondary' ? 'tag' : state.searchScope,
+          featuredTopicsEnabled: selectedMode === 'secondary' ? false : state.featuredTopicsEnabled,
+          featuredMarketsEnabled: selectedMode === 'secondary' ? true : state.featuredMarketsEnabled,
+          sectionsEnabled: selectedMode === 'secondary' ? false : state.sectionsEnabled,
         }),
         fallbackMessage: 'Failed to save market discovery layout.',
       });
       replaceSelectedState(saved);
-      setMessage(`${mode.label} saved. /markets will use the TOP layout immediately after refresh.`);
+      setMessage(`${selectedPageLabel} saved.`);
     } catch (err) {
       setError(err.message || 'Unable to save market discovery layout.');
     } finally {
@@ -485,14 +556,14 @@ function MarketDiscoveryLayoutEditor() {
     setMessage('');
     setError('');
     try {
-      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${mode.slug}/sections`, {
+      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${selectedPageSlug}/sections`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sections: state.sections }),
         fallbackMessage: 'Failed to save discovery sections.',
       });
       replaceSelectedState(saved);
-      setMessage(`${mode.label} sections saved.`);
+      setMessage(`${selectedPageLabel} sections saved.`);
     } catch (err) {
       setError(err.message || 'Unable to save discovery sections.');
     } finally {
@@ -505,14 +576,17 @@ function MarketDiscoveryLayoutEditor() {
     setMessage('');
     setError('');
     try {
-      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${mode.slug}/pins`, {
+      const pins = selectedMode === 'secondary'
+        ? state.pins.filter((pin) => pin.pinType === 'market')
+        : state.pins;
+      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${selectedPageSlug}/pins`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pins: state.pins }),
+        body: JSON.stringify({ pins }),
         fallbackMessage: 'Failed to save discovery pins.',
       });
       replaceSelectedState(saved);
-      setMessage(`${mode.label} pins saved.`);
+      setMessage(`${selectedPageLabel} pins saved.`);
     } catch (err) {
       setError(err.message || 'Unable to save discovery pins.');
     } finally {
@@ -615,18 +689,40 @@ function MarketDiscoveryLayoutEditor() {
             <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">{mode.label}</h2>
+                  <h2 className="text-2xl font-bold text-white">{selectedPageLabel}</h2>
                   <p className="mt-2 max-w-2xl text-sm text-gray-300">{mode.purpose}</p>
+                  <p className="mt-1 text-xs font-semibold text-sky-200">{selectedRoute}</p>
                 </div>
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={saving || loadingSecondary || !canEditSelectedPage}
                   onClick={saveLayout}
                   className="rounded-md bg-primary-pink px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-pink/80 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save Layout'}
                 </button>
               </div>
+
+              {selectedMode === 'secondary' && (
+                <div className="mt-5 rounded-lg border border-sky-500/30 bg-sky-950/20 p-4">
+                  <Field label="Secondary Topic Page">
+                    <select
+                      value={selectedSecondarySlug}
+                      onChange={(event) => setSelectedSecondarySlug(event.target.value)}
+                      className={textInputClass}
+                    >
+                      {activeTagOptions.length === 0 && <option value="">Create an active tag first</option>}
+                      {activeTagOptions.map((tag) => (
+                        <option key={tag.slug} value={tag.slug}>{tagOptionLabel(tag)}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <p className="mt-3 text-xs text-sky-100/80">
+                    Secondary pages are stored per active tag. Market pins here are independent from the TOP /markets page pins and are searched within this topic.
+                  </p>
+                  {loadingSecondary && <p className="mt-2 text-xs text-gray-300">Loading selected topic page...</p>}
+                </div>
+              )}
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <Field label="Page Title">
@@ -641,6 +737,7 @@ function MarketDiscoveryLayoutEditor() {
                   <select
                     value={state.searchScope}
                     onChange={(event) => updateState({ searchScope: event.target.value })}
+                    disabled={selectedMode === 'secondary'}
                     className={textInputClass}
                   >
                     <option value="all">All public markets</option>
@@ -679,24 +776,28 @@ function MarketDiscoveryLayoutEditor() {
               </div>
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <ToggleCard
-                  title="Topic Pins"
-                  description="Create the topic navigation bar by pinning active topic tags. Usually enabled on the TOP markets page and disabled inside individual topic pages."
-                  checked={state.featuredTopicsEnabled}
-                  onChange={(checked) => updateState({ featuredTopicsEnabled: checked })}
-                />
+                {selectedMode === 'top' && (
+                  <ToggleCard
+                    title="Topic Pins"
+                    description="Create the topic navigation bar by pinning active topic tags. Usually enabled on the TOP markets page and disabled inside individual topic pages."
+                    checked={state.featuredTopicsEnabled}
+                    onChange={(checked) => updateState({ featuredTopicsEnabled: checked })}
+                  />
+                )}
                 <ToggleCard
                   title="Market Pins"
-                  description="Pin active markets as large chart cards before long fallback lists."
-                  checked={state.featuredMarketsEnabled}
+                  description={selectedMode === 'secondary' ? 'Pin active markets for this topic page only.' : 'Pin active markets as large chart cards before long fallback lists.'}
+                  checked={selectedMode === 'secondary' ? true : state.featuredMarketsEnabled}
                   onChange={(checked) => updateState({ featuredMarketsEnabled: checked })}
                 />
-                <ToggleCard
-                  title="CMS sections"
-                  description="Allow named sections beyond the implicit All section."
-                  checked={state.sectionsEnabled}
-                  onChange={(checked) => updateState({ sectionsEnabled: checked })}
-                />
+                {selectedMode === 'top' && (
+                  <ToggleCard
+                    title="CMS sections"
+                    description="Allow named sections beyond the implicit All section."
+                    checked={state.sectionsEnabled}
+                    onChange={(checked) => updateState({ sectionsEnabled: checked })}
+                  />
+                )}
                 <ToggleCard
                   title="Published"
                   description="Unpublished secondary layouts stay editable but should not appear publicly once topic routes are added."
@@ -715,7 +816,8 @@ function MarketDiscoveryLayoutEditor() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
+            {selectedMode === 'top' && (
+              <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-bold text-white">Sections</h3>
@@ -771,8 +873,10 @@ function MarketDiscoveryLayoutEditor() {
                 ))}
               </div>
             </div>
+            )}
 
-            <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
+            {selectedMode === 'top' && (
+              <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-bold text-white">Topic Pins</h3>
@@ -833,18 +937,21 @@ function MarketDiscoveryLayoutEditor() {
                 ))}
               </div>
             </div>
+            )}
 
             <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-bold text-white">Market Pins</h3>
                   <p className="mt-1 text-sm text-gray-400">
-                    Market pins render selected active markets as featured chart cards. Search active markets, select one, then save.
+                    {selectedMode === 'secondary'
+                      ? `Market pins render selected active ${selectedSecondarySlug || 'topic'} markets on this topic page only.`
+                      : 'Market pins render selected active markets as featured chart cards. Search active markets, select one, then save.'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => addPin('market')} className="rounded-md border border-emerald-500/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/50">Add Market Pin</button>
-                  <button type="button" disabled={savingPins} onClick={savePins} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
+                  <button type="button" onClick={() => addPin('market')} disabled={!canEditSelectedPage || loadingSecondary} className="rounded-md border border-emerald-500/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/50 disabled:cursor-not-allowed disabled:opacity-50">Add Market Pin</button>
+                  <button type="button" disabled={savingPins || !canEditSelectedPage || loadingSecondary} onClick={savePins} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
                     {savingPins ? 'Saving...' : 'Save Pins'}
                   </button>
                 </div>
@@ -856,7 +963,7 @@ function MarketDiscoveryLayoutEditor() {
                 {marketPins.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No market pins yet.</p>}
                 {marketPins.map(({ pin, index }) => (
                   <div key={`market-${pin.id || pin.marketId || index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,90px)]">
-                    <MarketPinSearch pin={pin} onSelect={(marketId) => updatePin(index, { marketId: Number(marketId), label: '' })} />
+                    <MarketPinSearch pin={pin} tagSlug={selectedMode === 'secondary' ? selectedSecondarySlug : ''} onSelect={(marketId) => updatePin(index, { marketId: Number(marketId), label: '' })} />
                     <Field label="Order">
                       <input type="number" value={pin.sortOrder || index + 1} onChange={(event) => updatePin(index, { sortOrder: Number(event.target.value || 0) })} className={textInputClass} />
                     </Field>
@@ -870,7 +977,7 @@ function MarketDiscoveryLayoutEditor() {
               </div>
             </div>
 
-            <LayoutPreview mode={mode} state={state} />
+            <LayoutPreview mode={{ ...mode, route: selectedRoute }} state={state} />
           </div>
         </div>
       </div>
