@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
-import { searchMarkets } from '../../api/marketsApi';
+import { getMarketDetails, searchMarkets } from '../../api/marketsApi';
 import { listAdminMarketTags } from '../../api/marketTagsApi';
 
 const layoutModes = {
@@ -151,6 +151,40 @@ const MarketPinSearch = ({ pin, onSelect }) => {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [selectedTitle, setSelectedTitle] = useState('');
+  const [loadingSelectedTitle, setLoadingSelectedTitle] = useState(false);
+
+  useEffect(() => {
+    const marketId = Number(pin.marketId);
+    if (!marketId) {
+      setSelectedTitle('');
+      setLoadingSelectedTitle(false);
+      return undefined;
+    }
+
+    let ignore = false;
+    setLoadingSelectedTitle(true);
+    getMarketDetails(marketId)
+      .then((details) => {
+        if (!ignore) {
+          setSelectedTitle(details?.market?.questionTitle || `Market #${marketId}`);
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setSelectedTitle(`Market #${marketId}`);
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setLoadingSelectedTitle(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [pin.marketId]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -191,9 +225,16 @@ const MarketPinSearch = ({ pin, onSelect }) => {
     <div className="grid gap-3">
       <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-3">
         <div className="font-mono text-xs uppercase tracking-[0.14em] text-gray-400">Selected Market</div>
-        <div className="mt-1 text-sm text-white">
-          {Number(pin.marketId) > 0 ? `Market #${pin.marketId}` : 'No market selected yet.'}
-        </div>
+        {Number(pin.marketId) > 0 ? (
+          <>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {loadingSelectedTitle ? 'Loading selected market...' : selectedTitle || `Market #${pin.marketId}`}
+            </div>
+            <div className="mt-1 text-xs text-gray-400">Market #{pin.marketId}</div>
+          </>
+        ) : (
+          <div className="mt-1 text-sm text-white">No market selected yet.</div>
+        )}
       </div>
       <Field label="Search Active Markets">
         <input
@@ -214,6 +255,7 @@ const MarketPinSearch = ({ pin, onSelect }) => {
                 key={id}
                 type="button"
                 onClick={() => {
+                  setSelectedTitle(marketOverviewTitle(overview));
                   onSelect(id);
                   setQuery('');
                   setResults([]);
