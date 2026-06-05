@@ -191,7 +191,7 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var markets []*dmarkets.Market
-	if params.status != "" && params.filters.CreatedBy == "" {
+	if params.status != "" && params.filters.CreatedBy == "" && params.filters.TagSlug == "" {
 		page := dmarkets.Page{Limit: params.limit, Offset: params.offset}
 		markets, err = h.service.ListByStatus(r.Context(), params.status, page)
 	} else {
