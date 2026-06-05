@@ -271,7 +271,7 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
     );
 };
 
-const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true, showBackToMarkets = false }) => {
+const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true }) => {
     const pins = sortBySortOrder(layout.pins || []);
     const sections = sortBySortOrder(layout.sections || []).filter((section) => section.isActive !== false);
     const topicPins = persistentTopicPins.length > 0
@@ -285,11 +285,6 @@ const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins =
     return (
         <div className="mb-6 space-y-5 text-gray-200">
             {hasTopicNav && <TopicNav topicPins={topicPins} />}
-            {showBackToMarkets && (
-                <Link to="/markets" className="-mt-3 inline-flex text-sm font-semibold text-sky-300 hover:text-sky-200">
-                    Back to all markets
-                </Link>
-            )}
 
             {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} />}
 
@@ -429,11 +424,11 @@ function Markets() {
             <div className='Center-content'>
                 <div className='Center-content-header'>
                     {isTopicPage ? (
-                        <div className="mb-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-start">
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-start">
                             <div>
                                 <h1 className='text-2xl font-semibold text-gray-300 mb-2'>{discoveryLayout.title || 'Markets'}</h1>
                                 {discoveryLayout.description && (
-                                    <p className="max-w-3xl text-sm text-gray-400">{discoveryLayout.description}</p>
+                                    <p className="mb-3 max-w-3xl text-sm text-gray-400">{discoveryLayout.description}</p>
                                 )}
                             </div>
                             <div className="space-y-2 md:text-right">
@@ -471,7 +466,6 @@ function Markets() {
                             layout={discoveryLayout}
                             persistentTopicPins={persistentTopicPins}
                             useLayoutTopicPins={!isTopicPage}
-                            showBackToMarkets={isTopicPage}
                         />
                     )}
                     
