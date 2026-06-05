@@ -101,46 +101,82 @@ const currentProbabilityFromDetails = (details) => {
     return toNumber(details?.lastProbability ?? details?.LastProbability ?? details?.market?.initialProbability);
 };
 
-const chartPointsFromDetails = (details) => {
+const chartSamplesFromDetails = (details) => {
     const changes = normalizeProbabilityChanges(details?.probabilityChanges ?? details?.ProbabilityChanges);
     const currentProbability = currentProbabilityFromDetails(details);
-    const points = changes.length > 0
-        ? changes.map((change) => toNumber(change.probability, currentProbability))
-        : [currentProbability];
+    const market = details?.market || {};
+    const fallbackTimestamp = market.createdAt || market.CreatedAt || new Date().toISOString();
+    const samples = changes.length > 0
+        ? changes.map((change) => ({
+            probability: toNumber(change.probability, currentProbability),
+            timestamp: new Date(change.timestamp).getTime(),
+        }))
+        : [{
+            probability: currentProbability,
+            timestamp: new Date(fallbackTimestamp).getTime(),
+        }];
 
-    if (points.length === 1) {
-        return [points[0], points[0]];
+    const validSamples = samples
+        .filter((sample) => Number.isFinite(sample.timestamp))
+        .sort((left, right) => left.timestamp - right.timestamp);
+
+    if (validSamples.length === 0) {
+        return [{
+            probability: currentProbability,
+            timestamp: Date.now(),
+        }];
     }
 
-    return points;
+    return validSamples;
 };
 
-const pointsToPolyline = (points, width, height, inset) => {
+const sampleToPoint = (sample, minTime, maxTime, width, height, inset) => {
     const usableWidth = width - inset * 2;
     const usableHeight = height - inset * 2;
-    const maxIndex = Math.max(points.length - 1, 1);
+    const timeSpan = Math.max(maxTime - minTime, 1);
+    const probability = Math.max(0, Math.min(1, sample.probability));
 
-    return points
-        .map((probability, index) => {
-            const x = inset + (index / maxIndex) * usableWidth;
-            const y = inset + (1 - Math.max(0, Math.min(1, probability))) * usableHeight;
-            return `${x.toFixed(2)},${y.toFixed(2)}`;
-        })
-        .join(' ');
+    return {
+        x: inset + ((sample.timestamp - minTime) / timeSpan) * usableWidth,
+        y: inset + (1 - probability) * usableHeight,
+    };
+};
+
+const buildStepPath = (points) => {
+    if (points.length === 0) {
+        return '';
+    }
+    const [first, ...rest] = points;
+    const commands = [`M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`];
+
+    rest.forEach((point) => {
+        commands.push(`H ${point.x.toFixed(2)}`);
+        commands.push(`V ${point.y.toFixed(2)}`);
+    });
+
+    if (points.length === 1) {
+        commands.push(`H ${first.x.toFixed(2)}`);
+    }
+
+    return commands.join(' ');
 };
 
 const PinnedMarketSparkline = ({ details }) => {
     const width = 960;
     const height = 260;
     const inset = 18;
-    const points = chartPointsFromDetails(details);
-    const linePoints = pointsToPolyline(points, width, height, inset);
-    const linePointPairs = linePoints.split(' ');
-    const lastPoint = linePointPairs[linePointPairs.length - 1]?.split(',') || [];
+    const samples = chartSamplesFromDetails(details);
+    const currentTime = Date.now();
+    const minTime = Math.min(...samples.map((sample) => sample.timestamp));
+    const maxSampleTime = Math.max(...samples.map((sample) => sample.timestamp));
+    const maxTime = Math.max(maxSampleTime, currentTime, minTime + 1);
+    const points = samples.map((sample) => sampleToPoint(sample, minTime, maxTime, width, height, inset));
     const firstX = inset;
     const lastX = width - inset;
     const floorY = height - inset;
-    const areaPoints = `${firstX},${floorY} ${linePoints} ${lastX},${floorY}`;
+    const lastPoint = points[points.length - 1] || { x: lastX, y: height / 2 };
+    const stepPath = `${buildStepPath(points)} H ${lastX.toFixed(2)}`;
+    const areaPath = `${stepPath} L ${lastX} ${floorY} L ${firstX} ${floorY} Z`;
     const currentProbability = currentProbabilityFromDetails(details);
 
     return (
@@ -159,9 +195,9 @@ const PinnedMarketSparkline = ({ details }) => {
             </defs>
             <rect width={width} height={height} rx="18" fill="#101827" />
             <line x1="0" x2={width} y1={height / 2} y2={height / 2} stroke="#334155" strokeWidth="2" strokeDasharray="10 12" opacity="0.45" />
-            <polygon points={areaPoints} fill="url(#pinned-market-area)" />
-            <polyline points={linePoints} fill="none" stroke="#22d3ee" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={lastX} cy={lastPoint[1] || height / 2} r="10" fill="#22d3ee" />
+            <path d={areaPath} fill="url(#pinned-market-area)" />
+            <path d={stepPath} fill="none" stroke="#22d3ee" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={lastX} cy={lastPoint.y || height / 2} r="10" fill="#22d3ee" />
             <text x={width - 28} y="58" textAnchor="end" fill="#e2e8f0" fontSize="24" fontWeight="700">
                 {(currentProbability * 100).toFixed(0)}%
             </text>
