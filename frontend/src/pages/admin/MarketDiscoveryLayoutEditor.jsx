@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
+import { listAdminMarketTags } from '../../api/marketTagsApi';
 
 const layoutModes = {
   top: {
@@ -118,6 +119,24 @@ const Field = ({ label, children, className = '' }) => (
 
 const textInputClass = 'rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40';
 
+const tagOptionLabel = (tag) => `${tag.displayName || tag.slug} (${tag.slug})`;
+
+const tagOptionsWithCurrent = (tags, currentSlug) => {
+  const normalizedCurrent = String(currentSlug || '').trim();
+  if (!normalizedCurrent || tags.some((tag) => tag.slug === normalizedCurrent)) {
+    return tags;
+  }
+
+  return [
+    ...tags,
+    {
+      slug: normalizedCurrent,
+      displayName: `Saved slug: ${normalizedCurrent}`,
+      isActive: false,
+    },
+  ];
+};
+
 const LayoutPreview = ({ mode, state }) => {
   const hasCuratedBlocks = state.featuredTopicsEnabled || state.featuredMarketsEnabled || state.sectionsEnabled;
   const recommendationLimit = hasCuratedBlocks
@@ -181,6 +200,7 @@ function MarketDiscoveryLayoutEditor() {
   const [saving, setSaving] = useState(false);
   const [savingSections, setSavingSections] = useState(false);
   const [savingPins, setSavingPins] = useState(false);
+  const [activeTags, setActiveTags] = useState([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -219,10 +239,39 @@ function MarketDiscoveryLayoutEditor() {
     };
   }, []);
 
+  useEffect(() => {
+    let ignore = false;
+
+    const loadActiveTags = async () => {
+      try {
+        const result = await listAdminMarketTags({ includeInactive: false });
+        if (!ignore) {
+          setActiveTags(result.tags || []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Unable to load active market tags.');
+        }
+      }
+    };
+
+    loadActiveTags();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   const mode = layoutModes[selectedMode];
   const state = layoutState[selectedMode];
   const topicPins = state.pins.filter((pin) => pin.pinType === 'discovery_page');
   const marketPins = state.pins.filter((pin) => pin.pinType === 'market');
+  const activeTagOptions = useMemo(() => (
+    [...activeTags].sort((left, right) => (
+      (left.displayName || left.slug).localeCompare(right.displayName || right.slug)
+    ))
+  ), [activeTags]);
+  const firstActiveTagSlug = activeTagOptions[0]?.slug || '';
 
   const replaceSelectedState = (saved) => {
     setLayoutState((current) => ({
@@ -350,7 +399,7 @@ function MarketDiscoveryLayoutEditor() {
         {
           pinType,
           marketId: pinType === 'market' ? '' : 0,
-          targetPageSlug: pinType === 'discovery_page' ? 'topic-template' : '',
+          targetPageSlug: pinType === 'discovery_page' ? firstActiveTagSlug : '',
           label: pinType === 'market' ? 'Featured Market' : 'Featured Topic',
           sortOrder: nextSortOrder(state.pins),
         },
@@ -522,7 +571,7 @@ function MarketDiscoveryLayoutEditor() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-bold text-white">Sections</h3>
-                  <p className="mt-1 text-sm text-gray-400">Named section cards can optionally point at a tag slug. Empty pages still use the implicit All section.</p>
+                  <p className="mt-1 text-sm text-gray-400">Named section cards can optionally point at an active tag. Empty pages still use the implicit All section.</p>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={addSection} className="rounded-md border border-sky-500/50 px-3 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/50">Add Section</button>
@@ -548,8 +597,19 @@ function MarketDiscoveryLayoutEditor() {
                       <input type="checkbox" checked={section.isActive !== false} onChange={(event) => updateSection(index, { isActive: event.target.checked })} className="h-4 w-4 accent-primary-pink" />
                       Active
                     </label>
-                    <Field label="Tag Filter Slug" className="md:col-span-2">
-                      <input value={section.tagFilterSlug || ''} onChange={(event) => updateSection(index, { tagFilterSlug: event.target.value })} placeholder="politics" className={textInputClass} />
+                    <Field label="Tag Filter" className="md:col-span-2">
+                      <select
+                        value={section.tagFilterSlug || ''}
+                        onChange={(event) => updateSection(index, { tagFilterSlug: event.target.value })}
+                        className={textInputClass}
+                      >
+                        <option value="">No tag filter</option>
+                        {tagOptionsWithCurrent(activeTagOptions, section.tagFilterSlug).map((tag) => (
+                          <option key={tag.slug} value={tag.slug}>
+                            {tagOptionLabel(tag)}{tag.isActive === false ? ' - inactive or missing' : ''}
+                          </option>
+                        ))}
+                      </select>
                     </Field>
                     <Field label="Description" className="md:col-span-2">
                       <input value={section.description || ''} onChange={(event) => updateSection(index, { description: event.target.value })} className={textInputClass} />
@@ -568,10 +628,18 @@ function MarketDiscoveryLayoutEditor() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xl font-bold text-white">Pins</h3>
-                  <p className="mt-1 text-sm text-gray-400">Page-level pins render as featured topic cards or featured market cards on /markets when their block is enabled.</p>
+                  <p className="mt-1 text-sm text-gray-400">Topic pins point at active tag slugs. The selected tag drives /markets/topic/:slug filtering.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => addPin('discovery_page')} className="rounded-md border border-sky-500/50 px-3 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/50">Add Topic Pin</button>
+                  <button
+                    type="button"
+                    onClick={() => addPin('discovery_page')}
+                    disabled={activeTagOptions.length === 0}
+                    className="rounded-md border border-sky-500/50 px-3 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/50 disabled:cursor-not-allowed disabled:opacity-50"
+                    title={activeTagOptions.length === 0 ? 'Create an active tag before adding topic pins.' : 'Add a pinned topic from active tags.'}
+                  >
+                    Add Topic Pin
+                  </button>
                   <button type="button" onClick={() => addPin('market')} className="rounded-md border border-emerald-500/50 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/50">Add Market Pin</button>
                   <button type="button" disabled={savingPins} onClick={savePins} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
                     {savingPins ? 'Saving...' : 'Save Pins'}
@@ -587,7 +655,18 @@ function MarketDiscoveryLayoutEditor() {
                 {state.pins.map((pin, index) => (
                   <div key={`${pin.pinType}-${index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[170px_1fr_120px]">
                     <Field label="Pin Type">
-                      <select value={pin.pinType || 'market'} onChange={(event) => updatePin(index, { pinType: event.target.value })} className={textInputClass}>
+                      <select
+                        value={pin.pinType || 'market'}
+                        onChange={(event) => {
+                          const pinType = event.target.value;
+                          updatePin(index, {
+                            pinType,
+                            marketId: pinType === 'market' ? (pin.marketId || '') : 0,
+                            targetPageSlug: pinType === 'discovery_page' ? (pin.targetPageSlug || firstActiveTagSlug) : '',
+                          });
+                        }}
+                        className={textInputClass}
+                      >
                         <option value="market">Featured market</option>
                         <option value="discovery_page">Featured topic page</option>
                       </select>
@@ -599,8 +678,21 @@ function MarketDiscoveryLayoutEditor() {
                       <input type="number" value={pin.sortOrder || index + 1} onChange={(event) => updatePin(index, { sortOrder: Number(event.target.value || 0) })} className={textInputClass} />
                     </Field>
                     {pin.pinType === 'discovery_page' ? (
-                      <Field label="Target Page Slug" className="md:col-span-2">
-                        <input value={pin.targetPageSlug || ''} onChange={(event) => updatePin(index, { targetPageSlug: event.target.value })} placeholder="topic-template" className={textInputClass} />
+                      <Field label="Target Topic Tag" className="md:col-span-2">
+                        <select
+                          value={pin.targetPageSlug || ''}
+                          onChange={(event) => updatePin(index, { targetPageSlug: event.target.value })}
+                          className={textInputClass}
+                        >
+                          {activeTagOptions.length === 0 && !pin.targetPageSlug && (
+                            <option value="">Create an active tag first</option>
+                          )}
+                          {tagOptionsWithCurrent(activeTagOptions, pin.targetPageSlug).map((tag) => (
+                            <option key={tag.slug} value={tag.slug}>
+                              {tagOptionLabel(tag)}{tag.isActive === false ? ' - inactive or missing' : ''}
+                            </option>
+                          ))}
+                        </select>
                       </Field>
                     ) : (
                       <Field label="Market ID" className="md:col-span-2">
