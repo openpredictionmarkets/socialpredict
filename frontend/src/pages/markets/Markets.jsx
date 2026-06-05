@@ -1,9 +1,10 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import MarketsByStatusTable from '../../components/tables/MarketsByStatusTable';
 import GlobalSearchBar from '../../components/search/GlobalSearchBar';
 import SearchResultsTable from '../../components/tables/SearchResultsTable';
+import MarketChart from '../../components/charts/MarketChart';
 import { TAB_TO_STATUS } from '../../utils/statusMap';
 import { apiRequest } from '../../api/httpClient';
 
@@ -25,6 +26,14 @@ const hasCuratedBlocks = (layout) => (
 );
 
 const sortBySortOrder = (items = []) => [...items].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+
+const toNumber = (value, fallback = 0) => {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : fallback;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 const slugTitle = (slug = '') => slug
     .split('-')
@@ -54,25 +63,6 @@ const DiscoveryBadge = ({ children, tone = 'sky' }) => {
     );
 };
 
-const DiscoveryCard = ({ eyebrow, title, description, children, to, tone = 'sky' }) => {
-    const toneClass = tone === 'emerald'
-        ? 'border-emerald-500/30 hover:border-emerald-400/60'
-        : 'border-sky-500/30 hover:border-sky-400/60';
-    const content = (
-        <div className={`h-full rounded-xl border bg-gray-950/70 p-4 transition ${toneClass}`}>
-            {eyebrow && <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-gray-400">{eyebrow}</p>}
-            <h3 className="mt-2 text-lg font-semibold text-white">{title}</h3>
-            {description && <p className="mt-2 text-sm text-gray-400">{description}</p>}
-            {children}
-        </div>
-    );
-
-    if (to) {
-        return <Link to={to} className="block h-full no-underline">{content}</Link>;
-    }
-    return content;
-};
-
 const TopicNav = ({ topicPins = [] }) => {
     if (!topicPins.length) return null;
 
@@ -93,62 +83,96 @@ const TopicNav = ({ topicPins = [] }) => {
     );
 };
 
-const FeaturedMarketSlider = ({ marketPins = [] }) => {
-    const sliderRef = useRef(null);
-    if (!marketPins.length) return null;
+const normalizeProbabilityChanges = (raw = []) => (
+    Array.isArray(raw)
+        ? raw
+            .map((change) => ({
+                probability: toNumber(change?.probability ?? change?.Probability),
+                timestamp: change?.timestamp ?? change?.Timestamp ?? change?.createdAt ?? change?.CreatedAt,
+            }))
+            .filter((change) => change.timestamp)
+        : []
+);
 
-    const scroll = (direction) => {
-        const slider = sliderRef.current;
-        if (!slider) return;
-        const amount = Math.max(320, Math.floor(slider.clientWidth * 0.86));
-        slider.scrollBy({ left: direction * amount, behavior: 'smooth' });
-    };
+const currentProbabilityFromDetails = (details) => {
+    const changes = normalizeProbabilityChanges(details?.probabilityChanges ?? details?.ProbabilityChanges);
+    if (changes.length > 0) {
+        return toNumber(changes[changes.length - 1].probability);
+    }
+    return toNumber(details?.lastProbability ?? details?.LastProbability ?? details?.market?.initialProbability);
+};
+
+const FeaturedMarketPins = ({ marketPins = [] }) => {
+    const [pinnedMarkets, setPinnedMarkets] = useState([]);
+    const pinKey = marketPins
+        .map((pin) => `${pin.id || ''}:${pin.marketId || ''}:${pin.sortOrder || ''}`)
+        .join('|');
+
+    useEffect(() => {
+        let ignore = false;
+        const pinsWithIds = marketPins.filter((pin) => Number(pin.marketId) > 0);
+
+        if (pinsWithIds.length === 0) {
+            setPinnedMarkets([]);
+            return () => {
+                ignore = true;
+            };
+        }
+
+        Promise.all(
+            pinsWithIds.map((pin) => (
+                apiRequest(`/v0/markets/${pin.marketId}`, {
+                    fallbackMessage: `Failed to load pinned market ${pin.marketId}`,
+                })
+                    .then((details) => ({ pin, details }))
+                    .catch(() => null)
+            )),
+        ).then((items) => {
+            if (!ignore) {
+                setPinnedMarkets(items.filter((item) => item?.details?.market));
+            }
+        });
+
+        return () => {
+            ignore = true;
+        };
+    }, [pinKey]);
+
+    if (!pinnedMarkets.length) return null;
 
     return (
-        <section>
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-bold text-white">Featured markets</h2>
-                {marketPins.length > 1 && (
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => scroll(-1)}
-                            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-gray-200 transition hover:border-sky-400/70 hover:text-white"
-                            aria-label="Scroll featured markets left"
-                        >
-                            ‹
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => scroll(1)}
-                            className="rounded-full border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm font-semibold text-gray-200 transition hover:border-sky-400/70 hover:text-white"
-                            aria-label="Scroll featured markets right"
-                        >
-                            ›
-                        </button>
-                    </div>
-                )}
-            </div>
-            <div
-                ref={sliderRef}
-                className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3"
-                aria-label="Featured market carousel"
-            >
-                {marketPins.map((pin) => (
-                    <div
-                        key={`market-${pin.id || pin.marketId || pin.sortOrder}`}
-                        className="min-w-[min(88vw,720px)] snap-start md:min-w-[560px] xl:min-w-[680px]"
+        <section className="flex flex-wrap gap-3" aria-label="Pinned markets">
+            {pinnedMarkets.map(({ pin, details }) => {
+                const market = details.market || {};
+                const marketId = market.id || pin.marketId;
+                const probabilityChanges = normalizeProbabilityChanges(details.probabilityChanges);
+                const currentProbability = currentProbabilityFromDetails(details);
+                return (
+                    <Link
+                        key={`market-${pin.id || marketId || pin.sortOrder}`}
+                        to={marketId ? `/markets/${marketId}` : '#'}
+                        className="block w-full max-w-sm rounded-xl border border-gray-700 bg-gray-950/80 p-3 no-underline shadow-lg transition hover:border-sky-400/60 hover:bg-gray-900 sm:w-[320px]"
                     >
-                        <DiscoveryCard
-                            eyebrow="Pinned Market"
-                            title={pin.label || `Market #${pin.marketId}`}
-                            description={pin.marketId ? `Market ID: ${pin.marketId}` : 'Set a market ID in CMS.'}
-                            to={pin.marketId ? `/markets/${pin.marketId}` : undefined}
-                            tone="emerald"
-                        />
-                    </div>
-                ))}
-            </div>
+                        <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 text-white">
+                            {market.questionTitle || pin.label || `Market #${marketId}`}
+                        </h3>
+                        <div className="h-28 overflow-hidden rounded-lg border border-gray-800 bg-gray-900/60">
+                            <MarketChart
+                                data={probabilityChanges}
+                                currentProbability={currentProbability}
+                                title=""
+                                className="h-full w-full"
+                                closeDateTime={market.resolutionDateTime}
+                                yesLabel={market.yesLabel || 'YES'}
+                                noLabel={market.noLabel || 'NO'}
+                                showHeader={false}
+                                compact
+                                height={112}
+                            />
+                        </div>
+                    </Link>
+                );
+            })}
         </section>
     );
 };
@@ -165,7 +189,7 @@ const DiscoveryPanel = ({ layout, isTopicPage = false }) => {
         <div className="mb-6 space-y-5 text-gray-200">
             {!isTopicPage && layout.featuredTopicsEnabled && <TopicNav topicPins={topicPins} />}
 
-            {layout.featuredMarketsEnabled && <FeaturedMarketSlider marketPins={marketPins} />}
+            {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} />}
 
             {layout.sectionsEnabled && sections.length > 0 && (
                 <section>
