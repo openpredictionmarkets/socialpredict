@@ -234,7 +234,7 @@ function Markets() {
     }, [isTopicPage, topicSlug]);
 
     const tagScope = isTopicPage
-        ? (discoveryLayout.primaryTagSlug || topicSlug)
+        ? topicSlug
         : (discoveryLayout.searchScope === 'tag' ? discoveryLayout.primaryTagSlug : '');
 
     const handleSearchResults = (results) => {
