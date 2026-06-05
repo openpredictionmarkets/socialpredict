@@ -7,12 +7,12 @@ import SocialShareEditor from './SocialShareEditor';
 function CmsDashboard() {
   const tabsData = [
     {
-      label: 'Home Page',
-      content: <HomeEditor />,
-    },
-    {
       label: 'Market Discovery Layout',
       content: <MarketDiscoveryLayoutEditor />,
+    },
+    {
+      label: 'Home Page',
+      content: <HomeEditor />,
     },
     {
       label: 'Social Share',
@@ -29,7 +29,7 @@ function CmsDashboard() {
           Manage public homepage content, market discovery layout planning, and social share defaults.
         </p>
       </div>
-      <SiteTabs tabs={tabsData} defaultTab="Home Page" />
+      <SiteTabs tabs={tabsData} defaultTab="Market Discovery Layout" />
     </section>
   );
 }
