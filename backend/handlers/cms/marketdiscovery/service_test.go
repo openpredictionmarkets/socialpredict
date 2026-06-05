@@ -10,11 +10,10 @@ import (
 )
 
 type mockRepository struct {
-	page     *models.MarketDiscoveryPage
-	sections []models.MarketDiscoverySection
-	pins     []models.MarketDiscoveryPin
-	saveErr  error
-	getErr   error
+	page    *models.MarketDiscoveryPage
+	pins    []models.MarketDiscoveryPin
+	saveErr error
+	getErr  error
 }
 
 func (m *mockRepository) GetPageBySlug(string) (*models.MarketDiscoveryPage, error) {
@@ -35,15 +34,6 @@ func (m *mockRepository) SavePage(page *models.MarketDiscoveryPage) error {
 		page.ID = 1
 	}
 	m.page = page
-	return nil
-}
-
-func (m *mockRepository) ListSections(uint) ([]models.MarketDiscoverySection, error) {
-	return m.sections, nil
-}
-
-func (m *mockRepository) ReplaceSections(_ uint, sections []models.MarketDiscoverySection) error {
-	m.sections = sections
 	return nil
 }
 
@@ -118,23 +108,6 @@ func TestUpdatePagePropagatesRepositoryError(t *testing.T) {
 	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("UpdatePage error = %v, want %v", err, wantErr)
-	}
-}
-
-func TestReplaceSectionsPersistsOrderedSections(t *testing.T) {
-	repo := &mockRepository{}
-	svc := NewService(repo)
-
-	composition, err := svc.ReplaceSections(PageSlugMarkets, []SectionInput{{
-		Title:       "Politics",
-		Description: "Political markets",
-		IsActive:    true,
-	}})
-	if err != nil {
-		t.Fatalf("ReplaceSections returned error: %v", err)
-	}
-	if len(composition.Sections) != 1 || composition.Sections[0].Slug != "politics" || composition.Sections[0].SortOrder != 1 {
-		t.Fatalf("unexpected sections: %+v", composition.Sections)
 	}
 }
 

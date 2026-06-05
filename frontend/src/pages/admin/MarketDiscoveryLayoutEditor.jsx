@@ -32,7 +32,6 @@ const layoutModes = {
 
 const persistedTables = [
   'market_discovery_pages',
-  'market_discovery_sections',
   'market_discovery_pins',
 ];
 
@@ -45,12 +44,10 @@ const defaultPageState = {
   searchScope: 'all',
   featuredTopicsEnabled: false,
   featuredMarketsEnabled: false,
-  sectionsEnabled: false,
   defaultRecommendationLimit: 20,
   curatedRecommendationLimit: 5,
   recommendationLimit: 20,
   version: 0,
-  sections: [],
   pins: [],
 };
 
@@ -58,7 +55,7 @@ const sortBySortOrder = (items = []) => [...items].sort((a, b) => Number(a.sortO
 
 const normalizePage = (page = {}, modeKey = 'top') => {
   const mode = layoutModes[modeKey];
-  const hasCuratedBlocks = !!(page.featuredTopicsEnabled || page.featuredMarketsEnabled || page.sectionsEnabled);
+  const hasCuratedBlocks = !!(page.featuredTopicsEnabled || page.featuredMarketsEnabled);
   const defaultRecommendationLimit = Number(page.defaultRecommendationLimit || 20);
   const curatedRecommendationLimit = Number(page.curatedRecommendationLimit || 5);
 
@@ -72,12 +69,10 @@ const normalizePage = (page = {}, modeKey = 'top') => {
     searchScope: page.searchScope || (modeKey === 'secondary' ? 'tag' : 'all'),
     featuredTopicsEnabled: !!page.featuredTopicsEnabled,
     featuredMarketsEnabled: !!page.featuredMarketsEnabled,
-    sectionsEnabled: !!page.sectionsEnabled,
     defaultRecommendationLimit,
     curatedRecommendationLimit,
     recommendationLimit: hasCuratedBlocks ? curatedRecommendationLimit : defaultRecommendationLimit,
     version: Number(page.version || 0),
-    sections: sortBySortOrder(page.sections || []),
     pins: sortBySortOrder(page.pins || []),
   };
 };
@@ -276,7 +271,7 @@ const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
 };
 
 const LayoutPreview = ({ mode, state }) => {
-  const hasCuratedBlocks = state.featuredTopicsEnabled || state.featuredMarketsEnabled || state.sectionsEnabled;
+  const hasCuratedBlocks = state.featuredTopicsEnabled || state.featuredMarketsEnabled;
   const recommendationLimit = hasCuratedBlocks
     ? state.curatedRecommendationLimit
     : state.defaultRecommendationLimit;
@@ -317,12 +312,6 @@ const LayoutPreview = ({ mode, state }) => {
             <div className="mt-1 text-xs text-gray-400">{state.pins.filter((pin) => pin.pinType === 'market').length} market pins configured.</div>
           </div>
         )}
-        {state.sectionsEnabled && (
-          <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
-            <div className="text-sm font-semibold text-white">Sections</div>
-            <div className="mt-1 text-xs text-gray-400">{state.sections.length} named sections configured; otherwise the page has an implicit All section.</div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -339,7 +328,6 @@ function MarketDiscoveryLayoutEditor() {
   const [loading, setLoading] = useState(true);
   const [loadingSecondary, setLoadingSecondary] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savingSections, setSavingSections] = useState(false);
   const [savingPins, setSavingPins] = useState(false);
   const [activeTags, setActiveTags] = useState([]);
   const [message, setMessage] = useState('');
@@ -426,7 +414,6 @@ function MarketDiscoveryLayoutEditor() {
               searchScope: 'tag',
               featuredTopicsEnabled: false,
               featuredMarketsEnabled: true,
-              sectionsEnabled: false,
             },
           }));
         }
@@ -485,7 +472,6 @@ function MarketDiscoveryLayoutEditor() {
     }
     return [
       layoutTab,
-      { key: 'sections', label: 'Sections' },
       { key: 'topicPins', label: 'Topic Pins' },
       { key: 'marketPins', label: 'Market Pins' },
       { key: 'preview', label: 'Preview' },
@@ -509,7 +495,6 @@ function MarketDiscoveryLayoutEditor() {
           searchScope: 'tag',
           featuredTopicsEnabled: false,
           featuredMarketsEnabled: true,
-          sectionsEnabled: false,
         }
         : normalizePage(saved, selectedMode),
     }));
@@ -525,14 +510,6 @@ function MarketDiscoveryLayoutEditor() {
     }));
   };
 
-  const updateSection = (index, updates) => {
-    updateState({
-      sections: state.sections.map((section, currentIndex) => (
-        currentIndex === index ? { ...section, ...updates } : section
-      )),
-    });
-  };
-
   const updatePin = (index, updates) => {
     updateState({
       pins: state.pins.map((pin, currentIndex) => (
@@ -545,7 +522,6 @@ function MarketDiscoveryLayoutEditor() {
     ...mode.fixedBlocks,
     ...(state.featuredTopicsEnabled ? ['Topic Pins'] : []),
     ...(state.featuredMarketsEnabled ? ['Market Pins'] : []),
-    ...(state.sectionsEnabled ? ['CMS sections'] : []),
   ], [mode, state]);
 
   const saveLayout = async () => {
@@ -563,7 +539,6 @@ function MarketDiscoveryLayoutEditor() {
           searchScope: selectedMode === 'secondary' ? 'tag' : state.searchScope,
           featuredTopicsEnabled: selectedMode === 'secondary' ? false : state.featuredTopicsEnabled,
           featuredMarketsEnabled: selectedMode === 'secondary' ? true : state.featuredMarketsEnabled,
-          sectionsEnabled: selectedMode === 'secondary' ? false : state.sectionsEnabled,
         }),
         fallbackMessage: 'Failed to save market discovery layout.',
       });
@@ -573,26 +548,6 @@ function MarketDiscoveryLayoutEditor() {
       setError(err.message || 'Unable to save market discovery layout.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const saveSections = async () => {
-    setSavingSections(true);
-    setMessage('');
-    setError('');
-    try {
-      const saved = await authenticatedApiRequest(`/v0/admin/content/market-discovery/${selectedPageSlug}/sections`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sections: state.sections }),
-        fallbackMessage: 'Failed to save discovery sections.',
-      });
-      replaceSelectedState(saved);
-      setMessage(`${selectedPageLabel} sections saved.`);
-    } catch (err) {
-      setError(err.message || 'Unable to save discovery sections.');
-    } finally {
-      setSavingSections(false);
     }
   };
 
@@ -617,22 +572,6 @@ function MarketDiscoveryLayoutEditor() {
     } finally {
       setSavingPins(false);
     }
-  };
-
-  const addSection = () => {
-    updateState({
-      sections: [
-        ...state.sections,
-        {
-          slug: '',
-          title: 'New Section',
-          description: '',
-          tagFilterSlug: '',
-          sortOrder: nextSortOrder(state.sections),
-          isActive: true,
-        },
-      ],
-    });
   };
 
   const addPin = (pinType) => {
@@ -829,14 +768,6 @@ function MarketDiscoveryLayoutEditor() {
                   checked={selectedMode === 'secondary' ? true : state.featuredMarketsEnabled}
                   onChange={(checked) => updateState({ featuredMarketsEnabled: checked })}
                 />
-                {selectedMode === 'top' && (
-                  <ToggleCard
-                    title="CMS sections"
-                    description="Allow named sections beyond the implicit All section."
-                    checked={state.sectionsEnabled}
-                    onChange={(checked) => updateState({ sectionsEnabled: checked })}
-                  />
-                )}
               </div>
 
               <div className="mt-6 rounded-lg border border-gray-700 bg-gray-950 p-4">
@@ -846,65 +777,6 @@ function MarketDiscoveryLayoutEditor() {
                     <li key={block}>{block}</li>
                   ))}
                 </ol>
-              </div>
-            </div>
-            )}
-
-            {selectedMode === 'top' && activeEditorTab === 'sections' && (
-              <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-xl font-bold text-white">Sections</h3>
-                  <p className="mt-1 text-sm text-gray-400">Named section cards can optionally point at an active tag. Empty pages still use the implicit All section.</p>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={addSection} className="rounded-md border border-sky-500/50 px-3 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/50">Add Section</button>
-                  <button type="button" disabled={savingSections} onClick={saveSections} className="rounded-md bg-primary-pink px-3 py-2 text-sm font-semibold text-white hover:bg-primary-pink/80 disabled:opacity-50">
-                    {savingSections ? 'Saving...' : 'Save Sections'}
-                  </button>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                {state.sections.length === 0 && <p className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-400">No explicit sections yet.</p>}
-                {state.sections.map((section, index) => (
-                  <div key={`${section.slug}-${index}`} className="grid gap-3 rounded-lg border border-gray-700 bg-gray-950 p-4 md:grid-cols-[1fr_1fr_110px_auto]">
-                    <Field label="Title">
-                      <input value={section.title || ''} onChange={(event) => updateSection(index, { title: event.target.value })} className={textInputClass} />
-                    </Field>
-                    <Field label="Slug">
-                      <input value={section.slug || ''} onChange={(event) => updateSection(index, { slug: event.target.value })} placeholder="auto-from-title" className={textInputClass} />
-                    </Field>
-                    <Field label="Order">
-                      <input type="number" value={section.sortOrder || index + 1} onChange={(event) => updateSection(index, { sortOrder: Number(event.target.value || 0) })} className={textInputClass} />
-                    </Field>
-                    <label className="flex items-end gap-2 pb-2 text-sm text-gray-300">
-                      <input type="checkbox" checked={section.isActive !== false} onChange={(event) => updateSection(index, { isActive: event.target.checked })} className="h-4 w-4 accent-primary-pink" />
-                      Active
-                    </label>
-                    <Field label="Tag Filter" className="md:col-span-2">
-                      <select
-                        value={section.tagFilterSlug || ''}
-                        onChange={(event) => updateSection(index, { tagFilterSlug: event.target.value })}
-                        className={textInputClass}
-                      >
-                        <option value="">No tag filter</option>
-                        {tagOptionsWithCurrent(activeTagOptions, section.tagFilterSlug).map((tag) => (
-                          <option key={tag.slug} value={tag.slug}>
-                            {tagOptionLabel(tag)}{tag.isActive === false ? ' - inactive or missing' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Description" className="md:col-span-2">
-                      <input value={section.description || ''} onChange={(event) => updateSection(index, { description: event.target.value })} className={textInputClass} />
-                    </Field>
-                    <div className="md:col-span-4">
-                      <button type="button" onClick={() => updateState({ sections: state.sections.filter((_, currentIndex) => currentIndex !== index) })} className="text-sm font-semibold text-red-300 hover:text-red-200">
-                        Remove section
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
             )}

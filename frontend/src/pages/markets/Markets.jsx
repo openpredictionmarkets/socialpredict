@@ -14,16 +14,14 @@ const defaultDiscoveryLayout = {
     description: '',
     featuredTopicsEnabled: false,
     featuredMarketsEnabled: false,
-    sectionsEnabled: false,
     recommendationLimit: 20,
     primaryTagSlug: '',
     searchScope: 'all',
-    sections: [],
     pins: [],
 };
 
 const hasCuratedBlocks = (layout) => (
-    layout?.featuredTopicsEnabled || layout?.featuredMarketsEnabled || layout?.sectionsEnabled
+    layout?.featuredTopicsEnabled || layout?.featuredMarketsEnabled
 );
 
 const sortBySortOrder = (items = []) => [...items].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
@@ -46,7 +44,6 @@ const normalizeDiscoveryLayout = (layout, fallback = {}) => ({
     ...defaultDiscoveryLayout,
     ...fallback,
     ...layout,
-    sections: sortBySortOrder(layout?.sections || []),
     pins: sortBySortOrder(layout?.pins || []),
 });
 
@@ -275,7 +272,6 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
 
 const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true }) => {
     const pins = sortBySortOrder(layout.pins || []);
-    const sections = sortBySortOrder(layout.sections || []).filter((section) => section.isActive !== false);
     const topicPins = persistentTopicPins.length > 0
         ? persistentTopicPins
         : (useLayoutTopicPins ? pins.filter((pin) => pin.pinType === 'discovery_page') : []);
@@ -289,23 +285,6 @@ const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins =
             {hasTopicNav && <TopicNav topicPins={topicPins} />}
 
             {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} />}
-
-            {layout.sectionsEnabled && sections.length > 0 && (
-                <section>
-                    <div className="flex flex-wrap gap-2" aria-label="Market discovery sections">
-                        {sections.map((section) => (
-                            <Link
-                                key={`section-${section.id || section.slug || section.sortOrder}`}
-                                to={section.tagFilterSlug ? `/markets/topic/${section.tagFilterSlug}` : '#'}
-                                className="rounded-full border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:bg-amber-900/30"
-                                title={section.description || section.title}
-                            >
-                                {section.title}
-                            </Link>
-                        ))}
-                    </div>
-                </section>
-            )}
         </div>
     );
 };
@@ -356,7 +335,6 @@ function Markets() {
                 primaryTagSlug: topicSlug,
                 searchScope: 'tag',
                 featuredMarketsEnabled: true,
-                sectionsEnabled: true,
                 recommendationLimit: 5,
             }
             : {};

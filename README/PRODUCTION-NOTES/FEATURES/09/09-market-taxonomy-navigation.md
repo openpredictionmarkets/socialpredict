@@ -5,7 +5,7 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-04T00:00:00Z
 updated_at_display: "Thursday, June 4, 2026"
-update_reason: "Start the feature spec for tags, category pages, featured market pinning, section layouts, and CMS-driven market discovery."
+update_reason: "Start the feature spec for tags, category pages, featured market pinning, and CMS-driven market discovery."
 status: draft
 ---
 
@@ -15,7 +15,7 @@ status: draft
 
 SocialPredict needs a richer market discovery model than a single `/markets` page with search and status tabs.
 
-Search should remain the primary entry point because it is direct, familiar, and works even when taxonomy content is sparse. Under that search-first entry point, the platform should support a CMS-managed market taxonomy: tags, top-level and secondary category pages, pinned featured markets, optional sections, and curated page layouts.
+Search should remain the primary entry point because it is direct, familiar, and works even when taxonomy content is sparse. Under that search-first entry point, the platform should support a CMS-managed market taxonomy: tags, top-level and secondary category pages, pinned featured markets, optional and curated page layouts.
 
 This feature creates the design foundation for that hierarchy before implementation.
 
@@ -37,12 +37,11 @@ The market discovery hierarchy should support:
 4. CMS-pinned secondary category pages on the top-level page.
 5. Secondary category pages organized by tag/category.
 6. Search on each secondary page, filtered by that category/tag by default.
-7. Optional sections within each secondary page.
-8. Featured/pinned markets within a page or section.
-9. Market tags displayed as chips in search results, market cards, admin review, and market detail pages.
-10. Moderator-selected tags during market creation, constrained to admin-managed tags.
-11. Admin tag review during market approval.
-12. Admin-only tag creation, deletion, ordering, and page layout management.
+7. Featured/pinned markets within a page.
+8. Market tags displayed as chips in search results, market cards, admin review, and market detail pages.
+9. Moderator-selected tags during market creation, constrained to admin-managed tags.
+10. Admin tag review during market approval.
+11. Admin-only tag creation, deletion, ordering, and page layout management.
 
 ## Current Behavior
 
@@ -62,18 +61,16 @@ Current market discovery is mostly flat:
 - Tag: admin-managed label that can be attached to markets and used for search/filtering.
 - Category page: CMS-managed market discovery page, usually backed by one primary tag or tag query.
 - Secondary page: category page below the top-level `/markets` page.
-- Section: CMS-managed grouping inside a category page; defaults to `All` when no sections are configured.
-- Featured market: market manually pinned to a page or section by an admin.
+- Featured market: market manually pinned to a page by an admin.
 - Featured category: secondary category page manually pinned to the top-level markets page.
 - Recommendation panel: automatic non-CMS fallback list, initially random active markets.
 - Tag chip: compact UI label that shows market tags in lists/details/review flows.
-- Taxonomy: the admin-managed set of tags, category pages, sections, and layout rules.
+- Taxonomy: the admin-managed set of tags, category pages, and layout rules.
 
 Avoid confusing:
 
 - Tag is not a free-form user hashtag.
 - Category page is not necessarily a backend route hardcoded in React.
-- Section is not a market lifecycle status.
 - Featured is manual CMS curation, not the same as algorithmic recommendation.
 - Recommendation is automatic fallback content, not an endorsement unless later copy says so.
 
@@ -93,7 +90,6 @@ Layout when CMS pinning exists:
 2. Compact recommendation panel, about 5 markets.
 3. Featured category/page cards.
 4. Featured market cards.
-5. Optional CMS sections if admins configure them later.
 
 The top-level page should not become blank just because CMS content is empty. Search and recommendation fallback keep the page useful from day one.
 
@@ -108,7 +104,6 @@ Each secondary page should support:
 - status tabs: Active, Closed, Resolved, All
 - recommendation/fallback markets for that tag if nothing is pinned
 - pinned featured markets
-- optional sections
 - tag chips on market cards/results
 
 Default layout when nothing is pinned:
@@ -123,20 +118,6 @@ Layout when page is curated:
 2. Search bar filtered to the category.
 3. Compact recommendation panel, about 5 markets.
 4. Pinned featured markets.
-5. Pinned sections.
-6. Section-specific featured markets.
-
-## Sections
-
-Sections allow a category page to be further organized without creating too many pages.
-
-Examples:
-
-- Politics category with sections: Elections, Policy, Geopolitics.
-- Sports category with sections: NFL, NBA, Soccer.
-- AI category with sections: Models, Regulation, Companies.
-
-Initial behavior can support a default `All` section only. The schema should still leave room for named sections and section-specific featured markets.
 
 ## Tag Assignment Flow
 
@@ -186,8 +167,6 @@ Admin capabilities:
 - create category page from a tag or tag query
 - pin/unpin featured markets
 - pin/unpin featured category pages
-- create/reorder sections
-- assign pinned markets to sections
 
 Deletion requires safety guardrails:
 
@@ -203,7 +182,6 @@ Candidate tables:
 - `market_tags`: admin-owned tag definitions.
 - `market_tag_assignments`: many-to-many relation between markets and tags.
 - `market_discovery_pages`: top/secondary page definitions.
-- `market_discovery_sections`: sections within pages.
 - `market_discovery_pins`: pinned markets and pinned category pages, ordered by admin.
 
 Important design choice: use additive timestamped Go migrations under `backend/migration/migrations`, following the existing migration convention.
@@ -233,7 +211,7 @@ This should be backend-owned enough that frontend does not invent recommendation
 Evans/domain posture:
 
 - Treat taxonomy terms as ubiquitous language before schema work.
-- Separate tags, category pages, sections, featured markets, and recommendations because each has a different business meaning.
+- Separate tags, category pages, featured markets, and recommendations because each has a different business meaning.
 - Do not let React route structure define the domain taxonomy.
 
 Fowler/evolutionary posture:
@@ -252,7 +230,7 @@ Martin/clean-architecture posture:
 
 Planning-level acceptance criteria:
 
-- Feature docs define tags, category pages, sections, featured markets, and recommendations distinctly.
+- Feature docs define tags, category pages, featured markets, and recommendations distinctly.
 - Database migration plan is additive and timestamped.
 - Admin ownership of tag creation/deletion is explicit.
 - Moderator tag selection is constrained to existing admin-managed tags.

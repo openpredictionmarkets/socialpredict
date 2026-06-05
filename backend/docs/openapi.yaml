@@ -230,7 +230,6 @@ x-route-family-migration-matrix:
         - /v0/admin/content/home
         - /v0/content/market-discovery/{slug}
         - /v0/admin/content/market-discovery/{slug}
-        - /v0/admin/content/market-discovery/{slug}/sections
         - /v0/admin/content/market-discovery/{slug}/pins
         - /v0/content/social-share
         - /v0/content/social-share/image
@@ -3234,59 +3233,6 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
 
 
-  /v0/admin/content/market-discovery/{slug}/sections:
-    put:
-      tags: [Content]
-      operationId: replaceMarketDiscoverySections
-      summary: Replace market discovery page sections
-      description: Replaces ordered CMS section cards for a TOP or SECONDARY market discovery page.
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: slug
-          required: true
-          schema:
-            type: string
-            enum: [markets, topic-template]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MarketDiscoverySectionsUpdateRequest'
-      responses:
-        '200':
-          description: Market discovery sections updated successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MarketDiscoveryPageEnvelopeResponse'
-        '400':
-          description: Invalid request body or section validation failure.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-        '401':
-          description: Authentication failed or token invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-        '403':
-          description: Admin privileges required or password change is still required.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-        '429':
-          description: Rate limit exceeded by shared security middleware.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReasonResponse'
-
   /v0/admin/content/market-discovery/{slug}/pins:
     put:
       tags: [Content]
@@ -5114,8 +5060,6 @@ components:
           type: boolean
         featuredMarketsEnabled:
           type: boolean
-        sectionsEnabled:
-          type: boolean
         defaultRecommendationLimit:
           type: integer
           minimum: 1
@@ -5133,36 +5077,10 @@ components:
         updatedAt:
           type: string
           format: date-time
-        sections:
-          type: array
-          items:
-            $ref: '#/components/schemas/MarketDiscoverySection'
         pins:
           type: array
           items:
             $ref: '#/components/schemas/MarketDiscoveryPin'
-
-    MarketDiscoverySection:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        slug:
-          type: string
-          maxLength: 96
-        title:
-          type: string
-          maxLength: 160
-        description:
-          type: string
-          maxLength: 500
-        tagFilterSlug:
-          type: string
-        sortOrder:
-          type: integer
-        isActive:
-          type: boolean
 
     MarketDiscoveryPin:
       type: object
@@ -5206,8 +5124,6 @@ components:
           type: boolean
         featuredMarketsEnabled:
           type: boolean
-        sectionsEnabled:
-          type: boolean
         defaultRecommendationLimit:
           type: integer
           minimum: 1
@@ -5219,16 +5135,6 @@ components:
         version:
           type: integer
           format: int64
-
-    MarketDiscoverySectionsUpdateRequest:
-      type: object
-      properties:
-        sections:
-          type: array
-          maxItems: 24
-          items:
-            $ref: '#/components/schemas/MarketDiscoverySection'
-      required: [sections]
 
     MarketDiscoveryPinsUpdateRequest:
       type: object

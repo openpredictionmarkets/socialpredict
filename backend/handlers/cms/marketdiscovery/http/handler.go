@@ -31,23 +31,9 @@ type updateReq struct {
 	SearchScope                string `json:"searchScope"`
 	FeaturedTopicsEnabled      bool   `json:"featuredTopicsEnabled"`
 	FeaturedMarketsEnabled     bool   `json:"featuredMarketsEnabled"`
-	SectionsEnabled            bool   `json:"sectionsEnabled"`
 	DefaultRecommendationLimit int    `json:"defaultRecommendationLimit"`
 	CuratedRecommendationLimit int    `json:"curatedRecommendationLimit"`
 	Version                    uint   `json:"version"`
-}
-
-type replaceSectionsReq struct {
-	Sections []sectionReq `json:"sections"`
-}
-
-type sectionReq struct {
-	Slug          string `json:"slug"`
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	TagFilterSlug string `json:"tagFilterSlug"`
-	SortOrder     int    `json:"sortOrder"`
-	IsActive      bool   `json:"isActive"`
 }
 
 type replacePinsReq struct {
@@ -63,32 +49,20 @@ type pinReq struct {
 }
 
 type pageResponse struct {
-	Slug                       string            `json:"slug"`
-	Title                      string            `json:"title"`
-	Description                string            `json:"description"`
-	PageType                   string            `json:"pageType"`
-	PrimaryTagSlug             string            `json:"primaryTagSlug"`
-	SearchScope                string            `json:"searchScope"`
-	FeaturedTopicsEnabled      bool              `json:"featuredTopicsEnabled"`
-	FeaturedMarketsEnabled     bool              `json:"featuredMarketsEnabled"`
-	SectionsEnabled            bool              `json:"sectionsEnabled"`
-	DefaultRecommendationLimit int               `json:"defaultRecommendationLimit"`
-	CuratedRecommendationLimit int               `json:"curatedRecommendationLimit"`
-	RecommendationLimit        int               `json:"recommendationLimit"`
-	Version                    uint              `json:"version"`
-	UpdatedAt                  string            `json:"updatedAt,omitempty"`
-	Sections                   []sectionResponse `json:"sections"`
-	Pins                       []pinResponse     `json:"pins"`
-}
-
-type sectionResponse struct {
-	ID            uint   `json:"id,omitempty"`
-	Slug          string `json:"slug"`
-	Title         string `json:"title"`
-	Description   string `json:"description,omitempty"`
-	TagFilterSlug string `json:"tagFilterSlug,omitempty"`
-	SortOrder     int    `json:"sortOrder"`
-	IsActive      bool   `json:"isActive"`
+	Slug                       string        `json:"slug"`
+	Title                      string        `json:"title"`
+	Description                string        `json:"description"`
+	PageType                   string        `json:"pageType"`
+	PrimaryTagSlug             string        `json:"primaryTagSlug"`
+	SearchScope                string        `json:"searchScope"`
+	FeaturedTopicsEnabled      bool          `json:"featuredTopicsEnabled"`
+	FeaturedMarketsEnabled     bool          `json:"featuredMarketsEnabled"`
+	DefaultRecommendationLimit int           `json:"defaultRecommendationLimit"`
+	CuratedRecommendationLimit int           `json:"curatedRecommendationLimit"`
+	RecommendationLimit        int           `json:"recommendationLimit"`
+	Version                    uint          `json:"version"`
+	UpdatedAt                  string        `json:"updatedAt,omitempty"`
+	Pins                       []pinResponse `json:"pins"`
 }
 
 type pinResponse struct {
@@ -133,7 +107,6 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		SearchScope:                in.SearchScope,
 		FeaturedTopicsEnabled:      in.FeaturedTopicsEnabled,
 		FeaturedMarketsEnabled:     in.FeaturedMarketsEnabled,
-		SectionsEnabled:            in.SectionsEnabled,
 		DefaultRecommendationLimit: in.DefaultRecommendationLimit,
 		CuratedRecommendationLimit: in.CuratedRecommendationLimit,
 		Version:                    in.Version,
@@ -146,25 +119,6 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	composition, err := h.svc.GetComposition(page.Slug)
 	if err != nil {
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
-		return
-	}
-	_ = handlers.WriteResult(w, http.StatusOK, responseFromComposition(composition))
-}
-
-func (h *Handler) AdminReplaceSections(w http.ResponseWriter, r *http.Request) {
-	admin, ok := h.requireAdmin(w, r)
-	if !ok {
-		return
-	}
-	_ = admin
-	var in replaceSectionsReq
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
-		return
-	}
-	composition, err := h.svc.ReplaceSections(mux.Vars(r)["slug"], sectionInputsFromRequest(in.Sections))
-	if err != nil {
-		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 		return
 	}
 	_ = handlers.WriteResult(w, http.StatusOK, responseFromComposition(composition))
@@ -202,10 +156,10 @@ func (h *Handler) requireAdmin(w http.ResponseWriter, r *http.Request) (*dusers.
 }
 
 func responseFromComposition(composition *marketdiscovery.PageComposition) pageResponse {
-	return responseFromPage(composition.Page, composition.Sections, composition.Pins)
+	return responseFromPage(composition.Page, composition.Pins)
 }
 
-func responseFromPage(page *models.MarketDiscoveryPage, sections []models.MarketDiscoverySection, pins []models.MarketDiscoveryPin) pageResponse {
+func responseFromPage(page *models.MarketDiscoveryPage, pins []models.MarketDiscoveryPin) pageResponse {
 	response := pageResponse{
 		Slug:                       page.Slug,
 		Title:                      page.Title,
@@ -215,11 +169,9 @@ func responseFromPage(page *models.MarketDiscoveryPage, sections []models.Market
 		SearchScope:                page.SearchScope,
 		FeaturedTopicsEnabled:      page.FeaturedTopicsEnabled,
 		FeaturedMarketsEnabled:     page.FeaturedMarketsEnabled,
-		SectionsEnabled:            page.SectionsEnabled,
 		DefaultRecommendationLimit: page.DefaultRecommendationLimit,
 		CuratedRecommendationLimit: page.CuratedRecommendationLimit,
 		Version:                    page.Version,
-		Sections:                   sectionResponses(sections),
 		Pins:                       pinResponses(pins),
 	}
 	if page.UpdatedAt.IsZero() {
@@ -228,25 +180,10 @@ func responseFromPage(page *models.MarketDiscoveryPage, sections []models.Market
 		response.UpdatedAt = page.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
 	}
 	response.RecommendationLimit = response.DefaultRecommendationLimit
-	if page.FeaturedTopicsEnabled || page.FeaturedMarketsEnabled || page.SectionsEnabled {
+	if page.FeaturedTopicsEnabled || page.FeaturedMarketsEnabled {
 		response.RecommendationLimit = response.CuratedRecommendationLimit
 	}
 	return response
-}
-
-func sectionInputsFromRequest(sections []sectionReq) []marketdiscovery.SectionInput {
-	inputs := make([]marketdiscovery.SectionInput, 0, len(sections))
-	for _, section := range sections {
-		inputs = append(inputs, marketdiscovery.SectionInput{
-			Slug:          section.Slug,
-			Title:         section.Title,
-			Description:   section.Description,
-			TagFilterSlug: section.TagFilterSlug,
-			SortOrder:     section.SortOrder,
-			IsActive:      section.IsActive,
-		})
-	}
-	return inputs
 }
 
 func pinInputsFromRequest(pins []pinReq) []marketdiscovery.PinInput {
@@ -261,22 +198,6 @@ func pinInputsFromRequest(pins []pinReq) []marketdiscovery.PinInput {
 		})
 	}
 	return inputs
-}
-
-func sectionResponses(sections []models.MarketDiscoverySection) []sectionResponse {
-	responses := make([]sectionResponse, 0, len(sections))
-	for _, section := range sections {
-		responses = append(responses, sectionResponse{
-			ID:            section.ID,
-			Slug:          section.Slug,
-			Title:         section.Title,
-			Description:   section.Description,
-			TagFilterSlug: section.TagFilterSlug,
-			SortOrder:     section.SortOrder,
-			IsActive:      section.IsActive,
-		})
-	}
-	return responses
 }
 
 func pinResponses(pins []models.MarketDiscoveryPin) []pinResponse {

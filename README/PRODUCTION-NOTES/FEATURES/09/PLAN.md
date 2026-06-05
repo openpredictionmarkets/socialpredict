@@ -5,7 +5,7 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-04T00:00:00Z
 updated_at_display: "Thursday, June 4, 2026"
-update_reason: "Track implementation slices for tag persistence, market discovery layout persistence, page-level CMS sections/pins, secondary routes, and tag-scoped discovery."
+update_reason: "Track implementation slices for tag persistence, market discovery layout persistence, page-level CMS pins, secondary routes, and tag-scoped discovery."
 status: in-progress
 ---
 
@@ -94,7 +94,7 @@ Checklist:
 - [x] Add query/index tests for tag-filtered search.
 - [ ] Verify performance posture for many tags/markets.
 
-## 06. Discovery Pages And Sections
+## 06. Discovery Pages
 
 Service ownership: CMS/content context and composed read model.
 
@@ -102,13 +102,13 @@ Checklist:
 
 - [x] Add admin CMS scaffold for TOP and SECONDARY market discovery layout options.
 - [x] Add migration for `market_discovery_pages`.
-- [x] Add migration for `market_discovery_sections`.
+- [x] Remove unused `market_discovery_sections` scaffold.
 - [x] Add domain/read models for top-level and secondary category pages.
-- [ ] Support implicit `All` section when no sections exist.
+- [x] Keep implicit All behavior through normal page search/status tabs.
 - [x] Add public page composition endpoint.
 - [x] Add admin page layout management API.
-- [x] Add admin section management APIs.
-- [x] Add tests for page composition and section ordering.
+- [x] Remove unused admin section management APIs.
+- [x] Add tests for page composition ordering.
 
 ## 07. Pins And Featured Content
 
@@ -118,7 +118,6 @@ Checklist:
 
 - [x] Add migration for `market_discovery_pins`.
 - [x] Support page-level pinned markets.
-- [ ] Support section-level pinned markets.
 - [x] Support pinned secondary category pages on top-level page.
 - [x] Add ordering controls.
 - [ ] Define behavior for cancelled/resolved/hidden pinned targets.
@@ -177,6 +176,6 @@ Checklist:
 - Search can be filtered by tag/category.
 - Top-level `/markets` remains useful with or without CMS pinning.
 - Secondary category pages reuse familiar search/status behavior.
-- Pinned markets/pages and sections are CMS-managed and ordered.
+- Pinned markets/pages  are CMS-managed and ordered.
 - Empty pages fall back to recommendation content.
 - OpenAPI and tests are updated before frontend depends on new endpoints.

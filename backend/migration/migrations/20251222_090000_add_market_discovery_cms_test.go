@@ -17,7 +17,6 @@ func TestMigrateAddMarketDiscoveryCMSCreatesTables(t *testing.T) {
 
 	for _, table := range []any{
 		&models.MarketDiscoveryPage{},
-		&models.MarketDiscoverySection{},
 		&models.MarketDiscoveryPin{},
 	} {
 		if !db.Migrator().HasTable(table) {

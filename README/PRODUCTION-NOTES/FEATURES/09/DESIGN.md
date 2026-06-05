@@ -15,7 +15,7 @@ status: draft
 
 Market taxonomy is a discovery and curation capability. It is not just UI decoration.
 
-Tags affect market creation, admin review, search filtering, page composition, public navigation, and future CMS layout. The backend should own tag definitions, tag assignments, page definitions, section definitions, pinning, and recommendation/fallback policy. The frontend should render backend-owned read models and provide admin/moderator workflows.
+Tags affect market creation, admin review, search filtering, page composition, public navigation, and future CMS layout. The backend should own tag definitions, tag assignments, page definitions, pinning, and recommendation/fallback policy. The frontend should render backend-owned read models and provide admin/moderator workflows.
 
 ## Design Inputs
 
@@ -47,11 +47,11 @@ The next design step is a taxonomy and page-composition model that preserves sea
 | Boundary | Responsibility |
 | --- | --- |
 | Prediction Market Context | Owns market-tag assignment policy and public market filtering by tags. |
-| CMS / Content Context | Owns discovery pages, sections, page copy, pinning, and layout order. |
+| CMS / Content Context | Owns discovery pages, page copy, pinning, and layout order. |
 | Participant Account Context | Owns admin/moderator authority facts used by taxonomy management and tag assignment workflows. |
 | API And Auth Boundary | Owns admin taxonomy endpoints, moderator create/review payloads, public page/search endpoints, and OpenAPI schemas. |
 | Frontend Experience Context | Owns top-level and secondary page presentation, tag chips, admin taxonomy UI, and moderator tag selection UI. |
-| Repository And Migration Boundary | Owns additive tag/page/section/pin tables and timestamped Go migrations. |
+| Repository And Migration Boundary | Owns additive tag/page/pin tables and timestamped Go migrations. |
 
 ## Core Domain Model
 
@@ -118,26 +118,6 @@ Rules:
 - secondary pages usually have a primary tag
 - page edits publish immediately in the current CMS model
 
-### Section
-
-CMS-managed grouping within a discovery page.
-
-Candidate fields:
-
-- `id`
-- `page_id`
-- `slug`
-- `title`
-- `description`
-- `tag_filter_id` nullable
-- `sort_order`
-- `is_active`
-
-Rules:
-
-- every page has an implicit `All` section even if no explicit sections exist
-- sections can filter by tags or simply group pinned markets
-
 ### Pin
 
 Manual CMS curation of a market or category page.
@@ -145,7 +125,7 @@ Manual CMS curation of a market or category page.
 Candidate fields:
 
 - `id`
-- `scope_type`: page, section
+- `scope_type`: page
 - `scope_id`
 - `pin_type`: market, discovery_page
 - `market_id` nullable
@@ -185,8 +165,7 @@ Candidate response shape:
     "markets": []
   },
   "featuredPages": [],
-  "featuredMarkets": [],
-  "sections": []
+  "featuredMarkets": []
 }
 ```
 
@@ -247,7 +226,6 @@ Admin can manage:
 
 - tags
 - discovery pages
-- sections
 - pins
 
 ## Migration Design
@@ -258,7 +236,7 @@ Candidate migration slices:
 
 1. Tag definitions and assignments.
 2. Market create/review/read payload support for tags.
-3. Discovery pages and sections.
+3. Discovery pages .
 4. Pins and page composition read model.
 
 Avoid combining all tables and all UI behavior in one PR unless the migration is purely schema-only and low-risk.
@@ -267,7 +245,7 @@ Avoid combining all tables and all UI behavior in one PR unless the migration is
 
 Evans/domain lens:
 
-- The domain language must distinguish tag, category page, section, pin, featured market, and recommendation.
+- The domain language must distinguish tag, category page, pin, featured market, and recommendation.
 - Taxonomy is shared language between moderators, admins, and market browsers.
 - CMS curation and market lifecycle are related but not the same bounded context.
 
@@ -307,7 +285,7 @@ Martin/clean-architecture lens:
 
 ## Design Exit Criteria
 
-- Tag, page, section, pin, and recommendation language is stable enough for API names.
+- Tag, page, pin, and recommendation language is stable enough for API names.
 - Database migration slices are chosen.
 - Backend-first API contracts are drafted before frontend UI implementation.
 - Admin tag deletion policy is decided.

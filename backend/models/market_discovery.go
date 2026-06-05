@@ -17,7 +17,6 @@ type MarketDiscoveryPage struct {
 	SearchScope                string `gorm:"not null;default:all;size:32"`
 	FeaturedTopicsEnabled      bool   `gorm:"not null;default:false"`
 	FeaturedMarketsEnabled     bool   `gorm:"not null;default:false"`
-	SectionsEnabled            bool   `gorm:"not null;default:false"`
 	DefaultRecommendationLimit int    `gorm:"not null;default:20"`
 	CuratedRecommendationLimit int    `gorm:"not null;default:5"`
 	SortOrder                  int    `gorm:"not null;default:0;index"`
@@ -25,18 +24,6 @@ type MarketDiscoveryPage struct {
 	UpdatedBy                  string `gorm:"size:64"`
 	CreatedAt                  time.Time
 	UpdatedAt                  time.Time
-}
-
-type MarketDiscoverySection struct {
-	gorm.Model
-	ID            uint   `gorm:"primaryKey"`
-	PageID        uint   `gorm:"not null;index"`
-	Slug          string `gorm:"not null;size:96"`
-	Title         string `gorm:"not null;size:160"`
-	Description   string `gorm:"size:500"`
-	TagFilterSlug string `gorm:"index;size:64"`
-	SortOrder     int    `gorm:"not null;default:0;index"`
-	IsActive      bool   `gorm:"not null;default:true;index"`
 }
 
 type MarketDiscoveryPin struct {

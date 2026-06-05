@@ -22,7 +22,6 @@ const (
 	MaxTitleLength       = 160
 	MaxDescriptionLength = 500
 	MaxSlugLength        = 96
-	MaxSectionsPerPage   = 24
 	MaxPinsPerPage       = 48
 	MinRecommendation    = 1
 	MaxRecommendation    = 50
@@ -48,20 +47,10 @@ type UpdateInput struct {
 	SearchScope                string
 	FeaturedTopicsEnabled      bool
 	FeaturedMarketsEnabled     bool
-	SectionsEnabled            bool
 	DefaultRecommendationLimit int
 	CuratedRecommendationLimit int
 	UpdatedBy                  string
 	Version                    uint
-}
-
-type SectionInput struct {
-	Slug          string
-	Title         string
-	Description   string
-	TagFilterSlug string
-	SortOrder     int
-	IsActive      bool
 }
 
 type PinInput struct {
@@ -73,9 +62,8 @@ type PinInput struct {
 }
 
 type PageComposition struct {
-	Page     *models.MarketDiscoveryPage
-	Sections []models.MarketDiscoverySection
-	Pins     []models.MarketDiscoveryPin
+	Page *models.MarketDiscoveryPage
+	Pins []models.MarketDiscoveryPin
 }
 
 func (s *Service) GetPage(slug string) (*models.MarketDiscoveryPage, error) {
@@ -99,17 +87,13 @@ func (s *Service) GetComposition(slug string) (*PageComposition, error) {
 		return nil, err
 	}
 	if page.ID == 0 {
-		return &PageComposition{Page: page, Sections: []models.MarketDiscoverySection{}, Pins: []models.MarketDiscoveryPin{}}, nil
-	}
-	sections, err := s.repo.ListSections(page.ID)
-	if err != nil {
-		return nil, err
+		return &PageComposition{Page: page, Pins: []models.MarketDiscoveryPin{}}, nil
 	}
 	pins, err := s.repo.ListPins(page.ID)
 	if err != nil {
 		return nil, err
 	}
-	return &PageComposition{Page: page, Sections: sections, Pins: pins}, nil
+	return &PageComposition{Page: page, Pins: pins}, nil
 }
 
 func (s *Service) UpdatePage(slug string, in UpdateInput) (*models.MarketDiscoveryPage, error) {
@@ -138,7 +122,6 @@ func (s *Service) UpdatePage(slug string, in UpdateInput) (*models.MarketDiscove
 	page.SearchScope = searchScope
 	page.FeaturedTopicsEnabled = in.FeaturedTopicsEnabled
 	page.FeaturedMarketsEnabled = in.FeaturedMarketsEnabled
-	page.SectionsEnabled = in.SectionsEnabled
 	page.DefaultRecommendationLimit = defaultLimit
 	page.CuratedRecommendationLimit = curatedLimit
 	page.UpdatedBy = strings.TrimSpace(in.UpdatedBy)
@@ -152,28 +135,6 @@ func (s *Service) UpdatePage(slug string, in UpdateInput) (*models.MarketDiscove
 		return nil, err
 	}
 	return page, nil
-}
-
-func (s *Service) ReplaceSections(slug string, inputs []SectionInput) (*PageComposition, error) {
-	if len(inputs) > MaxSectionsPerPage {
-		return nil, errors.New("too many sections")
-	}
-	page, err := s.ensurePersistedPage(slug)
-	if err != nil {
-		return nil, err
-	}
-	sections := make([]models.MarketDiscoverySection, 0, len(inputs))
-	for index, input := range inputs {
-		section, err := sectionFromInput(input, index)
-		if err != nil {
-			return nil, err
-		}
-		sections = append(sections, section)
-	}
-	if err := s.repo.ReplaceSections(page.ID, sections); err != nil {
-		return nil, err
-	}
-	return s.GetComposition(page.Slug)
 }
 
 func (s *Service) ReplacePins(slug string, inputs []PinInput, actorUsername string) (*PageComposition, error) {
@@ -222,7 +183,6 @@ func DefaultPage(slug string) *models.MarketDiscoveryPage {
 		SearchScope:                SearchScopeAll,
 		FeaturedTopicsEnabled:      false,
 		FeaturedMarketsEnabled:     false,
-		SectionsEnabled:            false,
 		DefaultRecommendationLimit: 20,
 		CuratedRecommendationLimit: 5,
 		Version:                    1,
@@ -233,7 +193,6 @@ func DefaultPage(slug string) *models.MarketDiscoveryPage {
 		page.PageType = PageTypeSecondary
 		page.SearchScope = SearchScopeTag
 		page.FeaturedMarketsEnabled = true
-		page.SectionsEnabled = true
 	} else if slug != PageSlugMarkets {
 		page.Title = titleFromSlug(slug)
 		page.Description = "Browse and search markets in this topic."
@@ -241,42 +200,8 @@ func DefaultPage(slug string) *models.MarketDiscoveryPage {
 		page.PrimaryTagSlug = slug
 		page.SearchScope = SearchScopeTag
 		page.FeaturedMarketsEnabled = true
-		page.SectionsEnabled = true
 	}
 	return page
-}
-
-func sectionFromInput(input SectionInput, index int) (models.MarketDiscoverySection, error) {
-	title := strings.Join(strings.Fields(strings.TrimSpace(input.Title)), " ")
-	if title == "" {
-		return models.MarketDiscoverySection{}, errors.New("section title is required")
-	}
-	if len([]rune(title)) > MaxTitleLength {
-		return models.MarketDiscoverySection{}, errors.New("section title is too long")
-	}
-	description := strings.Join(strings.Fields(strings.TrimSpace(input.Description)), " ")
-	if len([]rune(description)) > MaxDescriptionLength {
-		return models.MarketDiscoverySection{}, errors.New("section description is too long")
-	}
-	slug := normalizeSlug(input.Slug)
-	if slug == "" {
-		slug = slugFromTitle(title)
-	}
-	if len([]rune(slug)) > MaxSlugLength {
-		return models.MarketDiscoverySection{}, errors.New("section slug is too long")
-	}
-	sortOrder := input.SortOrder
-	if sortOrder == 0 {
-		sortOrder = index + 1
-	}
-	return models.MarketDiscoverySection{
-		Slug:          slug,
-		Title:         title,
-		Description:   description,
-		TagFilterSlug: normalizeSlug(input.TagFilterSlug),
-		SortOrder:     sortOrder,
-		IsActive:      input.IsActive,
-	}, nil
 }
 
 func pinFromInput(input PinInput, index int, actorUsername string) (models.MarketDiscoveryPin, error) {
