@@ -26,21 +26,24 @@ type reviewMarketDescriptionAmendmentRequest struct {
 }
 
 type marketDescriptionAmendmentResponse struct {
-	ID              int64      `json:"id"`
-	MarketID        int64      `json:"marketId"`
-	Version         int        `json:"version"`
-	Body            string     `json:"body"`
-	BodyFormat      string     `json:"bodyFormat"`
-	Status          string     `json:"status"`
-	CreatedBy       string     `json:"createdBy"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
-	ApprovedBy      string     `json:"approvedBy,omitempty"`
-	ApprovedAt      *time.Time `json:"approvedAt,omitempty"`
-	RejectedBy      string     `json:"rejectedBy,omitempty"`
-	RejectedAt      *time.Time `json:"rejectedAt,omitempty"`
-	RejectionReason string     `json:"rejectionReason,omitempty"`
-	SubmitReason    string     `json:"submitReason,omitempty"`
+	ID                         int64                                `json:"id"`
+	MarketID                   int64                                `json:"marketId"`
+	MarketTitle                string                               `json:"marketTitle,omitempty"`
+	MarketDescription          string                               `json:"marketDescription,omitempty"`
+	Version                    int                                  `json:"version"`
+	Body                       string                               `json:"body"`
+	BodyFormat                 string                               `json:"bodyFormat"`
+	Status                     string                               `json:"status"`
+	CreatedBy                  string                               `json:"createdBy"`
+	CreatedAt                  time.Time                            `json:"createdAt"`
+	UpdatedAt                  time.Time                            `json:"updatedAt"`
+	ApprovedBy                 string                               `json:"approvedBy,omitempty"`
+	ApprovedAt                 *time.Time                           `json:"approvedAt,omitempty"`
+	RejectedBy                 string                               `json:"rejectedBy,omitempty"`
+	RejectedAt                 *time.Time                           `json:"rejectedAt,omitempty"`
+	RejectionReason            string                               `json:"rejectionReason,omitempty"`
+	SubmitReason               string                               `json:"submitReason,omitempty"`
+	PreviousApprovedAmendments []marketDescriptionAmendmentResponse `json:"previousApprovedAmendments,omitempty"`
 }
 
 type marketDescriptionAmendmentListResponse struct {
@@ -141,21 +144,30 @@ func parseAdminAmendmentFilters(w http.ResponseWriter, r *http.Request) (dmarket
 }
 
 func marketDescriptionAmendmentResponseFromDomain(item dmarkets.MarketDescriptionAmendment) marketDescriptionAmendmentResponse {
-	return marketDescriptionAmendmentResponse{
-		ID:              item.ID,
-		MarketID:        item.MarketID,
-		Version:         item.Version,
-		Body:            item.Body,
-		BodyFormat:      item.BodyFormat,
-		Status:          item.Status,
-		CreatedBy:       item.CreatedBy,
-		CreatedAt:       item.CreatedAt,
-		UpdatedAt:       item.UpdatedAt,
-		ApprovedBy:      item.ApprovedBy,
-		ApprovedAt:      item.ApprovedAt,
-		RejectedBy:      item.RejectedBy,
-		RejectedAt:      item.RejectedAt,
-		RejectionReason: item.RejectionReason,
-		SubmitReason:    item.SubmitReason,
+	response := marketDescriptionAmendmentResponse{
+		ID:                item.ID,
+		MarketID:          item.MarketID,
+		MarketTitle:       item.MarketTitle,
+		MarketDescription: item.MarketDescription,
+		Version:           item.Version,
+		Body:              item.Body,
+		BodyFormat:        item.BodyFormat,
+		Status:            item.Status,
+		CreatedBy:         item.CreatedBy,
+		CreatedAt:         item.CreatedAt,
+		UpdatedAt:         item.UpdatedAt,
+		ApprovedBy:        item.ApprovedBy,
+		ApprovedAt:        item.ApprovedAt,
+		RejectedBy:        item.RejectedBy,
+		RejectedAt:        item.RejectedAt,
+		RejectionReason:   item.RejectionReason,
+		SubmitReason:      item.SubmitReason,
 	}
+	if len(item.PreviousApprovedAmendments) > 0 {
+		response.PreviousApprovedAmendments = make([]marketDescriptionAmendmentResponse, 0, len(item.PreviousApprovedAmendments))
+		for _, previous := range item.PreviousApprovedAmendments {
+			response.PreviousApprovedAmendments = append(response.PreviousApprovedAmendments, marketDescriptionAmendmentResponseFromDomain(previous))
+		}
+	}
+	return response
 }

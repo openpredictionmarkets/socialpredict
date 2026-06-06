@@ -22,21 +22,24 @@ const (
 var unsafeMarkdownLitePattern = regexp.MustCompile(`(?i)<[^>]+>|javascript:|data:`)
 
 type MarketDescriptionAmendment struct {
-	ID              int64
-	MarketID        int64
-	Version         int
-	Body            string
-	BodyFormat      string
-	Status          string
-	CreatedBy       string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	ApprovedBy      string
-	ApprovedAt      *time.Time
-	RejectedBy      string
-	RejectedAt      *time.Time
-	RejectionReason string
-	SubmitReason    string
+	ID                         int64
+	MarketID                   int64
+	MarketTitle                string
+	MarketDescription          string
+	Version                    int
+	Body                       string
+	BodyFormat                 string
+	Status                     string
+	CreatedBy                  string
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	ApprovedBy                 string
+	ApprovedAt                 *time.Time
+	RejectedBy                 string
+	RejectedAt                 *time.Time
+	RejectionReason            string
+	SubmitReason               string
+	PreviousApprovedAmendments []MarketDescriptionAmendment
 }
 
 type MarketDescriptionAmendmentRequest struct {
@@ -139,7 +142,11 @@ func (s *Service) ListMarketDescriptionAmendments(ctx context.Context, filters M
 	if err != nil {
 		return nil, err
 	}
-	return repo.ListMarketDescriptionAmendments(ctx, filters)
+	items, err := repo.ListMarketDescriptionAmendments(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	return s.hydrateDescriptionAmendmentContext(ctx, items), nil
 }
 
 func (s *Service) ReviewMarketDescriptionAmendment(ctx context.Context, amendmentID int64, status string, actorUsername string, reason string) (*MarketDescriptionAmendment, error) {
@@ -184,6 +191,54 @@ func (s *Service) approvedDescriptionAmendments(ctx context.Context, marketID in
 		return []MarketDescriptionAmendment{}
 	}
 	return items
+}
+
+func (s *Service) hydrateDescriptionAmendmentContext(ctx context.Context, items []MarketDescriptionAmendment) []MarketDescriptionAmendment {
+	if len(items) == 0 {
+		return items
+	}
+
+	marketCache := map[int64]*Market{}
+	approvedCache := map[int64][]MarketDescriptionAmendment{}
+
+	for index := range items {
+		item := &items[index]
+		market, ok := marketCache[item.MarketID]
+		if !ok {
+			var err error
+			market, err = s.GetMarket(ctx, item.MarketID)
+			if err != nil {
+				market = nil
+			}
+			marketCache[item.MarketID] = market
+		}
+		if market != nil {
+			item.MarketTitle = market.QuestionTitle
+			item.MarketDescription = market.Description
+		}
+
+		approved, ok := approvedCache[item.MarketID]
+		if !ok {
+			approved = s.approvedDescriptionAmendments(ctx, item.MarketID)
+			approvedCache[item.MarketID] = approved
+		}
+		item.PreviousApprovedAmendments = approvedAmendmentsBeforeVersion(approved, item.Version)
+	}
+
+	return items
+}
+
+func approvedAmendmentsBeforeVersion(items []MarketDescriptionAmendment, version int) []MarketDescriptionAmendment {
+	if len(items) == 0 {
+		return []MarketDescriptionAmendment{}
+	}
+	out := make([]MarketDescriptionAmendment, 0, len(items))
+	for _, item := range items {
+		if item.Status == DescriptionAmendmentStatusApproved && item.Version < version {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func (s *Service) ensureActiveModerator(ctx context.Context, username string) error {

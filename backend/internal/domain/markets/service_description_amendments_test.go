@@ -133,6 +133,61 @@ func TestApprovedDescriptionAmendmentsAppearInMarketDetails(t *testing.T) {
 	}
 }
 
+func TestListMarketDescriptionAmendmentsIncludesAdminReviewContext(t *testing.T) {
+	repo, original := seedAmendmentMarket(t, "moderator")
+	now := marketsTestTime()
+	first, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:   original.ID,
+		Body:       "First approved clarification",
+		BodyFormat: markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:     markets.DescriptionAmendmentStatusPending,
+		CreatedBy:  "moderator",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	})
+	if err != nil {
+		t.Fatalf("create first amendment: %v", err)
+	}
+	if _, err := repo.ReviewMarketDescriptionAmendment(context.Background(), first.ID, markets.DescriptionAmendmentStatusApproved, "admin", "approved", now); err != nil {
+		t.Fatalf("approve first amendment: %v", err)
+	}
+	pending, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:   original.ID,
+		Body:       "Pending clarification",
+		BodyFormat: markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:     markets.DescriptionAmendmentStatusPending,
+		CreatedBy:  "moderator",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	})
+	if err != nil {
+		t.Fatalf("create pending amendment: %v", err)
+	}
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return activeModeratorUser(username), nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{})
+
+	items, err := service.ListMarketDescriptionAmendments(context.Background(), markets.MarketDescriptionAmendmentFilters{
+		Status: markets.DescriptionAmendmentStatusPending,
+		Limit:  10,
+	})
+	if err != nil {
+		t.Fatalf("ListMarketDescriptionAmendments returned error: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != pending.ID {
+		t.Fatalf("unexpected pending amendments: %+v", items)
+	}
+	if items[0].MarketTitle != original.QuestionTitle || items[0].MarketDescription != original.Description {
+		t.Fatalf("missing market review context: %+v", items[0])
+	}
+	if len(items[0].PreviousApprovedAmendments) != 1 || items[0].PreviousApprovedAmendments[0].Body != "First approved clarification" {
+		t.Fatalf("missing previous approved amendments: %+v", items[0].PreviousApprovedAmendments)
+	}
+}
+
 func TestReviewMarketDescriptionAmendmentRequiresPendingState(t *testing.T) {
 	repo, original := seedAmendmentMarket(t, "moderator")
 	now := marketsTestTime()

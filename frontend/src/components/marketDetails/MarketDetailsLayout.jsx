@@ -167,7 +167,7 @@ function MarketDetailsTable({
         >
           <section>
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-              Original Description v1
+              Description
             </h2>
             <p className="whitespace-pre-wrap">{marketDescription}</p>
           </section>
@@ -177,7 +177,7 @@ function MarketDetailsTable({
               {descriptionAmendments.map((amendment) => (
                 <article key={amendment.id || amendment.version} className="rounded-md border border-sky-900/70 bg-sky-950/30 p-3">
                   <div className="mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80">
-                    <span>v{amendment.version}</span>
+                    <span>Amendment {amendment.version}</span>
                     <span>Submitted by @{amendment.createdBy}</span>
                     {amendment.approvedAt && <span>Approved {new Date(amendment.approvedAt).toLocaleString()}</span>}
                   </div>

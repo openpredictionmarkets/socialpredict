@@ -424,24 +424,61 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
       )}
       {amendments.map((amendment) => {
         const reason = reasonById[amendment.id] || '';
+        const marketTitle = amendment.marketTitle || `Market #${amendment.marketId}`;
+        const previousAmendments = Array.isArray(amendment.previousApprovedAmendments)
+          ? amendment.previousApprovedAmendments
+          : [];
         return (
           <article key={amendment.id} className="grid gap-4 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
-              <span className="rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 text-xs font-semibold text-sky-100">
-                Market #{amendment.marketId}
-              </span>
-              <span className="rounded-full border border-gray-600 bg-gray-800 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-gray-200">
-                Amendment v{amendment.version}
-              </span>
-              <span>Submitted by @{amendment.createdBy}</span>
-              <span>{amendment.createdAt ? new Date(amendment.createdAt).toLocaleString() : ''}</span>
+            <div className="grid gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
+                <span className="rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 text-xs font-semibold text-sky-100">
+                  Market #{amendment.marketId}
+                </span>
+                <span className="rounded-full border border-gray-600 bg-gray-800 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-gray-200">
+                  Amendment {amendment.version}
+                </span>
+                <span>Submitted by @{amendment.createdBy}</span>
+                <span>{amendment.createdAt ? new Date(amendment.createdAt).toLocaleString() : ''}</span>
+              </div>
+              <a
+                href={`/markets/${amendment.marketId}`}
+                className="text-lg font-semibold text-white underline decoration-sky-500/40 underline-offset-4 transition hover:text-sky-200"
+              >
+                {marketTitle}
+              </a>
             </div>
             {amendment.submitReason && (
               <div className="rounded-md border border-gray-700 bg-gray-950 p-3 text-sm text-gray-300">
                 <span className="font-semibold text-gray-100">Submit reason:</span> {amendment.submitReason}
               </div>
             )}
+            <div className="grid gap-3 rounded-md border border-gray-700 bg-gray-950 p-4">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Description</p>
+                <p className="whitespace-pre-wrap text-sm leading-6 text-gray-200">
+                  {amendment.marketDescription || 'No market description was returned.'}
+                </p>
+              </div>
+              {previousAmendments.length > 0 && (
+                <div className="grid gap-2">
+                  {previousAmendments.map((previous) => (
+                    <article key={previous.id || previous.version} className="rounded-md border border-gray-700 bg-gray-900 p-3">
+                      <div className="mb-2 flex flex-wrap gap-2 text-xs text-gray-400">
+                        <span>Amendment {previous.version}</span>
+                        <span>Approved by @{previous.approvedBy || 'admin'}</span>
+                        {previous.approvedAt && <span>{new Date(previous.approvedAt).toLocaleString()}</span>}
+                      </div>
+                      <MarkdownLite>{previous.body}</MarkdownLite>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="rounded-md border border-sky-900/70 bg-sky-950/20 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">
+                Proposed Amendment {amendment.version}
+              </p>
               <MarkdownLite>{amendment.body}</MarkdownLite>
             </div>
             {status === 'rejected' && amendment.rejectionReason && (

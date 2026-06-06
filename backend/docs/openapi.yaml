@@ -4913,6 +4913,12 @@ components:
         marketId:
           type: integer
           format: int64
+        marketTitle:
+          type: string
+          description: Market title shown in admin review queues.
+        marketDescription:
+          type: string
+          description: Base market description shown as review context.
         version:
           type: integer
           minimum: 2
@@ -4946,6 +4952,11 @@ components:
           type: string
         submitReason:
           type: string
+        previousApprovedAmendments:
+          type: array
+          description: Approved amendments lower than this amendment version, included for admin review context.
+          items:
+            $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
 
     MarketDescriptionAmendmentListResponse:
       type: object
