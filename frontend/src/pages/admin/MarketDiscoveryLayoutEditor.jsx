@@ -66,7 +66,7 @@ const normalizePage = (page = {}, modeKey = 'top') => {
     description: page.description || (modeKey === 'secondary' ? 'Browse and search markets in this topic.' : 'Browse and search prediction markets.'),
     pageType: page.pageType || mode.pageType,
     primaryTagSlug: page.primaryTagSlug || '',
-    searchScope: page.searchScope || (modeKey === 'secondary' ? 'tag' : 'all'),
+    searchScope: modeKey === 'secondary' ? 'tag' : 'all',
     featuredTopicsEnabled: !!page.featuredTopicsEnabled,
     featuredMarketsEnabled: !!page.featuredMarketsEnabled,
     defaultRecommendationLimit,
@@ -536,7 +536,7 @@ function MarketDiscoveryLayoutEditor() {
           ...state,
           pageType: mode.pageType,
           primaryTagSlug: selectedMode === 'secondary' ? selectedSecondarySlug : state.primaryTagSlug,
-          searchScope: selectedMode === 'secondary' ? 'tag' : state.searchScope,
+          searchScope: selectedMode === 'secondary' ? 'tag' : 'all',
           featuredTopicsEnabled: selectedMode === 'secondary' ? false : state.featuredTopicsEnabled,
           featuredMarketsEnabled: selectedMode === 'secondary' ? true : state.featuredMarketsEnabled,
         }),
@@ -703,24 +703,13 @@ function MarketDiscoveryLayoutEditor() {
               )}
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <Field label="Page Title">
+                <Field label="Page Title" className="md:col-span-2">
                   <input
                     value={state.title}
                     maxLength={160}
                     onChange={(event) => updateState({ title: event.target.value })}
                     className={textInputClass}
                   />
-                </Field>
-                <Field label="Search Scope">
-                  <select
-                    value={state.searchScope}
-                    onChange={(event) => updateState({ searchScope: event.target.value })}
-                    disabled={selectedMode === 'secondary'}
-                    className={textInputClass}
-                  >
-                    <option value="all">All public markets</option>
-                    <option value="tag">Current topic/tag by default</option>
-                  </select>
                 </Field>
                 <Field label="Page Description" className="md:col-span-2">
                   <textarea
