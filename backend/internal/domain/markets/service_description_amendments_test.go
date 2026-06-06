@@ -83,6 +83,37 @@ func TestProposeMarketDescriptionAmendmentRequiresCurrentActiveSteward(t *testin
 	}
 }
 
+func TestProposeMarketDescriptionAmendmentAllowsReassignedStewardNotOriginalCreator(t *testing.T) {
+	repo, original := seedAmendmentMarket(t, "creator")
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return activeModeratorUser(username), nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(marketsTestTime()), markets.Config{GameMode: "moderator"})
+
+	reassigned, err := service.ReassignMarketSteward(context.Background(), original.ID, "steward", "admin", "creator unavailable")
+	if err != nil {
+		t.Fatalf("ReassignMarketSteward returned error: %v", err)
+	}
+	if reassigned.CurrentStewardUsername() != "steward" {
+		t.Fatalf("current steward = %q, want steward", reassigned.CurrentStewardUsername())
+	}
+
+	_, err = service.ProposeMarketDescriptionAmendment(context.Background(), original.ID, "creator", markets.MarketDescriptionAmendmentRequest{Body: "Creator should not be allowed after reassignment."})
+	if !errors.Is(err, markets.ErrUnauthorized) {
+		t.Fatalf("original creator proposal error = %v, want ErrUnauthorized", err)
+	}
+
+	amendment, err := service.ProposeMarketDescriptionAmendment(context.Background(), original.ID, "steward", markets.MarketDescriptionAmendmentRequest{Body: "Current steward clarification."})
+	if err != nil {
+		t.Fatalf("current steward proposal returned error: %v", err)
+	}
+	if amendment.CreatedBy != "steward" {
+		t.Fatalf("amendment creator = %q, want steward", amendment.CreatedBy)
+	}
+}
+
 func TestProposeMarketDescriptionAmendmentRejectsRawHTML(t *testing.T) {
 	repo, original := seedAmendmentMarket(t, "moderator")
 	usersSvc := newNoopUserService(func(service *noopUserService) {
