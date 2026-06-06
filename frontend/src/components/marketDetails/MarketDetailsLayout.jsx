@@ -8,6 +8,7 @@ import TradeTabs from '../../components/tabs/TradeTabs';
 import { BetButton } from '../buttons/trade/BetButtons';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketTagChips from '../markets/MarketTagChips';
 
 const DEFAULT_CREATOR_EMOJI = '👤';
 
@@ -92,6 +93,7 @@ function MarketDetailsTable({
           <span>•</span>
           <span>🪙 {currentProbability.toFixed(2)}</span>
         </div>
+        <MarketTagChips tags={safeMarket.tags || []} className='mt-3' />
       </div>
 
       <div className='mb-4'>

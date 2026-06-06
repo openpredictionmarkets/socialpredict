@@ -22,6 +22,7 @@ type marketReviewServiceMock struct {
 	rejectFn   func(context.Context, int64, string, string) (*dmarkets.Market, error)
 	listFn     func(context.Context, dmarkets.ListFilters) ([]*dmarkets.Market, error)
 	reassignFn func(context.Context, int64, string, string, string) (*dmarkets.Market, error)
+	tagsFn     func(context.Context, int64, []string, string) (*dmarkets.Market, error)
 }
 
 func (m marketReviewServiceMock) ApproveProposedMarket(ctx context.Context, marketID int64, actorUsername string, confirmed bool) (*dmarkets.Market, error) {
@@ -38,6 +39,10 @@ func (m marketReviewServiceMock) ListLifecycleMarkets(ctx context.Context, filte
 
 func (m marketReviewServiceMock) ReassignMarketSteward(ctx context.Context, marketID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.Market, error) {
 	return m.reassignFn(ctx, marketID, newStewardUsername, actorUsername, reason)
+}
+
+func (m marketReviewServiceMock) UpdateMarketTags(ctx context.Context, marketID int64, tagSlugs []string, actorUsername string) (*dmarkets.Market, error) {
+	return m.tagsFn(ctx, marketID, tagSlugs, actorUsername)
 }
 
 type marketReviewAuthMock struct {
@@ -242,6 +247,42 @@ func TestReassignMarketStewardHandlerReassignsSteward(t *testing.T) {
 	}
 	if len(envelope.Result.StewardshipAudits) != 1 || envelope.Result.StewardshipAudits[0].Reason != "moderator inactive" {
 		t.Fatalf("expected stewardship audit in response, got %+v", envelope.Result.StewardshipAudits)
+	}
+}
+
+func TestUpdateMarketTagsHandlerRewritesMarketTags(t *testing.T) {
+	svc := marketReviewServiceMock{
+		tagsFn: func(_ context.Context, marketID int64, tagSlugs []string, actorUsername string) (*dmarkets.Market, error) {
+			if marketID != 46 || actorUsername != "admin" || len(tagSlugs) != 2 || tagSlugs[0] != "sports" || tagSlugs[1] != "policy" {
+				t.Fatalf("unexpected tag update args: id=%d actor=%q slugs=%+v", marketID, actorUsername, tagSlugs)
+			}
+			return &dmarkets.Market{
+				ID:              marketID,
+				QuestionTitle:   "Tagged market",
+				Status:          dmarkets.MarketStatusActive,
+				LifecycleStatus: dmarkets.MarketLifecyclePublished,
+				Tags: []dmarkets.MarketTag{
+					{ID: 1, Slug: "policy", DisplayName: "Policy", IsActive: true},
+					{ID: 2, Slug: "sports", DisplayName: "Sports", IsActive: true},
+				},
+			}, nil
+		},
+	}
+	handler := UpdateMarketTagsHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := mux.SetURLVars(httptest.NewRequest(http.MethodPatch, "/v0/admin/markets/46/tags", bytes.NewBufferString(`{"tagSlugs":["sports","policy"]}`)), map[string]string{"id": "46"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketReviewResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !envelope.OK || len(envelope.Result.Tags) != 2 || envelope.Result.Tags[0].Slug != "policy" {
+		t.Fatalf("unexpected response: %+v", envelope)
 	}
 }
 

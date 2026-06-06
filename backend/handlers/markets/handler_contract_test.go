@@ -270,6 +270,60 @@ func TestHandlerListMarkets_UsesCreatedByFilterWhenStatusProvided(t *testing.T) 
 	}
 }
 
+func TestHandlerListMarkets_UsesTagFilterWhenStatusProvided(t *testing.T) {
+	now := time.Now().UTC()
+	market := &dmarkets.Market{
+		ID:                 12,
+		QuestionTitle:      "Tagged active market",
+		Description:        "desc",
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: now.Add(time.Hour),
+		CreatorUsername:    "alice",
+		YesLabel:           "YES",
+		NoLabel:            "NO",
+		Status:             "active",
+		CreatedAt:          now.Add(-24 * time.Hour),
+		UpdatedAt:          now,
+		Tags: []dmarkets.MarketTag{
+			{Slug: "one", DisplayName: "One", IsActive: true},
+		},
+	}
+
+	service := &contractServiceMock{
+		listFn: func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+			want := dmarkets.ListFilters{Status: "active", TagSlug: "one", Limit: 5, Offset: 2}
+			if filters != want {
+				t.Fatalf("expected filters %+v, got %+v", want, filters)
+			}
+			return []*dmarkets.Market{market}, nil
+		},
+		listByStatusFn: func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error) {
+			t.Fatalf("expected status+tag request to use ListMarkets, got ListByStatus(%q, %+v)", status, p)
+			return nil, nil
+		},
+		detailsFn: func(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+			return newOverview(market), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets?status=active&tagSlug=one&limit=5&offset=2", nil)
+	rr := httptest.NewRecorder()
+
+	newContractHandler(service, nil).ListMarkets(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+
+	var resp dto.ListMarketsResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if resp.Total != 1 || len(resp.Markets) != 1 || resp.Markets[0].Market.ID != 12 {
+		t.Fatalf("unexpected list response: %+v", resp)
+	}
+}
+
 func TestHandlerSearchMarkets_SupportsLegacyQAndInvalidRequestFailure(t *testing.T) {
 	now := time.Now().UTC()
 	market := &dmarkets.Market{

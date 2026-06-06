@@ -40,6 +40,7 @@ func parseListMarketsParams(r *http.Request) (listMarketsParams, error) {
 		filters: dmarkets.ListFilters{
 			Status:    status,
 			CreatedBy: strings.TrimSpace(r.URL.Query().Get("created_by")),
+			TagSlug:   normalizeTagSlugParam(r.URL.Query().Get("tagSlug")),
 			Limit:     page.Limit,
 			Offset:    page.Offset,
 		},
@@ -77,6 +78,9 @@ func parseListPage(r *http.Request) dmarkets.Page {
 }
 
 func fetchMarketsByStatus(r *http.Request, svc dmarkets.ServiceInterface, params listMarketsParams) ([]*dmarkets.Market, error) {
+	if params.filters.TagSlug != "" || params.filters.CreatedBy != "" {
+		return svc.ListMarkets(r.Context(), params.filters)
+	}
 	return svc.ListByStatus(r.Context(), params.filters.Status, params.page)
 }
 

@@ -40,6 +40,13 @@ const AppRoutes = () => {
           <About />
         )}
       </Route>
+      <Route exact path='/markets/topic/:slug'>
+        {isLoggedIn && mustChangePassword ? (
+          <Redirect to='/changepassword' />
+        ) : (
+          <Markets />
+        )}
+      </Route>
       <Route exact path='/markets/:marketId'>
         {isLoggedIn && mustChangePassword ? (
           <Redirect to='/changepassword' />

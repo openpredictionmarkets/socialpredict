@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import MarketTagChips from '../../markets/MarketTagChips';
 
 const formatDate = (value) => {
   if (!value) return 'n/a';
@@ -101,6 +102,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
                     </button>
                   </div>
                 )}
+                <MarketTagChips tags={market.tags || []} className="mt-3" />
                 <MarketLabels market={market} />
                 {statusLabel(market) === 'published' && (
                   <Link className="mt-2 inline-block text-primary-pink hover:underline" to={`/markets/${market.id}`}>

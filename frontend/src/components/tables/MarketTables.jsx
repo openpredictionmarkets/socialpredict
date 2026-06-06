@@ -6,6 +6,7 @@ import MobileMarketCard from '../../components/tables/MobileMarketCard';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketTagChips from '../markets/MarketTagChips';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -45,7 +46,7 @@ const MarketRow = ({ marketData }) => (
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-300'>
       {marketData.lastProbability.toFixed(2)}
     </td>
-    <td className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300'>
+    <td className='px-6 py-4 whitespace-normal text-sm font-medium text-gray-300'>
       <Link
         to={`/markets/${marketData.market.id}`}
         className='hover:text-blue-400 transition-colors duration-200 block max-w-xs overflow-hidden overflow-ellipsis'
@@ -53,6 +54,7 @@ const MarketRow = ({ marketData }) => (
       >
         {marketData.market.questionTitle}
       </Link>
+      <MarketTagChips tags={marketData.market.tags || []} className="mt-2" />
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
       {formatResolutionDate(marketData.market.resolutionDateTime)}

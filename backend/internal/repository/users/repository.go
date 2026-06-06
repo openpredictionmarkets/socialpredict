@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"socialpredict/internal/domain/boundary"
@@ -152,6 +153,16 @@ func (r *GormRepository) List(ctx context.Context, filters dusers.ListFilters) (
 
 	if filters.UserType != "" {
 		query = query.Where("user_type = ?", filters.UserType)
+	}
+
+	if term := strings.ToLower(strings.TrimSpace(filters.Query)); term != "" {
+		like := "%" + term + "%"
+		query = query.Where(
+			"LOWER(username) LIKE ? OR LOWER(display_name) LIKE ? OR LOWER(email) LIKE ?",
+			like,
+			like,
+			like,
+		)
 	}
 
 	if filters.Limit > 0 {

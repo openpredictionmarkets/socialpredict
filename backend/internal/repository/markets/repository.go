@@ -50,7 +50,11 @@ func (r *GormRepository) GetByID(ctx context.Context, id int64) (*dmarkets.Marke
 		return nil, err
 	}
 
-	return r.modelToDomain(&dbMarket), nil
+	market := r.modelToDomain(&dbMarket)
+	if err := r.hydrateTagsForMarkets(ctx, []*dmarkets.Market{market}); err != nil {
+		return nil, err
+	}
+	return market, nil
 }
 
 // GetPublicMarket retrieves a market with public-facing attributes.
@@ -63,6 +67,10 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		return nil, err
 	}
 
+	domainMarket := r.modelToDomain(&market)
+	if err := r.hydrateTagsForMarkets(ctx, []*dmarkets.Market{domainMarket}); err != nil {
+		return nil, err
+	}
 	return &dmarkets.PublicMarket{
 		ID:                      market.ID,
 		QuestionTitle:           market.QuestionTitle,
@@ -75,12 +83,13 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		ResolutionResult:        market.ResolutionResult,
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
-		StewardUsername:         r.modelToDomain(&market).CurrentStewardUsername(),
+		StewardUsername:         domainMarket.CurrentStewardUsername(),
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
-		Status:                  r.modelToDomain(&market).Status,
+		Status:                  domainMarket.Status,
 		LifecycleStatus:         dmarkets.NormalizeLifecycleStatus(market.LifecycleStatus),
+		Tags:                    domainMarket.Tags,
 	}, nil
 }
 
@@ -111,15 +120,20 @@ func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters)
 
 	query = applyListStatusFilter(query, filters.Status)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
+	query = applyTagSlugFilter(query, filters.TagSlug)
 	query = applyPagination(query, filters.Limit, filters.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 // ListByStatus retrieves markets filtered by status with pagination
@@ -128,14 +142,18 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 
 	query = applyStatusByResolution(query, status, time.Now())
 	query = applyPagination(query, p.Limit, p.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 // ListByLifecycle retrieves lifecycle queues that are intentionally excluded
@@ -147,7 +165,7 @@ func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.L
 	query = applyLifecycleSearchTerm(query, filters.Query)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
 	query = applyPagination(query, filters.Limit, filters.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
@@ -155,6 +173,9 @@ func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.L
 	}
 
 	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
 	if err := r.hydrateStewardshipAudits(ctx, markets); err != nil {
 		return nil, err
 	}
@@ -207,6 +228,18 @@ func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
 	return query.Where("creator_username = ?", createdBy)
 }
 
+func applyTagSlugFilter(query *gorm.DB, tagSlug string) *gorm.DB {
+	tagSlug = strings.Trim(strings.ToLower(strings.TrimSpace(tagSlug)), "-")
+	if tagSlug == "" {
+		return query
+	}
+	return query.
+		Joins("JOIN market_tag_assignments ON market_tag_assignments.market_id = markets.id AND market_tag_assignments.deleted_at IS NULL").
+		Joins("JOIN market_tags ON market_tags.id = market_tag_assignments.tag_id AND market_tags.deleted_at IS NULL").
+		Where("market_tags.slug = ?", tagSlug).
+		Distinct("markets.*")
+}
+
 func applyStatusByResolution(query *gorm.DB, status string, now time.Time) *gorm.DB {
 	switch status {
 	case dmarkets.MarketStatusActive:
@@ -226,21 +259,26 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 
 	dbQuery = applySearchTerm(dbQuery, query)
 	dbQuery = applyStatusFilter(dbQuery, filters.Status)
+	dbQuery = applyTagSlugFilter(dbQuery, filters.TagSlug)
 	dbQuery = applyPagination(dbQuery, filters.Limit, filters.Offset)
-	dbQuery = dbQuery.Order("created_at DESC")
+	dbQuery = dbQuery.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := dbQuery.Find(&dbMarkets).Error; err != nil {
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 func applySearchTerm(dbQuery *gorm.DB, query string) *gorm.DB {
 	searchTerm := strings.ToLower(query)
 	searchPattern := "%" + searchTerm + "%"
-	return dbQuery.Where("(LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?)", searchPattern, searchPattern)
+	return dbQuery.Where("(LOWER(markets.question_title) LIKE ? OR LOWER(markets.description) LIKE ?)", searchPattern, searchPattern)
 }
 
 func applyStatusFilter(dbQuery *gorm.DB, status string) *gorm.DB {
@@ -647,6 +685,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		UpdatedAt:               dbMarket.UpdatedAt,
 		InitialProbability:      dbMarket.InitialProbability,
 		UTCOffset:               dbMarket.UTCOffset,
+		Tags:                    []dmarkets.MarketTag{},
 	}
 }
 

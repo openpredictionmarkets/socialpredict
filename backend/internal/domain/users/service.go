@@ -110,6 +110,7 @@ type ServiceDependencies struct {
 // ListFilters represents filters for listing users
 type ListFilters struct {
 	UserType string
+	Query    string
 	Limit    int
 	Offset   int
 }

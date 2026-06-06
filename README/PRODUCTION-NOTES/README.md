@@ -81,6 +81,8 @@ Current feature specs:
 4. **Load Testing And Release Dossier Evidence** - [`FEATURES/04/04-load-testing.md`](./FEATURES/04/04-load-testing.md), [`FEATURES/04/DESIGN.md`](./FEATURES/04/DESIGN.md), [`FEATURES/04/PLAN.md`](./FEATURES/04/PLAN.md)
 5. **Runtime Rate Limit Policy** - [`FEATURES/05/05-runtime-rate-limit-policy.md`](./FEATURES/05/05-runtime-rate-limit-policy.md), [`FEATURES/05/DESIGN.md`](./FEATURES/05/DESIGN.md), [`FEATURES/05/PLAN.md`](./FEATURES/05/PLAN.md)
 6. **Temporary Load-Test Droplets** - [`FEATURES/06/06-temporary-loadtest-droplets.md`](./FEATURES/06/06-temporary-loadtest-droplets.md), [`FEATURES/06/DESIGN.md`](./FEATURES/06/DESIGN.md), [`FEATURES/06/PLAN.md`](./FEATURES/06/PLAN.md)
+7. **Market Stewardship** - [`FEATURES/07/07-market-stewardship.md`](./FEATURES/07/07-market-stewardship.md), [`FEATURES/07/DESIGN.md`](./FEATURES/07/DESIGN.md), [`FEATURES/07/PLAN.md`](./FEATURES/07/PLAN.md)
+9. **Market Taxonomy And Hierarchical Navigation** - [`FEATURES/09/09-market-taxonomy-navigation.md`](./FEATURES/09/09-market-taxonomy-navigation.md), [`FEATURES/09/DESIGN.md`](./FEATURES/09/DESIGN.md), [`FEATURES/09/PLAN.md`](./FEATURES/09/PLAN.md)
 
 ## Implementation Priority
 
