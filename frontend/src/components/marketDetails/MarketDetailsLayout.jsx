@@ -157,7 +157,7 @@ function MarketDetailsTable({
           className={`grid gap-4 text-sm break-words ${
             showFullDescription
               ? ''
-              : 'sm:max-h-40 h-24 overflow-y-auto sm:overflow-hidden'
+              : 'max-h-40 overflow-y-auto sm:overflow-hidden'
           }`}
           style={{
             wordBreak: 'break-word',
@@ -169,7 +169,11 @@ function MarketDetailsTable({
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
               Description
             </h2>
-            <p className="whitespace-pre-wrap">{marketDescription}</p>
+            {marketDescription.trim() ? (
+              <p className="whitespace-pre-wrap">{marketDescription}</p>
+            ) : (
+              <p className="text-gray-500 italic">No description provided.</p>
+            )}
           </section>
           {descriptionAmendments.length > 0 && (
             <section className="grid gap-3">
