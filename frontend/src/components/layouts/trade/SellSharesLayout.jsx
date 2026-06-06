@@ -365,6 +365,9 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
                 <QuoteMetric label="Dust coverage" value={`${coverageLabel}%`} />
             </div>
             <p className="mt-3 text-xs leading-relaxed">{quote.message}</p>
+            <p className="mt-2 text-xs leading-relaxed opacity-80">
+                Informational only. Dust fee amounts not guaranteed if trade volume is currently high.
+            </p>
             {!quote.allowed && quote.suggestedAmounts?.length > 0 && (
                 <div className="mt-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide">Try a valid amount</p>
