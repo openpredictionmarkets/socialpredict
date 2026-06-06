@@ -2232,6 +2232,11 @@ paths:
           schema:
             type: string
             enum: [ADMIN, REGULAR, MODERATOR]
+        - in: query
+          name: query
+          schema:
+            type: string
+          description: Optional case-insensitive search across username, display name, and email.
       responses:
         '200':
           description: Admin user queue returned.
