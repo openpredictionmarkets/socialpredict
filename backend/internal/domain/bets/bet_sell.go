@@ -237,11 +237,11 @@ func dustCapCoverage(maxDust int64, valuePerShare int64) float64 {
 func sellQuoteMessage(allowed bool, dust int64, maxDust int64) string {
 	if allowed {
 		if dust == 0 {
-			return "This sale can be submitted with no dust."
+			return "This sale can be submitted with no dust fee."
 		}
-		return fmt.Sprintf("This sale can be submitted. It would retain %d dust as a whole-share rounding remainder.", dust)
+		return fmt.Sprintf("This Sale Order can be submitted. It would include a %d credit dust fee from whole-share rounding.", dust)
 	}
-	return fmt.Sprintf("This sale would create %d dust, above the configured maximum of %d. Try a different requested credit amount.", dust, maxDust)
+	return fmt.Sprintf("This Sale Order would create a %d credit dust fee, above the configured maximum of %d. Try a different Sale Order amount.", dust, maxDust)
 }
 
 func suggestSaleAmounts(sale SaleQuote, sharesOwned int64, maxDust int64) []int64 {

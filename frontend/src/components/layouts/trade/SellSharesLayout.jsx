@@ -156,7 +156,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             .then((quote) => {
                 setSaleQuote(quote);
                 if (!quote.allowed) {
-                    alert(quote.message || 'Sale preview is not allowed. Try a different requested credit amount.');
+                    alert(quote.message || 'Sale preview is not allowed. Try a different Sale Order amount.');
                     setIsSubmitting(false);
                     return;
                 }
@@ -210,9 +210,9 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     <div className="border-t border-gray-200 my-2"></div>
                     <div className="flex items-center space-x-4 mb-4">
                         <div>
-                            <h2 className="text-xl">Requested Credits</h2>
+                            <h2 className="text-xl">Sale Order</h2>
                             <p className="text-xs text-blue-100">
-                                Sales are rounded down to whole shares. Any small remainder is shown as dust.
+                                Share values are rounded, you may change your Sale Order to reduce dust fees.
                             </p>
                         </div>
                         <SaleInputAmount
@@ -318,7 +318,7 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
     if (!selectedOutcome) {
         return (
             <div className="mb-4 rounded-lg border border-blue-700 bg-blue-950/40 p-3 text-sm text-blue-100">
-                Select YES or NO shares to preview how many whole shares will be sold and whether any dust applies.
+                Select YES or NO shares to preview how many whole shares will be sold and whether any dust fee applies.
             </div>
         );
     }
@@ -357,12 +357,12 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
                 </span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-                <QuoteMetric label="Requested" value={quote.requestedCredits} />
+                <QuoteMetric label="Sale order" value={quote.requestedCredits} />
                 <QuoteMetric label="Credits received" value={quote.saleValue} />
                 <QuoteMetric label="Shares sold" value={quote.sharesSold} />
-                <QuoteMetric label="Dust" value={`${quote.dust} / ${quote.maxDust}`} />
+                <QuoteMetric label="Dust fee" value={`${quote.dust} / ${quote.maxDust}`} />
                 <QuoteMetric label="Value per share" value={quote.valuePerShare} />
-                <QuoteMetric label="Dust coverage" value={`${coverageLabel}% of one share step`} />
+                <QuoteMetric label="Dust coverage" value={`${coverageLabel}%`} />
             </div>
             <p className="mt-3 text-xs leading-relaxed">{quote.message}</p>
             {!quote.allowed && quote.suggestedAmounts?.length > 0 && (

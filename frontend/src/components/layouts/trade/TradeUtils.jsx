@@ -23,9 +23,9 @@ const formatApiError = (errorData, fallback) => {
         const dust = errorData.details?.dust;
         const maxDust = errorData.details?.maxDust;
         const suffix = dust !== undefined && maxDust !== undefined
-            ? ` This sale would create ${dust} dust, but the maximum allowed is ${maxDust}.`
+            ? ` This Sale Order would create a ${dust} credit dust fee, but the maximum allowed is ${maxDust}.`
             : '';
-        return `${errorData.message || 'Sale would create too much rounding dust.'}${suffix} Try a different requested credit amount.`;
+        return `${errorData.message || 'Sale would create too much rounding dust.'}${suffix} Try a different Sale Order amount.`;
     }
 
     return errorData.message || errorData.reason || errorData.error || fallback;
