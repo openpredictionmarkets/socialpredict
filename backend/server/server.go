@@ -422,6 +422,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// handle private user actions such as make a bet, sell positions, get user position
 	router.Handle("/v0/bet", privateActionMiddleware(buybetshandlers.PlaceBetHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 	router.Handle("/v0/userposition/{marketId}", privateActionMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
+	router.Handle("/v0/sell/quote", privateActionMiddleware(sellbetshandlers.SellQuoteHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 	router.Handle("/v0/sell", privateActionMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
 
 	// admin stuff - apply security middleware

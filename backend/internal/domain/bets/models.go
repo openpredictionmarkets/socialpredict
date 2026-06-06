@@ -122,3 +122,58 @@ func buildSellResult(target *SellResult, req SellRequest, outcome string, sale S
 func (r *SellResult) Build(req SellRequest, outcome string, sale SaleQuote, transactionAt time.Time) *SellResult {
 	return buildSellResult(r, req, outcome, sale, transactionAt)
 }
+
+// SellQuoteResult previews a sale without mutating account or market state.
+type SellQuoteResult struct {
+	Username          string
+	MarketID          uint
+	Outcome           string
+	RequestedCredits  int64
+	SharesSold        int64
+	SaleValue         int64
+	Dust              int64
+	MaxDust           int64
+	ValuePerShare     int64
+	DustCapCoverage   float64
+	Allowed           bool
+	SuggestedAmounts  []int64
+	Message           string
+	QuotedAt          time.Time
+	DustCapExceeded   bool
+	DustCapExceededBy int64
+}
+
+func buildSellQuoteResult(target *SellQuoteResult, req SellRequest, outcome string, sale SaleQuote, maxDust int64, allowed bool, suggested []int64, quotedAt time.Time) *SellQuoteResult {
+	if target == nil {
+		target = &SellQuoteResult{}
+	}
+
+	exceededBy := int64(0)
+	if maxDust > 0 && sale.Dust > maxDust {
+		exceededBy = sale.Dust - maxDust
+	}
+
+	*target = SellQuoteResult{
+		Username:          req.Username,
+		MarketID:          req.MarketID,
+		Outcome:           outcome,
+		RequestedCredits:  req.Amount,
+		SharesSold:        sale.SharesToSell,
+		SaleValue:         sale.SaleValue,
+		Dust:              sale.Dust,
+		MaxDust:           maxDust,
+		ValuePerShare:     sale.ValuePerShare,
+		DustCapCoverage:   dustCapCoverage(maxDust, sale.ValuePerShare),
+		Allowed:           allowed,
+		SuggestedAmounts:  suggested,
+		Message:           sellQuoteMessage(allowed, sale.Dust, maxDust),
+		QuotedAt:          quotedAt,
+		DustCapExceeded:   exceededBy > 0,
+		DustCapExceededBy: exceededBy,
+	}
+	return target
+}
+
+func (r *SellQuoteResult) Build(req SellRequest, outcome string, sale SaleQuote, maxDust int64, allowed bool, suggested []int64, quotedAt time.Time) *SellQuoteResult {
+	return buildSellQuoteResult(r, req, outcome, sale, maxDust, allowed, suggested, quotedAt)
+}

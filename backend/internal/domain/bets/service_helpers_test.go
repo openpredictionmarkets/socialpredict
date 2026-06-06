@@ -422,14 +422,14 @@ func TestSaleCalculator_Calculate(t *testing.T) {
 			position:    pos,
 			sharesOwned: 10,
 			requested:   23,
-			want:        SaleQuote{SharesToSell: 2, SaleValue: 20, Dust: 3},
+			want:        SaleQuote{RequestedCredits: 23, SharesToSell: 2, SaleValue: 20, Dust: 3, ValuePerShare: 10},
 		},
 		{
 			name:        "successful sale below dust cap",
 			position:    pos,
 			sharesOwned: 10,
 			requested:   32,
-			want:        SaleQuote{SharesToSell: 3, SaleValue: 30, Dust: 2},
+			want:        SaleQuote{RequestedCredits: 32, SharesToSell: 3, SaleValue: 30, Dust: 2, ValuePerShare: 10},
 		},
 		{
 			name:        "request too small",

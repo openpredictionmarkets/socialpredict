@@ -599,6 +599,7 @@ func TestServerBlocksPrivateActionRoutesWhenPasswordChangeRequiredWithSharedReas
 		body   string
 	}{
 		{name: "place bet", method: http.MethodPost, path: "/v0/bet", body: `{"marketId":1,"amount":10,"outcome":"YES"}`},
+		{name: "quote sell position", method: http.MethodPost, path: "/v0/sell/quote", body: `{"marketId":1,"amount":1,"outcome":"YES"}`},
 		{name: "sell position", method: http.MethodPost, path: "/v0/sell", body: `{"marketId":1,"amount":1,"outcome":"YES"}`},
 		{name: "user position", method: http.MethodGet, path: "/v0/userposition/1"},
 	}

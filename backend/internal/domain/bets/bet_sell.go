@@ -2,6 +2,9 @@ package bets
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"sort"
 
 	dmarkets "socialpredict/internal/domain/markets"
 )
@@ -23,6 +26,39 @@ func (s *Service) Sell(ctx context.Context, req SellRequest) (*SellResult, error
 	}
 
 	return s.sellInTransaction(ctx, req, outcome)
+}
+
+// QuoteSell previews a sell request without mutating account or market state.
+func (s *Service) QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteResult, error) {
+	outcome, err := s.sellValidator.Validate(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if outcome == "" {
+		return nil, ErrInvalidOutcome
+	}
+
+	if _, err := (marketGate{markets: s.markets, clock: s.clock}).Open(ctx, int64(req.MarketID)); err != nil {
+		return nil, err
+	}
+
+	sharesOwned, position, err := s.loadUserShares(ctx, req, outcome)
+	if err != nil {
+		return nil, err
+	}
+
+	sale, err := s.saleCalculator.Quote(position, sharesOwned, req.Amount)
+	if err != nil {
+		return nil, err
+	}
+
+	allowed := true
+	if err := validateDustCap(sale.Dust, s.config.MaxDustPerSale); err != nil {
+		allowed = false
+	}
+
+	suggested := suggestSaleAmounts(sale, sharesOwned, s.config.MaxDustPerSale)
+	return new(SellQuoteResult).Build(req, outcome, sale, s.config.MaxDustPerSale, allowed, suggested, s.clock.Now()), nil
 }
 
 func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcome string) (*SellResult, error) {
@@ -84,9 +120,11 @@ func loadUserSharesFrom(ctx context.Context, markets PositionReader, req SellReq
 // SaleQuote summarises how a sale request would be executed.
 // Exported so alternative SaleCalculator implementations can return it.
 type SaleQuote struct {
-	SharesToSell int64
-	SaleValue    int64
-	Dust         int64
+	RequestedCredits int64
+	SharesToSell     int64
+	SaleValue        int64
+	Dust             int64
+	ValuePerShare    int64
 }
 
 type saleCalculator struct {
@@ -94,6 +132,17 @@ type saleCalculator struct {
 }
 
 func (s saleCalculator) Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error) {
+	quote, err := s.Quote(pos, sharesOwned, creditsRequested)
+	if err != nil {
+		return SaleQuote{}, err
+	}
+	if err := validateDustCap(quote.Dust, s.maxDustPerSale); err != nil {
+		return SaleQuote{}, err
+	}
+	return quote, nil
+}
+
+func (s saleCalculator) Quote(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error) {
 	if pos == nil {
 		return SaleQuote{}, ErrNoPosition
 	}
@@ -123,11 +172,13 @@ func (s saleCalculator) Calculate(pos *dmarkets.UserPosition, sharesOwned int64,
 	saleValue := sharesToSell * valuePerShare
 	dust := calculateDust(creditsRequested, saleValue)
 
-	if err := validateDustCap(dust, s.maxDustPerSale); err != nil {
-		return SaleQuote{}, err
-	}
-
-	return SaleQuote{SharesToSell: sharesToSell, SaleValue: saleValue, Dust: dust}, nil
+	return SaleQuote{
+		RequestedCredits: creditsRequested,
+		SharesToSell:     sharesToSell,
+		SaleValue:        saleValue,
+		Dust:             dust,
+		ValuePerShare:    valuePerShare,
+	}, nil
 }
 
 func sharesOwnedForOutcome(pos *dmarkets.UserPosition, outcome string) (int64, error) {
@@ -167,4 +218,76 @@ func validateDustCap(dust int64, cap int64) error {
 		return newDustCapExceeded(cap, dust)
 	}
 	return nil
+}
+
+func dustCapCoverage(maxDust int64, valuePerShare int64) float64 {
+	if valuePerShare <= 0 {
+		return 0
+	}
+	if maxDust < 0 {
+		maxDust = 0
+	}
+	coverage := float64(maxDust+1) / float64(valuePerShare)
+	if coverage > 1 {
+		return 1
+	}
+	return math.Round(coverage*10000) / 10000
+}
+
+func sellQuoteMessage(allowed bool, dust int64, maxDust int64) string {
+	if allowed {
+		if dust == 0 {
+			return "This sale can be submitted with no dust."
+		}
+		return fmt.Sprintf("This sale can be submitted. It would retain %d dust as a whole-share rounding remainder.", dust)
+	}
+	return fmt.Sprintf("This sale would create %d dust, above the configured maximum of %d. Try a different requested credit amount.", dust, maxDust)
+}
+
+func suggestSaleAmounts(sale SaleQuote, sharesOwned int64, maxDust int64) []int64 {
+	if sale.ValuePerShare <= 0 || sharesOwned <= 0 {
+		return []int64{}
+	}
+	if maxDust < 0 {
+		maxDust = 0
+	}
+
+	seen := make(map[int64]struct{})
+	var candidates []int64
+	for _, shares := range []int64{sale.SharesToSell - 1, sale.SharesToSell, sale.SharesToSell + 1} {
+		if shares <= 0 || shares > sharesOwned {
+			continue
+		}
+		base := shares * sale.ValuePerShare
+		for dust := int64(0); dust <= maxDust; dust++ {
+			amount := base + dust
+			if _, ok := seen[amount]; ok {
+				continue
+			}
+			seen[amount] = struct{}{}
+			candidates = append(candidates, amount)
+		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		leftDistance := absInt64(candidates[i] - sale.RequestedCredits)
+		rightDistance := absInt64(candidates[j] - sale.RequestedCredits)
+		if leftDistance == rightDistance {
+			return candidates[i] < candidates[j]
+		}
+		return leftDistance < rightDistance
+	})
+
+	if len(candidates) > 6 {
+		candidates = candidates[:6]
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i] < candidates[j] })
+	return candidates
+}
+
+func absInt64(value int64) int64 {
+	if value < 0 {
+		return -value
+	}
+	return value
 }

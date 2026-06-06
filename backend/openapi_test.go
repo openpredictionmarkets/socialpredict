@@ -314,6 +314,7 @@ func TestOpenAPIDocumentsPasswordChangeAuthExceptions(t *testing.T) {
 		method string
 	}{
 		{path: "/v0/bet", method: httpMethodPost},
+		{path: "/v0/sell/quote", method: httpMethodPost},
 		{path: "/v0/sell", method: httpMethodPost},
 		{path: "/v0/userposition/{marketId}", method: httpMethodGet},
 	} {

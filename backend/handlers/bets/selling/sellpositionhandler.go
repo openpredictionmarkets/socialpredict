@@ -44,6 +44,36 @@ func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceI
 	}
 }
 
+// SellQuoteHandler returns an HTTP handler that previews a sale without settlement.
+func SellQuoteHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+			return
+		}
+
+		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
+			return
+		}
+
+		req, decodeErr := decodeSellRequest(r)
+		if decodeErr != nil {
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+			return
+		}
+
+		result, err := betsSvc.QuoteSell(r.Context(), toSellRequest(req, user.Username))
+		if err != nil {
+			handleSellError(w, err)
+			return
+		}
+
+		writeSellQuoteResponse(w, result)
+	}
+}
+
 func decodeSellRequest(r *http.Request) (dto.SellBetRequest, error) {
 	var req dto.SellBetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -106,4 +136,27 @@ func writeSellResponse(w http.ResponseWriter, result *bets.SellResult) {
 	}
 
 	_ = handlers.WriteResult(w, http.StatusCreated, response)
+}
+
+func writeSellQuoteResponse(w http.ResponseWriter, result *bets.SellQuoteResult) {
+	response := dto.SellQuoteResponse{
+		Username:          result.Username,
+		MarketID:          result.MarketID,
+		Outcome:           result.Outcome,
+		RequestedCredits:  result.RequestedCredits,
+		SharesSold:        result.SharesSold,
+		SaleValue:         result.SaleValue,
+		Dust:              result.Dust,
+		MaxDust:           result.MaxDust,
+		ValuePerShare:     result.ValuePerShare,
+		DustCapCoverage:   result.DustCapCoverage,
+		Allowed:           result.Allowed,
+		SuggestedAmounts:  result.SuggestedAmounts,
+		Message:           result.Message,
+		QuotedAt:          result.QuotedAt,
+		DustCapExceeded:   result.DustCapExceeded,
+		DustCapExceededBy: result.DustCapExceededBy,
+	}
+
+	_ = handlers.WriteResult(w, http.StatusOK, response)
 }

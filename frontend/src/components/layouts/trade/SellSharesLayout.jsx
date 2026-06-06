@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons';
-import { fetchUserShares, submitSale } from './TradeUtils';
+import { fetchSaleQuote, fetchUserShares, submitSale } from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
 import { API_URL } from '../../../config';
 import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
@@ -13,6 +13,9 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     const [isLoading, setIsLoading] = useState(true);
     const [sharesLoading, setSharesLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [saleQuote, setSaleQuote] = useState(null);
+    const [quoteError, setQuoteError] = useState('');
+    const [isQuoteLoading, setIsQuoteLoading] = useState(false);
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
@@ -52,6 +55,8 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
             setSelectedOutcome(null);
             setSellAmount(1);
+            setSaleQuote(null);
+            setQuoteError('');
             return;
         }
 
@@ -83,6 +88,43 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             .finally(() => setSharesLoading(false));
     }, [marketId, token]);
 
+    useEffect(() => {
+        if (!token || !selectedOutcome || sellAmount < 1 || sharesLoading) {
+            setSaleQuote(null);
+            setQuoteError('');
+            setIsQuoteLoading(false);
+            return undefined;
+        }
+
+        let cancelled = false;
+        setIsQuoteLoading(true);
+        setQuoteError('');
+
+        const timeoutId = window.setTimeout(() => {
+            fetchSaleQuote({ marketId, outcome: selectedOutcome, amount: sellAmount }, token)
+                .then((quote) => {
+                    if (!cancelled) {
+                        setSaleQuote(quote);
+                    }
+                })
+                .catch((error) => {
+                    if (!cancelled) {
+                        setSaleQuote(null);
+                        setQuoteError(error.message);
+                    }
+                })
+                .finally(() => {
+                    if (!cancelled) {
+                        setIsQuoteLoading(false);
+                    }
+                });
+        }, 300);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [marketId, selectedOutcome, sellAmount, sharesLoading, token]);
 
     const handleSellAmountChange = (event) => {
         const newAmount = parseInt(event.target.value, 10) || 0; // Ensure it defaults to 0 if conversion fails
@@ -110,22 +152,36 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
         };
 
         setIsSubmitting(true);
-        submitSale(
-            saleData,
-            token,
-            (data) => {
-                alert(buildSaleSuccessMessage(data));
-                setSelectedOutcome(null);
-                setSellAmount(1);
+        fetchSaleQuote(saleData, token)
+            .then((quote) => {
+                setSaleQuote(quote);
+                if (!quote.allowed) {
+                    alert(quote.message || 'Sale preview is not allowed. Try a different requested credit amount.');
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                submitSale(
+                    saleData,
+                    token,
+                    (data) => {
+                        alert(buildSaleSuccessMessage(data));
+                        setSelectedOutcome(null);
+                        setSellAmount(1);
+                        setIsSubmitting(false);
+                        window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
+                        onTransactionSuccess();
+                    },
+                    (error) => {
+                        alert(`Sale failed: ${error.message}`);
+                        setIsSubmitting(false);
+                    }
+                );
+            })
+            .catch((error) => {
+                alert(`Sale quote failed: ${error.message}`);
                 setIsSubmitting(false);
-                window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
-                onTransactionSuccess();
-            },
-            (error) => {
-                alert(`Sale failed: ${error.message}`);
-                setIsSubmitting(false);
-            }
-        );
+            });
     };
 
     const isActionDisabled = sharesLoading || isSubmitting;
@@ -166,6 +222,13 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                             disabled={isActionDisabled}
                         />
                     </div>
+                    <SaleQuotePanel
+                        quote={saleQuote}
+                        quoteError={quoteError}
+                        isLoading={isQuoteLoading}
+                        selectedOutcome={selectedOutcome}
+                        onSelectAmount={setSellAmount}
+                    />
                     <div className="flex justify-center">
                         {shares.noSharesOwned > 0 &&
                             <ConfirmSaleButton
@@ -250,5 +313,84 @@ const buildSaleSuccessMessage = (data) => {
     }
     return `${base} Dust assessed: ${dust} credit${dust === 1 ? '' : 's'} retained by the market due to whole-share rounding.`;
 };
+
+const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelectAmount }) => {
+    if (!selectedOutcome) {
+        return (
+            <div className="mb-4 rounded-lg border border-blue-700 bg-blue-950/40 p-3 text-sm text-blue-100">
+                Select YES or NO shares to preview how many whole shares will be sold and whether any dust applies.
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="mb-4 rounded-lg border border-blue-700 bg-blue-950/40 p-3 text-sm text-blue-100">
+                Calculating sale preview...
+            </div>
+        );
+    }
+
+    if (quoteError) {
+        return (
+            <div className="mb-4 rounded-lg border border-red-400 bg-red-950/40 p-3 text-sm text-red-100">
+                {quoteError}
+            </div>
+        );
+    }
+
+    if (!quote) {
+        return null;
+    }
+
+    const coverageLabel = Math.round((Number(quote.dustCapCoverage) || 0) * 100);
+    const panelTone = quote.allowed
+        ? 'border-emerald-400/50 bg-emerald-950/30 text-emerald-50'
+        : 'border-amber-300/70 bg-amber-950/40 text-amber-50';
+
+    return (
+        <div className={`mb-4 rounded-lg border p-3 text-sm ${panelTone}`}>
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="text-base font-semibold">Sale Preview</h3>
+                <span className="rounded-full bg-white/10 px-2 py-1 text-xs">
+                    {quote.allowed ? 'Allowed' : 'Adjust amount'}
+                </span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+                <QuoteMetric label="Requested" value={quote.requestedCredits} />
+                <QuoteMetric label="Credits received" value={quote.saleValue} />
+                <QuoteMetric label="Shares sold" value={quote.sharesSold} />
+                <QuoteMetric label="Dust" value={`${quote.dust} / ${quote.maxDust}`} />
+                <QuoteMetric label="Value per share" value={quote.valuePerShare} />
+                <QuoteMetric label="Dust coverage" value={`${coverageLabel}% of one share step`} />
+            </div>
+            <p className="mt-3 text-xs leading-relaxed">{quote.message}</p>
+            {!quote.allowed && quote.suggestedAmounts?.length > 0 && (
+                <div className="mt-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide">Try a valid amount</p>
+                    <div className="flex flex-wrap gap-2">
+                        {quote.suggestedAmounts.map((amount) => (
+                            <button
+                                type="button"
+                                key={amount}
+                                onClick={() => onSelectAmount(amount)}
+                                className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold hover:bg-white/25"
+                            >
+                                {amount}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const QuoteMetric = ({ label, value }) => (
+    <div className="rounded-md bg-white/10 px-3 py-2">
+        <p className="text-[0.7rem] uppercase tracking-wide opacity-75">{label}</p>
+        <p className="font-semibold">{value}</p>
+    </div>
+);
 
 export default SellSharesLayout;

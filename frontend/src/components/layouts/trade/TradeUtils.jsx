@@ -1,6 +1,4 @@
-// import API_URL from your config
 import { API_URL } from '../../../config';
-import React, { useState, useEffect } from 'react';
 
 const unwrapApiResponse = (payload) => {
     if (payload && typeof payload === 'object' && 'ok' in payload) {
@@ -33,14 +31,24 @@ const formatApiError = (errorData, fallback) => {
     return errorData.message || errorData.reason || errorData.error || fallback;
 };
 
-export const submitBet = (betData, token, onSuccess, onError) => {
+const parseErrorResponse = async (response, fallbackPrefix) => {
+    const text = await response.text();
+    let errorMessage;
+    try {
+        const errorData = JSON.parse(text);
+        errorMessage = formatApiError(errorData, text);
+    } catch {
+        errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(`${fallbackPrefix} (${response.status}): ${errorMessage}`);
+};
 
+export const submitBet = (betData, token, onSuccess, onError) => {
     if (!token) {
         alert('Please log in to place a bet.');
         return;
     }
 
-    // Validate bet data before sending
     if (!betData.marketId || !betData.amount || !betData.outcome) {
         onError(new Error('Missing required bet data (marketId, amount, outcome)'));
         return;
@@ -66,17 +74,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
     })
     .then(response => {
         if (!response.ok) {
-            // Try to get error message from response body
-            return response.text().then(text => {
-                let errorMessage;
-                try {
-                    const errorData = JSON.parse(text);
-                    errorMessage = formatApiError(errorData, text);
-                } catch {
-                    errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
-                }
-                throw new Error(`Bet failed (${response.status}): ${errorMessage}`);
-            });
+            return parseErrorResponse(response, 'Bet failed');
         }
         return response.json();
     })
@@ -86,20 +84,51 @@ export const submitBet = (betData, token, onSuccess, onError) => {
     });
 };
 
-
 export const fetchUserShares = async (marketId, token) => {
     const response = await fetch(`${API_URL}/v0/userposition/${marketId}`, {
         headers: {
-        'Authorization': `Bearer ${token}` // Include the authorization token to validate user
-        }
+            Authorization: `Bearer ${token}`,
+        },
     });
     if (!response.ok) {
         throw new Error('Failed to fetch user shares');
     }
     const data = await response.json();
     return unwrapApiResponse(data);
-    };
+};
 
+export const fetchSaleQuote = async (saleData, token) => {
+    if (!token) {
+        throw new Error('Please log in to sell shares.');
+    }
+
+    if (!saleData.marketId || !saleData.amount || !saleData.outcome) {
+        throw new Error('Missing required sale data (marketId, amount, outcome)');
+    }
+
+    if (saleData.amount < 1) {
+        throw new Error('Sale amount must be at least 1');
+    }
+
+    if (saleData.outcome !== 'YES' && saleData.outcome !== 'NO') {
+        throw new Error('Sale outcome must be YES or NO');
+    }
+
+    const response = await fetch(`${API_URL}/v0/sell/quote`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(saleData),
+    });
+
+    if (!response.ok) {
+        return parseErrorResponse(response, 'Sale quote failed');
+    }
+
+    return unwrapApiResponse(await response.json());
+};
 
 export const submitSale = (saleData, token, onSuccess, onError) => {
     if (!token) {
@@ -107,7 +136,6 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
         return;
     }
 
-    // Validate sale data before sending
     if (!saleData.marketId || !saleData.amount || !saleData.outcome) {
         onError(new Error('Missing required sale data (marketId, amount, outcome)'));
         return;
@@ -133,17 +161,7 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
     })
     .then(response => {
         if (!response.ok) {
-            // Try to get error message from response body
-            return response.text().then(text => {
-                let errorMessage;
-                try {
-                    const errorData = JSON.parse(text);
-                    errorMessage = formatApiError(errorData, text);
-                } catch {
-                    errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
-                }
-                throw new Error(`Sale failed (${response.status}): ${errorMessage}`);
-            });
+            return parseErrorResponse(response, 'Sale failed');
         }
         return response.json();
     })

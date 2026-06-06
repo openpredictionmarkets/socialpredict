@@ -544,6 +544,64 @@ func TestServiceSell_DustCapExceeded(t *testing.T) {
 	}
 }
 
+func TestServiceQuoteSell_AllowsDustAtCapWithoutMutatingState(t *testing.T) {
+	now := serviceTestTime()
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(2),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 10, Value: 100}),
+		withFixtureUser(&dusers.User{Username: "alice"}),
+	)
+
+	quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 32, Outcome: "YES"})
+	if err != nil {
+		t.Fatalf("QuoteSell returned error: %v", err)
+	}
+	if !quote.Allowed || quote.SaleValue != 30 || quote.Dust != 2 || quote.MaxDust != 2 || quote.ValuePerShare != 10 {
+		t.Fatalf("unexpected quote: %+v", quote)
+	}
+	if quote.DustCapCoverage != 0.3 {
+		t.Fatalf("expected dust cap coverage 0.3, got %v", quote.DustCapCoverage)
+	}
+	if !containsInt64(quote.SuggestedAmounts, 32) {
+		t.Fatalf("expected valid requested amount suggestions to include current request, got %+v", quote.SuggestedAmounts)
+	}
+	if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+		t.Fatalf("quote should not mutate repo or user ledger: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
+	}
+}
+
+func TestServiceQuoteSell_OverCapReturnsPreviewAndSuggestions(t *testing.T) {
+	now := serviceTestTime()
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(2),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 10, Value: 100}),
+		withFixtureUser(&dusers.User{Username: "alice"}),
+	)
+
+	quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 33, Outcome: "YES"})
+	if err != nil {
+		t.Fatalf("QuoteSell returned error: %v", err)
+	}
+	if quote.Allowed || !quote.DustCapExceeded || quote.DustCapExceededBy != 1 {
+		t.Fatalf("expected over-cap quote, got %+v", quote)
+	}
+	if quote.SaleValue != 30 || quote.Dust != 3 || quote.MaxDust != 2 {
+		t.Fatalf("unexpected over-cap quote amounts: %+v", quote)
+	}
+	for _, want := range []int64{30, 31, 32} {
+		if !containsInt64(quote.SuggestedAmounts, want) {
+			t.Fatalf("expected suggestions to include %d, got %+v", want, quote.SuggestedAmounts)
+		}
+	}
+	if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+		t.Fatalf("quote should not mutate repo or user ledger: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
+	}
+}
+
 func TestServiceSell_RequestTooSmall(t *testing.T) {
 	now := serviceTestTime()
 	_, svc := newServiceFixture(
@@ -567,4 +625,13 @@ func TestServiceSell_RequestTooSmall(t *testing.T) {
 	if !errors.Is(err, bets.ErrInvalidAmount) {
 		t.Fatalf("expected ErrInvalidAmount, got %v", err)
 	}
+}
+
+func containsInt64(values []int64, want int64) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

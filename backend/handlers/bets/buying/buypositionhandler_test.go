@@ -35,6 +35,10 @@ func (f *fakeBetsService) Sell(ctx context.Context, req bets.SellRequest) (*bets
 	return nil, nil
 }
 
+func (f *fakeBetsService) QuoteSell(ctx context.Context, req bets.SellRequest) (*bets.SellQuoteResult, error) {
+	return nil, nil
+}
+
 type fakeUsersService struct {
 	user *dusers.User
 	err  error

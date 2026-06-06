@@ -18,6 +18,37 @@ dust          = requestedCredits - saleValue
 
 If `dust` exceeds `economics.betting.maxDustPerSale` from `setup.yaml`, the sale is rejected with `DUST_CAP_EXCEEDED`.
 
+## Sale Quote Preview
+
+Use the quote endpoint before submitting a sale:
+
+```text
+POST /v0/sell/quote
+{ marketId, outcome, amount }
+```
+
+The quote endpoint is read-only. It uses the same backend sale calculator as
+`POST /v0/sell`, then returns:
+
+```json
+{
+  "requestedCredits": 33,
+  "sharesSold": 3,
+  "saleValue": 30,
+  "dust": 3,
+  "maxDust": 2,
+  "valuePerShare": 10,
+  "dustCapCoverage": 0.3,
+  "allowed": false,
+  "suggestedAmounts": [30, 31, 32],
+  "message": "This sale would create 3 dust, above the configured maximum of 2. Try a different requested credit amount."
+}
+```
+
+That keeps frontend previews aligned with `maxDustPerSale` and the current
+`valuePerShare`: the frontend displays the quote and suggested amounts, but it
+does not recalculate dust independently.
+
 ## Persistence
 
 The sale creates a bet ledger row where:

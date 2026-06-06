@@ -18,9 +18,12 @@ import (
 )
 
 type fakeSellService struct {
-	req  bets.SellRequest
-	resp *bets.SellResult
-	err  error
+	req       bets.SellRequest
+	quoteReq  bets.SellRequest
+	resp      *bets.SellResult
+	quoteResp *bets.SellQuoteResult
+	err       error
+	quoteErr  error
 }
 
 func (f *fakeSellService) Place(ctx context.Context, req bets.PlaceRequest) (*bets.PlacedBet, error) {
@@ -29,6 +32,10 @@ func (f *fakeSellService) Place(ctx context.Context, req bets.PlaceRequest) (*be
 func (f *fakeSellService) Sell(ctx context.Context, req bets.SellRequest) (*bets.SellResult, error) {
 	f.req = req
 	return f.resp, f.err
+}
+func (f *fakeSellService) QuoteSell(ctx context.Context, req bets.SellRequest) (*bets.SellQuoteResult, error) {
+	f.quoteReq = req
+	return f.quoteResp, f.quoteErr
 }
 
 type fakeUsersService struct {
@@ -150,6 +157,95 @@ func TestSellPositionHandler_Success(t *testing.T) {
 	}
 	if resp.Result.SharesSold != 3 || resp.Result.SaleValue != 60 || resp.Result.Dust != 5 {
 		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestSellQuoteHandler_Success(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	quotedAt := time.Date(2026, time.June, 6, 10, 0, 0, 0, time.UTC)
+	svc := &fakeSellService{quoteResp: &bets.SellQuoteResult{
+		Username:         "alice",
+		MarketID:         7,
+		Outcome:          "YES",
+		RequestedCredits: 32,
+		SharesSold:       3,
+		SaleValue:        30,
+		Dust:             2,
+		MaxDust:          2,
+		ValuePerShare:    10,
+		DustCapCoverage:  0.3,
+		Allowed:          true,
+		SuggestedAmounts: []int64{30, 31, 32, 40, 41, 42},
+		Message:          "This sale can be submitted.",
+		QuotedAt:         quotedAt,
+	}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 7, Amount: 32, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell/quote", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellQuoteHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+	if svc.quoteReq.Username != "alice" || svc.quoteReq.MarketID != 7 || svc.quoteReq.Amount != 32 || svc.quoteReq.Outcome != "YES" {
+		t.Fatalf("unexpected quote request: %+v", svc.quoteReq)
+	}
+
+	var resp handlers.SuccessEnvelope[dto.SellQuoteResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !resp.Result.Allowed || resp.Result.Dust != 2 || resp.Result.MaxDust != 2 || resp.Result.ValuePerShare != 10 {
+		t.Fatalf("unexpected quote response: %+v", resp.Result)
+	}
+	if len(resp.Result.SuggestedAmounts) != 6 {
+		t.Fatalf("expected suggestions, got %+v", resp.Result.SuggestedAmounts)
+	}
+}
+
+func TestSellQuoteHandler_DustCapExceededQuoteStillReturnsPreview(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{quoteResp: &bets.SellQuoteResult{
+		Username:          "alice",
+		MarketID:          7,
+		Outcome:           "YES",
+		RequestedCredits:  33,
+		SharesSold:        3,
+		SaleValue:         30,
+		Dust:              3,
+		MaxDust:           2,
+		ValuePerShare:     10,
+		DustCapCoverage:   0.3,
+		Allowed:           false,
+		SuggestedAmounts:  []int64{30, 31, 32},
+		Message:           "This sale would create too much dust.",
+		DustCapExceeded:   true,
+		DustCapExceededBy: 1,
+	}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 7, Amount: 33, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell/quote", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellQuoteHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+	var resp handlers.SuccessEnvelope[dto.SellQuoteResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Result.Allowed || !resp.Result.DustCapExceeded || resp.Result.DustCapExceededBy != 1 {
+		t.Fatalf("unexpected over-cap quote: %+v", resp.Result)
 	}
 }
 

@@ -1657,6 +1657,83 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/sell/quote:
+    post:
+      tags: [Bets]
+      operationId: quoteSellPosition
+      summary: Preview a share sale
+      description: >
+        Previews a sell request without mutating balances or bet history. The
+        response uses the same whole-share sale calculator as POST /v0/sell and
+        reports requestedCredits, saleValue, dust, maxDust, valuePerShare,
+        whether the request is allowed, and nearby suggested requested-credit
+        amounts when dust would exceed the configured cap. This private action
+        route is explicitly blocked at the route boundary with PASSWORD_CHANGE_REQUIRED
+        when the caller must change their password.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellBetRequest'
+      responses:
+        '200':
+          description: Sale preview calculated successfully, including over-cap dust previews.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellQuoteEnvelopeResponse'
+        '400':
+          description: Invalid sale request or amount/outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Invalid or missing token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change is required before previewing share sales.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Authenticated user or market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market closed; sale preview not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '422':
+          description: No position or insufficient shares.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error while previewing sale.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/sell:
     post:
       tags: [Bets]
@@ -4043,6 +4120,16 @@ components:
           $ref: '#/components/schemas/SellBetResponse'
       required: [ok, result]
 
+    SellQuoteEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/SellQuoteResponse'
+      required: [ok, result]
+
     MarketBetsEnvelopeResponse:
       type: object
       properties:
@@ -4681,6 +4768,63 @@ components:
         transactionAt:
           type: string
           format: date-time
+
+    SellQuoteResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        marketId:
+          type: integer
+        outcome:
+          type: string
+        requestedCredits:
+          type: integer
+          format: int64
+          description: Requested gross credits for the sale preview.
+        sharesSold:
+          type: integer
+          format: int64
+          description: Whole shares that would be sold.
+        saleValue:
+          type: integer
+          format: int64
+          description: Credits that would be deposited after whole-share rounding.
+        dust:
+          type: integer
+          format: int64
+          description: Requested credits minus saleValue, retained by the market due to rounding if submitted.
+        maxDust:
+          type: integer
+          format: int64
+          description: Configured economics.betting.maxDustPerSale cap for one sale.
+        valuePerShare:
+          type: integer
+          format: int64
+          description: Current integer position value per share used by the sale calculator.
+        dustCapCoverage:
+          type: number
+          format: double
+          description: Approximate fraction of one valuePerShare interval covered by maxDust plus the exact zero-dust value.
+        allowed:
+          type: boolean
+          description: Whether POST /v0/sell would be allowed for this exact request.
+        suggestedAmounts:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: Nearby requested-credit amounts that fit the current maxDustPerSale cap.
+        message:
+          type: string
+        quotedAt:
+          type: string
+          format: date-time
+        dustCapExceeded:
+          type: boolean
+        dustCapExceededBy:
+          type: integer
+          format: int64
 
     MarketPosition:
       type: object
