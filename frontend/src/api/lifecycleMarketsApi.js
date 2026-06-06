@@ -21,21 +21,24 @@ const lifecycleRequest = async ({ path, token }) => {
   });
 };
 
-const buildLifecycleQuery = ({ status, limit = 50, offset = 0 }) => {
+const buildLifecycleQuery = ({ status, query, limit = 50, offset = 0 }) => {
   const params = new URLSearchParams({
     status,
     limit: String(limit),
     offset: String(offset),
   });
+  if (String(query || '').trim()) {
+    params.set('query', String(query).trim());
+  }
   return params.toString();
 };
 
-export const listMyLifecycleMarkets = ({ token, status, limit, offset }) => lifecycleRequest({
-  path: `/v0/profile/markets?${buildLifecycleQuery({ status, limit, offset })}`,
+export const listMyLifecycleMarkets = ({ token, status, query, limit, offset }) => lifecycleRequest({
+  path: `/v0/profile/markets?${buildLifecycleQuery({ status, query, limit, offset })}`,
   token,
 });
 
-export const listAdminLifecycleMarkets = ({ token, status, limit, offset }) => lifecycleRequest({
-  path: `/v0/admin/markets?${buildLifecycleQuery({ status, limit, offset })}`,
+export const listAdminLifecycleMarkets = ({ token, status, query, limit, offset }) => lifecycleRequest({
+  path: `/v0/admin/markets?${buildLifecycleQuery({ status, query, limit, offset })}`,
   token,
 });

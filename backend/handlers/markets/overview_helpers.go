@@ -56,6 +56,7 @@ func marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
 		OutcomeType:        market.OutcomeType,
 		ResolutionDateTime: market.ResolutionDateTime,
 		CreatorUsername:    market.CreatorUsername,
+		StewardUsername:    market.CurrentStewardUsername(),
 		YesLabel:           market.YesLabel,
 		NoLabel:            market.NoLabel,
 		Status:             market.Status,
@@ -70,6 +71,7 @@ func marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
 		ResolutionResult:   market.ResolutionResult,
 		CreatedAt:          market.CreatedAt,
 		UpdatedAt:          market.UpdatedAt,
+		Tags:               marketTagResponsesFromDomain(market.Tags),
 	}
 }
 
@@ -100,9 +102,11 @@ func publicMarketResponseFromDomain(market *dmarkets.Market) dto.PublicMarketRes
 		ResolutionResult:        market.ResolutionResult,
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
+		StewardUsername:         market.CurrentStewardUsername(),
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
+		Tags:                    marketTagResponsesFromDomain(market.Tags),
 	}
 }
 

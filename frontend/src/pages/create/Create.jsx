@@ -9,6 +9,8 @@ import EmojiPickerInput from '../../components/inputs/EmojiPicker';
 import SiteButton from '../../components/buttons/SiteButtons';
 import { USER_CREDIT_REFRESH_EVENT } from '../../components/utils/userFinanceTools/FetchUserCredit';
 import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
+import { listMarketTags } from '../../api/marketTagsApi';
+import MarketTagChips from '../../components/markets/MarketTagChips';
 
 function Create() {
   const [questionTitle, setQuestionTitle] = useState('');
@@ -21,6 +23,8 @@ function Create() {
   const [error, setError] = useState('');
   const [createdMarket, setCreatedMarket] = useState(null);
   const [marketCreationCost, setMarketCreationCost] = useState(null);
+  const [marketTags, setMarketTags] = useState([]);
+  const [selectedTagSlugs, setSelectedTagSlugs] = useState([]);
   const { username } = useAuth();
   const history = useHistory();
 
@@ -52,6 +56,42 @@ function Create() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadTags = async () => {
+      try {
+        const data = await listMarketTags();
+        if (!ignore) {
+          setMarketTags(data.tags || []);
+        }
+      } catch {
+        if (!ignore) {
+          setMarketTags([]);
+        }
+      }
+    };
+
+    loadTags();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const toggleTagSlug = (slug) => {
+    setSelectedTagSlugs((current) => {
+      if (current.includes(slug)) {
+        return current.filter((value) => value !== slug);
+      }
+      if (current.length >= 5) {
+        setError('You can select up to five market tags.');
+        return current;
+      }
+      setError('');
+      return [...current, slug];
+    });
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -97,6 +137,7 @@ function Create() {
         utcOffset: new Date().getTimezoneOffset(),
         yesLabel: trimmedYesLabel || 'YES',
         noLabel: trimmedNoLabel || 'NO',
+        tagSlugs: selectedTagSlugs,
       };
 
       const responseData = await authenticatedApiRequest('/v0/markets', {
@@ -172,6 +213,45 @@ function Create() {
             className='w-full h-32 resize-y bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
           />
         </div>
+
+        {marketTags.length > 0 && (
+          <div className='rounded-lg border border-gray-700 bg-gray-900/60 p-4'>
+            <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
+              <div>
+                <p className='text-sm font-medium text-gray-200'>Market Tags</p>
+                <p className='mt-1 text-xs text-gray-400'>
+                  Pick up to five categories so admins can review routing and users can find this market.
+                </p>
+              </div>
+              <span className='rounded-full bg-gray-800 px-3 py-1 text-xs text-gray-300'>
+                {selectedTagSlugs.length}/5 selected
+              </span>
+            </div>
+            <div className='flex flex-wrap gap-2'>
+              {marketTags.map((tag) => {
+                const selected = selectedTagSlugs.includes(tag.slug);
+                return (
+                  <button
+                    key={tag.slug}
+                    type='button'
+                    onClick={() => toggleTagSlug(tag.slug)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      selected
+                        ? 'border-primary-pink bg-primary-pink/20 text-white'
+                        : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-primary-pink/70 hover:text-white'
+                    }`}
+                  >
+                    {tag.displayName || tag.slug}
+                  </button>
+                );
+              })}
+            </div>
+            <MarketTagChips
+              tags={marketTags.filter((tag) => selectedTagSlugs.includes(tag.slug))}
+              className='mt-3'
+            />
+          </div>
+        )}
 
         <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
           <div>

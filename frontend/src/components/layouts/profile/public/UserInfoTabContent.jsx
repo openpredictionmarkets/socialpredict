@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../../../../config';
+import { apiRequest } from '../../../../api/httpClient';
 import LoadingSpinner from '../../../loaders/LoadingSpinner';
 import { useAuth } from '../../../../helpers/AuthContent';
 
@@ -12,20 +12,12 @@ const UserInfoTabContent = ({ username, userData }) => {
     useEffect(() => {
         const fetchUserCredit = async () => {
             try {
-                const headers = token
-                    ? {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    }
-                    : {};
-
-                const response = await fetch(`${API_URL}/v0/usercredit/${username}`, { headers });
-                if (response.ok) {
-                    const data = await response.json();
-                    setUserCredit(data);
-                } else {
-                    throw new Error(`Error fetching user credit: ${response.statusText}`);
-                }
+                const data = await apiRequest(`/v0/usercredit/${username}`, {
+                    authenticated: true,
+                    authToken: token,
+                    fallbackMessage: 'Error fetching user credit',
+                });
+                setUserCredit(data);
             } catch (err) {
                 setError(err.message);
             } finally {

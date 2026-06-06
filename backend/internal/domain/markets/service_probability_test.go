@@ -27,6 +27,11 @@ type projectionRepo struct {
 	getPublicMarketFunc          func(context.Context, int64) (*markets.PublicMarket, error)
 	approveMarketFunc            func(context.Context, int64, string, time.Time) error
 	rejectMarketFunc             func(context.Context, int64, string, time.Time, string) error
+	reassignMarketStewardFunc    func(context.Context, int64, string, string, string, string, time.Time) error
+	listMarketTagsFunc           func(context.Context, bool) ([]markets.MarketTag, error)
+	createMarketTagFunc          func(context.Context, markets.MarketTag) (*markets.MarketTag, error)
+	updateMarketTagFunc          func(context.Context, string, markets.MarketTagRequest) (*markets.MarketTag, error)
+	setMarketTagsFunc            func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error)
 }
 
 func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
@@ -67,6 +72,21 @@ func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
 		},
 		rejectMarketFunc: func(context.Context, int64, string, time.Time, string) error {
 			return errUnexpectedMarketsTestCall
+		},
+		reassignMarketStewardFunc: func(context.Context, int64, string, string, string, string, time.Time) error {
+			return errUnexpectedMarketsTestCall
+		},
+		listMarketTagsFunc: func(context.Context, bool) ([]markets.MarketTag, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		createMarketTagFunc: func(context.Context, markets.MarketTag) (*markets.MarketTag, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		updateMarketTagFunc: func(context.Context, string, markets.MarketTagRequest) (*markets.MarketTag, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		setMarketTagsFunc: func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error) {
+			return nil, errUnexpectedMarketsTestCall
 		},
 	}
 	for _, opt := range opts {
@@ -150,6 +170,42 @@ func (r *projectionRepo) RejectMarket(ctx context.Context, id int64, actorUserna
 	}
 	return r.rejectMarketFunc(ctx, id, actorUsername, rejectedAt, reason)
 }
+
+func (r *projectionRepo) ReassignMarketSteward(ctx context.Context, id int64, fromStewardUsername string, toStewardUsername string, actorUsername string, reason string, changedAt time.Time) error {
+	if r.reassignMarketStewardFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.reassignMarketStewardFunc(ctx, id, fromStewardUsername, toStewardUsername, actorUsername, reason, changedAt)
+}
+
+func (r *projectionRepo) ListMarketTags(ctx context.Context, includeInactive bool) ([]markets.MarketTag, error) {
+	if r.listMarketTagsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.listMarketTagsFunc(ctx, includeInactive)
+}
+
+func (r *projectionRepo) CreateMarketTag(ctx context.Context, tag markets.MarketTag) (*markets.MarketTag, error) {
+	if r.createMarketTagFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.createMarketTagFunc(ctx, tag)
+}
+
+func (r *projectionRepo) UpdateMarketTag(ctx context.Context, slug string, update markets.MarketTagRequest) (*markets.MarketTag, error) {
+	if r.updateMarketTagFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.updateMarketTagFunc(ctx, slug, update)
+}
+
+func (r *projectionRepo) SetMarketTags(ctx context.Context, marketID int64, tagSlugs []string, assignedBy string, source string, assignedAt time.Time) ([]markets.MarketTag, error) {
+	if r.setMarketTagsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.setMarketTagsFunc(ctx, marketID, tagSlugs, assignedBy, source, assignedAt)
+}
+
 func (r *projectionRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {
 	if r.getUserPositionFunc == nil {
 		return nil, errUnexpectedMarketsTestCall

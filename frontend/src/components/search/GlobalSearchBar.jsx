@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { searchMarkets } from '../../api/marketsApi';
 import { RegularInput } from '../inputs/InputBar';
 
-const GlobalSearchBar = ({ onSearchResults, currentStatus, isSearching, setIsSearching }) => {
+const GlobalSearchBar = ({ onSearchResults, currentStatus, isSearching, setIsSearching, tagSlug = '' }) => {
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -19,14 +19,14 @@ const GlobalSearchBar = ({ onSearchResults, currentStatus, isSearching, setIsSea
         }, 300); // 300ms debounce
 
         return () => clearTimeout(timeoutId);
-    }, [query, currentStatus]);
+    }, [query, currentStatus, tagSlug]);
 
     const performSearch = async (searchQuery) => {
         setLoading(true);
         setIsSearching(true);
         
         try {
-            const results = await searchMarkets(searchQuery, currentStatus, 20);
+            const results = await searchMarkets(searchQuery, currentStatus, 20, { tagSlug });
             onSearchResults(results);
         } catch (error) {
             console.error('Search error:', error);
@@ -73,7 +73,9 @@ const GlobalSearchBar = ({ onSearchResults, currentStatus, isSearching, setIsSea
             </div>
             {isSearching && query && (
                 <div className="mt-2 text-sm text-gray-400">
-                    Searching in <span className="text-primary-pink font-medium">{currentStatus}</span> markets for: 
+                    Searching in <span className="text-primary-pink font-medium">{currentStatus}</span> markets{tagSlug ? (
+                        <> tagged <span className="text-primary-pink font-medium">{tagSlug}</span></>
+                    ) : null} for:
                     <span className="text-white font-medium"> "{query}"</span>
                 </div>
             )}

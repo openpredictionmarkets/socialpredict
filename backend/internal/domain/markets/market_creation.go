@@ -20,6 +20,10 @@ func (s *Service) CreateMarket(ctx context.Context, req MarketCreateRequest, cre
 	}
 
 	labels := s.creationPolicy.NormalizeLabels(req.YesLabel, req.NoLabel)
+	tagSlugs, err := s.validateCreateTagSlugs(ctx, req.TagSlugs)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := s.userService.ValidateUserExists(ctx, creatorUsername); err != nil {
 		return nil, ErrUserNotFound
@@ -40,6 +44,10 @@ func (s *Service) CreateMarket(ctx context.Context, req MarketCreateRequest, cre
 	}
 
 	if err := s.repo.Create(ctx, market); err != nil {
+		return nil, err
+	}
+
+	if err := s.assignTagsToMarket(ctx, market, tagSlugs, creatorUsername); err != nil {
 		return nil, err
 	}
 

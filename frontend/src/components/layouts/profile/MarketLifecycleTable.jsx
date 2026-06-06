@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import MarketTagChips from '../../markets/MarketTagChips';
 
 const formatDate = (value) => {
   if (!value) return 'n/a';
@@ -28,7 +29,28 @@ const MarketLabels = ({ market }) => (
   </div>
 );
 
-const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, actions }) => {
+const StewardshipAuditTrail = ({ audits = [] }) => {
+  if (!audits.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {audits.map((audit, index) => (
+        <div key={audit.id || `${audit.createdAt || 'audit'}-${index}`} className="rounded-md border border-info-blue/30 bg-info-blue/10 px-3 py-2">
+          <div>
+            Steward reassigned from {audit.fromStewardUsername || 'n/a'} to {audit.toStewardUsername || 'n/a'}
+            {audit.actorUsername ? ` by ${audit.actorUsername}` : ''}
+            {audit.createdAt ? ` at ${formatDate(audit.createdAt)}` : ''}
+          </div>
+          {audit.reason && <div className="mt-1 text-info-blue">Reason: {audit.reason}</div>}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, showSteward = false, actions }) => {
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
 
   const toggleDescription = (marketId) => {
@@ -53,6 +75,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
           <tr>
             <th className="px-4 py-3 text-left">Market</th>
             {showCreator && <th className="px-4 py-3 text-left">Creator</th>}
+            {showSteward && <th className="px-4 py-3 text-left">Steward</th>}
             <th className="px-4 py-3 text-left">Status</th>
             <th className="px-4 py-3 text-left">Created</th>
             <th className="px-4 py-3 text-left">Review Trail</th>
@@ -79,6 +102,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
                     </button>
                   </div>
                 )}
+                <MarketTagChips tags={market.tags || []} className="mt-3" />
                 <MarketLabels market={market} />
                 {statusLabel(market) === 'published' && (
                   <Link className="mt-2 inline-block text-primary-pink hover:underline" to={`/markets/${market.id}`}>
@@ -88,6 +112,9 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
               </td>
               {showCreator && (
                 <td className="px-4 py-4 font-mono text-gray-300">{market.creatorUsername || 'n/a'}</td>
+              )}
+              {showSteward && (
+                <td className="px-4 py-4 font-mono text-gray-300">{market.stewardUsername || market.creatorUsername || 'n/a'}</td>
               )}
               <td className="px-4 py-4">
                 <span className="rounded-full bg-gray-700 px-3 py-1 font-mono text-xs text-white">
@@ -100,7 +127,8 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
                 {market.approvedBy && <div>Approved by {market.approvedBy} at {formatDate(market.approvedAt)}</div>}
                 {market.rejectedBy && <div>Rejected by {market.rejectedBy} at {formatDate(market.rejectedAt)}</div>}
                 {market.rejectionReason && <div className="mt-1 text-rose-200">Reason: {market.rejectionReason}</div>}
-                {!market.approvedBy && !market.rejectedBy && <span className="text-gray-500">Awaiting admin review</span>}
+                <StewardshipAuditTrail audits={market.stewardshipAudits || []} />
+                {!market.approvedBy && !market.rejectedBy && !(market.stewardshipAudits || []).length && <span className="text-gray-500">Awaiting admin review</span>}
               </td>
               {actions && <td className="px-4 py-4">{actions(market)}</td>}
             </tr>

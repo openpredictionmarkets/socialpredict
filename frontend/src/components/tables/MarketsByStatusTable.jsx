@@ -6,6 +6,8 @@ import MobileMarketCard from './MobileMarketCard';
 import LoadingSpinner from '../loaders/LoadingSpinner';
 import ExpandableLink from '../utils/ExpandableLink';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
+import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketTagChips from '../markets/MarketTagChips';
 
 const DEFAULT_LIMIT = 50;
 const DEFAULT_CREATOR_EMOJI = '👤';
@@ -84,6 +86,7 @@ const MarketRow = ({ marketData }) => {
   const creator = marketData?.creator ?? {};
   const creatorUsername = creator.username ?? market.creatorUsername ?? 'unknown';
   const creatorEmoji = creator.personalEmoji ?? DEFAULT_CREATOR_EMOJI;
+  const stewardUsername = stewardUsernameFor(market, creatorUsername);
   const probability = toNumber(marketData?.lastProbability);
   const probabilityDisplay = Number.isFinite(probability)
     ? probability.toFixed(2)
@@ -111,29 +114,35 @@ const MarketRow = ({ marketData }) => {
         {probabilityDisplay}
       </td>
       <td className='px-6 py-4 text-sm font-medium text-gray-300'>
-        <ExpandableLink
-          text={questionTitle}
-          to={marketId ? `/markets/${marketId}` : '#'}
-          maxLength={45}
-          className=''
-          linkClassName='hover:text-blue-400 transition-colors duration-200'
-          buttonClassName='text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1'
-          expandIcon='📐'
-        />
+        <div className='flex max-w-md flex-wrap items-center gap-2'>
+          <ExpandableLink
+            text={questionTitle}
+            to={marketId ? `/markets/${marketId}` : '#'}
+            maxLength={45}
+            className=''
+            linkClassName='hover:text-blue-400 transition-colors duration-200'
+            buttonClassName='text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1'
+            expandIcon='📐'
+          />
+          <MarketTagChips tags={market.tags || []} />
+        </div>
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
         {formatResolutionDate(resolutionDate)}
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
-        <Link
-          to={`/user/${creatorUsername}`}
-          className='flex items-center hover:text-blue-400 transition-colors duration-200'
-        >
-          <span role='img' aria-label='Creator' className='mr-2'>
-            {creatorEmoji}
-          </span>
-          @{creatorUsername}
-        </Link>
+        <div className='flex flex-col items-start gap-2'>
+          <Link
+            to={`/user/${creatorUsername}`}
+            className='flex items-center hover:text-blue-400 transition-colors duration-200'
+          >
+            <span role='img' aria-label='Creator' className='mr-2'>
+              {creatorEmoji}
+            </span>
+            @{creatorUsername}
+          </Link>
+          <StewardTag username={stewardUsername} creatorUsername={creatorUsername} />
+        </div>
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
         {numUsers}
@@ -155,7 +164,7 @@ const MarketRow = ({ marketData }) => {
   );
 };
 
-function MarketsByStatusTable({ status }) {
+function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
   const [marketsData, setMarketsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -172,10 +181,13 @@ function MarketsByStatusTable({ status }) {
         const params = new URLSearchParams();
 
         if (status && status.toLowerCase() !== 'all') {
-          params.set('status', status.toUpperCase());
+          params.set('status', status.toLowerCase());
         }
 
-        params.set('limit', String(DEFAULT_LIMIT));
+        params.set('limit', String(limit || DEFAULT_LIMIT));
+        if (tagSlug) {
+          params.set('tagSlug', tagSlug);
+        }
         url.search = params.toString();
 
         const response = await fetch(url.toString(), { signal: controller.signal });
@@ -205,7 +217,7 @@ function MarketsByStatusTable({ status }) {
     fetchMarkets();
 
     return () => controller.abort();
-  }, [status]);
+  }, [status, limit, tagSlug]);
 
   if (loading)
     return (

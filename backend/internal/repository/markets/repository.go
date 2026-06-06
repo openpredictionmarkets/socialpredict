@@ -50,7 +50,11 @@ func (r *GormRepository) GetByID(ctx context.Context, id int64) (*dmarkets.Marke
 		return nil, err
 	}
 
-	return r.modelToDomain(&dbMarket), nil
+	market := r.modelToDomain(&dbMarket)
+	if err := r.hydrateTagsForMarkets(ctx, []*dmarkets.Market{market}); err != nil {
+		return nil, err
+	}
+	return market, nil
 }
 
 // GetPublicMarket retrieves a market with public-facing attributes.
@@ -63,6 +67,10 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		return nil, err
 	}
 
+	domainMarket := r.modelToDomain(&market)
+	if err := r.hydrateTagsForMarkets(ctx, []*dmarkets.Market{domainMarket}); err != nil {
+		return nil, err
+	}
 	return &dmarkets.PublicMarket{
 		ID:                      market.ID,
 		QuestionTitle:           market.QuestionTitle,
@@ -75,11 +83,13 @@ func (r *GormRepository) GetPublicMarket(ctx context.Context, marketID int64) (*
 		ResolutionResult:        market.ResolutionResult,
 		InitialProbability:      market.InitialProbability,
 		CreatorUsername:         market.CreatorUsername,
+		StewardUsername:         domainMarket.CurrentStewardUsername(),
 		CreatedAt:               market.CreatedAt,
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
-		Status:                  r.modelToDomain(&market).Status,
+		Status:                  domainMarket.Status,
 		LifecycleStatus:         dmarkets.NormalizeLifecycleStatus(market.LifecycleStatus),
+		Tags:                    domainMarket.Tags,
 	}, nil
 }
 
@@ -110,15 +120,20 @@ func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters)
 
 	query = applyListStatusFilter(query, filters.Status)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
+	query = applyTagSlugFilter(query, filters.TagSlug)
 	query = applyPagination(query, filters.Limit, filters.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 // ListByStatus retrieves markets filtered by status with pagination
@@ -127,32 +142,79 @@ func (r *GormRepository) ListByStatus(ctx context.Context, status string, p dmar
 
 	query = applyStatusByResolution(query, status, time.Now())
 	query = applyPagination(query, p.Limit, p.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 // ListByLifecycle retrieves lifecycle queues that are intentionally excluded
 // from the public market listing scope.
 func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
-	query := r.db.WithContext(ctx).Model(&models.Market{}).
-		Where("lifecycle_status = ?", dmarkets.NormalizeLifecycleStatus(filters.Status))
+	query := r.db.WithContext(ctx).Model(&models.Market{})
 
+	query = applyLifecycleAdminStatusFilter(query, filters.Status)
+	query = applyLifecycleSearchTerm(query, filters.Query)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
 	query = applyPagination(query, filters.Limit, filters.Offset)
-	query = query.Order("created_at DESC")
+	query = query.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := query.Find(&dbMarkets).Error; err != nil {
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	if err := r.hydrateStewardshipAudits(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
+}
+
+func applyLifecycleAdminStatusFilter(query *gorm.DB, status string) *gorm.DB {
+	normalized := dmarkets.NormalizeLifecycleStatus(status)
+	switch normalized {
+	case dmarkets.MarketStatusAll:
+		return query.Where(
+			"lifecycle_status IN ? OR lifecycle_status = '' OR lifecycle_status IS NULL",
+			[]string{
+				dmarkets.MarketLifecycleProposed,
+				dmarkets.MarketLifecyclePublished,
+				dmarkets.MarketLifecycleClosed,
+				dmarkets.MarketLifecycleResolved,
+			},
+		)
+	case dmarkets.MarketLifecycleClosed:
+		return query.Where("lifecycle_status = ? OR (lifecycle_status = ? AND is_resolved = ? AND resolution_date_time <= ?)",
+			dmarkets.MarketLifecycleClosed,
+			dmarkets.MarketLifecyclePublished,
+			false,
+			time.Now(),
+		)
+	case dmarkets.MarketLifecycleResolved:
+		return query.Where("is_resolved = ? OR lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
+	default:
+		return query.Where("lifecycle_status = ?", normalized)
+	}
+}
+
+func applyLifecycleSearchTerm(query *gorm.DB, value string) *gorm.DB {
+	term := strings.TrimSpace(value)
+	if term == "" {
+		return query
+	}
+	return applySearchTerm(query, term)
 }
 
 func applyListStatusFilter(query *gorm.DB, status string) *gorm.DB {
@@ -164,6 +226,18 @@ func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
 		return query
 	}
 	return query.Where("creator_username = ?", createdBy)
+}
+
+func applyTagSlugFilter(query *gorm.DB, tagSlug string) *gorm.DB {
+	tagSlug = strings.Trim(strings.ToLower(strings.TrimSpace(tagSlug)), "-")
+	if tagSlug == "" {
+		return query
+	}
+	return query.
+		Joins("JOIN market_tag_assignments ON market_tag_assignments.market_id = markets.id AND market_tag_assignments.deleted_at IS NULL").
+		Joins("JOIN market_tags ON market_tags.id = market_tag_assignments.tag_id AND market_tags.deleted_at IS NULL").
+		Where("market_tags.slug = ?", tagSlug).
+		Distinct("markets.*")
 }
 
 func applyStatusByResolution(query *gorm.DB, status string, now time.Time) *gorm.DB {
@@ -185,21 +259,26 @@ func (r *GormRepository) Search(ctx context.Context, query string, filters dmark
 
 	dbQuery = applySearchTerm(dbQuery, query)
 	dbQuery = applyStatusFilter(dbQuery, filters.Status)
+	dbQuery = applyTagSlugFilter(dbQuery, filters.TagSlug)
 	dbQuery = applyPagination(dbQuery, filters.Limit, filters.Offset)
-	dbQuery = dbQuery.Order("created_at DESC")
+	dbQuery = dbQuery.Order("markets.created_at DESC")
 
 	var dbMarkets []models.Market
 	if err := dbQuery.Find(&dbMarkets).Error; err != nil {
 		return nil, err
 	}
 
-	return r.mapMarkets(dbMarkets), nil
+	markets := r.mapMarkets(dbMarkets)
+	if err := r.hydrateTagsForMarkets(ctx, markets); err != nil {
+		return nil, err
+	}
+	return markets, nil
 }
 
 func applySearchTerm(dbQuery *gorm.DB, query string) *gorm.DB {
 	searchTerm := strings.ToLower(query)
 	searchPattern := "%" + searchTerm + "%"
-	return dbQuery.Where("(LOWER(question_title) LIKE ? OR LOWER(description) LIKE ?)", searchPattern, searchPattern)
+	return dbQuery.Where("(LOWER(markets.question_title) LIKE ? OR LOWER(markets.description) LIKE ?)", searchPattern, searchPattern)
 }
 
 func applyStatusFilter(dbQuery *gorm.DB, status string) *gorm.DB {
@@ -244,6 +323,50 @@ func (r *GormRepository) mapMarkets(dbMarkets []models.Market) []*dmarkets.Marke
 		markets[i] = r.modelToDomain(&dbMarket)
 	}
 	return markets
+}
+
+func (r *GormRepository) hydrateStewardshipAudits(ctx context.Context, markets []*dmarkets.Market) error {
+	if len(markets) == 0 {
+		return nil
+	}
+
+	marketIDs := make([]int64, 0, len(markets))
+	marketByID := make(map[int64]*dmarkets.Market, len(markets))
+	for _, market := range markets {
+		if market == nil {
+			continue
+		}
+		marketIDs = append(marketIDs, market.ID)
+		marketByID[market.ID] = market
+	}
+	if len(marketIDs) == 0 {
+		return nil
+	}
+
+	var dbAudits []models.MarketStewardshipAudit
+	if err := r.db.WithContext(ctx).
+		Where("market_id IN ?", marketIDs).
+		Order("created_at ASC, id ASC").
+		Find(&dbAudits).Error; err != nil {
+		return err
+	}
+
+	for _, dbAudit := range dbAudits {
+		market := marketByID[dbAudit.MarketID]
+		if market == nil {
+			continue
+		}
+		market.StewardshipAudits = append(market.StewardshipAudits, dmarkets.MarketStewardshipAuditRecord{
+			ID:                  dbAudit.ID,
+			MarketID:            dbAudit.MarketID,
+			FromStewardUsername: dbAudit.FromStewardUsername,
+			ToStewardUsername:   dbAudit.ToStewardUsername,
+			ActorUsername:       dbAudit.ActorUsername,
+			Reason:              dbAudit.Reason,
+			CreatedAt:           dbAudit.CreatedAt,
+		})
+	}
+	return nil
 }
 
 // GetUserPosition retrieves the aggregated position for a specific user in a market.
@@ -381,6 +504,35 @@ func (r *GormRepository) RejectMarket(ctx context.Context, id int64, actorUserna
 	return nil
 }
 
+// ReassignMarketSteward updates the current steward and records an audit fact atomically.
+func (r *GormRepository) ReassignMarketSteward(ctx context.Context, marketID int64, fromStewardUsername string, toStewardUsername string, actorUsername string, reason string, changedAt time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.Market{}).
+			Where("id = ?", marketID).
+			Updates(map[string]any{
+				"steward_username": toStewardUsername,
+				"updated_at":       changedAt,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return dmarkets.ErrMarketNotFound
+		}
+
+		audit := models.MarketStewardshipAudit{
+			MarketID:            marketID,
+			FromStewardUsername: fromStewardUsername,
+			ToStewardUsername:   toStewardUsername,
+			ActorUsername:       actorUsername,
+			Reason:              reason,
+		}
+		audit.CreatedAt = changedAt
+		audit.UpdatedAt = changedAt
+		return tx.Create(&audit).Error
+	})
+}
+
 // ListBetsForMarket returns all bets for the specified market ordered by placement time.
 func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
 	var bets []models.Bet
@@ -488,6 +640,7 @@ func (r *GormRepository) domainToModel(market *dmarkets.Market) models.Market {
 		FinalResolutionDateTime: market.FinalResolutionDateTime,
 		ResolutionResult:        market.ResolutionResult,
 		CreatorUsername:         market.CreatorUsername,
+		StewardUsername:         market.CurrentStewardUsername(),
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
 		UTCOffset:               market.UTCOffset,
@@ -517,6 +670,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		FinalResolutionDateTime: dbMarket.FinalResolutionDateTime,
 		ResolutionResult:        dbMarket.ResolutionResult,
 		CreatorUsername:         dbMarket.CreatorUsername,
+		StewardUsername:         dbMarket.StewardUsername,
 		YesLabel:                dbMarket.YesLabel,
 		NoLabel:                 dbMarket.NoLabel,
 		Status:                  status,
@@ -531,6 +685,7 @@ func (r *GormRepository) modelToDomain(dbMarket *models.Market) *dmarkets.Market
 		UpdatedAt:               dbMarket.UpdatedAt,
 		InitialProbability:      dbMarket.InitialProbability,
 		UTCOffset:               dbMarket.UTCOffset,
+		Tags:                    []dmarkets.MarketTag{},
 	}
 }
 

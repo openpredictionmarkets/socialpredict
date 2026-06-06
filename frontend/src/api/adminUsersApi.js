@@ -26,11 +26,23 @@ const adminRequest = async ({ path, token, method = 'GET', body }) => {
   });
 };
 
-export const listAdminUsers = ({ token, limit = 100, offset = 0 }) => {
+export const listAdminUsers = ({
+  token,
+  limit = 100,
+  offset = 0,
+  usertype = '',
+  query = '',
+}) => {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
   });
+  if (usertype) {
+    params.set('usertype', usertype);
+  }
+  if (query) {
+    params.set('query', query);
+  }
   return adminRequest({
     path: `/v0/admin/users?${params.toString()}`,
     token,

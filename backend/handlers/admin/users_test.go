@@ -41,7 +41,7 @@ func (m adminUserManagerMock) UnsuspendModerator(ctx context.Context, username, 
 func TestListAdminUsersHandlerReturnsUserQueue(t *testing.T) {
 	svc := adminUserManagerMock{
 		listFn: func(_ context.Context, filters dusers.ListFilters) ([]*dusers.User, error) {
-			if filters.Limit != 50 || filters.Offset != 10 {
+			if filters.Limit != 50 || filters.Offset != 10 || filters.UserType != string(dusers.UserTypeModerator) || filters.Query != "mod" {
 				t.Fatalf("unexpected filters: %+v", filters)
 			}
 			return []*dusers.User{
@@ -51,7 +51,7 @@ func TestListAdminUsersHandlerReturnsUserQueue(t *testing.T) {
 		},
 	}
 	handler := ListAdminUsersHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
-	req := httptest.NewRequest(http.MethodGet, "/v0/admin/users?limit=50&offset=10", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v0/admin/users?limit=50&offset=10&usertype=MODERATOR&query=mod", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

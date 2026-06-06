@@ -35,6 +35,9 @@ func TestResolveMarketDistributesAllBetVolumePostgres(t *testing.T) {
 		modelstesting.GenerateUser("pg_yes_winner", 0),
 		modelstesting.GenerateUser("pg_yes_second", 0),
 	}
+	users[0].UserType = "MODERATOR"
+	users[0].ModeratorStatus = "active"
+
 	for i := range users {
 		if err := db.Create(&users[i]).Error; err != nil {
 			t.Fatalf("create user %s: %v", users[i].Username, err)
@@ -43,6 +46,7 @@ func TestResolveMarketDistributesAllBetVolumePostgres(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(time.Now().UnixNano()%1_000_000, users[0].Username)
 	market.IsResolved = false
+	market.StewardUsername = market.CreatorUsername
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}

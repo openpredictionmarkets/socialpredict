@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
@@ -120,10 +121,15 @@ func parseSearchFilters(r *http.Request) (dmarkets.SearchFilters, *httpError) {
 	}
 
 	return dmarkets.SearchFilters{
-		Status: status,
-		Limit:  parseLimit(r.URL.Query().Get("limit")),
-		Offset: parseOffset(r.URL.Query().Get("offset")),
+		Status:  status,
+		TagSlug: normalizeTagSlugParam(r.URL.Query().Get("tagSlug")),
+		Limit:   parseLimit(r.URL.Query().Get("limit")),
+		Offset:  parseOffset(r.URL.Query().Get("offset")),
 	}, nil
+}
+
+func normalizeTagSlugParam(value string) string {
+	return strings.Trim(strings.ToLower(strings.TrimSpace(value)), "-")
 }
 
 func searchMarkets(ctx context.Context, svc dmarkets.ServiceInterface, params searchRequestParams) (*dmarkets.SearchResults, error) {
