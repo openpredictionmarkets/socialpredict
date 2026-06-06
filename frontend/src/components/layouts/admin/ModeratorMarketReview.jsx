@@ -49,14 +49,20 @@ const AdminMarketQueue = ({ status }) => {
   const [rejectionReasons, setRejectionReasons] = useState({});
   const [tagForms, setTagForms] = useState({});
   const [busyMarketId, setBusyMarketId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const tagEditingEnabled = status === 'proposed' || status === 'published';
 
-  const loadMarkets = async () => {
+  const loadMarkets = async (query = searchQuery) => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAdminLifecycleMarkets({ token, status });
+      const data = await listAdminLifecycleMarkets({
+        token,
+        status,
+        query,
+        limit: 100,
+      });
       setMarkets(data.markets || []);
     } catch (err) {
       setError(err.message || 'Unable to load market queue.');
@@ -66,9 +72,15 @@ const AdminMarketQueue = ({ status }) => {
   };
 
   useEffect(() => {
-    loadMarkets();
+    const timeoutId = window.setTimeout(() => {
+      loadMarkets(searchQuery);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, token]);
+  }, [status, token, searchQuery]);
 
   useEffect(() => {
     if (!token || !tagEditingEnabled) {
@@ -287,6 +299,24 @@ const AdminMarketQueue = ({ status }) => {
           {successMessage}
         </div>
       )}
+      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+        <label htmlFor={`market-review-search-${status}`} className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
+          Search markets
+        </label>
+        <div className="relative">
+          <input
+            id={`market-review-search-${status}`}
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={`Search ${status} markets by title or description`}
+            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+          />
+          {loading && (
+            <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
+          )}
+        </div>
+      </div>
       <MarketLifecycleTable
         markets={markets}
         emptyMessage={`No ${status} markets found.`}
@@ -833,9 +863,6 @@ function ModeratorMarketReview() {
           Moderator mode
         </p>
         <h1 className="text-2xl font-bold mt-2">Market Review Queue</h1>
-        <p className="text-sm text-gray-300 mt-2 max-w-3xl">
-          Review proposed markets without manually entering IDs. Approved markets become published and tradable; rejected markets record the reason and refund the proposal cost. Stewardship controls which active moderator is responsible for operational market governance.
-        </p>
       </div>
 
       <SiteTabs tabs={tabsData} defaultTab="Proposed Markets" />
