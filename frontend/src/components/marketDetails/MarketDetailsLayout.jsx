@@ -173,11 +173,11 @@ function MarketDetailsTable({
           </section>
           {descriptionAmendments.length > 0 && (
             <section className="grid gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-200">Approved Amendments</h2>
-              {descriptionAmendments.map((amendment) => (
+              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-200">Amendments</h2>
+              {descriptionAmendments.map((amendment, index) => (
                 <article key={amendment.id || amendment.version} className="rounded-md border border-sky-900/70 bg-sky-950/30 p-3">
                   <div className="mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80">
-                    <span>Amendment {amendment.version}</span>
+                    <span>Amendment {index + 1}</span>
                     <span>Submitted by @{amendment.createdBy}</span>
                     {amendment.approvedAt && <span>Approved {new Date(amendment.approvedAt).toLocaleString()}</span>}
                   </div>
