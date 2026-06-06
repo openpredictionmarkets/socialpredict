@@ -16,6 +16,8 @@ import (
 )
 
 type marketDescriptionAmendmentReviewer interface {
+	GetMarketGovernanceSettings(ctx context.Context) (*dmarkets.MarketGovernanceSettings, error)
+	UpdateMarketGovernanceSettings(ctx context.Context, update dmarkets.MarketGovernanceSettingsUpdate) (*dmarkets.MarketGovernanceSettings, error)
 	ListMarketDescriptionAmendments(ctx context.Context, filters dmarkets.MarketDescriptionAmendmentFilters) ([]dmarkets.MarketDescriptionAmendment, error)
 	ReviewMarketDescriptionAmendment(ctx context.Context, amendmentID int64, status string, actorUsername string, reason string) (*dmarkets.MarketDescriptionAmendment, error)
 }
@@ -49,6 +51,72 @@ type marketDescriptionAmendmentResponse struct {
 type marketDescriptionAmendmentListResponse struct {
 	Amendments []marketDescriptionAmendmentResponse `json:"amendments"`
 	Total      int                                  `json:"total"`
+}
+
+type marketGovernanceSettingsResponse struct {
+	AutoApproveDescriptionAmendments bool      `json:"autoApproveDescriptionAmendments"`
+	Version                          uint      `json:"version"`
+	UpdatedBy                        string    `json:"updatedBy,omitempty"`
+	UpdatedAt                        time.Time `json:"updatedAt"`
+}
+
+type updateMarketGovernanceSettingsRequest struct {
+	AutoApproveDescriptionAmendments *bool `json:"autoApproveDescriptionAmendments"`
+	Version                          uint  `json:"version"`
+}
+
+func GetMarketGovernanceSettingsHandler(svc marketDescriptionAmendmentReviewer, auth authsvc.Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+			return
+		}
+		if _, ok := requireAdminForMarketReview(w, r, auth); !ok {
+			return
+		}
+		if svc == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		settings, err := svc.GetMarketGovernanceSettings(r.Context())
+		if err != nil {
+			writeMarketReviewError(w, err)
+			return
+		}
+		_ = handlers.WriteResult(w, http.StatusOK, marketGovernanceSettingsResponseFromDomain(settings))
+	}
+}
+
+func UpdateMarketGovernanceSettingsHandler(svc marketDescriptionAmendmentReviewer, auth authsvc.Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+			return
+		}
+		admin, ok := requireAdminForMarketReview(w, r, auth)
+		if !ok {
+			return
+		}
+		if svc == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		var req updateMarketGovernanceSettingsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+			return
+		}
+		settings, err := svc.UpdateMarketGovernanceSettings(r.Context(), dmarkets.MarketGovernanceSettingsUpdate{
+			AutoApproveDescriptionAmendments: req.AutoApproveDescriptionAmendments,
+			Version:                          req.Version,
+			UpdatedBy:                        admin.Username,
+		})
+		if err != nil {
+			writeMarketReviewError(w, err)
+			return
+		}
+		_ = handlers.WriteResult(w, http.StatusOK, marketGovernanceSettingsResponseFromDomain(settings))
+	}
 }
 
 func ListMarketDescriptionAmendmentsHandler(svc marketDescriptionAmendmentReviewer, auth authsvc.Authenticator) http.HandlerFunc {
@@ -141,6 +209,18 @@ func parseAdminAmendmentFilters(w http.ResponseWriter, r *http.Request) (dmarket
 		Limit:    boundedAdminReviewInt(query.Get("limit"), 50, 1, 200),
 		Offset:   boundedAdminReviewInt(query.Get("offset"), 0, 0, 100000),
 	}, true
+}
+
+func marketGovernanceSettingsResponseFromDomain(settings *dmarkets.MarketGovernanceSettings) marketGovernanceSettingsResponse {
+	if settings == nil {
+		return marketGovernanceSettingsResponse{Version: 1}
+	}
+	return marketGovernanceSettingsResponse{
+		AutoApproveDescriptionAmendments: settings.AutoApproveDescriptionAmendments,
+		Version:                          settings.Version,
+		UpdatedBy:                        settings.UpdatedBy,
+		UpdatedAt:                        settings.UpdatedAt,
+	}
 }
 
 func marketDescriptionAmendmentResponseFromDomain(item dmarkets.MarketDescriptionAmendment) marketDescriptionAmendmentResponse {

@@ -435,6 +435,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/markets/{id}/steward", securityMiddleware(adminhandlers.ReassignMarketStewardHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/tags", securityMiddleware(adminhandlers.UpdateMarketTagsHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/market-description-amendments", securityMiddleware(adminhandlers.ListMarketDescriptionAmendmentsHandler(marketsService, authService))).Methods("GET")
+	router.Handle("/v0/admin/market-description-amendments/settings", securityMiddleware(adminhandlers.GetMarketGovernanceSettingsHandler(marketsService, authService))).Methods("GET")
+	router.Handle("/v0/admin/market-description-amendments/settings", securityMiddleware(adminhandlers.UpdateMarketGovernanceSettingsHandler(marketsService, authService))).Methods("PUT")
 	router.Handle("/v0/admin/market-description-amendments/{id}", securityMiddleware(adminhandlers.ReviewMarketDescriptionAmendmentHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.ListAdminMarketTagsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.CreateAdminMarketTagHandler(marketsService, authService))).Methods("POST")

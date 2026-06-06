@@ -134,6 +134,48 @@ func TestProposeMarketDescriptionAmendmentRejectsClosedMarket(t *testing.T) {
 	}
 }
 
+func TestProposeMarketDescriptionAmendmentAutoApprovesWhenEnabled(t *testing.T) {
+	repo, original := seedAmendmentMarket(t, "moderator")
+	now := marketsTestTime()
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return activeModeratorUser(username), nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{GameMode: "moderator"})
+
+	defaultSettings, err := service.GetMarketGovernanceSettings(context.Background())
+	if err != nil {
+		t.Fatalf("GetMarketGovernanceSettings returned error: %v", err)
+	}
+	if defaultSettings.AutoApproveDescriptionAmendments {
+		t.Fatalf("auto approval should be disabled by default")
+	}
+	enabled := true
+	saved, err := service.UpdateMarketGovernanceSettings(context.Background(), markets.MarketGovernanceSettingsUpdate{
+		AutoApproveDescriptionAmendments: &enabled,
+		Version:                          defaultSettings.Version,
+		UpdatedBy:                        "admin",
+	})
+	if err != nil {
+		t.Fatalf("UpdateMarketGovernanceSettings returned error: %v", err)
+	}
+	if !saved.AutoApproveDescriptionAmendments {
+		t.Fatalf("expected auto approval setting to be enabled")
+	}
+
+	amendment, err := service.ProposeMarketDescriptionAmendment(context.Background(), original.ID, "moderator", markets.MarketDescriptionAmendmentRequest{Body: "Auto-approved clarification."})
+	if err != nil {
+		t.Fatalf("ProposeMarketDescriptionAmendment returned error: %v", err)
+	}
+	if amendment.Status != markets.DescriptionAmendmentStatusApproved {
+		t.Fatalf("status = %q, want approved", amendment.Status)
+	}
+	if amendment.ApprovedBy != markets.DescriptionAmendmentApprovedByAuto || amendment.ApprovedAt == nil {
+		t.Fatalf("unexpected auto approval audit fields: %+v", amendment)
+	}
+}
+
 func TestProposeMarketDescriptionAmendmentRejectsRawHTML(t *testing.T) {
 	repo, original := seedAmendmentMarket(t, "moderator")
 	usersSvc := newNoopUserService(func(service *noopUserService) {

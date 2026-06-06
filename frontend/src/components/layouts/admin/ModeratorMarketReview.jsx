@@ -19,8 +19,10 @@ import {
 import MarketTagChips, { MARKET_TAG_COLOR_OPTIONS } from '../../markets/MarketTagChips';
 import MarkdownLite from '../../markdown/MarkdownLite';
 import {
+  getMarketGovernanceSettings,
   listAdminMarketDescriptionAmendments,
   reviewMarketDescriptionAmendment,
+  updateMarketGovernanceSettings,
 } from '../../../api/marketDescriptionAmendmentsApi';
 
 const reviewTabs = [
@@ -521,15 +523,108 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
 };
 
 const DescriptionAmendmentQueue = () => {
+  const { token } = useAuth();
+  const [settings, setSettings] = useState({
+    autoApproveDescriptionAmendments: false,
+    version: 0,
+  });
+  const [settingsDraft, setSettingsDraft] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
   const tabsData = amendmentReviewTabs.map((tab) => ({
     label: tab.label,
     content: <DescriptionAmendmentStatusQueue status={tab.status} />,
   }));
 
+  useEffect(() => {
+    if (!token) return;
+    let ignore = false;
+    const loadSettings = async () => {
+      setSettingsLoading(true);
+      setSettingsError('');
+      try {
+        const data = await getMarketGovernanceSettings({ token });
+        if (!ignore) {
+          setSettings(data);
+          setSettingsDraft(Boolean(data.autoApproveDescriptionAmendments));
+        }
+      } catch (err) {
+        if (!ignore) {
+          setSettingsError(err.message || 'Unable to load governance settings.');
+        }
+      } finally {
+        if (!ignore) {
+          setSettingsLoading(false);
+        }
+      }
+    };
+    loadSettings();
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  const saveSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsError('');
+    setSettingsMessage('');
+    try {
+      const saved = await updateMarketGovernanceSettings({
+        token,
+        autoApproveDescriptionAmendments: settingsDraft,
+        version: settings.version,
+      });
+      setSettings(saved);
+      setSettingsDraft(Boolean(saved.autoApproveDescriptionAmendments));
+      setSettingsMessage('Amendment auto-approval setting saved.');
+    } catch (err) {
+      setSettingsError(err.message || 'Unable to save governance settings.');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const settingsChanged = settingsDraft !== Boolean(settings.autoApproveDescriptionAmendments);
+
   return (
     <div className="grid gap-4">
       <div className="rounded-lg border border-sky-800/70 bg-sky-950/30 p-4 text-sm text-sky-100">
         Description amendments are append-only contract clarifications. Approving one makes it visible on the public market page.
+      </div>
+      <div className="grid gap-3 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-semibold text-white">Auto-approve new amendments</p>
+            <p className="mt-1 text-sm text-gray-400">
+              When enabled, newly proposed steward amendments are immediately accepted. Turn it off and save to restore manual admin review.
+            </p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-3 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={settingsDraft}
+              disabled={settingsLoading || settingsSaving}
+              onChange={(event) => setSettingsDraft(event.target.checked)}
+              className="h-5 w-5 rounded border-gray-600 bg-gray-800 text-primary-pink focus:ring-primary-pink"
+            />
+            <span>{settingsDraft ? 'Auto-accept on' : 'Auto-accept off'}</span>
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={settingsLoading || settingsSaving || !settingsChanged}
+            onClick={saveSettings}
+            className="rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {settingsSaving ? 'Saving...' : 'Save Auto-Approval Setting'}
+          </button>
+          <span className="text-xs text-gray-500">Version {settings.version || 1}</span>
+        </div>
+        {settingsError && <div className="rounded-md bg-red-700 p-3 text-sm text-white">{settingsError}</div>}
+        {settingsMessage && <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">{settingsMessage}</div>}
       </div>
       <SiteTabs tabs={tabsData} defaultTab="Pending Amendments" />
     </div>

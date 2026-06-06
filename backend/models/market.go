@@ -79,3 +79,11 @@ type MarketDescriptionAmendment struct {
 	RejectionReason string     `json:"rejectionReason,omitempty" gorm:"type:text"`
 	SubmitReason    string     `json:"submitReason,omitempty" gorm:"type:text"`
 }
+
+type MarketGovernanceSettings struct {
+	gorm.Model
+	ID                               uint   `json:"id" gorm:"primaryKey"`
+	AutoApproveDescriptionAmendments bool   `json:"autoApproveDescriptionAmendments" gorm:"not null;default:false"`
+	Version                          uint   `json:"version" gorm:"not null;default:1"`
+	UpdatedBy                        string `json:"updatedBy,omitempty" gorm:"size:64"`
+}

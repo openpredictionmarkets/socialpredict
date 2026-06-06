@@ -15,6 +15,7 @@ const (
 	DescriptionAmendmentStatusPending      = "pending"
 	DescriptionAmendmentStatusApproved     = "approved"
 	DescriptionAmendmentStatusRejected     = "rejected"
+	DescriptionAmendmentApprovedByAuto     = "auto-approval"
 	MaxDescriptionAmendmentLength          = 2000
 	MaxDescriptionAmendmentReasonLength    = 500
 )
@@ -59,6 +60,24 @@ type MarketDescriptionAmendmentRepository interface {
 	CreateMarketDescriptionAmendment(ctx context.Context, amendment MarketDescriptionAmendment) (*MarketDescriptionAmendment, error)
 	ListMarketDescriptionAmendments(ctx context.Context, filters MarketDescriptionAmendmentFilters) ([]MarketDescriptionAmendment, error)
 	ReviewMarketDescriptionAmendment(ctx context.Context, id int64, status string, actorUsername string, reason string, reviewedAt time.Time) (*MarketDescriptionAmendment, error)
+}
+
+type MarketGovernanceSettings struct {
+	AutoApproveDescriptionAmendments bool
+	Version                          uint
+	UpdatedBy                        string
+	UpdatedAt                        time.Time
+}
+
+type MarketGovernanceSettingsUpdate struct {
+	AutoApproveDescriptionAmendments *bool
+	Version                          uint
+	UpdatedBy                        string
+}
+
+type MarketGovernanceSettingsRepository interface {
+	GetMarketGovernanceSettings(ctx context.Context) (*MarketGovernanceSettings, error)
+	UpdateMarketGovernanceSettings(ctx context.Context, update MarketGovernanceSettingsUpdate) (*MarketGovernanceSettings, error)
 }
 
 func NormalizeDescriptionAmendmentStatus(value string) string {
@@ -112,14 +131,25 @@ func (s *Service) ProposeMarketDescriptionAmendment(ctx context.Context, marketI
 	if err != nil {
 		return nil, err
 	}
+	amendmentStatus := DescriptionAmendmentStatusPending
+	approvedBy := ""
+	var approvedAt *time.Time
+	settings, settingsErr := s.GetMarketGovernanceSettings(ctx)
+	if settingsErr == nil && settings != nil && settings.AutoApproveDescriptionAmendments {
+		amendmentStatus = DescriptionAmendmentStatusApproved
+		approvedBy = DescriptionAmendmentApprovedByAuto
+		approvedAt = cloneDescriptionAmendmentTime(now)
+	}
 	return repo.CreateMarketDescriptionAmendment(ctx, MarketDescriptionAmendment{
 		MarketID:     marketID,
 		Body:         body,
 		BodyFormat:   format,
-		Status:       DescriptionAmendmentStatusPending,
+		Status:       amendmentStatus,
 		CreatedBy:    actorUsername,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+		ApprovedBy:   approvedBy,
+		ApprovedAt:   approvedAt,
 		SubmitReason: reason,
 	})
 }
@@ -166,11 +196,42 @@ func (s *Service) ReviewMarketDescriptionAmendment(ctx context.Context, amendmen
 	return repo.ReviewMarketDescriptionAmendment(ctx, amendmentID, status, actorUsername, reason, s.clock.Now())
 }
 
+func (s *Service) GetMarketGovernanceSettings(ctx context.Context) (*MarketGovernanceSettings, error) {
+	repo, err := s.marketGovernanceSettingsRepository()
+	if err != nil {
+		return nil, err
+	}
+	return repo.GetMarketGovernanceSettings(ctx)
+}
+
+func (s *Service) UpdateMarketGovernanceSettings(ctx context.Context, update MarketGovernanceSettingsUpdate) (*MarketGovernanceSettings, error) {
+	update.UpdatedBy = strings.TrimSpace(update.UpdatedBy)
+	if update.UpdatedBy == "" || update.AutoApproveDescriptionAmendments == nil {
+		return nil, ErrInvalidInput
+	}
+	repo, err := s.marketGovernanceSettingsRepository()
+	if err != nil {
+		return nil, err
+	}
+	return repo.UpdateMarketGovernanceSettings(ctx, update)
+}
+
 func (s *Service) descriptionAmendmentRepository() (MarketDescriptionAmendmentRepository, error) {
 	if s == nil || s.repo == nil {
 		return nil, ErrInvalidInput
 	}
 	repo, ok := s.repo.(MarketDescriptionAmendmentRepository)
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+	return repo, nil
+}
+
+func (s *Service) marketGovernanceSettingsRepository() (MarketGovernanceSettingsRepository, error) {
+	if s == nil || s.repo == nil {
+		return nil, ErrInvalidInput
+	}
+	repo, ok := s.repo.(MarketGovernanceSettingsRepository)
 	if !ok {
 		return nil, ErrInvalidInput
 	}
@@ -239,6 +300,11 @@ func approvedAmendmentsBeforeVersion(items []MarketDescriptionAmendment, version
 		}
 	}
 	return out
+}
+
+func cloneDescriptionAmendmentTime(value time.Time) *time.Time {
+	cloned := value
+	return &cloned
 }
 
 func (s *Service) ensureActiveModerator(ctx context.Context, username string) error {

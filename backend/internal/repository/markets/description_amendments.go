@@ -114,6 +114,57 @@ func (r *GormRepository) ReviewMarketDescriptionAmendment(ctx context.Context, i
 	return &out, nil
 }
 
+func (r *GormRepository) GetMarketGovernanceSettings(ctx context.Context) (*dmarkets.MarketGovernanceSettings, error) {
+	var row models.MarketGovernanceSettings
+	if err := r.db.WithContext(ctx).First(&row, 1).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &dmarkets.MarketGovernanceSettings{Version: 1}, nil
+		}
+		return nil, err
+	}
+	out := modelMarketGovernanceSettingsToDomain(row)
+	return &out, nil
+}
+
+func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, update dmarkets.MarketGovernanceSettingsUpdate) (*dmarkets.MarketGovernanceSettings, error) {
+	if update.AutoApproveDescriptionAmendments == nil {
+		return nil, dmarkets.ErrInvalidInput
+	}
+	var saved models.MarketGovernanceSettings
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var row models.MarketGovernanceSettings
+		err := tx.First(&row, 1).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			row = models.MarketGovernanceSettings{ID: 1, Version: 1}
+		} else if err != nil {
+			return err
+		} else if update.Version != 0 && update.Version != row.Version {
+			return dmarkets.ErrInvalidState
+		}
+		row.AutoApproveDescriptionAmendments = *update.AutoApproveDescriptionAmendments
+		row.UpdatedBy = update.UpdatedBy
+		if row.ID == 0 {
+			row.ID = 1
+			row.Version = 1
+		} else if !row.CreatedAt.IsZero() {
+			row.Version++
+		}
+		if row.Version == 0 {
+			row.Version = 1
+		}
+		if err := tx.Save(&row).Error; err != nil {
+			return err
+		}
+		saved = row
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := modelMarketGovernanceSettingsToDomain(saved)
+	return &out, nil
+}
+
 func domainDescriptionAmendmentToModel(amendment dmarkets.MarketDescriptionAmendment) models.MarketDescriptionAmendment {
 	return models.MarketDescriptionAmendment{
 		ID:              amendment.ID,
@@ -129,6 +180,15 @@ func domainDescriptionAmendmentToModel(amendment dmarkets.MarketDescriptionAmend
 		RejectedAt:      amendment.RejectedAt,
 		RejectionReason: amendment.RejectionReason,
 		SubmitReason:    amendment.SubmitReason,
+	}
+}
+
+func modelMarketGovernanceSettingsToDomain(row models.MarketGovernanceSettings) dmarkets.MarketGovernanceSettings {
+	return dmarkets.MarketGovernanceSettings{
+		AutoApproveDescriptionAmendments: row.AutoApproveDescriptionAmendments,
+		Version:                          row.Version,
+		UpdatedBy:                        row.UpdatedBy,
+		UpdatedAt:                        row.UpdatedAt,
 	}
 }
 

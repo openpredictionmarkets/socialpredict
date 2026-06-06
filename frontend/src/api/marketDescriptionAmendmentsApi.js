@@ -52,6 +52,26 @@ export const listAdminMarketDescriptionAmendments = ({ token, status = 'pending'
   });
 };
 
+export const getMarketGovernanceSettings = ({ token }) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
+  authToken: token,
+  reasonMessages: adminAmendmentReasonMessages,
+  fallbackMessage: 'Unable to load market governance settings.',
+});
+
+export const updateMarketGovernanceSettings = ({ token, autoApproveDescriptionAmendments, version = 0 }) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  authToken: token,
+  body: JSON.stringify({
+    autoApproveDescriptionAmendments: Boolean(autoApproveDescriptionAmendments),
+    version,
+  }),
+  reasonMessages: adminAmendmentReasonMessages,
+  fallbackMessage: 'Unable to save market governance settings.',
+});
+
 export const reviewMarketDescriptionAmendment = ({ token, amendmentId, status, reason }) => {
   const normalizedStatus = String(status || '').trim();
   const normalizedReason = String(reason || '').trim();

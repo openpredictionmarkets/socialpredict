@@ -226,6 +226,7 @@ x-route-family-migration-matrix:
         - /v0/admin/markets/{id}/steward
         - /v0/admin/markets/{id}/tags
         - /v0/admin/market-description-amendments
+        - /v0/admin/market-description-amendments/settings
         - /v0/admin/market-description-amendments/{id}
         - /v0/admin/market-tags
         - /v0/admin/market-tags/{slug}
@@ -2922,6 +2923,102 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/market-description-amendments/settings:
+    get:
+      tags: [Markets]
+      operationId: getMarketGovernanceSettings
+      summary: Get market governance settings
+      description: Admin-only endpoint for reading market governance settings, including description amendment auto-approval.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Market governance settings returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGovernanceSettingsEnvelopeResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected settings lookup failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+    put:
+      tags: [Markets]
+      operationId: updateMarketGovernanceSettings
+      summary: Update market governance settings
+      description: Admin-only endpoint for saving market governance settings such as description amendment auto-approval.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketGovernanceSettingsUpdateRequest'
+      responses:
+        '200':
+          description: Market governance settings updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGovernanceSettingsEnvelopeResponse'
+        '400':
+          description: Invalid settings request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Settings version mismatch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected settings update failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/market-description-amendments/{id}:
     patch:
       tags: [Markets]
@@ -4902,6 +4999,41 @@ components:
           minLength: 1
           maxLength: 500
           description: Admin-visible decision reason.
+
+    MarketGovernanceSettingsUpdateRequest:
+      type: object
+      required: [autoApproveDescriptionAmendments]
+      properties:
+        autoApproveDescriptionAmendments:
+          type: boolean
+          description: When true, newly proposed steward amendments are immediately approved.
+        version:
+          type: integer
+          description: Optional optimistic concurrency version returned by the settings read endpoint.
+
+    MarketGovernanceSettingsResponse:
+      type: object
+      required: [autoApproveDescriptionAmendments, version]
+      properties:
+        autoApproveDescriptionAmendments:
+          type: boolean
+        version:
+          type: integer
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    MarketGovernanceSettingsEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketGovernanceSettingsResponse'
 
     MarketDescriptionAmendmentResponse:
       type: object
