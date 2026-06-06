@@ -1,138 +1,52 @@
-```
-User submits Sell Request (marketID, outcome, creditAmount)
-│
-├── Stream all bets in chronological order
-│   │
-│   ├── For each bet:
-│   │   ├── If bet is a BUY (Amount > 0):
-│   │   │   ├── Update user's position (shares, value)
-│   │   │   └── Update total market volume
-│   │   │
-│   │   └── If bet is a SALE (Amount < 0):
-│   │       ├── Look up current user position
-│   │       ├── Calculate value/share = position.Value / shares
-│   │       ├── Compute sharesSold = -bet.Amount
-│   │       ├── Compute actualCredits = sharesSold × valuePerShare
-│   │       ├── Compute dust = creditRequested - actualCredits
-│   │       └── Accumulate dust in totalDust variable
-│   │
-│   └── Continue until all bets processed
-│
-└── Output:
-    ├── Final market volume = sum(abs(bet.Amount)) + totalDust
-    ├── Updated user balance = oldBalance + actualCredits
-    ├── New negative bet recorded
-    └── TotalDust available for audit / liquidity
+# Sell Flow And Dust
+
+A sell request asks for a credit amount, not a share count:
+
+```text
+POST /v0/sell
+{ marketId, outcome, amount }
 ```
 
-Ramifications of this:
+`amount` is the number of credits the user is requesting from the sale. The sell domain calculates the current integer value per share, rounds the sale down to whole shares, credits the user with the actual sale value, and records any remainder as dust.
 
-* GetMarketVolume is used in positions.
-* GetMarketVolume, in order to be stateless, needs to compute market dust.
-
-```
-User submits Sell Request (marketID, outcome, creditAmount)
-│
-├── Stream all bets in chronological order
-│   │
-│   ├── For each bet:
-│   │   ├── If bet is a BUY (Amount > 0):
-│   │   │   ├── Update user's position (shares, value)
-│   │   │   └── Update total market volume
-│   │   │
-│   │   └── If bet is a SALE (Amount < 0):
-│   │       ├── Snapshot user state (position, value/share)
-│   │       ├── ⬇️ Call CalculateMarketPositions_WPAM_DBPM()
-│   │       │     ├── ⬇️ Calls GetMarketVolume(allBets)
-│   │       │     │     ├── sum(abs(bet.Amount)) from allBets
-│   │       │     │     └── ⬇️ + GetMarketDust(allBets)
-│   │       │     │           └── Iterates over allBets, and for each SALE:
-│   │       │     │               ├── Snapshot position at sale time
-│   │       │     │               ├── Compute value/share
-│   │       │     │               ├── Compute actual credits = shares × value/share
-│   │       │     │               ├── Infer dust = requested - actualCredits
-│   │       │     │               └── Accumulate to dustTotal
-│   │       │     └── Uses totalVolume (with dust) to calculate valuations
-│   │       ├── Compute value/share from user's position
-│   │       ├── Compute sharesSold = -bet.Amount
-│   │       ├── Compute actualCredits = sharesSold × value/share
-│   │       ├── Compute dust = creditRequested - actualCredits
-│   │       └── Accumulate dust in totalDust variable
-│   │
-│   └── Continue until all bets processed
-│
-└── Output:
-    ├── Final market volume = sum(abs(bet.Amount)) + inferred dust
-    ├── Updated user balance = oldBalance + actualCredits
-    ├── New negative bet recorded
-    └── TotalDust available for audit / liquidity
-
+```text
+valuePerShare = position.Value / sharesOwned
+sharesSold    = requestedCredits / valuePerShare
+saleValue     = sharesSold * valuePerShare
+dust          = requestedCredits - saleValue
 ```
 
-* Note that MarketDust is calculated along with volume.
+If `dust` exceeds `economics.betting.maxDustPerSale` from `setup.yaml`, the sale is rejected with `DUST_CAP_EXCEEDED`.
 
+## Persistence
+
+The sale creates a bet ledger row where:
+
+```text
+amount = -sharesSold
+dust   = exact assessed dust
 ```
-func GetMarketDust(bets []models.Bet) int64 {
-    var totalDust int64 = 0
-    userPositions := make(map[string]positionsmath.UserMarketPosition)
-    var totalVolume int64 = 0
 
-    for _, bet := range bets {
-        absAmount := bet.Amount
-        if absAmount < 0 {
-            absAmount = -absAmount
-        }
+That keeps share accounting and dust accounting separate:
 
-        // Update volume
-        totalVolume += absAmount
+- `amount` remains the share/position ledger entry used by the market math.
+- `dust` is explicit transaction metadata used to calculate market dust.
+- User balance is credited by `saleValue`, not the originally requested credits.
 
-        // BUY bet → update user position
-        if bet.Amount > 0 {
-            pos := userPositions[bet.Username]
-            if bet.Outcome == "YES" {
-                pos.YesSharesOwned += bet.Amount
-            } else {
-                pos.NoSharesOwned += bet.Amount
-            }
-            userPositions[bet.Username] = pos
-            continue
-        }
+## API Response
 
-        // SELL bet → infer dust
-        pos := userPositions[bet.Username]
-        var sharesOwned int64
-        if bet.Outcome == "YES" {
-            sharesOwned = pos.YesSharesOwned
-        } else {
-            sharesOwned = pos.NoSharesOwned
-        }
+A successful sale returns:
 
-        if sharesOwned == 0 {
-            continue // skip invalid sale
-        }
-
-        // ⚠️ Placeholder logic for valuation (replace with real valuation logic)
-        value := pos.YesSharesOwned + pos.NoSharesOwned
-        valuePerShare := int64(0)
-        if sharesOwned != 0 {
-            valuePerShare = value / sharesOwned
-        }
-
-        sharesSold := -bet.Amount
-        actualCredits := valuePerShare * sharesSold
-        requestedCredits := actualCredits // or override if known
-        dust := requestedCredits - actualCredits
-        totalDust += dust
-
-        // Burn sold shares
-        if bet.Outcome == "YES" {
-            pos.YesSharesOwned -= sharesSold
-        } else {
-            pos.NoSharesOwned -= sharesSold
-        }
-        userPositions[bet.Username] = pos
-    }
-
-    return totalDust
+```json
+{
+  "sharesSold": 2,
+  "saleValue": 20,
+  "dust": 1
 }
 ```
+
+The frontend should tell the user when `dust > 0` so the rounding fee is visible at the time of sale.
+
+## Market Dust
+
+Market dust is no longer inferred from negative sale rows. It is summed from the persisted `bets.dust` values for sale rows. Legacy sale rows without recorded dust use the historical fallback dust value so old markets continue to display a conservative dust estimate.

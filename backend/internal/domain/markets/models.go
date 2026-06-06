@@ -126,6 +126,7 @@ type Bet struct {
 	Username  string
 	MarketID  uint
 	Amount    int64
+	Dust      int64
 	Outcome   string
 	PlacedAt  time.Time
 	CreatedAt time.Time
@@ -141,6 +142,7 @@ func boundaryBetFromDomain(bet *Bet) boundary.Bet {
 		Username:  bet.Username,
 		MarketID:  bet.MarketID,
 		Amount:    bet.Amount,
+		Dust:      bet.Dust,
 		Outcome:   bet.Outcome,
 		PlacedAt:  bet.PlacedAt,
 		CreatedAt: bet.CreatedAt,

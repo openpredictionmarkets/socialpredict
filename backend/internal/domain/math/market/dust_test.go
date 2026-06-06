@@ -20,11 +20,16 @@ func (c fixedSellDustCalculator) DustForSell(sellBet boundary.Bet, allBets []bou
 var dustTestBaseTime = time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
 func makeDustTestBet(amount int64, outcome, username string, minutes int) boundary.Bet {
+	return makeDustTestBetWithDust(amount, 0, outcome, username, minutes)
+}
+
+func makeDustTestBetWithDust(amount int64, dust int64, outcome, username string, minutes int) boundary.Bet {
 	placedAt := dustTestBaseTime.Add(time.Duration(minutes) * time.Minute)
 	return boundary.Bet{
 		Username:  username,
 		MarketID:  1,
 		Amount:    amount,
+		Dust:      dust,
 		Outcome:   outcome,
 		PlacedAt:  placedAt,
 		CreatedAt: placedAt,
@@ -79,11 +84,11 @@ func TestGetMarketVolumeWithDust(t *testing.T) {
 			bets: []boundary.Bet{
 				makeDustTestBet(100, "YES", "user1", 0),
 				makeDustTestBet(200, "NO", "user2", 1),
-				makeDustTestBet(-50, "YES", "user1", 2), // Sell
-				makeDustTestBet(-75, "NO", "user2", 3),  // Sell
+				makeDustTestBetWithDust(-50, 3, "YES", "user1", 2), // Sell
+				makeDustTestBetWithDust(-75, 2, "NO", "user2", 3),  // Sell
 			},
 			expectedBase:     175, // 100 + 200 - 50 - 75
-			expectedWithDust: 177, // Base + 2 dust (1 per sell as placeholder)
+			expectedWithDust: 180, // Base + exact recorded sale dust
 		},
 	}
 
@@ -117,20 +122,20 @@ func TestCalculateDustStack(t *testing.T) {
 		{
 			name: "only sell bets",
 			bets: []boundary.Bet{
-				makeDustTestBet(-50, "YES", "user1", 0),
-				makeDustTestBet(-75, "NO", "user2", 1),
+				makeDustTestBetWithDust(-50, 3, "YES", "user1", 0),
+				makeDustTestBetWithDust(-75, 2, "NO", "user2", 1),
 			},
-			expectedDust: 2, // 1 dust per sell (placeholder implementation)
+			expectedDust: 5,
 		},
 		{
 			name: "mixed bets - chronological order matters",
 			bets: []boundary.Bet{
-				makeDustTestBet(100, "YES", "user1", 0), // Buy first
-				makeDustTestBet(-50, "YES", "user1", 1), // Sell second
-				makeDustTestBet(200, "NO", "user2", 2),  // Buy third
-				makeDustTestBet(-75, "NO", "user2", 3),  // Sell fourth
+				makeDustTestBet(100, "YES", "user1", 0),            // Buy first
+				makeDustTestBetWithDust(-50, 3, "YES", "user1", 1), // Sell second
+				makeDustTestBet(200, "NO", "user2", 2),             // Buy third
+				makeDustTestBetWithDust(-75, 2, "NO", "user2", 3),  // Sell fourth
 			},
-			expectedDust: 2, // 2 sells = 2 dust points
+			expectedDust: 5,
 		},
 	}
 
@@ -142,6 +147,16 @@ func TestCalculateDustStack(t *testing.T) {
 }
 
 func TestGetMarketDust(t *testing.T) {
+	bets := []boundary.Bet{
+		makeDustTestBet(100, "YES", "user1", 0),
+		makeDustTestBetWithDust(-50, 3, "YES", "user1", 1),
+		makeDustTestBetWithDust(-25, 2, "NO", "user2", 2),
+	}
+
+	assertInt64Equal(t, "dust", 5, GetMarketDust(bets))
+}
+
+func TestGetMarketDustFallsBackForLegacySellBets(t *testing.T) {
 	bets := []boundary.Bet{
 		makeDustTestBet(100, "YES", "user1", 0),
 		makeDustTestBet(-50, "YES", "user1", 1),
@@ -161,13 +176,13 @@ func TestGetMarketDustWithCalculator(t *testing.T) {
 	assertInt64Equal(t, "dust", 6, GetMarketDustWithCalculator(bets, fixedSellDustCalculator{dust: 3}))
 }
 
-func TestCalculateDustForSell_Placeholder(t *testing.T) {
-	sellBet := boundary.Bet{Amount: -50, Outcome: "YES", Username: "user1", MarketID: 1, PlacedAt: dustTestBaseTime}
+func TestCalculateDustForSell(t *testing.T) {
+	sellBet := boundary.Bet{Amount: -50, Dust: 2, Outcome: "YES", Username: "user1", MarketID: 1, PlacedAt: dustTestBaseTime}
 	buyBet := boundary.Bet{Amount: 100, Outcome: "YES", Username: "user1", MarketID: 1, PlacedAt: dustTestBaseTime}
 
 	allBets := []boundary.Bet{buyBet, sellBet}
 
-	assertInt64Equal(t, "sell dust", 1, calculateDustForSell(sellBet, allBets))
+	assertInt64Equal(t, "sell dust", 2, calculateDustForSell(sellBet, allBets))
 	assertInt64Equal(t, "buy dust", 0, calculateDustForSell(buyBet, allBets))
 }
 

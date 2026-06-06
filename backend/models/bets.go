@@ -15,6 +15,7 @@ type Bet struct {
 	MarketID uint      `json:"marketId"`
 	Market   Market    `gorm:"foreignKey:ID;references:MarketID"`
 	Amount   int64     `json:"amount"`
+	Dust     int64     `json:"dust"`
 	PlacedAt time.Time `json:"placedAt"`
 	Outcome  string    `json:"outcome,omitempty"`
 }

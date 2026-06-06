@@ -12,6 +12,7 @@ type Bet struct {
 	Username  string
 	MarketID  uint
 	Amount    int64
+	Dust      int64
 	Outcome   string
 	PlacedAt  time.Time
 	CreatedAt time.Time

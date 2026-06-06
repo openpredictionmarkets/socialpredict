@@ -113,6 +113,7 @@ func sellModelBetsToBoundary(dbBets []models.Bet) []boundary.Bet {
 			Username:  bet.Username,
 			MarketID:  bet.MarketID,
 			Amount:    bet.Amount,
+			Dust:      bet.Dust,
 			Outcome:   bet.Outcome,
 			PlacedAt:  bet.PlacedAt,
 			CreatedAt: bet.CreatedAt,

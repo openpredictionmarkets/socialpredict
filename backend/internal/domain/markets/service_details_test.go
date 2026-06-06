@@ -40,11 +40,12 @@ func seedMarketDetailsFixture(t *testing.T) marketDetailsFixture {
 	bets := []boundary.Bet{
 		{Username: "alice", MarketID: uint(market.ID), Amount: 150, Outcome: "YES", PlacedAt: market.CreatedAt.Add(1 * time.Minute), CreatedAt: market.CreatedAt.Add(1 * time.Minute)},
 		{Username: "bob", MarketID: uint(market.ID), Amount: 90, Outcome: "NO", PlacedAt: market.CreatedAt.Add(2 * time.Minute), CreatedAt: market.CreatedAt.Add(2 * time.Minute)},
-		{Username: "alice", MarketID: uint(market.ID), Amount: -40, Outcome: "YES", PlacedAt: market.CreatedAt.Add(3 * time.Minute), CreatedAt: market.CreatedAt.Add(3 * time.Minute)},
+		{Username: "alice", MarketID: uint(market.ID), Amount: -40, Dust: 2, Outcome: "YES", PlacedAt: market.CreatedAt.Add(3 * time.Minute), CreatedAt: market.CreatedAt.Add(3 * time.Minute)},
 	}
 
 	for i, bet := range bets {
 		dbBet := modelstesting.GenerateBet(bet.Amount, bet.Outcome, bet.Username, bet.MarketID, 0)
+		dbBet.Dust = bet.Dust
 		dbBet.PlacedAt = bet.PlacedAt
 		dbBet.CreatedAt = bet.CreatedAt
 		if err := db.Create(&dbBet).Error; err != nil {

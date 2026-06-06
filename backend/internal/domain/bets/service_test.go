@@ -471,7 +471,7 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	if !res.TransactionAt.Equal(now) {
 		t.Fatalf("expected transaction time %v, got %v", now, res.TransactionAt)
 	}
-	if fixture.repo.created == nil || fixture.repo.created.Amount != -2 || fixture.repo.created.Outcome != "YES" {
+	if fixture.repo.created == nil || fixture.repo.created.Amount != -2 || fixture.repo.created.Dust != 5 || fixture.repo.created.Outcome != "YES" {
 		t.Fatalf("unexpected stored bet: %+v", fixture.repo.created)
 	}
 	if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != 20 {

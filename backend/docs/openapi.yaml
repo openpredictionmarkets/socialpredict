@@ -1663,10 +1663,12 @@ paths:
       operationId: sellPosition
       summary: Sell shares
       description: >
-        Sells an amount of YES/NO shares for the authenticated user and deposits
-        the proceeds. This private action route is explicitly blocked at the
-        route boundary with PASSWORD_CHANGE_REQUIRED when the caller must change
-        their password.
+        Sells enough YES/NO shares to satisfy the requested credit amount, rounded
+        down to whole shares, and deposits the actual sale value. Any remainder
+        caused by whole-share rounding is returned as dust and retained by the
+        market subject to the configured maxDustPerSale cap. This private action
+        route is explicitly blocked at the route boundary with PASSWORD_CHANGE_REQUIRED
+        when the caller must change their password.
       security:
         - bearerAuth: []
       requestBody:
@@ -4644,6 +4646,7 @@ components:
         amount:
           type: integer
           format: int64
+          description: Requested credits to receive from the sale. The actual credited value may be lower by the reported dust amount.
         outcome:
           type: string
 
@@ -4657,12 +4660,15 @@ components:
         sharesSold:
           type: integer
           format: int64
+          description: Whole shares sold to satisfy the requested credit amount.
         saleValue:
           type: integer
           format: int64
+          description: Actual credits deposited after whole-share rounding.
         dust:
           type: integer
           format: int64
+          description: Requested credits minus actual saleValue, retained by the market due to rounding.
         outcome:
           type: string
         transactionAt:

@@ -118,7 +118,7 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) (
 	}
 	var bets []analyticsBetRow
 	if err := db.Table("bets").
-		Select("id", "username", "market_id", "amount", "outcome", "placed_at", "created_at").
+		Select("id", "username", "market_id", "amount", "dust", "outcome", "placed_at", "created_at").
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC").
 		Find(&bets).Error; err != nil {
@@ -306,6 +306,7 @@ type analyticsBetRow struct {
 	Username  string
 	MarketID  uint
 	Amount    int64
+	Dust      int64
 	Outcome   string
 	PlacedAt  time.Time
 	CreatedAt time.Time
@@ -343,6 +344,7 @@ func mapBets(dbBets []analyticsBetRow) []boundary.Bet {
 			Username:  bet.Username,
 			MarketID:  bet.MarketID,
 			Amount:    bet.Amount,
+			Dust:      bet.Dust,
 			Outcome:   bet.Outcome,
 			PlacedAt:  bet.PlacedAt,
 			CreatedAt: bet.CreatedAt,

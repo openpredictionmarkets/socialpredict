@@ -16,11 +16,12 @@ func newPlacedBoundaryBet(req PlaceRequest, outcome string, placedAt time.Time) 
 	}
 }
 
-func newSoldBoundaryBet(req SellRequest, outcome string, sharesSold int64, placedAt time.Time) *boundary.Bet {
+func newSoldBoundaryBet(req SellRequest, outcome string, sharesSold int64, dust int64, placedAt time.Time) *boundary.Bet {
 	return &boundary.Bet{
 		Username: req.Username,
 		MarketID: req.MarketID,
 		Amount:   -sharesSold,
+		Dust:     dust,
 		Outcome:  outcome,
 		PlacedAt: placedAt,
 	}
@@ -85,8 +86,8 @@ type SellRequest struct {
 }
 
 // NewSaleBet builds the persisted ledger entry for a share sale.
-func (r SellRequest) NewSaleBet(outcome string, sharesSold int64, placedAt time.Time) *boundary.Bet {
-	return newSoldBoundaryBet(r, outcome, sharesSold, placedAt)
+func (r SellRequest) NewSaleBet(outcome string, sharesSold int64, dust int64, placedAt time.Time) *boundary.Bet {
+	return newSoldBoundaryBet(r, outcome, sharesSold, dust, placedAt)
 }
 
 // SellResult summarises the sale that occurred.

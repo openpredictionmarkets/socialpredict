@@ -246,6 +246,7 @@ func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID i
 			Username:  bets[i].Username,
 			MarketID:  bets[i].MarketID,
 			Amount:    bets[i].Amount,
+			Dust:      bets[i].Dust,
 			PlacedAt:  bets[i].PlacedAt,
 			Outcome:   bets[i].Outcome,
 			CreatedAt: bets[i].CreatedAt,

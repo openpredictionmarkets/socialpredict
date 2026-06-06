@@ -139,6 +139,7 @@ func convertToBoundaryBets(bets []*Bet) []boundary.Bet {
 			Username: bet.Username,
 			MarketID: bet.MarketID,
 			Amount:   bet.Amount,
+			Dust:     bet.Dust,
 			PlacedAt: bet.PlacedAt,
 			Outcome:  bet.Outcome,
 		}

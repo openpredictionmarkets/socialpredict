@@ -17,6 +17,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
     const showFeeSection = !isLoading && feeData;
+    const maxSaleCredits = Math.max(0, Number(shares.value) || 0);
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -63,10 +64,10 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 // Set outcome and amount based on shares
                 if (normalized.noSharesOwned > 0 && normalized.yesSharesOwned === 0) {
                     setSelectedOutcome('NO');
-                    setSellAmount(normalized.noSharesOwned);
+                    setSellAmount(defaultSaleAmount(normalized));
                 } else if (normalized.yesSharesOwned > 0 && normalized.noSharesOwned === 0) {
                     setSelectedOutcome('YES');
-                    setSellAmount(normalized.yesSharesOwned);
+                    setSellAmount(defaultSaleAmount(normalized));
                 } else {
                     setSelectedOutcome(null);
                     setSellAmount(1);
@@ -85,20 +86,14 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
     const handleSellAmountChange = (event) => {
         const newAmount = parseInt(event.target.value, 10) || 0; // Ensure it defaults to 0 if conversion fails
-        // Check the selected outcome and compare the new amount with the owned shares
-        if (selectedOutcome === 'NO') {
-            if (newAmount > shares.noSharesOwned) {
-                setSellAmount(shares.noSharesOwned); // Set to max shares if over the limit
-            } else if (newAmount >= 0) {
-                setSellAmount(newAmount); // Only set if it's a non-negative number
-            }
-        } else if (selectedOutcome === 'YES') {
-            if (newAmount > shares.yesSharesOwned) {
-                setSellAmount(shares.yesSharesOwned); // Set to max shares if over the limit
-            } else if (newAmount >= 0) {
-                setSellAmount(newAmount); // Only set if it's a non-negative number
-            }
+        if (newAmount < 0) {
+            return;
         }
+        if (maxSaleCredits > 0 && newAmount > maxSaleCredits) {
+            setSellAmount(maxSaleCredits);
+            return;
+        }
+        setSellAmount(newAmount);
     };
 
     const handleSaleSubmission = (outcomeOverride) => {
@@ -119,7 +114,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             saleData,
             token,
             (data) => {
-                alert(`Sale successful! Sold ${data.sharesSold} for ${data.saleValue}.`);
+                alert(buildSaleSuccessMessage(data));
                 setSelectedOutcome(null);
                 setSellAmount(1);
                 setIsSubmitting(false);
@@ -158,11 +153,16 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     )}
                     <div className="border-t border-gray-200 my-2"></div>
                     <div className="flex items-center space-x-4 mb-4">
-                        <h2 className="text-xl">Sale Amount</h2>
+                        <div>
+                            <h2 className="text-xl">Requested Credits</h2>
+                            <p className="text-xs text-blue-100">
+                                Sales are rounded down to whole shares. Any small remainder is shown as dust.
+                            </p>
+                        </div>
                         <SaleInputAmount
                             value={sellAmount}
                             onChange={handleSellAmountChange}
-                            max={selectedOutcome === 'NO' ? shares.noSharesOwned : shares.yesSharesOwned}
+                            max={maxSaleCredits || 1}
                             disabled={isActionDisabled}
                         />
                     </div>
@@ -236,6 +236,19 @@ const normalizeShares = (data) => {
         yesSharesOwned: data.yesSharesOwned ?? data.YesSharesOwned ?? 0,
         value: data.value ?? data.Value ?? 0,
     };
+};
+
+const defaultSaleAmount = (normalized) => {
+    return Math.max(1, Number(normalized?.value) || 1);
+};
+
+const buildSaleSuccessMessage = (data) => {
+    const dust = Number(data?.dust) || 0;
+    const base = `Sale successful! Sold ${data.sharesSold} shares and credited ${data.saleValue} credits.`;
+    if (dust <= 0) {
+        return base;
+    }
+    return `${base} Dust assessed: ${dust} credit${dust === 1 ? '' : 's'} retained by the market due to whole-share rounding.`;
 };
 
 export default SellSharesLayout;

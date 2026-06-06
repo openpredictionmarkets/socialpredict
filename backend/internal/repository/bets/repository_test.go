@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"socialpredict/internal/domain/boundary"
+	"socialpredict/models"
 	"socialpredict/models/modelstesting"
 )
 
@@ -36,6 +37,7 @@ func TestGormRepositoryCreateAndUserHasBet(t *testing.T) {
 		Username: "bettor",
 		MarketID: uint(market.ID),
 		Amount:   250,
+		Dust:     2,
 		Outcome:  "YES",
 		PlacedAt: time.Now().UTC(),
 	}
@@ -45,6 +47,13 @@ func TestGormRepositoryCreateAndUserHasBet(t *testing.T) {
 	}
 	if bet.ID == 0 {
 		t.Fatalf("expected bet ID to be set after Create")
+	}
+	var storedDust int64
+	if err := db.Model(&models.Bet{}).Where("id = ?", bet.ID).Select("dust").Scan(&storedDust).Error; err != nil {
+		t.Fatalf("load stored dust: %v", err)
+	}
+	if storedDust != 2 {
+		t.Fatalf("expected stored dust 2, got %d", storedDust)
 	}
 
 	hasBet, err := repo.UserHasBet(ctx, uint(market.ID), "bettor")

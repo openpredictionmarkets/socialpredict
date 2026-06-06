@@ -14,6 +14,7 @@ func TestMapModelBetsToBoundaryPreservesBetFields(t *testing.T) {
 		Username: "alice",
 		MarketID: 7,
 		Amount:   25,
+		Dust:     2,
 		Outcome:  "YES",
 		PlacedAt: now,
 	}}
@@ -22,7 +23,7 @@ func TestMapModelBetsToBoundaryPreservesBetFields(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 bet, got %d", len(got))
 	}
-	if got[0].ID != 9 || got[0].Username != "alice" || got[0].MarketID != 7 || got[0].Amount != 25 || got[0].Outcome != "YES" || !got[0].PlacedAt.Equal(now) {
+	if got[0].ID != 9 || got[0].Username != "alice" || got[0].MarketID != 7 || got[0].Amount != 25 || got[0].Dust != 2 || got[0].Outcome != "YES" || !got[0].PlacedAt.Equal(now) {
 		t.Fatalf("unexpected mapped bet: %#v", got[0])
 	}
 }

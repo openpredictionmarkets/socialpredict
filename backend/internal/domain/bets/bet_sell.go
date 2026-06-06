@@ -46,7 +46,7 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 		}
 
 		now := s.clock.Now()
-		bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
+		bet := req.NewSaleBet(outcome, sale.SharesToSell, sale.Dust, now)
 		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, sale.SaleValue); err != nil {
 			return err
 		}
