@@ -104,13 +104,14 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 	numUsers := countUniqueUsers(boundaryBets)
 
 	return &MarketOverview{
-		Market:             market,
-		Creator:            s.buildCreatorSummary(ctx, market.CreatorUsername),
-		ProbabilityChanges: probabilityPoints,
-		LastProbability:    lastProbability,
-		NumUsers:           numUsers,
-		TotalVolume:        totalVolumeWithDust,
-		MarketDust:         marketDust,
+		Market:                market,
+		Creator:               s.buildCreatorSummary(ctx, market.CreatorUsername),
+		ProbabilityChanges:    probabilityPoints,
+		LastProbability:       lastProbability,
+		NumUsers:              numUsers,
+		TotalVolume:           totalVolumeWithDust,
+		MarketDust:            marketDust,
+		DescriptionAmendments: s.approvedDescriptionAmendments(ctx, marketID),
 	}, nil
 }
 

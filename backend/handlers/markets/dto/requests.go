@@ -41,3 +41,9 @@ type SearchMarketsQueryParams struct {
 type ResolveMarketRequest struct {
 	Resolution string `json:"resolution" validate:"required"`
 }
+
+type MarketDescriptionAmendmentRequest struct {
+	Body         string `json:"body" validate:"required,max=2000"`
+	BodyFormat   string `json:"bodyFormat,omitempty"`
+	SubmitReason string `json:"submitReason,omitempty" validate:"max=500"`
+}

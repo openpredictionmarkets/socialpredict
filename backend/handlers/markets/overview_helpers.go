@@ -123,3 +123,30 @@ func probabilityChangesToResponse(points []dmarkets.ProbabilityPoint) []dto.Prob
 	}
 	return result
 }
+
+func descriptionAmendmentsToResponse(amendments []dmarkets.MarketDescriptionAmendment) []dto.MarketDescriptionAmendmentResponse {
+	if len(amendments) == 0 {
+		return []dto.MarketDescriptionAmendmentResponse{}
+	}
+	result := make([]dto.MarketDescriptionAmendmentResponse, 0, len(amendments))
+	for _, amendment := range amendments {
+		result = append(result, dto.MarketDescriptionAmendmentResponse{
+			ID:              amendment.ID,
+			MarketID:        amendment.MarketID,
+			Version:         amendment.Version,
+			Body:            amendment.Body,
+			BodyFormat:      amendment.BodyFormat,
+			Status:          amendment.Status,
+			CreatedBy:       amendment.CreatedBy,
+			CreatedAt:       amendment.CreatedAt,
+			UpdatedAt:       amendment.UpdatedAt,
+			ApprovedBy:      amendment.ApprovedBy,
+			ApprovedAt:      amendment.ApprovedAt,
+			RejectedBy:      amendment.RejectedBy,
+			RejectedAt:      amendment.RejectedAt,
+			RejectionReason: amendment.RejectionReason,
+			SubmitReason:    amendment.SubmitReason,
+		})
+	}
+	return result
+}

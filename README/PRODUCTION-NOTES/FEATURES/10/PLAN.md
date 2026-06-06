@@ -45,13 +45,13 @@ Service ownership: repository and migration boundary.
 
 Checklist:
 
-- [ ] Add timestamped migration for `market_description_amendments`.
-- [ ] Add unique `(market_id, version)` constraint.
-- [ ] Add admin queue indexes for status and created time.
-- [ ] Add market/version lookup indexes.
-- [ ] Add model struct for amendment records.
-- [ ] Add migration tests following existing migration conventions.
-- [ ] Verify migration does not mutate existing market descriptions.
+- [x] Add timestamped migration for `market_description_amendments`.
+- [x] Add unique `(market_id, version)` constraint.
+- [x] Add admin queue indexes for status and created time.
+- [x] Add market/version lookup indexes.
+- [x] Add model struct for amendment records.
+- [x] Add migration tests following existing migration conventions.
+- [x] Verify migration does not mutate existing market descriptions.
 
 ## 03. Domain Model And Service Policy
 
@@ -59,15 +59,15 @@ Service ownership: prediction market context and moderator governance context.
 
 Checklist:
 
-- [ ] Add domain model for description amendment.
-- [ ] Add domain read model for original description plus approved amendments.
-- [ ] Add service method for proposing an amendment.
-- [ ] Assign next version server-side in a transaction.
-- [ ] Enforce title immutability in amendment use cases.
-- [ ] Enforce append-only behavior.
-- [ ] Enforce current-steward authority for moderator proposals.
-- [ ] Block suspended moderators from proposing amendments.
-- [ ] Add service tests for version ordering and concurrent insert protection.
+- [x] Add domain model for description amendment.
+- [x] Add domain read model for original description plus approved amendments.
+- [x] Add service method for proposing an amendment.
+- [x] Assign next version server-side in a transaction.
+- [x] Enforce title immutability in amendment use cases.
+- [x] Enforce append-only behavior.
+- [x] Enforce current-steward authority for moderator proposals.
+- [x] Block suspended moderators from proposing amendments.
+- [x] Add service tests for version ordering and pending-review protection.
 
 ## 04. Markdown-Lite Validation And Sanitization
 
@@ -75,13 +75,13 @@ Service ownership: security boundary.
 
 Checklist:
 
-- [ ] Define allowed markdown-lite syntax.
-- [ ] Add backend validation for amendment body length.
-- [ ] Reject or neutralize raw HTML.
-- [ ] Reject unsafe links and suspicious script patterns.
-- [ ] Preserve safe markdown source for rendering.
-- [ ] Add sanitizer tests for allowed markdown.
-- [ ] Add sanitizer tests for disallowed HTML/script/image/embed content.
+- [x] Define allowed markdown-lite syntax.
+- [x] Add backend validation for amendment body length.
+- [x] Reject or neutralize raw HTML.
+- [x] Reject unsafe links and suspicious script patterns.
+- [x] Preserve safe markdown source for rendering.
+- [x] Add sanitizer tests for allowed markdown.
+- [x] Add sanitizer tests for disallowed HTML/script/image/embed content.
 - [ ] Decide whether original market descriptions remain plain text or are migrated to `plain_text` version 1 read model.
 
 ## 05. API And OpenAPI
@@ -90,13 +90,13 @@ Service ownership: API and auth boundary.
 
 Checklist:
 
-- [ ] Add moderator/steward endpoint to propose amendment.
-- [ ] Add admin endpoint to list pending amendments.
-- [ ] Add admin endpoint to approve/reject amendment.
-- [ ] Include approved amendments in public market details or add a public amendment endpoint.
+- [x] Add moderator/steward endpoint to propose amendment.
+- [x] Add admin endpoint to list pending amendments.
+- [x] Add admin endpoint to approve/reject amendment.
+- [x] Include approved amendments in public market details or add a public amendment endpoint.
 - [ ] Include pending/rejected amendments in admin/moderator governance payloads.
-- [ ] Return stable public error reasons for invalid state, unauthorized steward, suspended moderator, and unsafe markdown.
-- [ ] Update `backend/docs/openapi.yaml`.
+- [x] Return stable public error reasons for invalid state, unauthorized steward, suspended moderator, and unsafe markdown.
+- [x] Update `backend/docs/openapi.yaml`.
 - [ ] Run go-kin OpenAPI validation.
 - [ ] Run Schemathesis validation for the new/changed endpoints.
 
@@ -106,11 +106,11 @@ Service ownership: frontend admin workflow.
 
 Checklist:
 
-- [ ] Add amendment review tab/panel to Market Review or Market Stewardship area.
+- [x] Add amendment review tab/panel to Market Review or Market Stewardship area.
 - [ ] Show market title, original description, existing approved amendments, and proposed amendment.
-- [ ] Show submitter, timestamp, and reason.
-- [ ] Add approve/reject actions with required decision reason.
-- [ ] Clearly identify pending, approved, and rejected states.
+- [x] Show submitter, timestamp, and reason.
+- [x] Add approve/reject actions with required decision reason.
+- [x] Clearly identify pending, approved, and rejected states.
 - [ ] Avoid placing amendment actions where admins might confuse them with tag/steward actions.
 
 ## 07. Moderator UX
@@ -119,13 +119,13 @@ Service ownership: frontend moderator workflow.
 
 Checklist:
 
-- [ ] Add amendment proposal entry point for current steward.
-- [ ] Explain title immutability and append-only amendment behavior.
-- [ ] Add markdown-lite help text.
-- [ ] Add markdown-lite preview.
-- [ ] Submit amendment through authenticated API.
+- [x] Add amendment proposal entry point for current steward.
+- [x] Explain title immutability and append-only amendment behavior.
+- [x] Add markdown-lite help text.
+- [x] Add markdown-lite preview.
+- [x] Submit amendment through authenticated API.
 - [ ] Show pending/approved/rejected amendment status in moderator profile or market governance view.
-- [ ] Hide amendment controls for suspended moderators and non-stewards.
+- [x] Hide amendment controls for suspended moderators and non-stewards.
 
 ## 08. Public Market Detail UX
 
@@ -133,28 +133,28 @@ Service ownership: frontend market detail experience.
 
 Checklist:
 
-- [ ] Render original description separately from approved amendments.
-- [ ] Render approved amendments in chronological version order.
-- [ ] Display version, author, and timestamp for each amendment.
-- [ ] Make amendment text visible enough that users understand it is part of the contract text.
-- [ ] Use safe markdown-lite rendering with raw HTML disabled.
-- [ ] Preserve readable collapsed/expanded behavior for long descriptions and amendments.
+- [x] Render original description separately from approved amendments.
+- [x] Render approved amendments in chronological version order.
+- [x] Display version, author, and timestamp for each amendment.
+- [x] Make amendment text visible enough that users understand it is part of the contract text.
+- [x] Use safe markdown-lite rendering with raw HTML disabled.
+- [x] Preserve readable collapsed/expanded behavior for long descriptions and amendments.
 
 ## 09. Tests And Regression Coverage
 
 Checklist:
 
-- [ ] Test no route can mutate market title through amendment flow.
-- [ ] Test original description remains unchanged after amendments.
-- [ ] Test amendment versions increment correctly.
-- [ ] Test public detail returns only approved amendments.
+- [x] Test no route can mutate market title through amendment flow.
+- [x] Test original description remains unchanged after amendments.
+- [x] Test amendment versions increment correctly.
+- [x] Test public detail returns only approved amendments.
 - [ ] Test admin/moderator views can see pending/rejected records as intended.
-- [ ] Test unauthorized moderator cannot propose amendment.
-- [ ] Test suspended moderator cannot propose amendment.
-- [ ] Test admin approval/rejection records actor, time, and reason.
-- [ ] Test markdown-lite sanitization rejects unsafe content.
-- [ ] Run frontend build.
-- [ ] Run targeted backend tests.
+- [x] Test unauthorized moderator cannot propose amendment.
+- [x] Test suspended moderator cannot propose amendment.
+- [x] Test admin approval/rejection records actor, time, and reason.
+- [x] Test markdown-lite sanitization rejects unsafe content.
+- [x] Run frontend build.
+- [x] Run targeted backend tests.
 
 ## 10. Deferred Enhancements
 

@@ -150,6 +150,7 @@ x-route-family-migration-matrix:
         - /v0/markets/closed
         - /v0/markets/resolved
         - /v0/markets/{id}
+        - /v0/markets/{id}/description-amendments
         - /v0/markets/{id}/resolve
         - /v0/markets/{id}/leaderboard
         - /v0/markets/{id}/projection
@@ -224,6 +225,8 @@ x-route-family-migration-matrix:
         - /v0/admin/markets/{id}/reject
         - /v0/admin/markets/{id}/steward
         - /v0/admin/markets/{id}/tags
+        - /v0/admin/market-description-amendments
+        - /v0/admin/market-description-amendments/{id}
         - /v0/admin/market-tags
         - /v0/admin/market-tags/{slug}
         - /v0/content/home
@@ -1052,6 +1055,83 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while fetching market details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+
+  /v0/markets/{id}/description-amendments:
+    post:
+      tags: [Markets]
+      operationId: proposeMarketDescriptionAmendment
+      summary: Propose a market description amendment
+      description: >
+        Current active market stewards can propose append-only markdown-lite
+        description amendments. The original market title and description are
+        not mutated. Approved amendments become public contract text after admin review.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: Numeric identifier of the market.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketDescriptionAmendmentRequest'
+      responses:
+        '201':
+          description: Amendment submitted for admin review.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
+        '400':
+          description: Invalid amendment body, unsafe markdown-lite, or invalid market ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Caller is not the current active market steward or must change password first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market or steward user was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market lifecycle does not allow amendments.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected amendment proposal failure.
           content:
             application/json:
               schema:
@@ -2769,6 +2849,153 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+
+  /v0/admin/market-description-amendments:
+    get:
+      tags: [Markets]
+      operationId: listAdminMarketDescriptionAmendments
+      summary: List market description amendments
+      description: Admin-only queue for pending, approved, or rejected append-only market description amendments.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+            default: pending
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Description amendments returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDescriptionAmendmentListEnvelopeResponse'
+        '400':
+          description: Invalid status, market ID, or pagination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected amendment queue failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/market-description-amendments/{id}:
+    patch:
+      tags: [Markets]
+      operationId: reviewMarketDescriptionAmendment
+      summary: Approve or reject a market description amendment
+      description: Admin-only endpoint for approving or rejecting a pending market description amendment with a required decision reason.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReviewMarketDescriptionAmendmentRequest'
+      responses:
+        '200':
+          description: Amendment reviewed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDescriptionAmendmentEnvelopeResponse'
+        '400':
+          description: Invalid amendment ID, status, or missing reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Amendment was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Amendment has already been reviewed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected amendment review failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/market-tags:
     get:
       tags: [Markets]
@@ -3926,6 +4153,25 @@ components:
             type: string
             pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
 
+
+    MarketDescriptionAmendmentRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Markdown-lite amendment body. Raw HTML, images, embeds, javascript links, and data links are rejected.
+        bodyFormat:
+          type: string
+          enum: [markdown_lite]
+          default: markdown_lite
+        submitReason:
+          type: string
+          maxLength: 500
+          description: Optional internal reason shown to admins during amendment review.
+
     AdminMarketTagRequest:
       type: object
       properties:
@@ -4122,6 +4368,10 @@ components:
         marketDust:
           type: integer
           format: int64
+        descriptionAmendments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
 
     PublicMarketResponse:
       type: object
@@ -4642,6 +4892,95 @@ components:
             type: string
             pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
           description: Active market tag slugs to assign; an empty list removes all tag assignments.
+
+
+    AdminReviewMarketDescriptionAmendmentRequest:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Admin-visible decision reason.
+
+    MarketDescriptionAmendmentResponse:
+      type: object
+      required: [id, marketId, version, body, bodyFormat, status, createdBy, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        marketId:
+          type: integer
+          format: int64
+        version:
+          type: integer
+          minimum: 2
+        body:
+          type: string
+        bodyFormat:
+          type: string
+          enum: [markdown_lite]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        approvedBy:
+          type: string
+        approvedAt:
+          type: string
+          format: date-time
+        rejectedBy:
+          type: string
+        rejectedAt:
+          type: string
+          format: date-time
+        rejectionReason:
+          type: string
+        submitReason:
+          type: string
+
+    MarketDescriptionAmendmentListResponse:
+      type: object
+      required: [amendments, total]
+      properties:
+        amendments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
+        total:
+          type: integer
+
+    MarketDescriptionAmendmentListEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketDescriptionAmendmentListResponse'
+
+    MarketDescriptionAmendmentEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
 
     MarketReviewResponse:
       type: object

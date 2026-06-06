@@ -451,13 +451,14 @@ var (
 
 // MarketOverview represents enriched market data with calculations.
 type MarketOverview struct {
-	Market             *Market
-	Creator            *CreatorSummary
-	ProbabilityChanges []ProbabilityPoint
-	LastProbability    float64
-	NumUsers           int
-	TotalVolume        int64
-	MarketDust         int64
+	Market                *Market
+	Creator               *CreatorSummary
+	ProbabilityChanges    []ProbabilityPoint
+	LastProbability       float64
+	NumUsers              int
+	TotalVolume           int64
+	MarketDust            int64
+	DescriptionAmendments []MarketDescriptionAmendment
 }
 
 // Page represents pagination parameters.

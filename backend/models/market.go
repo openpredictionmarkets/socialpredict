@@ -62,3 +62,20 @@ type MarketStewardshipAudit struct {
 	ActorUsername       string `json:"actorUsername" gorm:"not null;index"`
 	Reason              string `json:"reason,omitempty" gorm:"type:text"`
 }
+
+type MarketDescriptionAmendment struct {
+	gorm.Model
+	ID              int64      `json:"id" gorm:"primary_key"`
+	MarketID        int64      `json:"marketId" gorm:"not null;uniqueIndex:uniq_market_description_amendment_version;index:idx_market_description_amendments_market_status_version"`
+	Version         int        `json:"version" gorm:"not null;uniqueIndex:uniq_market_description_amendment_version;index:idx_market_description_amendments_market_status_version"`
+	Body            string     `json:"body" gorm:"type:text;not null"`
+	BodyFormat      string     `json:"bodyFormat" gorm:"not null;default:markdown_lite;size:32"`
+	Status          string     `json:"status" gorm:"not null;default:pending;index:idx_market_description_amendments_market_status_version;index:idx_market_description_amendments_status_created"`
+	CreatedBy       string     `json:"createdBy" gorm:"not null;index"`
+	ApprovedBy      string     `json:"approvedBy,omitempty" gorm:"index"`
+	ApprovedAt      *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy      string     `json:"rejectedBy,omitempty" gorm:"index"`
+	RejectedAt      *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason string     `json:"rejectionReason,omitempty" gorm:"type:text"`
+	SubmitReason    string     `json:"submitReason,omitempty" gorm:"type:text"`
+}

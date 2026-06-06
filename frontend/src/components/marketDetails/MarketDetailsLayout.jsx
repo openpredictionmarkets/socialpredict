@@ -9,6 +9,8 @@ import { BetButton } from '../buttons/trade/BetButtons';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketTagChips from '../markets/MarketTagChips';
+import MarkdownLite from '../markdown/MarkdownLite';
+import { proposeMarketDescriptionAmendment } from '../../api/marketDescriptionAmendmentsApi';
 
 const DEFAULT_CREATOR_EMOJI = '👤';
 
@@ -20,6 +22,7 @@ function MarketDetailsTable({
   marketDust,
   currentProbability,
   probabilityChanges,
+  descriptionAmendments = [],
   marketId: marketIdProp,
   username,
   isLoggedIn,
@@ -37,6 +40,11 @@ function MarketDetailsTable({
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showBetModal, setShowBetModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [amendmentBody, setAmendmentBody] = useState('');
+  const [amendmentReason, setAmendmentReason] = useState('');
+  const [amendmentMessage, setAmendmentMessage] = useState('');
+  const [amendmentError, setAmendmentError] = useState('');
+  const [submittingAmendment, setSubmittingAmendment] = useState(false);
 
   const toggleBetModal = () => setShowBetModal(prev => !prev);
 
@@ -63,6 +71,34 @@ function MarketDetailsTable({
   const canResolveMarket =
     !safeMarket.isResolved &&
     String(username || '').trim() === String(stewardUsername || '').trim();
+  const canProposeDescriptionAmendment =
+    isLoggedIn &&
+    token &&
+    !safeMarket.isResolved &&
+    ['proposed', 'published', 'active', ''].includes(String(safeMarket.lifecycleStatus || safeMarket.status || '').toLowerCase()) &&
+    String(username || '').trim() === String(stewardUsername || '').trim();
+
+  const submitDescriptionAmendment = async (event) => {
+    event.preventDefault();
+    setAmendmentMessage('');
+    setAmendmentError('');
+    setSubmittingAmendment(true);
+    try {
+      await proposeMarketDescriptionAmendment({
+        token,
+        marketId: resolvedMarketId,
+        body: amendmentBody,
+        submitReason: amendmentReason,
+      });
+      setAmendmentBody('');
+      setAmendmentReason('');
+      setAmendmentMessage('Description amendment submitted for admin review.');
+    } catch (err) {
+      setAmendmentError(err.message || 'Unable to submit description amendment.');
+    } finally {
+      setSubmittingAmendment(false);
+    }
+  };
 
   return (
     <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
@@ -113,15 +149,15 @@ function MarketDetailsTable({
           onClick={() => setShowFullDescription(!showFullDescription)}
           className='w-full py-2 bg-gray-700 hover:bg-gray-600 transition-colors duration-200 rounded-lg text-center text-sm'
         >
-          {showFullDescription ? 'Hide Description' : 'Show Full Description'}
+          {showFullDescription ? 'Hide Contract Text' : 'Show Full Contract Text'}
         </button>
       </div>
       <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
-        <p
-          className={`text-sm break-words whitespace-pre-wrap ${
+        <div
+          className={`grid gap-4 break-words ${
             showFullDescription
               ? ''
-              : 'sm:max-h-24 h-16 overflow-y-auto sm:overflow-hidden'
+              : 'sm:max-h-32 h-28 overflow-y-auto sm:overflow-hidden'
           }`}
           style={{
             wordBreak: 'break-word',
@@ -129,9 +165,75 @@ function MarketDetailsTable({
             hyphens: 'auto',
           }}
         >
-          {marketDescription}
-        </p>
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-gray-600 bg-gray-900 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-gray-300">
+                Original Description v1
+              </span>
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-6">{marketDescription}</p>
+          </div>
+          {descriptionAmendments.length > 0 && (
+            <div className="grid gap-3 border-t border-gray-700 pt-4">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-200">Approved Amendments</h2>
+              {descriptionAmendments.map((amendment) => (
+                <article key={amendment.id || amendment.version} className="rounded-lg border border-sky-800/50 bg-sky-950/20 p-3">
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                    <span className="rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 font-semibold text-sky-100">
+                      Amendment v{amendment.version}
+                    </span>
+                    <span>Added by @{amendment.createdBy}</span>
+                    {amendment.approvedAt && <span>Approved {new Date(amendment.approvedAt).toLocaleString()}</span>}
+                  </div>
+                  <MarkdownLite className="text-gray-200">{amendment.body}</MarkdownLite>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {canProposeDescriptionAmendment && (
+        <form onSubmit={submitDescriptionAmendment} className="mb-4 grid gap-3 rounded-lg border border-sky-800/60 bg-sky-950/20 p-4">
+          <div>
+            <p className="text-sm font-semibold text-sky-100">Propose Description Amendment</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Titles are immutable. Description changes are append-only, versioned, and require admin review before becoming public contract text.
+            </p>
+          </div>
+          {amendmentMessage && <div className="rounded-md bg-emerald-700 p-2 text-sm text-white">{amendmentMessage}</div>}
+          {amendmentError && <div className="rounded-md bg-red-700 p-2 text-sm text-white">{amendmentError}</div>}
+          <textarea
+            value={amendmentBody}
+            onChange={(event) => setAmendmentBody(event.target.value)}
+            maxLength={2000}
+            rows={5}
+            placeholder="Add markdown-lite clarification text. Raw HTML, images, and embeds are not allowed."
+            className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+          />
+          <textarea
+            value={amendmentReason}
+            onChange={(event) => setAmendmentReason(event.target.value)}
+            maxLength={500}
+            rows={2}
+            placeholder="Optional internal reason for admin review"
+            className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+          />
+          {amendmentBody.trim() && (
+            <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
+              <p className="mb-2 text-xs uppercase tracking-[0.14em] text-gray-500">Preview</p>
+              <MarkdownLite>{amendmentBody}</MarkdownLite>
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={submittingAmendment || !amendmentBody.trim()}
+            className="justify-self-start rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submittingAmendment ? 'Submitting...' : 'Submit Amendment'}
+          </button>
+        </form>
+      )}
 
       <div className='grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-4'>
         {[

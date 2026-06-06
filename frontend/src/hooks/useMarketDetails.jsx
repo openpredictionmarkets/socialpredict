@@ -65,6 +65,37 @@ const normalizeMarketTags = (raw) => {
     .filter((tag) => tag !== null);
 };
 
+const normalizeDescriptionAmendment = (amendment) => {
+  if (!amendment || typeof amendment !== 'object') {
+    return null;
+  }
+
+  return {
+    id: amendment.id ?? amendment.ID ?? null,
+    marketId: amendment.marketId ?? amendment.MarketID ?? null,
+    version: toNumber(amendment.version ?? amendment.Version),
+    body: amendment.body ?? amendment.Body ?? '',
+    bodyFormat: amendment.bodyFormat ?? amendment.BodyFormat ?? 'markdown_lite',
+    status: amendment.status ?? amendment.Status ?? '',
+    createdBy: amendment.createdBy ?? amendment.CreatedBy ?? '',
+    createdAt: amendment.createdAt ?? amendment.CreatedAt ?? null,
+    approvedBy: amendment.approvedBy ?? amendment.ApprovedBy ?? '',
+    approvedAt: amendment.approvedAt ?? amendment.ApprovedAt ?? null,
+    rejectionReason: amendment.rejectionReason ?? amendment.RejectionReason ?? '',
+    submitReason: amendment.submitReason ?? amendment.SubmitReason ?? '',
+  };
+};
+
+const normalizeDescriptionAmendments = (raw) => {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map(normalizeDescriptionAmendment)
+    .filter((amendment) => amendment !== null);
+};
+
 const normalizeMarket = (market) => {
   if (!market || typeof market !== 'object') {
     return {
@@ -134,6 +165,7 @@ const normalizeMarketDetails = (raw) => {
     market: normalizedMarket,
     creator: normalizedCreator,
     probabilityChanges: normalizeProbabilityChanges(raw.probabilityChanges ?? raw.ProbabilityChanges),
+    descriptionAmendments: normalizeDescriptionAmendments(raw.descriptionAmendments ?? raw.DescriptionAmendments),
     numUsers: toNumber(raw.numUsers ?? raw.NumUsers),
     totalVolume: toNumber(raw.totalVolume ?? raw.TotalVolume),
     marketDust: toNumber(raw.marketDust ?? raw.MarketDust),
