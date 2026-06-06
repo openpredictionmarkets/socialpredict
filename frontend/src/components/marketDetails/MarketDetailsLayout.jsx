@@ -152,46 +152,44 @@ function MarketDetailsTable({
           {showFullDescription ? 'Hide Contract Text' : 'Show Full Contract Text'}
         </button>
       </div>
-      <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
-        <div
-          className={`grid gap-4 text-sm break-words ${
-            showFullDescription
-              ? ''
-              : 'max-h-40 overflow-y-auto sm:overflow-hidden'
-          }`}
-          style={{
-            wordBreak: 'break-word',
-            overflowWrap: 'break-word',
-            hyphens: 'auto',
-          }}
-        >
-          <section>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
-              Description
-            </h2>
-            {marketDescription.trim() ? (
-              <p className="whitespace-pre-wrap">{marketDescription}</p>
-            ) : (
-              <p className="text-gray-500 italic">No description provided.</p>
-            )}
-          </section>
-          {descriptionAmendments.length > 0 && (
-            <section className="grid gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-200">Amendments</h2>
-              {descriptionAmendments.map((amendment, index) => (
-                <article key={amendment.id || amendment.version} className="rounded-md border border-sky-900/70 bg-sky-950/30 p-3">
-                  <div className="mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80">
-                    <span>Amendment {index + 1}</span>
-                    <span>Submitted by @{amendment.createdBy}</span>
-                    {amendment.approvedAt && <span>Approved {new Date(amendment.approvedAt).toLocaleString()}</span>}
-                  </div>
-                  <MarkdownLite className="text-gray-200">{amendment.body}</MarkdownLite>
-                </article>
-              ))}
+      {showFullDescription && (
+        <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
+          <div
+            className="grid gap-4 text-sm break-words"
+            style={{
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word',
+              hyphens: 'auto',
+            }}
+          >
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+                Description
+              </h2>
+              {marketDescription.trim() ? (
+                <p className="whitespace-pre-wrap">{marketDescription}</p>
+              ) : (
+                <p className="text-gray-500 italic">No description provided.</p>
+              )}
             </section>
-          )}
+            {descriptionAmendments.length > 0 && (
+              <section className="grid gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-200">Amendments</h2>
+                {descriptionAmendments.map((amendment, index) => (
+                  <article key={amendment.id || amendment.version} className="rounded-md border border-sky-900/70 bg-sky-950/30 p-3">
+                    <div className="mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80">
+                      <span>Amendment {index + 1}</span>
+                      <span>Submitted by @{amendment.createdBy}</span>
+                      {amendment.approvedAt && <span>Approved {new Date(amendment.approvedAt).toLocaleString()}</span>}
+                    </div>
+                    <MarkdownLite className="text-gray-200">{amendment.body}</MarkdownLite>
+                  </article>
+                ))}
+              </section>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {canProposeDescriptionAmendment && (
         <form onSubmit={submitDescriptionAmendment} className="mb-4 grid gap-3 rounded-lg border border-sky-800/60 bg-sky-950/20 p-4">
