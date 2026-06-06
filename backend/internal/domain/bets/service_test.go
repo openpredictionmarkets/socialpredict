@@ -602,6 +602,167 @@ func TestServiceQuoteSell_OverCapReturnsPreviewAndSuggestions(t *testing.T) {
 	}
 }
 
+func TestServiceSell_DustScenarioMatrix(t *testing.T) {
+	now := serviceTestTime()
+	tests := []struct {
+		name            string
+		maxDust         int64
+		sharesOwned     int64
+		positionValue   int64
+		requestedAmount int64
+		wantShares      int64
+		wantSaleValue   int64
+		wantDust        int64
+		wantDustCapErr  bool
+	}{
+		{
+			name:            "exact share multiple has zero dust",
+			maxDust:         2,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 30,
+			wantShares:      3,
+			wantSaleValue:   30,
+			wantDust:        0,
+		},
+		{
+			name:            "one dust below cap is recorded and withheld",
+			maxDust:         2,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 31,
+			wantShares:      3,
+			wantSaleValue:   30,
+			wantDust:        1,
+		},
+		{
+			name:            "dust at cap is allowed",
+			maxDust:         2,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 32,
+			wantShares:      3,
+			wantSaleValue:   30,
+			wantDust:        2,
+		},
+		{
+			name:            "dust above cap is rejected before writes",
+			maxDust:         2,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 33,
+			wantDustCapErr:  true,
+		},
+		{
+			name:            "zero cap disables cap and allows dust",
+			maxDust:         0,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 35,
+			wantShares:      3,
+			wantSaleValue:   30,
+			wantDust:        5,
+		},
+		{
+			name:            "full-position exact sale has zero dust",
+			maxDust:         2,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 100,
+			wantShares:      10,
+			wantSaleValue:   100,
+			wantDust:        0,
+		},
+		{
+			name:            "full-position sale plus cap dust is allowed",
+			maxDust:         2,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 102,
+			wantShares:      10,
+			wantSaleValue:   100,
+			wantDust:        2,
+		},
+		{
+			name:            "full-position sale above cap is rejected",
+			maxDust:         2,
+			sharesOwned:     10,
+			positionValue:   100,
+			requestedAmount: 103,
+			wantDustCapErr:  true,
+		},
+		{
+			name:            "larger share value creates larger possible dust interval",
+			maxDust:         4,
+			sharesOwned:     5,
+			positionValue:   100,
+			requestedAmount: 44,
+			wantShares:      2,
+			wantSaleValue:   40,
+			wantDust:        4,
+		},
+		{
+			name:            "larger share value rejects dust beyond cap",
+			maxDust:         4,
+			sharesOwned:     5,
+			positionValue:   100,
+			requestedAmount: 45,
+			wantDustCapErr:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture, svc := newServiceFixture(
+				now,
+				withFixtureMaxDust(tc.maxDust),
+				withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+				withFixturePosition(&dmarkets.UserPosition{
+					Username:       "alice",
+					MarketID:       1,
+					YesSharesOwned: tc.sharesOwned,
+					Value:          tc.positionValue,
+				}),
+				withFixtureUser(&dusers.User{Username: "alice"}),
+			)
+
+			result, err := svc.Sell(context.Background(), bets.SellRequest{
+				Username: "alice",
+				MarketID: 1,
+				Amount:   tc.requestedAmount,
+				Outcome:  "YES",
+			})
+
+			if tc.wantDustCapErr {
+				var dustErr bets.ErrDustCapExceeded
+				if !errors.As(err, &dustErr) {
+					t.Fatalf("expected ErrDustCapExceeded, got %v", err)
+				}
+				if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+					t.Fatalf("rejected dust-cap sale should not write repo/user state: repo=%+v calls=%+v", fixture.repo.created, fixture.users.calls)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Sell returned error: %v", err)
+			}
+			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust {
+				t.Fatalf("unexpected result: got %+v, want shares=%d saleValue=%d dust=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			}
+			if fixture.repo.created == nil {
+				t.Fatal("expected stored sale bet")
+			}
+			if fixture.repo.created.Amount != -tc.wantShares || fixture.repo.created.Dust != tc.wantDust || !fixture.repo.created.DustRecorded {
+				t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
+			}
+			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != tc.wantSaleValue {
+				t.Fatalf("unexpected user ledger calls: %+v", fixture.users.calls)
+			}
+		})
+	}
+}
+
 func TestServiceSell_RequestTooSmall(t *testing.T) {
 	now := serviceTestTime()
 	_, svc := newServiceFixture(

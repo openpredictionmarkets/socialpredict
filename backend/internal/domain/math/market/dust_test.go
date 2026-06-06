@@ -26,14 +26,21 @@ func makeDustTestBet(amount int64, outcome, username string, minutes int) bounda
 func makeDustTestBetWithDust(amount int64, dust int64, outcome, username string, minutes int) boundary.Bet {
 	placedAt := dustTestBaseTime.Add(time.Duration(minutes) * time.Minute)
 	return boundary.Bet{
-		Username:  username,
-		MarketID:  1,
-		Amount:    amount,
-		Dust:      dust,
-		Outcome:   outcome,
-		PlacedAt:  placedAt,
-		CreatedAt: placedAt,
+		Username:     username,
+		MarketID:     1,
+		Amount:       amount,
+		Dust:         dust,
+		DustRecorded: true,
+		Outcome:      outcome,
+		PlacedAt:     placedAt,
+		CreatedAt:    placedAt,
 	}
+}
+
+func makeLegacyDustTestBet(amount int64, outcome, username string, minutes int) boundary.Bet {
+	bet := makeDustTestBetWithDust(amount, 0, outcome, username, minutes)
+	bet.DustRecorded = false
+	return bet
 }
 
 func assertInt64Equal(t *testing.T, label string, want, got int64) {
@@ -159,18 +166,153 @@ func TestGetMarketDust(t *testing.T) {
 func TestGetMarketDustFallsBackForLegacySellBets(t *testing.T) {
 	bets := []boundary.Bet{
 		makeDustTestBet(100, "YES", "user1", 0),
-		makeDustTestBet(-50, "YES", "user1", 1),
-		makeDustTestBet(-25, "NO", "user2", 2),
+		makeLegacyDustTestBet(-50, "YES", "user1", 1),
+		makeLegacyDustTestBet(-25, "NO", "user2", 2),
 	}
 
 	assertInt64Equal(t, "dust", 2, GetMarketDust(bets))
 }
 
+func TestGetMarketDustDoesNotFallbackForRecordedZeroDustSell(t *testing.T) {
+	bets := []boundary.Bet{
+		makeDustTestBet(10, "YES", "user1", 0),
+		makeDustTestBet(1, "YES", "user1", 1),
+		makeDustTestBetWithDust(-9, 0, "YES", "user1", 2),
+	}
+
+	assertInt64Equal(t, "dust", 0, GetMarketDust(bets))
+	assertInt64Equal(t, "volume with dust", 2, GetMarketVolumeWithDust(bets))
+}
+
+func TestMarketDustScenarioMatrix(t *testing.T) {
+	tests := []struct {
+		name               string
+		bets               []boundary.Bet
+		wantBaseVolume     int64
+		wantMarketDust     int64
+		wantVolumeWithDust int64
+	}{
+		{
+			name:               "no bets",
+			bets:               []boundary.Bet{},
+			wantBaseVolume:     0,
+			wantMarketDust:     0,
+			wantVolumeWithDust: 0,
+		},
+		{
+			name: "only buys produce no dust",
+			bets: []boundary.Bet{
+				makeDustTestBet(10, "YES", "alice", 0),
+				makeDustTestBet(5, "NO", "bob", 1),
+			},
+			wantBaseVolume:     15,
+			wantMarketDust:     0,
+			wantVolumeWithDust: 15,
+		},
+		{
+			name: "recorded zero-dust sale does not fallback",
+			bets: []boundary.Bet{
+				makeDustTestBet(10, "YES", "alice", 0),
+				makeDustTestBet(1, "YES", "alice", 1),
+				makeDustTestBetWithDust(-9, 0, "YES", "alice", 2),
+			},
+			wantBaseVolume:     2,
+			wantMarketDust:     0,
+			wantVolumeWithDust: 2,
+		},
+		{
+			name: "single recorded one-dust sale adds one",
+			bets: []boundary.Bet{
+				makeDustTestBet(10, "YES", "alice", 0),
+				makeDustTestBetWithDust(-9, 1, "YES", "alice", 1),
+			},
+			wantBaseVolume:     1,
+			wantMarketDust:     1,
+			wantVolumeWithDust: 2,
+		},
+		{
+			name: "single recorded two-dust sale adds two",
+			bets: []boundary.Bet{
+				makeDustTestBet(10, "YES", "alice", 0),
+				makeDustTestBetWithDust(-8, 2, "YES", "alice", 1),
+			},
+			wantBaseVolume:     2,
+			wantMarketDust:     2,
+			wantVolumeWithDust: 4,
+		},
+		{
+			name: "mixed users and outcomes sum recorded sale dust",
+			bets: []boundary.Bet{
+				makeDustTestBet(100, "YES", "alice", 0),
+				makeDustTestBet(70, "NO", "bob", 1),
+				makeDustTestBetWithDust(-40, 2, "YES", "alice", 2),
+				makeDustTestBetWithDust(-30, 1, "NO", "bob", 3),
+			},
+			wantBaseVolume:     100,
+			wantMarketDust:     3,
+			wantVolumeWithDust: 103,
+		},
+		{
+			name: "multiple sells by one user include zero and nonzero dust",
+			bets: []boundary.Bet{
+				makeDustTestBet(50, "YES", "alice", 0),
+				makeDustTestBetWithDust(-10, 0, "YES", "alice", 1),
+				makeDustTestBetWithDust(-15, 2, "YES", "alice", 2),
+			},
+			wantBaseVolume:     25,
+			wantMarketDust:     2,
+			wantVolumeWithDust: 27,
+		},
+		{
+			name: "legacy null-dust sells still use fallback",
+			bets: []boundary.Bet{
+				makeDustTestBet(50, "YES", "alice", 0),
+				makeLegacyDustTestBet(-10, "YES", "alice", 1),
+				makeLegacyDustTestBet(-5, "YES", "alice", 2),
+			},
+			wantBaseVolume:     35,
+			wantMarketDust:     2,
+			wantVolumeWithDust: 37,
+		},
+		{
+			name: "legacy and recorded sells combine",
+			bets: []boundary.Bet{
+				makeDustTestBet(80, "YES", "alice", 0),
+				makeLegacyDustTestBet(-10, "YES", "alice", 1),
+				makeDustTestBetWithDust(-20, 3, "YES", "alice", 2),
+			},
+			wantBaseVolume:     50,
+			wantMarketDust:     4,
+			wantVolumeWithDust: 54,
+		},
+		{
+			name: "recorded zero-dust sale after nonzero sale keeps total stable",
+			bets: []boundary.Bet{
+				makeDustTestBet(40, "YES", "alice", 0),
+				makeDustTestBetWithDust(-8, 1, "YES", "alice", 1),
+				makeDustTestBetWithDust(-7, 0, "YES", "alice", 2),
+				makeDustTestBet(15, "NO", "bob", 3),
+			},
+			wantBaseVolume:     40,
+			wantMarketDust:     1,
+			wantVolumeWithDust: 41,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assertInt64Equal(t, "base volume", tc.wantBaseVolume, GetMarketVolume(tc.bets))
+			assertInt64Equal(t, "market dust", tc.wantMarketDust, GetMarketDust(tc.bets))
+			assertInt64Equal(t, "volume with dust", tc.wantVolumeWithDust, GetMarketVolumeWithDust(tc.bets))
+		})
+	}
+}
+
 func TestGetMarketDustWithCalculator(t *testing.T) {
 	bets := []boundary.Bet{
 		makeDustTestBet(100, "YES", "user1", 0),
-		makeDustTestBet(-50, "YES", "user1", 1),
-		makeDustTestBet(-25, "NO", "user2", 2),
+		makeLegacyDustTestBet(-50, "YES", "user1", 1),
+		makeLegacyDustTestBet(-25, "NO", "user2", 2),
 	}
 
 	assertInt64Equal(t, "dust", 6, GetMarketDustWithCalculator(bets, fixedSellDustCalculator{dust: 3}))

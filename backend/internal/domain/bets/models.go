@@ -18,12 +18,13 @@ func newPlacedBoundaryBet(req PlaceRequest, outcome string, placedAt time.Time) 
 
 func newSoldBoundaryBet(req SellRequest, outcome string, sharesSold int64, dust int64, placedAt time.Time) *boundary.Bet {
 	return &boundary.Bet{
-		Username: req.Username,
-		MarketID: req.MarketID,
-		Amount:   -sharesSold,
-		Dust:     dust,
-		Outcome:  outcome,
-		PlacedAt: placedAt,
+		Username:     req.Username,
+		MarketID:     req.MarketID,
+		Amount:       -sharesSold,
+		Dust:         dust,
+		DustRecorded: true,
+		Outcome:      outcome,
+		PlacedAt:     placedAt,
 	}
 }
 

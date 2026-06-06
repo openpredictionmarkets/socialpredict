@@ -20,7 +20,7 @@ func (c RecordedSellDustCalculator) DustForSell(sellBet boundary.Bet, allBets []
 	if sellBet.Amount >= 0 {
 		return 0
 	}
-	if sellBet.Dust > 0 {
+	if sellBet.DustRecorded || sellBet.Dust > 0 {
 		return sellBet.Dust
 	}
 	return c.LegacyDustPerSell

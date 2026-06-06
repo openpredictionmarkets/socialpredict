@@ -19,6 +19,11 @@ type GormRepository struct {
 	db *gorm.DB
 }
 
+type betDustRow struct {
+	models.Bet
+	DustRecorded bool `gorm:"column:dust_recorded"`
+}
+
 // NewGormRepository creates a new GORM-based markets repository
 func NewGormRepository(db *gorm.DB) *GormRepository {
 	return &GormRepository{db: db}
@@ -535,8 +540,10 @@ func (r *GormRepository) ReassignMarketSteward(ctx context.Context, marketID int
 
 // ListBetsForMarket returns all bets for the specified market ordered by placement time.
 func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
-	var bets []models.Bet
+	var bets []betDustRow
 	if err := r.db.WithContext(ctx).
+		Model(&models.Bet{}).
+		Select("bets.*, (dust IS NOT NULL) AS dust_recorded").
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC").
 		Find(&bets).Error; err != nil {
@@ -546,14 +553,15 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) 
 	result := make([]*dmarkets.Bet, len(bets))
 	for i := range bets {
 		result[i] = &dmarkets.Bet{
-			ID:        bets[i].ID,
-			Username:  bets[i].Username,
-			MarketID:  bets[i].MarketID,
-			Amount:    bets[i].Amount,
-			Dust:      bets[i].Dust,
-			Outcome:   bets[i].Outcome,
-			PlacedAt:  bets[i].PlacedAt,
-			CreatedAt: bets[i].CreatedAt,
+			ID:           bets[i].ID,
+			Username:     bets[i].Username,
+			MarketID:     bets[i].MarketID,
+			Amount:       bets[i].Amount,
+			Dust:         bets[i].Dust,
+			DustRecorded: bets[i].DustRecorded,
+			Outcome:      bets[i].Outcome,
+			PlacedAt:     bets[i].PlacedAt,
+			CreatedAt:    bets[i].CreatedAt,
 		}
 	}
 	return result, nil
@@ -590,8 +598,10 @@ func (r *GormRepository) loadMarketData(ctx context.Context, marketID int64) (po
 		return positionsmath.MarketSnapshot{}, nil, err
 	}
 
-	var bets []models.Bet
+	var bets []betDustRow
 	if err := r.db.WithContext(ctx).
+		Model(&models.Bet{}).
+		Select("bets.*, (dust IS NOT NULL) AS dust_recorded").
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC").
 		Find(&bets).Error; err != nil {
@@ -608,18 +618,19 @@ func (r *GormRepository) loadMarketData(ctx context.Context, marketID int64) (po
 	return snapshot, mapModelBetsToBoundary(bets), nil
 }
 
-func mapModelBetsToBoundary(dbBets []models.Bet) []boundary.Bet {
+func mapModelBetsToBoundary(dbBets []betDustRow) []boundary.Bet {
 	bets := make([]boundary.Bet, len(dbBets))
 	for i, bet := range dbBets {
 		bets[i] = boundary.Bet{
-			ID:        uint(bet.ID),
-			Username:  bet.Username,
-			MarketID:  bet.MarketID,
-			Amount:    bet.Amount,
-			Dust:      bet.Dust,
-			Outcome:   bet.Outcome,
-			PlacedAt:  bet.PlacedAt,
-			CreatedAt: bet.CreatedAt,
+			ID:           uint(bet.ID),
+			Username:     bet.Username,
+			MarketID:     bet.MarketID,
+			Amount:       bet.Amount,
+			Dust:         bet.Dust,
+			DustRecorded: bet.DustRecorded,
+			Outcome:      bet.Outcome,
+			PlacedAt:     bet.PlacedAt,
+			CreatedAt:    bet.CreatedAt,
 		}
 	}
 	return bets

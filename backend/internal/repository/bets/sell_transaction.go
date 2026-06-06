@@ -17,6 +17,11 @@ import (
 
 var _ dbets.SellUnitOfWork = (*GormRepository)(nil)
 
+type sellBetDustRow struct {
+	models.Bet
+	DustRecorded bool `gorm:"column:dust_recorded"`
+}
+
 // SellBetTransaction commits the sale credit and sale bet as one unit of work.
 func (r *GormRepository) SellBetTransaction(ctx context.Context, fn dbets.SellTransactionFunc) error {
 	// The transaction-scoped market reader locks the market row before deriving
@@ -84,8 +89,10 @@ func (r sellMarketRepository) loadMarketData(ctx context.Context, marketID int64
 		return positionsmath.MarketSnapshot{}, nil, err
 	}
 
-	var dbBets []models.Bet
+	var dbBets []sellBetDustRow
 	betsQuery := r.db.WithContext(ctx).
+		Model(&models.Bet{}).
+		Select("bets.*, (dust IS NOT NULL) AS dust_recorded").
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC")
 	if r.db.Dialector.Name() == "postgres" {
@@ -105,18 +112,19 @@ func (r sellMarketRepository) loadMarketData(ctx context.Context, marketID int64
 	return snapshot, sellModelBetsToBoundary(dbBets), nil
 }
 
-func sellModelBetsToBoundary(dbBets []models.Bet) []boundary.Bet {
+func sellModelBetsToBoundary(dbBets []sellBetDustRow) []boundary.Bet {
 	bets := make([]boundary.Bet, len(dbBets))
 	for i, bet := range dbBets {
 		bets[i] = boundary.Bet{
-			ID:        uint(bet.ID),
-			Username:  bet.Username,
-			MarketID:  bet.MarketID,
-			Amount:    bet.Amount,
-			Dust:      bet.Dust,
-			Outcome:   bet.Outcome,
-			PlacedAt:  bet.PlacedAt,
-			CreatedAt: bet.CreatedAt,
+			ID:           uint(bet.ID),
+			Username:     bet.Username,
+			MarketID:     bet.MarketID,
+			Amount:       bet.Amount,
+			Dust:         bet.Dust,
+			DustRecorded: bet.DustRecorded,
+			Outcome:      bet.Outcome,
+			PlacedAt:     bet.PlacedAt,
+			CreatedAt:    bet.CreatedAt,
 		}
 	}
 	return bets
