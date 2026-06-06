@@ -1060,7 +1060,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
-
   /v0/markets/{id}/description-amendments:
     post:
       tags: [Markets]
@@ -2849,7 +2848,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
-
   /v0/admin/market-description-amendments:
     get:
       tags: [Markets]
@@ -4153,7 +4151,6 @@ components:
             type: string
             pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
 
-
     MarketDescriptionAmendmentRequest:
       type: object
       required: [body]
@@ -4338,6 +4335,10 @@ components:
         marketDust:
           type: integer
           format: int64
+        descriptionAmendments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
 
     ListMarketsResponse:
       type: object
@@ -4368,10 +4369,6 @@ components:
         marketDust:
           type: integer
           format: int64
-        descriptionAmendments:
-          type: array
-          items:
-            $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
 
     PublicMarketResponse:
       type: object
@@ -4892,7 +4889,6 @@ components:
             type: string
             pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
           description: Active market tag slugs to assign; an empty list removes all tag assignments.
-
 
     AdminReviewMarketDescriptionAmendmentRequest:
       type: object

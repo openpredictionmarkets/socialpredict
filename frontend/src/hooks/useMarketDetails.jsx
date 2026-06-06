@@ -165,11 +165,11 @@ const normalizeMarketDetails = (raw) => {
     market: normalizedMarket,
     creator: normalizedCreator,
     probabilityChanges: normalizeProbabilityChanges(raw.probabilityChanges ?? raw.ProbabilityChanges),
-    descriptionAmendments: normalizeDescriptionAmendments(raw.descriptionAmendments ?? raw.DescriptionAmendments),
     numUsers: toNumber(raw.numUsers ?? raw.NumUsers),
     totalVolume: toNumber(raw.totalVolume ?? raw.TotalVolume),
     marketDust: toNumber(raw.marketDust ?? raw.MarketDust),
     lastProbability: toNumber(raw.lastProbability ?? raw.LastProbability),
+    descriptionAmendments: normalizeDescriptionAmendments(raw.descriptionAmendments ?? raw.DescriptionAmendments),
   };
 };
 

@@ -154,10 +154,10 @@ function MarketDetailsTable({
       </div>
       <div className='mb-4 bg-gray-800 p-4 rounded-lg'>
         <div
-          className={`grid gap-4 break-words ${
+          className={`grid gap-4 text-sm break-words ${
             showFullDescription
               ? ''
-              : 'sm:max-h-32 h-28 overflow-y-auto sm:overflow-hidden'
+              : 'sm:max-h-40 h-24 overflow-y-auto sm:overflow-hidden'
           }`}
           style={{
             wordBreak: 'break-word',
@@ -165,30 +165,26 @@ function MarketDetailsTable({
             hyphens: 'auto',
           }}
         >
-          <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-gray-600 bg-gray-900 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-gray-300">
-                Original Description v1
-              </span>
-            </div>
-            <p className="whitespace-pre-wrap text-sm leading-6">{marketDescription}</p>
-          </div>
+          <section>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">
+              Original Description v1
+            </h2>
+            <p className="whitespace-pre-wrap">{marketDescription}</p>
+          </section>
           {descriptionAmendments.length > 0 && (
-            <div className="grid gap-3 border-t border-gray-700 pt-4">
+            <section className="grid gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-200">Approved Amendments</h2>
               {descriptionAmendments.map((amendment) => (
-                <article key={amendment.id || amendment.version} className="rounded-lg border border-sky-800/50 bg-sky-950/20 p-3">
-                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
-                    <span className="rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 font-semibold text-sky-100">
-                      Amendment v{amendment.version}
-                    </span>
-                    <span>Added by @{amendment.createdBy}</span>
+                <article key={amendment.id || amendment.version} className="rounded-md border border-sky-900/70 bg-sky-950/30 p-3">
+                  <div className="mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80">
+                    <span>v{amendment.version}</span>
+                    <span>Submitted by @{amendment.createdBy}</span>
                     {amendment.approvedAt && <span>Approved {new Date(amendment.approvedAt).toLocaleString()}</span>}
                   </div>
                   <MarkdownLite className="text-gray-200">{amendment.body}</MarkdownLite>
                 </article>
               ))}
-            </div>
+            </section>
           )}
         </div>
       </div>
@@ -197,40 +193,45 @@ function MarketDetailsTable({
         <form onSubmit={submitDescriptionAmendment} className="mb-4 grid gap-3 rounded-lg border border-sky-800/60 bg-sky-950/20 p-4">
           <div>
             <p className="text-sm font-semibold text-sky-100">Propose Description Amendment</p>
-            <p className="mt-1 text-xs text-gray-400">
-              Titles are immutable. Description changes are append-only, versioned, and require admin review before becoming public contract text.
+            <p className="mt-1 text-xs text-sky-100/70">
+              Titles are immutable. Description changes are append-only, versioned, and require admin approval before becoming public contract text.
             </p>
           </div>
-          {amendmentMessage && <div className="rounded-md bg-emerald-700 p-2 text-sm text-white">{amendmentMessage}</div>}
-          {amendmentError && <div className="rounded-md bg-red-700 p-2 text-sm text-white">{amendmentError}</div>}
+          {amendmentMessage && (
+            <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">{amendmentMessage}</div>
+          )}
+          {amendmentError && (
+            <div className="rounded-md bg-red-700 p-3 text-sm text-white">{amendmentError}</div>
+          )}
           <textarea
             value={amendmentBody}
             onChange={(event) => setAmendmentBody(event.target.value)}
-            maxLength={2000}
             rows={5}
-            placeholder="Add markdown-lite clarification text. Raw HTML, images, and embeds are not allowed."
+            maxLength={2000}
+            placeholder="Append clarification using markdown-lite: bold, italic, inline code, links, lists, and blockquotes. Raw HTML is not allowed."
             className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+            required
           />
-          <textarea
-            value={amendmentReason}
-            onChange={(event) => setAmendmentReason(event.target.value)}
-            maxLength={500}
-            rows={2}
-            placeholder="Optional internal reason for admin review"
-            className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          />
-          {amendmentBody.trim() && (
-            <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
-              <p className="mb-2 text-xs uppercase tracking-[0.14em] text-gray-500">Preview</p>
+          {amendmentBody && (
+            <div className="rounded-md border border-gray-700 bg-gray-950 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Preview</p>
               <MarkdownLite>{amendmentBody}</MarkdownLite>
             </div>
           )}
+          <input
+            type="text"
+            value={amendmentReason}
+            onChange={(event) => setAmendmentReason(event.target.value)}
+            maxLength={500}
+            placeholder="Optional submit reason for admin review"
+            className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+          />
           <button
             type="submit"
             disabled={submittingAmendment || !amendmentBody.trim()}
             className="justify-self-start rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submittingAmendment ? 'Submitting...' : 'Submit Amendment'}
+            {submittingAmendment ? 'Submitting...' : 'Submit Amendment for Review'}
           </button>
         </form>
       )}
