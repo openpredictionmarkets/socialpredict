@@ -22,7 +22,9 @@ const AppRoutes = () => {
   const isRegularUser = isLoggedIn && auth.usertype !== 'ADMIN';
   const { frontendConfig } = useFrontendConfig();
   const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
-  const canCreateMarket = isRegularUser && (!isModeratorMode || auth.usertype === 'MODERATOR');
+  const isActiveModerator = auth.usertype === 'MODERATOR' && auth.moderatorStatus === 'active';
+  const isSuspendedModerator = auth.usertype === 'MODERATOR' && auth.moderatorStatus === 'suspended';
+  const canCreateMarket = isRegularUser && !isSuspendedModerator && (!isModeratorMode || isActiveModerator);
   const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
 
   return (
@@ -36,6 +38,13 @@ const AppRoutes = () => {
           <Redirect to='/changepassword' />
         ) : (
           <About />
+        )}
+      </Route>
+      <Route exact path='/markets/topic/:slug'>
+        {isLoggedIn && mustChangePassword ? (
+          <Redirect to='/changepassword' />
+        ) : (
+          <Markets />
         )}
       </Route>
       <Route exact path='/markets/:marketId'>

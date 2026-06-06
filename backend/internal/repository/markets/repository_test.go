@@ -25,6 +25,7 @@ func TestGormRepositoryCreateAndGetByID(t *testing.T) {
 		FinalResolutionDateTime: now.Add(48 * time.Hour),
 		ResolutionResult:        "",
 		CreatorUsername:         "creator",
+		StewardUsername:         "creator",
 		YesLabel:                "YES",
 		NoLabel:                 "NO",
 		Status:                  dmarkets.MarketStatusActive,
@@ -46,7 +47,7 @@ func TestGormRepositoryCreateAndGetByID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID returned error: %v", err)
 	}
-	if got.QuestionTitle != market.QuestionTitle || got.CreatorUsername != market.CreatorUsername || got.YesLabel != "YES" || got.InitialProbability != 0.5 || got.LifecycleStatus != dmarkets.MarketLifecyclePublished {
+	if got.QuestionTitle != market.QuestionTitle || got.CreatorUsername != market.CreatorUsername || got.CurrentStewardUsername() != "creator" || got.YesLabel != "YES" || got.InitialProbability != 0.5 || got.LifecycleStatus != dmarkets.MarketLifecyclePublished {
 		t.Fatalf("unexpected market data: %+v", got)
 	}
 
@@ -417,5 +418,259 @@ func TestGormRepositoryApproveAndRejectMarketPersistReviewMetadata(t *testing.T)
 
 	if err := repo.ApproveMarket(ctx, published.ID, "admin", approvedAt); !errors.Is(err, dmarkets.ErrInvalidState) {
 		t.Fatalf("ApproveMarket wrong state error = %v, want ErrInvalidState", err)
+	}
+}
+
+func TestGormRepositoryReassignMarketStewardPersistsAudit(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("steward_creator", 1000)
+	backup := modelstesting.GenerateUser("steward_backup", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	if err := db.Create(&backup).Error; err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(701, creator.Username)
+	market.StewardUsername = creator.Username
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+
+	changedAt := time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC)
+	if err := repo.ReassignMarketSteward(ctx, market.ID, creator.Username, backup.Username, "admin", "creator inactive", changedAt); err != nil {
+		t.Fatalf("ReassignMarketSteward returned error: %v", err)
+	}
+
+	updated, err := repo.GetByID(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("load market: %v", err)
+	}
+	if updated.CurrentStewardUsername() != backup.Username {
+		t.Fatalf("steward = %q, want %q", updated.CurrentStewardUsername(), backup.Username)
+	}
+
+	var audits []models.MarketStewardshipAudit
+	if err := db.Where("market_id = ?", market.ID).Find(&audits).Error; err != nil {
+		t.Fatalf("load audits: %v", err)
+	}
+	if len(audits) != 1 {
+		t.Fatalf("expected one audit, got %d", len(audits))
+	}
+	audit := audits[0]
+	if audit.FromStewardUsername != creator.Username || audit.ToStewardUsername != backup.Username || audit.ActorUsername != "admin" || audit.Reason != "creator inactive" {
+		t.Fatalf("unexpected audit: %+v", audit)
+	}
+
+	if err := repo.ReassignMarketSteward(ctx, market.ID+999, creator.Username, backup.Username, "admin", "missing", changedAt); !errors.Is(err, dmarkets.ErrMarketNotFound) {
+		t.Fatalf("missing market error = %v, want ErrMarketNotFound", err)
+	}
+}
+
+func TestGormRepositoryListByLifecycleHydratesStewardshipAudits(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("lifecycle_steward_creator", 1000)
+	backup := modelstesting.GenerateUser("lifecycle_steward_backup", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	if err := db.Create(&backup).Error; err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(702, creator.Username)
+	market.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	market.StewardUsername = backup.Username
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+
+	changedAt := time.Date(2026, 6, 4, 15, 0, 0, 0, time.UTC)
+	audit := models.MarketStewardshipAudit{
+		MarketID:            market.ID,
+		FromStewardUsername: creator.Username,
+		ToStewardUsername:   backup.Username,
+		ActorUsername:       "admin",
+		Reason:              "creator suspended",
+	}
+	audit.CreatedAt = changedAt
+	audit.UpdatedAt = changedAt
+	if err := db.Create(&audit).Error; err != nil {
+		t.Fatalf("seed audit: %v", err)
+	}
+
+	markets, err := repo.ListByLifecycle(ctx, dmarkets.ListFilters{Status: dmarkets.MarketLifecyclePublished, Limit: 10})
+	if err != nil {
+		t.Fatalf("ListByLifecycle returned error: %v", err)
+	}
+	if len(markets) != 1 {
+		t.Fatalf("expected one market, got %d", len(markets))
+	}
+	audits := markets[0].StewardshipAudits
+	if len(audits) != 1 || audits[0].Reason != "creator suspended" || audits[0].FromStewardUsername != creator.Username || audits[0].ToStewardUsername != backup.Username || !audits[0].CreatedAt.Equal(changedAt) {
+		t.Fatalf("unexpected hydrated audits: %+v", audits)
+	}
+}
+
+func TestGormRepositoryListByLifecycleAllExcludesRejectedAndSearchesOperationalMarkets(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("lifecycle_search_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+
+	published := modelstesting.GenerateMarket(703, creator.Username)
+	published.QuestionTitle = "Orchard published market"
+	published.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	rejected := modelstesting.GenerateMarket(704, creator.Username)
+	rejected.QuestionTitle = "Orchard rejected market"
+	rejected.LifecycleStatus = dmarkets.MarketLifecycleRejected
+	resolved := modelstesting.GenerateMarket(705, creator.Username)
+	resolved.QuestionTitle = "Orchard resolved market"
+	resolved.LifecycleStatus = dmarkets.MarketLifecycleResolved
+	resolved.IsResolved = true
+
+	for _, market := range []models.Market{published, rejected, resolved} {
+		if err := db.Create(&market).Error; err != nil {
+			t.Fatalf("seed market %q: %v", market.QuestionTitle, err)
+		}
+	}
+
+	markets, err := repo.ListByLifecycle(ctx, dmarkets.ListFilters{
+		Status: dmarkets.MarketStatusAll,
+		Query:  "orchard",
+		Limit:  10,
+	})
+	if err != nil {
+		t.Fatalf("ListByLifecycle returned error: %v", err)
+	}
+	if len(markets) != 2 {
+		t.Fatalf("expected published and resolved markets only, got %d: %+v", len(markets), markets)
+	}
+	for _, market := range markets {
+		if market.LifecycleStatus == dmarkets.MarketLifecycleRejected {
+			t.Fatalf("rejected market should not be included in all stewardship list: %+v", market)
+		}
+	}
+}
+
+func TestGormRepositoryMarketTagsCreateListUpdateAssignAndHydrate(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("tag_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	market := modelstesting.GenerateMarket(801, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+
+	politics, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "politics", DisplayName: "Politics", IsActive: true, SortOrder: 2, CreatedBy: "admin"})
+	if err != nil {
+		t.Fatalf("CreateMarketTag politics: %v", err)
+	}
+	if _, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "sports", DisplayName: "Sports", IsActive: true, SortOrder: 1, CreatedBy: "admin"}); err != nil {
+		t.Fatalf("CreateMarketTag sports: %v", err)
+	}
+	if _, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "economy", DisplayName: "Economy", IsActive: true, SortOrder: 3, CreatedBy: "admin"}); err != nil {
+		t.Fatalf("CreateMarketTag economy: %v", err)
+	}
+
+	activeTags, err := repo.ListMarketTags(ctx, false)
+	if err != nil {
+		t.Fatalf("ListMarketTags returned error: %v", err)
+	}
+	if len(activeTags) != 3 || activeTags[0].Slug != "sports" || activeTags[1].Slug != "politics" || activeTags[2].Slug != "economy" {
+		t.Fatalf("expected sorted active tags, got %+v", activeTags)
+	}
+
+	inactive := false
+	updated, err := repo.UpdateMarketTag(ctx, politics.Slug, dmarkets.MarketTagRequest{DisplayName: "Civic life", IsActive: &inactive})
+	if err != nil {
+		t.Fatalf("UpdateMarketTag returned error: %v", err)
+	}
+	if updated.DisplayName != "Civic life" || updated.IsActive {
+		t.Fatalf("unexpected updated tag: %+v", updated)
+	}
+
+	assigned, err := repo.SetMarketTags(ctx, market.ID, []string{"sports"}, creator.Username, dmarkets.MarketTagAssignmentSourceCreate, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SetMarketTags returned error: %v", err)
+	}
+	if len(assigned) != 1 || assigned[0].Slug != "sports" {
+		t.Fatalf("unexpected assigned tags: %+v", assigned)
+	}
+
+	got, err := repo.GetByID(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("GetByID returned error: %v", err)
+	}
+	if len(got.Tags) != 1 || got.Tags[0].Slug != "sports" {
+		t.Fatalf("expected hydrated tag on GetByID, got %+v", got.Tags)
+	}
+
+	listed, err := repo.List(ctx, dmarkets.ListFilters{Limit: 10})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(listed) != 1 || len(listed[0].Tags) != 1 || listed[0].Tags[0].Slug != "sports" {
+		t.Fatalf("expected hydrated tag on List, got %+v", listed)
+	}
+
+	assigned, err = repo.SetMarketTags(ctx, market.ID, []string{"sports", "economy"}, creator.Username, dmarkets.MarketTagAssignmentSourceAdmin, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SetMarketTags with two tags returned error: %v", err)
+	}
+	if len(assigned) != 2 {
+		t.Fatalf("expected two assigned tags, got %+v", assigned)
+	}
+	assigned, err = repo.SetMarketTags(ctx, market.ID, []string{"sports"}, creator.Username, dmarkets.MarketTagAssignmentSourceAdmin, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("SetMarketTags removing one retained tag returned error: %v", err)
+	}
+	if len(assigned) != 1 || assigned[0].Slug != "sports" {
+		t.Fatalf("expected only retained sports tag, got %+v", assigned)
+	}
+	got, err = repo.GetByID(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("GetByID after replacing tags returned error: %v", err)
+	}
+	if len(got.Tags) != 1 || got.Tags[0].Slug != "sports" {
+		t.Fatalf("expected hydrated retained tag after replacement, got %+v", got.Tags)
+	}
+}
+
+func TestGormRepositorySetMarketTagsRejectsInactiveTags(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("inactive_tag_creator", 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator: %v", err)
+	}
+	market := modelstesting.GenerateMarket(802, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+	if _, err := repo.CreateMarketTag(ctx, dmarkets.MarketTag{Slug: "inactive", DisplayName: "Inactive", IsActive: false}); err != nil {
+		t.Fatalf("CreateMarketTag returned error: %v", err)
+	}
+
+	if _, err := repo.SetMarketTags(ctx, market.ID, []string{"inactive"}, creator.Username, dmarkets.MarketTagAssignmentSourceCreate, time.Now().UTC()); !errors.Is(err, dmarkets.ErrInvalidInput) {
+		t.Fatalf("SetMarketTags error = %v, want ErrInvalidInput", err)
 	}
 }

@@ -35,6 +35,7 @@ type PrivateUserResponse struct {
 	Username              string `json:"username"`
 	DisplayName           string `json:"displayname"`
 	UserType              string `json:"usertype"`
+	ModeratorStatus       string `json:"moderatorStatus"`
 	InitialAccountBalance int64  `json:"initialAccountBalance"`
 	AccountBalance        int64  `json:"accountBalance"`
 	PersonalEmoji         string `json:"personalEmoji,omitempty"`

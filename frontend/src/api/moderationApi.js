@@ -5,6 +5,7 @@ const marketReviewReasonMessages = {
   INVALID_REQUEST: 'Check the market ID and request fields.',
   INVALID_STATE: 'This market is not in a state that can be reviewed.',
   MARKET_NOT_FOUND: 'No market was found for that ID.',
+  USER_NOT_FOUND: 'No active moderator was found for that steward username.',
   VALIDATION_FAILED: 'Check the review fields and try again.',
 };
 
@@ -47,5 +48,39 @@ export const rejectProposedMarket = ({ marketId, token, reason }) => {
     token,
     action: 'reject',
     body: { reason: normalizedReason },
+  });
+};
+
+export const reassignMarketSteward = ({ marketId, token, stewardUsername, reason }) => {
+  const normalizedStewardUsername = String(stewardUsername || '').trim();
+  const normalizedReason = String(reason || '').trim();
+  if (!normalizedStewardUsername) {
+    throw new Error('A steward username is required.');
+  }
+  if (!normalizedReason) {
+    throw new Error('A reassignment reason is required.');
+  }
+
+  return reviewMarket({
+    marketId,
+    token,
+    action: 'steward',
+    body: {
+      stewardUsername: normalizedStewardUsername,
+      reason: normalizedReason,
+    },
+  });
+};
+
+export const updateMarketTags = ({ marketId, token, tagSlugs }) => {
+  if (!Array.isArray(tagSlugs)) {
+    throw new Error('Market tags must be provided as a list.');
+  }
+
+  return reviewMarket({
+    marketId,
+    token,
+    action: 'tags',
+    body: { tagSlugs },
   });
 };

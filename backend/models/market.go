@@ -29,4 +29,36 @@ type Market struct {
 	ProposalCost            int64      `json:"proposalCost" gorm:"not null;default:0"`
 	CreatorUsername         string     `json:"creatorUsername" gorm:"not null"`
 	Creator                 User       `gorm:"foreignKey:CreatorUsername;references:Username"`
+	StewardUsername         string     `json:"stewardUsername" gorm:"index"`
+}
+
+type MarketTag struct {
+	gorm.Model
+	ID          int64  `json:"id" gorm:"primary_key"`
+	Slug        string `json:"slug" gorm:"not null;uniqueIndex;size:64"`
+	DisplayName string `json:"displayName" gorm:"not null;size:120"`
+	Description string `json:"description,omitempty" gorm:"type:text"`
+	ColorKey    string `json:"colorKey,omitempty" gorm:"size:40"`
+	SortOrder   int    `json:"sortOrder" gorm:"not null;default:0;index"`
+	IsActive    bool   `json:"isActive" gorm:"not null;default:true;index"`
+	CreatedBy   string `json:"createdBy,omitempty" gorm:"index"`
+}
+
+type MarketTagAssignment struct {
+	gorm.Model
+	ID         int64  `json:"id" gorm:"primary_key"`
+	MarketID   int64  `json:"marketId" gorm:"not null;uniqueIndex:uniq_market_tag_assignment;index"`
+	TagID      int64  `json:"tagId" gorm:"not null;uniqueIndex:uniq_market_tag_assignment;index"`
+	AssignedBy string `json:"assignedBy,omitempty" gorm:"index"`
+	Source     string `json:"source,omitempty" gorm:"not null;default:moderator_create;index"`
+}
+
+type MarketStewardshipAudit struct {
+	gorm.Model
+	ID                  int64  `json:"id" gorm:"primary_key"`
+	MarketID            int64  `json:"marketId" gorm:"not null;index"`
+	FromStewardUsername string `json:"fromStewardUsername" gorm:"index"`
+	ToStewardUsername   string `json:"toStewardUsername" gorm:"not null;index"`
+	ActorUsername       string `json:"actorUsername" gorm:"not null;index"`
+	Reason              string `json:"reason,omitempty" gorm:"type:text"`
 }

@@ -207,6 +207,7 @@ func adminUserListFiltersFromRequest(w http.ResponseWriter, r *http.Request) (du
 
 	return dusers.ListFilters{
 		UserType: strings.TrimSpace(query.Get("usertype")),
+		Query:    strings.TrimSpace(query.Get("query")),
 		Limit:    limit,
 		Offset:   offset,
 	}, true

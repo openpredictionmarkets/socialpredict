@@ -7,7 +7,7 @@ import { API_URL } from '../config';
  * @param {number} limit - Maximum number of results (optional, defaults to 20)
  * @returns {Promise<Object>} Search results object
  */
-export const searchMarkets = async (query, status = 'all', limit = 20) => {
+export const searchMarkets = async (query, status = 'all', limit = 20, options = {}) => {
     if (!query?.trim()) {
         throw new Error('Search query is required');
     }
@@ -17,6 +17,9 @@ export const searchMarkets = async (query, status = 'all', limit = 20) => {
         status: status,
         limit: limit.toString()
     });
+    if (options.tagSlug) {
+        params.set('tagSlug', options.tagSlug);
+    }
 
     const response = await fetch(`${API_URL}/v0/markets/search?${params}`);
 

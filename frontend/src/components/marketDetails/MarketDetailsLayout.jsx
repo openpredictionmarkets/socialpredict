@@ -7,6 +7,8 @@ import TradeCTA from '../TradeCTA';
 import TradeTabs from '../../components/tabs/TradeTabs';
 import { BetButton } from '../buttons/trade/BetButtons';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
+import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketTagChips from '../markets/MarketTagChips';
 
 const DEFAULT_CREATOR_EMOJI = '👤';
 
@@ -28,6 +30,7 @@ function MarketDetailsTable({
   const safeCreator = creator ?? {};
   const resolvedMarketId = marketIdProp ?? safeMarket.id;
   const creatorUsername = safeMarket.creatorUsername ?? safeCreator.username ?? 'unknown';
+  const stewardUsername = stewardUsernameFor(safeMarket, creatorUsername);
   const creatorEmoji = safeCreator.personalEmoji ?? DEFAULT_CREATOR_EMOJI;
   const marketDescription = safeMarket.description ?? '';
 
@@ -57,6 +60,9 @@ function MarketDetailsTable({
     isLoggedIn &&
     safeMarket.resolutionDateTime &&
     new Date(safeMarket.resolutionDateTime) > new Date();
+  const canResolveMarket =
+    !safeMarket.isResolved &&
+    String(username || '').trim() === String(stewardUsername || '').trim();
 
   return (
     <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
@@ -83,9 +89,11 @@ function MarketDetailsTable({
             </span>
             @{creatorUsername}
           </a>
+          <StewardTag username={stewardUsername} creatorUsername={creatorUsername} />
           <span>•</span>
           <span>🪙 {currentProbability.toFixed(2)}</span>
         </div>
+        <MarketTagChips tags={safeMarket.tags || []} className='mt-3' />
       </div>
 
       <div className='mb-4'>
@@ -175,7 +183,7 @@ function MarketDetailsTable({
       )}
 
       <div className='flex items-center justify-center mb-4 space-x-4 py-4'>
-        {username === creatorUsername && !safeMarket.isResolved && (
+        {canResolveMarket && (
           <ResolveModalButton
             marketId={resolvedMarketId}
             token={token}

@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"socialpredict/internal/domain/boundary"
@@ -21,6 +22,7 @@ type GormRepository struct {
 type authenticatedUserRow struct {
 	Username           string
 	UserType           string
+	ModeratorStatus    string
 	Password           string
 	MustChangePassword bool
 }
@@ -151,6 +153,16 @@ func (r *GormRepository) List(ctx context.Context, filters dusers.ListFilters) (
 
 	if filters.UserType != "" {
 		query = query.Where("user_type = ?", filters.UserType)
+	}
+
+	if term := strings.ToLower(strings.TrimSpace(filters.Query)); term != "" {
+		like := "%" + term + "%"
+		query = query.Where(
+			"LOWER(username) LIKE ? OR LOWER(display_name) LIKE ? OR LOWER(email) LIKE ?",
+			like,
+			like,
+			like,
+		)
 	}
 
 	if filters.Limit > 0 {
@@ -314,7 +326,7 @@ func (r *GormRepository) FindAuthenticatedUser(ctx context.Context, username str
 	var user authenticatedUserRow
 	if err := r.db.WithContext(ctx).
 		Table("users").
-		Select("username", "user_type", "password", "must_change_password").
+		Select("username", "user_type", "moderator_status", "password", "must_change_password").
 		Where("username = ?", username).
 		Take(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -326,6 +338,7 @@ func (r *GormRepository) FindAuthenticatedUser(ctx context.Context, username str
 	return &boundary.AuthenticatedUser{
 		Username:           user.Username,
 		UserType:           user.UserType,
+		ModeratorStatus:    string(dusers.NormalizeModeratorStatus(user.UserType, user.ModeratorStatus)),
 		PasswordHash:       user.Password,
 		MustChangePassword: user.MustChangePassword,
 	}, nil

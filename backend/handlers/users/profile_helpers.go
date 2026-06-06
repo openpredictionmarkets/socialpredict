@@ -34,6 +34,7 @@ func toPrivateUserResponse(user *dusers.User) dto.PrivateUserResponse {
 		Username:              user.Username,
 		DisplayName:           user.DisplayName,
 		UserType:              user.UserType,
+		ModeratorStatus:       string(dusers.NormalizeModeratorStatus(user.UserType, string(user.ModeratorStatus))),
 		InitialAccountBalance: user.InitialAccountBalance,
 		AccountBalance:        user.AccountBalance,
 		PersonalEmoji:         user.PersonalEmoji,

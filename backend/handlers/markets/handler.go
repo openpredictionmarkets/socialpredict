@@ -90,6 +90,7 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 		ResolutionDateTime: req.ResolutionDateTime,
 		YesLabel:           req.YesLabel,
 		NoLabel:            req.NoLabel,
+		TagSlugs:           req.TagSlugs,
 	}
 
 	market, err := h.service.CreateMarket(r.Context(), createReq, user.Username)
@@ -190,7 +191,7 @@ func (h *Handler) ListMarkets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var markets []*dmarkets.Market
-	if params.status != "" && params.filters.CreatedBy == "" {
+	if params.status != "" && params.filters.CreatedBy == "" && params.filters.TagSlug == "" {
 		page := dmarkets.Page{Limit: params.limit, Offset: params.offset}
 		markets, err = h.service.ListByStatus(r.Context(), params.status, page)
 	} else {

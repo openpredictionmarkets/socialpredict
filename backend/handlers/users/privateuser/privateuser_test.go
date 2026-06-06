@@ -19,6 +19,8 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 
 	user := modelstesting.GenerateUser("alice", 0)
+	user.UserType = "MODERATOR"
+	user.ModeratorStatus = "suspended"
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("failed to create user: %v", err)
 	}
@@ -53,6 +55,9 @@ func TestGetPrivateProfileUserResponse_Success(t *testing.T) {
 	}
 	if resp.Email != user.PrivateUser.Email {
 		t.Fatalf("expected email %q, got %q", user.PrivateUser.Email, resp.Email)
+	}
+	if resp.ModeratorStatus != "suspended" {
+		t.Fatalf("expected moderator status suspended, got %q", resp.ModeratorStatus)
 	}
 }
 

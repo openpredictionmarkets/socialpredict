@@ -35,6 +35,7 @@ type User struct {
 type AuthenticatedUser struct {
 	Username           string
 	UserType           string
+	ModeratorStatus    string
 	PasswordHash       string
 	MustChangePassword bool
 }

@@ -39,6 +39,32 @@ const normalizeProbabilityChanges = (raw) => {
     .filter((item) => item !== null);
 };
 
+const normalizeMarketTag = (tag) => {
+  if (!tag || typeof tag !== 'object') {
+    return null;
+  }
+
+  return {
+    id: tag.id ?? tag.ID ?? null,
+    slug: tag.slug ?? tag.Slug ?? '',
+    displayName: tag.displayName ?? tag.DisplayName ?? '',
+    description: tag.description ?? tag.Description ?? '',
+    colorKey: tag.colorKey ?? tag.ColorKey ?? 'slate',
+    sortOrder: toNumber(tag.sortOrder ?? tag.SortOrder),
+    isActive: tag.isActive ?? tag.IsActive ?? true,
+  };
+};
+
+const normalizeMarketTags = (raw) => {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map(normalizeMarketTag)
+    .filter((tag) => tag !== null);
+};
+
 const normalizeMarket = (market) => {
   if (!market || typeof market !== 'object') {
     return {
@@ -48,6 +74,7 @@ const normalizeMarket = (market) => {
       outcomeType: '',
       resolutionDateTime: null,
       creatorUsername: 'unknown',
+      stewardUsername: '',
       yesLabel: '',
       noLabel: '',
       status: '',
@@ -56,6 +83,7 @@ const normalizeMarket = (market) => {
       initialProbability: 0,
       isResolved: false,
       resolutionResult: null,
+      tags: [],
     };
   }
 
@@ -66,6 +94,7 @@ const normalizeMarket = (market) => {
     outcomeType: market.outcomeType ?? market.OutcomeType ?? '',
     resolutionDateTime: market.resolutionDateTime ?? market.ResolutionDateTime ?? null,
     creatorUsername: market.creatorUsername ?? market.CreatorUsername ?? 'unknown',
+    stewardUsername: market.stewardUsername ?? market.StewardUsername ?? '',
     yesLabel: market.yesLabel ?? market.YesLabel ?? '',
     noLabel: market.noLabel ?? market.NoLabel ?? '',
     status: market.status ?? market.Status ?? '',
@@ -74,6 +103,7 @@ const normalizeMarket = (market) => {
     initialProbability: toNumber(market.initialProbability ?? market.InitialProbability),
     isResolved: market.isResolved ?? market.IsResolved ?? false,
     resolutionResult: market.resolutionResult ?? market.ResolutionResult ?? null,
+    tags: normalizeMarketTags(market.tags ?? market.Tags),
   };
 };
 

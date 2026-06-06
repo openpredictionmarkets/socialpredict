@@ -18,6 +18,8 @@ import (
 	sellbetshandlers "socialpredict/handlers/bets/selling"
 	"socialpredict/handlers/cms/homepage"
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
+	"socialpredict/handlers/cms/marketdiscovery"
+	cmsdiscoveryhttp "socialpredict/handlers/cms/marketdiscovery/http"
 	"socialpredict/handlers/cms/socialshare"
 	cmssocialhttp "socialpredict/handlers/cms/socialshare/http"
 	marketshandlers "socialpredict/handlers/markets"
@@ -328,6 +330,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	homepageSvc := homepage.NewService(homepageRepo, homepageRenderer)
 	homepageHandler := cmshomehttp.NewHandler(homepageSvc, authService)
 
+	marketDiscoveryRepo := marketdiscovery.NewGormRepository(db)
+	marketDiscoverySvc := marketdiscovery.NewService(marketDiscoveryRepo)
+	marketDiscoveryHandler := cmsdiscoveryhttp.NewHandler(marketDiscoverySvc, authService)
+
 	socialShareRepo := socialshare.NewGormRepository(db)
 	socialShareSvc := socialshare.NewService(socialShareRepo)
 	socialShareHandler := cmssocialhttp.NewHandler(socialShareSvc, authService)
@@ -386,6 +392,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/markets/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarket))).Methods("POST")
 	router.Handle("/v0/markets/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketLeaderboard))).Methods("GET")
 	router.Handle("/v0/markets/{id}/projection", securityMiddleware(http.HandlerFunc(marketsHandler.ProjectProbability))).Methods("GET")
+	router.Handle("/v0/market-tags", securityMiddleware(marketshandlers.ListMarketTagsHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 	router.Handle("/v0/marketprojection/{marketId}/{amount}/{outcome}/", securityMiddleware(marketshandlers.ProjectNewProbabilityHandler(marketsService))).Methods("GET")
 
@@ -424,9 +431,17 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/markets", securityMiddleware(adminhandlers.ListReviewMarketsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/steward", securityMiddleware(adminhandlers.ReassignMarketStewardHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/tags", securityMiddleware(adminhandlers.UpdateMarketTagsHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.ListAdminMarketTagsHandler(marketsService, authService))).Methods("GET")
+	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.CreateAdminMarketTagHandler(marketsService, authService))).Methods("POST")
+	router.Handle("/v0/admin/market-tags/{slug}", securityMiddleware(adminhandlers.UpdateAdminMarketTagHandler(marketsService, authService))).Methods("PATCH")
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
+	router.HandleFunc("/v0/content/market-discovery/{slug}", marketDiscoveryHandler.PublicGet).Methods("GET")
+	router.Handle("/v0/admin/content/market-discovery/{slug}", securityMiddleware(http.HandlerFunc(marketDiscoveryHandler.AdminUpdate))).Methods("PUT")
+	router.Handle("/v0/admin/content/market-discovery/{slug}/pins", securityMiddleware(http.HandlerFunc(marketDiscoveryHandler.AdminReplacePins))).Methods("PUT")
 	router.HandleFunc("/v0/content/social-share", socialShareHandler.PublicGet).Methods("GET")
 	router.HandleFunc("/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")
 	router.HandleFunc("/api/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")

@@ -6,42 +6,61 @@ import (
 
 // MarketResponse represents the HTTP response for a market
 type MarketResponse struct {
-	ID                 int64      `json:"id"`
-	QuestionTitle      string     `json:"questionTitle"`
-	Description        string     `json:"description"`
-	OutcomeType        string     `json:"outcomeType"`
-	ResolutionDateTime time.Time  `json:"resolutionDateTime"`
-	CreatorUsername    string     `json:"creatorUsername"`
-	YesLabel           string     `json:"yesLabel"`
-	NoLabel            string     `json:"noLabel"`
-	Status             string     `json:"status"`
-	LifecycleStatus    string     `json:"lifecycleStatus,omitempty"`
-	ApprovedBy         string     `json:"approvedBy,omitempty"`
-	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
-	RejectedBy         string     `json:"rejectedBy,omitempty"`
-	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
-	RejectionReason    string     `json:"rejectionReason,omitempty"`
-	ProposalCost       int64      `json:"proposalCost,omitempty"`
-	IsResolved         bool       `json:"isResolved"`
-	ResolutionResult   string     `json:"resolutionResult"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	UpdatedAt          time.Time  `json:"updatedAt"`
+	ID                 int64               `json:"id"`
+	QuestionTitle      string              `json:"questionTitle"`
+	Description        string              `json:"description"`
+	OutcomeType        string              `json:"outcomeType"`
+	ResolutionDateTime time.Time           `json:"resolutionDateTime"`
+	CreatorUsername    string              `json:"creatorUsername"`
+	StewardUsername    string              `json:"stewardUsername"`
+	YesLabel           string              `json:"yesLabel"`
+	NoLabel            string              `json:"noLabel"`
+	Status             string              `json:"status"`
+	LifecycleStatus    string              `json:"lifecycleStatus,omitempty"`
+	ApprovedBy         string              `json:"approvedBy,omitempty"`
+	ApprovedAt         *time.Time          `json:"approvedAt,omitempty"`
+	RejectedBy         string              `json:"rejectedBy,omitempty"`
+	RejectedAt         *time.Time          `json:"rejectedAt,omitempty"`
+	RejectionReason    string              `json:"rejectionReason,omitempty"`
+	ProposalCost       int64               `json:"proposalCost,omitempty"`
+	IsResolved         bool                `json:"isResolved"`
+	ResolutionResult   string              `json:"resolutionResult"`
+	CreatedAt          time.Time           `json:"createdAt"`
+	UpdatedAt          time.Time           `json:"updatedAt"`
+	Tags               []MarketTagResponse `json:"tags,omitempty"`
 }
 
 // CreateMarketResponse represents the HTTP response after creating a market
 type CreateMarketResponse struct {
-	ID                 int64     `json:"id"`
-	QuestionTitle      string    `json:"questionTitle"`
-	Description        string    `json:"description"`
-	OutcomeType        string    `json:"outcomeType"`
-	ResolutionDateTime time.Time `json:"resolutionDateTime"`
-	CreatorUsername    string    `json:"creatorUsername"`
-	YesLabel           string    `json:"yesLabel"`
-	NoLabel            string    `json:"noLabel"`
-	Status             string    `json:"status"`
-	LifecycleStatus    string    `json:"lifecycleStatus,omitempty"`
-	ProposalCost       int64     `json:"proposalCost,omitempty"`
-	CreatedAt          time.Time `json:"createdAt"`
+	ID                 int64               `json:"id"`
+	QuestionTitle      string              `json:"questionTitle"`
+	Description        string              `json:"description"`
+	OutcomeType        string              `json:"outcomeType"`
+	ResolutionDateTime time.Time           `json:"resolutionDateTime"`
+	CreatorUsername    string              `json:"creatorUsername"`
+	StewardUsername    string              `json:"stewardUsername"`
+	YesLabel           string              `json:"yesLabel"`
+	NoLabel            string              `json:"noLabel"`
+	Status             string              `json:"status"`
+	LifecycleStatus    string              `json:"lifecycleStatus,omitempty"`
+	ProposalCost       int64               `json:"proposalCost,omitempty"`
+	CreatedAt          time.Time           `json:"createdAt"`
+	Tags               []MarketTagResponse `json:"tags,omitempty"`
+}
+
+type MarketTagResponse struct {
+	ID          int64  `json:"id"`
+	Slug        string `json:"slug"`
+	DisplayName string `json:"displayName"`
+	Description string `json:"description,omitempty"`
+	ColorKey    string `json:"colorKey,omitempty"`
+	SortOrder   int    `json:"sortOrder"`
+	IsActive    bool   `json:"isActive"`
+}
+
+type MarketTagsResponse struct {
+	Tags  []MarketTagResponse `json:"tags"`
+	Total int                 `json:"total"`
 }
 
 // CreatorResponse represents the creator information for frontend display
@@ -63,20 +82,22 @@ type MarketOverviewResponse struct {
 
 // PublicMarketResponse represents the legacy public market payload.
 type PublicMarketResponse struct {
-	ID                      int64     `json:"id"`
-	QuestionTitle           string    `json:"questionTitle"`
-	Description             string    `json:"description"`
-	OutcomeType             string    `json:"outcomeType"`
-	ResolutionDateTime      time.Time `json:"resolutionDateTime"`
-	FinalResolutionDateTime time.Time `json:"finalResolutionDateTime"`
-	UTCOffset               int       `json:"utcOffset"`
-	IsResolved              bool      `json:"isResolved"`
-	ResolutionResult        string    `json:"resolutionResult"`
-	InitialProbability      float64   `json:"initialProbability"`
-	CreatorUsername         string    `json:"creatorUsername"`
-	CreatedAt               time.Time `json:"createdAt"`
-	YesLabel                string    `json:"yesLabel"`
-	NoLabel                 string    `json:"noLabel"`
+	ID                      int64               `json:"id"`
+	QuestionTitle           string              `json:"questionTitle"`
+	Description             string              `json:"description"`
+	OutcomeType             string              `json:"outcomeType"`
+	ResolutionDateTime      time.Time           `json:"resolutionDateTime"`
+	FinalResolutionDateTime time.Time           `json:"finalResolutionDateTime"`
+	UTCOffset               int                 `json:"utcOffset"`
+	IsResolved              bool                `json:"isResolved"`
+	ResolutionResult        string              `json:"resolutionResult"`
+	InitialProbability      float64             `json:"initialProbability"`
+	CreatorUsername         string              `json:"creatorUsername"`
+	StewardUsername         string              `json:"stewardUsername"`
+	CreatedAt               time.Time           `json:"createdAt"`
+	YesLabel                string              `json:"yesLabel"`
+	NoLabel                 string              `json:"noLabel"`
+	Tags                    []MarketTagResponse `json:"tags,omitempty"`
 }
 
 // ProbabilityChangeResponse represents WPAM probability history.

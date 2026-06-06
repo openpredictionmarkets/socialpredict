@@ -31,6 +31,7 @@ const getStoredAuthState = () => {
         token,
         username: normalizedUsername,
         usertype: authStorage.getUsertype(),
+        moderatorStatus: authStorage.getModeratorStatus(),
         changePasswordNeeded: false,
     };
 };
@@ -40,6 +41,7 @@ const AuthContext = createContext({
     setUsername: () => {},
     isLoggedIn: false,
     usertype: null,
+    moderatorStatus: null,
     changePasswordNeeded: true, // Default to true until login confirms otherwise
     login: () => {},
     logout: () => {},
@@ -65,6 +67,44 @@ const AuthProvider = ({ children }) => {
             // Redirect or perform other actions based on usertype
         }
     }, [authState.isLoggedIn, authState.usertype]);
+
+    useEffect(() => {
+        if (!authState.isLoggedIn || !authState.token || authState.changePasswordNeeded) {
+            return undefined;
+        }
+
+        let ignore = false;
+        const refreshProfile = async () => {
+            try {
+                const profile = await apiRequest('/v0/privateprofile', {
+                    authenticated: true,
+                    authToken: authState.token,
+                    fallbackMessage: 'Failed to refresh user profile.',
+                });
+                if (ignore) return;
+
+                authStorage.saveLogin({
+                    token: authState.token,
+                    username: profile.username || authState.username,
+                    usertype: profile.usertype || authState.usertype,
+                    moderatorStatus: profile.moderatorStatus || authState.moderatorStatus,
+                });
+                setAuthState((current) => ({
+                    ...current,
+                    username: profile.username || current.username,
+                    usertype: profile.usertype || current.usertype,
+                    moderatorStatus: profile.moderatorStatus || current.moderatorStatus,
+                }));
+            } catch (error) {
+                console.error('Failed to refresh auth profile:', error);
+            }
+        };
+
+        refreshProfile();
+        return () => {
+            ignore = true;
+        };
+    }, [authState.isLoggedIn, authState.token, authState.changePasswordNeeded]);
 
     useEffect(() => {
         authStorage.clearLegacyPasswordChangeFlag();
@@ -95,6 +135,7 @@ const AuthProvider = ({ children }) => {
                 token: authData.token,
                 username: authData.username,
                 usertype: authData.usertype,
+                moderatorStatus: authData.moderatorStatus,
                 changePasswordNeeded: authData.mustChangePassword,
             });
             return { success: true, mustChangePassword: authData.mustChangePassword };
@@ -112,6 +153,7 @@ const AuthProvider = ({ children }) => {
             token: null,
             username: null,
             usertype: null,
+            moderatorStatus: null,
             changePasswordNeeded: null,
         });
     };

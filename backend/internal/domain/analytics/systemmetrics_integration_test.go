@@ -82,6 +82,9 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		modelstesting.GenerateUser("bob", 0),
 		modelstesting.GenerateUser("carol", 0),
 	}
+	users[0].UserType = "MODERATOR"
+	users[0].ModeratorStatus = "active"
+
 	for i := range users {
 		if err := db.Create(&users[i]).Error; err != nil {
 			t.Fatalf("create user: %v", err)
@@ -90,6 +93,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(7001, users[0].Username)
 	market.IsResolved = false
+	market.StewardUsername = market.CreatorUsername
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}
@@ -185,6 +189,9 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 		modelstesting.GenerateUser("jyron", 0),
 		modelstesting.GenerateUser("testuser03", 0),
 	}
+	users[0].UserType = "MODERATOR"
+	users[0].ModeratorStatus = "active"
+
 	for i := range users {
 		if err := db.Create(&users[i]).Error; err != nil {
 			t.Fatalf("create user: %v", err)
@@ -193,6 +200,7 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 
 	market := modelstesting.GenerateMarket(8002, users[0].Username)
 	market.IsResolved = false
+	market.StewardUsername = market.CreatorUsername
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("create market: %v", err)
 	}

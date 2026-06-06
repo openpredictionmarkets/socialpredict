@@ -3,7 +3,18 @@ import CanvasJSReact from '@canvasjs/react-charts';
 
 const CanvasJSChart = CanvasJSReact.CanvasJSChart;
 
-const MarketChart = ({ data, currentProbability, title, className, closeDateTime, yesLabel, noLabel }) => {
+const MarketChart = ({
+  data,
+  currentProbability,
+  title,
+  className,
+  closeDateTime,
+  yesLabel,
+  noLabel,
+  showHeader = true,
+  compact = false,
+  height,
+}) => {
   const [showInverseProbability, setShowInverseProbability] = useState(false);
 
   const generateDataPoints = (data, isInverse = false) => {
@@ -61,28 +72,39 @@ const MarketChart = ({ data, currentProbability, title, className, closeDateTime
   };
 
   const options = {
-    animationEnabled: true,
+    animationEnabled: !compact,
     backgroundColor: 'transparent',
-    zoomEnabled: true,
+    zoomEnabled: !compact,
     axisX: {
       valueFormatString: 'DD MMM YY HH:mm',
-      labelFontColor: '#708090',
+      labelFontColor: compact ? 'transparent' : '#708090',
     },
     axisY: {
       includeZero: true,
       minimum: 0,
       maximum: 1,
-      labelFontColor: '#708090',
+      labelFontColor: compact ? 'transparent' : '#708090',
       suffix: '',
       valueFormatString: '0.00',
     },
     data: generateChartData(),
   };
+  if (height) {
+    options.height = height;
+  }
+  if (compact) {
+    options.axisX.tickLength = 0;
+    options.axisX.lineThickness = 0;
+    options.axisY.tickLength = 0;
+    options.axisY.lineThickness = 0;
+    options.axisY.gridThickness = 0;
+  }
 
   return (
-    <div className={`rounded-lg shadow p-4 ${className} overflow-hidden`}>
-      <div className="flex justify-between items-center mb-2">
-        <h3 className='text-lg font-medium'>{title}</h3>
+    <div className={`rounded-lg shadow ${compact ? 'p-0' : 'p-4'} ${className} overflow-hidden`}>
+      {showHeader && (
+        <div className="flex justify-between items-center mb-2">
+          <h3 className='text-lg font-medium'>{title}</h3>
           <button
             onClick={() => setShowInverseProbability(!showInverseProbability)}
             className={`px-3 py-1 text-sm rounded-lg transition-colors duration-200 ${showInverseProbability
@@ -93,7 +115,8 @@ const MarketChart = ({ data, currentProbability, title, className, closeDateTime
               ? `Show ${yesLabel} Probability`
               : `Show ${noLabel} Probability`}
           </button>
-      </div>
+        </div>
+      )}
       <CanvasJSChart options={options} />
     </div>
   );

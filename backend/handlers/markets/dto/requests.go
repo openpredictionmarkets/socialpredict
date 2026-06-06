@@ -12,6 +12,7 @@ type CreateMarketRequest struct {
 	ResolutionDateTime time.Time `json:"resolutionDateTime" validate:"required"`
 	YesLabel           string    `json:"yesLabel" validate:"omitempty,max=20"`
 	NoLabel            string    `json:"noLabel" validate:"omitempty,max=20"`
+	TagSlugs           []string  `json:"tagSlugs" validate:"omitempty,max=5"`
 }
 
 // UpdateLabelsRequest represents the HTTP request body for updating market labels

@@ -67,6 +67,7 @@ func run() error {
 		return err
 	}
 	initialBalance := config.Economics().User.InitialAccountBalance
+	maximumDebtAllowed := config.Economics().User.MaximumDebtAllowed
 
 	users := []bootstrapUser{
 		{
@@ -83,7 +84,7 @@ func run() error {
 		username := fmt.Sprintf("%s%02d", prefix, i)
 		users = append(users, bootstrapUser{
 			username:    username,
-			displayName: fmt.Sprintf("Dev Test User %02d", i),
+			displayName: fmt.Sprintf("Dev %s User %02d", prefix, i),
 			email:       fmt.Sprintf("%s%02d@example.com", prefix, i),
 			apiKey:      fmt.Sprintf("dev-%s%02d-api-key", prefix, i),
 			userType:    "REGULAR",
@@ -102,6 +103,8 @@ func run() error {
 	fmt.Printf("Password: %s\n", password)
 	fmt.Printf("Admin: admin\n")
 	fmt.Printf("Users: %s01 through %s%02d\n", prefix, prefix, count)
+	fmt.Printf("InitialAccountBalance: %d\n", initialBalance)
+	fmt.Printf("CreditAvailableBeforeBets: %d\n", initialBalance+maximumDebtAllowed)
 	fmt.Printf("MustChangePassword: false\n")
 	return nil
 }
@@ -135,6 +138,9 @@ func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initi
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		if err := db.Create(&user).Error; err != nil {
 			return fmt.Errorf("create %s: %w", seed.username, err)
+		}
+		if err := db.Model(&models.User{}).Where("username = ?", seed.username).Update("must_change_password", false).Error; err != nil {
+			return fmt.Errorf("clear password-change flag for %s: %w", seed.username, err)
 		}
 		fmt.Printf("created %s (%s)\n", seed.username, seed.userType)
 		return nil

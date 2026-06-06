@@ -5,6 +5,22 @@ import {
   promoteUserToModerator,
   updateModeratorSuspension,
 } from '../../../api/adminUsersApi';
+import SiteTabs from '../../tabs/SiteTabs';
+
+const userQueueTabs = [
+  {
+    label: 'Non-Moderators',
+    usertype: 'REGULAR',
+    emptyMessage: 'No non-moderator users found.',
+    searchPlaceholder: 'Search non-moderators by username, display name, or email',
+  },
+  {
+    label: 'Moderators',
+    usertype: 'MODERATOR',
+    emptyMessage: 'No moderators found.',
+    searchPlaceholder: 'Search moderators by username, display name, or email',
+  },
+];
 
 const roleBadgeClass = (user) => {
   if (user.usertype === 'ADMIN') return 'bg-sky-700 text-sky-50';
@@ -18,13 +34,16 @@ const moderatorLabel = (user) => {
   return user.moderatorStatus || 'active';
 };
 
-function UserQueue() {
+const userMatchesTab = (user, usertype) => user?.usertype === usertype;
+
+const UserQueueTab = ({ config }) => {
   const { token } = useAuth();
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingUsername, setPendingUsername] = useState('');
   const [reasonByUsername, setReasonByUsername] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   const counts = useMemo(() => users.reduce((acc, user) => {
     if (user.usertype === 'MODERATOR') {
@@ -38,11 +57,16 @@ function UserQueue() {
     return acc;
   }, { candidates: 0, moderators: 0, suspended: 0 }), [users]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (query = searchQuery) => {
     setError('');
     setIsLoading(true);
     try {
-      const result = await listAdminUsers({ token });
+      const result = await listAdminUsers({
+        token,
+        usertype: config.usertype,
+        query,
+        limit: 250,
+      });
       setUsers(result.users || []);
     } catch (err) {
       setError(err.message || 'Failed to load user queue.');
@@ -52,9 +76,19 @@ function UserQueue() {
   };
 
   useEffect(() => {
-    loadUsers();
+    if (!token) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      loadUsers(searchQuery);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token, config.usertype, searchQuery]);
 
   const reasonFor = (username) => reasonByUsername[username] || '';
 
@@ -66,9 +100,14 @@ function UserQueue() {
   };
 
   const updateUserInQueue = (updatedUser) => {
-    setUsers((current) => current.map((user) => (
-      user.username === updatedUser.username ? updatedUser : user
-    )));
+    setUsers((current) => {
+      if (!userMatchesTab(updatedUser, config.usertype)) {
+        return current.filter((user) => user.username !== updatedUser.username);
+      }
+      return current.map((user) => (
+        user.username === updatedUser.username ? updatedUser : user
+      ));
+    });
   };
 
   const runUserAction = async (username, action) => {
@@ -94,50 +133,52 @@ function UserQueue() {
   };
 
   return (
-    <section className="p-6 bg-primary-background shadow-md rounded-lg text-white">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-primary-pink">
-            Moderator governance
-          </p>
-          <h1 className="mt-2 text-2xl font-bold">User Queue</h1>
-          <p className="mt-2 max-w-3xl text-sm text-gray-300">
-            Review all users, see who is approved as a moderator, and perform
-            baseline moderator promotion or suspension actions.
-          </p>
+    <div className="grid gap-5">
+      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+        <label htmlFor={`user-queue-search-${config.usertype}`} className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
+          Search users
+        </label>
+        <div className="relative">
+          <input
+            id={`user-queue-search-${config.usertype}`}
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={config.searchPlaceholder}
+            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+          />
+          {isLoading && (
+            <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
+          )}
         </div>
-        <button
-          type="button"
-          onClick={loadUsers}
-          disabled={isLoading}
-          className="rounded-md bg-primary-pink px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isLoading ? 'Refreshing...' : 'Refresh Queue'}
-        </button>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {config.usertype === 'REGULAR' && (
         <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
-          <p className="text-xs uppercase tracking-wide text-gray-400">Candidates</p>
+          <p className="text-xs uppercase tracking-wide text-gray-400">Non-moderator users</p>
           <p className="mt-1 text-2xl font-bold">{counts.candidates}</p>
         </div>
-        <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
-          <p className="text-xs uppercase tracking-wide text-gray-400">Moderators</p>
-          <p className="mt-1 text-2xl font-bold">{counts.moderators}</p>
+      )}
+      {config.usertype === 'MODERATOR' && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-400">Moderators</p>
+            <p className="mt-1 text-2xl font-bold">{counts.moderators}</p>
+          </div>
+          <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-400">Suspended</p>
+            <p className="mt-1 text-2xl font-bold">{counts.suspended}</p>
+          </div>
         </div>
-        <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
-          <p className="text-xs uppercase tracking-wide text-gray-400">Suspended</p>
-          <p className="mt-1 text-2xl font-bold">{counts.suspended}</p>
-        </div>
-      </div>
+      )}
 
       {error && (
-        <div className="mt-5 rounded-md bg-red-700 p-3 text-sm text-white">
+        <div className="rounded-md bg-red-700 p-3 text-sm text-white">
           {error}
         </div>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-gray-700">
+      <div className="overflow-x-auto rounded-lg border border-gray-700">
         <table className="min-w-full divide-y divide-gray-700 text-left text-sm">
           <thead className="bg-gray-900 text-xs uppercase tracking-wide text-gray-300">
             <tr>
@@ -228,12 +269,39 @@ function UserQueue() {
             {!isLoading && users.length === 0 && (
               <tr>
                 <td className="px-4 py-8 text-center text-gray-400" colSpan="5">
-                  No users found.
+                  {config.emptyMessage}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+};
+
+function UserQueue() {
+  const tabsData = userQueueTabs.map((tab) => ({
+    label: tab.label,
+    content: <UserQueueTab config={tab} />,
+  }));
+
+  return (
+    <section className="p-6 bg-primary-background shadow-md rounded-lg text-white">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-primary-pink">
+            Moderator governance
+          </p>
+          <h1 className="mt-2 text-2xl font-bold">User Queue</h1>
+          <p className="mt-2 max-w-3xl text-sm text-gray-300">
+            Review users by moderator status and perform baseline moderator promotion or suspension actions.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <SiteTabs tabs={tabsData} defaultTab="Non-Moderators" />
       </div>
     </section>
   );
