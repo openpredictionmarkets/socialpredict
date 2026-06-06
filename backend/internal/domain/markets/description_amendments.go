@@ -97,7 +97,8 @@ func (s *Service) ProposeMarketDescriptionAmendment(ctx context.Context, marketI
 	if err != nil {
 		return nil, err
 	}
-	if !marketAllowsDescriptionAmendmentProposal(market) {
+	now := s.clock.Now()
+	if !marketAllowsDescriptionAmendmentProposal(market, now) {
 		return nil, ErrInvalidState
 	}
 	if !market.StewardedBy(actorUsername) {
@@ -111,7 +112,6 @@ func (s *Service) ProposeMarketDescriptionAmendment(ctx context.Context, marketI
 	if err != nil {
 		return nil, err
 	}
-	now := s.clock.Now()
 	return repo.CreateMarketDescriptionAmendment(ctx, MarketDescriptionAmendment{
 		MarketID:     marketID,
 		Body:         body,
@@ -277,8 +277,11 @@ func validateDescriptionAmendmentInput(req MarketDescriptionAmendmentRequest) (s
 	return body, format, reason, nil
 }
 
-func marketAllowsDescriptionAmendmentProposal(market *Market) bool {
+func marketAllowsDescriptionAmendmentProposal(market *Market, now time.Time) bool {
 	if market == nil || market.IsResolved() {
+		return false
+	}
+	if !market.ResolutionDateTime.IsZero() && !now.Before(market.ResolutionDateTime) {
 		return false
 	}
 	switch NormalizeLifecycleStatus(market.LifecycleStatus) {

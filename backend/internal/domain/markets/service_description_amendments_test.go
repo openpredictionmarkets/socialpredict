@@ -18,6 +18,10 @@ func activeModeratorUser(username string) *dusers.PublicUser {
 }
 
 func seedAmendmentMarket(t *testing.T, dbUser string) (*rmarkets.GormRepository, *markets.Market) {
+	return seedAmendmentMarketClosingAt(t, dbUser, time.Now().Add(24*time.Hour))
+}
+
+func seedAmendmentMarketClosingAt(t *testing.T, dbUser string, closesAt time.Time) (*rmarkets.GormRepository, *markets.Market) {
 	t.Helper()
 	db := modelstesting.NewFakeDB(t)
 	user := modelstesting.GenerateUser(dbUser, 1000)
@@ -31,7 +35,7 @@ func seedAmendmentMarket(t *testing.T, dbUser string) (*rmarkets.GormRepository,
 	seed.Description = "Original description"
 	seed.StewardUsername = dbUser
 	seed.LifecycleStatus = markets.MarketLifecyclePublished
-	seed.ResolutionDateTime = time.Now().Add(24 * time.Hour)
+	seed.ResolutionDateTime = closesAt
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed market: %v", err)
 	}
@@ -111,6 +115,22 @@ func TestProposeMarketDescriptionAmendmentAllowsReassignedStewardNotOriginalCrea
 	}
 	if amendment.CreatedBy != "steward" {
 		t.Fatalf("amendment creator = %q, want steward", amendment.CreatedBy)
+	}
+}
+
+func TestProposeMarketDescriptionAmendmentRejectsClosedMarket(t *testing.T) {
+	now := marketsTestTime()
+	repo, original := seedAmendmentMarketClosingAt(t, "moderator", now.Add(-time.Minute))
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return activeModeratorUser(username), nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{GameMode: "moderator"})
+
+	_, err := service.ProposeMarketDescriptionAmendment(context.Background(), original.ID, "moderator", markets.MarketDescriptionAmendmentRequest{Body: "Too late."})
+	if !errors.Is(err, markets.ErrInvalidState) {
+		t.Fatalf("closed market proposal error = %v, want ErrInvalidState", err)
 	}
 }
 
