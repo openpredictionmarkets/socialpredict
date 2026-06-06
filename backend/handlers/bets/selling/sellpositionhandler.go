@@ -62,8 +62,19 @@ func toSellRequest(req dto.SellBetRequest, username string) bets.SellRequest {
 }
 
 func handleSellError(w http.ResponseWriter, err error) {
-	if _, ok := err.(bets.ErrDustCapExceeded); ok {
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonDustCapExceeded)
+	var dustErr bets.ErrDustCapExceeded
+	if errors.As(err, &dustErr) {
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusUnprocessableEntity,
+			handlers.ReasonDustCapExceeded,
+			"Sale would create too much dust. Dust is the small rounding remainder retained by the market when sale proceeds are rounded to whole shares. Submit a different credit amount and try again.",
+			map[string]any{
+				"dust":    dustErr.Requested,
+				"maxDust": dustErr.Cap,
+				"hint":    "Try lowering or adjusting the requested credit amount so the rounding dust is within the configured cap.",
+			},
+		)
 		return
 	}
 

@@ -198,6 +198,38 @@ func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 	}
 }
 
+func TestSellPositionHandler_DustCapExceededIncludesUserGuidance(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{err: bets.ErrDustCapExceeded{Cap: 2, Requested: 3}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 1, Amount: 10, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellPositionHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonDustCapExceeded) {
+		t.Fatalf("expected dust cap reason, got %q", resp.Reason)
+	}
+	if resp.Message == "" {
+		t.Fatalf("expected user-facing guidance message")
+	}
+	if resp.Details["dust"] != float64(3) || resp.Details["maxDust"] != float64(2) {
+		t.Fatalf("expected dust details, got %+v", resp.Details)
+	}
+}
+
 func TestSellPositionHandler_InvalidJSON(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 	svc := &fakeSellService{}

@@ -16,6 +16,23 @@ const unwrapApiResponse = (payload) => {
     return payload;
 };
 
+const formatApiError = (errorData, fallback) => {
+    if (!errorData || typeof errorData !== 'object') {
+        return fallback;
+    }
+
+    if (errorData.reason === 'DUST_CAP_EXCEEDED') {
+        const dust = errorData.details?.dust;
+        const maxDust = errorData.details?.maxDust;
+        const suffix = dust !== undefined && maxDust !== undefined
+            ? ` This sale would create ${dust} dust, but the maximum allowed is ${maxDust}.`
+            : '';
+        return `${errorData.message || 'Sale would create too much rounding dust.'}${suffix} Try a different requested credit amount.`;
+    }
+
+    return errorData.message || errorData.reason || errorData.error || fallback;
+};
+
 export const submitBet = (betData, token, onSuccess, onError) => {
 
     if (!token) {
@@ -54,7 +71,7 @@ export const submitBet = (betData, token, onSuccess, onError) => {
                 let errorMessage;
                 try {
                     const errorData = JSON.parse(text);
-                    errorMessage = errorData.reason || errorData.message || errorData.error || text;
+                    errorMessage = formatApiError(errorData, text);
                 } catch {
                     errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
                 }
@@ -121,7 +138,7 @@ export const submitSale = (saleData, token, onSuccess, onError) => {
                 let errorMessage;
                 try {
                     const errorData = JSON.parse(text);
-                    errorMessage = errorData.reason || errorData.message || errorData.error || text;
+                    errorMessage = formatApiError(errorData, text);
                 } catch {
                     errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
                 }

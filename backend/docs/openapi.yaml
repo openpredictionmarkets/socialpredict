@@ -1715,7 +1715,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '422':
-          description: No position, insufficient shares, or dust cap exceeded.
+          description: No position, insufficient shares, or dust cap exceeded. Dust cap responses include a message and details with dust and maxDust.
           content:
             application/json:
               schema:
@@ -3842,6 +3842,13 @@ components:
             - DUST_CAP_EXCEEDED
             - INTERNAL_ERROR
           example: VALIDATION_FAILED
+        message:
+          type: string
+          description: Optional human-readable guidance for failures that need user-facing context.
+        details:
+          type: object
+          description: Optional structured context for actionable failures, such as dust and maxDust on DUST_CAP_EXCEEDED.
+          additionalProperties: true
       required: [ok, reason]
 
     PlainTextErrorResponse:

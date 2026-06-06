@@ -418,11 +418,18 @@ func TestSaleCalculator_Calculate(t *testing.T) {
 		wantDustCapErr bool
 	}{
 		{
-			name:        "successful sale",
+			name:        "successful sale at dust cap",
 			position:    pos,
 			sharesOwned: 10,
 			requested:   23,
 			want:        SaleQuote{SharesToSell: 2, SaleValue: 20, Dust: 3},
+		},
+		{
+			name:        "successful sale below dust cap",
+			position:    pos,
+			sharesOwned: 10,
+			requested:   32,
+			want:        SaleQuote{SharesToSell: 3, SaleValue: 30, Dust: 2},
 		},
 		{
 			name:        "request too small",

@@ -483,6 +483,31 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	}
 }
 
+func TestServiceSell_DustAtCapCreditsSaleValueAndStoresDust(t *testing.T) {
+	now := serviceTestTime()
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(2),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, YesSharesOwned: 10, Value: 100}),
+		withFixtureUser(&dusers.User{Username: "alice"}),
+	)
+
+	res, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 32, Outcome: "YES"})
+	if err != nil {
+		t.Fatalf("Sell returned error: %v", err)
+	}
+	if res.SharesSold != 3 || res.SaleValue != 30 || res.Dust != 2 {
+		t.Fatalf("unexpected sell result: %+v", res)
+	}
+	if fixture.repo.created == nil || fixture.repo.created.Amount != -3 || fixture.repo.created.Dust != 2 {
+		t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
+	}
+	if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != 30 {
+		t.Fatalf("unexpected user transaction: %+v", fixture.users.calls)
+	}
+}
+
 func TestServiceSell_NoPosition(t *testing.T) {
 	now := serviceTestTime()
 	_, svc := newServiceFixture(
