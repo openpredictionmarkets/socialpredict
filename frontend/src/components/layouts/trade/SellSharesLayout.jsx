@@ -19,7 +19,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
-    const showFeeSection = !isLoading && feeData;
+    const showFeeSection = !isLoading && Number(feeData?.sellSharesFee) > 0;
     const maxSaleCredits = Math.max(0, Number(shares.value) || 0);
 
     useEffect(() => {
@@ -256,13 +256,9 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 <>
                 <div className="border-t border-gray-200 my-2"></div>
                 <div className="mb-4">
-                    {feeData.sellSharesFee === 0 ? (
-                        <p className="text-sm text-gray-300">No fees</p>
-                    ) : (
-                        <p className="text-sm text-gray-300">
-                            Trading Fee (Selling Share): {feeData.sellSharesFee}
-                        </p>
-                    )}
+                    <p className="text-sm text-gray-300">
+                        Trading Fee (Selling Share): {feeData.sellSharesFee}
+                    </p>
                 </div>
                 </>
             )}
