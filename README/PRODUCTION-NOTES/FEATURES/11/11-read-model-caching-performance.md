@@ -30,7 +30,7 @@ Some data is order-critical and must be read from the canonical current state at
 The key product distinction is:
 
 ```text
-Order calculations and settlement = canonical, non-stale, transaction-safe reads
+Transaction-time decisions = canonical, non-stale, transaction-safe reads
 Display, discovery, statistics, and leaderboards = cacheable read models
 ```
 
@@ -40,7 +40,9 @@ Caching should reduce load, not hide correctness problems.
 
 Do not use stale cache values to decide whether a trade, sale, refund, resolution, or payout is valid.
 
-Order-critical paths must continue to use canonical tables and transaction-safe services.
+Transaction paths are never cache-driven. Any operation that can create, mutate,
+or settle user credits must continue to use canonical tables and
+transaction-safe services at transaction time.
 
 Examples:
 
@@ -51,6 +53,10 @@ Examples:
 - resolving/yanking/cancelling a market
 - final payout/refund execution
 - any logic that can create or destroy user credits
+
+This applies even if a nearby display widget is cached. A cached probability,
+volume, leaderboard, or market card can help users browse, but it cannot decide
+whether a transaction succeeds.
 
 ## Critical Decision Matrix
 
@@ -66,16 +72,15 @@ The following table defines which decisions are transaction-critical and which a
 | Market resolution payout | Yes | Do not use display cache. Use canonical payout/read model explicitly approved for settlement. | Final settlement moves credits and must conserve money. |
 | Market cancellation/yank refund | Yes | Do not use display cache. Use canonical bet/user state. | Refunds can move credits across many users. |
 | Admin mutation actions | Yes | Read fresh before mutating. | Approval/rejection/stewardship/tag changes alter governance state. |
-| System financial metrics display | No | Cacheable snapshot with freshness metadata. | Informational dashboard; does not execute orders. |
-| Global leaderboard display | No | Cacheable snapshot, paginate. | Ranking is display-oriented and can tolerate short staleness. |
-| Market leaderboard display | No | Cacheable snapshot, paginate. | Informational market widget; does not execute orders. |
-| `/markets` discovery page | No | Cacheable card/read-model payload. | Browsing page can tolerate short staleness. |
-| `/markets/topic/:slug` page | No | Cacheable topic/card/read-model payload. | Browsing page can tolerate short staleness. |
-| Pinned market chart cards | No | Cacheable compact chart snapshot. | Discovery display, not transaction execution. |
-| Individual market probability display | No, unless used for order execution | Cache briefly for display; order confirmation must use canonical path. | Users need reasonably fresh UI, but the displayed value should not settle trades. |
-| Individual market volume/user count display | No | Cache briefly with freshness metadata. | Informational display only. |
-| Market bet table display | No | Paginate and optionally cache first page briefly. | Users are reading history, not executing from the table. |
-| Market comments display | No | Paginate and optionally cache briefly. | Not settlement-critical. |
+| System financial metrics display | No | Cacheable snapshot, roughly hourly. | Informational dashboard; does not execute orders. |
+| Global leaderboard display | No | Cacheable snapshot, roughly hourly; paginate. | Ranking is display-oriented and changes less urgently. |
+| Market leaderboard display | No | Cacheable snapshot, roughly 10 minutes; paginate. | Informational market widget; does not execute orders. |
+| `/markets` discovery page | No | Cacheable page/card read model, roughly 10 minutes. | High-visibility browsing page can tolerate page-level staleness. |
+| `/markets/topic/:slug` page | No | Cacheable topic/card read model, roughly 10 minutes. | High-visibility browsing page can tolerate page-level staleness. |
+| Pinned market chart cards | No | Cacheable compact chart snapshot, roughly 10 minutes. | Discovery display, not transaction execution. |
+| Individual market probability display | No, unless used for order execution | Cache briefly for display, roughly 1 minute; order confirmation must use canonical path. | Users need fresher UI on a market page, but displayed value should not settle trades. |
+| Individual market volume/user count display | No | Cache briefly, roughly 1 minute, with freshness metadata. | Informational display only. |
+| Market bet table display | No | Paginate; do not cache, or at most poll/refresh around 10 seconds. | Users should see their accepted bet appear quickly after transaction success. |
 
 ## Cacheable Display Candidates
 
@@ -83,25 +88,65 @@ These are good early candidates because they are read-heavy and not directly res
 
 | Area | Candidate data | Suggested freshness |
 |---|---|---:|
-| System statistics | financial metrics, active volume, user counts, market counts | 30s-5m |
-| Global leaderboard | user ranking, profit summaries, resolved market counts | 1m-15m |
-| Market leaderboard | per-market participant ranking | 30s-5m |
-| Market cards | title, status, probability, volume, users, tags, steward, close time | 10s-60s |
-| `/markets` page | discovery cards, pinned market summaries, topic navigation payloads | 10s-60s |
-| `/markets/topic/:slug` page | filtered topic cards and pinned topic markets | 10s-60s |
-| Pinned charts | compact probability history snapshots | 10s-60s |
-| Bet table display | paginated recent bets, first page only by default | 5s-30s |
-| Comment table display | paginated comments | 5s-60s |
+| System statistics | financial metrics, active volume, user counts, market counts | about 1h |
+| Global leaderboard | user ranking, profit summaries, resolved market counts | about 1h |
+| Market leaderboard | per-market participant ranking | about 10m |
+| Market cards | title, status, probability, volume, users, tags, steward, close time | about 10m |
+| `/markets` page | discovery cards, pinned market summaries, topic navigation payloads | about 10m |
+| `/markets/topic/:slug` page | filtered topic cards and pinned topic markets | about 10m |
+| Pinned charts | compact probability history snapshots | about 10m |
+| Individual market widgets | probability, volume, user count, compact summary metrics | about 1m |
+| Bet table display | paginated recent bets, first page only by default | not cached; refresh/poll around 10s if needed |
 
 ## Less Cacheable Or Non-Cacheable Paths
 
 | Area | Position |
 |---|---|
 | Confirm buy/sell order | Do not cache for decision-making. |
-| Sale quote | Can be preview-only but should be treated as informational; final sale recalculates. |
+| Sale quote | Preview-only and informational; final sale recalculates. |
 | User balance | Avoid stale values for transaction decisions; display can poll or show last refreshed timestamp. |
 | Final payout | Do not use display cache as payout truth. |
 | Admin mutation actions | Read fresh before mutating. |
+
+## API Shape Recommendation
+
+Prefer separate API boundaries for canonical transaction paths and cached display paths.
+
+Transaction endpoints should remain canonical and never cache-driven:
+
+```text
+POST /v0/bet
+POST /v0/sell
+POST /v0/markets/{id}/resolve
+admin mutation endpoints
+```
+
+Display/read-model endpoints can be cache-backed and should expose freshness
+metadata:
+
+```text
+GET /v0/read/markets
+GET /v0/read/markets/topic/{slug}
+GET /v0/read/markets/{id}/summary
+GET /v0/read/markets/{id}/leaderboard
+GET /v0/read/system/metrics
+GET /v0/read/leaderboard
+```
+
+The exact route names are placeholders. The important design rule is that cached
+read endpoints are visibly separate from transaction endpoints. If existing
+routes are reused for display, handlers should still call explicit read-model
+services rather than sharing transaction services implicitly.
+
+Every cache-backed response should be able to include freshness metadata:
+
+```json
+{
+  "generatedAt": "2026-06-07T00:00:00Z",
+  "cacheTtlSeconds": 600,
+  "source": "read_model"
+}
+```
 
 ## Redis And Postgres Roles
 

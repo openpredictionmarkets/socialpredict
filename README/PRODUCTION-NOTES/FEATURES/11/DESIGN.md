@@ -17,6 +17,9 @@ Caching should be applied to read models, not to order truth.
 
 The design should preserve raw tables as the source of truth while creating explicit read-model seams for expensive displays. Cached values can be stale for browsing and dashboards, but must not decide user credits, order execution, or final settlement.
 
+Transaction-time anything is canonical. Display-time anything can be considered
+for caching if it cannot create, mutate, or settle user credits.
+
 ## Design Inputs
 
 Primary inputs:
@@ -45,10 +48,12 @@ Primary inputs:
 
 | Classification | Examples | Cache policy |
 |---|---|---|
-| Transaction-critical | buy, sell, dust settlement, user balance mutation, resolution payout | Never use stale cache for decision-making. |
-| Near-real-time display | market detail probability, volume, recent bets, individual market leaderboard | Short TTL or snapshot with freshness metadata. |
-| Discovery display | `/markets`, topic pages, pinned cards, compact charts | Cacheable with short TTL. |
-| Dashboard analytics | system metrics, global leaderboard | Cacheable with medium TTL or scheduled refresh. |
+| Transaction-critical | buy, sell, dust settlement, user balance mutation, resolution payout, cancellation/yank refund, admin mutation | Never use stale cache for decision-making. |
+| Market-page display | market detail probability, volume, user count, compact widgets | Cache around 1 minute with freshness metadata. |
+| Market bet table display | recent bets | Paginate; do not cache, or refresh/poll around 10 seconds so accepted bets appear quickly. |
+| Discovery display | `/markets`, topic pages, pinned cards, compact charts | Cache around 10 minutes. |
+| Market leaderboard display | participant ranking for one market | Cache around 10 minutes and paginate. |
+| Dashboard analytics | system metrics, global leaderboard | Cache around 1 hour or scheduled refresh; paginate leaderboard. |
 | Audit/reconciliation | raw bets, migrations, payout verification | Recompute from source of truth. |
 
 ## Postgres Read Models
@@ -115,6 +120,48 @@ Avoid Redis for:
 - final payout truth
 - any write transaction that needs canonical data
 
+## Endpoint Boundary
+
+Prefer explicit separation between transaction endpoints and cache-backed display
+endpoints.
+
+Transaction endpoints should be canonical and never cache-driven:
+
+```text
+POST /v0/bet
+POST /v0/sell
+POST /v0/markets/{id}/resolve
+admin mutation endpoints
+```
+
+Display/read-model endpoints may be cache-backed:
+
+```text
+GET /v0/read/markets
+GET /v0/read/markets/topic/{slug}
+GET /v0/read/markets/{id}/summary
+GET /v0/read/markets/{id}/leaderboard
+GET /v0/read/system/metrics
+GET /v0/read/leaderboard
+```
+
+The exact URL shape can change during implementation. The architectural rule is
+more important than the names: display read models must not be accidentally
+reused by transaction code.
+
+## Freshness Tiers
+
+Baseline TTL/freshness classes:
+
+| Tier | Data | Target freshness |
+|---|---|---:|
+| Transaction | buy/sell/dust/balance/resolution/refund/admin mutations | never cached |
+| Fast display refresh | market bet table first page | not cached; refresh/poll around 10s |
+| Market detail widgets | probability, volume, user count, compact summary | about 1m |
+| Page-level discovery | `/markets`, topic pages, pinned chart cards, market cards | about 10m |
+| Leaderboard snapshots | market leaderboards | about 10m |
+| Slow dashboard snapshots | system financial metrics, global leaderboard | about 1h |
+
 ## Invalidation And Freshness
 
 Recommended baseline policies:
@@ -125,7 +172,7 @@ Recommended baseline policies:
 | Market approval/rejection/resolution | Invalidate market card, detail, topic, and admin queue caches. |
 | Tag/CMS layout update | Invalidate discovery and topic page caches. |
 | User profile or leaderboard-affecting event | Invalidate user/global leaderboard caches. |
-| Scheduled refresh | Rebuild system metrics and leaderboard snapshots periodically. |
+| Scheduled refresh | Rebuild system metrics and global leaderboard snapshots periodically, roughly hourly. |
 
 Use freshness metadata in responses where staleness may be visible:
 
@@ -144,7 +191,6 @@ Caching alone is not enough. Heavy lists should also be paginated or hidden behi
 Recommended display changes:
 
 - market page bets table defaults to latest 10 rows
-- comments become the first lightweight tab where appropriate
 - positions and leaderboard widgets are paginated
 - global leaderboard is paginated
 - system financial metrics show a simplified summary first

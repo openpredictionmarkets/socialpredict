@@ -18,6 +18,7 @@ This plan turns [11-read-model-caching-performance.md](./11-read-model-caching-p
 ## Planning Principles
 
 - Do not use stale cache for order execution or settlement.
+- Treat transaction-time anything as never cache-driven.
 - Raw tables remain the audit source of truth.
 - Read models must be testable against raw recomputation.
 - Prefer pagination and simpler displays before broad caching.
@@ -69,6 +70,7 @@ Checklist:
 - [ ] Add cached/read-model path for `/markets` card payloads.
 - [ ] Add cached/read-model path for `/markets/topic/:slug` card payloads.
 - [ ] Cache compact pinned chart payloads.
+- [ ] Use a target freshness of about 10 minutes for page-level discovery/pinned-card payloads.
 - [ ] Include freshness metadata where appropriate.
 - [ ] Invalidate discovery caches on tag/CMS layout changes.
 - [ ] Invalidate market card caches on bet/sale/status changes.
@@ -82,6 +84,9 @@ Checklist:
 - [ ] Add system metrics snapshot read model.
 - [ ] Add global leaderboard snapshot read model.
 - [ ] Add market leaderboard snapshot read model.
+- [ ] Use a target freshness of about 1 hour for system financial metrics.
+- [ ] Use a target freshness of about 1 hour for global leaderboard snapshots.
+- [ ] Use a target freshness of about 10 minutes for market leaderboard snapshots.
 - [ ] Add scheduled or on-demand refresh service.
 - [ ] Add tests comparing snapshot outputs to raw recomputation.
 - [ ] Add pagination to global and market leaderboard responses.
@@ -94,12 +99,24 @@ Checklist:
 
 - [ ] Keep transaction actions canonical and fresh.
 - [ ] Add pagination for market bets table, default latest 10.
-- [ ] Add pagination for comments if needed.
-- [ ] Cache or snapshot non-transactional market detail widgets briefly.
+- [ ] Keep market bets table uncached; optionally refresh/poll around 10 seconds after accepted transactions.
+- [ ] Cache or snapshot non-transactional market detail widgets around 1 minute.
 - [ ] Keep sale/buy confirmation responses authoritative.
 - [ ] Add UI freshness copy for cached widgets if useful.
 
-## 07. Optional Redis Layer
+## 07. Endpoint Boundary
+
+Service ownership: API boundary.
+
+Checklist:
+
+- [ ] Identify canonical transaction endpoints that must never read from display caches.
+- [ ] Identify cache-backed display/read-model endpoints.
+- [ ] Decide whether to introduce explicit `/v0/read/...` routes or route existing display handlers through explicit read-model services.
+- [ ] Add freshness metadata to cache-backed display responses.
+- [ ] Add API tests proving transaction endpoints do not call read-model cache services.
+
+## 08. Optional Redis Layer
 
 Service ownership: infrastructure and API boundary.
 
@@ -112,7 +129,7 @@ Checklist:
 - [ ] Add integration tests with fake/in-memory cache where practical.
 - [ ] Document production deployment requirements if Redis becomes required.
 
-## 08. Verification And Load Testing
+## 09. Verification And Load Testing
 
 Service ownership: testing boundary.
 
