@@ -88,6 +88,65 @@ the source of payout truth. Display fields should never be used as the canonical
 input to final payout. Instead, both display and payout should derive from the
 same underlying accounting snapshot.
 
+## Complexity Summary
+
+The full graph is not `O(1)`. Exact recomputation from the market bet vector is
+generally `O(n)`, where `n` is the number of historical bets on the market.
+
+| Flow | Complexity | Reason |
+|---|---:|---|
+| WPAM probability history | `O(n)` | Walks the ordered market bet vector to produce probability changes. |
+| DBPM share path | `O(n)` | Walks bets and probability history for pool shares, course payouts, scaling, and aggregation. |
+| Plain net volume | `O(n)` | Sums bet amounts. |
+| Market dust derivation | `O(n)` | Walks historical sell rows. |
+| VolumeWithDust | `O(n)` | Combines net volume and derived dust. |
+| User position calculation | `O(n)` | Derived from market bet history and probability history. |
+| Final payout positions | `O(n)` | Derived from the position/payout pipeline. |
+| Transaction-time sale dust calculation | `O(1)` | Direct integer arithmetic once the current user position has already been loaded. |
+
+The important distinction is:
+
+```text
+Full market accounting recomputation = O(n)
+Sale dust arithmetic after position load = O(1)
+```
+
+Could the entire flow become `O(1)`? Not for exact recomputation from raw bet
+history. If the system starts from only a raw bet vector, it must inspect the
+relevant historical bets to derive probability history, positions, volume, dust,
+and final payouts.
+
+However, request-time reads can be made effectively `O(1)` by maintaining
+materialized accounting state as bets are written. That changes the cost model:
+
+| Approach | Read cost | Write cost | Tradeoff |
+|---|---:|---:|---|
+| Recompute from raw bets | `O(n)` | Simple append | Simple and auditable, but slower as history grows. |
+| Materialized market accounting snapshot | `O(1)` | More complex transactional update | Fast reads, but requires correctness guarantees around snapshot updates. |
+| Periodic cached snapshot plus tail replay | `O(k)` | Moderate | Replays only bets since the last snapshot; `k` is tail length. |
+
+A future materialized snapshot might track:
+
+```text
+MarketAccountingSnapshot {
+  marketID
+  lastProcessedBetID
+  yesContributions
+  noContributions
+  currentProbability
+  netBetVolume
+  marketDust
+  volumeWithDust
+  userPositions
+}
+```
+
+That would not make the math intrinsically `O(1)` from raw history, but it could
+make normal API reads `O(1)` by shifting work to the transaction that records each
+new bet or sale. Because this is accounting-sensitive, any such optimization
+should preserve raw bet history as the audit source of truth and include tests
+that compare snapshot-derived results to full recomputation.
+
 ## Dust, Probability, And Human Preference
 
 Dust is user-originated capital, but it is not directional user intent.
