@@ -33,3 +33,29 @@ func (s *Service) RefreshUserFinancialMetricSnapshot(ctx context.Context, req Fi
 	}
 	return &snapshot, nil
 }
+
+// GetUserFinancialMetricReadModel returns a stored authenticated display
+// snapshot with freshness metadata. A missing snapshot is not an error.
+func (s *Service) GetUserFinancialMetricReadModel(ctx context.Context, username string) (*UserFinancialMetricReadModel, error) {
+	if username == "" {
+		return nil, errors.New("username is required")
+	}
+
+	snapshotRepo, ok := s.repo.(UserFinancialMetricSnapshotRepository)
+	if !ok {
+		return nil, errors.New("user financial metric snapshot repository not provided")
+	}
+
+	snapshot, err := snapshotRepo.GetUserFinancialMetricSnapshot(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot == nil {
+		return nil, nil
+	}
+
+	return &UserFinancialMetricReadModel{
+		Snapshot:  *snapshot,
+		Freshness: snapshot.Freshness(),
+	}, nil
+}

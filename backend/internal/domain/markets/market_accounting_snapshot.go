@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"socialpredict/internal/domain/boundary"
+	"socialpredict/internal/domain/readmodels"
 )
 
 // MarketAccountingSnapshot is a display/read-model snapshot. It must not be
@@ -22,6 +23,18 @@ type MarketAccountingSnapshot struct {
 	LastProcessedBetAt  time.Time
 	Source              string
 	TransactionSafeRead bool
+}
+
+const MarketAccountingSnapshotTargetFreshness = time.Minute
+
+// Freshness returns display metadata for this market accounting read model.
+func (s MarketAccountingSnapshot) Freshness() readmodels.Freshness {
+	return readmodels.NewFreshness(
+		s.GeneratedAt,
+		s.Source,
+		MarketAccountingSnapshotTargetFreshness,
+		s.TransactionSafeRead,
+	)
 }
 
 type MarketAccountingSnapshotCalculator struct {

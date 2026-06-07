@@ -215,6 +215,12 @@ Use freshness metadata in responses where staleness may be visible:
 }
 ```
 
+Implementation note:
+
+- Market accounting snapshots and user financial metric snapshots expose a shared freshness metadata contract.
+- Existing public display handlers should only add this metadata through explicit display/read-model wiring.
+- Existing transaction endpoints and transaction service interfaces must not consume this metadata.
+
 ## Pagination And Display Simplification
 
 Caching alone is not enough. Heavy lists should also be paginated or hidden behind explicit user actions.

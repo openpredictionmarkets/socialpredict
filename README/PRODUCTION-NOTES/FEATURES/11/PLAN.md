@@ -47,6 +47,7 @@ Checklist:
 - [x] Add raw recomputation calculator for the snapshot.
 - [x] Add tests proving snapshot fields match raw recomputation.
 - [x] Keep display dust in the read model while preserving canonical transaction-time sale dust calculation.
+- [x] Expose explicit market accounting freshness metadata.
 - [x] Add boundary tests proving transaction repository interfaces do not expose snapshot methods.
 - [ ] Decide whether historical dust remains simple retained-dust convention or exact replay.
 - [ ] Ensure snapshot code does not affect order execution.
@@ -105,6 +106,7 @@ Checklist:
 - [x] Define authenticated read-model shape for user financial snapshots.
 - [x] Add durable snapshot persistence if the display path is expensive enough.
 - [x] Add on-demand user financial snapshot refresh service.
+- [x] Add freshness metadata to user financial read-model retrieval.
 - [ ] Add freshness metadata to user financial display responses.
 - [ ] Invalidate or mark stale user financial snapshots after user bet/sale/resolution payout/refund events.
 - [ ] Ensure user financial snapshots are never used for transaction decisions, spend checks, dust settlement, or payout/refund truth.
@@ -134,6 +136,7 @@ Checklist:
 - [ ] Identify canonical transaction endpoints that must never read from display caches.
 - [ ] Identify cache-backed display/read-model endpoints.
 - [ ] Decide whether to introduce explicit `/v0/read/...` routes or route existing display handlers through explicit read-model services.
+- [x] Add shared read-model freshness metadata contract.
 - [ ] Add freshness metadata to cache-backed display responses.
 - [x] Add domain boundary tests proving transaction interfaces do not expose read-model snapshot services.
 - [ ] Add API tests proving transaction endpoints do not call read-model cache services.

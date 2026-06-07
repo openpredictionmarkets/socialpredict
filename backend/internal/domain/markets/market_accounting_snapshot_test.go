@@ -64,6 +64,19 @@ func TestMarketAccountingSnapshotCalculatorMatchesRawRecomputation(t *testing.T)
 	if snapshot.TransactionSafeRead {
 		t.Fatalf("snapshot must not be marked transaction safe")
 	}
+	freshness := snapshot.Freshness()
+	if !freshness.GeneratedAt.Equal(now) {
+		t.Fatalf("freshness generated at = %s, want %s", freshness.GeneratedAt, now)
+	}
+	if freshness.Source != "read_model" {
+		t.Fatalf("freshness source = %q, want read_model", freshness.Source)
+	}
+	if freshness.TargetFreshnessSeconds != 60 {
+		t.Fatalf("freshness target = %d, want 60", freshness.TargetFreshnessSeconds)
+	}
+	if freshness.TransactionSafeRead {
+		t.Fatalf("market accounting freshness must not be transaction safe")
+	}
 	if len(snapshot.ProbabilityChanges) != len(expectedProbabilities) {
 		t.Fatalf("probability history length = %d, want %d", len(snapshot.ProbabilityChanges), len(expectedProbabilities))
 	}

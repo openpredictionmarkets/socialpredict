@@ -72,3 +72,52 @@ func TestServiceRefreshUserFinancialMetricSnapshotPersistsRawRecomputedSnapshot(
 		t.Fatalf("stored snapshot mismatch:\ngot  %+v\nwant %+v", stored, snapshot)
 	}
 }
+
+func TestServiceGetUserFinancialMetricReadModelReturnsStoredFreshness(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+	user := modelstesting.GenerateUser("financial_read_model_user", 500)
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	service := newAnalyticsService(t, db, econ)
+	generatedAt := time.Date(2026, 6, 7, 13, 0, 0, 0, time.UTC)
+	if _, err := service.RefreshUserFinancialMetricSnapshot(context.Background(), FinancialSnapshotRequest{
+		Username:       user.Username,
+		AccountBalance: user.AccountBalance,
+	}, generatedAt); err != nil {
+		t.Fatalf("refresh snapshot: %v", err)
+	}
+
+	readModel, err := service.GetUserFinancialMetricReadModel(context.Background(), user.Username)
+	if err != nil {
+		t.Fatalf("GetUserFinancialMetricReadModel returned error: %v", err)
+	}
+	if readModel == nil {
+		t.Fatalf("read model is nil")
+	}
+	if readModel.Snapshot.Username != user.Username {
+		t.Fatalf("snapshot username = %s, want %s", readModel.Snapshot.Username, user.Username)
+	}
+	if !readModel.Freshness.GeneratedAt.Equal(generatedAt) {
+		t.Fatalf("freshness generated at = %s, want %s", readModel.Freshness.GeneratedAt, generatedAt)
+	}
+	if readModel.Freshness.Source != "read_model" {
+		t.Fatalf("freshness source = %q, want read_model", readModel.Freshness.Source)
+	}
+	if readModel.Freshness.TargetFreshnessSeconds != 600 {
+		t.Fatalf("freshness target = %d, want 600", readModel.Freshness.TargetFreshnessSeconds)
+	}
+	if readModel.Freshness.TransactionSafeRead {
+		t.Fatalf("read-model freshness must not be transaction safe")
+	}
+
+	missing, err := service.GetUserFinancialMetricReadModel(context.Background(), "missing_user")
+	if err != nil {
+		t.Fatalf("missing read model returned error: %v", err)
+	}
+	if missing != nil {
+		t.Fatalf("missing read model = %+v, want nil", missing)
+	}
+}

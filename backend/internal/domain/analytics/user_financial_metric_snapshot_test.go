@@ -51,6 +51,19 @@ func TestUserFinancialMetricSnapshotCalculatorMatchesFinancialSnapshotMath(t *te
 	if snapshot.Source != "read_model" {
 		t.Fatalf("source = %q, want read_model", snapshot.Source)
 	}
+	freshness := snapshot.Freshness()
+	if !freshness.GeneratedAt.Equal(generatedAt) {
+		t.Fatalf("freshness generated at = %s, want %s", freshness.GeneratedAt, generatedAt)
+	}
+	if freshness.Source != "read_model" {
+		t.Fatalf("freshness source = %q, want read_model", freshness.Source)
+	}
+	if freshness.TargetFreshnessSeconds != 600 {
+		t.Fatalf("freshness target = %d, want 600", freshness.TargetFreshnessSeconds)
+	}
+	if freshness.TransactionSafeRead {
+		t.Fatalf("user financial freshness must not be transaction safe")
+	}
 
 	financial := snapshot.Financial
 	if financial.AccountBalance != 500 ||

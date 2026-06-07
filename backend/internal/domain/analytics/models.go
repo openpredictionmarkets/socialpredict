@@ -4,6 +4,7 @@ import (
 	"time"
 
 	positionsmath "socialpredict/internal/domain/math/positions"
+	"socialpredict/internal/domain/readmodels"
 )
 
 // UserAccount captures the user fields needed by analytics calculations.
@@ -89,6 +90,25 @@ type UserFinancialMetricSnapshot struct {
 	Financial           FinancialSnapshot
 	Source              string
 	TransactionSafeRead bool
+}
+
+const UserFinancialMetricSnapshotTargetFreshness = 10 * time.Minute
+
+// Freshness returns display metadata for this user financial read model.
+func (s UserFinancialMetricSnapshot) Freshness() readmodels.Freshness {
+	return readmodels.NewFreshness(
+		s.GeneratedAt,
+		s.Source,
+		UserFinancialMetricSnapshotTargetFreshness,
+		s.TransactionSafeRead,
+	)
+}
+
+// UserFinancialMetricReadModel wraps a snapshot with explicit freshness
+// metadata for future display endpoints.
+type UserFinancialMetricReadModel struct {
+	Snapshot  UserFinancialMetricSnapshot
+	Freshness readmodels.Freshness
 }
 
 func (s FinancialSnapshot) AccountBalanceValue() int64     { return s.AccountBalance }
