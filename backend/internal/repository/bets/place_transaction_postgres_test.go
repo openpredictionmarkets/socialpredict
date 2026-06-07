@@ -150,7 +150,6 @@ func TestGormRepositorySellBetTransactionPostgres(t *testing.T) {
 				Username: "seller",
 				MarketID: 301,
 				Amount:   -2,
-				Dust:     1,
 				Outcome:  "YES",
 				PlacedAt: time.Date(2026, time.May, 11, 22, 30, 0, 0, time.UTC),
 			})

@@ -122,15 +122,13 @@ func (p MarketPositions) Normalize() MarketPositions {
 
 // Bet represents a wager placed within a market.
 type Bet struct {
-	ID           uint
-	Username     string
-	MarketID     uint
-	Amount       int64
-	Dust         int64
-	DustRecorded bool
-	Outcome      string
-	PlacedAt     time.Time
-	CreatedAt    time.Time
+	ID        uint
+	Username  string
+	MarketID  uint
+	Amount    int64
+	Outcome   string
+	PlacedAt  time.Time
+	CreatedAt time.Time
 }
 
 func boundaryBetFromDomain(bet *Bet) boundary.Bet {
@@ -139,15 +137,13 @@ func boundaryBetFromDomain(bet *Bet) boundary.Bet {
 	}
 
 	return boundary.Bet{
-		ID:           bet.ID,
-		Username:     bet.Username,
-		MarketID:     bet.MarketID,
-		Amount:       bet.Amount,
-		Dust:         bet.Dust,
-		DustRecorded: bet.DustRecorded,
-		Outcome:      bet.Outcome,
-		PlacedAt:     bet.PlacedAt,
-		CreatedAt:    bet.CreatedAt,
+		ID:        bet.ID,
+		Username:  bet.Username,
+		MarketID:  bet.MarketID,
+		Amount:    bet.Amount,
+		Outcome:   bet.Outcome,
+		PlacedAt:  bet.PlacedAt,
+		CreatedAt: bet.CreatedAt,
 	}
 }
 

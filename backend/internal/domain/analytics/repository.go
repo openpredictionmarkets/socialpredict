@@ -118,7 +118,7 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) (
 	}
 	var bets []analyticsBetRow
 	if err := db.Table("bets").
-		Select("id, username, market_id, amount, dust, (dust IS NOT NULL) AS dust_recorded, outcome, placed_at, created_at").
+		Select("id, username, market_id, amount, outcome, placed_at, created_at").
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC").
 		Find(&bets).Error; err != nil {
@@ -134,7 +134,7 @@ func (r *GormRepository) ListBetsOrdered(ctx context.Context) ([]boundary.Bet, e
 	}
 	var bets []analyticsBetRow
 	if err := db.Table("bets").
-		Select("id, username, market_id, amount, dust, (dust IS NOT NULL) AS dust_recorded, outcome, placed_at, created_at").
+		Select("id, username, market_id, amount, outcome, placed_at, created_at").
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
@@ -184,7 +184,7 @@ func (r *GormRepository) UserMarketPositions(ctx context.Context, username strin
 func (r *GormRepository) listUserBets(db *gorm.DB, username string) ([]boundary.Bet, error) {
 	var userBets []analyticsBetRow
 	if err := db.Table("bets").
-		Select("id, username, market_id, amount, dust, (dust IS NOT NULL) AS dust_recorded, outcome, placed_at, created_at").
+		Select("id, username, market_id, amount, outcome, placed_at, created_at").
 		Where("username = ?", username).
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&userBets).Error; err != nil {
@@ -235,7 +235,7 @@ func (r *GormRepository) listBetsByMarketIDs(db *gorm.DB, marketIDs []uint) ([]b
 	}
 	var allBets []analyticsBetRow
 	if err := db.Table("bets").
-		Select("id, username, market_id, amount, dust, (dust IS NOT NULL) AS dust_recorded, outcome, placed_at, created_at").
+		Select("id, username, market_id, amount, outcome, placed_at, created_at").
 		Where("market_id IN ?", marketIDs).
 		Order("market_id ASC, placed_at ASC, id ASC").
 		Find(&allBets).Error; err != nil {
@@ -302,15 +302,13 @@ type analyticsMarketRow struct {
 }
 
 type analyticsBetRow struct {
-	ID           uint
-	Username     string
-	MarketID     uint
-	Amount       int64
-	Dust         int64
-	DustRecorded bool
-	Outcome      string
-	PlacedAt     time.Time
-	CreatedAt    time.Time
+	ID        uint
+	Username  string
+	MarketID  uint
+	Amount    int64
+	Outcome   string
+	PlacedAt  time.Time
+	CreatedAt time.Time
 }
 
 func mapUsers(dbUsers []analyticsUserRow) []UserAccount {
@@ -341,15 +339,13 @@ func mapBets(dbBets []analyticsBetRow) []boundary.Bet {
 	bets := make([]boundary.Bet, len(dbBets))
 	for i, bet := range dbBets {
 		bets[i] = boundary.Bet{
-			ID:           bet.ID,
-			Username:     bet.Username,
-			MarketID:     bet.MarketID,
-			Amount:       bet.Amount,
-			Dust:         bet.Dust,
-			DustRecorded: bet.DustRecorded,
-			Outcome:      bet.Outcome,
-			PlacedAt:     bet.PlacedAt,
-			CreatedAt:    bet.CreatedAt,
+			ID:        bet.ID,
+			Username:  bet.Username,
+			MarketID:  bet.MarketID,
+			Amount:    bet.Amount,
+			Outcome:   bet.Outcome,
+			PlacedAt:  bet.PlacedAt,
+			CreatedAt: bet.CreatedAt,
 		}
 	}
 	return bets

@@ -11,22 +11,19 @@ type SellDustCalculator interface {
 	DustForSell(sellBet boundary.Bet, allBets []boundary.Bet) int64
 }
 
-// RecordedSellDustCalculator reads exact dust recorded with each sell bet.
-type RecordedSellDustCalculator struct {
-	LegacyDustPerSell int64
+// ConstantSellDustCalculator returns a fixed dust amount for every sell.
+type ConstantSellDustCalculator struct {
+	DustPerSell int64
 }
 
-func (c RecordedSellDustCalculator) DustForSell(sellBet boundary.Bet, allBets []boundary.Bet) int64 {
+func (c ConstantSellDustCalculator) DustForSell(sellBet boundary.Bet, allBets []boundary.Bet) int64 {
 	if sellBet.Amount >= 0 {
 		return 0
 	}
-	if sellBet.DustRecorded || sellBet.Dust > 0 {
-		return sellBet.Dust
-	}
-	return c.LegacyDustPerSell
+	return c.DustPerSell
 }
 
-var defaultSellDustCalculator = RecordedSellDustCalculator{LegacyDustPerSell: 1}
+var defaultSellDustCalculator = ConstantSellDustCalculator{DustPerSell: 1}
 
 type marketDustCalculator struct {
 	volumeCalculator VolumeCalculator

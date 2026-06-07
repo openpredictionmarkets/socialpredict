@@ -7,7 +7,7 @@ POST /v0/sell
 { marketId, outcome, amount }
 ```
 
-`amount` is the number of credits the user is requesting from the sale. The sell domain calculates the current integer value per share, rounds the sale down to whole shares, credits the user with the actual sale value, and records any remainder as dust.
+`amount` is the number of credits the user is requesting from the sale. The sell domain calculates the current integer value per share, rounds the sale down to whole shares, credits the user with the actual sale value, and reports any remainder as transaction-time dust.
 
 ```text
 valuePerShare = position.Value / sharesOwned
@@ -36,12 +36,12 @@ The quote endpoint is read-only. It uses the same backend sale calculator as
   "sharesSold": 3,
   "saleValue": 30,
   "dust": 3,
-  "maxDust": 2,
+  "maxDust": 1,
   "valuePerShare": 10,
-  "dustCapCoverage": 0.3,
+  "dustCapCoverage": 0.2,
   "allowed": false,
-  "suggestedAmounts": [30, 31, 32],
-  "message": "This sale would create 3 dust, above the configured maximum of 2. Try a different requested credit amount."
+  "suggestedAmounts": [30, 31],
+  "message": "This sale would create 3 dust, above the configured maximum of 1. Try a different requested credit amount."
 }
 ```
 
@@ -55,14 +55,13 @@ The sale creates a bet ledger row where:
 
 ```text
 amount = -sharesSold
-dust   = exact assessed dust
 ```
 
-That keeps share accounting and dust accounting separate:
+That keeps dust stateless:
 
 - `amount` remains the share/position ledger entry used by the market math.
-- `dust` is explicit transaction metadata used to calculate market dust.
 - User balance is credited by `saleValue`, not the originally requested credits.
+- The transaction response reports `dust`, but dust is not persisted as a separate bet column.
 
 ## API Response
 
@@ -80,4 +79,4 @@ The frontend should tell the user when `dust > 0` so the rounding fee is visible
 
 ## Market Dust
 
-Market dust is no longer inferred from negative sale rows. It is summed from the persisted `bets.dust` values for sale rows. Legacy sale rows without recorded dust use the historical fallback dust value so old markets continue to display a conservative dust estimate.
+Market dust is derived from the bet vector without additional database state. The current stateless convention counts one retained dust unit per historical sell row, while the sale endpoint enforces `maxDustPerSale` at transaction time.

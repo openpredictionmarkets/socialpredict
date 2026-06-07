@@ -8,17 +8,13 @@ import (
 
 // Bet captures the persistence-neutral wager fields used by domain and math code.
 type Bet struct {
-	ID       uint
-	Username string
-	MarketID uint
-	Amount   int64
-	Dust     int64
-	// DustRecorded distinguishes an explicit zero dust fee from a legacy sale
-	// row created before dust was persisted.
-	DustRecorded bool `gorm:"-"`
-	Outcome      string
-	PlacedAt     time.Time
-	CreatedAt    time.Time
+	ID        uint
+	Username  string
+	MarketID  uint
+	Amount    int64
+	Outcome   string
+	PlacedAt  time.Time
+	CreatedAt time.Time
 }
 
 // Market captures the persistence-neutral market fields used by analytics flows.

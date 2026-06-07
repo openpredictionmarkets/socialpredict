@@ -471,7 +471,7 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	if !res.TransactionAt.Equal(now) {
 		t.Fatalf("expected transaction time %v, got %v", now, res.TransactionAt)
 	}
-	if fixture.repo.created == nil || fixture.repo.created.Amount != -2 || fixture.repo.created.Dust != 5 || fixture.repo.created.Outcome != "YES" {
+	if fixture.repo.created == nil || fixture.repo.created.Amount != -2 || fixture.repo.created.Outcome != "YES" {
 		t.Fatalf("unexpected stored bet: %+v", fixture.repo.created)
 	}
 	if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != 20 {
@@ -483,7 +483,7 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	}
 }
 
-func TestServiceSell_DustAtCapCreditsSaleValueAndStoresDust(t *testing.T) {
+func TestServiceSell_DustAtCapCreditsSaleValue(t *testing.T) {
 	now := serviceTestTime()
 	fixture, svc := newServiceFixture(
 		now,
@@ -500,7 +500,7 @@ func TestServiceSell_DustAtCapCreditsSaleValueAndStoresDust(t *testing.T) {
 	if res.SharesSold != 3 || res.SaleValue != 30 || res.Dust != 2 {
 		t.Fatalf("unexpected sell result: %+v", res)
 	}
-	if fixture.repo.created == nil || fixture.repo.created.Amount != -3 || fixture.repo.created.Dust != 2 {
+	if fixture.repo.created == nil || fixture.repo.created.Amount != -3 {
 		t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
 	}
 	if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != 30 {
@@ -753,7 +753,7 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 			if fixture.repo.created == nil {
 				t.Fatal("expected stored sale bet")
 			}
-			if fixture.repo.created.Amount != -tc.wantShares || fixture.repo.created.Dust != tc.wantDust || !fixture.repo.created.DustRecorded {
+			if fixture.repo.created.Amount != -tc.wantShares {
 				t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
 			}
 			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != tc.wantSaleValue {
