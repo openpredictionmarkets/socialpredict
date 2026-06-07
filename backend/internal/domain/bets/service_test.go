@@ -9,6 +9,7 @@ import (
 	bets "socialpredict/internal/domain/bets"
 	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
+	positionsmath "socialpredict/internal/domain/math/positions"
 	dusers "socialpredict/internal/domain/users"
 	"socialpredict/models/modelstesting"
 )
@@ -826,6 +827,131 @@ func TestServiceSell_MarketHistorySaleOrderDustScenarios(t *testing.T) {
 				withFixtureMaxDust(tc.maxDust),
 				withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
 				withFixturePosition(position),
+				withFixtureUser(&dusers.User{Username: "alice"}),
+			)
+
+			quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{
+				Username: "alice",
+				MarketID: 1,
+				Amount:   tc.requestedAmount,
+				Outcome:  "YES",
+			})
+			if err != nil {
+				t.Fatalf("QuoteSell returned error: %v", err)
+			}
+			if !quote.Allowed || quote.RequestedCredits != tc.wantExecutableOrder || quote.SharesSold != tc.wantShares || quote.SaleValue != tc.wantSaleValue || quote.Dust != tc.wantDust {
+				t.Fatalf("unexpected quote: got %+v, want order=%d shares=%d saleValue=%d dust=%d", quote, tc.wantExecutableOrder, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			}
+			if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+				t.Fatalf("quote should not mutate state: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
+			}
+
+			result, err := svc.Sell(context.Background(), bets.SellRequest{
+				Username: "alice",
+				MarketID: 1,
+				Amount:   tc.requestedAmount,
+				Outcome:  "YES",
+			})
+			if err != nil {
+				t.Fatalf("Sell returned error: %v", err)
+			}
+			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust {
+				t.Fatalf("unexpected sale result: got %+v, want shares=%d saleValue=%d dust=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			}
+			if fixture.repo.created == nil || fixture.repo.created.Amount != -tc.wantShares || fixture.repo.created.Outcome != "YES" {
+				t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
+			}
+			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != tc.wantSaleValue {
+				t.Fatalf("unexpected user ledger calls: %+v", fixture.users.calls)
+			}
+		})
+	}
+}
+
+func TestServiceSell_ActualMixedMarketHistorySaleOrderDustScenarios(t *testing.T) {
+	now := serviceTestTime()
+	history := []boundary.Bet{
+		{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES", PlacedAt: now.Add(-5 * time.Hour), CreatedAt: now.Add(-5 * time.Hour)},
+		{Username: "bob", MarketID: 1, Amount: 10000, Outcome: "NO", PlacedAt: now.Add(-4 * time.Hour), CreatedAt: now.Add(-4 * time.Hour)},
+		{Username: "carol", MarketID: 1, Amount: 10000, Outcome: "NO", PlacedAt: now.Add(-3 * time.Hour), CreatedAt: now.Add(-3 * time.Hour)},
+		{Username: "dave", MarketID: 1, Amount: 50000, Outcome: "YES", PlacedAt: now.Add(-2 * time.Hour), CreatedAt: now.Add(-2 * time.Hour)},
+		{Username: "erin", MarketID: 1, Amount: 50000, Outcome: "YES", PlacedAt: now.Add(-1 * time.Hour), CreatedAt: now.Add(-1 * time.Hour)},
+	}
+	snapshot := positionsmath.MarketSnapshot{ID: 1, CreatedAt: now.Add(-6 * time.Hour)}
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, history, "alice")
+	if err != nil {
+		t.Fatalf("calculate actual position: %v", err)
+	}
+	if position.YesSharesOwned != 20 || position.Value != 8350 {
+		t.Fatalf("expected mixed market history to produce Alice YES position worth 8350 over 20 shares, got %+v", position)
+	}
+	valuePerShare := position.Value / position.YesSharesOwned
+	if valuePerShare != 417 {
+		t.Fatalf("expected mixed market history valuePerShare=417, got %d from position %+v", valuePerShare, position)
+	}
+
+	tests := []struct {
+		name                string
+		maxDust             int64
+		requestedAmount     int64
+		wantExecutableOrder int64
+		wantShares          int64
+		wantSaleValue       int64
+		wantDust            int64
+	}{
+		{
+			name:                "actual mixed history then zero dust sale order",
+			maxDust:             1,
+			requestedAmount:     1251,
+			wantExecutableOrder: 1251,
+			wantShares:          3,
+			wantSaleValue:       1251,
+			wantDust:            0,
+		},
+		{
+			name:                "actual mixed history then one dust sale order executes",
+			maxDust:             1,
+			requestedAmount:     1252,
+			wantExecutableOrder: 1252,
+			wantShares:          3,
+			wantSaleValue:       1251,
+			wantDust:            1,
+		},
+		{
+			name:                "actual mixed history then over remainder rounds down to one dust",
+			maxDust:             1,
+			requestedAmount:     1255,
+			wantExecutableOrder: 1252,
+			wantShares:          3,
+			wantSaleValue:       1251,
+			wantDust:            1,
+		},
+		{
+			name:                "actual mixed history then over remainder rounds down to zero dust when cap is zero",
+			maxDust:             0,
+			requestedAmount:     1255,
+			wantExecutableOrder: 1251,
+			wantShares:          3,
+			wantSaleValue:       1251,
+			wantDust:            0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture, svc := newServiceFixture(
+				now,
+				withFixtureMaxDust(tc.maxDust),
+				withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+				withFixturePosition(&dmarkets.UserPosition{
+					Username:         "alice",
+					MarketID:         1,
+					YesSharesOwned:   position.YesSharesOwned,
+					NoSharesOwned:    position.NoSharesOwned,
+					Value:            position.Value,
+					TotalSpent:       position.TotalSpent,
+					TotalSpentInPlay: position.TotalSpentInPlay,
+				}),
 				withFixtureUser(&dusers.User{Username: "alice"}),
 			)
 
