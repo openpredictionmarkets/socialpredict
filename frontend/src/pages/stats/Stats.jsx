@@ -8,6 +8,25 @@ import SiteTabs from '../../components/tabs/SiteTabs';
 import { unwrapApiResponse } from '../../utils/apiResponse';
 
 const LOGIN_REQUIRED_REASON = 'INVALID_TOKEN';
+const LEADERBOARD_PAGE_SIZE = 20;
+const paginationButtonClass = [
+  'rounded',
+  'border',
+  'border-transparent',
+  'bg-neutral-btn',
+  'px-3',
+  'py-1.5',
+  'text-xs',
+  'font-semibold',
+  'text-white',
+  'transition-colors',
+  'duration-200',
+  'hover:bg-neutral-btn-hover',
+  'disabled:cursor-not-allowed',
+  'disabled:bg-custom-gray-light',
+  'disabled:text-gray-400',
+  'disabled:opacity-60',
+].join(' ');
 
 const loginRequiredError = (message) => {
   const error = new Error(message);
@@ -118,6 +137,7 @@ const Stats = () => {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState(null);
   const [leaderboardLoginRequired, setLeaderboardLoginRequired] = useState(false);
+  const [leaderboardPage, setLeaderboardPage] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -199,6 +219,7 @@ const Stats = () => {
 
       const data = await response.json();
       setGlobalLeaderboard(unwrapApiResponse(data));
+      setLeaderboardPage(0);
     } catch (err) {
       setLeaderboardError(err.message);
       setLeaderboardLoginRequired(Boolean(err.loginRequired));
@@ -206,6 +227,14 @@ const Stats = () => {
       setLeaderboardLoading(false);
     }
   };
+
+  const leaderboardStart = leaderboardPage * LEADERBOARD_PAGE_SIZE;
+  const visibleGlobalLeaderboard = Array.isArray(globalLeaderboard)
+    ? globalLeaderboard.slice(leaderboardStart, leaderboardStart + LEADERBOARD_PAGE_SIZE)
+    : [];
+  const canPageLeaderboardBack = leaderboardPage > 0;
+  const canPageLeaderboardForward = Array.isArray(globalLeaderboard)
+    && leaderboardStart + LEADERBOARD_PAGE_SIZE < globalLeaderboard.length;
 
   const toggleFormula = (key) => {
     setShowFormulas(prev => ({
@@ -518,67 +547,92 @@ const Stats = () => {
       )}
 
       {globalLeaderboard && globalLeaderboard.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-600">
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Rank</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Profit</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Current Value</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Spent</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Active Markets</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Resolved Markets</th>
-              </tr>
-            </thead>
-            <tbody>
-              {globalLeaderboard.map((user, index) => {
-                const getRankDisplay = (rank) => {
-                  if (rank === 1) return '🥇';
-                  if (rank === 2) return '🥈';
-                  if (rank === 3) return '🥉';
-                  return `#${rank}`;
-                };
+        <div>
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+              Showing leaderboard {leaderboardStart + 1}-{Math.min(leaderboardStart + LEADERBOARD_PAGE_SIZE, globalLeaderboard.length)} of {globalLeaderboard.length}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLeaderboardPage(current => Math.max(0, current - 1))}
+                disabled={!canPageLeaderboardBack}
+                className={paginationButtonClass}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeaderboardPage(current => current + 1)}
+                disabled={!canPageLeaderboardForward}
+                className={paginationButtonClass}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-600">
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Rank</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Profit</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Current Value</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Spent</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Active Markets</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Resolved Markets</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleGlobalLeaderboard.map((user) => {
+                  const getRankDisplay = (rank) => {
+                    if (rank === 1) return '🥇';
+                    if (rank === 2) return '🥈';
+                    if (rank === 3) return '🥉';
+                    return `#${rank}`;
+                  };
 
-                const getProfitColor = (profit) => {
-                  if (profit > 0) return 'text-green-400';
-                  if (profit < 0) return 'text-red-400';
-                  return 'text-gray-300';
-                };
+                  const getProfitColor = (profit) => {
+                    if (profit > 0) return 'text-green-400';
+                    if (profit < 0) return 'text-red-400';
+                    return 'text-gray-300';
+                  };
 
-                return (
-                  <tr key={user.username} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
-                    <td className="py-3 px-4 text-white font-semibold">
-                      {getRankDisplay(user.rank)}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Link
-                        to={`/user/${user.username}`}
-                        className="text-blue-400 font-medium hover:text-blue-300 transition-colors"
-                      >
-                        {user.username}
-                      </Link>
-                    </td>
-                    <td className={`py-3 px-4 font-semibold ${getProfitColor(user.totalProfit)}`}>
-                      {user.totalProfit >= 0 ? '+' : ''}{user.totalProfit.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300">
-                      {user.totalCurrentValue.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300">
-                      {user.totalSpent.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300 text-center">
-                      {user.activeMarkets}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300 text-center">
-                      {user.resolvedMarkets}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={user.username} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
+                      <td className="py-3 px-4 text-white font-semibold">
+                        {getRankDisplay(user.rank)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Link
+                          to={`/user/${user.username}`}
+                          className="text-blue-400 font-medium hover:text-blue-300 transition-colors"
+                        >
+                          {user.username}
+                        </Link>
+                      </td>
+                      <td className={`py-3 px-4 font-semibold ${getProfitColor(user.totalProfit)}`}>
+                        {user.totalProfit >= 0 ? '+' : ''}{user.totalProfit.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300">
+                        {user.totalCurrentValue.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300">
+                        {user.totalSpent.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300 text-center">
+                        {user.activeMarkets}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300 text-center">
+                        {user.resolvedMarkets}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
@@ -9,7 +9,7 @@ import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketTagChips from '../markets/MarketTagChips';
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 20;
 const DEFAULT_CREATOR_EMOJI = '👤';
 
 const toNumber = (value, fallback = 0) => {
@@ -167,57 +167,132 @@ const MarketRow = ({ marketData }) => {
 function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
   const [marketsData, setMarketsData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef(null);
+  const observerRef = useRef(null);
+  const inFlightRef = useRef(false);
+  const activeRequestRef = useRef(null);
+  const pageSize = limit || DEFAULT_LIMIT;
+
+  const fetchMarketsPage = useCallback(async ({ offset, append, signal }) => {
+    if (append && inFlightRef.current) {
+      return;
+    }
+    const requestId = Symbol('markets-page-request');
+    activeRequestRef.current = requestId;
+    inFlightRef.current = true;
+
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    setError('');
+
+    try {
+      const url = new URL(`${API_URL}/v0/markets`);
+      const params = new URLSearchParams();
+
+      if (status && status.toLowerCase() !== 'all') {
+        params.set('status', status.toLowerCase());
+      }
+
+      params.set('limit', String(pageSize));
+      params.set('offset', String(offset));
+      if (tagSlug) {
+        params.set('tagSlug', tagSlug);
+      }
+      url.search = params.toString();
+
+      const response = await fetch(url.toString(), { signal });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${status} markets`);
+      }
+
+      const data = await response.json();
+      const rawMarkets = Array.isArray(data.markets) ? data.markets : [];
+      const normalized = rawMarkets
+        .map(normalizeMarketOverview)
+        .filter((item) => item !== null);
+
+      setMarketsData((current) => {
+        if (!append) {
+          return normalized;
+        }
+        const seen = new Set(current.map((item) => item.market?.id ?? item.market?.marketId));
+        return [
+          ...current,
+          ...normalized.filter((item) => !seen.has(item.market?.id ?? item.market?.marketId)),
+        ];
+      });
+      setHasMore(normalized.length === pageSize);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        return;
+      }
+      console.error(`Error fetching ${status} market data:`, err);
+      setError(err.message || String(err));
+    } finally {
+      if (activeRequestRef.current === requestId) {
+        inFlightRef.current = false;
+      }
+      setTimeout(() => {
+        if (activeRequestRef.current === requestId) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }, 300);
+    }
+  }, [pageSize, status, tagSlug]);
 
   useEffect(() => {
     const controller = new AbortController();
+    setMarketsData([]);
+    setHasMore(true);
 
-    const fetchMarkets = async () => {
-      setLoading(true);
-      setError('');
-
-      try {
-        const url = new URL(`${API_URL}/v0/markets`);
-        const params = new URLSearchParams();
-
-        if (status && status.toLowerCase() !== 'all') {
-          params.set('status', status.toLowerCase());
-        }
-
-        params.set('limit', String(limit || DEFAULT_LIMIT));
-        if (tagSlug) {
-          params.set('tagSlug', tagSlug);
-        }
-        url.search = params.toString();
-
-        const response = await fetch(url.toString(), { signal: controller.signal });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${status} markets`);
-        }
-
-        const data = await response.json();
-        const rawMarkets = Array.isArray(data.markets) ? data.markets : [];
-        const normalized = rawMarkets
-          .map(normalizeMarketOverview)
-          .filter((item) => item !== null);
-
-        setMarketsData(normalized);
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          return;
-        }
-        console.error(`Error fetching ${status} market data:`, err);
-        setError(err.message || String(err));
-      } finally {
-        setTimeout(() => setLoading(false), 300);
-      }
-    };
-
-    fetchMarkets();
+    fetchMarketsPage({ offset: 0, append: false, signal: controller.signal });
 
     return () => controller.abort();
-  }, [status, limit, tagSlug]);
+  }, [fetchMarketsPage]);
+
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore || error) {
+      return undefined;
+    }
+
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver((entries) => {
+      if (!entries[0]?.isIntersecting) {
+        return;
+      }
+
+      const controller = new AbortController();
+      fetchMarketsPage({
+        offset: marketsData.length,
+        append: true,
+        signal: controller.signal,
+      });
+    }, {
+      rootMargin: '300px',
+    });
+
+    const sentinel = sentinelRef.current;
+    if (sentinel) {
+      observerRef.current.observe(sentinel);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [error, fetchMarketsPage, hasMore, loading, loadingMore, marketsData.length]);
 
   if (loading)
     return (
@@ -254,6 +329,15 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
                 </tbody>
               </table>
             </div>
+          </div>
+          <div ref={sentinelRef} className="py-4 text-center text-sm text-gray-400">
+            {loadingMore && (
+              <div className="flex items-center justify-center gap-2">
+                <LoadingSpinner />
+                <span>Loading more markets...</span>
+              </div>
+            )}
+            {!loadingMore && !hasMore && 'No more markets.'}
           </div>
         </>
       )}

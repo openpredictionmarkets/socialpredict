@@ -19,6 +19,7 @@ const defaultDiscoveryLayout = {
     searchScope: 'all',
     pins: [],
 };
+const MARKET_LIST_PAGE_SIZE = 20;
 
 const hasCuratedBlocks = (layout) => (
     layout?.featuredTopicsEnabled || layout?.featuredMarketsEnabled
@@ -402,28 +403,28 @@ function Markets() {
             label: 'Active', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="active" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="active" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('Active')
         },
         { 
             label: 'Closed', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="closed" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="closed" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('Closed')
         },
         { 
             label: 'Resolved', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="resolved" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="resolved" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('Resolved')
         },
         { 
             label: 'All', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="all" limit={discoveryLayout.recommendationLimit} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="all" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
             onSelect: () => handleTabChange('All')
         },
     ];
