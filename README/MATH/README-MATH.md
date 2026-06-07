@@ -1,6 +1,7 @@
 ## Social Predict Math Discussion
 
 * For background on Prediction Markets, please read [the wikipedia article on Prediction Markets](https://en.wikipedia.org/wiki/Prediction_market) and [this substack article analyzing modern Prediction Market history](https://patdel.substack.com/p/insights-from-recent-prediction-markets).
+* For an implementation-oriented flow of how bets become positions, sale dust, and displayed market volume, see [Market Position, Dust, And Volume Flows](README-MATH-MARKET-FLOWS.md).
 
 ### Market Mechanisms and Decentralized Finance
 
