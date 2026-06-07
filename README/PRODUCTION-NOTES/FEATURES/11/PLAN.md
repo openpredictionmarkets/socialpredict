@@ -1,0 +1,126 @@
+---
+title: Read Model Caching And Performance Plan
+document_type: feature-plan
+domain: features
+author: Patrick Delaney
+updated_at: 2026-06-07T00:00:00Z
+updated_at_display: "Sunday, June 7, 2026"
+update_reason: "Track implementation slices for display-safe caching, Postgres read models, optional Redis response caching, pagination, and correctness verification."
+status: draft
+---
+
+# Read Model Caching And Performance Plan
+
+## Purpose
+
+This plan turns [11-read-model-caching-performance.md](./11-read-model-caching-performance.md) and [DESIGN.md](./DESIGN.md) into implementation slices.
+
+## Planning Principles
+
+- Do not use stale cache for order execution or settlement.
+- Raw tables remain the audit source of truth.
+- Read models must be testable against raw recomputation.
+- Prefer pagination and simpler displays before broad caching.
+- Make freshness explicit where users may care.
+- Keep Redis optional until deployment posture is finalized.
+
+## 01. Feature Artifact And Design Alignment
+
+Checklist:
+
+- [x] Create `README/PRODUCTION-NOTES/FEATURES/11/`.
+- [x] Add feature overview.
+- [x] Add design artifact.
+- [x] Add implementation plan.
+- [ ] Review terminology against the canonical design plan.
+- [ ] Review implementation order with designer-agent postures.
+
+## 02. Market Accounting Read Model Boundary
+
+Service ownership: prediction market context and repository boundary.
+
+Checklist:
+
+- [ ] Define domain type for market accounting snapshots.
+- [ ] Include net volume, market dust, volume with dust, probability, user count, bet count, and generated timestamp.
+- [ ] Add raw recomputation calculator for the snapshot.
+- [ ] Add tests proving snapshot fields match raw recomputation.
+- [ ] Decide whether historical dust remains simple retained-dust convention or exact replay.
+- [ ] Ensure snapshot code does not affect order execution.
+
+## 03. Display Snapshot Persistence
+
+Service ownership: repository and migration boundary.
+
+Checklist:
+
+- [ ] Add timestamped migration for durable read-model table(s) if needed.
+- [ ] Add model/repository methods for snapshot upsert/read.
+- [ ] Add generated-at and last-processed-bet tracking.
+- [ ] Add migration tests.
+- [ ] Add repository tests for snapshot writes/reads.
+
+## 04. Market Discovery Cache
+
+Service ownership: CMS/discovery and API boundary.
+
+Checklist:
+
+- [ ] Add cached/read-model path for `/markets` card payloads.
+- [ ] Add cached/read-model path for `/markets/topic/:slug` card payloads.
+- [ ] Cache compact pinned chart payloads.
+- [ ] Include freshness metadata where appropriate.
+- [ ] Invalidate discovery caches on tag/CMS layout changes.
+- [ ] Invalidate market card caches on bet/sale/status changes.
+
+## 05. Statistics And Leaderboard Snapshots
+
+Service ownership: analytics context.
+
+Checklist:
+
+- [ ] Add system metrics snapshot read model.
+- [ ] Add global leaderboard snapshot read model.
+- [ ] Add market leaderboard snapshot read model.
+- [ ] Add scheduled or on-demand refresh service.
+- [ ] Add tests comparing snapshot outputs to raw recomputation.
+- [ ] Add pagination to global and market leaderboard responses.
+
+## 06. Market Detail Display Optimization
+
+Service ownership: frontend/API boundary.
+
+Checklist:
+
+- [ ] Keep transaction actions canonical and fresh.
+- [ ] Add pagination for market bets table, default latest 10.
+- [ ] Add pagination for comments if needed.
+- [ ] Cache or snapshot non-transactional market detail widgets briefly.
+- [ ] Keep sale/buy confirmation responses authoritative.
+- [ ] Add UI freshness copy for cached widgets if useful.
+
+## 07. Optional Redis Layer
+
+Service ownership: infrastructure and API boundary.
+
+Checklist:
+
+- [ ] Add Redis config/env posture behind feature flags.
+- [ ] Define cache key conventions.
+- [ ] Define TTL defaults by endpoint class.
+- [ ] Add safe fallback when Redis is unavailable.
+- [ ] Add integration tests with fake/in-memory cache where practical.
+- [ ] Document production deployment requirements if Redis becomes required.
+
+## 08. Verification And Load Testing
+
+Service ownership: testing boundary.
+
+Checklist:
+
+- [ ] Add recomputation-vs-snapshot tests for core read models.
+- [ ] Add API tests proving order endpoints do not read from display caches.
+- [ ] Add load-test scenario for cached discovery pages.
+- [ ] Add load-test scenario for market detail with paginated bets.
+- [ ] Capture before/after latency and CPU metrics.
+- [ ] Update performance dossier with results.
