@@ -56,11 +56,11 @@ Service ownership: repository and migration boundary.
 
 Checklist:
 
-- [ ] Add timestamped migration for durable read-model table(s) if needed.
-- [ ] Add model/repository methods for snapshot upsert/read.
-- [ ] Add generated-at and last-processed-bet tracking.
-- [ ] Add migration tests.
-- [ ] Add repository tests for snapshot writes/reads.
+- [x] Add timestamped migration for durable read-model table(s) if needed.
+- [x] Add model/repository methods for snapshot upsert/read.
+- [x] Add generated-at and last-processed-bet tracking.
+- [x] Add migration tests.
+- [x] Add repository tests for snapshot writes/reads.
 
 ## 04. Market Discovery Cache
 

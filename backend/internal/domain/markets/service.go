@@ -59,6 +59,12 @@ type MarketBetRepository interface {
 	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
 }
 
+// MarketAccountingSnapshotRepository exposes durable display/read-model snapshot persistence.
+type MarketAccountingSnapshotRepository interface {
+	GetMarketAccountingSnapshot(ctx context.Context, marketID int64) (*MarketAccountingSnapshot, error)
+	UpsertMarketAccountingSnapshot(ctx context.Context, snapshot MarketAccountingSnapshot) error
+}
+
 // Repository defines the interface for market data access.
 type Repository interface {
 	MarketReadRepository
