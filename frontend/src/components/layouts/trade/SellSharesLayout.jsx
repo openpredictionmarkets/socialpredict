@@ -256,22 +256,12 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 <>
                 <div className="border-t border-gray-200 my-2"></div>
                 <div className="mb-4">
-                    {feeData.initialBetFee === 0 && feeData.sellSharesFee === 0 ? (
+                    {feeData.sellSharesFee === 0 ? (
                         <p className="text-sm text-gray-300">No fees</p>
                     ) : (
-                        <>
-                            {feeData.initialBetFee > 0 && (
-                                <p className="text-sm text-gray-300">
-                                    Initial Trade Fee: {feeData.initialBetFee}
-                                    <span className="block">Does not apply if already traded on this market.</span>
-                                </p>
-                            )}
-                            {feeData.sellSharesFee > 0 && (
-                                <p className="text-sm text-gray-300">
-                                    Trading Fee (Selling Share): {feeData.sellSharesFee}
-                                </p>
-                            )}
-                        </>
+                        <p className="text-sm text-gray-300">
+                            Trading Fee (Selling Share): {feeData.sellSharesFee}
+                        </p>
                     )}
                 </div>
                 </>
