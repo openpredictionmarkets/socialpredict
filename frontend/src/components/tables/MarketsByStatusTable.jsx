@@ -214,7 +214,8 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', dis
       }
 
       const data = await response.json();
-      const rawMarkets = Array.isArray(data.markets) ? data.markets : [];
+      const payload = data?.result && typeof data.result === 'object' ? data.result : data;
+      const rawMarkets = Array.isArray(payload.markets) ? payload.markets : [];
       const normalized = rawMarkets
         .map(normalizeMarketOverview)
         .filter((item) => item !== null);
