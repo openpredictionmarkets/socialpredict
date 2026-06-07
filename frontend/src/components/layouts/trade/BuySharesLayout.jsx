@@ -122,9 +122,6 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
                             )}
                         </div>
                     )}
-                    <p className="mb-2 text-xs leading-relaxed text-blue-100">
-                        Informational only. Projection results are not guaranteed if trade volume is currently high.
-                    </p>
                     <MarketProjectionLayout
                         marketId={marketId}
                         amount={betAmount}

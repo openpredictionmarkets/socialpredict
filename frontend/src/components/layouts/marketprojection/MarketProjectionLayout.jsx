@@ -31,11 +31,6 @@ const MarketProjectionLayout = ({ marketId, amount, direction }) => {
     return (
         <div className="market-projection-layout">
             <div className="projection-details">
-                {!canProject && (
-                    <p className="text-sm text-gray-300 mb-2">
-                        Select amount and outcome to see the projected probability after this trade.
-                    </p>
-                )}
                 <SiteButtonSmall
                     className="mb-4"
                     onClick={fetchProjectionData}
