@@ -172,5 +172,7 @@ Checklist:
 - [x] Add handler/domain tests proving order endpoints do not read from display caches and only mark read models stale after success.
 - [ ] Add load-test scenario for cached discovery pages.
 - [x] Add market detail UI/API pagination for bets, positions, and leaderboard display.
+- [x] Expose market leaderboard snapshot freshness in the API and UI.
+- [x] Keep market positions as live paginated display data rather than a cached snapshot.
 - [ ] Capture before/after latency and CPU metrics.
 - [ ] Update performance dossier with results.

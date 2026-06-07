@@ -56,7 +56,7 @@ type marketDiscoveryReadModelResponse struct {
 	Markets       []*dto.MarketOverviewResponse `json:"markets"`
 	PinnedMarkets []pinnedMarketResponse        `json:"pinnedMarkets"`
 	Total         int                           `json:"total"`
-	Freshness     readModelFreshnessResponse    `json:"freshness"`
+	Freshness     dto.Freshness                 `json:"freshness"`
 }
 
 type discoveryPageResponse struct {

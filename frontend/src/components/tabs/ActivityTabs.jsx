@@ -8,7 +8,7 @@ const ActivityTabs = ({ marketId, market, refreshTrigger }) => {
     const tabsData = [
         { label: 'Bets', content: <BetsActivityLayout marketId={marketId} refreshTrigger={refreshTrigger} /> },
         { label: 'Positions', content: <PositionsActivityLayout marketId={marketId} market={market} refreshTrigger={refreshTrigger} /> },
-        { label: 'Leaderboard', content: <LeaderboardActivity marketId={marketId} market={market} /> },
+        { label: 'Leaderboard', content: <LeaderboardActivity marketId={marketId} market={market} refreshTrigger={refreshTrigger} /> },
         { label: 'Comments', content: <div>Comments Go here...</div> },
     ];
 

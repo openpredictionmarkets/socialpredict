@@ -3,7 +3,6 @@ package marketshandlers
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
@@ -23,21 +22,11 @@ type marketSummaryReadModelResponse struct {
 	NumUsers    int                             `json:"numUsers"`
 	TotalVolume int64                           `json:"totalVolume"`
 	MarketDust  int64                           `json:"marketDust"`
-	Freshness   readModelFreshnessResponse      `json:"freshness"`
+	Freshness   dto.Freshness                   `json:"freshness"`
 }
 
-type readModelFreshnessResponse struct {
-	GeneratedAt            time.Time  `json:"generatedAt"`
-	Source                 string     `json:"source"`
-	TargetFreshnessSeconds int        `json:"targetFreshnessSeconds"`
-	TransactionSafeRead    bool       `json:"transactionSafeRead"`
-	IsStale                bool       `json:"isStale"`
-	StaleReason            string     `json:"staleReason,omitempty"`
-	MarkedStaleAt          *time.Time `json:"markedStaleAt,omitempty"`
-}
-
-func readModelFreshnessToResponse(freshness readmodels.Freshness) readModelFreshnessResponse {
-	return readModelFreshnessResponse{
+func readModelFreshnessToResponse(freshness readmodels.Freshness) dto.Freshness {
+	return dto.Freshness{
 		GeneratedAt:            freshness.GeneratedAt,
 		Source:                 freshness.Source,
 		TargetFreshnessSeconds: freshness.TargetFreshnessSeconds,
