@@ -61,6 +61,7 @@ Primary inputs:
 | Market bet table display | recent bets | Paginate; do not cache, or refresh/poll around 10 seconds so accepted bets appear quickly. |
 | Discovery display | `/markets`, topic pages, pinned cards, compact charts | Cache around 10 minutes. |
 | Market leaderboard display | participant ranking for one market | Cache around 10 minutes and paginate. |
+| Market positions display | paginated YES/NO position cards for one market | Cache around 10 minutes and expose freshness metadata. |
 | Dashboard analytics | system metrics, global leaderboard | Cache around 1 hour or scheduled refresh; paginate leaderboard. |
 | User financial display | individual user P/L, exposure, financial summaries, historical position views | Cache authenticated display snapshots around 1-10 minutes; never use for spend checks or settlement. |
 | Audit/reconciliation | raw bets, migrations, payout verification | Recompute from source of truth. |
@@ -245,7 +246,7 @@ Caching alone is not enough. Heavy lists should also be paginated or hidden behi
 Recommended display changes:
 
 - market page bets table defaults to latest 20 rows
-- positions and leaderboard widgets are paginated
+- positions and leaderboard widgets are paginated and cache-backed display read models
 - global leaderboard is paginated
 - system financial metrics show a simplified summary first
 - complex financial paths are behind expansion buttons

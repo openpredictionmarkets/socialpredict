@@ -9,6 +9,7 @@ import (
 type MarketInvalidator interface {
 	MarkMarketAccountingSnapshotStale(ctx context.Context, marketID int64, reason string) error
 	MarkMarketLeaderboardSnapshotStale(ctx context.Context, marketID int64, reason string) error
+	MarkMarketPositionsSnapshotStale(ctx context.Context, marketID int64, reason string) error
 }
 
 // AnalyticsInvalidator marks analytics-owned display read models stale.
@@ -47,6 +48,9 @@ func (s *Service) InvalidateAfterMarketTransaction(ctx context.Context, username
 			errs = append(errs, err)
 		}
 		if err := s.markets.MarkMarketLeaderboardSnapshotStale(ctx, marketID, reason); err != nil {
+			errs = append(errs, err)
+		}
+		if err := s.markets.MarkMarketPositionsSnapshotStale(ctx, marketID, reason); err != nil {
 			errs = append(errs, err)
 		}
 	}

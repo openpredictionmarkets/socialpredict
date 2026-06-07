@@ -39,6 +39,10 @@ const normalizeProbabilityChanges = (raw) => {
     .filter((item) => item !== null);
 };
 
+const unwrapApiEnvelope = (data) => (
+  data?.result && typeof data.result === 'object' ? data.result : data
+);
+
 const normalizeMarketTag = (tag) => {
   if (!tag || typeof tag !== 'object') {
     return null;
@@ -234,14 +238,16 @@ export const useMarketDetails = () => {
         if (!detailsResponse.ok) {
           throw new Error('Failed to fetch market data');
         }
-        const data = await detailsResponse.json();
+        const data = unwrapApiEnvelope(await detailsResponse.json());
         let normalized = normalizeMarketDetails(data);
         if (summaryResponse?.ok) {
-          const summary = normalizeMarketDetails(await summaryResponse.json());
+          const summary = normalizeMarketDetails(unwrapApiEnvelope(await summaryResponse.json()));
           if (summary) {
             normalized = {
               ...normalized,
-              probabilityChanges: summary.probabilityChanges,
+              probabilityChanges: summary.probabilityChanges.length > 0
+                ? summary.probabilityChanges
+                : normalized.probabilityChanges,
               numUsers: summary.numUsers,
               totalVolume: summary.totalVolume,
               marketDust: summary.marketDust,

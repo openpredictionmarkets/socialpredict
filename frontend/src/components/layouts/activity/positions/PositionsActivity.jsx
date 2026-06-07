@@ -40,6 +40,7 @@ const paginationButtonClass = [
 const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
   const pageSize = 20;
   const [positions, setPositions] = useState([]);
+  const [freshness, setFreshness] = useState(null);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const { token } = useAuth();
@@ -52,6 +53,7 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
     const fetchPositions = async () => {
       if (!token) {
         setPositions([]);
+        setFreshness(null);
         setHasNextPage(false);
         return;
       }
@@ -66,22 +68,32 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
 
       if (!response.ok) {
         setPositions([]);
+        setFreshness(null);
         setHasNextPage(false);
         return;
       }
 
       const rawData = unwrapApiResponse(await response.json());
-      const filteredSorted = rawData
+      const positionRows = Array.isArray(rawData?.positions)
+        ? rawData.positions
+        : Array.isArray(rawData)
+          ? rawData
+          : [];
+      const filteredSorted = positionRows
         .filter(user => user.noSharesOwned > 0 || user.yesSharesOwned > 0)
         .sort((a, b) => (b.noSharesOwned + b.yesSharesOwned) - (a.noSharesOwned + a.yesSharesOwned));
 
       setPositions(filteredSorted);
-      setHasNextPage(rawData.length === pageSize);
+      setFreshness(rawData?.freshness || null);
+      setHasNextPage(positionRows.length === pageSize);
     };
 
     fetchPositions();
   }, [marketId, refreshTrigger, token, page]);
 
+  const freshnessLabel = freshness?.generatedAt
+    ? new Date(freshness.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+    : null;
   const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
   const pageStart = page * pageSize;
   const canPageBack = page > 0;
@@ -90,8 +102,15 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
   return (
     <div className="p-4">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
-          Showing positions page {page + 1}{positions.length ? ` (${pageStart + 1}-${pageStart + positions.length})` : ''}
+        <div>
+          <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+            Showing positions page {page + 1}{positions.length ? ` (${pageStart + 1}-${pageStart + positions.length})` : ''}
+          </div>
+          {freshnessLabel && (
+            <div className="mt-1 text-xs text-gray-500">
+              Positions generated at {freshnessLabel}. Trade confirmations remain authoritative.
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button

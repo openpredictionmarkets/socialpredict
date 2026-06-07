@@ -20,6 +20,7 @@ type VolumeRepository interface {
 
 // FeeRepository exposes the ordered bet data needed for participation fee calculations.
 type FeeRepository interface {
+	ListMarkets(ctx context.Context) ([]MarketRecord, error)
 	ListBetsOrdered(ctx context.Context) ([]boundary.Bet, error)
 }
 
@@ -32,6 +33,8 @@ type LeaderboardRepository interface {
 // FinancialsRepository provides the data required for per-user financial snapshots.
 type FinancialsRepository interface {
 	UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error)
+	UserWorkProfitResolvedMarkets(ctx context.Context, username string) ([]WorkProfitMarketRecord, error)
+	ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error)
 }
 
 // UserFinancialMetricSnapshotRepository persists authenticated display-only

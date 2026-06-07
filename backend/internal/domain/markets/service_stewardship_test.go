@@ -108,3 +108,23 @@ func TestResolveMarketBlocksSuspendedSteward(t *testing.T) {
 		t.Fatalf("suspended steward resolve error = %v, want ErrUnauthorized", err)
 	}
 }
+
+func TestReassignMarketStewardRejectsResolvedMarket(t *testing.T) {
+	market := &markets.Market{ID: 14, CreatorUsername: "creator", StewardUsername: "creator", Status: markets.MarketStatusResolved, LifecycleStatus: markets.MarketLifecyclePublished}
+	repo := newProjectionRepo(withProjectionRepoMarket(market), func(repo *projectionRepo) {
+		repo.reassignMarketStewardFunc = func(context.Context, int64, string, string, string, string, time.Time) error {
+			t.Fatalf("repository reassign should not be called")
+			return nil
+		}
+	})
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*users.PublicUser, error) {
+			return &users.PublicUser{Username: username, UserType: string(users.UserTypeModerator), ModeratorStatus: users.ModeratorStatusActive}, nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(marketsTestTime()), markets.Config{GameMode: "moderator"})
+
+	if _, err := service.ReassignMarketSteward(context.Background(), market.ID, "backup", "admin", "resolved already"); !errors.Is(err, markets.ErrInvalidState) {
+		t.Fatalf("reassign resolved market error = %v, want ErrInvalidState", err)
+	}
+}

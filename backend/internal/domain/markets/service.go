@@ -104,6 +104,7 @@ type UserService interface {
 type Config struct {
 	MinimumFutureHours     float64
 	CreateMarketCost       int64
+	InitialBetFee          int64
 	MaximumDebtAllowed     int64
 	GameMode               string
 	MarketApprovalRequired bool

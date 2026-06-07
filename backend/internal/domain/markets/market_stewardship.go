@@ -36,6 +36,9 @@ func (s *Service) ReassignMarketSteward(ctx context.Context, marketID int64, new
 	if err != nil {
 		return nil, err
 	}
+	if market.IsResolved() {
+		return nil, ErrInvalidState
+	}
 
 	if err := s.validateAssignableSteward(ctx, newStewardUsername); err != nil {
 		return nil, err

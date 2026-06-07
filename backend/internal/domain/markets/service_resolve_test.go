@@ -291,7 +291,7 @@ func TestResolveMarketRefundsOnNA(t *testing.T) {
 		}),
 	)
 	userSvc := newResolveUserService()
-	service := markets.NewService(repo, userSvc, newNopClock(marketsTestTime()), markets.Config{})
+	service := markets.NewService(repo, userSvc, newNopClock(marketsTestTime()), markets.Config{InitialBetFee: 3})
 
 	if err := service.ResolveMarket(context.Background(), 1, "N/A", "creator"); err != nil {
 		t.Fatalf("ResolveMarket returned error: %v", err)
@@ -355,6 +355,53 @@ func TestResolveMarketPaysWinners(t *testing.T) {
 
 	if _, err := (&resolveRepo{}).CalculatePayoutPositions(context.Background(), 1); !errors.Is(err, errUnexpectedMarketsTestCall) {
 		t.Fatalf("expected zero-value repo to fail predictably, got %v", err)
+	}
+}
+
+func TestResolveMarketPaysStewardWorkProfitAfterWinnerPayouts(t *testing.T) {
+	market := &markets.Market{
+		ID:              42,
+		CreatorUsername: "creator",
+		StewardUsername: "backup",
+		Status:          "active",
+	}
+	repo := newResolveRepo(
+		withResolveRepoMarket(market),
+		withResolveRepoResolve(func(context.Context, int64, string) error {
+			market.Status = "resolved"
+			return nil
+		}),
+		withResolveRepoPayouts([]*markets.PayoutPosition{
+			{Username: "winner", Value: 120},
+			{Username: "loser", Value: 0},
+		}),
+		withResolveRepoBets([]*markets.Bet{
+			{Username: "alice", Amount: 100},
+			{Username: "alice", Amount: -20},
+			{Username: "bob", Amount: 50},
+			{Username: "bob", Amount: 10},
+			{Username: "creator", Amount: 0},
+		}),
+	)
+	userSvc := newResolveUserService()
+	service := markets.NewService(repo, userSvc, newNopClock(marketsTestTime()), markets.Config{InitialBetFee: 3})
+
+	if err := service.ResolveMarket(context.Background(), 42, "YES", "backup"); err != nil {
+		t.Fatalf("ResolveMarket returned error: %v", err)
+	}
+
+	if len(userSvc.applied) != 2 {
+		t.Fatalf("expected winner payout and work-profit payout, got %d: %+v", len(userSvc.applied), userSvc.applied)
+	}
+
+	winnerCall := userSvc.applied[0]
+	if winnerCall.username != "winner" || winnerCall.amount != 120 || winnerCall.txType != users.TransactionWin {
+		t.Fatalf("unexpected winner payout %+v", winnerCall)
+	}
+
+	workProfitCall := userSvc.applied[1]
+	if workProfitCall.username != "backup" || workProfitCall.amount != 6 || workProfitCall.txType != users.TransactionWorkProfit {
+		t.Fatalf("unexpected work-profit payout %+v", workProfitCall)
 	}
 }
 

@@ -296,6 +296,59 @@ func TestMarketPositionsHandlerWithService_UsesPaginationQuery(t *testing.T) {
 	}
 }
 
+func TestMarketPositionsHandlerWithService_UsesSnapshotFreshnessWhenAvailable(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-3 * time.Minute)
+	mockSvc := &readModelPositionsService{
+		mockPositionsService: mockPositionsService{
+			positionsPage: dmarkets.MarketPositions{
+				{Username: "raw_alice", MarketID: 7, YesSharesOwned: 99},
+			},
+		},
+		readModel: &dmarkets.MarketPositionsSnapshot{
+			MarketID:    7,
+			GeneratedAt: generatedAt,
+			Source:      "read_model",
+			Positions: dmarkets.MarketPositions{
+				{Username: "snapshot_alice", MarketID: 7, YesSharesOwned: 3},
+			},
+		},
+	}
+	handler := MarketPositionsHandlerWithService(mockSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/positions/7?limit=20&offset=0", nil)
+	req = mux.SetURLVars(req, map[string]string{"marketId": "7"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if mockSvc.page != nil {
+		t.Fatalf("raw paginated position calculation should not be used when snapshot is available")
+	}
+
+	var resp handlers.SuccessEnvelope[marketPositionsResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if len(resp.Result.Positions) != 1 || resp.Result.Positions[0].Username != "snapshot_alice" {
+		t.Fatalf("unexpected positions payload: %+v", resp.Result.Positions)
+	}
+	if resp.Result.Freshness == nil {
+		t.Fatalf("expected freshness metadata")
+	}
+	if !resp.Result.Freshness.GeneratedAt.Equal(generatedAt) {
+		t.Fatalf("freshness generatedAt = %s, want %s", resp.Result.Freshness.GeneratedAt, generatedAt)
+	}
+	if resp.Result.Freshness.TargetFreshnessSeconds != int(dmarkets.MarketPositionsSnapshotTargetFreshness.Seconds()) {
+		t.Fatalf("freshness target = %d, want %d", resp.Result.Freshness.TargetFreshnessSeconds, int(dmarkets.MarketPositionsSnapshotTargetFreshness.Seconds()))
+	}
+	if resp.Result.Freshness.TransactionSafeRead {
+		t.Fatalf("positions snapshot must not be marked transaction safe")
+	}
+}
+
 func TestMarketUserPositionHandlerWithService_FailureEnvelope(t *testing.T) {
 	handler := MarketUserPositionHandlerWithService(&mockUserPositionService{
 		mockPositionsService: mockPositionsService{err: errors.New("boom")},
@@ -321,6 +374,31 @@ func TestMarketUserPositionHandlerWithService_FailureEnvelope(t *testing.T) {
 	if resp.Reason != string(handlers.ReasonInternalError) {
 		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, resp.Reason)
 	}
+}
+
+type readModelPositionsService struct {
+	mockPositionsService
+	readModel *dmarkets.MarketPositionsSnapshot
+}
+
+func (m *readModelPositionsService) GetMarketPositionsReadModel(ctx context.Context, marketID int64, p dmarkets.Page) (*dmarkets.MarketPositionsSnapshot, error) {
+	if m.readModel == nil {
+		return nil, nil
+	}
+	return &dmarkets.MarketPositionsSnapshot{
+		MarketID:            m.readModel.MarketID,
+		Positions:           m.readModel.Positions,
+		GeneratedAt:         m.readModel.GeneratedAt,
+		Source:              m.readModel.Source,
+		TransactionSafeRead: m.readModel.TransactionSafeRead,
+		IsStale:             m.readModel.IsStale,
+		StaleReason:         m.readModel.StaleReason,
+		MarkedStaleAt:       m.readModel.MarkedStaleAt,
+	}, nil
+}
+
+func (m *readModelPositionsService) RefreshMarketPositionsSnapshot(ctx context.Context, marketID int64) (*dmarkets.MarketPositionsSnapshot, error) {
+	return m.readModel, nil
 }
 
 type mockUserPositionService struct {

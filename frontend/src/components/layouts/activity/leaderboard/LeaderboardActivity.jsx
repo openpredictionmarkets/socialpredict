@@ -23,16 +23,17 @@ const paginationButtonClass = [
     'disabled:opacity-60',
 ].join(' ');
 
-const LeaderboardActivity = ({ marketId, market }) => {
+const LeaderboardActivity = ({ marketId, market, refreshTrigger }) => {
     const pageSize = 20;
     const [leaderboard, setLeaderboard] = useState([]);
+    const [freshness, setFreshness] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [page, setPage] = useState(0);
 
     useEffect(() => {
         setPage(0);
-    }, [marketId]);
+    }, [marketId, refreshTrigger]);
 
     useEffect(() => {
         const fetchLeaderboard = async () => {
@@ -44,13 +45,17 @@ const LeaderboardActivity = ({ marketId, market }) => {
                     const data = unwrapApiResponse(await response.json());
                     const rows = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
                     setLeaderboard(rows);
+                    setFreshness(data?.freshness || null);
+                    setError(null);
                 } else {
                     console.error('Error fetching leaderboard:', response.statusText);
                     setError('Failed to load leaderboard data');
+                    setFreshness(null);
                 }
             } catch (err) {
                 console.error('Error fetching leaderboard:', err);
                 setError('Failed to load leaderboard data');
+                setFreshness(null);
             } finally {
                 setLoading(false);
             }
@@ -59,7 +64,11 @@ const LeaderboardActivity = ({ marketId, market }) => {
         if (marketId) {
             fetchLeaderboard();
         }
-    }, [marketId, page]);
+    }, [marketId, page, refreshTrigger]);
+
+    const freshnessLabel = freshness?.generatedAt
+        ? new Date(freshness.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+        : null;
 
     const formatCurrency = (amount) => {
         return amount.toLocaleString();
@@ -123,8 +132,15 @@ const LeaderboardActivity = ({ marketId, market }) => {
     return (
         <div className="p-4">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
-                    Showing leaderboard page {page + 1}
+                <div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+                        Showing leaderboard page {page + 1}
+                    </div>
+                    {freshnessLabel && (
+                        <div className="mt-1 text-xs text-gray-500">
+                            Leaderboard generated at {freshnessLabel}. Trade confirmations remain authoritative.
+                        </div>
+                    )}
                 </div>
                 <div className="flex gap-2">
                     <button
