@@ -110,6 +110,7 @@ These are good early candidates because they are read-heavy and not directly res
 | Individual user financial metrics | user P/L, resolved/unresolved exposure, historical positions, market-by-market financial summaries | about 1-10m; load on demand and refresh after user-initiated transaction success |
 | Global leaderboard | user ranking, profit summaries, resolved market counts | about 1h |
 | Market leaderboard | per-market participant ranking | about 10m |
+| Market positions | per-market YES/NO position cards | about 10m |
 | Market cards | title, status, probability, volume, users, tags, steward, close time | about 10m |
 | `/markets` page | discovery cards, pinned market summaries, topic navigation payloads | about 10m |
 | `/markets/topic/:slug` page | filtered topic cards and pinned topic markets | about 10m |

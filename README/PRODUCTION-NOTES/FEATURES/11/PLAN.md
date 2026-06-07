@@ -173,6 +173,6 @@ Checklist:
 - [ ] Add load-test scenario for cached discovery pages.
 - [x] Add market detail UI/API pagination for bets, positions, and leaderboard display.
 - [x] Expose market leaderboard snapshot freshness in the API and UI.
-- [x] Keep market positions as live paginated display data rather than a cached snapshot.
+- [x] Cache market positions as a display/read-model snapshot with freshness metadata.
 - [ ] Capture before/after latency and CPU metrics.
 - [ ] Update performance dossier with results.
