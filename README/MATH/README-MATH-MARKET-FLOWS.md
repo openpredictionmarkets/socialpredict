@@ -25,10 +25,13 @@ flowchart TD
     C --> D[WPAM probability path]
     B --> E[DBPM share path]
     B --> R[Plain net volume]
+    D --> PH[Probability history]
+    PH --> E
+    PH --> CP[Current probability]
+    CP --> V[Position valuation input]
     R --> V[Position valuation input]
     E --> F[User position]
     V --> F
-    D --> PH[Probability history]
     F --> G[Sale quote or sale execution]
     G --> H[Integer value per share]
     H --> I[sharesSold = requestedCredits / valuePerShare]
@@ -48,6 +51,25 @@ flowchart TD
 The important distinction is that the WPAM probability path receives directional
 YES/NO contributions from the bet vector. It does not receive market dust or
 displayed `TotalVolume`.
+
+Probability history does feed the DBPM share path. In the current code, the
+position pipeline first calculates WPAM probability changes from the ordered bet
+vector, then passes that probability history into DBPM:
+
+```text
+sorted bets -> WPAM probability history
+sorted bets + WPAM probability history -> DBPM net positions
+```
+
+DBPM uses the probability history in two ways:
+
+| DBPM step | Probability input |
+|---|---|
+| Pool share division | Current/final probability from the probability history. |
+| Course payout calculation | Probability at the time each bet was placed. |
+
+The current probability from that same history is also used by the valuation
+step after DBPM has produced the user's YES/NO share position.
 
 Plain net volume is shown separately because current position valuation and some
 analytics paths use the net bet volume. Market dust is shown separately because
