@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent';
 import PrivateUserInfoLayout from '../../components/layouts/profile/private/PrivateUserInfoLayout';
-import PublicUserPortfolioLayout from '../../components/layouts/profile/public/PublicUserPortfolioLayout';
+import PortfolioTabContent from '../../components/layouts/profile/public/PortfolioTabContent';
 import UserFinancialStatementsLayout from '../../components/layouts/profile/public/UserFinancialStatementsLayout';
 import MarketLifecycleTable from '../../components/layouts/profile/MarketLifecycleTable';
 import SiteTabs from '../../components/tabs/SiteTabs';
@@ -122,7 +122,7 @@ const Profile = () => {
     ] : []),
     {
       label: 'Portfolio',
-      content: <PublicUserPortfolioLayout username={username} userData={userData} />,
+      content: <PortfolioTabContent username={username} />,
     },
     {
       label: 'Financials',
