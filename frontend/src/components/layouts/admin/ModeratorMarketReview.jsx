@@ -526,9 +526,13 @@ const DescriptionAmendmentQueue = () => {
   const { token } = useAuth();
   const [settings, setSettings] = useState({
     autoApproveDescriptionAmendments: false,
+    autoApproveMarketProposals: false,
     version: 0,
   });
-  const [settingsDraft, setSettingsDraft] = useState(false);
+  const [settingsDraft, setSettingsDraft] = useState({
+    autoApproveDescriptionAmendments: false,
+    autoApproveMarketProposals: false,
+  });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState('');
@@ -548,7 +552,10 @@ const DescriptionAmendmentQueue = () => {
         const data = await getMarketGovernanceSettings({ token });
         if (!ignore) {
           setSettings(data);
-          setSettingsDraft(Boolean(data.autoApproveDescriptionAmendments));
+          setSettingsDraft({
+            autoApproveDescriptionAmendments: Boolean(data.autoApproveDescriptionAmendments),
+            autoApproveMarketProposals: Boolean(data.autoApproveMarketProposals),
+          });
         }
       } catch (err) {
         if (!ignore) {
@@ -573,12 +580,16 @@ const DescriptionAmendmentQueue = () => {
     try {
       const saved = await updateMarketGovernanceSettings({
         token,
-        autoApproveDescriptionAmendments: settingsDraft,
+        autoApproveDescriptionAmendments: settingsDraft.autoApproveDescriptionAmendments,
+        autoApproveMarketProposals: settingsDraft.autoApproveMarketProposals,
         version: settings.version,
       });
       setSettings(saved);
-      setSettingsDraft(Boolean(saved.autoApproveDescriptionAmendments));
-      setSettingsMessage('Amendment auto-approval setting saved.');
+      setSettingsDraft({
+        autoApproveDescriptionAmendments: Boolean(saved.autoApproveDescriptionAmendments),
+        autoApproveMarketProposals: Boolean(saved.autoApproveMarketProposals),
+      });
+      setSettingsMessage('Governance auto-approval settings saved.');
     } catch (err) {
       setSettingsError(err.message || 'Unable to save governance settings.');
     } finally {
@@ -586,7 +597,9 @@ const DescriptionAmendmentQueue = () => {
     }
   };
 
-  const settingsChanged = settingsDraft !== Boolean(settings.autoApproveDescriptionAmendments);
+  const settingsChanged =
+    settingsDraft.autoApproveDescriptionAmendments !== Boolean(settings.autoApproveDescriptionAmendments) ||
+    settingsDraft.autoApproveMarketProposals !== Boolean(settings.autoApproveMarketProposals);
 
   return (
     <div className="grid gap-4">
@@ -596,20 +609,48 @@ const DescriptionAmendmentQueue = () => {
       <div className="grid gap-3 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="font-semibold text-white">Auto-approve new amendments</p>
+            <p className="font-semibold text-white">Governance auto-approval settings</p>
             <p className="mt-1 text-sm text-gray-400">
-              When enabled, newly proposed steward amendments are immediately accepted. Turn it off and save to restore manual admin review.
+              Control whether new market proposals and steward description amendments require manual admin review.
             </p>
           </div>
-          <label className="inline-flex cursor-pointer items-center gap-3 text-sm text-gray-200">
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-700 bg-gray-950 p-3 text-sm text-gray-200">
             <input
               type="checkbox"
-              checked={settingsDraft}
+              checked={settingsDraft.autoApproveDescriptionAmendments}
               disabled={settingsLoading || settingsSaving}
-              onChange={(event) => setSettingsDraft(event.target.checked)}
-              className="h-5 w-5 rounded border-gray-600 bg-gray-800 text-primary-pink focus:ring-primary-pink"
+              onChange={(event) => setSettingsDraft((current) => ({
+                ...current,
+                autoApproveDescriptionAmendments: event.target.checked,
+              }))}
+              className="mt-1 h-5 w-5 rounded border-gray-600 bg-gray-800 text-primary-pink focus:ring-primary-pink"
             />
-            <span>{settingsDraft ? 'Auto-accept on' : 'Auto-accept off'}</span>
+            <span>
+              <span className="block font-semibold text-white">Auto-approve new amendments</span>
+              <span className="mt-1 block text-gray-400">
+                Newly proposed steward amendments are immediately accepted when enabled.
+              </span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-gray-700 bg-gray-950 p-3 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={settingsDraft.autoApproveMarketProposals}
+              disabled={settingsLoading || settingsSaving}
+              onChange={(event) => setSettingsDraft((current) => ({
+                ...current,
+                autoApproveMarketProposals: event.target.checked,
+              }))}
+              className="mt-1 h-5 w-5 rounded border-gray-600 bg-gray-800 text-primary-pink focus:ring-primary-pink"
+            />
+            <span>
+              <span className="block font-semibold text-white">Auto-approve new market proposals</span>
+              <span className="mt-1 block text-gray-400">
+                New moderator-created proposals become published and tradable immediately when enabled.
+              </span>
+            </span>
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -619,7 +660,7 @@ const DescriptionAmendmentQueue = () => {
             onClick={saveSettings}
             className="rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {settingsSaving ? 'Saving...' : 'Save Auto-Approval Setting'}
+            {settingsSaving ? 'Saving...' : 'Save Auto-Approval Settings'}
           </button>
           <span className="text-xs text-gray-500">Version {settings.version || 1}</span>
         </div>

@@ -498,6 +498,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// handle private user stuff, display sensitive profile information to customize
 	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")
 	router.Handle("/v0/profile/markets", securityMiddleware(marketshandlers.ListMyLifecycleMarketsHandler(marketsService, authService))).Methods("GET")
+	router.Handle("/v0/profile/market-description-amendments", securityMiddleware(http.HandlerFunc(marketsHandler.ListMyDescriptionAmendments))).Methods("GET")
 
 	// changing profile stuff - apply security middleware
 	router.Handle("/v0/changepassword", securityMiddleware(usershandlers.ChangePasswordHandler(usersService))).Methods("POST")

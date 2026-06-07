@@ -87,6 +87,53 @@ func TestCreateMarketModeratorModeCreatesProposedMarketForActiveModerator(t *tes
 	}
 }
 
+func TestCreateMarketModeratorModeAutoApprovesProposalWhenGovernanceSettingEnabled(t *testing.T) {
+	now := marketsTestTime()
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.createFunc = func(_ context.Context, market *markets.Market) error {
+			market.ID = 103
+			return nil
+		}
+		repo.getMarketGovernanceSettingsFunc = func(context.Context) (*markets.MarketGovernanceSettings, error) {
+			return &markets.MarketGovernanceSettings{
+				AutoApproveMarketProposals: true,
+				Version:                    1,
+			}, nil
+		}
+	})
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return &dusers.PublicUser{
+				Username:        username,
+				UserType:        string(dusers.UserTypeModerator),
+				ModeratorStatus: dusers.ModeratorStatusActive,
+			}, nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{
+		GameMode:               "moderator",
+		MarketApprovalRequired: true,
+		CreateMarketCost:       10,
+	})
+
+	market, err := service.CreateMarket(context.Background(), validCreateRequest(now), "moderator")
+	if err != nil {
+		t.Fatalf("CreateMarket returned error: %v", err)
+	}
+	if market.Status != markets.MarketStatusActive || market.LifecycleStatus != markets.MarketLifecyclePublished {
+		t.Fatalf("expected auto-approved published market, got %+v", market)
+	}
+	if market.ProposalCost != 10 {
+		t.Fatalf("proposal cost = %d, want 10", market.ProposalCost)
+	}
+	if market.ApprovedBy != markets.MarketProposalApprovedByAuto || market.ApprovedAt == nil {
+		t.Fatalf("unexpected auto approval audit fields: %+v", market)
+	}
+	if !market.IsTradableAt(now) {
+		t.Fatalf("auto-approved market should be tradable")
+	}
+}
+
 func TestCreateMarketModeratorModeRejectsRegularAndSuspendedModerators(t *testing.T) {
 	now := marketsTestTime()
 	repo := newProjectionRepo(func(repo *projectionRepo) {

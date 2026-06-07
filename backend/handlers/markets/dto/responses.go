@@ -190,21 +190,24 @@ type MarketDetailsResponse struct {
 }
 
 type MarketDescriptionAmendmentResponse struct {
-	ID              int64      `json:"id"`
-	MarketID        int64      `json:"marketId"`
-	Version         int        `json:"version"`
-	Body            string     `json:"body"`
-	BodyFormat      string     `json:"bodyFormat"`
-	Status          string     `json:"status"`
-	CreatedBy       string     `json:"createdBy"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
-	ApprovedBy      string     `json:"approvedBy,omitempty"`
-	ApprovedAt      *time.Time `json:"approvedAt,omitempty"`
-	RejectedBy      string     `json:"rejectedBy,omitempty"`
-	RejectedAt      *time.Time `json:"rejectedAt,omitempty"`
-	RejectionReason string     `json:"rejectionReason,omitempty"`
-	SubmitReason    string     `json:"submitReason,omitempty"`
+	ID                         int64                                `json:"id"`
+	MarketID                   int64                                `json:"marketId"`
+	MarketTitle                string                               `json:"marketTitle,omitempty"`
+	MarketDescription          string                               `json:"marketDescription,omitempty"`
+	Version                    int                                  `json:"version"`
+	Body                       string                               `json:"body"`
+	BodyFormat                 string                               `json:"bodyFormat"`
+	Status                     string                               `json:"status"`
+	CreatedBy                  string                               `json:"createdBy"`
+	CreatedAt                  time.Time                            `json:"createdAt"`
+	UpdatedAt                  time.Time                            `json:"updatedAt"`
+	ApprovedBy                 string                               `json:"approvedBy,omitempty"`
+	ApprovedAt                 *time.Time                           `json:"approvedAt,omitempty"`
+	RejectedBy                 string                               `json:"rejectedBy,omitempty"`
+	RejectedAt                 *time.Time                           `json:"rejectedAt,omitempty"`
+	RejectionReason            string                               `json:"rejectionReason,omitempty"`
+	SubmitReason               string                               `json:"submitReason,omitempty"`
+	PreviousApprovedAmendments []MarketDescriptionAmendmentResponse `json:"previousApprovedAmendments,omitempty"`
 }
 
 // MarketDetailHandlerResponse - backward compatibility type for tests

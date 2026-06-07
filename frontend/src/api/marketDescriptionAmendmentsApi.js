@@ -52,13 +52,34 @@ export const listAdminMarketDescriptionAmendments = ({ token, status = 'pending'
   });
 };
 
+export const listMyMarketDescriptionAmendments = ({ token, status = 'pending', marketId = '', limit = 100, offset = 0 }) => {
+  const params = new URLSearchParams({
+    status,
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (marketId) {
+    params.set('marketId', String(marketId));
+  }
+  return authenticatedApiRequest(`/v0/profile/market-description-amendments?${params.toString()}`, {
+    authToken: token,
+    reasonMessages: amendmentReasonMessages,
+    fallbackMessage: 'Unable to load your description amendments.',
+  });
+};
+
 export const getMarketGovernanceSettings = ({ token }) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
   authToken: token,
   reasonMessages: adminAmendmentReasonMessages,
   fallbackMessage: 'Unable to load market governance settings.',
 });
 
-export const updateMarketGovernanceSettings = ({ token, autoApproveDescriptionAmendments, version = 0 }) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
+export const updateMarketGovernanceSettings = ({
+  token,
+  autoApproveDescriptionAmendments,
+  autoApproveMarketProposals,
+  version = 0,
+}) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
   method: 'PUT',
   headers: {
     'Content-Type': 'application/json',
@@ -66,6 +87,7 @@ export const updateMarketGovernanceSettings = ({ token, autoApproveDescriptionAm
   authToken: token,
   body: JSON.stringify({
     autoApproveDescriptionAmendments: Boolean(autoApproveDescriptionAmendments),
+    autoApproveMarketProposals: Boolean(autoApproveMarketProposals),
     version,
   }),
   reasonMessages: adminAmendmentReasonMessages,

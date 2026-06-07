@@ -840,6 +840,83 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/profile/market-description-amendments:
+    get:
+      tags: [Markets]
+      operationId: listMyMarketDescriptionAmendments
+      summary: List current user's description amendments
+      description: >
+        Returns pending, approved, or rejected append-only market description
+        amendments submitted by the authenticated moderator. The response is
+        scoped to the current user and includes market context for profile tabs.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+            default: pending
+        - in: query
+          name: marketId
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Current user's description amendments returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDescriptionAmendmentListResponse'
+        '400':
+          description: Invalid amendment status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Password change required or authorization denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected profile amendment queue failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/markets/status/{status}:
     get:
       tags: [Markets]
@@ -5573,20 +5650,24 @@ components:
 
     MarketGovernanceSettingsUpdateRequest:
       type: object
-      required: [autoApproveDescriptionAmendments]
       properties:
         autoApproveDescriptionAmendments:
           type: boolean
           description: When true, newly proposed steward amendments are immediately approved.
+        autoApproveMarketProposals:
+          type: boolean
+          description: When true, newly created moderator market proposals are immediately published.
         version:
           type: integer
           description: Optional optimistic concurrency version returned by the settings read endpoint.
 
     MarketGovernanceSettingsResponse:
       type: object
-      required: [autoApproveDescriptionAmendments, version]
+      required: [autoApproveDescriptionAmendments, autoApproveMarketProposals, version]
       properties:
         autoApproveDescriptionAmendments:
+          type: boolean
+        autoApproveMarketProposals:
           type: boolean
         version:
           type: integer

@@ -12,26 +12,28 @@ import (
 )
 
 type projectionRepo struct {
-	createFunc                   func(context.Context, *markets.Market) error
-	updateLabelsFunc             func(context.Context, int64, string, string) error
-	listFunc                     func(context.Context, markets.ListFilters) ([]*markets.Market, error)
-	listByStatusFunc             func(context.Context, string, markets.Page) ([]*markets.Market, error)
-	searchFunc                   func(context.Context, string, markets.SearchFilters) ([]*markets.Market, error)
-	deleteFunc                   func(context.Context, int64) error
-	resolveMarketFunc            func(context.Context, int64, string) error
-	getUserPositionFunc          func(context.Context, int64, string) (*markets.UserPosition, error)
-	listMarketPositionsFunc      func(context.Context, int64) (markets.MarketPositions, error)
-	listBetsForMarketFunc        func(context.Context, int64) ([]*markets.Bet, error)
-	getByIDFunc                  func(context.Context, int64) (*markets.Market, error)
-	calculatePayoutPositionsFunc func(context.Context, int64) ([]*markets.PayoutPosition, error)
-	getPublicMarketFunc          func(context.Context, int64) (*markets.PublicMarket, error)
-	approveMarketFunc            func(context.Context, int64, string, time.Time) error
-	rejectMarketFunc             func(context.Context, int64, string, time.Time, string) error
-	reassignMarketStewardFunc    func(context.Context, int64, string, string, string, string, time.Time) error
-	listMarketTagsFunc           func(context.Context, bool) ([]markets.MarketTag, error)
-	createMarketTagFunc          func(context.Context, markets.MarketTag) (*markets.MarketTag, error)
-	updateMarketTagFunc          func(context.Context, string, markets.MarketTagRequest) (*markets.MarketTag, error)
-	setMarketTagsFunc            func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error)
+	createFunc                         func(context.Context, *markets.Market) error
+	updateLabelsFunc                   func(context.Context, int64, string, string) error
+	listFunc                           func(context.Context, markets.ListFilters) ([]*markets.Market, error)
+	listByStatusFunc                   func(context.Context, string, markets.Page) ([]*markets.Market, error)
+	searchFunc                         func(context.Context, string, markets.SearchFilters) ([]*markets.Market, error)
+	deleteFunc                         func(context.Context, int64) error
+	resolveMarketFunc                  func(context.Context, int64, string) error
+	getUserPositionFunc                func(context.Context, int64, string) (*markets.UserPosition, error)
+	listMarketPositionsFunc            func(context.Context, int64) (markets.MarketPositions, error)
+	listBetsForMarketFunc              func(context.Context, int64) ([]*markets.Bet, error)
+	getByIDFunc                        func(context.Context, int64) (*markets.Market, error)
+	calculatePayoutPositionsFunc       func(context.Context, int64) ([]*markets.PayoutPosition, error)
+	getPublicMarketFunc                func(context.Context, int64) (*markets.PublicMarket, error)
+	approveMarketFunc                  func(context.Context, int64, string, time.Time) error
+	rejectMarketFunc                   func(context.Context, int64, string, time.Time, string) error
+	reassignMarketStewardFunc          func(context.Context, int64, string, string, string, string, time.Time) error
+	listMarketTagsFunc                 func(context.Context, bool) ([]markets.MarketTag, error)
+	createMarketTagFunc                func(context.Context, markets.MarketTag) (*markets.MarketTag, error)
+	updateMarketTagFunc                func(context.Context, string, markets.MarketTagRequest) (*markets.MarketTag, error)
+	setMarketTagsFunc                  func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error)
+	getMarketGovernanceSettingsFunc    func(context.Context) (*markets.MarketGovernanceSettings, error)
+	updateMarketGovernanceSettingsFunc func(context.Context, markets.MarketGovernanceSettingsUpdate) (*markets.MarketGovernanceSettings, error)
 }
 
 func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
@@ -86,6 +88,12 @@ func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
 			return nil, errUnexpectedMarketsTestCall
 		},
 		setMarketTagsFunc: func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		getMarketGovernanceSettingsFunc: func(context.Context) (*markets.MarketGovernanceSettings, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		updateMarketGovernanceSettingsFunc: func(context.Context, markets.MarketGovernanceSettingsUpdate) (*markets.MarketGovernanceSettings, error) {
 			return nil, errUnexpectedMarketsTestCall
 		},
 	}
@@ -204,6 +212,20 @@ func (r *projectionRepo) SetMarketTags(ctx context.Context, marketID int64, tagS
 		return nil, errUnexpectedMarketsTestCall
 	}
 	return r.setMarketTagsFunc(ctx, marketID, tagSlugs, assignedBy, source, assignedAt)
+}
+
+func (r *projectionRepo) GetMarketGovernanceSettings(ctx context.Context) (*markets.MarketGovernanceSettings, error) {
+	if r.getMarketGovernanceSettingsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.getMarketGovernanceSettingsFunc(ctx)
+}
+
+func (r *projectionRepo) UpdateMarketGovernanceSettings(ctx context.Context, update markets.MarketGovernanceSettingsUpdate) (*markets.MarketGovernanceSettings, error) {
+	if r.updateMarketGovernanceSettingsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.updateMarketGovernanceSettingsFunc(ctx, update)
 }
 
 func (r *projectionRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {

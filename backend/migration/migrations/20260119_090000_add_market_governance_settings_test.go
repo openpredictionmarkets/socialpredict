@@ -18,7 +18,7 @@ func TestMigrateAddMarketGovernanceSettingsCreatesTable(t *testing.T) {
 	if !db.Migrator().HasTable(&models.MarketGovernanceSettings{}) {
 		t.Fatalf("expected market governance settings table")
 	}
-	for _, column := range []string{"AutoApproveDescriptionAmendments", "Version", "UpdatedBy"} {
+	for _, column := range []string{"AutoApproveDescriptionAmendments", "AutoApproveMarketProposals", "Version", "UpdatedBy"} {
 		if !db.Migrator().HasColumn(&models.MarketGovernanceSettings{}, column) {
 			t.Fatalf("expected %s column after migration", column)
 		}
