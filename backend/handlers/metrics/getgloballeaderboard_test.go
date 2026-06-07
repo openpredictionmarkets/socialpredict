@@ -50,6 +50,10 @@ func (r *leaderboardRepo) UserMarketPositions(context.Context, string) ([]positi
 	return []positionsmath.MarketPosition{}, nil
 }
 
+func (r *leaderboardRepo) UserWorkProfitResolvedMarkets(context.Context, string) ([]analytics.WorkProfitMarketRecord, error) {
+	return []analytics.WorkProfitMarketRecord{}, nil
+}
+
 func (r *leaderboardRepo) CountUsersByType(context.Context, string) (int64, error) {
 	return 0, nil
 }
@@ -123,6 +127,10 @@ func (f failingRepo) ListBetsOrdered(context.Context) ([]boundary.Bet, error) {
 }
 
 func (f failingRepo) UserMarketPositions(context.Context, string) ([]positionsmath.MarketPosition, error) {
+	return nil, nil
+}
+
+func (f failingRepo) UserWorkProfitResolvedMarkets(context.Context, string) ([]analytics.WorkProfitMarketRecord, error) {
 	return nil, nil
 }
 
