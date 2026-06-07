@@ -21,10 +21,14 @@ make the current accounting paths explicit.
 ```mermaid
 flowchart TD
     A[Market] --> B[Bet vector]
-    B --> C[WPAM probability path]
-    B --> D[DBPM position path]
-    C --> E[Probability history]
-    D --> F[User position]
+    B --> C[Directional YES/NO contributions]
+    C --> D[WPAM probability path]
+    B --> E[DBPM share path]
+    B --> R[Plain net volume]
+    R --> V[Position valuation input]
+    E --> F[User position]
+    V --> F
+    D --> PH[Probability history]
     F --> G[Sale quote or sale execution]
     G --> H[Integer value per share]
     H --> I[sharesSold = requestedCredits / valuePerShare]
@@ -36,11 +40,60 @@ flowchart TD
     M --> O[Stored sale bet amount = -sharesSold]
     J --> P[User balance credited by saleValue]
     B --> Q[Market dust derivation]
-    B --> R[Plain net volume]
     Q --> S[VolumeWithDust]
     R --> S
     S --> T[Market detail TotalVolume display]
 ```
+
+The important distinction is that the WPAM probability path receives directional
+YES/NO contributions from the bet vector. It does not receive market dust or
+displayed `TotalVolume`.
+
+Plain net volume is shown separately because current position valuation and some
+analytics paths use the net bet volume. Market dust is shown separately because
+the market page can display both the retained dust and the total accounting
+volume:
+
+```text
+displayed TotalVolume = plain net volume + market dust
+```
+
+## Dust, Probability, And Human Preference
+
+Dust is user-originated capital, but it is not directional user intent.
+
+WPAM probability is intended to represent the directional preference signal in
+the market: how much users intentionally put behind YES versus NO, and how much
+exposure they intentionally remove through sell rows. Dust is different. Dust is
+a whole-credit rounding remainder retained by the market during sale settlement
+because integer accounting cannot always return the exact requested sale amount.
+
+Therefore, the current design keeps these concepts separate:
+
+| Quantity | Meaning | Affects WPAM probability? |
+|---|---|---|
+| Buy amount | Intentional directional belief or liquidity. | Yes |
+| Sell row | Intentional reduction of directional exposure. | Yes |
+| Transaction-time dust | Rounding remainder from integer sale settlement. | No |
+| Display/accounting volume with dust | Capital retained in the market for accounting visibility. | No, not directly |
+
+This can be summarized as:
+
+```text
+Probability = directional preference signal
+Volume/accounting = capital retained in the market
+```
+
+Dust can be understood as previous human capital, but not previous human
+directional intention. Including dust in WPAM would require assigning it to YES,
+NO, or some proportional side allocation. That allocation would be arbitrary and
+could let small rounding artifacts move probability even when no user intended a
+new probability movement.
+
+For that reason, excluding dust from WPAM is justified. The follow-up consistency
+question is not whether dust should move probability; it is how all position,
+payout, display, and analytics paths should consistently treat retained dust as
+accounting volume.
 
 ## Position Calculation
 
@@ -249,4 +302,3 @@ Recommended follow-up:
 | 2 | Route market detail, overview, analytics, and plain `CalculateMarketVolume` through that calculator. |
 | 3 | Decide whether historical market dust should remain the simple stateless sell-row convention or replay the sell history to derive exact zero-or-one dust per sale. |
 | 4 | Add tests proving all public volume callers return the same intended volume policy. |
-
