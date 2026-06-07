@@ -4,6 +4,25 @@ import { Link } from 'react-router-dom';
 import { getMarketLabels } from '../../../../utils/labelMapping';
 import { unwrapApiResponse } from '../../../../utils/apiResponse';
 
+const paginationButtonClass = [
+    'rounded',
+    'border',
+    'border-transparent',
+    'bg-neutral-btn',
+    'px-3',
+    'py-1.5',
+    'text-xs',
+    'font-semibold',
+    'text-white',
+    'transition-colors',
+    'duration-200',
+    'hover:bg-neutral-btn-hover',
+    'disabled:cursor-not-allowed',
+    'disabled:bg-custom-gray-light',
+    'disabled:text-gray-400',
+    'disabled:opacity-60',
+].join(' ');
+
 const LeaderboardActivity = ({ marketId, market }) => {
     const pageSize = 20;
     const [leaderboard, setLeaderboard] = useState([]);
@@ -112,7 +131,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
                         type="button"
                         onClick={() => setPage(current => Math.max(0, current - 1))}
                         disabled={!canPageBack}
-                        className="rounded border border-gray-600 px-3 py-1 text-xs text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        className={paginationButtonClass}
                     >
                         Previous
                     </button>
@@ -120,7 +139,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
                         type="button"
                         onClick={() => setPage(current => current + 1)}
                         disabled={!canPageForward}
-                        className="rounded border border-gray-600 px-3 py-1 text-xs text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                        className={paginationButtonClass}
                     >
                         Next
                     </button>
