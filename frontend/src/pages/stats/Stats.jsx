@@ -1,10 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
+import { authStorage } from '../../api/authStorage';
 import SiteButton from '../../components/buttons/SiteButtons';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import { unwrapApiResponse } from '../../utils/apiResponse';
+
+const LOGIN_REQUIRED_REASON = 'INVALID_TOKEN';
+
+const loginRequiredError = (message) => {
+  const error = new Error(message);
+  error.loginRequired = true;
+  return error;
+};
+
+const getOptionalAuthHeaders = () => {
+  const token = authStorage.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const readReportingError = async (response, loginMessage, fallbackMessage) => {
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+
+  if (response.status === 401 && payload?.reason === LOGIN_REQUIRED_REASON) {
+    throw loginRequiredError(loginMessage);
+  }
+
+  throw new Error(payload?.message || payload?.reason || `${fallbackMessage}: ${response.status}`);
+};
+
+const ReportingNotice = ({ message, loginRequired, errorLabel }) => (
+  <div
+    className={`rounded-lg border p-4 mb-6 ${
+      loginRequired
+        ? 'bg-info-blue/15 border-info-blue/50'
+        : 'bg-red-900/50 border-red-600'
+    }`}
+  >
+    <p className={loginRequired ? 'text-blue-100' : 'text-red-300'}>
+      {loginRequired ? message : `${errorLabel}: ${message}`}
+    </p>
+  </div>
+);
 
 // MetricCard Component
 const MetricCard = ({
@@ -67,12 +110,14 @@ const Stats = () => {
   const [systemMetrics, setSystemMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [metricsError, setMetricsError] = useState(null);
+  const [metricsLoginRequired, setMetricsLoginRequired] = useState(false);
   const [showFormulas, setShowFormulas] = useState({});
 
   // Global leaderboard state
   const [globalLeaderboard, setGlobalLeaderboard] = useState(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState(null);
+  const [leaderboardLoginRequired, setLeaderboardLoginRequired] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -103,22 +148,29 @@ const Stats = () => {
   const fetchSystemMetrics = async () => {
     setMetricsLoading(true);
     setMetricsError(null);
+    setMetricsLoginRequired(false);
     try {
       const response = await fetch(`${API_URL}/v0/system/metrics`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...getOptionalAuthHeaders(),
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch system metrics: ${response.status}`);
+        await readReportingError(
+          response,
+          'Log in to see system stats',
+          'Failed to fetch system metrics'
+        );
       }
 
       const data = await response.json();
       setSystemMetrics(unwrapApiResponse(data));
     } catch (err) {
       setMetricsError(err.message);
+      setMetricsLoginRequired(Boolean(err.loginRequired));
     } finally {
       setMetricsLoading(false);
     }
@@ -127,22 +179,29 @@ const Stats = () => {
   const fetchGlobalLeaderboard = async () => {
     setLeaderboardLoading(true);
     setLeaderboardError(null);
+    setLeaderboardLoginRequired(false);
     try {
       const response = await fetch(`${API_URL}/v0/global/leaderboard`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...getOptionalAuthHeaders(),
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch global leaderboard: ${response.status}`);
+        await readReportingError(
+          response,
+          'Log in to see leaderboard',
+          'Failed to fetch global leaderboard'
+        );
       }
 
       const data = await response.json();
       setGlobalLeaderboard(unwrapApiResponse(data));
     } catch (err) {
       setLeaderboardError(err.message);
+      setLeaderboardLoginRequired(Boolean(err.loginRequired));
     } finally {
       setLeaderboardLoading(false);
     }
@@ -269,9 +328,11 @@ const Stats = () => {
       )}
 
       {metricsError && (
-        <div className="bg-red-900/50 border border-red-600 rounded-lg p-4 mb-6">
-          <p className="text-red-300">Error loading metrics: {metricsError}</p>
-        </div>
+        <ReportingNotice
+          message={metricsError}
+          loginRequired={metricsLoginRequired}
+          errorLabel="Error loading metrics"
+        />
       )}
 
       {!systemMetrics && !metricsLoading && !metricsError && (
@@ -442,9 +503,11 @@ const Stats = () => {
       )}
 
       {leaderboardError && (
-        <div className="bg-red-900/50 border border-red-600 rounded-lg p-4 mb-6">
-          <p className="text-red-300">Error loading leaderboard: {leaderboardError}</p>
-        </div>
+        <ReportingNotice
+          message={leaderboardError}
+          loginRequired={leaderboardLoginRequired}
+          errorLabel="Error loading leaderboard"
+        />
       )}
 
       {!globalLeaderboard && !leaderboardLoading && !leaderboardError && (
