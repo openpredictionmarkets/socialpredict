@@ -3480,6 +3480,121 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/read/market-discovery/{slug}:
+    get:
+      tags: [Markets]
+      operationId: getMarketDiscoveryReadModel
+      summary: Get market discovery read-model payload
+      description: >
+        Returns a display-only read model for market discovery pages, including
+        CMS layout data, market cards, pinned market details, and freshness
+        metadata. This route must not be used for transaction decisions.
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          description: "`markets` for the top page, or a topic/tag slug for a secondary page."
+          schema:
+            type: string
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [active, closed, resolved, all]
+        - in: query
+          name: tagSlug
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Market discovery read model returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDiscoveryReadModelEnvelopeResponse'
+        '400':
+          description: Invalid market discovery request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to build market discovery read model.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/read/markets/{id}/summary:
+    get:
+      tags: [Markets]
+      operationId: getMarketSummaryReadModel
+      summary: Get market summary read-model widgets
+      description: >
+        Returns display-only market summary widgets and freshness metadata.
+        Buy, sell, resolution, payout, and refund flows must continue to read
+        canonical market, bet, and user balance data instead.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Market summary read model returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketSummaryReadModelEnvelopeResponse'
+        '400':
+          description: Invalid market ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to build market summary read model.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/read/users/{username}/financial-summary:
     get:
       tags: [Users]
@@ -4363,6 +4478,26 @@ components:
           $ref: '#/components/schemas/MarketDiscoveryPage'
       required: [ok, result]
 
+    MarketDiscoveryReadModelEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketDiscoveryReadModel'
+      required: [ok, result]
+
+    MarketSummaryReadModelEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketSummaryReadModel'
+      required: [ok, result]
+
     SocialShareSettingsEnvelopeResponse:
       type: object
       properties:
@@ -4791,6 +4926,56 @@ components:
         marketDust:
           type: integer
           format: int64
+
+    MarketDiscoveryReadModel:
+      type: object
+      properties:
+        layout:
+          $ref: '#/components/schemas/MarketDiscoveryPage'
+        topicNav:
+          $ref: '#/components/schemas/MarketDiscoveryPage'
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketOverviewResponse'
+        pinnedMarkets:
+          type: array
+          items:
+            $ref: '#/components/schemas/PinnedMarketReadModel'
+        total:
+          type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
+
+    PinnedMarketReadModel:
+      type: object
+      properties:
+        pin:
+          $ref: '#/components/schemas/MarketDiscoveryPin'
+        details:
+          $ref: '#/components/schemas/MarketDetailsResponse'
+
+    MarketSummaryReadModel:
+      type: object
+      properties:
+        market:
+          $ref: '#/components/schemas/PublicMarketResponse'
+        creator:
+          $ref: '#/components/schemas/CreatorResponse'
+        probabilityChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProbabilityChange'
+        numUsers:
+          type: integer
+        totalVolume:
+          type: integer
+          format: int64
+        marketDust:
+          type: integer
+          format: int64
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
 
     PublicMarketResponse:
       type: object

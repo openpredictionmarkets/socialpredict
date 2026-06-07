@@ -145,8 +145,8 @@ Display/read-model endpoints can be cache-backed and should expose freshness
 metadata:
 
 ```text
-GET /v0/read/markets
-GET /v0/read/markets/topic/{slug}
+GET /v0/read/market-discovery/markets
+GET /v0/read/market-discovery/{topicSlug}
 GET /v0/read/markets/{id}/summary
 GET /v0/read/markets/{id}/leaderboard
 GET /v0/read/system/metrics

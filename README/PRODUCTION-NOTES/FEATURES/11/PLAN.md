@@ -33,8 +33,8 @@ Checklist:
 - [x] Add feature overview.
 - [x] Add design artifact.
 - [x] Add implementation plan.
-- [ ] Review terminology against the canonical design plan.
-- [ ] Review implementation order with designer-agent postures.
+- [x] Review terminology against the canonical design plan.
+- [x] Review implementation order with designer-agent postures.
 
 ## 02. Market Accounting Read Model Boundary
 
@@ -49,7 +49,7 @@ Checklist:
 - [x] Keep display dust in the read model while preserving canonical transaction-time sale dust calculation.
 - [x] Expose explicit market accounting freshness metadata.
 - [x] Add boundary tests proving transaction repository interfaces do not expose snapshot methods.
-- [ ] Decide whether historical dust remains simple retained-dust convention or exact replay.
+- [x] Decide whether historical dust remains simple retained-dust convention or exact replay.
 - [x] Ensure snapshot code does not affect order execution.
 
 ## 03. Display Snapshot Persistence
@@ -71,13 +71,13 @@ Service ownership: CMS/discovery and API boundary.
 
 Checklist:
 
-- [ ] Add cached/read-model path for `/markets` card payloads.
-- [ ] Add cached/read-model path for `/markets/topic/:slug` card payloads.
-- [ ] Cache compact pinned chart payloads.
-- [ ] Use a target freshness of about 10 minutes for page-level discovery/pinned-card payloads.
-- [ ] Include freshness metadata where appropriate.
-- [ ] Invalidate discovery caches on tag/CMS layout changes.
-- [ ] Invalidate market card caches on bet/sale/status changes.
+- [x] Add cached/read-model path for `/markets` card payloads.
+- [x] Add cached/read-model path for `/markets/topic/:slug` card payloads.
+- [x] Cache compact pinned chart payloads.
+- [x] Use a target freshness of about 10 minutes for page-level discovery/pinned-card payloads.
+- [x] Include freshness metadata where appropriate.
+- [x] Invalidate discovery caches on tag/CMS layout changes.
+- [x] Invalidate market card caches on bet/sale/status changes.
 
 ## 05. Statistics And Leaderboard Snapshots
 
@@ -105,8 +105,8 @@ Service ownership: user financial read-model boundary.
 
 Checklist:
 
-- [ ] Identify individual user financial metrics that are computationally expensive.
-- [ ] Separate top-line transaction-sensitive balance/spend checks from display-only user financial summaries.
+- [x] Identify individual user financial metrics that are computationally expensive.
+- [x] Separate top-line transaction-sensitive balance/spend checks from display-only user financial summaries.
 - [x] Define authenticated read-model shape for user financial snapshots.
 - [x] Add durable snapshot persistence if the display path is expensive enough.
 - [x] Add on-demand user financial snapshot refresh service.
@@ -129,10 +129,10 @@ Checklist:
 - [x] Keep transaction actions canonical and fresh.
 - [x] Add pagination for market bets table, default latest 20.
 - [x] Add pagination for market positions table, default top 20.
-- [ ] Keep market bets table uncached; optionally refresh/poll around 10 seconds after accepted transactions.
-- [ ] Cache or snapshot non-transactional market detail widgets around 1 minute.
+- [x] Keep market bets table uncached; optionally refresh/poll around 10 seconds after accepted transactions.
+- [x] Cache or snapshot non-transactional market detail widgets around 1 minute.
 - [x] Keep sale/buy confirmation responses authoritative.
-- [ ] Add UI freshness copy for cached widgets if useful.
+- [x] Add UI freshness copy for cached widgets if useful.
 
 ## 07. Endpoint Boundary
 
@@ -143,7 +143,7 @@ Checklist:
 - [x] Identify canonical transaction endpoints that must never read from display caches.
 - [x] Identify cache-backed display/read-model endpoints.
 - [x] Introduce explicit `/v0/read/...` route for user financial summaries.
-- [ ] Decide remaining `/v0/read/...` routes versus existing display handler rewrites.
+- [x] Decide remaining `/v0/read/...` routes versus existing display handler rewrites.
 - [x] Add shared read-model freshness metadata contract.
 - [x] Add freshness metadata to user financial read-model display response.
 - [x] Add domain boundary tests proving transaction interfaces do not expose read-model snapshot services.

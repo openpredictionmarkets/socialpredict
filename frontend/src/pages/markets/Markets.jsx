@@ -217,7 +217,7 @@ const PinnedMarketSparkline = ({ details }) => {
     );
 };
 
-const FeaturedMarketPins = ({ marketPins = [] }) => {
+const FeaturedMarketPins = ({ marketPins = [], discoverySlug = 'markets' }) => {
     const [pinnedMarkets, setPinnedMarkets] = useState([]);
     const pinKey = marketPins
         .map((pin) => `${pin.id || ''}:${pin.marketId || ''}:${pin.sortOrder || ''}`)
@@ -234,24 +234,25 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
             };
         }
 
-        Promise.all(
-            pinsWithIds.map((pin) => (
-                apiRequest(`/v0/markets/${pin.marketId}`, {
-                    fallbackMessage: `Failed to load pinned market ${pin.marketId}`,
-                })
-                    .then((details) => ({ pin, details }))
-                    .catch(() => null)
-            )),
-        ).then((items) => {
+        apiRequest(`/v0/read/market-discovery/${encodeURIComponent(discoverySlug || 'markets')}?limit=1&offset=0`, {
+            fallbackMessage: 'Failed to load pinned market read model',
+        }).then((data) => {
             if (!ignore) {
-                setPinnedMarkets(items.filter((item) => item?.details?.market));
+                const readModelPins = Array.isArray(data.pinnedMarkets) ? data.pinnedMarkets : [];
+                setPinnedMarkets(readModelPins
+                    .map((item) => ({ pin: item.pin, details: item.details }))
+                    .filter((item) => item?.details?.market));
+            }
+        }).catch(() => {
+            if (!ignore) {
+                setPinnedMarkets([]);
             }
         });
 
         return () => {
             ignore = true;
         };
-    }, [pinKey]);
+    }, [discoverySlug, pinKey]);
 
     if (!pinnedMarkets.length) return null;
 
@@ -279,7 +280,7 @@ const FeaturedMarketPins = ({ marketPins = [] }) => {
     );
 };
 
-const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true }) => {
+const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins = true, discoverySlug = 'markets' }) => {
     const pins = sortBySortOrder(layout.pins || []);
     const topicPins = persistentTopicPins.length > 0
         ? persistentTopicPins
@@ -293,7 +294,7 @@ const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins =
         <div className="mb-6 mt-4 space-y-5 text-gray-200 sm:mt-5">
             {hasTopicNav && <TopicNav topicPins={topicPins} />}
 
-            {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} />}
+            {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} discoverySlug={discoverySlug} />}
         </div>
     );
 };
@@ -302,6 +303,7 @@ function Markets() {
     const { slug: topicSlugParam } = useParams();
     const topicSlug = topicSlugParam || '';
     const isTopicPage = !!topicSlug;
+    const discoverySlug = isTopicPage ? topicSlug : 'markets';
     const [searchResults, setSearchResults] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
     const [activeTab, setActiveTab] = useState('Active');
@@ -336,7 +338,6 @@ function Markets() {
 
     useEffect(() => {
         let ignore = false;
-        const discoverySlug = isTopicPage ? topicSlug : 'markets';
         const fallback = isTopicPage
             ? {
                 title: slugTitle(topicSlug) || 'Topic Markets',
@@ -414,28 +415,28 @@ function Markets() {
             label: 'Active', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="active" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="active" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} discoverySlug={discoverySlug} />,
             onSelect: () => handleTabChange('Active')
         },
         { 
             label: 'Closed', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="closed" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="closed" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} discoverySlug={discoverySlug} />,
             onSelect: () => handleTabChange('Closed')
         },
         { 
             label: 'Resolved', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="resolved" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="resolved" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} discoverySlug={discoverySlug} />,
             onSelect: () => handleTabChange('Resolved')
         },
         { 
             label: 'All', 
             content: isSearching ? 
                 <SearchResultsTable searchResults={searchResults} /> : 
-                <MarketsByStatusTable status="all" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} />,
+                <MarketsByStatusTable status="all" limit={MARKET_LIST_PAGE_SIZE} tagSlug={tagScope} discoverySlug={discoverySlug} />,
             onSelect: () => handleTabChange('All')
         },
     ];
@@ -487,6 +488,7 @@ function Markets() {
                             layout={discoveryLayout}
                             persistentTopicPins={persistentTopicPins}
                             useLayoutTopicPins={!isTopicPage}
+                            discoverySlug={discoverySlug}
                         />
                     )}
                     

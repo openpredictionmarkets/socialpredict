@@ -401,15 +401,7 @@ func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.MarketDetailsResponse{
-		Market:                publicMarketResponseFromDomain(details.Market),
-		Creator:               creatorResponseFromSummary(details.Creator),
-		ProbabilityChanges:    probabilityChangesToResponse(details.ProbabilityChanges),
-		NumUsers:              details.NumUsers,
-		TotalVolume:           details.TotalVolume,
-		MarketDust:            details.MarketDust,
-		DescriptionAmendments: descriptionAmendmentsToResponse(details.DescriptionAmendments),
-	}
+	response := marketDetailsToResponse(details)
 
 	_ = writeJSON(w, http.StatusOK, response)
 }

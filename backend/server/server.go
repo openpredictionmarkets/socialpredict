@@ -37,6 +37,7 @@ import (
 	"socialpredict/internal/app/readmodelinvalidation"
 	appruntime "socialpredict/internal/app/runtime"
 	dmarkets "socialpredict/internal/domain/markets"
+	readmodelrepo "socialpredict/internal/repository/readmodels"
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/logger"
@@ -332,6 +333,41 @@ func requirePasswordChangeCleared(auth authsvc.Authenticator, next http.Handler)
 	})
 }
 
+type marketDiscoveryStaleMarker interface {
+	MarkMarketDiscoverySnapshotsStale(ctx context.Context, reason string) error
+}
+
+type responseStatusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *responseStatusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *responseStatusRecorder) Write(data []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(data)
+}
+
+func markDiscoveryStaleOnSuccess(marker marketDiscoveryStaleMarker, reason string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder := &responseStatusRecorder{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		status := recorder.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		if marker != nil && status >= 200 && status < 300 {
+			_ = marker.MarkMarketDiscoverySnapshotsStale(r.Context(), reason)
+		}
+	})
+}
+
 func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, securityConfig appruntime.SecurityConfig) {
 	container := app.BuildApplicationWithConfigAndJWTSigningKey(db, configService, securityConfig.JWTSigningKey)
 	marketsService := container.GetMarketsService()
@@ -340,7 +376,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	analyticsService := container.GetAnalyticsService()
 	authService := container.GetAuthService()
 	requestSecurityService := container.GetSecurityService()
-	readModelInvalidator := readmodelinvalidation.New(marketsService, analyticsService)
+	readModelSnapshotRepo := readmodelrepo.NewGormRepository(db)
+	readModelInvalidator := readmodelinvalidation.New(marketsService, analyticsService, readModelSnapshotRepo)
 
 	// Create Handler instances
 	marketsHandler := marketshandlers.NewHandler(marketsService, authService, requestSecurityService)
@@ -377,6 +414,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	marketDiscoveryRepo := marketdiscovery.NewGormRepository(db)
 	marketDiscoverySvc := marketdiscovery.NewService(marketDiscoveryRepo)
 	marketDiscoveryHandler := cmsdiscoveryhttp.NewHandler(marketDiscoverySvc, authService)
+	marketDiscoveryHandler.SetReadModelInvalidator(readModelSnapshotRepo)
+	marketDiscoveryReadModelHandler := marketshandlers.NewMarketDiscoveryReadModelHandler(marketsService, marketDiscoverySvc, readModelSnapshotRepo)
 
 	socialShareRepo := socialshare.NewGormRepository(db)
 	socialShareSvc := socialshare.NewService(socialShareRepo)
@@ -405,6 +444,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// Markets routes - using new Handler instance
 	router.Handle("/markets/{id:[0-9]+}", securityMiddleware(marketshandlers.MarketShareShellHandler(marketsService, shareMetadataConfig(securityConfig.Share), socialShareConfigProvider))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
+	router.Handle("/v0/read/market-discovery/{slug}", securityMiddleware(http.HandlerFunc(marketDiscoveryReadModelHandler.Get))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
 	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
 	router.Handle("/v0/markets/status/{status}", securityMiddleware(http.HandlerFunc(marketsHandler.ListByStatus))).Methods("GET")
@@ -412,6 +452,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 		rWithStatus := mux.SetURLVars(r, map[string]string{"status": "all"})
 		marketsHandler.ListByStatus(w, rWithStatus)
 	}))).Methods("GET")
+	router.Handle("/v0/read/markets/{id}/summary", securityMiddleware(http.HandlerFunc(marketsHandler.MarketSummaryReadModel))).Methods("GET")
 
 	// Legacy routes for backward compatibility — rewrite to new handler with status query
 	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -477,17 +518,17 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/users/{username}/role", securityMiddleware(adminhandlers.UpdateAdminUserRoleHandler(usersService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/moderators/{username}/suspension", securityMiddleware(adminhandlers.UpdateAdminModeratorSuspensionHandler(usersService, authService, time.Now))).Methods("PATCH")
 	router.Handle("/v0/admin/markets", securityMiddleware(adminhandlers.ListReviewMarketsHandler(marketsService, authService))).Methods("GET")
-	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
-	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "market_status_changed", adminhandlers.ApproveMarketHandler(marketsService, authService)))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "market_status_changed", adminhandlers.RejectMarketHandler(marketsService, authService)))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/steward", securityMiddleware(adminhandlers.ReassignMarketStewardHandler(marketsService, authService))).Methods("PATCH")
-	router.Handle("/v0/admin/markets/{id}/tags", securityMiddleware(adminhandlers.UpdateMarketTagsHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/tags", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "market_tags_changed", adminhandlers.UpdateMarketTagsHandler(marketsService, authService)))).Methods("PATCH")
 	router.Handle("/v0/admin/market-description-amendments", securityMiddleware(adminhandlers.ListMarketDescriptionAmendmentsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/market-description-amendments/settings", securityMiddleware(adminhandlers.GetMarketGovernanceSettingsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/market-description-amendments/settings", securityMiddleware(adminhandlers.UpdateMarketGovernanceSettingsHandler(marketsService, authService))).Methods("PUT")
 	router.Handle("/v0/admin/market-description-amendments/{id}", securityMiddleware(adminhandlers.ReviewMarketDescriptionAmendmentHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.ListAdminMarketTagsHandler(marketsService, authService))).Methods("GET")
-	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.CreateAdminMarketTagHandler(marketsService, authService))).Methods("POST")
-	router.Handle("/v0/admin/market-tags/{slug}", securityMiddleware(adminhandlers.UpdateAdminMarketTagHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/market-tags", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "tag_catalog_changed", adminhandlers.CreateAdminMarketTagHandler(marketsService, authService)))).Methods("POST")
+	router.Handle("/v0/admin/market-tags/{slug}", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "tag_catalog_changed", adminhandlers.UpdateAdminMarketTagHandler(marketsService, authService)))).Methods("PATCH")
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")

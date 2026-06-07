@@ -36,6 +36,7 @@ const MarketDetails = () => {
           marketDust={details.marketDust || 0}
           currentProbability={currentProbability}
           probabilityChanges={details.probabilityChanges}
+          freshness={details.freshness}
           descriptionAmendments={details.descriptionAmendments}
           marketId={details.market.id}
           username={username}

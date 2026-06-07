@@ -17,16 +17,22 @@ type AnalyticsInvalidator interface {
 	MarkAnalyticsReadModelsStale(ctx context.Context, reason string) error
 }
 
+// DiscoveryInvalidator marks page/card discovery read models stale.
+type DiscoveryInvalidator interface {
+	MarkMarketDiscoverySnapshotsStale(ctx context.Context, reason string) error
+}
+
 // Service coordinates best-effort display read-model invalidation after
 // canonical mutations. It must not participate in transaction decisions.
 type Service struct {
 	markets   MarketInvalidator
 	analytics AnalyticsInvalidator
+	discovery DiscoveryInvalidator
 }
 
 // New builds a read-model invalidator from optional collaborators.
-func New(markets MarketInvalidator, analytics AnalyticsInvalidator) *Service {
-	return &Service{markets: markets, analytics: analytics}
+func New(markets MarketInvalidator, analytics AnalyticsInvalidator, discovery DiscoveryInvalidator) *Service {
+	return &Service{markets: markets, analytics: analytics, discovery: discovery}
 }
 
 // InvalidateAfterMarketTransaction marks affected display read models stale.
@@ -51,6 +57,11 @@ func (s *Service) InvalidateAfterMarketTransaction(ctx context.Context, username
 			}
 		}
 		if err := s.analytics.MarkAnalyticsReadModelsStale(ctx, reason); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if s.discovery != nil {
+		if err := s.discovery.MarkMarketDiscoverySnapshotsStale(ctx, reason); err != nil {
 			errs = append(errs, err)
 		}
 	}

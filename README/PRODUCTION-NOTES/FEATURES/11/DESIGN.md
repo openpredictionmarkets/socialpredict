@@ -172,8 +172,8 @@ admin mutation endpoints
 Display/read-model endpoints may be cache-backed:
 
 ```text
-GET /v0/read/markets
-GET /v0/read/markets/topic/{slug}
+GET /v0/read/market-discovery/markets
+GET /v0/read/market-discovery/{topicSlug}
 GET /v0/read/markets/{id}/summary
 GET /v0/read/markets/{id}/leaderboard
 GET /v0/read/system/metrics
@@ -182,9 +182,13 @@ GET /v0/read/users/{username}/positions
 GET /v0/read/leaderboard
 ```
 
-The exact URL shape can change during implementation. The architectural rule is
-more important than the names: display read models must not be accidentally
-reused by transaction code.
+Implementation decision for this slice:
+
+- `/v0/read/market-discovery/{slug}` backs `/markets` and `/markets/topic/:slug` card payloads, topic navigation data, and pinned market chart payloads.
+- `/v0/read/markets/{id}/summary` backs non-transactional market detail widgets with roughly one-minute freshness metadata.
+- Existing canonical routes remain in place for compatibility and transaction-adjacent UI needs.
+
+The architectural rule is more important than the names: display read models must not be accidentally reused by transaction code.
 
 ## Freshness Tiers
 
@@ -228,6 +232,8 @@ Implementation note:
 
 - Market accounting snapshots and user financial metric snapshots expose a shared freshness metadata contract.
 - Existing public display handlers should only add this metadata through explicit display/read-model wiring.
+- Market discovery snapshots are broadly marked stale after bet/sale/status/tag/CMS layout changes because a changed market can appear on multiple status/tag/topic pages.
+- Market detail summary snapshots may be refreshed on demand by the read-model endpoint, but transaction endpoints never consume them.
 - User financial read-model routes are login-required game transparency routes, not public anonymous routes.
 - Aggregate reporting routes can be public or login-required based on CMS reporting visibility settings.
 - Existing transaction endpoints and transaction service interfaces must not consume this metadata.
@@ -238,7 +244,7 @@ Caching alone is not enough. Heavy lists should also be paginated or hidden behi
 
 Recommended display changes:
 
-- market page bets table defaults to latest 10 rows
+- market page bets table defaults to latest 20 rows
 - positions and leaderboard widgets are paginated
 - global leaderboard is paginated
 - system financial metrics show a simplified summary first

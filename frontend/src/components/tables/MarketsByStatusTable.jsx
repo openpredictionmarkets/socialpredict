@@ -164,7 +164,7 @@ const MarketRow = ({ marketData }) => {
   );
 };
 
-function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
+function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', discoverySlug = 'markets' }) {
   const [marketsData, setMarketsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -192,7 +192,8 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
     setError('');
 
     try {
-      const url = new URL(`${API_URL}/v0/markets`);
+      const safeDiscoverySlug = encodeURIComponent(discoverySlug || 'markets');
+      const url = new URL(`${API_URL}/v0/read/market-discovery/${safeDiscoverySlug}`);
       const params = new URLSearchParams();
 
       if (status && status.toLowerCase() !== 'all') {
@@ -246,7 +247,7 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '' }) {
         }
       }, 300);
     }
-  }, [pageSize, status, tagSlug]);
+  }, [discoverySlug, pageSize, status, tagSlug]);
 
   useEffect(() => {
     const controller = new AbortController();
