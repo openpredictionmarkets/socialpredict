@@ -282,7 +282,7 @@ const DiscoveryPanel = ({ layout, persistentTopicPins = [], useLayoutTopicPins =
     if (!hasCuratedBlocks(layout) && !hasTopicNav) return null;
 
     return (
-        <div className="mb-6 space-y-5 text-gray-200">
+        <div className="mb-6 mt-4 space-y-5 text-gray-200 sm:mt-5">
             {hasTopicNav && <TopicNav topicPins={topicPins} />}
 
             {layout.featuredMarketsEnabled && <FeaturedMarketPins marketPins={marketPins} />}
