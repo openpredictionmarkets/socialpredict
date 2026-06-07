@@ -762,6 +762,129 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 	}
 }
 
+func TestServiceSell_MarketHistorySaleOrderDustScenarios(t *testing.T) {
+	now := serviceTestTime()
+	priorHistory := []boundary.Bet{
+		{Username: "alice", MarketID: 1, Amount: 70, Outcome: "YES", PlacedAt: now.Add(-4 * time.Hour)},
+		{Username: "bob", MarketID: 1, Amount: 40, Outcome: "NO", PlacedAt: now.Add(-3 * time.Hour)},
+		{Username: "alice", MarketID: 1, Amount: 30, Outcome: "YES", PlacedAt: now.Add(-2 * time.Hour)},
+		{Username: "bob", MarketID: 1, Amount: -1, Outcome: "NO", PlacedAt: now.Add(-1 * time.Hour)},
+	}
+
+	tests := []struct {
+		name                string
+		maxDust             int64
+		requestedAmount     int64
+		wantExecutableOrder int64
+		wantShares          int64
+		wantSaleValue       int64
+		wantDust            int64
+	}{
+		{
+			name:                "prior buy sell history then zero dust sale order",
+			maxDust:             1,
+			requestedAmount:     30,
+			wantExecutableOrder: 30,
+			wantShares:          3,
+			wantSaleValue:       30,
+			wantDust:            0,
+		},
+		{
+			name:                "prior buy sell history then one dust sale order executes",
+			maxDust:             1,
+			requestedAmount:     31,
+			wantExecutableOrder: 31,
+			wantShares:          3,
+			wantSaleValue:       30,
+			wantDust:            1,
+		},
+		{
+			name:                "prior buy sell history then over remainder rounds down to one dust",
+			maxDust:             1,
+			requestedAmount:     35,
+			wantExecutableOrder: 31,
+			wantShares:          3,
+			wantSaleValue:       30,
+			wantDust:            1,
+		},
+		{
+			name:                "prior buy sell history then over remainder rounds down to zero dust when cap is zero",
+			maxDust:             0,
+			requestedAmount:     35,
+			wantExecutableOrder: 30,
+			wantShares:          3,
+			wantSaleValue:       30,
+			wantDust:            0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			position := positionFromHistoryForAlice(priorHistory)
+			fixture, svc := newServiceFixture(
+				now,
+				withFixtureMaxDust(tc.maxDust),
+				withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+				withFixturePosition(position),
+				withFixtureUser(&dusers.User{Username: "alice"}),
+			)
+
+			quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{
+				Username: "alice",
+				MarketID: 1,
+				Amount:   tc.requestedAmount,
+				Outcome:  "YES",
+			})
+			if err != nil {
+				t.Fatalf("QuoteSell returned error: %v", err)
+			}
+			if !quote.Allowed || quote.RequestedCredits != tc.wantExecutableOrder || quote.SharesSold != tc.wantShares || quote.SaleValue != tc.wantSaleValue || quote.Dust != tc.wantDust {
+				t.Fatalf("unexpected quote: got %+v, want order=%d shares=%d saleValue=%d dust=%d", quote, tc.wantExecutableOrder, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			}
+			if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+				t.Fatalf("quote should not mutate state: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
+			}
+
+			result, err := svc.Sell(context.Background(), bets.SellRequest{
+				Username: "alice",
+				MarketID: 1,
+				Amount:   tc.requestedAmount,
+				Outcome:  "YES",
+			})
+			if err != nil {
+				t.Fatalf("Sell returned error: %v", err)
+			}
+			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust {
+				t.Fatalf("unexpected sale result: got %+v, want shares=%d saleValue=%d dust=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			}
+			if fixture.repo.created == nil || fixture.repo.created.Amount != -tc.wantShares || fixture.repo.created.Outcome != "YES" {
+				t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
+			}
+			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != tc.wantSaleValue {
+				t.Fatalf("unexpected user ledger calls: %+v", fixture.users.calls)
+			}
+		})
+	}
+}
+
+func positionFromHistoryForAlice(history []boundary.Bet) *dmarkets.UserPosition {
+	var yesShares int64
+	var value int64
+	for _, bet := range history {
+		if bet.Username != "alice" || bet.Outcome != "YES" {
+			continue
+		}
+		yesShares += bet.Amount / 10
+		value += bet.Amount
+	}
+	return &dmarkets.UserPosition{
+		Username:       "alice",
+		MarketID:       1,
+		YesSharesOwned: yesShares,
+		Value:          value,
+	}
+}
+
 func TestServiceSell_RequestTooSmall(t *testing.T) {
 	now := serviceTestTime()
 	_, svc := newServiceFixture(
