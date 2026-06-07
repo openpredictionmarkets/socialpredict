@@ -32,6 +32,7 @@ flowchart TD
     R --> V[Position valuation input]
     E --> F[User position]
     V --> F
+    F --> FP[Final payout positions]
     F --> G[Sale quote or sale execution]
     G --> H[Integer value per share]
     H --> I[sharesSold = requestedCredits / valuePerShare]
@@ -46,6 +47,7 @@ flowchart TD
     Q --> S[VolumeWithDust]
     R --> S
     S --> T[Market detail TotalVolume display]
+    S -. intended accounting pool .-> FP
 ```
 
 The important distinction is that the WPAM probability path receives directional
@@ -79,6 +81,12 @@ volume:
 ```text
 displayed TotalVolume = plain net volume + market dust
 ```
+
+The dotted edge from `VolumeWithDust` to final payout positions is an intended
+accounting relationship, not a statement that the market detail display itself is
+the source of payout truth. Display fields should never be used as the canonical
+input to final payout. Instead, both display and payout should derive from the
+same underlying accounting snapshot.
 
 ## Dust, Probability, And Human Preference
 
@@ -116,6 +124,45 @@ For that reason, excluding dust from WPAM is justified. The follow-up consistenc
 question is not whether dust should move probability; it is how all position,
 payout, display, and analytics paths should consistently treat retained dust as
 accounting volume.
+
+## Dust, Integer Accounting, And Money Conservation
+
+SocialPredict uses integer credits rather than floating-point balances. This
+avoids floating-point precision drift in user balances, market volume, and final
+payouts, but it also means some sale requests cannot be represented exactly when
+share values are converted back into whole credits.
+
+Dust is the retained integer remainder from that conversion:
+
+```text
+saleValue = sharesSold * valuePerShare
+dust = executableCredits - saleValue
+```
+
+The purpose of retaining dust in market accounting is to preserve conservation:
+
+```text
+money in = money out + money still retained by the market
+```
+
+Without a retained-dust convention, the platform risks either losing integer
+remainders or creating credits from nowhere when resolving or displaying market
+accounting. Dust is therefore an accounting mechanism, not a probability signal.
+
+The desired conservation model is:
+
+| Concept | Role |
+|---|---|
+| User sale credit | Credits returned to the seller. |
+| Dust | Credits retained by the market due to whole-share rounding. |
+| Accounting volume with dust | Pool used to explain where retained market value lives. |
+| Probability | Directional preference signal, excluding dust. |
+
+Current implementation note: market detail display uses `VolumeWithDust`, but
+the final payout/position pipeline currently derives payout positions through
+`CalculateMarketPositions_WPAM_DBPM`, whose DBPM volume path uses plain
+`GetMarketVolume`. That means the code does not yet fully express the intended
+"one accounting snapshot" model for dust-aware conservation.
 
 ## Position Calculation
 
