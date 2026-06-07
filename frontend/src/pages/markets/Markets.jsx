@@ -48,6 +48,14 @@ const normalizeDiscoveryLayout = (layout, fallback = {}) => ({
     pins: sortBySortOrder(layout?.pins || []),
 });
 
+const attachTagsToPins = (pins = [], tagsBySlug = {}) => (
+    sortBySortOrder(pins).map((pin) => (
+        pin.pinType === 'discovery_page'
+            ? { ...pin, tag: tagsBySlug[pin.targetPageSlug] || pin.tag }
+            : pin
+    ))
+);
+
 const DiscoveryBadge = ({ children, tag }) => {
     const tones = {
         sky: 'border-sky-500/40 bg-sky-950/40 text-sky-100',
@@ -357,16 +365,19 @@ function Markets() {
                 ]);
                 if (!ignore) {
                     const normalizedLayout = normalizeDiscoveryLayout(layout, fallback);
+                    const enrichedLayout = {
+                        ...normalizedLayout,
+                        pins: attachTagsToPins(normalizedLayout.pins, marketTagsBySlug),
+                    };
                     const topNavLayout = isTopicPage
                         ? normalizeDiscoveryLayout(topLayout || {}, {})
-                        : normalizedLayout;
+                        : enrichedLayout;
                     const topTopicPins = topNavLayout.featuredTopicsEnabled
-                        ? sortBySortOrder(topNavLayout.pins || [])
+                        ? attachTagsToPins(topNavLayout.pins || [], marketTagsBySlug)
                             .filter((pin) => pin.pinType === 'discovery_page')
-                            .map((pin) => ({ ...pin, tag: marketTagsBySlug[pin.targetPageSlug] }))
                         : [];
 
-                    setDiscoveryLayout(normalizedLayout);
+                    setDiscoveryLayout(enrichedLayout);
                     setPersistentTopicPins(topTopicPins);
                 }
             } catch {
