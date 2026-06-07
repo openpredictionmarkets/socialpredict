@@ -101,13 +101,13 @@ Checklist:
 
 - [ ] Identify individual user financial metrics that are computationally expensive.
 - [ ] Separate top-line transaction-sensitive balance/spend checks from display-only user financial summaries.
-- [ ] Define authenticated read-model shape for user financial snapshots.
-- [ ] Add durable snapshot persistence if the display path is expensive enough.
+- [x] Define authenticated read-model shape for user financial snapshots.
+- [x] Add durable snapshot persistence if the display path is expensive enough.
 - [ ] Add freshness metadata to user financial display responses.
 - [ ] Invalidate or mark stale user financial snapshots after user bet/sale/resolution payout/refund events.
 - [ ] Ensure user financial snapshots are never used for transaction decisions, spend checks, dust settlement, or payout/refund truth.
-- [ ] Add boundary tests proving buy/sell/user-balance transaction interfaces do not expose user financial snapshot services.
-- [ ] Add recomputation-vs-snapshot tests for user financial metrics.
+- [x] Add boundary tests proving buy/sell/user-balance transaction interfaces do not expose user financial snapshot services.
+- [x] Add recomputation-vs-snapshot tests for user financial metrics.
 - [ ] Consider Redis only after authenticated Postgres snapshots or read-model services prove correct and still become hot.
 
 ## 06. Market Detail Display Optimization

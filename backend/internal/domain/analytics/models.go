@@ -79,6 +79,18 @@ type FinancialSnapshot struct {
 	PotentialValue     int64
 }
 
+// UserFinancialMetricSnapshot captures a user's display-only financial read
+// model. It is not transaction truth and must not be used for spend checks,
+// balance mutation, dust settlement, or payout/refund decisions.
+type UserFinancialMetricSnapshot struct {
+	Username            string
+	GeneratedAt         time.Time
+	PositionCount       int
+	Financial           FinancialSnapshot
+	Source              string
+	TransactionSafeRead bool
+}
+
 func (s FinancialSnapshot) AccountBalanceValue() int64     { return s.AccountBalance }
 func (s FinancialSnapshot) MaximumDebtAllowedValue() int64 { return s.MaximumDebtAllowed }
 func (s FinancialSnapshot) AmountBorrowedValue() int64     { return s.AmountBorrowed }

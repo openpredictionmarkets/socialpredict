@@ -34,6 +34,14 @@ type FinancialsRepository interface {
 	UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error)
 }
 
+// UserFinancialMetricSnapshotRepository persists authenticated display-only
+// user financial read models. It is intentionally separate from Repository so
+// transaction paths cannot satisfy their dependencies from financial snapshots.
+type UserFinancialMetricSnapshotRepository interface {
+	GetUserFinancialMetricSnapshot(ctx context.Context, username string) (*UserFinancialMetricSnapshot, error)
+	UpsertUserFinancialMetricSnapshot(ctx context.Context, snapshot UserFinancialMetricSnapshot) error
+}
+
 // StatsRepository exposes aggregate account data required by stats reporting.
 type StatsRepository interface {
 	CountUsersByType(ctx context.Context, userType string) (int64, error)

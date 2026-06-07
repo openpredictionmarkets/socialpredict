@@ -352,10 +352,11 @@ func mapBets(dbBets []analyticsBetRow) []boundary.Bet {
 }
 
 var (
-	_ Repository            = (*GormRepository)(nil)
-	_ LeaderboardRepository = (*GormRepository)(nil)
-	_ FinancialsRepository  = (*GormRepository)(nil)
-	_ DebtRepository        = (*GormRepository)(nil)
-	_ VolumeRepository      = (*GormRepository)(nil)
-	_ FeeRepository         = (*GormRepository)(nil)
+	_ Repository                            = (*GormRepository)(nil)
+	_ LeaderboardRepository                 = (*GormRepository)(nil)
+	_ FinancialsRepository                  = (*GormRepository)(nil)
+	_ UserFinancialMetricSnapshotRepository = (*GormRepository)(nil)
+	_ DebtRepository                        = (*GormRepository)(nil)
+	_ VolumeRepository                      = (*GormRepository)(nil)
+	_ FeeRepository                         = (*GormRepository)(nil)
 )

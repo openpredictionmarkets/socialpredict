@@ -3,6 +3,9 @@ package analytics
 import (
 	"context"
 	"errors"
+	"time"
+
+	positionsmath "socialpredict/internal/domain/math/positions"
 )
 
 // ComputeUserFinancials calculates comprehensive financial metrics for a user.
@@ -20,36 +23,57 @@ func (s *Service) ComputeUserFinancials(ctx context.Context, req FinancialSnapsh
 		return nil, err
 	}
 
-	snapshot := &FinancialSnapshot{
-		AccountBalance:     req.AccountBalance,
-		MaximumDebtAllowed: s.config.MaximumDebtAllowed,
-	}
+	snapshot := NewUserFinancialMetricSnapshotCalculator(s.config).Calculate(req, positions, time.Time{})
+	return &snapshot.Financial, nil
+}
 
+// UserFinancialMetricSnapshotCalculator calculates display-only user financial
+// read models from canonical position data.
+type UserFinancialMetricSnapshotCalculator struct {
+	config Config
+}
+
+func NewUserFinancialMetricSnapshotCalculator(config Config) UserFinancialMetricSnapshotCalculator {
+	return UserFinancialMetricSnapshotCalculator{config: config}
+}
+
+func (c UserFinancialMetricSnapshotCalculator) Calculate(req FinancialSnapshotRequest, positions []positionsmath.MarketPosition, generatedAt time.Time) UserFinancialMetricSnapshot {
+	financial := FinancialSnapshot{
+		AccountBalance:     req.AccountBalance,
+		MaximumDebtAllowed: c.config.MaximumDebtAllowed,
+	}
 	for _, pos := range positions {
 		profit := pos.Value - pos.TotalSpent
 
-		snapshot.AmountInPlay += pos.Value
-		snapshot.TotalSpent += pos.TotalSpent
-		snapshot.TradingProfits += profit
+		financial.AmountInPlay += pos.Value
+		financial.TotalSpent += pos.TotalSpent
+		financial.TradingProfits += profit
 
 		if pos.IsResolved {
-			snapshot.RealizedProfits += profit
-			snapshot.RealizedValue += pos.Value
+			financial.RealizedProfits += profit
+			financial.RealizedValue += pos.Value
 		} else {
-			snapshot.PotentialProfits += profit
-			snapshot.PotentialValue += pos.Value
-			snapshot.AmountInPlayActive += pos.Value
-			snapshot.TotalSpentInPlay += pos.TotalSpentInPlay
+			financial.PotentialProfits += profit
+			financial.PotentialValue += pos.Value
+			financial.AmountInPlayActive += pos.Value
+			financial.TotalSpentInPlay += pos.TotalSpentInPlay
 		}
 	}
 
 	if req.AccountBalance < 0 {
-		snapshot.AmountBorrowed = -req.AccountBalance
+		financial.AmountBorrowed = -req.AccountBalance
 	}
 
-	snapshot.RetainedEarnings = req.AccountBalance - snapshot.AmountInPlay
-	snapshot.Equity = snapshot.RetainedEarnings + snapshot.AmountInPlay - snapshot.AmountBorrowed
-	snapshot.TotalProfits = snapshot.TradingProfits + snapshot.WorkProfits
+	financial.RetainedEarnings = req.AccountBalance - financial.AmountInPlay
+	financial.Equity = financial.RetainedEarnings + financial.AmountInPlay - financial.AmountBorrowed
+	financial.TotalProfits = financial.TradingProfits + financial.WorkProfits
 
-	return snapshot, nil
+	return UserFinancialMetricSnapshot{
+		Username:            req.Username,
+		GeneratedAt:         generatedAt,
+		PositionCount:       len(positions),
+		Financial:           financial,
+		Source:              "read_model",
+		TransactionSafeRead: false,
+	}
 }

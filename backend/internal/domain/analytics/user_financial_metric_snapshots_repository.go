@@ -1,0 +1,133 @@
+package analytics
+
+import (
+	"context"
+	"errors"
+
+	"socialpredict/models"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+// GetUserFinancialMetricSnapshot returns an authenticated display/read-model
+// financial snapshot for username. A missing snapshot is not an error.
+func (r *GormRepository) GetUserFinancialMetricSnapshot(ctx context.Context, username string) (*UserFinancialMetricSnapshot, error) {
+	if username == "" {
+		return nil, errors.New("username is required")
+	}
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var snapshot models.UserFinancialMetricSnapshot
+	if err := db.Where("username = ?", username).First(&snapshot).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return modelUserFinancialMetricSnapshotToDomain(&snapshot), nil
+}
+
+// UpsertUserFinancialMetricSnapshot stores authenticated display/read-model
+// financial metrics. Transaction paths must continue using canonical user,
+// market, and bet state instead of these snapshots.
+func (r *GormRepository) UpsertUserFinancialMetricSnapshot(ctx context.Context, snapshot UserFinancialMetricSnapshot) error {
+	if snapshot.Username == "" {
+		return errors.New("username is required")
+	}
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	dbSnapshot := domainUserFinancialMetricSnapshotToModel(snapshot)
+	return db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "username"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"account_balance",
+			"maximum_debt_allowed",
+			"amount_in_play",
+			"amount_borrowed",
+			"retained_earnings",
+			"equity",
+			"trading_profits",
+			"work_profits",
+			"total_profits",
+			"amount_in_play_active",
+			"total_spent",
+			"total_spent_in_play",
+			"realized_profits",
+			"potential_profits",
+			"realized_value",
+			"potential_value",
+			"position_count",
+			"generated_at",
+			"source",
+			"updated_at",
+		}),
+	}).Create(&dbSnapshot).Error
+}
+
+func domainUserFinancialMetricSnapshotToModel(snapshot UserFinancialMetricSnapshot) models.UserFinancialMetricSnapshot {
+	source := snapshot.Source
+	if source == "" {
+		source = "read_model"
+	}
+	financial := snapshot.Financial
+	return models.UserFinancialMetricSnapshot{
+		Username:           snapshot.Username,
+		AccountBalance:     financial.AccountBalance,
+		MaximumDebtAllowed: financial.MaximumDebtAllowed,
+		AmountInPlay:       financial.AmountInPlay,
+		AmountBorrowed:     financial.AmountBorrowed,
+		RetainedEarnings:   financial.RetainedEarnings,
+		Equity:             financial.Equity,
+		TradingProfits:     financial.TradingProfits,
+		WorkProfits:        financial.WorkProfits,
+		TotalProfits:       financial.TotalProfits,
+		AmountInPlayActive: financial.AmountInPlayActive,
+		TotalSpent:         financial.TotalSpent,
+		TotalSpentInPlay:   financial.TotalSpentInPlay,
+		RealizedProfits:    financial.RealizedProfits,
+		PotentialProfits:   financial.PotentialProfits,
+		RealizedValue:      financial.RealizedValue,
+		PotentialValue:     financial.PotentialValue,
+		PositionCount:      snapshot.PositionCount,
+		GeneratedAt:        snapshot.GeneratedAt,
+		Source:             source,
+	}
+}
+
+func modelUserFinancialMetricSnapshotToDomain(snapshot *models.UserFinancialMetricSnapshot) *UserFinancialMetricSnapshot {
+	if snapshot == nil {
+		return nil
+	}
+	return &UserFinancialMetricSnapshot{
+		Username:      snapshot.Username,
+		GeneratedAt:   snapshot.GeneratedAt,
+		PositionCount: snapshot.PositionCount,
+		Financial: FinancialSnapshot{
+			AccountBalance:     snapshot.AccountBalance,
+			MaximumDebtAllowed: snapshot.MaximumDebtAllowed,
+			AmountInPlay:       snapshot.AmountInPlay,
+			AmountBorrowed:     snapshot.AmountBorrowed,
+			RetainedEarnings:   snapshot.RetainedEarnings,
+			Equity:             snapshot.Equity,
+			TradingProfits:     snapshot.TradingProfits,
+			WorkProfits:        snapshot.WorkProfits,
+			TotalProfits:       snapshot.TotalProfits,
+			AmountInPlayActive: snapshot.AmountInPlayActive,
+			TotalSpent:         snapshot.TotalSpent,
+			TotalSpentInPlay:   snapshot.TotalSpentInPlay,
+			RealizedProfits:    snapshot.RealizedProfits,
+			PotentialProfits:   snapshot.PotentialProfits,
+			RealizedValue:      snapshot.RealizedValue,
+			PotentialValue:     snapshot.PotentialValue,
+		},
+		Source:              snapshot.Source,
+		TransactionSafeRead: false,
+	}
+}
