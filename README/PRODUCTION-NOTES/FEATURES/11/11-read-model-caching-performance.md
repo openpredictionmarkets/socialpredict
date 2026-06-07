@@ -52,6 +52,31 @@ Examples:
 - final payout/refund execution
 - any logic that can create or destroy user credits
 
+## Critical Decision Matrix
+
+The following table defines which decisions are transaction-critical and which are display/read-model candidates.
+
+| Decision or display area | Critical decision? | Cache/read-model policy | Reason |
+|---|---|---|---|
+| Place buy order | Yes | Do not use stale cache. Use canonical transaction-safe reads. | Can debit user balance and change market state. |
+| Confirm sale order | Yes | Do not use stale cache. Recalculate at execution time. | Can credit user balance, write a negative sale row, and create transaction-time dust. |
+| Sale quote preview | No, informational only | May use fresh canonical calculation or short-lived preview data, but final sale must recalculate. | Quote is not settlement; high-volume trading can make previews stale. |
+| Transaction-time dust calculation | Yes | Do not use stale cache. Calculate from current position at execution time. | Determines actual sale value, retained dust, and ledger writes. |
+| User balance mutation | Yes | Do not use stale cache. Use canonical balance inside transaction. | Can create incorrect debt, credits, or payouts. |
+| Market resolution payout | Yes | Do not use display cache. Use canonical payout/read model explicitly approved for settlement. | Final settlement moves credits and must conserve money. |
+| Market cancellation/yank refund | Yes | Do not use display cache. Use canonical bet/user state. | Refunds can move credits across many users. |
+| Admin mutation actions | Yes | Read fresh before mutating. | Approval/rejection/stewardship/tag changes alter governance state. |
+| System financial metrics display | No | Cacheable snapshot with freshness metadata. | Informational dashboard; does not execute orders. |
+| Global leaderboard display | No | Cacheable snapshot, paginate. | Ranking is display-oriented and can tolerate short staleness. |
+| Market leaderboard display | No | Cacheable snapshot, paginate. | Informational market widget; does not execute orders. |
+| `/markets` discovery page | No | Cacheable card/read-model payload. | Browsing page can tolerate short staleness. |
+| `/markets/topic/:slug` page | No | Cacheable topic/card/read-model payload. | Browsing page can tolerate short staleness. |
+| Pinned market chart cards | No | Cacheable compact chart snapshot. | Discovery display, not transaction execution. |
+| Individual market probability display | No, unless used for order execution | Cache briefly for display; order confirmation must use canonical path. | Users need reasonably fresh UI, but the displayed value should not settle trades. |
+| Individual market volume/user count display | No | Cache briefly with freshness metadata. | Informational display only. |
+| Market bet table display | No | Paginate and optionally cache first page briefly. | Users are reading history, not executing from the table. |
+| Market comments display | No | Paginate and optionally cache briefly. | Not settlement-critical. |
+
 ## Cacheable Display Candidates
 
 These are good early candidates because they are read-heavy and not directly responsible for executing trades.
