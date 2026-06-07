@@ -232,7 +232,6 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         {shares.noSharesOwned > 0 &&
                             <SaleActionGroup
                                 outcome="NO"
-                                label={noLabel}
                                 disabled={isActionDisabled}
                                 isQuoteLoading={isQuoteLoading && selectedOutcome === 'NO'}
                                 onTerms={() => requestSaleQuote('NO')}
@@ -244,7 +243,6 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         {shares.yesSharesOwned > 0 &&
                             <SaleActionGroup
                                 outcome="YES"
-                                label={yesLabel}
                                 disabled={isActionDisabled}
                                 isQuoteLoading={isQuoteLoading && selectedOutcome === 'YES'}
                                 onTerms={() => requestSaleQuote('YES')}
@@ -386,14 +384,14 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
     );
 };
 
-const SaleActionGroup = ({ outcome, label, disabled, isQuoteLoading, onTerms, onSubmit }) => {
-    const displayLabel = label || outcome;
-
+const SaleActionGroup = ({ outcome, disabled, isQuoteLoading, onTerms, onSubmit }) => {
     return (
         <div className="flex w-full flex-col gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
-            <div className="text-center text-xs font-semibold uppercase tracking-wide text-blue-100">
-                {displayLabel}
-            </div>
+            <ConfirmSaleButton
+                onClick={onSubmit}
+                selectedDirection={outcome}
+                disabled={disabled || isQuoteLoading}
+            />
             <button
                 type="button"
                 onClick={onTerms}
@@ -402,11 +400,6 @@ const SaleActionGroup = ({ outcome, label, disabled, isQuoteLoading, onTerms, on
             >
                 {isQuoteLoading ? 'Loading Terms' : 'Terms'}
             </button>
-            <ConfirmSaleButton
-                onClick={onSubmit}
-                selectedDirection={outcome}
-                disabled={disabled || isQuoteLoading}
-            />
         </div>
     );
 };
