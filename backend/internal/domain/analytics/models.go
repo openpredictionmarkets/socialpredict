@@ -21,6 +21,17 @@ type MarketRecord struct {
 	ResolutionResult string
 }
 
+// WorkProfitMarketRecord captures the resolved market fields needed to derive
+// steward work profit without adding separate accounting state.
+type WorkProfitMarketRecord struct {
+	ID               uint
+	CreatorUsername  string
+	StewardUsername  string
+	IsResolved       bool
+	ResolutionResult string
+	ProposalCost     int64
+}
+
 // Snapshot converts the record into the shared math snapshot.
 func (m MarketRecord) Snapshot() positionsmath.MarketSnapshot {
 	return positionsmath.MarketSnapshot{
@@ -203,6 +214,7 @@ type FinancialSnapshotRequestReader interface {
 type FinancialSnapshotRequest struct {
 	Username       string
 	AccountBalance int64
+	WorkProfits    int64
 }
 
 func (r FinancialSnapshotRequest) UsernameValue() string      { return r.Username }
