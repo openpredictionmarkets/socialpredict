@@ -44,6 +44,7 @@ Primary inputs:
 | Prediction Market Context | Own canonical market, bet, position, probability, dust, and payout math. |
 | Market Accounting Read Model | Own derived market accounting/display snapshots. |
 | Analytics Context | Own system metrics and global leaderboard snapshots. |
+| User Financial Read Model | Own authenticated display snapshots for individual user financial summaries and position-heavy profile views. |
 | CMS/Discovery Context | Own cached market discovery cards, topic pages, and pinned market summaries. |
 | API Boundary | Own freshness metadata, pagination, and cache-safe response schemas. |
 | Infrastructure Boundary | Own optional Redis deployment/configuration and operational cache settings. |
@@ -61,6 +62,7 @@ Primary inputs:
 | Discovery display | `/markets`, topic pages, pinned cards, compact charts | Cache around 10 minutes. |
 | Market leaderboard display | participant ranking for one market | Cache around 10 minutes and paginate. |
 | Dashboard analytics | system metrics, global leaderboard | Cache around 1 hour or scheduled refresh; paginate leaderboard. |
+| User financial display | individual user P/L, exposure, financial summaries, historical position views | Cache authenticated display snapshots around 1-10 minutes; never use for spend checks or settlement. |
 | Audit/reconciliation | raw bets, migrations, payout verification | Recompute from source of truth. |
 
 ## Postgres Read Models
@@ -106,7 +108,22 @@ global_leaderboard_snapshots
   generated_at
 ```
 
+```text
+user_financial_metric_snapshots
+  username
+  summary_json
+  position_count
+  unresolved_exposure
+  realized_profit_loss
+  generated_at
+```
+
 Implementation may choose tables, materialized views, or service-managed snapshots. The key requirement is one explicit read-model boundary rather than ad hoc duplicate math.
+
+User financial snapshots require authenticated cache boundaries. A user-specific
+financial snapshot may be safe for that user or an admin to view, but it must
+not be served as a global/public cache entry. Cache keys and API responses must
+include the authenticated user scope.
 
 ## Redis Cache
 
@@ -119,11 +136,13 @@ Recommended uses:
 - compact pinned market chart payloads
 - system metrics API response bodies
 - leaderboard pages
+- authenticated user financial summary pages
 
 Avoid Redis for:
 
 - final order validation
 - user balance mutation decisions
+- spend checks or debt-limit checks
 - final payout truth
 - any write transaction that needs canonical data
 
@@ -149,6 +168,8 @@ GET /v0/read/markets/topic/{slug}
 GET /v0/read/markets/{id}/summary
 GET /v0/read/markets/{id}/leaderboard
 GET /v0/read/system/metrics
+GET /v0/read/users/{username}/financial-summary
+GET /v0/read/users/{username}/positions
 GET /v0/read/leaderboard
 ```
 
@@ -166,6 +187,7 @@ Baseline TTL/freshness classes:
 | Fast display refresh | market bet table first page | not cached; refresh/poll around 10s |
 | Market detail widgets | probability, volume, user count, compact summary | about 1m |
 | Market detail dust display | net volume, retained dust, volume with dust | about 1m |
+| User financial widgets | individual P/L, exposure, position-heavy summaries | about 1-10m; refresh after user transaction success |
 | Page-level discovery | `/markets`, topic pages, pinned chart cards, market cards | about 10m |
 | Leaderboard snapshots | market leaderboards | about 10m |
 | Slow dashboard snapshots | system financial metrics, global leaderboard | about 1h |
@@ -177,6 +199,7 @@ Recommended baseline policies:
 | Trigger | Cache behavior |
 |---|---|
 | New bet/sale | Invalidate or mark stale market detail/card/leaderboard caches for that market. |
+| User bet/sale/resolution payout/refund | Invalidate or mark stale affected user financial snapshots. |
 | Market approval/rejection/resolution | Invalidate market card, detail, topic, and admin queue caches. |
 | Tag/CMS layout update | Invalidate discovery and topic page caches. |
 | User profile or leaderboard-affecting event | Invalidate user/global leaderboard caches. |
@@ -204,6 +227,7 @@ Recommended display changes:
 - system financial metrics show a simplified summary first
 - complex financial paths are behind expansion buttons
 - user financial positions are loaded on demand
+- user financial metrics use authenticated read models and expose freshness metadata
 
 ## Correctness Tests
 
@@ -222,6 +246,7 @@ Also test cache invalidation boundaries:
 
 - new bet invalidates market card snapshot
 - sale invalidates market accounting snapshot
+- user transaction invalidates user financial metric snapshot
 - market resolution invalidates leaderboard/system metrics snapshots
 - tag/CMS changes invalidate discovery snapshots
 

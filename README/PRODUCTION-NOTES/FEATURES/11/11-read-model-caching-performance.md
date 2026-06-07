@@ -89,6 +89,7 @@ The following table defines which decisions are transaction-critical and which a
 | Market cancellation/yank refund | Yes | Do not use display cache. Use canonical bet/user state. | Refunds can move credits across many users. |
 | Admin mutation actions | Yes | Read fresh before mutating. | Approval/rejection/stewardship/tag changes alter governance state. |
 | System financial metrics display | No | Cacheable snapshot, roughly hourly. | Informational dashboard; does not execute orders. |
+| Individual user financial metrics display | No | Cacheable authenticated read model, roughly 1-10 minutes depending on widget. | User profile financial summaries, P/L, historical positions, and heavier derived views are display-only and can be refreshed separately from transactions. |
 | Global leaderboard display | No | Cacheable snapshot, roughly hourly; paginate. | Ranking is display-oriented and changes less urgently. |
 | Market leaderboard display | No | Cacheable snapshot, roughly 10 minutes; paginate. | Informational market widget; does not execute orders. |
 | `/markets` discovery page | No | Cacheable page/card read model, roughly 10 minutes. | High-visibility browsing page can tolerate page-level staleness. |
@@ -106,6 +107,7 @@ These are good early candidates because they are read-heavy and not directly res
 | Area | Candidate data | Suggested freshness |
 |---|---|---:|
 | System statistics | financial metrics, active volume, user counts, market counts | about 1h |
+| Individual user financial metrics | user P/L, resolved/unresolved exposure, historical positions, market-by-market financial summaries | about 1-10m; load on demand and refresh after user-initiated transaction success |
 | Global leaderboard | user ranking, profit summaries, resolved market counts | about 1h |
 | Market leaderboard | per-market participant ranking | about 10m |
 | Market cards | title, status, probability, volume, users, tags, steward, close time | about 10m |
@@ -122,7 +124,7 @@ These are good early candidates because they are read-heavy and not directly res
 |---|---|
 | Confirm buy/sell order | Do not cache for decision-making. |
 | Sale quote | Preview-only and informational; final sale recalculates. |
-| User balance | Avoid stale values for transaction decisions; display can poll or show last refreshed timestamp. |
+| User balance | Avoid stale values for transaction decisions; display can poll or show last refreshed timestamp. Complex user financial metrics can be cached separately from spend/settlement checks. |
 | Final payout | Do not use display cache as payout truth. |
 | Admin mutation actions | Read fresh before mutating. |
 
@@ -148,6 +150,8 @@ GET /v0/read/markets/topic/{slug}
 GET /v0/read/markets/{id}/summary
 GET /v0/read/markets/{id}/leaderboard
 GET /v0/read/system/metrics
+GET /v0/read/users/{username}/financial-summary
+GET /v0/read/users/{username}/positions
 GET /v0/read/leaderboard
 ```
 
@@ -186,6 +190,7 @@ Candidate durable Postgres tables or materialized views:
 - `market_display_snapshots`
 - `market_leaderboard_snapshots`
 - `global_leaderboard_snapshots`
+- `user_financial_metric_snapshots`
 - `system_metrics_snapshots`
 - `topic_market_snapshots`
 
