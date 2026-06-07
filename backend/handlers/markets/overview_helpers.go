@@ -110,6 +110,21 @@ func publicMarketResponseFromDomain(market *dmarkets.Market) dto.PublicMarketRes
 	}
 }
 
+func marketDetailsToResponse(details *dmarkets.MarketOverview) dto.MarketDetailsResponse {
+	if details == nil {
+		return dto.MarketDetailsResponse{}
+	}
+	return dto.MarketDetailsResponse{
+		Market:                publicMarketResponseFromDomain(details.Market),
+		Creator:               creatorResponseFromSummary(details.Creator),
+		ProbabilityChanges:    probabilityChangesToResponse(details.ProbabilityChanges),
+		NumUsers:              details.NumUsers,
+		TotalVolume:           details.TotalVolume,
+		MarketDust:            details.MarketDust,
+		DescriptionAmendments: descriptionAmendmentsToResponse(details.DescriptionAmendments),
+	}
+}
+
 func probabilityChangesToResponse(points []dmarkets.ProbabilityPoint) []dto.ProbabilityChangeResponse {
 	if len(points) == 0 {
 		return []dto.ProbabilityChangeResponse{}

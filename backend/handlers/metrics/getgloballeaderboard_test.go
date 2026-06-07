@@ -21,6 +21,15 @@ type leaderboardRepo struct {
 	betsByID map[uint][]boundary.Bet
 }
 
+type globalLeaderboardServiceStub struct {
+	snapshot *analytics.GlobalLeaderboardSnapshot
+	err      error
+}
+
+func (s globalLeaderboardServiceStub) ComputeGlobalLeaderboardSnapshot(context.Context) (*analytics.GlobalLeaderboardSnapshot, error) {
+	return s.snapshot, s.err
+}
+
 func (r *leaderboardRepo) ListUsers(ctx context.Context) ([]analytics.UserAccount, error) {
 	return append([]analytics.UserAccount(nil), r.users...), nil
 }
@@ -144,5 +153,37 @@ func TestGetGlobalLeaderboardHandler_Error(t *testing.T) {
 	}
 	if payload.Reason != string(handlers.ReasonInternalError) {
 		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, payload.Reason)
+	}
+}
+
+func TestGetGlobalLeaderboardHandler_PaginatesResult(t *testing.T) {
+	entries := make([]analytics.GlobalUserProfitability, 0, 5)
+	for i := 1; i <= 5; i++ {
+		entries = append(entries, analytics.GlobalUserProfitability{
+			Username: "user" + string(rune('0'+i)),
+			Rank:     i,
+		})
+	}
+	handler := GetGlobalLeaderboardHandler(globalLeaderboardServiceStub{
+		snapshot: &analytics.GlobalLeaderboardSnapshot{Entries: entries},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard?limit=2&offset=2", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var payload handlers.SuccessEnvelope[[]analytics.GlobalUserProfitability]
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(payload.Result) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(payload.Result))
+	}
+	if payload.Result[0].Username != "user3" || payload.Result[0].Rank != 3 {
+		t.Fatalf("expected first paged entry user3 rank 3, got %+v", payload.Result[0])
 	}
 }

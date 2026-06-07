@@ -92,9 +92,10 @@ func TestServiceApplyTransaction(t *testing.T) {
 		{"win adds funds", users.TransactionWin, 50, 150, false},
 		{"refund adds funds", users.TransactionRefund, 30, 180, false},
 		{"sale adds funds", users.TransactionSale, 20, 200, false},
-		{"buy subtracts funds", users.TransactionBuy, 40, 160, false},
-		{"fee subtracts funds", users.TransactionFee, 10, 150, false},
-		{"invalid type", "UNKNOWN", 5, 150, true},
+		{"work profit adds funds", users.TransactionWorkProfit, 12, 212, false},
+		{"buy subtracts funds", users.TransactionBuy, 40, 172, false},
+		{"fee subtracts funds", users.TransactionFee, 10, 162, false},
+		{"invalid type", "UNKNOWN", 5, 162, true},
 	}
 
 	ctx := context.Background()

@@ -39,6 +39,10 @@ const normalizeProbabilityChanges = (raw) => {
     .filter((item) => item !== null);
 };
 
+const unwrapApiEnvelope = (data) => (
+  data?.result && typeof data.result === 'object' ? data.result : data
+);
+
 const normalizeMarketTag = (tag) => {
   if (!tag || typeof tag !== 'object') {
     return null;
@@ -94,6 +98,22 @@ const normalizeDescriptionAmendments = (raw) => {
   return raw
     .map(normalizeDescriptionAmendment)
     .filter((amendment) => amendment !== null);
+};
+
+const normalizeFreshness = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  return {
+    generatedAt: raw.generatedAt ?? raw.GeneratedAt ?? null,
+    source: raw.source ?? raw.Source ?? '',
+    targetFreshnessSeconds: toNumber(raw.targetFreshnessSeconds ?? raw.TargetFreshnessSeconds),
+    transactionSafeRead: raw.transactionSafeRead ?? raw.TransactionSafeRead ?? false,
+    isStale: raw.isStale ?? raw.IsStale ?? false,
+    staleReason: raw.staleReason ?? raw.StaleReason ?? '',
+    markedStaleAt: raw.markedStaleAt ?? raw.MarkedStaleAt ?? null,
+  };
 };
 
 const normalizeMarket = (market) => {
@@ -170,6 +190,7 @@ const normalizeMarketDetails = (raw) => {
     marketDust: toNumber(raw.marketDust ?? raw.MarketDust),
     lastProbability: toNumber(raw.lastProbability ?? raw.LastProbability),
     descriptionAmendments: normalizeDescriptionAmendments(raw.descriptionAmendments ?? raw.DescriptionAmendments),
+    freshness: normalizeFreshness(raw.freshness ?? raw.Freshness),
   };
 };
 
@@ -210,12 +231,30 @@ export const useMarketDetails = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${API_URL}/v0/markets/${marketId}`);
-        if (!response.ok) {
+        const [detailsResponse, summaryResponse] = await Promise.all([
+          fetch(`${API_URL}/v0/markets/${marketId}`),
+          fetch(`${API_URL}/v0/read/markets/${marketId}/summary`).catch(() => null),
+        ]);
+        if (!detailsResponse.ok) {
           throw new Error('Failed to fetch market data');
         }
-        const data = await response.json();
-        const normalized = normalizeMarketDetails(data);
+        const data = unwrapApiEnvelope(await detailsResponse.json());
+        let normalized = normalizeMarketDetails(data);
+        if (summaryResponse?.ok) {
+          const summary = normalizeMarketDetails(unwrapApiEnvelope(await summaryResponse.json()));
+          if (summary) {
+            normalized = {
+              ...normalized,
+              probabilityChanges: summary.probabilityChanges.length > 0
+                ? summary.probabilityChanges
+                : normalized.probabilityChanges,
+              numUsers: summary.numUsers,
+              totalVolume: summary.totalVolume,
+              marketDust: summary.marketDust,
+              freshness: summary.freshness,
+            };
+          }
+        }
         setDetails(normalized);
         setCurrentProbability(calculateCurrentProbability(normalized));
       } catch (error) {

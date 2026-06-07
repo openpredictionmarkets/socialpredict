@@ -7,7 +7,7 @@ const UserInfoTabContent = ({ username, userData }) => {
     const [userCredit, setUserCredit] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const { token } = useAuth();
+    const { isLoggedIn, token } = useAuth();
 
     useEffect(() => {
         const fetchUserCredit = async () => {
@@ -28,6 +28,8 @@ const UserInfoTabContent = ({ username, userData }) => {
         if (username && token) {
             fetchUserCredit();
         } else {
+            setUserCredit(null);
+            setError(null);
             setLoading(false);
         }
     }, [username, token]);
@@ -74,6 +76,15 @@ const UserInfoTabContent = ({ username, userData }) => {
                             <div className="flex items-center">
                                 <LoadingSpinner />
                                 <span className="ml-2 text-gray-300">Loading...</span>
+                            </div>
+                        ) : !isLoggedIn ? (
+                            <div className="text-center">
+                                <div className="text-xl font-semibold text-blue-100">
+                                    Log in to see credits
+                                </div>
+                                <div className="text-sm text-gray-400 mt-2">
+                                    User credit is visible to logged-in players.
+                                </div>
                             </div>
                         ) : error ? (
                             <div className="text-red-400">

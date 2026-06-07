@@ -18,18 +18,48 @@ const unwrapApiResponse = (payload) => {
   return payload;
 };
 
+const paginationButtonClass = [
+  'rounded',
+  'border',
+  'border-transparent',
+  'bg-neutral-btn',
+  'px-3',
+  'py-1.5',
+  'text-xs',
+  'font-semibold',
+  'text-white',
+  'transition-colors',
+  'duration-200',
+  'hover:bg-neutral-btn-hover',
+  'disabled:cursor-not-allowed',
+  'disabled:bg-custom-gray-light',
+  'disabled:text-gray-400',
+  'disabled:opacity-60',
+].join(' ');
+
 const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
+  const pageSize = 20;
   const [positions, setPositions] = useState([]);
+  const [freshness, setFreshness] = useState(null);
+  const [page, setPage] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const { token } = useAuth();
+
+  useEffect(() => {
+    setPage(0);
+  }, [marketId, refreshTrigger, token]);
 
   useEffect(() => {
     const fetchPositions = async () => {
       if (!token) {
         setPositions([]);
+        setFreshness(null);
+        setHasNextPage(false);
         return;
       }
 
-      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}`, {
+      const offset = page * pageSize;
+      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}?limit=${pageSize}&offset=${offset}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -38,59 +68,106 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
 
       if (!response.ok) {
         setPositions([]);
+        setFreshness(null);
+        setHasNextPage(false);
         return;
       }
 
       const rawData = unwrapApiResponse(await response.json());
-      const filteredSorted = rawData
+      const positionRows = Array.isArray(rawData?.positions)
+        ? rawData.positions
+        : Array.isArray(rawData)
+          ? rawData
+          : [];
+      const filteredSorted = positionRows
         .filter(user => user.noSharesOwned > 0 || user.yesSharesOwned > 0)
         .sort((a, b) => (b.noSharesOwned + b.yesSharesOwned) - (a.noSharesOwned + a.yesSharesOwned));
 
       setPositions(filteredSorted);
+      setFreshness(rawData?.freshness || null);
+      setHasNextPage(positionRows.length === pageSize);
     };
 
     fetchPositions();
-  }, [marketId, refreshTrigger, token]);
+  }, [marketId, refreshTrigger, token, page]);
 
+  const freshnessLabel = freshness?.generatedAt
+    ? new Date(freshness.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+    : null;
   const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
+  const pageStart = page * pageSize;
+  const canPageBack = page > 0;
+  const canPageForward = hasNextPage;
 
   return (
-    <div className="flex flex-row gap-4 p-4">
-      {/* NO Shares */}
-      <div className="flex-1">
-        <h2 className="text-center font-bold mb-2">Shares for: <span className="text-red-500">{labels.no}</span></h2>
-        <div className="flex flex-col gap-2">
-          {positions.filter(pos => pos.noSharesOwned > 0).map((pos, index) => (
-            <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">
-              <Link
-                to={`/user/${pos.username}`}
-                className="text-blue-400 font-bold underline hover:text-blue-600"
-              >
-                {pos.username}
-              </Link>
-              <div className="text-sm text-gray-300">Shares: {pos.noSharesOwned}</div>
-              <div className="text-sm text-green-400">Value: {pos.value}</div>
+    <div className="p-4">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+            Showing positions page {page + 1}{positions.length ? ` (${pageStart + 1}-${pageStart + positions.length})` : ''}
+          </div>
+          {freshnessLabel && (
+            <div className="mt-1 text-xs text-gray-500">
+              Positions generated at {freshnessLabel}. Trade confirmations remain authoritative.
             </div>
-          ))}
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPage(current => Math.max(0, current - 1))}
+            disabled={!canPageBack}
+            className={paginationButtonClass}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => setPage(current => current + 1)}
+            disabled={!canPageForward}
+            className={paginationButtonClass}
+          >
+            Next
+          </button>
         </div>
       </div>
+      <div className="flex flex-row gap-4">
+        {/* NO Shares */}
+        <div className="flex-1">
+          <h2 className="text-center font-bold mb-2">Shares for: <span className="text-red-500">{labels.no}</span></h2>
+          <div className="flex flex-col gap-2">
+            {positions.filter(pos => pos.noSharesOwned > 0).map((pos, index) => (
+              <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">
+                <Link
+                  to={`/user/${pos.username}`}
+                  className="text-blue-400 font-bold underline hover:text-blue-600"
+                >
+                  {pos.username}
+                </Link>
+                <div className="text-sm text-gray-300">Shares: {pos.noSharesOwned}</div>
+                <div className="text-sm text-green-400">Value: {pos.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-      {/* YES Shares */}
-      <div className="flex-1">
-        <h2 className="text-center font-bold mb-2">Shares for: <span className="text-green-500">{labels.yes}</span></h2>
-        <div className="flex flex-col gap-2">
-          {positions.filter(pos => pos.yesSharesOwned > 0).map((pos, index) => (
-            <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">
-              <Link
-                to={`/user/${pos.username}`}
-                className="text-blue-400 font-bold underline hover:text-blue-600"
-              >
-                {pos.username}
-              </Link>
-              <div className="text-sm text-gray-300">Shares: {pos.yesSharesOwned}</div>
-              <div className="text-sm text-green-400">Value: {pos.value}</div>
-            </div>
-          ))}
+        {/* YES Shares */}
+        <div className="flex-1">
+          <h2 className="text-center font-bold mb-2">Shares for: <span className="text-green-500">{labels.yes}</span></h2>
+          <div className="flex flex-col gap-2">
+            {positions.filter(pos => pos.yesSharesOwned > 0).map((pos, index) => (
+              <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">
+                <Link
+                  to={`/user/${pos.username}`}
+                  className="text-blue-400 font-bold underline hover:text-blue-600"
+                >
+                  {pos.username}
+                </Link>
+                <div className="text-sm text-gray-300">Shares: {pos.yesSharesOwned}</div>
+                <div className="text-sm text-green-400">Value: {pos.value}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -20,6 +20,8 @@ import (
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
 	"socialpredict/handlers/cms/marketdiscovery"
 	cmsdiscoveryhttp "socialpredict/handlers/cms/marketdiscovery/http"
+	"socialpredict/handlers/cms/reportingvisibility"
+	cmsreportinghttp "socialpredict/handlers/cms/reportingvisibility/http"
 	"socialpredict/handlers/cms/socialshare"
 	cmssocialhttp "socialpredict/handlers/cms/socialshare/http"
 	marketshandlers "socialpredict/handlers/markets"
@@ -32,11 +34,14 @@ import (
 	privateuser "socialpredict/handlers/users/privateuser"
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
+	"socialpredict/internal/app/readmodelinvalidation"
 	appruntime "socialpredict/internal/app/runtime"
 	dmarkets "socialpredict/internal/domain/markets"
+	readmodelrepo "socialpredict/internal/repository/readmodels"
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/logger"
+	"socialpredict/models"
 	"socialpredict/security"
 	"sort"
 	"strings"
@@ -270,12 +275,47 @@ func writeProbeResponse(w http.ResponseWriter, status int, body string) {
 	_, _ = w.Write([]byte(body))
 }
 
-func registerApplicationReportingRoutes(router *mux.Router, configService configsvc.Service, statsService statshandlers.FinancialStatsService, reportingService applicationReportingService, securityMiddleware func(http.Handler) http.Handler) {
+type reportingVisibilityService interface {
+	GetSettings() (*models.ReportingVisibilitySettings, error)
+}
+
+func registerApplicationReportingRoutes(router *mux.Router, configService configsvc.Service, statsService statshandlers.FinancialStatsService, reportingService applicationReportingService, visibility reportingVisibilityService, auth authsvc.Authenticator, securityMiddleware func(http.Handler) http.Handler) {
 	// These /v0/ reporting routes stay application-owned. Future tracing or metrics
 	// export work belongs in request-boundary/runtime wiring, not in health probes.
 	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(statsService, configService))).Methods("GET")
-	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(reportingService))).Methods("GET")
-	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(reportingService))).Methods("GET")
+	router.Handle("/v0/system/metrics", securityMiddleware(reportingVisibilityGate(visibility, auth, func(s *models.ReportingVisibilitySettings) bool {
+		return s == nil || s.SystemMetricsPublic
+	}, metricshandlers.GetSystemMetricsHandler(reportingService)))).Methods("GET")
+	router.Handle("/v0/global/leaderboard", securityMiddleware(reportingVisibilityGate(visibility, auth, func(s *models.ReportingVisibilitySettings) bool {
+		return s == nil || s.GlobalLeaderboardPublic
+	}, metricshandlers.GetGlobalLeaderboardHandler(reportingService)))).Methods("GET")
+}
+
+func reportingVisibilityGate(visibility reportingVisibilityService, auth authsvc.Authenticator, isPublic func(*models.ReportingVisibilitySettings) bool, next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		settings := reportingvisibility.DefaultSettings()
+		if visibility != nil {
+			loaded, err := visibility.GetSettings()
+			if err != nil {
+				_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+				return
+			}
+			settings = loaded
+		}
+		if isPublic == nil || isPublic(settings) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if auth == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		if _, authErr := auth.CurrentUser(r); authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func requirePasswordChangeCleared(auth authsvc.Authenticator, next http.Handler) http.Handler {
@@ -293,6 +333,41 @@ func requirePasswordChangeCleared(auth authsvc.Authenticator, next http.Handler)
 	})
 }
 
+type marketDiscoveryStaleMarker interface {
+	MarkMarketDiscoverySnapshotsStale(ctx context.Context, reason string) error
+}
+
+type responseStatusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *responseStatusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *responseStatusRecorder) Write(data []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(data)
+}
+
+func markDiscoveryStaleOnSuccess(marker marketDiscoveryStaleMarker, reason string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder := &responseStatusRecorder{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		status := recorder.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		if marker != nil && status >= 200 && status < 300 {
+			_ = marker.MarkMarketDiscoverySnapshotsStale(r.Context(), reason)
+		}
+	})
+}
+
 func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService configsvc.Service, securityConfig appruntime.SecurityConfig) {
 	container := app.BuildApplicationWithConfigAndJWTSigningKey(db, configService, securityConfig.JWTSigningKey)
 	marketsService := container.GetMarketsService()
@@ -301,9 +376,12 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	analyticsService := container.GetAnalyticsService()
 	authService := container.GetAuthService()
 	requestSecurityService := container.GetSecurityService()
+	readModelSnapshotRepo := readmodelrepo.NewGormRepository(db)
+	readModelInvalidator := readmodelinvalidation.New(marketsService, analyticsService, readModelSnapshotRepo)
 
 	// Create Handler instances
 	marketsHandler := marketshandlers.NewHandler(marketsService, authService, requestSecurityService)
+	marketsHandler.SetReadModelInvalidator(readModelInvalidator)
 
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
@@ -322,7 +400,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// application setup information
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
 	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
-	registerApplicationReportingRoutes(router, configService, analyticsService, analyticsService, securityMiddleware)
+	reportingVisibilityRepo := reportingvisibility.NewGormRepository(db)
+	reportingVisibilitySvc := reportingvisibility.NewService(reportingVisibilityRepo)
+	reportingVisibilityHandler := cmsreportinghttp.NewHandler(reportingVisibilitySvc, authService)
+	registerApplicationReportingRoutes(router, configService, analyticsService, analyticsService, reportingVisibilitySvc, authService, securityMiddleware)
 
 	// CMS routes and services
 	homepageRepo := homepage.NewGormRepository(db)
@@ -333,6 +414,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	marketDiscoveryRepo := marketdiscovery.NewGormRepository(db)
 	marketDiscoverySvc := marketdiscovery.NewService(marketDiscoveryRepo)
 	marketDiscoveryHandler := cmsdiscoveryhttp.NewHandler(marketDiscoverySvc, authService)
+	marketDiscoveryHandler.SetReadModelInvalidator(readModelSnapshotRepo)
+	marketDiscoveryReadModelHandler := marketshandlers.NewMarketDiscoveryReadModelHandler(marketsService, marketDiscoverySvc, readModelSnapshotRepo)
 
 	socialShareRepo := socialshare.NewGormRepository(db)
 	socialShareSvc := socialshare.NewService(socialShareRepo)
@@ -361,6 +444,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// Markets routes - using new Handler instance
 	router.Handle("/markets/{id:[0-9]+}", securityMiddleware(marketshandlers.MarketShareShellHandler(marketsService, shareMetadataConfig(securityConfig.Share), socialShareConfigProvider))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.ListMarkets))).Methods("GET")
+	router.Handle("/v0/read/market-discovery/{slug}", securityMiddleware(http.HandlerFunc(marketDiscoveryReadModelHandler.Get))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
 	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
 	router.Handle("/v0/markets/status/{status}", securityMiddleware(http.HandlerFunc(marketsHandler.ListByStatus))).Methods("GET")
@@ -368,6 +452,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 		rWithStatus := mux.SetURLVars(r, map[string]string{"status": "all"})
 		marketsHandler.ListByStatus(w, rWithStatus)
 	}))).Methods("GET")
+	router.Handle("/v0/read/markets/{id}/summary", securityMiddleware(http.HandlerFunc(marketsHandler.MarketSummaryReadModel))).Methods("GET")
 
 	// Legacy routes for backward compatibility — rewrite to new handler with status query
 	router.Handle("/v0/markets/active", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -407,6 +492,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, configService.Economics().User.MaximumDebtAllowed))).Methods("GET")
 	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(usershandlers.GetUserFinancialHandler(usersService))).Methods("GET")
+	router.Handle("/v0/read/users/{username}/financial-summary", securityMiddleware(usershandlers.GetUserFinancialReadModelHandler(analyticsService, authService))).Methods("GET")
+	router.Handle("/v0/users/{username}/owned-markets", securityMiddleware(marketshandlers.ListUserOwnedMarketsHandler(marketsService, authService))).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize
 	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")
@@ -420,9 +507,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/profilechange/links", securityMiddleware(usershandlers.ChangePersonalLinksHandler(usersService))).Methods("POST")
 
 	// handle private user actions such as make a bet, sell positions, get user position
-	router.Handle("/v0/bet", privateActionMiddleware(buybetshandlers.PlaceBetHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
+	router.Handle("/v0/bet", privateActionMiddleware(buybetshandlers.PlaceBetHandlerWithInvalidator(container.GetBetsService(), container.GetUsersService(), readModelInvalidator))).Methods("POST")
 	router.Handle("/v0/userposition/{marketId}", privateActionMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
-	router.Handle("/v0/sell", privateActionMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
+	router.Handle("/v0/sell/quote", privateActionMiddleware(sellbetshandlers.SellQuoteHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
+	router.Handle("/v0/sell", privateActionMiddleware(sellbetshandlers.SellPositionHandlerWithInvalidator(container.GetBetsService(), container.GetUsersService(), readModelInvalidator))).Methods("POST")
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(usersService, container.GetConfigService(), authService, requestSecurityService)))).Methods("POST")
@@ -430,17 +518,17 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/admin/users/{username}/role", securityMiddleware(adminhandlers.UpdateAdminUserRoleHandler(usersService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/moderators/{username}/suspension", securityMiddleware(adminhandlers.UpdateAdminModeratorSuspensionHandler(usersService, authService, time.Now))).Methods("PATCH")
 	router.Handle("/v0/admin/markets", securityMiddleware(adminhandlers.ListReviewMarketsHandler(marketsService, authService))).Methods("GET")
-	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(adminhandlers.ApproveMarketHandler(marketsService, authService))).Methods("PATCH")
-	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(adminhandlers.RejectMarketHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/approve", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "market_status_changed", adminhandlers.ApproveMarketHandler(marketsService, authService)))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/reject", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "market_status_changed", adminhandlers.RejectMarketHandler(marketsService, authService)))).Methods("PATCH")
 	router.Handle("/v0/admin/markets/{id}/steward", securityMiddleware(adminhandlers.ReassignMarketStewardHandler(marketsService, authService))).Methods("PATCH")
-	router.Handle("/v0/admin/markets/{id}/tags", securityMiddleware(adminhandlers.UpdateMarketTagsHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/markets/{id}/tags", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "market_tags_changed", adminhandlers.UpdateMarketTagsHandler(marketsService, authService)))).Methods("PATCH")
 	router.Handle("/v0/admin/market-description-amendments", securityMiddleware(adminhandlers.ListMarketDescriptionAmendmentsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/market-description-amendments/settings", securityMiddleware(adminhandlers.GetMarketGovernanceSettingsHandler(marketsService, authService))).Methods("GET")
 	router.Handle("/v0/admin/market-description-amendments/settings", securityMiddleware(adminhandlers.UpdateMarketGovernanceSettingsHandler(marketsService, authService))).Methods("PUT")
 	router.Handle("/v0/admin/market-description-amendments/{id}", securityMiddleware(adminhandlers.ReviewMarketDescriptionAmendmentHandler(marketsService, authService))).Methods("PATCH")
 	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.ListAdminMarketTagsHandler(marketsService, authService))).Methods("GET")
-	router.Handle("/v0/admin/market-tags", securityMiddleware(adminhandlers.CreateAdminMarketTagHandler(marketsService, authService))).Methods("POST")
-	router.Handle("/v0/admin/market-tags/{slug}", securityMiddleware(adminhandlers.UpdateAdminMarketTagHandler(marketsService, authService))).Methods("PATCH")
+	router.Handle("/v0/admin/market-tags", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "tag_catalog_changed", adminhandlers.CreateAdminMarketTagHandler(marketsService, authService)))).Methods("POST")
+	router.Handle("/v0/admin/market-tags/{slug}", securityMiddleware(markDiscoveryStaleOnSuccess(readModelSnapshotRepo, "tag_catalog_changed", adminhandlers.UpdateAdminMarketTagHandler(marketsService, authService)))).Methods("PATCH")
 
 	router.HandleFunc("/v0/content/home", homepageHandler.PublicGet).Methods("GET")
 	router.Handle("/v0/admin/content/home", securityMiddleware(http.HandlerFunc(homepageHandler.AdminUpdate))).Methods("PUT")
@@ -452,6 +540,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.HandleFunc("/api/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")
 	router.Handle("/v0/admin/content/social-share", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUpdate))).Methods("PUT")
 	router.Handle("/v0/admin/content/social-share/image", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUploadImage))).Methods("POST")
+	router.Handle("/v0/content/reporting-visibility", securityMiddleware(http.HandlerFunc(reportingVisibilityHandler.PublicGet))).Methods("GET")
+	router.Handle("/v0/admin/content/reporting-visibility", securityMiddleware(http.HandlerFunc(reportingVisibilityHandler.AdminUpdate))).Methods("PUT")
 }
 
 func shareMetadataConfig(config appruntime.ShareConfig) dmarkets.ShareMetadataConfig {

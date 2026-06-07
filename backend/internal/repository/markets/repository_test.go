@@ -519,6 +519,59 @@ func TestGormRepositoryListByLifecycleHydratesStewardshipAudits(t *testing.T) {
 	}
 }
 
+func TestGormRepositoryListByLifecycleOwnedByIncludesCreatorAndCurrentSteward(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	alice := modelstesting.GenerateUser("owned_alice", 1000)
+	bob := modelstesting.GenerateUser("owned_bob", 1000)
+	carol := modelstesting.GenerateUser("owned_carol", 1000)
+	for _, user := range []any{&alice, &bob, &carol} {
+		if err := db.Create(user).Error; err != nil {
+			t.Fatalf("seed user: %v", err)
+		}
+	}
+
+	createdByAlice := modelstesting.GenerateMarket(710, alice.Username)
+	createdByAlice.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	createdByAlice.StewardUsername = alice.Username
+
+	stewardedByAlice := modelstesting.GenerateMarket(711, bob.Username)
+	stewardedByAlice.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	stewardedByAlice.StewardUsername = alice.Username
+
+	unowned := modelstesting.GenerateMarket(712, bob.Username)
+	unowned.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	unowned.StewardUsername = carol.Username
+
+	for _, market := range []any{&createdByAlice, &stewardedByAlice, &unowned} {
+		if err := db.Create(market).Error; err != nil {
+			t.Fatalf("seed market: %v", err)
+		}
+	}
+
+	markets, err := repo.ListByLifecycle(ctx, dmarkets.ListFilters{
+		Status:  dmarkets.MarketStatusAll,
+		OwnedBy: alice.Username,
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("ListByLifecycle returned error: %v", err)
+	}
+
+	got := map[int64]bool{}
+	for _, market := range markets {
+		got[market.ID] = true
+	}
+	if !got[createdByAlice.ID] || !got[stewardedByAlice.ID] {
+		t.Fatalf("expected created and stewarded markets, got %+v", got)
+	}
+	if got[unowned.ID] {
+		t.Fatalf("did not expect unowned market in results: %+v", got)
+	}
+}
+
 func TestGormRepositoryListByLifecycleAllExcludesRejectedAndSearchesOperationalMarkets(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := NewGormRepository(db)

@@ -7,7 +7,7 @@ const UserFinancialStatementsLayout = ({ username }) => {
     const [financialData, setFinancialData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const { token } = useAuth();
+    const { isLoggedIn, token } = useAuth();
 
     useEffect(() => {
         const fetchFinancialData = async () => {
@@ -36,6 +36,8 @@ const UserFinancialStatementsLayout = ({ username }) => {
         if (username && token) {
             fetchFinancialData();
         } else {
+            setFinancialData(null);
+            setError(null);
             setLoading(false);
         }
     }, [username, token]);
@@ -117,8 +119,15 @@ const UserFinancialStatementsLayout = ({ username }) => {
     if (!financialData) {
         return (
             <div className="bg-primary-background shadow-md rounded-lg p-6">
-                <div className="text-gray-300">
-                    No financial data available.
+                <div className="text-center">
+                    <div className="text-xl font-semibold text-blue-100">
+                        {isLoggedIn ? 'No financial data available.' : 'Log in to see financials'}
+                    </div>
+                    {!isLoggedIn && (
+                        <div className="text-sm text-gray-400 mt-2">
+                            User financial summaries are visible to logged-in players.
+                        </div>
+                    )}
                 </div>
             </div>
         );

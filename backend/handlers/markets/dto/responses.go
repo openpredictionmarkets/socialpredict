@@ -1,8 +1,6 @@
 package dto
 
-import (
-	"time"
-)
+import "time"
 
 // MarketResponse represents the HTTP response for a market
 type MarketResponse struct {
@@ -157,6 +155,18 @@ type LeaderboardResponse struct {
 	MarketID    int64            `json:"marketId"`
 	Leaderboard []LeaderboardRow `json:"leaderboard"`
 	Total       int              `json:"total"`
+	Freshness   *Freshness       `json:"freshness,omitempty"`
+}
+
+// Freshness represents display/read-model freshness metadata.
+type Freshness struct {
+	GeneratedAt            time.Time  `json:"generatedAt"`
+	Source                 string     `json:"source"`
+	TargetFreshnessSeconds int        `json:"targetFreshnessSeconds"`
+	TransactionSafeRead    bool       `json:"transactionSafeRead"`
+	IsStale                bool       `json:"isStale"`
+	StaleReason            string     `json:"staleReason,omitempty"`
+	MarkedStaleAt          *time.Time `json:"markedStaleAt,omitempty"`
 }
 
 // ProbabilityProjectionResponse represents the HTTP response for probability projection

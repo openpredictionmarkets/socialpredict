@@ -30,7 +30,7 @@ func TestGetSetupHandler(t *testing.T) {
 				"marketcreation":{"initialMarketProbability":0.5,"initialMarketSubsidization":10,"initialMarketYes":0,"initialMarketNo":0,"minimumFutureHours":1},
 				"marketincentives":{"createMarketCost":10,"traderBonus":1},
 				"user":{"initialAccountBalance":0,"maximumDebtAllowed":500},
-				"betting":{"minimumBet":1,"maxDustPerSale":2,"betFees":{"initialBetFee":1,"buySharesFee":0,"sellSharesFee":0}}}`,
+				"betting":{"minimumBet":1,"maxDustPerSale":1,"betFees":{"initialBetFee":1,"buySharesFee":0,"sellSharesFee":0}}}`,
 			IsJSONResponse: true,
 		}, {
 			Name:             "missing config service",

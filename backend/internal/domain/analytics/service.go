@@ -20,6 +20,7 @@ type VolumeRepository interface {
 
 // FeeRepository exposes the ordered bet data needed for participation fee calculations.
 type FeeRepository interface {
+	ListMarkets(ctx context.Context) ([]MarketRecord, error)
 	ListBetsOrdered(ctx context.Context) ([]boundary.Bet, error)
 }
 
@@ -32,6 +33,26 @@ type LeaderboardRepository interface {
 // FinancialsRepository provides the data required for per-user financial snapshots.
 type FinancialsRepository interface {
 	UserMarketPositions(ctx context.Context, username string) ([]positionsmath.MarketPosition, error)
+	UserWorkProfitResolvedMarkets(ctx context.Context, username string) ([]WorkProfitMarketRecord, error)
+	ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error)
+}
+
+// UserFinancialMetricSnapshotRepository persists authenticated display-only
+// user financial read models. It is intentionally separate from Repository so
+// transaction paths cannot satisfy their dependencies from financial snapshots.
+type UserFinancialMetricSnapshotRepository interface {
+	GetUserFinancialMetricSnapshot(ctx context.Context, username string) (*UserFinancialMetricSnapshot, error)
+	UpsertUserFinancialMetricSnapshot(ctx context.Context, snapshot UserFinancialMetricSnapshot) error
+	MarkUserFinancialMetricSnapshotStale(ctx context.Context, username string, reason string) error
+}
+
+// AnalyticsReadModelSnapshotRepository persists display-only aggregate
+// analytics snapshots. It is intentionally separate from transaction-facing
+// repository interfaces.
+type AnalyticsReadModelSnapshotRepository interface {
+	GetAnalyticsReadModelSnapshot(ctx context.Context, key string) (*AnalyticsReadModelSnapshot, error)
+	UpsertAnalyticsReadModelSnapshot(ctx context.Context, snapshot AnalyticsReadModelSnapshot) error
+	MarkAnalyticsReadModelSnapshotStale(ctx context.Context, key string, reason string) error
 }
 
 // StatsRepository exposes aggregate account data required by stats reporting.

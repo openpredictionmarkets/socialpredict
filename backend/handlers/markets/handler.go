@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
@@ -37,6 +38,16 @@ type Handler struct {
 	service         Service
 	auth            authsvc.Authenticator
 	securityService *security.SecurityService
+	invalidator     readModelInvalidator
+}
+
+type readModelInvalidator interface {
+	InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error
+}
+
+type marketLeaderboardReadModelService interface {
+	GetMarketLeaderboardReadModel(ctx context.Context, marketID int64, p dmarkets.Page) (*dmarkets.MarketLeaderboardSnapshot, error)
+	RefreshMarketLeaderboardSnapshot(ctx context.Context, marketID int64) (*dmarkets.MarketLeaderboardSnapshot, error)
 }
 
 // NewHandler creates a new markets handler
@@ -46,6 +57,12 @@ func NewHandler(service Service, auth authsvc.Authenticator, securityService *se
 		auth:            auth,
 		securityService: securityService,
 	}
+}
+
+// SetReadModelInvalidator wires optional post-mutation display read-model
+// invalidation without making it part of the market transaction service.
+func (h *Handler) SetReadModelInvalidator(invalidator readModelInvalidator) {
+	h.invalidator = invalidator
 }
 
 // CreateMarket handles POST /markets
@@ -316,6 +333,11 @@ func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	if h.invalidator != nil {
+		if err := h.invalidator.InvalidateAfterMarketTransaction(r.Context(), user.Username, id, "market_resolved"); err != nil {
+			logger.LogError("ResolveMarket", "InvalidateReadModels", err)
+		}
+	}
 }
 
 // ListByStatus handles GET /markets/status/{status}
@@ -385,15 +407,7 @@ func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.MarketDetailsResponse{
-		Market:                publicMarketResponseFromDomain(details.Market),
-		Creator:               creatorResponseFromSummary(details.Creator),
-		ProbabilityChanges:    probabilityChangesToResponse(details.ProbabilityChanges),
-		NumUsers:              details.NumUsers,
-		TotalVolume:           details.TotalVolume,
-		MarketDust:            details.MarketDust,
-		DescriptionAmendments: descriptionAmendmentsToResponse(details.DescriptionAmendments),
-	}
+	response := marketDetailsToResponse(details)
 
 	_ = writeJSON(w, http.StatusOK, response)
 }
@@ -413,10 +427,22 @@ func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
 
 	page := parsePagination(r, 100)
 
-	leaderboard, err := h.service.GetMarketLeaderboard(r.Context(), id, page)
-	if err != nil {
-		writeLeaderboardError(w, err)
-		return
+	var leaderboard []*dmarkets.LeaderboardRow
+	var freshness *dto.Freshness
+	if snapshot, snapshotErr := h.marketLeaderboardReadModel(r.Context(), id, page); snapshotErr == nil && snapshot != nil {
+		leaderboard = snapshot.Rows
+		freshnessResponse := readModelFreshnessToResponse(snapshot.Freshness())
+		freshness = &freshnessResponse
+	} else {
+		if snapshotErr != nil {
+			logger.LogError("MarketLeaderboard", "GetMarketLeaderboardReadModel", snapshotErr)
+		}
+		var err error
+		leaderboard, err = h.service.GetMarketLeaderboard(r.Context(), id, page)
+		if err != nil {
+			writeLeaderboardError(w, err)
+			return
+		}
 	}
 
 	leaderRows := buildLeaderboardRows(leaderboard)
@@ -425,9 +451,37 @@ func (h *Handler) MarketLeaderboard(w http.ResponseWriter, r *http.Request) {
 		MarketID:    id,
 		Leaderboard: leaderRows,
 		Total:       len(leaderRows),
+		Freshness:   freshness,
 	}
 
 	_ = handlers.WriteResult(w, http.StatusOK, response)
+}
+
+func (h *Handler) marketLeaderboardReadModel(ctx context.Context, marketID int64, page dmarkets.Page) (*dmarkets.MarketLeaderboardSnapshot, error) {
+	service, ok := h.service.(marketLeaderboardReadModelService)
+	if !ok {
+		return nil, nil
+	}
+
+	snapshot, err := service.GetMarketLeaderboardReadModel(ctx, marketID, page)
+	if err != nil {
+		return nil, err
+	}
+
+	if snapshot == nil || snapshot.IsStale || snapshot.GeneratedAt.IsZero() || time.Since(snapshot.GeneratedAt) > dmarkets.MarketLeaderboardSnapshotTargetFreshness {
+		if _, refreshErr := service.RefreshMarketLeaderboardSnapshot(ctx, marketID); refreshErr != nil {
+			if snapshot != nil {
+				return snapshot, nil
+			}
+			return nil, refreshErr
+		}
+		snapshot, err = service.GetMarketLeaderboardReadModel(ctx, marketID, page)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return snapshot, nil
 }
 
 // ProjectProbability handles GET /markets/{id}/projection

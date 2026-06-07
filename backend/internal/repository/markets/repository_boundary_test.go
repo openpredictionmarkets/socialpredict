@@ -9,14 +9,13 @@ import (
 
 func TestMapModelBetsToBoundaryPreservesBetFields(t *testing.T) {
 	now := time.Unix(1700000000, 0).UTC()
-	dbBets := []models.Bet{{
-		ID:       9,
-		Username: "alice",
-		MarketID: 7,
-		Amount:   25,
-		Outcome:  "YES",
-		PlacedAt: now,
-	}}
+	dbBets := []models.Bet{{}}
+	dbBets[0].ID = 9
+	dbBets[0].Username = "alice"
+	dbBets[0].MarketID = 7
+	dbBets[0].Amount = 25
+	dbBets[0].Outcome = "YES"
+	dbBets[0].PlacedAt = now
 
 	got := mapModelBetsToBoundary(dbBets)
 	if len(got) != 1 {

@@ -59,6 +59,17 @@ type MarketBetRepository interface {
 	ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error)
 }
 
+// MarketAccountingSnapshotRepository exposes durable display/read-model snapshot persistence.
+//
+// This interface is intentionally not embedded in Repository. Market
+// transaction paths such as buy, sell, resolution, payout, and refund must not
+// be able to satisfy their dependencies by reading display snapshots.
+type MarketAccountingSnapshotRepository interface {
+	GetMarketAccountingSnapshot(ctx context.Context, marketID int64) (*MarketAccountingSnapshot, error)
+	UpsertMarketAccountingSnapshot(ctx context.Context, snapshot MarketAccountingSnapshot) error
+	MarkMarketAccountingSnapshotStale(ctx context.Context, marketID int64, reason string) error
+}
+
 // Repository defines the interface for market data access.
 type Repository interface {
 	MarketReadRepository
@@ -93,6 +104,7 @@ type UserService interface {
 type Config struct {
 	MinimumFutureHours     float64
 	CreateMarketCost       int64
+	InitialBetFee          int64
 	MaximumDebtAllowed     int64
 	GameMode               string
 	MarketApprovalRequired bool
@@ -166,6 +178,7 @@ type ListFilters struct {
 	Status    string
 	Query     string
 	CreatedBy string
+	OwnedBy   string
 	TagSlug   string
 	Limit     int
 	Offset    int
@@ -204,7 +217,9 @@ type ServiceInterface interface {
 	ProjectProbability(ctx context.Context, req ProbabilityProjectionRequest) (*ProbabilityProjection, error)
 	GetMarketDetails(ctx context.Context, marketID int64) (*MarketOverview, error)
 	GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error)
+	GetMarketBetsPage(ctx context.Context, marketID int64, p Page) ([]*BetDisplayInfo, error)
 	GetMarketPositions(ctx context.Context, marketID int64) (MarketPositions, error)
+	GetMarketPositionsPage(ctx context.Context, marketID int64, p Page) (MarketPositions, error)
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*UserPosition, error)
 	CalculateMarketVolume(ctx context.Context, marketID int64) (int64, error)
 	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)

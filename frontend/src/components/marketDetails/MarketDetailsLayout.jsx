@@ -22,6 +22,7 @@ function MarketDetailsTable({
   marketDust,
   currentProbability,
   probabilityChanges,
+  freshness,
   descriptionAmendments = [],
   marketId: marketIdProp,
   username,
@@ -36,6 +37,12 @@ function MarketDetailsTable({
   const stewardUsername = stewardUsernameFor(safeMarket, creatorUsername);
   const creatorEmoji = safeCreator.personalEmoji ?? DEFAULT_CREATOR_EMOJI;
   const marketDescription = safeMarket.description ?? '';
+  const freshnessGeneratedAt = freshness?.generatedAt
+    ? new Date(freshness.generatedAt)
+    : null;
+  const freshnessLabel = freshnessGeneratedAt && !Number.isNaN(freshnessGeneratedAt.getTime())
+    ? freshnessGeneratedAt.toLocaleTimeString()
+    : '';
 
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showBetModal, setShowBetModal] = useState(false);
@@ -285,6 +292,12 @@ function MarketDetailsTable({
             <div className='text-sm font-semibold truncate'>—</div>
           </div>
         </div>
+      )}
+
+      {freshnessLabel && (
+        <p className="mb-4 text-center text-xs text-gray-500">
+          Display widgets generated at {freshnessLabel}. Trade confirmations remain authoritative.
+        </p>
       )}
 
       <div className='flex items-center justify-center mb-4 space-x-4 py-4'>

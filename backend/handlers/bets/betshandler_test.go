@@ -17,7 +17,8 @@ import (
 
 // marketServiceStub satisfies dmarkets.ServiceInterface for tests.
 type marketServiceStub struct {
-	getMarketBetsFunc func(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error)
+	getMarketBetsFunc     func(ctx context.Context, marketID int64) ([]*dmarkets.BetDisplayInfo, error)
+	getMarketBetsPageFunc func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error)
 }
 
 func (m marketServiceStub) CreateMarket(context.Context, dmarkets.MarketCreateRequest, string) (*dmarkets.Market, error) {
@@ -56,7 +57,16 @@ func (m marketServiceStub) GetMarketBets(ctx context.Context, marketID int64) ([
 	}
 	return m.getMarketBetsFunc(ctx, marketID)
 }
+func (m marketServiceStub) GetMarketBetsPage(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
+	if m.getMarketBetsPageFunc == nil {
+		panic("GetMarketBetsPage called without stub")
+	}
+	return m.getMarketBetsPageFunc(ctx, marketID, p)
+}
 func (m marketServiceStub) GetMarketPositions(context.Context, int64) (dmarkets.MarketPositions, error) {
+	panic("not implemented")
+}
+func (m marketServiceStub) GetMarketPositionsPage(context.Context, int64, dmarkets.Page) (dmarkets.MarketPositions, error) {
 	panic("not implemented")
 }
 func (m marketServiceStub) GetUserPositionInMarket(context.Context, int64, string) (*dmarkets.UserPosition, error) {
@@ -205,5 +215,29 @@ func TestMarketBetsHandlerWithService(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMarketBetsHandlerWithService_UsesPaginationQuery(t *testing.T) {
+	handler := MarketBetsHandlerWithService(marketServiceStub{
+		getMarketBetsPageFunc: func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
+			if marketID != 7 {
+				t.Fatalf("expected marketID 7, got %d", marketID)
+			}
+			if p.Limit != 20 || p.Offset != 40 {
+				t.Fatalf("expected page limit=20 offset=40, got %+v", p)
+			}
+			return []*dmarkets.BetDisplayInfo{}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/bets/7?limit=20&offset=40", nil)
+	req = mux.SetURLVars(req, map[string]string{"marketId": "7"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
