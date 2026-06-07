@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom'; // Import Link
 import { unwrapApiResponse } from '../../../../utils/apiResponse';
 
 const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
+    const pageSize = 20;
     const [bets, setBets] = useState([]);
+    const [page, setPage] = useState(0);
 
     useEffect(() => {
         const fetchBets = async () => {
@@ -12,7 +14,9 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
             });
             if (response.ok) {
                 const data = unwrapApiResponse(await response.json());
-                setBets(data.sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt)));
+                setBets(data
+                    .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt)));
+                setPage(0);
             } else {
                 console.error('Error fetching bets:', response.statusText);
             }
@@ -20,8 +24,36 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
         fetchBets();
     }, [marketId, refreshTrigger]);
 
+    const pageStart = page * pageSize;
+    const visibleBets = bets.slice(pageStart, pageStart + pageSize);
+    const canPageBack = page > 0;
+    const canPageForward = pageStart + pageSize < bets.length;
+
     return (
         <div className="p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+                    Showing bets {bets.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, bets.length)} of {bets.length}
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => Math.max(0, current - 1))}
+                        disabled={!canPageBack}
+                        className="rounded border border-gray-600 px-3 py-1 text-xs text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => current + 1)}
+                        disabled={!canPageForward}
+                        className="rounded border border-gray-600 px-3 py-1 text-xs text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
             <div className="sp-grid-bets-header">
                 <div>Username</div>
                 <div className="text-center">Outcome</div>
@@ -29,7 +61,7 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
                 <div className="text-right">After</div>
                 <div className="text-right">Placed</div>
             </div>
-            {bets.map((bet, index) => (
+            {visibleBets.map((bet, index) => (
                 <div key={index} className="sp-grid-bets-row mt-2">
                     {/* Username */}
                     <div className="sp-cell-username">

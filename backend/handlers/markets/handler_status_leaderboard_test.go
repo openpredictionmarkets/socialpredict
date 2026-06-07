@@ -12,6 +12,8 @@ import (
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
+	authsvc "socialpredict/internal/service/auth"
 	"socialpredict/security"
 
 	"github.com/gorilla/mux"
@@ -141,5 +143,69 @@ func TestMarketLeaderboardHandler_FailureEnvelope(t *testing.T) {
 	}
 	if resp.Reason != string(handlers.ReasonInternalError) {
 		t.Fatalf("expected reason %q, got %q", handlers.ReasonInternalError, resp.Reason)
+	}
+}
+
+func TestListUserOwnedMarketsHandlerRequiresLogin(t *testing.T) {
+	handler := ListUserOwnedMarketsHandler(&MockService{}, &contractAuthMock{
+		err: &authsvc.AuthError{Kind: authsvc.ErrorKindInvalidToken, Message: "invalid token"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/v0/users/alice/owned-markets", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "alice"})
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestListUserOwnedMarketsHandlerUsesOwnedByFilter(t *testing.T) {
+	now := time.Now()
+	svc := &MockService{}
+	svc.ListLifecycleFn = func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+		if filters.OwnedBy != "alice" {
+			t.Fatalf("OwnedBy = %q, want alice", filters.OwnedBy)
+		}
+		if filters.Status != dmarkets.MarketStatusAll {
+			t.Fatalf("Status = %q, want all", filters.Status)
+		}
+		if filters.Limit != 20 || filters.Offset != 5 {
+			t.Fatalf("pagination = %d/%d, want 20/5", filters.Limit, filters.Offset)
+		}
+		return []*dmarkets.Market{{
+			ID:                 45,
+			QuestionTitle:      "Owned Market",
+			Description:        "desc",
+			OutcomeType:        "BINARY",
+			ResolutionDateTime: now.Add(24 * time.Hour),
+			CreatorUsername:    "bob",
+			StewardUsername:    "alice",
+			YesLabel:           "YES",
+			NoLabel:            "NO",
+			Status:             dmarkets.MarketStatusActive,
+			LifecycleStatus:    dmarkets.MarketLifecyclePublished,
+			CreatedAt:          now,
+			UpdatedAt:          now,
+		}}, nil
+	}
+
+	handler := ListUserOwnedMarketsHandler(svc, &contractAuthMock{user: &dusers.User{Username: "viewer"}})
+	req := httptest.NewRequest(http.MethodGet, "/v0/users/alice/owned-markets?limit=20&offset=5", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "alice"})
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp handlers.SuccessEnvelope[userOwnedMarketsResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if !resp.OK || resp.Result.Total != 1 || resp.Result.Markets[0].StewardUsername != "alice" {
+		t.Fatalf("unexpected response: %+v", resp)
 	}
 }

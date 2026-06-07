@@ -120,6 +120,7 @@ func (r *GormRepository) List(ctx context.Context, filters dmarkets.ListFilters)
 
 	query = applyListStatusFilter(query, filters.Status)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
+	query = applyOwnedByFilter(query, filters.OwnedBy)
 	query = applyTagSlugFilter(query, filters.TagSlug)
 	query = applyPagination(query, filters.Limit, filters.Offset)
 	query = query.Order("markets.created_at DESC")
@@ -164,6 +165,7 @@ func (r *GormRepository) ListByLifecycle(ctx context.Context, filters dmarkets.L
 	query = applyLifecycleAdminStatusFilter(query, filters.Status)
 	query = applyLifecycleSearchTerm(query, filters.Query)
 	query = applyCreatedByFilter(query, filters.CreatedBy)
+	query = applyOwnedByFilter(query, filters.OwnedBy)
 	query = applyPagination(query, filters.Limit, filters.Offset)
 	query = query.Order("markets.created_at DESC")
 
@@ -226,6 +228,18 @@ func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
 		return query
 	}
 	return query.Where("creator_username = ?", createdBy)
+}
+
+func applyOwnedByFilter(query *gorm.DB, ownedBy string) *gorm.DB {
+	ownedBy = strings.TrimSpace(ownedBy)
+	if ownedBy == "" {
+		return query
+	}
+	return query.Where(
+		"creator_username = ? OR COALESCE(NULLIF(steward_username, ''), creator_username) = ?",
+		ownedBy,
+		ownedBy,
+	)
 }
 
 func applyTagSlugFilter(query *gorm.DB, tagSlug string) *gorm.DB {

@@ -449,6 +449,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(usershandlers.GetUserFinancialHandler(usersService))).Methods("GET")
 	router.Handle("/v0/read/users/{username}/financial-summary", securityMiddleware(usershandlers.GetUserFinancialReadModelHandler(analyticsService, authService))).Methods("GET")
+	router.Handle("/v0/users/{username}/owned-markets", securityMiddleware(marketshandlers.ListUserOwnedMarketsHandler(marketsService, authService))).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize
 	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")

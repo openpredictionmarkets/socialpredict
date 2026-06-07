@@ -5,15 +5,22 @@ import { getMarketLabels } from '../../../../utils/labelMapping';
 import { unwrapApiResponse } from '../../../../utils/apiResponse';
 
 const LeaderboardActivity = ({ marketId, market }) => {
+    const pageSize = 20;
     const [leaderboard, setLeaderboard] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [page, setPage] = useState(0);
+
+    useEffect(() => {
+        setPage(0);
+    }, [marketId]);
 
     useEffect(() => {
         const fetchLeaderboard = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard`);
+                const offset = page * pageSize;
+                const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard?limit=${pageSize}&offset=${offset}`);
                 if (response.ok) {
                     const data = unwrapApiResponse(await response.json());
                     const rows = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
@@ -33,7 +40,7 @@ const LeaderboardActivity = ({ marketId, market }) => {
         if (marketId) {
             fetchLeaderboard();
         }
-    }, [marketId]);
+    }, [marketId, page]);
 
     const formatCurrency = (amount) => {
         return amount.toLocaleString();
@@ -91,9 +98,35 @@ const LeaderboardActivity = ({ marketId, market }) => {
     }
 
     const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
+    const canPageBack = page > 0;
+    const canPageForward = leaderboard.length === pageSize;
 
     return (
         <div className="p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+                    Showing leaderboard page {page + 1}
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => Math.max(0, current - 1))}
+                        disabled={!canPageBack}
+                        className="rounded border border-gray-600 px-3 py-1 text-xs text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => current + 1)}
+                        disabled={!canPageForward}
+                        className="rounded border border-gray-600 px-3 py-1 text-xs text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+
             {/* Header */}
             <div className="sp-grid-leaderboard-header">
                 <div>Rank</div>

@@ -187,9 +187,10 @@ x-route-family-migration-matrix:
         - /v0/usercredit/{username}
         - /v0/portfolio/{username}
         - /v0/users/{username}/financial
+        - /v0/users/{username}/owned-markets
       success_contract: raw JSON DTO
       failure_contract: ReasonResponse plus middleware 429
-      migration_state: mixed_raw_success_reason_failure
+      migration_state: mixed_raw_success_and_envelope_success_reason_failure
       source: backend/server/server.go and handlers/users
     - family: private-users
       paths:
@@ -3416,6 +3417,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/users/{username}/owned-markets:
+    get:
+      tags: [Users, Markets]
+      operationId: getUserOwnedMarkets
+      summary: Get user-owned markets
+      description: >
+        Returns markets created by or currently stewarded by the requested user.
+        This is login-only game transparency data. Current steward ownership
+        falls back to creator ownership for legacy markets without an explicit steward.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          description: Username whose created and stewarded markets should be returned.
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Owned markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOwnedMarketsEnvelopeResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to fetch owned markets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/read/users/{username}/financial-summary:
     get:
       tags: [Users]
@@ -4327,6 +4391,24 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/UserFinancialReadModel'
+      required: [ok, result]
+
+    UserOwnedMarketsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          type: object
+          properties:
+            markets:
+              type: array
+              items:
+                $ref: '#/components/schemas/MarketResponse'
+            total:
+              type: integer
+          required: [markets, total]
       required: [ok, result]
 
     StatsResponse:

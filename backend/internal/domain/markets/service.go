@@ -176,6 +176,7 @@ type ListFilters struct {
 	Status    string
 	Query     string
 	CreatedBy string
+	OwnedBy   string
 	TagSlug   string
 	Limit     int
 	Offset    int
