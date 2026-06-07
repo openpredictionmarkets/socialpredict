@@ -12,10 +12,12 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
     const [selectedOutcome, setSelectedOutcome] = useState(null);
     const [feeData, setFeeData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [showTerms, setShowTerms] = useState(false);
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
     const showFeeSection = !isLoading && feeData;
+    const hasVisibleFee = showFeeSection && (feeData.initialBetFee > 0 || feeData.buySharesFee > 0);
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -47,7 +49,13 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
 
     const handleBetAmountChange = (event) => {
         const newAmount = parseInt(event.target.value, 10);
+        setShowTerms(false);
         setBetAmount(newAmount >= 0 ? newAmount : '');
+    };
+
+    const handleOutcomeSelection = (outcome) => {
+        setSelectedOutcome(outcome);
+        setShowTerms(false);
     };
 
     const handleBetSubmission = () => {
@@ -76,11 +84,11 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
             <h2 className="text-xl mb-4">Purchase Shares</h2>
             <div className="flex justify-center space-x-4 mb-4">
                 <BetNoButton 
-                    onClick={() => setSelectedOutcome('NO')} 
+                    onClick={() => handleOutcomeSelection('NO')} 
                     label={noLabel}
                 />
                 <BetYesButton 
-                    onClick={() => setSelectedOutcome('YES')} 
+                    onClick={() => handleOutcomeSelection('YES')} 
                     label={yesLabel}
                 />
             </div>
@@ -90,15 +98,17 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
                 <BetInputAmount value={betAmount} onChange={handleBetAmountChange} />
             </div>
             <ConfirmBetButton onClick={handleBetSubmission} selectedDirection={selectedOutcome} yesLabel={yesLabel} noLabel={noLabel} />
-            <div>
-            {showFeeSection && (
-                <>
-                <div className="border-t border-gray-200 my-2"></div>
-                <div className="mb-4">
-                    {feeData.initialBetFee === 0 && feeData.buySharesFee === 0 ? (
-                        <p className="text-sm text-gray-300">No fees</p>
-                    ) : (
-                        <>
+            <button
+                type="button"
+                onClick={() => setShowTerms((current) => !current)}
+                className="mt-2 w-full rounded border border-blue-200/60 px-4 py-2 text-sm font-semibold text-blue-50 hover:bg-white/10"
+            >
+                Terms
+            </button>
+            {showTerms && (
+                <div className="mt-3 border-t border-gray-200 pt-3">
+                    {hasVisibleFee && (
+                        <div className="mb-4">
                             {feeData.initialBetFee > 0 && (
                                 <p className="text-sm text-gray-300">
                                     Initial Trade Fee: {feeData.initialBetFee}
@@ -110,18 +120,18 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
                                     Trading Fee (Buying Share): {feeData.buySharesFee}
                                 </p>
                             )}
-                        </>
+                        </div>
                     )}
+                    <p className="mb-2 text-xs leading-relaxed text-blue-100">
+                        Informational only. Projection results are not guaranteed if trade volume is currently high.
+                    </p>
+                    <MarketProjectionLayout
+                        marketId={marketId}
+                        amount={betAmount}
+                        direction={selectedOutcome}
+                    />
                 </div>
-                <div className="border-t border-gray-200 my-2"></div>
-                </>
             )}
-            <MarketProjectionLayout
-                marketId={marketId}
-                amount={betAmount}
-                direction={selectedOutcome}
-            />
-            </div>
         </div>
     );
 };
