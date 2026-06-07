@@ -20,6 +20,12 @@ The design should preserve raw tables as the source of truth while creating expl
 Transaction-time anything is canonical. Display-time anything can be considered
 for caching if it cannot create, mutate, or settle user credits.
 
+Market accounting snapshots are therefore outside the transaction path. The
+snapshot repository is separate from the transaction repository interfaces used
+by buy, sell, resolution, payout, and refund flows. If a transaction interface
+starts exposing snapshot read/write methods, boundary tests should fail before
+the change reaches production.
+
 ## Design Inputs
 
 Primary inputs:

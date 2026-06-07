@@ -58,6 +58,22 @@ This applies even if a nearby display widget is cached. A cached probability,
 volume, leaderboard, or market card can help users browse, but it cannot decide
 whether a transaction succeeds.
 
+## Transaction Boundary Guardrails
+
+Market accounting snapshots are display/read-model artifacts only. They must not
+be exposed through transaction repository interfaces.
+
+Implementation guardrails:
+
+- buy/sell transaction interfaces must not expose snapshot read or write methods
+- market resolution/payout/refund interfaces must not expose snapshot read or write methods
+- transaction-time dust is calculated from canonical market, bet, position, and user state
+- display dust can be stored in snapshots, but confirmed sales must not read it
+- durable snapshots may be refreshed before or after transactions, but cannot determine transaction outcomes
+
+The codebase includes boundary tests that fail if transaction interfaces start
+exposing market accounting snapshot methods.
+
 ## Critical Decision Matrix
 
 The following table defines which decisions are transaction-critical and which are display/read-model candidates.

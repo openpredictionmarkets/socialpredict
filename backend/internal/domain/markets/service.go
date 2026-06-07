@@ -60,6 +60,10 @@ type MarketBetRepository interface {
 }
 
 // MarketAccountingSnapshotRepository exposes durable display/read-model snapshot persistence.
+//
+// This interface is intentionally not embedded in Repository. Market
+// transaction paths such as buy, sell, resolution, payout, and refund must not
+// be able to satisfy their dependencies by reading display snapshots.
 type MarketAccountingSnapshotRepository interface {
 	GetMarketAccountingSnapshot(ctx context.Context, marketID int64) (*MarketAccountingSnapshot, error)
 	UpsertMarketAccountingSnapshot(ctx context.Context, snapshot MarketAccountingSnapshot) error

@@ -47,6 +47,7 @@ Checklist:
 - [x] Add raw recomputation calculator for the snapshot.
 - [x] Add tests proving snapshot fields match raw recomputation.
 - [x] Keep display dust in the read model while preserving canonical transaction-time sale dust calculation.
+- [x] Add boundary tests proving transaction repository interfaces do not expose snapshot methods.
 - [ ] Decide whether historical dust remains simple retained-dust convention or exact replay.
 - [ ] Ensure snapshot code does not affect order execution.
 
@@ -115,6 +116,7 @@ Checklist:
 - [ ] Identify cache-backed display/read-model endpoints.
 - [ ] Decide whether to introduce explicit `/v0/read/...` routes or route existing display handlers through explicit read-model services.
 - [ ] Add freshness metadata to cache-backed display responses.
+- [x] Add domain boundary tests proving transaction interfaces do not expose read-model snapshot services.
 - [ ] Add API tests proving transaction endpoints do not call read-model cache services.
 
 ## 08. Optional Redis Layer
