@@ -58,9 +58,12 @@ After installing in Development mode and starting the containers with `./SocialP
 This command refuses to run unless `.env` has `APP_ENV=development`. By default it creates or updates:
 
 - `admin`
-- `testuser01` through `testuser10`
+- `testuser01` as an active moderator fixture
+- `testuser02` through `testuser10` as regular users
+- `Market A`, `Market B`, and `Market C` as published, tradable markets owned/stewarded by `testuser01`
+- `Category A`, `Category B`, and `Category C` tags assigned to those fixture markets
 
-All bootstrapped users receive password `password` and `must_change_password=false`. You can customize the regular user count or prefix:
+All bootstrapped users receive password `password` and `must_change_password=false`. You can customize the test user count or prefix:
 
 ```bash
 ./SocialPredict dev-bootstrap-users --count 20 --prefix player

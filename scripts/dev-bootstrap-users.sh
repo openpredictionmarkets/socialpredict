@@ -15,9 +15,14 @@ It writes to the development database through the dev Docker network.
 
 Created/updated users:
   admin       ADMIN user
-  testuser01  REGULAR user
+  testuser01  active MODERATOR user and fixture market owner
   testuser02  REGULAR user
   ...
+
+Created/updated fixture markets:
+  Market A    published, owned/stewarded by testuser01, tagged Category A
+  Market B    published, owned/stewarded by testuser01, tagged Category B
+  Market C    published, owned/stewarded by testuser01, tagged Category C
 
 Defaults:
   password: password
