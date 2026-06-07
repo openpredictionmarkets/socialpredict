@@ -181,6 +181,22 @@ func (r *GormRepository) UserMarketPositions(ctx context.Context, username strin
 	return positions, nil
 }
 
+func (r *GormRepository) UserWorkProfitResolvedMarkets(ctx context.Context, username string) ([]WorkProfitMarketRecord, error) {
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var markets []analyticsWorkProfitMarketRow
+	if err := db.Table("markets").
+		Select("id", "creator_username", "steward_username", "is_resolved", "resolution_result", "proposal_cost").
+		Where("COALESCE(NULLIF(steward_username, ''), creator_username) = ? AND is_resolved = ?", username, true).
+		Order("id ASC").
+		Find(&markets).Error; err != nil {
+		return nil, err
+	}
+	return mapWorkProfitMarkets(markets), nil
+}
+
 func (r *GormRepository) listUserBets(db *gorm.DB, username string) ([]boundary.Bet, error) {
 	var userBets []analyticsBetRow
 	if err := db.Table("bets").
@@ -301,6 +317,15 @@ type analyticsMarketRow struct {
 	ResolutionResult string
 }
 
+type analyticsWorkProfitMarketRow struct {
+	ID               uint
+	CreatorUsername  string
+	StewardUsername  string
+	IsResolved       bool
+	ResolutionResult string
+	ProposalCost     int64
+}
+
 type analyticsBetRow struct {
 	ID        uint
 	Username  string
@@ -335,6 +360,25 @@ func mapMarkets(dbMarkets []analyticsMarketRow) []MarketRecord {
 	return markets
 }
 
+func mapWorkProfitMarkets(dbMarkets []analyticsWorkProfitMarketRow) []WorkProfitMarketRecord {
+	markets := make([]WorkProfitMarketRecord, len(dbMarkets))
+	for i, market := range dbMarkets {
+		stewardUsername := market.StewardUsername
+		if stewardUsername == "" {
+			stewardUsername = market.CreatorUsername
+		}
+		markets[i] = WorkProfitMarketRecord{
+			ID:               market.ID,
+			CreatorUsername:  market.CreatorUsername,
+			StewardUsername:  stewardUsername,
+			IsResolved:       market.IsResolved,
+			ResolutionResult: market.ResolutionResult,
+			ProposalCost:     market.ProposalCost,
+		}
+	}
+	return markets
+}
+
 func mapBets(dbBets []analyticsBetRow) []boundary.Bet {
 	bets := make([]boundary.Bet, len(dbBets))
 	for i, bet := range dbBets {
@@ -352,10 +396,11 @@ func mapBets(dbBets []analyticsBetRow) []boundary.Bet {
 }
 
 var (
-	_ Repository            = (*GormRepository)(nil)
-	_ LeaderboardRepository = (*GormRepository)(nil)
-	_ FinancialsRepository  = (*GormRepository)(nil)
-	_ DebtRepository        = (*GormRepository)(nil)
-	_ VolumeRepository      = (*GormRepository)(nil)
-	_ FeeRepository         = (*GormRepository)(nil)
+	_ Repository                            = (*GormRepository)(nil)
+	_ LeaderboardRepository                 = (*GormRepository)(nil)
+	_ FinancialsRepository                  = (*GormRepository)(nil)
+	_ UserFinancialMetricSnapshotRepository = (*GormRepository)(nil)
+	_ DebtRepository                        = (*GormRepository)(nil)
+	_ VolumeRepository                      = (*GormRepository)(nil)
+	_ FeeRepository                         = (*GormRepository)(nil)
 )

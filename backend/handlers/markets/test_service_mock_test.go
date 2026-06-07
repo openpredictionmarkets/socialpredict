@@ -10,6 +10,7 @@ import (
 // MockService provides a reusable test double for markets service interactions.
 type MockService struct {
 	ListByStatusFn      func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
+	ListLifecycleFn     func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
 	MarketLeaderboardFn func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
 }
 
@@ -27,6 +28,13 @@ func (m *MockService) GetMarket(ctx context.Context, id int64) (*dmarkets.Market
 
 func (m *MockService) ListMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
 	return nil, nil
+}
+
+func (m *MockService) ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+	if m.ListLifecycleFn != nil {
+		return m.ListLifecycleFn(ctx, filters)
+	}
+	return []*dmarkets.Market{}, nil
 }
 
 func (m *MockService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {
@@ -121,7 +129,15 @@ func (m *MockService) GetMarketBets(ctx context.Context, marketID int64) ([]*dma
 	return []*dmarkets.BetDisplayInfo{}, nil
 }
 
+func (m *MockService) GetMarketBetsPage(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
+	return []*dmarkets.BetDisplayInfo{}, nil
+}
+
 func (m *MockService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *MockService) GetMarketPositionsPage(ctx context.Context, marketID int64, p dmarkets.Page) (dmarkets.MarketPositions, error) {
 	return nil, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	positionsmath "socialpredict/internal/domain/math/positions"
+	"socialpredict/internal/domain/readmodels"
 )
 
 // UserAccount captures the user fields needed by analytics calculations.
@@ -18,6 +19,17 @@ type MarketRecord struct {
 	CreatedAt        time.Time
 	IsResolved       bool
 	ResolutionResult string
+}
+
+// WorkProfitMarketRecord captures the resolved market fields needed to derive
+// steward work profit without adding separate accounting state.
+type WorkProfitMarketRecord struct {
+	ID               uint
+	CreatorUsername  string
+	StewardUsername  string
+	IsResolved       bool
+	ResolutionResult string
+	ProposalCost     int64
 }
 
 // Snapshot converts the record into the shared math snapshot.
@@ -79,6 +91,102 @@ type FinancialSnapshot struct {
 	PotentialValue     int64
 }
 
+// UserFinancialMetricSnapshot captures a user's display-only financial read
+// model. It is not transaction truth and must not be used for spend checks,
+// balance mutation, dust settlement, or payout/refund decisions.
+type UserFinancialMetricSnapshot struct {
+	Username            string
+	GeneratedAt         time.Time
+	PositionCount       int
+	Financial           FinancialSnapshot
+	Source              string
+	TransactionSafeRead bool
+	IsStale             bool
+	StaleReason         string
+	MarkedStaleAt       *time.Time
+}
+
+const UserFinancialMetricSnapshotTargetFreshness = 10 * time.Minute
+
+// Freshness returns display metadata for this user financial read model.
+func (s UserFinancialMetricSnapshot) Freshness() readmodels.Freshness {
+	if s.IsStale {
+		return readmodels.NewStaleFreshness(
+			s.GeneratedAt,
+			s.Source,
+			UserFinancialMetricSnapshotTargetFreshness,
+			s.TransactionSafeRead,
+			s.StaleReason,
+			s.MarkedStaleAt,
+		)
+	}
+	return readmodels.NewFreshness(
+		s.GeneratedAt,
+		s.Source,
+		UserFinancialMetricSnapshotTargetFreshness,
+		s.TransactionSafeRead,
+	)
+}
+
+// UserFinancialMetricReadModel wraps a snapshot with explicit freshness
+// metadata for future display endpoints.
+type UserFinancialMetricReadModel struct {
+	Snapshot  UserFinancialMetricSnapshot
+	Freshness readmodels.Freshness
+}
+
+// AnalyticsReadModelSnapshot stores display-only aggregate analytics payloads.
+// PayloadJSON is intentionally opaque to repository code; the analytics service
+// owns marshal/unmarshal semantics.
+type AnalyticsReadModelSnapshot struct {
+	Key                 string
+	Kind                string
+	PayloadJSON         []byte
+	GeneratedAt         time.Time
+	Source              string
+	TransactionSafeRead bool
+	IsStale             bool
+	StaleReason         string
+	MarkedStaleAt       *time.Time
+}
+
+const (
+	AnalyticsSnapshotKindSystemMetrics     = "system_metrics"
+	AnalyticsSnapshotKindGlobalLeaderboard = "global_leaderboard"
+
+	SystemMetricsSnapshotKey     = "system_metrics:default"
+	GlobalLeaderboardSnapshotKey = "global_leaderboard:default"
+)
+
+const (
+	SystemMetricsSnapshotTargetFreshness     = time.Hour
+	GlobalLeaderboardSnapshotTargetFreshness = time.Hour
+)
+
+func (s AnalyticsReadModelSnapshot) Freshness(target time.Duration) readmodels.Freshness {
+	if s.IsStale {
+		return readmodels.NewStaleFreshness(
+			s.GeneratedAt,
+			s.Source,
+			target,
+			s.TransactionSafeRead,
+			s.StaleReason,
+			s.MarkedStaleAt,
+		)
+	}
+	return readmodels.NewFreshness(s.GeneratedAt, s.Source, target, s.TransactionSafeRead)
+}
+
+type SystemMetricsReadModel struct {
+	Metrics   SystemMetrics
+	Freshness readmodels.Freshness
+}
+
+type GlobalLeaderboardReadModel struct {
+	Entries   []GlobalUserProfitability
+	Freshness readmodels.Freshness
+}
+
 func (s FinancialSnapshot) AccountBalanceValue() int64     { return s.AccountBalance }
 func (s FinancialSnapshot) MaximumDebtAllowedValue() int64 { return s.MaximumDebtAllowed }
 func (s FinancialSnapshot) AmountBorrowedValue() int64     { return s.AmountBorrowed }
@@ -106,6 +214,7 @@ type FinancialSnapshotRequestReader interface {
 type FinancialSnapshotRequest struct {
 	Username       string
 	AccountBalance int64
+	WorkProfits    int64
 }
 
 func (r FinancialSnapshotRequest) UsernameValue() string      { return r.Username }

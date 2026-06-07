@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../../../config';
-import { SharesBadge } from '../../../buttons/trade/SellButtons';
 import LoadingSpinner from '../../../loaders/LoadingSpinner';
 import { mapInternalToDisplay } from '../../../../utils/labelMapping';
+import { useAuth } from '../../../../helpers/AuthContent';
 
 const PortfolioTabContent = ({ username }) => {
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { isLoggedIn, token } = useAuth();
 
     useEffect(() => {
         const fetchPositions = async () => {
             try {
-                const response = await fetch(`${API_URL}/v0/portfolio/${username}`);
+                const response = await fetch(`${API_URL}/v0/portfolio/${username}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
                 if (response.ok) {
                     const data = await response.json();
                     setPositions(data.portfolioItems || []);
@@ -27,10 +33,14 @@ const PortfolioTabContent = ({ username }) => {
             }
         };
 
-        if (username) {
+        if (username && token) {
             fetchPositions();
+        } else {
+            setPositions([]);
+            setError(null);
+            setLoading(false);
         }
-    }, [username]);
+    }, [username, token]);
 
     if (loading) {
         return (
@@ -53,6 +63,21 @@ const PortfolioTabContent = ({ username }) => {
         );
     }
 
+    if (!isLoggedIn) {
+        return (
+            <div className="bg-primary-background shadow-md rounded-lg p-6">
+                <div className="text-center">
+                    <div className="text-xl font-semibold text-blue-100">
+                        Log in to see portfolio
+                    </div>
+                    <div className="text-sm text-gray-400 mt-2">
+                        User portfolio positions are visible to logged-in players.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (!positions || positions.length === 0) {
         return (
             <div className="bg-primary-background shadow-md rounded-lg p-6">
@@ -63,7 +88,6 @@ const PortfolioTabContent = ({ username }) => {
         );
     }
 
-    // Create a smaller version of SharesBadge for table use
     const CompactSharesBadge = ({ type, count, market = null }) => {
         if (count === 0) return null;
 
@@ -81,6 +105,31 @@ const PortfolioTabContent = ({ username }) => {
 
     return (
         <div className="space-y-6">
+            {/* Portfolio Summary */}
+            <div className="bg-primary-background shadow-md rounded-lg border-2 border-gold-btn">
+                <div className="p-6">
+                    <h3 className="text-xl font-bold text-gold-btn mb-4 text-center">Portfolio Summary</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div className="text-custom-gray-light font-medium mb-1">Total Markets</div>
+                            <div className="text-2xl font-bold text-white">{positions.length}</div>
+                        </div>
+                        <div>
+                            <div className="text-custom-gray-light font-medium mb-1">Total YES Shares</div>
+                            <div className="text-2xl font-bold text-green-400">
+                                {positions.reduce((sum, pos) => sum + pos.yesSharesOwned, 0)} 🪙
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-custom-gray-light font-medium mb-1">Total NO Shares</div>
+                            <div className="text-2xl font-bold text-red-400">
+                                {positions.reduce((sum, pos) => sum + pos.noSharesOwned, 0)} 🪙
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Portfolio Table */}
             <div className="bg-primary-background shadow-md rounded-lg border border-custom-gray-dark overflow-hidden">
                 <div className="overflow-x-auto">
@@ -146,31 +195,6 @@ const PortfolioTabContent = ({ username }) => {
                             ))}
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            {/* Portfolio Summary */}
-            <div className="bg-primary-background shadow-md rounded-lg border-2 border-gold-btn">
-                <div className="p-6">
-                    <h3 className="text-xl font-bold text-gold-btn mb-4 text-center">Portfolio Summary</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                        <div>
-                            <div className="text-custom-gray-light font-medium mb-1">Total Markets</div>
-                            <div className="text-2xl font-bold text-white">{positions.length}</div>
-                        </div>
-                        <div>
-                            <div className="text-custom-gray-light font-medium mb-1">Total YES Shares</div>
-                            <div className="text-2xl font-bold text-green-400">
-                                {positions.reduce((sum, pos) => sum + pos.yesSharesOwned, 0)} 🪙
-                            </div>
-                        </div>
-                        <div>
-                            <div className="text-custom-gray-light font-medium mb-1">Total NO Shares</div>
-                            <div className="text-2xl font-bold text-red-400">
-                                {positions.reduce((sum, pos) => sum + pos.noSharesOwned, 0)} 🪙
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

@@ -82,11 +82,19 @@ func (m *listMarketsServiceMock) GetMarketBets(ctx context.Context, marketID int
 	return nil, nil
 }
 
+func (m *listMarketsServiceMock) GetMarketBetsPage(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
+	return nil, nil
+}
+
 func (m *listMarketsServiceMock) GetPublicMarket(ctx context.Context, marketID int64) (*dmarkets.PublicMarket, error) {
 	return nil, nil
 }
 
 func (m *listMarketsServiceMock) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *listMarketsServiceMock) GetMarketPositionsPage(ctx context.Context, marketID int64, p dmarkets.Page) (dmarkets.MarketPositions, error) {
 	return nil, nil
 }
 

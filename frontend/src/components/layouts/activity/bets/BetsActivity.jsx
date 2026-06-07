@@ -3,25 +3,83 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom'; // Import Link
 import { unwrapApiResponse } from '../../../../utils/apiResponse';
 
+const paginationButtonClass = [
+    'rounded',
+    'border',
+    'border-transparent',
+    'bg-neutral-btn',
+    'px-3',
+    'py-1.5',
+    'text-xs',
+    'font-semibold',
+    'text-white',
+    'transition-colors',
+    'duration-200',
+    'hover:bg-neutral-btn-hover',
+    'disabled:cursor-not-allowed',
+    'disabled:bg-custom-gray-light',
+    'disabled:text-gray-400',
+    'disabled:opacity-60',
+].join(' ');
+
 const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
+    const pageSize = 20;
     const [bets, setBets] = useState([]);
+    const [page, setPage] = useState(0);
+    const [hasNextPage, setHasNextPage] = useState(false);
+
+    useEffect(() => {
+        setPage(0);
+    }, [marketId, refreshTrigger]);
 
     useEffect(() => {
         const fetchBets = async () => {
-            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}`, {
+            const offset = page * pageSize;
+            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}?limit=${pageSize}&offset=${offset}`, {
             });
             if (response.ok) {
                 const data = unwrapApiResponse(await response.json());
-                setBets(data.sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt)));
+                setBets(data
+                    .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt)));
+                setHasNextPage(data.length === pageSize);
             } else {
                 console.error('Error fetching bets:', response.statusText);
+                setBets([]);
+                setHasNextPage(false);
             }
         };
         fetchBets();
-    }, [marketId, refreshTrigger]);
+    }, [marketId, refreshTrigger, page]);
+
+    const pageStart = page * pageSize;
+    const canPageBack = page > 0;
+    const canPageForward = hasNextPage;
 
     return (
         <div className="p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+                    Showing bets page {page + 1}{bets.length ? ` (${pageStart + 1}-${pageStart + bets.length})` : ''}
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => Math.max(0, current - 1))}
+                        disabled={!canPageBack}
+                        className={paginationButtonClass}
+                    >
+                        Previous
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => current + 1)}
+                        disabled={!canPageForward}
+                        className={paginationButtonClass}
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
             <div className="sp-grid-bets-header">
                 <div>Username</div>
                 <div className="text-center">Outcome</div>

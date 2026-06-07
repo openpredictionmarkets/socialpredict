@@ -21,7 +21,7 @@ const MarketChart = ({
     let dataPoints = [];
     const now = new Date();
     const closeDate = closeDateTime ? new Date(closeDateTime) : null;
-    const isMarketClosed = closeDate && closeDate < now;
+    const isMarketClosed = closeDate && closeDate <= now;
 
     if (data && Array.isArray(data)) {
       // Filter out any probability changes that occurred after the close date for closed markets
@@ -35,8 +35,19 @@ const MarketChart = ({
       }));
     }
 
-    // For active markets: append current probability with current timestamp
-    // For closed markets: don't extend beyond close date
+    if (currentProbability !== undefined && currentProbability !== null && isMarketClosed && closeDate) {
+      const lastPoint = dataPoints[dataPoints.length - 1];
+      const lastY = lastPoint?.y ?? (isInverse ? 1 - currentProbability : currentProbability);
+      if (!lastPoint || lastPoint.x.getTime() < closeDate.getTime()) {
+        dataPoints.push({
+          x: closeDate,
+          y: lastY,
+        });
+      }
+    }
+
+    // For active markets: append current probability with current timestamp.
+    // Closed markets end at the close date above and never extend to now.
     if (currentProbability !== undefined && currentProbability !== null && !isMarketClosed) {
       dataPoints.push({
         x: now,

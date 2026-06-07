@@ -10,6 +10,23 @@ import (
 
 // GetMarketBets returns the bet history for a market with probabilities.
 func (s *Service) GetMarketBets(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error) {
+	return s.getMarketBetDisplayInfos(ctx, marketID)
+}
+
+// GetMarketBetsPage returns a display page of market bets. Probability history
+// is still derived from the full bet history so paginated display does not
+// create a second probability math path.
+func (s *Service) GetMarketBetsPage(ctx context.Context, marketID int64, p Page) ([]*BetDisplayInfo, error) {
+	infos, err := s.getMarketBetDisplayInfos(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	sortBetDisplayInfosNewestFirst(infos)
+	p = s.statusPolicy.NormalizePage(p, 20, 100)
+	return paginateBetDisplayInfos(infos, p), nil
+}
+
+func (s *Service) getMarketBetDisplayInfos(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error) {
 	if marketID <= 0 {
 		return nil, ErrInvalidInput
 	}
@@ -80,6 +97,23 @@ func buildBetDisplayInfos(boundaryBets []boundary.Bet, probabilityChanges []Prob
 		})
 	}
 	return results
+}
+
+func sortBetDisplayInfosNewestFirst(infos []*BetDisplayInfo) {
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].PlacedAt.After(infos[j].PlacedAt)
+	})
+}
+
+func paginateBetDisplayInfos(infos []*BetDisplayInfo, p Page) []*BetDisplayInfo {
+	if len(infos) == 0 || p.Offset >= len(infos) {
+		return []*BetDisplayInfo{}
+	}
+	end := p.Offset + p.Limit
+	if end > len(infos) {
+		end = len(infos)
+	}
+	return infos[p.Offset:end]
 }
 
 func latestProbabilityAt(changes []ProbabilityChange, timestamp time.Time) float64 {

@@ -4,27 +4,58 @@ import { Link } from 'react-router-dom';
 import { getMarketLabels } from '../../../../utils/labelMapping';
 import { unwrapApiResponse } from '../../../../utils/apiResponse';
 
-const LeaderboardActivity = ({ marketId, market }) => {
+const paginationButtonClass = [
+    'rounded',
+    'border',
+    'border-transparent',
+    'bg-neutral-btn',
+    'px-3',
+    'py-1.5',
+    'text-xs',
+    'font-semibold',
+    'text-white',
+    'transition-colors',
+    'duration-200',
+    'hover:bg-neutral-btn-hover',
+    'disabled:cursor-not-allowed',
+    'disabled:bg-custom-gray-light',
+    'disabled:text-gray-400',
+    'disabled:opacity-60',
+].join(' ');
+
+const LeaderboardActivity = ({ marketId, market, refreshTrigger }) => {
+    const pageSize = 20;
     const [leaderboard, setLeaderboard] = useState([]);
+    const [freshness, setFreshness] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [page, setPage] = useState(0);
+
+    useEffect(() => {
+        setPage(0);
+    }, [marketId, refreshTrigger]);
 
     useEffect(() => {
         const fetchLeaderboard = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard`);
+                const offset = page * pageSize;
+                const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard?limit=${pageSize}&offset=${offset}`);
                 if (response.ok) {
                     const data = unwrapApiResponse(await response.json());
                     const rows = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
                     setLeaderboard(rows);
+                    setFreshness(data?.freshness || null);
+                    setError(null);
                 } else {
                     console.error('Error fetching leaderboard:', response.statusText);
                     setError('Failed to load leaderboard data');
+                    setFreshness(null);
                 }
             } catch (err) {
                 console.error('Error fetching leaderboard:', err);
                 setError('Failed to load leaderboard data');
+                setFreshness(null);
             } finally {
                 setLoading(false);
             }
@@ -33,7 +64,11 @@ const LeaderboardActivity = ({ marketId, market }) => {
         if (marketId) {
             fetchLeaderboard();
         }
-    }, [marketId]);
+    }, [marketId, page, refreshTrigger]);
+
+    const freshnessLabel = freshness?.generatedAt
+        ? new Date(freshness.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+        : null;
 
     const formatCurrency = (amount) => {
         return amount.toLocaleString();
@@ -91,9 +126,42 @@ const LeaderboardActivity = ({ marketId, market }) => {
     }
 
     const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
+    const canPageBack = page > 0;
+    const canPageForward = leaderboard.length === pageSize;
 
     return (
         <div className="p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+                        Showing leaderboard page {page + 1}
+                    </div>
+                    {freshnessLabel && (
+                        <div className="mt-1 text-xs text-gray-500">
+                            Leaderboard generated at {freshnessLabel}. Trade confirmations remain authoritative.
+                        </div>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => Math.max(0, current - 1))}
+                        disabled={!canPageBack}
+                        className={paginationButtonClass}
+                    >
+                        Previous
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPage(current => current + 1)}
+                        disabled={!canPageForward}
+                        className={paginationButtonClass}
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+
             {/* Header */}
             <div className="sp-grid-leaderboard-header">
                 <div>Rank</div>

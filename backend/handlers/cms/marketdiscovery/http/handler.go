@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -15,12 +16,21 @@ import (
 )
 
 type Handler struct {
-	svc  *marketdiscovery.Service
-	auth authsvc.Authenticator
+	svc         *marketdiscovery.Service
+	auth        authsvc.Authenticator
+	invalidator discoveryInvalidator
 }
 
 func NewHandler(svc *marketdiscovery.Service, auth authsvc.Authenticator) *Handler {
 	return &Handler{svc: svc, auth: auth}
+}
+
+type discoveryInvalidator interface {
+	MarkMarketDiscoverySnapshotsStale(ctx context.Context, reason string) error
+}
+
+func (h *Handler) SetReadModelInvalidator(invalidator discoveryInvalidator) {
+	h.invalidator = invalidator
 }
 
 type updateReq struct {
@@ -116,6 +126,7 @@ func (h *Handler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 		return
 	}
+	h.markDiscoveryReadModelsStale(r.Context(), "cms_layout_changed")
 	composition, err := h.svc.GetComposition(page.Slug)
 	if err != nil {
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
@@ -139,7 +150,15 @@ func (h *Handler) AdminReplacePins(w http.ResponseWriter, r *http.Request) {
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 		return
 	}
+	h.markDiscoveryReadModelsStale(r.Context(), "cms_pins_changed")
 	_ = handlers.WriteResult(w, http.StatusOK, responseFromComposition(composition))
+}
+
+func (h *Handler) markDiscoveryReadModelsStale(ctx context.Context, reason string) {
+	if h.invalidator == nil {
+		return
+	}
+	_ = h.invalidator.MarkMarketDiscoverySnapshotsStale(ctx, reason)
 }
 
 func (h *Handler) requireAdmin(w http.ResponseWriter, r *http.Request) (*dusers.User, bool) {

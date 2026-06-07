@@ -6,6 +6,7 @@ import SiteTabs from '../../components/tabs/SiteTabs';
 import UserInfoTabContent from '../../components/layouts/profile/public/UserInfoTabContent';
 import PortfolioTabContent from '../../components/layouts/profile/public/PortfolioTabContent';
 import UserFinancialStatementsLayout from '../../components/layouts/profile/public/UserFinancialStatementsLayout';
+import OwnedMarketsTabContent from '../../components/layouts/profile/public/OwnedMarketsTabContent';
 
 const User = () => {
   const [userData, setUserData] = useState(null);
@@ -50,6 +51,10 @@ const User = () => {
     {
       label: 'Portfolio',
       content: <PortfolioTabContent username={username} />
+    },
+    {
+      label: 'Owned Markets',
+      content: <OwnedMarketsTabContent username={username} />
     },
     {
       label: 'Financials',

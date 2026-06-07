@@ -36,6 +36,29 @@ func (s *GlobalLeaderboardSnapshot) Result() []GlobalUserProfitability {
 	return s.Entries
 }
 
+// ResultPage returns a paged response-ready leaderboard slice while preserving
+// the original ranks from the full snapshot.
+func (s *GlobalLeaderboardSnapshot) ResultPage(limit, offset int) []GlobalUserProfitability {
+	entries := s.Result()
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if len(entries) == 0 || offset >= len(entries) {
+		return []GlobalUserProfitability{}
+	}
+	end := offset + limit
+	if end > len(entries) {
+		end = len(entries)
+	}
+	return entries[offset:end]
+}
+
 // ComputeGlobalLeaderboardSnapshot ranks users by profitability across all markets.
 func (s *Service) ComputeGlobalLeaderboardSnapshot(ctx context.Context) (*GlobalLeaderboardSnapshot, error) {
 	users, err := s.repo.ListUsers(ctx)

@@ -187,9 +187,10 @@ x-route-family-migration-matrix:
         - /v0/usercredit/{username}
         - /v0/portfolio/{username}
         - /v0/users/{username}/financial
+        - /v0/users/{username}/owned-markets
       success_contract: raw JSON DTO
       failure_contract: ReasonResponse plus middleware 429
-      migration_state: mixed_raw_success_reason_failure
+      migration_state: mixed_raw_success_and_envelope_success_reason_failure
       source: backend/server/server.go and handlers/users
     - family: private-users
       paths:
@@ -239,6 +240,9 @@ x-route-family-migration-matrix:
         - /v0/content/social-share/image
         - /v0/admin/content/social-share
         - /v0/admin/content/social-share/image
+        - /v0/content/reporting-visibility
+        - /v0/admin/content/reporting-visibility
+        - /v0/read/users/{username}/financial-summary
       success_contract: mixed raw JSON DTO and JSON `{ok:true,result}`
       failure_contract: ReasonResponse plus middleware 429 where wrapped
       migration_state: mixed_raw_success_reason_failure
@@ -3413,6 +3417,241 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/users/{username}/owned-markets:
+    get:
+      tags: [Users, Markets]
+      operationId: getUserOwnedMarkets
+      summary: Get user-owned markets
+      description: >
+        Returns markets created by or currently stewarded by the requested user.
+        This is login-only game transparency data. Current steward ownership
+        falls back to creator ownership for legacy markets without an explicit steward.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          description: Username whose created and stewarded markets should be returned.
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Owned markets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOwnedMarketsEnvelopeResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to fetch owned markets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/read/market-discovery/{slug}:
+    get:
+      tags: [Markets]
+      operationId: getMarketDiscoveryReadModel
+      summary: Get market discovery read-model payload
+      description: >
+        Returns a display-only read model for market discovery pages, including
+        CMS layout data, market cards, pinned market details, and freshness
+        metadata. This route must not be used for transaction decisions.
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          description: "`markets` for the top page, or a topic/tag slug for a secondary page."
+          schema:
+            type: string
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [active, closed, resolved, all]
+        - in: query
+          name: tagSlug
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Market discovery read model returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDiscoveryReadModelEnvelopeResponse'
+        '400':
+          description: Invalid market discovery request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to build market discovery read model.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/read/markets/{id}/summary:
+    get:
+      tags: [Markets]
+      operationId: getMarketSummaryReadModel
+      summary: Get market summary read-model widgets
+      description: >
+        Returns display-only market summary widgets and freshness metadata.
+        Buy, sell, resolution, payout, and refund flows must continue to read
+        canonical market, bet, and user balance data instead.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Market summary read model returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketSummaryReadModelEnvelopeResponse'
+        '400':
+          description: Invalid market ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to build market summary read model.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/read/users/{username}/financial-summary:
+    get:
+      tags: [Users]
+      operationId: getUserFinancialReadModelSummary
+      summary: Get authenticated user financial read-model summary
+      description: >
+        Returns a cached/read-model financial summary for game transparency.
+        Any logged-in user may view another user's game-financial summary, but
+        logged-out visitors cannot access this endpoint. The response includes
+        freshness metadata and must not be used for transaction decisions.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          description: Username whose financial read model is requested.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Financial read model returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserFinancialReadModelEnvelopeResponse'
+        '400':
+          description: Username missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Login required or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: User financial read model not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Failed to read financial read model.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/stats:
     get:
       tags: [Metrics]
@@ -3484,6 +3723,72 @@ paths:
                 $ref: '#/components/schemas/GlobalLeaderboardEnvelopeResponse'
         '500':
           description: Failed to compute global leaderboard.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/content/reporting-visibility:
+    get:
+      tags: [Content]
+      operationId: getReportingVisibilitySettings
+      summary: Get reporting visibility settings
+      description: Retrieves CMS settings controlling whether aggregate reporting routes are visible to logged-out visitors.
+      responses:
+        '200':
+          description: Reporting visibility settings returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportingVisibilitySettingsEnvelopeResponse'
+        '500':
+          description: Failed to load reporting visibility settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/content/reporting-visibility:
+    put:
+      tags: [Content]
+      operationId: updateReportingVisibilitySettings
+      summary: Update reporting visibility settings
+      description: Updates CMS settings controlling public/login-required access to system metrics and global leaderboard routes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportingVisibilitySettingsUpdateRequest'
+      responses:
+        '200':
+          description: Reporting visibility settings updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportingVisibilitySettingsEnvelopeResponse'
+        '400':
+          description: Invalid request body or validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required or password change is still required.
           content:
             application/json:
               schema:
@@ -4173,6 +4478,26 @@ components:
           $ref: '#/components/schemas/MarketDiscoveryPage'
       required: [ok, result]
 
+    MarketDiscoveryReadModelEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketDiscoveryReadModel'
+      required: [ok, result]
+
+    MarketSummaryReadModelEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketSummaryReadModel'
+      required: [ok, result]
+
     SocialShareSettingsEnvelopeResponse:
       type: object
       properties:
@@ -4181,6 +4506,44 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/SocialShareSettings'
+      required: [ok, result]
+
+    ReportingVisibilitySettingsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/ReportingVisibilitySettings'
+      required: [ok, result]
+
+    UserFinancialReadModelEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/UserFinancialReadModel'
+      required: [ok, result]
+
+    UserOwnedMarketsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          type: object
+          properties:
+            markets:
+              type: array
+              items:
+                $ref: '#/components/schemas/MarketResponse'
+            total:
+              type: integer
+          required: [markets, total]
       required: [ok, result]
 
     StatsResponse:
@@ -4563,6 +4926,56 @@ components:
         marketDust:
           type: integer
           format: int64
+
+    MarketDiscoveryReadModel:
+      type: object
+      properties:
+        layout:
+          $ref: '#/components/schemas/MarketDiscoveryPage'
+        topicNav:
+          $ref: '#/components/schemas/MarketDiscoveryPage'
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketOverviewResponse'
+        pinnedMarkets:
+          type: array
+          items:
+            $ref: '#/components/schemas/PinnedMarketReadModel'
+        total:
+          type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
+
+    PinnedMarketReadModel:
+      type: object
+      properties:
+        pin:
+          $ref: '#/components/schemas/MarketDiscoveryPin'
+        details:
+          $ref: '#/components/schemas/MarketDetailsResponse'
+
+    MarketSummaryReadModel:
+      type: object
+      properties:
+        market:
+          $ref: '#/components/schemas/PublicMarketResponse'
+        creator:
+          $ref: '#/components/schemas/CreatorResponse'
+        probabilityChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProbabilityChange'
+        numUsers:
+          type: integer
+        totalVolume:
+          type: integer
+          format: int64
+        marketDust:
+          type: integer
+          format: int64
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
 
     PublicMarketResponse:
       type: object
@@ -5396,6 +5809,40 @@ components:
             type: integer
             format: int64
 
+    ReadModelFreshness:
+      type: object
+      required: [generatedAt, source, targetFreshnessSeconds, transactionSafeRead]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        source:
+          type: string
+          example: read_model
+        targetFreshnessSeconds:
+          type: integer
+          example: 600
+        transactionSafeRead:
+          type: boolean
+          description: Always false for display/read-model summaries; transaction paths must use canonical data.
+          example: false
+
+    UserFinancialReadModel:
+      type: object
+      required: [username, financial, positionCount, freshness]
+      properties:
+        username:
+          type: string
+        financial:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        positionCount:
+          type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
+
     ChangeDescriptionRequest:
       type: object
       properties:
@@ -5819,6 +6266,36 @@ components:
           type: string
           format: date-time
       required: [siteName, defaultDescription, defaultImageUrl, imageEnabled, imageAlt, version]
+
+    ReportingVisibilitySettings:
+      type: object
+      properties:
+        systemMetricsPublic:
+          type: boolean
+          description: Whether logged-out visitors may access system metrics.
+          example: true
+        globalLeaderboardPublic:
+          type: boolean
+          description: Whether logged-out visitors may access the global leaderboard.
+          example: true
+        version:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+      required: [systemMetricsPublic, globalLeaderboardPublic, version]
+
+    ReportingVisibilitySettingsUpdateRequest:
+      type: object
+      properties:
+        systemMetricsPublic:
+          type: boolean
+        globalLeaderboardPublic:
+          type: boolean
+        version:
+          type: integer
+          format: int64
 
     SocialShareSettingsUpdateRequest:
       type: object
