@@ -1667,7 +1667,8 @@ paths:
         response uses the same whole-share sale calculator as POST /v0/sell and
         reports requestedCredits, saleValue, dust, maxDust, valuePerShare,
         whether the request is allowed, and nearby suggested requested-credit
-        amounts when dust would exceed the configured cap. This private action
+        amounts. Remainders above maxDust are rounded down to the configured
+        cap for the executable Sale Order. This private action
         route is explicitly blocked at the route boundary with PASSWORD_CHANGE_REQUIRED
         when the caller must change their password.
       security:
@@ -1680,7 +1681,7 @@ paths:
               $ref: '#/components/schemas/SellBetRequest'
       responses:
         '200':
-          description: Sale preview calculated successfully, including over-cap dust previews.
+          description: Sale preview calculated successfully, including rounded dust previews.
           content:
             application/json:
               schema:
@@ -1742,8 +1743,8 @@ paths:
       description: >
         Sells enough YES/NO shares to satisfy the requested credit amount, rounded
         down to whole shares, and deposits the actual sale value. Any remainder
-        caused by whole-share rounding is returned as dust and retained by the
-        market subject to the configured maxDustPerSale cap. This private action
+        caused by whole-share rounding is rounded down to the configured
+        maxDustPerSale cap, returned as dust, and retained by the market. This private action
         route is explicitly blocked at the route boundary with PASSWORD_CHANGE_REQUIRED
         when the caller must change their password.
       security:
@@ -1792,7 +1793,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
         '422':
-          description: No position, insufficient shares, or dust cap exceeded. Dust cap responses include a message and details with dust and maxDust.
+          description: No position or insufficient shares.
           content:
             application/json:
               schema:
@@ -4781,7 +4782,7 @@ components:
         requestedCredits:
           type: integer
           format: int64
-          description: Requested gross credits for the sale preview.
+          description: Executable Sale Order credits after rounding the raw request down to the maxDustPerSale cap.
         sharesSold:
           type: integer
           format: int64
@@ -4793,7 +4794,7 @@ components:
         dust:
           type: integer
           format: int64
-          description: Requested credits minus saleValue, retained by the market due to rounding if submitted.
+          description: Capped rounding remainder retained by the market if submitted.
         maxDust:
           type: integer
           format: int64
@@ -4808,13 +4809,13 @@ components:
           description: Approximate fraction of one valuePerShare interval covered by maxDust plus the exact zero-dust value.
         allowed:
           type: boolean
-          description: Whether POST /v0/sell would be allowed for this exact request.
+          description: Whether POST /v0/sell would be allowed after sale-order rounding.
         suggestedAmounts:
           type: array
           items:
             type: integer
             format: int64
-          description: Nearby requested-credit amounts that fit the current maxDustPerSale cap.
+          description: Nearby requested-credit amounts that fit the current maxDustPerSale cap exactly.
         message:
           type: string
         quotedAt:

@@ -208,24 +208,22 @@ func TestSellQuoteHandler_Success(t *testing.T) {
 	}
 }
 
-func TestSellQuoteHandler_DustCapExceededQuoteStillReturnsPreview(t *testing.T) {
+func TestSellQuoteHandler_RoundedDustQuoteReturnsAllowedPreview(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 	svc := &fakeSellService{quoteResp: &bets.SellQuoteResult{
-		Username:          "alice",
-		MarketID:          7,
-		Outcome:           "YES",
-		RequestedCredits:  33,
-		SharesSold:        3,
-		SaleValue:         30,
-		Dust:              3,
-		MaxDust:           2,
-		ValuePerShare:     10,
-		DustCapCoverage:   0.3,
-		Allowed:           false,
-		SuggestedAmounts:  []int64{30, 31, 32},
-		Message:           "This sale would create too much dust.",
-		DustCapExceeded:   true,
-		DustCapExceededBy: 1,
+		Username:         "alice",
+		MarketID:         7,
+		Outcome:          "YES",
+		RequestedCredits: 32,
+		SharesSold:       3,
+		SaleValue:        30,
+		Dust:             2,
+		MaxDust:          2,
+		ValuePerShare:    10,
+		DustCapCoverage:  0.3,
+		Allowed:          true,
+		SuggestedAmounts: []int64{30, 31, 32},
+		Message:          "This Sale Order can be submitted. It would include a 2 credit dust fee from whole-share rounding.",
 	}}
 	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
 
@@ -244,8 +242,8 @@ func TestSellQuoteHandler_DustCapExceededQuoteStillReturnsPreview(t *testing.T) 
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Result.Allowed || !resp.Result.DustCapExceeded || resp.Result.DustCapExceededBy != 1 {
-		t.Fatalf("unexpected over-cap quote: %+v", resp.Result)
+	if !resp.Result.Allowed || resp.Result.DustCapExceeded || resp.Result.DustCapExceededBy != 0 || resp.Result.Dust != 2 {
+		t.Fatalf("unexpected rounded quote: %+v", resp.Result)
 	}
 }
 

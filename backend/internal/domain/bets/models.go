@@ -156,7 +156,7 @@ func buildSellQuoteResult(target *SellQuoteResult, req SellRequest, outcome stri
 		Username:          req.Username,
 		MarketID:          req.MarketID,
 		Outcome:           outcome,
-		RequestedCredits:  req.Amount,
+		RequestedCredits:  sale.RequestedCredits,
 		SharesSold:        sale.SharesToSell,
 		SaleValue:         sale.SaleValue,
 		Dust:              sale.Dust,

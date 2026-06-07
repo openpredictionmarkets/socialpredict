@@ -13,10 +13,11 @@ POST /v0/sell
 valuePerShare = position.Value / sharesOwned
 sharesSold    = requestedCredits / valuePerShare
 saleValue     = sharesSold * valuePerShare
-dust          = requestedCredits - saleValue
+rawDust       = requestedCredits - saleValue
+dust          = min(rawDust, maxDustPerSale)
 ```
 
-If `dust` exceeds `economics.betting.maxDustPerSale` from `setup.yaml`, the sale is rejected with `DUST_CAP_EXCEEDED`.
+If the raw remainder exceeds `economics.betting.maxDustPerSale` from `setup.yaml`, the executable Sale Order is rounded down to the nearest allowed value. With the default `maxDustPerSale: 1`, an over-remainder sale is still allowed, but the charged dust fee is capped at `1`.
 
 ## Sale Quote Preview
 
@@ -32,16 +33,16 @@ The quote endpoint is read-only. It uses the same backend sale calculator as
 
 ```json
 {
-  "requestedCredits": 33,
+  "requestedCredits": 31,
   "sharesSold": 3,
   "saleValue": 30,
-  "dust": 3,
+  "dust": 1,
   "maxDust": 1,
   "valuePerShare": 10,
   "dustCapCoverage": 0.2,
-  "allowed": false,
+  "allowed": true,
   "suggestedAmounts": [30, 31],
-  "message": "This sale would create 3 dust, above the configured maximum of 1. Try a different requested credit amount."
+  "message": "This Sale Order can be submitted. It would include a 1 credit dust fee from whole-share rounding."
 }
 ```
 

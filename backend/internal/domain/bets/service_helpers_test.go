@@ -409,13 +409,12 @@ func TestSaleCalculator_Calculate(t *testing.T) {
 	calc := saleCalculator{maxDustPerSale: 3}
 	pos := &dmarkets.UserPosition{Value: 100}
 	tests := []struct {
-		name           string
-		position       *dmarkets.UserPosition
-		sharesOwned    int64
-		requested      int64
-		want           SaleQuote
-		wantErr        error
-		wantDustCapErr bool
+		name        string
+		position    *dmarkets.UserPosition
+		sharesOwned int64
+		requested   int64
+		want        SaleQuote
+		wantErr     error
 	}{
 		{
 			name:        "successful sale at dust cap",
@@ -439,11 +438,11 @@ func TestSaleCalculator_Calculate(t *testing.T) {
 			wantErr:     ErrInvalidAmount,
 		},
 		{
-			name:           "dust cap exceeded",
-			position:       pos,
-			sharesOwned:    10,
-			requested:      35,
-			wantDustCapErr: true,
+			name:        "dust above cap is rounded down to cap",
+			position:    pos,
+			sharesOwned: 10,
+			requested:   35,
+			want:        SaleQuote{RequestedCredits: 33, SharesToSell: 3, SaleValue: 30, Dust: 3, ValuePerShare: 10},
 		},
 	}
 
@@ -451,11 +450,6 @@ func TestSaleCalculator_Calculate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := calc.Calculate(tc.position, tc.sharesOwned, tc.requested)
 			switch {
-			case tc.wantDustCapErr:
-				var dustErr ErrDustCapExceeded
-				if !errors.As(err, &dustErr) {
-					t.Fatalf("expected dust cap error, got %v", err)
-				}
 			case tc.wantErr != nil:
 				if !errors.Is(err, tc.wantErr) {
 					t.Fatalf("expected %v, got %v", tc.wantErr, err)

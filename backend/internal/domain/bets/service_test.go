@@ -465,7 +465,7 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sell returned error: %v", err)
 	}
-	if res.SharesSold != 2 || res.SaleValue != 20 || res.Dust != 5 {
+	if res.SharesSold != 2 || res.SaleValue != 20 || res.Dust != 0 {
 		t.Fatalf("unexpected sell result: %+v", res)
 	}
 	if !res.TransactionAt.Equal(now) {
@@ -527,9 +527,9 @@ func TestServiceSell_NoPosition(t *testing.T) {
 	}
 }
 
-func TestServiceSell_DustCapExceeded(t *testing.T) {
+func TestServiceSell_RoundsDustDownToCap(t *testing.T) {
 	now := serviceTestTime()
-	_, svc := newServiceFixture(
+	fixture, svc := newServiceFixture(
 		now,
 		withFixtureMaxDust(2),
 		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
@@ -537,10 +537,15 @@ func TestServiceSell_DustCapExceeded(t *testing.T) {
 		withFixtureUser(&dusers.User{Username: "alice"}),
 	)
 
-	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 33, Outcome: "YES"})
-	var dustErr bets.ErrDustCapExceeded
-	if !errors.As(err, &dustErr) {
-		t.Fatalf("expected ErrDustCapExceeded, got %v", err)
+	result, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 33, Outcome: "YES"})
+	if err != nil {
+		t.Fatalf("Sell returned error: %v", err)
+	}
+	if result.SharesSold != 3 || result.SaleValue != 30 || result.Dust != 2 {
+		t.Fatalf("unexpected rounded sale result: %+v", result)
+	}
+	if fixture.repo.created == nil || fixture.repo.created.Amount != -3 {
+		t.Fatalf("expected stored sale bet, got %+v", fixture.repo.created)
 	}
 }
 
@@ -572,7 +577,7 @@ func TestServiceQuoteSell_AllowsDustAtCapWithoutMutatingState(t *testing.T) {
 	}
 }
 
-func TestServiceQuoteSell_OverCapReturnsPreviewAndSuggestions(t *testing.T) {
+func TestServiceQuoteSell_OverCapRoundsPreviewToCap(t *testing.T) {
 	now := serviceTestTime()
 	fixture, svc := newServiceFixture(
 		now,
@@ -586,10 +591,10 @@ func TestServiceQuoteSell_OverCapReturnsPreviewAndSuggestions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("QuoteSell returned error: %v", err)
 	}
-	if quote.Allowed || !quote.DustCapExceeded || quote.DustCapExceededBy != 1 {
-		t.Fatalf("expected over-cap quote, got %+v", quote)
+	if !quote.Allowed || quote.DustCapExceeded || quote.DustCapExceededBy != 0 {
+		t.Fatalf("expected rounded allowed quote, got %+v", quote)
 	}
-	if quote.SaleValue != 30 || quote.Dust != 3 || quote.MaxDust != 2 {
+	if quote.SaleValue != 30 || quote.Dust != 2 || quote.MaxDust != 2 {
 		t.Fatalf("unexpected over-cap quote amounts: %+v", quote)
 	}
 	for _, want := range []int64{30, 31, 32} {
@@ -613,7 +618,6 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 		wantShares      int64
 		wantSaleValue   int64
 		wantDust        int64
-		wantDustCapErr  bool
 	}{
 		{
 			name:            "exact share multiple has zero dust",
@@ -646,22 +650,24 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 			wantDust:        2,
 		},
 		{
-			name:            "dust above cap is rejected before writes",
+			name:            "dust above cap is rounded down to cap",
 			maxDust:         2,
 			sharesOwned:     10,
 			positionValue:   100,
 			requestedAmount: 33,
-			wantDustCapErr:  true,
+			wantShares:      3,
+			wantSaleValue:   30,
+			wantDust:        2,
 		},
 		{
-			name:            "zero cap disables cap and allows dust",
+			name:            "zero cap rounds dust down to zero",
 			maxDust:         0,
 			sharesOwned:     10,
 			positionValue:   100,
 			requestedAmount: 35,
 			wantShares:      3,
 			wantSaleValue:   30,
-			wantDust:        5,
+			wantDust:        0,
 		},
 		{
 			name:            "full-position exact sale has zero dust",
@@ -684,12 +690,14 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 			wantDust:        2,
 		},
 		{
-			name:            "full-position sale above cap is rejected",
+			name:            "full-position sale above cap is rounded down to cap",
 			maxDust:         2,
 			sharesOwned:     10,
 			positionValue:   100,
 			requestedAmount: 103,
-			wantDustCapErr:  true,
+			wantShares:      10,
+			wantSaleValue:   100,
+			wantDust:        2,
 		},
 		{
 			name:            "larger share value creates larger possible dust interval",
@@ -702,12 +710,14 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 			wantDust:        4,
 		},
 		{
-			name:            "larger share value rejects dust beyond cap",
+			name:            "larger share value rounds dust beyond cap down",
 			maxDust:         4,
 			sharesOwned:     5,
 			positionValue:   100,
 			requestedAmount: 45,
-			wantDustCapErr:  true,
+			wantShares:      2,
+			wantSaleValue:   40,
+			wantDust:        4,
 		},
 	}
 
@@ -732,17 +742,6 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 				Amount:   tc.requestedAmount,
 				Outcome:  "YES",
 			})
-
-			if tc.wantDustCapErr {
-				var dustErr bets.ErrDustCapExceeded
-				if !errors.As(err, &dustErr) {
-					t.Fatalf("expected ErrDustCapExceeded, got %v", err)
-				}
-				if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
-					t.Fatalf("rejected dust-cap sale should not write repo/user state: repo=%+v calls=%+v", fixture.repo.created, fixture.users.calls)
-				}
-				return
-			}
 
 			if err != nil {
 				t.Fatalf("Sell returned error: %v", err)

@@ -132,14 +132,7 @@ type saleCalculator struct {
 }
 
 func (s saleCalculator) Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error) {
-	quote, err := s.Quote(pos, sharesOwned, creditsRequested)
-	if err != nil {
-		return SaleQuote{}, err
-	}
-	if err := validateDustCap(quote.Dust, s.maxDustPerSale); err != nil {
-		return SaleQuote{}, err
-	}
-	return quote, nil
+	return s.Quote(pos, sharesOwned, creditsRequested)
 }
 
 func (s saleCalculator) Quote(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error) {
@@ -170,10 +163,12 @@ func (s saleCalculator) Quote(pos *dmarkets.UserPosition, sharesOwned int64, cre
 	}
 
 	saleValue := sharesToSell * valuePerShare
-	dust := calculateDust(creditsRequested, saleValue)
+	rawDust := calculateDust(creditsRequested, saleValue)
+	dust := normalizeDust(rawDust, s.maxDustPerSale)
+	executableCredits := saleValue + dust
 
 	return SaleQuote{
-		RequestedCredits: creditsRequested,
+		RequestedCredits: executableCredits,
 		SharesToSell:     sharesToSell,
 		SaleValue:        saleValue,
 		Dust:             dust,
@@ -218,6 +213,19 @@ func validateDustCap(dust int64, cap int64) error {
 		return newDustCapExceeded(cap, dust)
 	}
 	return nil
+}
+
+func normalizeDust(dust int64, maxDust int64) int64 {
+	if dust <= 0 {
+		return 0
+	}
+	if maxDust < 0 {
+		return 0
+	}
+	if dust > maxDust {
+		return maxDust
+	}
+	return dust
 }
 
 func dustCapCoverage(maxDust int64, valuePerShare int64) float64 {
