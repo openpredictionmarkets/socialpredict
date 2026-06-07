@@ -85,6 +85,10 @@ Service ownership: analytics context.
 
 Checklist:
 
+- [x] Add CMS reporting visibility settings for public/login-required aggregate reporting.
+- [x] Gate system metrics public access behind reporting visibility settings.
+- [x] Gate global leaderboard public access behind reporting visibility settings.
+- [x] Add admin CMS controls for reporting visibility settings.
 - [ ] Add system metrics snapshot read model.
 - [ ] Add global leaderboard snapshot read model.
 - [ ] Add market leaderboard snapshot read model.
@@ -107,7 +111,8 @@ Checklist:
 - [x] Add durable snapshot persistence if the display path is expensive enough.
 - [x] Add on-demand user financial snapshot refresh service.
 - [x] Add freshness metadata to user financial read-model retrieval.
-- [ ] Add freshness metadata to user financial display responses.
+- [x] Add authenticated game-transparency user financial read-model endpoint with freshness metadata.
+- [x] Keep user financial read-model endpoint unavailable to logged-out visitors.
 - [ ] Invalidate or mark stale user financial snapshots after user bet/sale/resolution payout/refund events.
 - [ ] Ensure user financial snapshots are never used for transaction decisions, spend checks, dust settlement, or payout/refund truth.
 - [x] Add boundary tests proving buy/sell/user-balance transaction interfaces do not expose user financial snapshot services.
@@ -135,9 +140,10 @@ Checklist:
 
 - [ ] Identify canonical transaction endpoints that must never read from display caches.
 - [ ] Identify cache-backed display/read-model endpoints.
-- [ ] Decide whether to introduce explicit `/v0/read/...` routes or route existing display handlers through explicit read-model services.
+- [x] Introduce explicit `/v0/read/...` route for user financial summaries.
+- [ ] Decide remaining `/v0/read/...` routes versus existing display handler rewrites.
 - [x] Add shared read-model freshness metadata contract.
-- [ ] Add freshness metadata to cache-backed display responses.
+- [x] Add freshness metadata to user financial read-model display response.
 - [x] Add domain boundary tests proving transaction interfaces do not expose read-model snapshot services.
 - [ ] Add API tests proving transaction endpoints do not call read-model cache services.
 

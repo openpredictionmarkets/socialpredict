@@ -120,10 +120,19 @@ user_financial_metric_snapshots
 
 Implementation may choose tables, materialized views, or service-managed snapshots. The key requirement is one explicit read-model boundary rather than ad hoc duplicate math.
 
-User financial snapshots require authenticated cache boundaries. A user-specific
-financial snapshot may be safe for that user or an admin to view, but it must
-not be served as a global/public cache entry. Cache keys and API responses must
-include the authenticated user scope.
+User financial snapshots require authenticated cache boundaries. SocialPredict
+is a game, so logged-in users may view each other's game-financial status for
+transparency. These summaries still must not be served to logged-out/public
+visitors. Private identity/security fields such as email, API keys, password
+flags, and admin-only notes remain outside the financial read model.
+
+Aggregate reporting visibility should be controlled explicitly by CMS/admin
+settings:
+
+- system statistics may be public or login-required
+- global leaderboard may be public or login-required
+- user financial read models remain login-required regardless of aggregate settings
+- transaction endpoints are unaffected by reporting visibility settings
 
 ## Redis Cache
 
@@ -219,6 +228,8 @@ Implementation note:
 
 - Market accounting snapshots and user financial metric snapshots expose a shared freshness metadata contract.
 - Existing public display handlers should only add this metadata through explicit display/read-model wiring.
+- User financial read-model routes are login-required game transparency routes, not public anonymous routes.
+- Aggregate reporting routes can be public or login-required based on CMS reporting visibility settings.
 - Existing transaction endpoints and transaction service interfaces must not consume this metadata.
 
 ## Pagination And Display Simplification

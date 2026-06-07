@@ -247,6 +247,57 @@ func TestServerServesPublicReportingAndContentRoutesWithoutAuth(t *testing.T) {
 	}
 }
 
+func TestServerReportingVisibilityCanRequireLoginForAggregateRoutes(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	db := modelstesting.NewFakeDB(t)
+	seedServerTestData(t, db)
+	viewer := modelstesting.GenerateUser("reporting_viewer", 1000)
+	viewer.MustChangePassword = false
+	if err := db.Create(&viewer).Error; err != nil {
+		t.Fatalf("seed viewer: %v", err)
+	}
+	if err := db.Model(&viewer).Update("must_change_password", false).Error; err != nil {
+		t.Fatalf("clear viewer password-change flag: %v", err)
+	}
+	if err := db.Model(&models.ReportingVisibilitySettings{}).
+		Where("slug = ?", "default").
+		Updates(map[string]any{
+			"system_metrics_public":     false,
+			"global_leaderboard_public": false,
+		}).Error; err != nil {
+		t.Fatalf("update reporting visibility settings: %v", err)
+	}
+
+	handler := buildTestHandler(t, db)
+
+	for _, path := range []string{"/v0/system/metrics", "/v0/global/leaderboard"} {
+		t.Run(path+" anonymous", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("expected anonymous status 401, got %d: %s", rec.Code, rec.Body.String())
+			}
+			assertServerFailureReason(t, rec, handlers.ReasonInvalidToken)
+		})
+
+		t.Run(path+" authenticated", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT(viewer.Username))
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected authenticated status 200, got %d: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestServerServesPublicMarketShareShell(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key")
 	t.Setenv("PUBLIC_BASE_URL", "https://kconfs.com")

@@ -2,6 +2,7 @@ import React from 'react';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import HomeEditor from './HomeEditor';
 import MarketDiscoveryLayoutEditor from './MarketDiscoveryLayoutEditor';
+import ReportingVisibilityEditor from './ReportingVisibilityEditor';
 import SocialShareEditor from './SocialShareEditor';
 
 function CmsDashboard() {
@@ -13,6 +14,10 @@ function CmsDashboard() {
     {
       label: 'Home Page',
       content: <HomeEditor />,
+    },
+    {
+      label: 'Reporting Visibility',
+      content: <ReportingVisibilityEditor />,
     },
     {
       label: 'Social Share',

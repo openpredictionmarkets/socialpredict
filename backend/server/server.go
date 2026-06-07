@@ -20,6 +20,8 @@ import (
 	cmshomehttp "socialpredict/handlers/cms/homepage/http"
 	"socialpredict/handlers/cms/marketdiscovery"
 	cmsdiscoveryhttp "socialpredict/handlers/cms/marketdiscovery/http"
+	"socialpredict/handlers/cms/reportingvisibility"
+	cmsreportinghttp "socialpredict/handlers/cms/reportingvisibility/http"
 	"socialpredict/handlers/cms/socialshare"
 	cmssocialhttp "socialpredict/handlers/cms/socialshare/http"
 	marketshandlers "socialpredict/handlers/markets"
@@ -37,6 +39,7 @@ import (
 	authsvc "socialpredict/internal/service/auth"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/logger"
+	"socialpredict/models"
 	"socialpredict/security"
 	"sort"
 	"strings"
@@ -270,12 +273,47 @@ func writeProbeResponse(w http.ResponseWriter, status int, body string) {
 	_, _ = w.Write([]byte(body))
 }
 
-func registerApplicationReportingRoutes(router *mux.Router, configService configsvc.Service, statsService statshandlers.FinancialStatsService, reportingService applicationReportingService, securityMiddleware func(http.Handler) http.Handler) {
+type reportingVisibilityService interface {
+	GetSettings() (*models.ReportingVisibilitySettings, error)
+}
+
+func registerApplicationReportingRoutes(router *mux.Router, configService configsvc.Service, statsService statshandlers.FinancialStatsService, reportingService applicationReportingService, visibility reportingVisibilityService, auth authsvc.Authenticator, securityMiddleware func(http.Handler) http.Handler) {
 	// These /v0/ reporting routes stay application-owned. Future tracing or metrics
 	// export work belongs in request-boundary/runtime wiring, not in health probes.
 	router.Handle("/v0/stats", securityMiddleware(statshandlers.StatsHandler(statsService, configService))).Methods("GET")
-	router.Handle("/v0/system/metrics", securityMiddleware(metricshandlers.GetSystemMetricsHandler(reportingService))).Methods("GET")
-	router.Handle("/v0/global/leaderboard", securityMiddleware(metricshandlers.GetGlobalLeaderboardHandler(reportingService))).Methods("GET")
+	router.Handle("/v0/system/metrics", securityMiddleware(reportingVisibilityGate(visibility, auth, func(s *models.ReportingVisibilitySettings) bool {
+		return s == nil || s.SystemMetricsPublic
+	}, metricshandlers.GetSystemMetricsHandler(reportingService)))).Methods("GET")
+	router.Handle("/v0/global/leaderboard", securityMiddleware(reportingVisibilityGate(visibility, auth, func(s *models.ReportingVisibilitySettings) bool {
+		return s == nil || s.GlobalLeaderboardPublic
+	}, metricshandlers.GetGlobalLeaderboardHandler(reportingService)))).Methods("GET")
+}
+
+func reportingVisibilityGate(visibility reportingVisibilityService, auth authsvc.Authenticator, isPublic func(*models.ReportingVisibilitySettings) bool, next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		settings := reportingvisibility.DefaultSettings()
+		if visibility != nil {
+			loaded, err := visibility.GetSettings()
+			if err != nil {
+				_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+				return
+			}
+			settings = loaded
+		}
+		if isPublic == nil || isPublic(settings) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if auth == nil {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		if _, authErr := auth.CurrentUser(r); authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func requirePasswordChangeCleared(auth authsvc.Authenticator, next http.Handler) http.Handler {
@@ -322,7 +360,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	// application setup information
 	router.Handle("/v0/setup", securityMiddleware(http.HandlerFunc(setuphandlers.GetSetupHandler(container.GetConfigService())))).Methods("GET")
 	router.Handle("/v0/setup/frontend", securityMiddleware(http.HandlerFunc(setuphandlers.GetFrontendSetupHandler(container.GetConfigService())))).Methods("GET")
-	registerApplicationReportingRoutes(router, configService, analyticsService, analyticsService, securityMiddleware)
+	reportingVisibilityRepo := reportingvisibility.NewGormRepository(db)
+	reportingVisibilitySvc := reportingvisibility.NewService(reportingVisibilityRepo)
+	reportingVisibilityHandler := cmsreportinghttp.NewHandler(reportingVisibilitySvc, authService)
+	registerApplicationReportingRoutes(router, configService, analyticsService, analyticsService, reportingVisibilitySvc, authService, securityMiddleware)
 
 	// CMS routes and services
 	homepageRepo := homepage.NewGormRepository(db)
@@ -407,6 +448,7 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/usercredit/{username}", securityMiddleware(usercredit.GetUserCreditHandler(usersService, configService.Economics().User.MaximumDebtAllowed))).Methods("GET")
 	router.Handle("/v0/portfolio/{username}", securityMiddleware(publicuser.GetPortfolioHandler(usersService))).Methods("GET")
 	router.Handle("/v0/users/{username}/financial", securityMiddleware(usershandlers.GetUserFinancialHandler(usersService))).Methods("GET")
+	router.Handle("/v0/read/users/{username}/financial-summary", securityMiddleware(usershandlers.GetUserFinancialReadModelHandler(analyticsService, authService))).Methods("GET")
 
 	// handle private user stuff, display sensitive profile information to customize
 	router.Handle("/v0/privateprofile", securityMiddleware(privateuser.GetPrivateProfileHandler(usersService))).Methods("GET")
@@ -453,6 +495,8 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.HandleFunc("/api/v0/content/social-share/image", socialShareHandler.PublicImage).Methods("GET", "HEAD")
 	router.Handle("/v0/admin/content/social-share", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUpdate))).Methods("PUT")
 	router.Handle("/v0/admin/content/social-share/image", securityMiddleware(http.HandlerFunc(socialShareHandler.AdminUploadImage))).Methods("POST")
+	router.Handle("/v0/content/reporting-visibility", securityMiddleware(http.HandlerFunc(reportingVisibilityHandler.PublicGet))).Methods("GET")
+	router.Handle("/v0/admin/content/reporting-visibility", securityMiddleware(http.HandlerFunc(reportingVisibilityHandler.AdminUpdate))).Methods("PUT")
 }
 
 func shareMetadataConfig(config appruntime.ShareConfig) dmarkets.ShareMetadataConfig {
