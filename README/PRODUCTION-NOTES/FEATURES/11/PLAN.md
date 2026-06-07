@@ -62,6 +62,7 @@ Checklist:
 - [x] Add generated-at and last-processed-bet tracking.
 - [x] Add migration tests.
 - [x] Add repository tests for snapshot writes/reads.
+- [x] Add on-demand market accounting snapshot refresh service.
 
 ## 04. Market Discovery Cache
 
@@ -103,6 +104,7 @@ Checklist:
 - [ ] Separate top-line transaction-sensitive balance/spend checks from display-only user financial summaries.
 - [x] Define authenticated read-model shape for user financial snapshots.
 - [x] Add durable snapshot persistence if the display path is expensive enough.
+- [x] Add on-demand user financial snapshot refresh service.
 - [ ] Add freshness metadata to user financial display responses.
 - [ ] Invalidate or mark stale user financial snapshots after user bet/sale/resolution payout/refund events.
 - [ ] Ensure user financial snapshots are never used for transaction decisions, spend checks, dust settlement, or payout/refund truth.
