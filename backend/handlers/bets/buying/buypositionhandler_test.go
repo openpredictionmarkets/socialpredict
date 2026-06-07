@@ -23,6 +23,22 @@ type fakeBetsService struct {
 	err  error
 }
 
+type fakeReadModelInvalidator struct {
+	username string
+	marketID int64
+	reason   string
+	calls    int
+	err      error
+}
+
+func (f *fakeReadModelInvalidator) InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error {
+	f.username = username
+	f.marketID = marketID
+	f.reason = reason
+	f.calls++
+	return f.err
+}
+
 func (f *fakeBetsService) Place(ctx context.Context, req bets.PlaceRequest) (*bets.PlacedBet, error) {
 	f.req = req
 	if f.err != nil {
@@ -32,6 +48,10 @@ func (f *fakeBetsService) Place(ctx context.Context, req bets.PlaceRequest) (*be
 }
 
 func (f *fakeBetsService) Sell(ctx context.Context, req bets.SellRequest) (*bets.SellResult, error) {
+	return nil, nil
+}
+
+func (f *fakeBetsService) QuoteSell(ctx context.Context, req bets.SellRequest) (*bets.SellQuoteResult, error) {
 	return nil, nil
 }
 
@@ -149,6 +169,36 @@ func TestPlaceBetHandler_Success(t *testing.T) {
 	}
 	if resp.Result.Username != "alice" || resp.Result.Amount != 120 || resp.Result.MarketID != 5 {
 		t.Fatalf("unexpected response body: %+v", resp)
+	}
+}
+
+func TestPlaceBetHandler_InvalidatesReadModelsAfterSuccess(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	userSvc := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	betsSvc := &fakeBetsService{resp: &bets.PlacedBet{
+		Username: "alice",
+		MarketID: 99,
+		Amount:   10,
+		Outcome:  "YES",
+		PlacedAt: time.Now(),
+	}}
+	invalidator := &fakeReadModelInvalidator{}
+	handler := PlaceBetHandlerWithInvalidator(betsSvc, userSvc, invalidator)
+
+	body, _ := json.Marshal(dto.PlaceBetRequest{MarketID: 99, Amount: 10, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/bet", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if invalidator.calls != 1 || invalidator.username != "alice" || invalidator.marketID != 99 || invalidator.reason != "bet_accepted" {
+		t.Fatalf("unexpected invalidation call: %+v", invalidator)
 	}
 }
 

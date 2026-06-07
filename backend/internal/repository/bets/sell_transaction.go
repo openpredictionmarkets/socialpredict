@@ -86,6 +86,8 @@ func (r sellMarketRepository) loadMarketData(ctx context.Context, marketID int64
 
 	var dbBets []models.Bet
 	betsQuery := r.db.WithContext(ctx).
+		Model(&models.Bet{}).
+		Select("bets.*").
 		Where("market_id = ?", marketID).
 		Order("placed_at ASC")
 	if r.db.Dialector.Name() == "postgres" {

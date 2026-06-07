@@ -1,10 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
+import { authStorage } from '../../api/authStorage';
 import SiteButton from '../../components/buttons/SiteButtons';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import { unwrapApiResponse } from '../../utils/apiResponse';
+
+const LOGIN_REQUIRED_REASON = 'INVALID_TOKEN';
+const LEADERBOARD_PAGE_SIZE = 20;
+const paginationButtonClass = [
+  'rounded',
+  'border',
+  'border-transparent',
+  'bg-neutral-btn',
+  'px-3',
+  'py-1.5',
+  'text-xs',
+  'font-semibold',
+  'text-white',
+  'transition-colors',
+  'duration-200',
+  'hover:bg-neutral-btn-hover',
+  'disabled:cursor-not-allowed',
+  'disabled:bg-custom-gray-light',
+  'disabled:text-gray-400',
+  'disabled:opacity-60',
+].join(' ');
+
+const loginRequiredError = (message) => {
+  const error = new Error(message);
+  error.loginRequired = true;
+  return error;
+};
+
+const getOptionalAuthHeaders = () => {
+  const token = authStorage.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const readReportingError = async (response, loginMessage, fallbackMessage) => {
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+
+  if (response.status === 401 && payload?.reason === LOGIN_REQUIRED_REASON) {
+    throw loginRequiredError(loginMessage);
+  }
+
+  throw new Error(payload?.message || payload?.reason || `${fallbackMessage}: ${response.status}`);
+};
+
+const ReportingNotice = ({ message, loginRequired, errorLabel }) => (
+  <div
+    className={`rounded-lg border p-4 mb-6 ${
+      loginRequired
+        ? 'bg-info-blue/15 border-info-blue/50'
+        : 'bg-red-900/50 border-red-600'
+    }`}
+  >
+    <p className={loginRequired ? 'text-blue-100' : 'text-red-300'}>
+      {loginRequired ? message : `${errorLabel}: ${message}`}
+    </p>
+  </div>
+);
 
 // MetricCard Component
 const MetricCard = ({
@@ -67,12 +129,16 @@ const Stats = () => {
   const [systemMetrics, setSystemMetrics] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [metricsError, setMetricsError] = useState(null);
+  const [metricsLoginRequired, setMetricsLoginRequired] = useState(false);
   const [showFormulas, setShowFormulas] = useState({});
 
   // Global leaderboard state
   const [globalLeaderboard, setGlobalLeaderboard] = useState(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState(null);
+  const [leaderboardLoginRequired, setLeaderboardLoginRequired] = useState(false);
+  const [leaderboardPage, setLeaderboardPage] = useState(0);
+  const [leaderboardHasNextPage, setLeaderboardHasNextPage] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -103,50 +169,73 @@ const Stats = () => {
   const fetchSystemMetrics = async () => {
     setMetricsLoading(true);
     setMetricsError(null);
+    setMetricsLoginRequired(false);
     try {
       const response = await fetch(`${API_URL}/v0/system/metrics`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...getOptionalAuthHeaders(),
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch system metrics: ${response.status}`);
+        await readReportingError(
+          response,
+          'Log in to see system stats',
+          'Failed to fetch system metrics'
+        );
       }
 
       const data = await response.json();
       setSystemMetrics(unwrapApiResponse(data));
     } catch (err) {
       setMetricsError(err.message);
+      setMetricsLoginRequired(Boolean(err.loginRequired));
     } finally {
       setMetricsLoading(false);
     }
   };
 
-  const fetchGlobalLeaderboard = async () => {
+  const fetchGlobalLeaderboard = async (page = 0) => {
     setLeaderboardLoading(true);
     setLeaderboardError(null);
+    setLeaderboardLoginRequired(false);
     try {
-      const response = await fetch(`${API_URL}/v0/global/leaderboard`, {
+      const offset = page * LEADERBOARD_PAGE_SIZE;
+      const response = await fetch(`${API_URL}/v0/global/leaderboard?limit=${LEADERBOARD_PAGE_SIZE}&offset=${offset}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...getOptionalAuthHeaders(),
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch global leaderboard: ${response.status}`);
+        await readReportingError(
+          response,
+          'Log in to see leaderboard',
+          'Failed to fetch global leaderboard'
+        );
       }
 
       const data = await response.json();
-      setGlobalLeaderboard(unwrapApiResponse(data));
+      const rows = unwrapApiResponse(data);
+      setGlobalLeaderboard(rows);
+      setLeaderboardPage(page);
+      setLeaderboardHasNextPage(Array.isArray(rows) && rows.length === LEADERBOARD_PAGE_SIZE);
     } catch (err) {
       setLeaderboardError(err.message);
+      setLeaderboardLoginRequired(Boolean(err.loginRequired));
+      setLeaderboardHasNextPage(false);
     } finally {
       setLeaderboardLoading(false);
     }
   };
+
+  const leaderboardStart = leaderboardPage * LEADERBOARD_PAGE_SIZE;
+  const canPageLeaderboardBack = leaderboardPage > 0;
+  const canPageLeaderboardForward = leaderboardHasNextPage;
 
   const toggleFormula = (key) => {
     setShowFormulas(prev => ({
@@ -269,9 +358,11 @@ const Stats = () => {
       )}
 
       {metricsError && (
-        <div className="bg-red-900/50 border border-red-600 rounded-lg p-4 mb-6">
-          <p className="text-red-300">Error loading metrics: {metricsError}</p>
-        </div>
+        <ReportingNotice
+          message={metricsError}
+          loginRequired={metricsLoginRequired}
+          errorLabel="Error loading metrics"
+        />
       )}
 
       {!systemMetrics && !metricsLoading && !metricsError && (
@@ -411,7 +502,7 @@ const Stats = () => {
           Global Leaderboard <span className="text-warning-orange text-lg">(Beta)</span>
         </h2>
         <SiteButton
-          onClick={fetchGlobalLeaderboard}
+          onClick={() => fetchGlobalLeaderboard(0)}
           isSelected={false}
           disabled={leaderboardLoading}
           className="bg-info-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
@@ -442,9 +533,11 @@ const Stats = () => {
       )}
 
       {leaderboardError && (
-        <div className="bg-red-900/50 border border-red-600 rounded-lg p-4 mb-6">
-          <p className="text-red-300">Error loading leaderboard: {leaderboardError}</p>
-        </div>
+        <ReportingNotice
+          message={leaderboardError}
+          loginRequired={leaderboardLoginRequired}
+          errorLabel="Error loading leaderboard"
+        />
       )}
 
       {!globalLeaderboard && !leaderboardLoading && !leaderboardError && (
@@ -455,67 +548,92 @@ const Stats = () => {
       )}
 
       {globalLeaderboard && globalLeaderboard.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-600">
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Rank</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Profit</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Current Value</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Spent</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Active Markets</th>
-                <th className="text-left py-3 px-4 text-gray-300 font-medium">Resolved Markets</th>
-              </tr>
-            </thead>
-            <tbody>
-              {globalLeaderboard.map((user, index) => {
-                const getRankDisplay = (rank) => {
-                  if (rank === 1) return '🥇';
-                  if (rank === 2) return '🥈';
-                  if (rank === 3) return '🥉';
-                  return `#${rank}`;
-                };
+        <div>
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+              Showing leaderboard page {leaderboardPage + 1}{globalLeaderboard.length ? ` (${leaderboardStart + 1}-${leaderboardStart + globalLeaderboard.length})` : ''}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => fetchGlobalLeaderboard(Math.max(0, leaderboardPage - 1))}
+                disabled={!canPageLeaderboardBack}
+                className={paginationButtonClass}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => fetchGlobalLeaderboard(leaderboardPage + 1)}
+                disabled={!canPageLeaderboardForward}
+                className={paginationButtonClass}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-600">
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Rank</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">User</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Profit</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Current Value</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Total Spent</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Active Markets</th>
+                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Resolved Markets</th>
+                </tr>
+              </thead>
+              <tbody>
+                {globalLeaderboard.map((user) => {
+                  const getRankDisplay = (rank) => {
+                    if (rank === 1) return '🥇';
+                    if (rank === 2) return '🥈';
+                    if (rank === 3) return '🥉';
+                    return `#${rank}`;
+                  };
 
-                const getProfitColor = (profit) => {
-                  if (profit > 0) return 'text-green-400';
-                  if (profit < 0) return 'text-red-400';
-                  return 'text-gray-300';
-                };
+                  const getProfitColor = (profit) => {
+                    if (profit > 0) return 'text-green-400';
+                    if (profit < 0) return 'text-red-400';
+                    return 'text-gray-300';
+                  };
 
-                return (
-                  <tr key={user.username} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
-                    <td className="py-3 px-4 text-white font-semibold">
-                      {getRankDisplay(user.rank)}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Link
-                        to={`/user/${user.username}`}
-                        className="text-blue-400 font-medium hover:text-blue-300 transition-colors"
-                      >
-                        {user.username}
-                      </Link>
-                    </td>
-                    <td className={`py-3 px-4 font-semibold ${getProfitColor(user.totalProfit)}`}>
-                      {user.totalProfit >= 0 ? '+' : ''}{user.totalProfit.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300">
-                      {user.totalCurrentValue.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300">
-                      {user.totalSpent.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300 text-center">
-                      {user.activeMarkets}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300 text-center">
-                      {user.resolvedMarkets}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={user.username} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors">
+                      <td className="py-3 px-4 text-white font-semibold">
+                        {getRankDisplay(user.rank)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Link
+                          to={`/user/${user.username}`}
+                          className="text-blue-400 font-medium hover:text-blue-300 transition-colors"
+                        >
+                          {user.username}
+                        </Link>
+                      </td>
+                      <td className={`py-3 px-4 font-semibold ${getProfitColor(user.totalProfit)}`}>
+                        {user.totalProfit >= 0 ? '+' : ''}{user.totalProfit.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300">
+                        {user.totalCurrentValue.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300">
+                        {user.totalSpent.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300 text-center">
+                        {user.activeMarkets}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300 text-center">
+                        {user.resolvedMarkets}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

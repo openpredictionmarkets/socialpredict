@@ -1,6 +1,7 @@
 package sellbetshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,10 +13,21 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/logger"
 )
+
+type readModelInvalidator interface {
+	InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error
+}
 
 // SellPositionHandler returns an HTTP handler that delegates sales to the bets service.
 func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+	return SellPositionHandlerWithInvalidator(betsSvc, usersSvc, nil)
+}
+
+// SellPositionHandlerWithInvalidator returns an HTTP handler that delegates
+// sales and then marks display read models stale after a successful write.
+func SellPositionHandlerWithInvalidator(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface, invalidator readModelInvalidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
@@ -41,6 +53,41 @@ func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceI
 		}
 
 		writeSellResponse(w, result)
+		if invalidator != nil {
+			if err := invalidator.InvalidateAfterMarketTransaction(r.Context(), result.Username, int64(result.MarketID), "sale_accepted"); err != nil {
+				logger.LogError("SellPosition", "InvalidateReadModels", err)
+			}
+		}
+	}
+}
+
+// SellQuoteHandler returns an HTTP handler that previews a sale without settlement.
+func SellQuoteHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
+			return
+		}
+
+		user, authErr := authsvc.ValidateUserAndEnforcePasswordChangeGetUser(r, usersSvc)
+		if authErr != nil {
+			_ = authhttp.WriteFailure(w, authErr)
+			return
+		}
+
+		req, decodeErr := decodeSellRequest(r)
+		if decodeErr != nil {
+			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+			return
+		}
+
+		result, err := betsSvc.QuoteSell(r.Context(), toSellRequest(req, user.Username))
+		if err != nil {
+			handleSellError(w, err)
+			return
+		}
+
+		writeSellQuoteResponse(w, result)
 	}
 }
 
@@ -62,8 +109,19 @@ func toSellRequest(req dto.SellBetRequest, username string) bets.SellRequest {
 }
 
 func handleSellError(w http.ResponseWriter, err error) {
-	if _, ok := err.(bets.ErrDustCapExceeded); ok {
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonDustCapExceeded)
+	var dustErr bets.ErrDustCapExceeded
+	if errors.As(err, &dustErr) {
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusUnprocessableEntity,
+			handlers.ReasonDustCapExceeded,
+			"Sale would create too much dust. Dust is the small rounding remainder retained by the market when sale proceeds are rounded to whole shares. Submit a different credit amount and try again.",
+			map[string]any{
+				"dust":    dustErr.Requested,
+				"maxDust": dustErr.Cap,
+				"hint":    "Try lowering or adjusting the requested credit amount so the rounding dust is within the configured cap.",
+			},
+		)
 		return
 	}
 
@@ -95,4 +153,27 @@ func writeSellResponse(w http.ResponseWriter, result *bets.SellResult) {
 	}
 
 	_ = handlers.WriteResult(w, http.StatusCreated, response)
+}
+
+func writeSellQuoteResponse(w http.ResponseWriter, result *bets.SellQuoteResult) {
+	response := dto.SellQuoteResponse{
+		Username:          result.Username,
+		MarketID:          result.MarketID,
+		Outcome:           result.Outcome,
+		RequestedCredits:  result.RequestedCredits,
+		SharesSold:        result.SharesSold,
+		SaleValue:         result.SaleValue,
+		Dust:              result.Dust,
+		MaxDust:           result.MaxDust,
+		ValuePerShare:     result.ValuePerShare,
+		DustCapCoverage:   result.DustCapCoverage,
+		Allowed:           result.Allowed,
+		SuggestedAmounts:  result.SuggestedAmounts,
+		Message:           result.Message,
+		QuotedAt:          result.QuotedAt,
+		DustCapExceeded:   result.DustCapExceeded,
+		DustCapExceededBy: result.DustCapExceededBy,
+	}
+
+	_ = handlers.WriteResult(w, http.StatusOK, response)
 }

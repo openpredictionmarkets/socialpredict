@@ -84,33 +84,19 @@ func (s *Service) GetMarketDetails(ctx context.Context, marketID int64) (*Market
 		return nil, err
 	}
 
-	boundaryBets := convertToBoundaryBets(bets)
-	probabilityChanges := s.probabilityEngine.Calculate(market.CreatedAt, boundaryBets)
-	probabilityPoints := make([]ProbabilityPoint, len(probabilityChanges))
-	for i, change := range probabilityChanges {
-		probabilityPoints[i] = ProbabilityPoint{
-			Probability: change.Probability,
-			Timestamp:   change.Timestamp,
-		}
-	}
-
-	lastProbability := 0.0
-	if len(probabilityPoints) > 0 {
-		lastProbability = probabilityPoints[len(probabilityPoints)-1].Probability
-	}
-
-	totalVolumeWithDust := s.metricsCalculator.VolumeWithDust(boundaryBets)
-	marketDust := s.metricsCalculator.Dust(boundaryBets)
-	numUsers := countUniqueUsers(boundaryBets)
+	boundaryBets := ToBoundaryBets(bets)
+	accounting := NewMarketAccountingSnapshotCalculator(s.probabilityEngine, s.metricsCalculator, s.clock).
+		Calculate(market, boundaryBets)
 
 	return &MarketOverview{
-		Market:             market,
-		Creator:            s.buildCreatorSummary(ctx, market.CreatorUsername),
-		ProbabilityChanges: probabilityPoints,
-		LastProbability:    lastProbability,
-		NumUsers:           numUsers,
-		TotalVolume:        totalVolumeWithDust,
-		MarketDust:         marketDust,
+		Market:                market,
+		Creator:               s.buildCreatorSummary(ctx, market.CreatorUsername),
+		ProbabilityChanges:    accounting.ProbabilityChanges,
+		LastProbability:       accounting.LastProbability,
+		NumUsers:              accounting.UserCount,
+		TotalVolume:           accounting.VolumeWithDust,
+		MarketDust:            accounting.MarketDust,
+		DescriptionAmendments: s.approvedDescriptionAmendments(ctx, marketID),
 	}, nil
 }
 
@@ -129,20 +115,7 @@ func (s *Service) buildCreatorSummary(ctx context.Context, username string) *Cre
 }
 
 func convertToBoundaryBets(bets []*Bet) []boundary.Bet {
-	if len(bets) == 0 {
-		return []boundary.Bet{}
-	}
-	out := make([]boundary.Bet, len(bets))
-	for i, bet := range bets {
-		out[i] = boundary.Bet{
-			Username: bet.Username,
-			MarketID: bet.MarketID,
-			Amount:   bet.Amount,
-			PlacedAt: bet.PlacedAt,
-			Outcome:  bet.Outcome,
-		}
-	}
-	return out
+	return ToBoundaryBets(bets)
 }
 
 func countUniqueUsers(bets []boundary.Bet) int {

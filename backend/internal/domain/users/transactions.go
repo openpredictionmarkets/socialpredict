@@ -14,19 +14,21 @@ type TransactionType = string
 
 // Transaction types supported when adjusting user balances.
 const (
-	TransactionWin    TransactionType = "WIN"
-	TransactionRefund TransactionType = "REFUND"
-	TransactionSale   TransactionType = "SALE"
-	TransactionBuy    TransactionType = "BUY"
-	TransactionFee    TransactionType = "FEE"
+	TransactionWin        TransactionType = "WIN"
+	TransactionRefund     TransactionType = "REFUND"
+	TransactionSale       TransactionType = "SALE"
+	TransactionWorkProfit TransactionType = "WORK_PROFIT"
+	TransactionBuy        TransactionType = "BUY"
+	TransactionFee        TransactionType = "FEE"
 )
 
 var transactionBalanceAdjustments = map[TransactionType]balanceAdjustment{
-	TransactionWin:    balanceAdjustmentFunc(creditBalance),
-	TransactionRefund: balanceAdjustmentFunc(creditBalance),
-	TransactionSale:   balanceAdjustmentFunc(creditBalance),
-	TransactionBuy:    balanceAdjustmentFunc(debitBalance),
-	TransactionFee:    balanceAdjustmentFunc(debitBalance),
+	TransactionWin:        balanceAdjustmentFunc(creditBalance),
+	TransactionRefund:     balanceAdjustmentFunc(creditBalance),
+	TransactionSale:       balanceAdjustmentFunc(creditBalance),
+	TransactionWorkProfit: balanceAdjustmentFunc(creditBalance),
+	TransactionBuy:        balanceAdjustmentFunc(debitBalance),
+	TransactionFee:        balanceAdjustmentFunc(debitBalance),
 }
 
 func creditBalance(balance int64, amount int64) int64 {

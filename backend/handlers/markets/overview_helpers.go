@@ -110,6 +110,21 @@ func publicMarketResponseFromDomain(market *dmarkets.Market) dto.PublicMarketRes
 	}
 }
 
+func marketDetailsToResponse(details *dmarkets.MarketOverview) dto.MarketDetailsResponse {
+	if details == nil {
+		return dto.MarketDetailsResponse{}
+	}
+	return dto.MarketDetailsResponse{
+		Market:                publicMarketResponseFromDomain(details.Market),
+		Creator:               creatorResponseFromSummary(details.Creator),
+		ProbabilityChanges:    probabilityChangesToResponse(details.ProbabilityChanges),
+		NumUsers:              details.NumUsers,
+		TotalVolume:           details.TotalVolume,
+		MarketDust:            details.MarketDust,
+		DescriptionAmendments: descriptionAmendmentsToResponse(details.DescriptionAmendments),
+	}
+}
+
 func probabilityChangesToResponse(points []dmarkets.ProbabilityPoint) []dto.ProbabilityChangeResponse {
 	if len(points) == 0 {
 		return []dto.ProbabilityChangeResponse{}
@@ -120,6 +135,33 @@ func probabilityChangesToResponse(points []dmarkets.ProbabilityPoint) []dto.Prob
 			Probability: point.Probability,
 			Timestamp:   point.Timestamp,
 		}
+	}
+	return result
+}
+
+func descriptionAmendmentsToResponse(amendments []dmarkets.MarketDescriptionAmendment) []dto.MarketDescriptionAmendmentResponse {
+	if len(amendments) == 0 {
+		return []dto.MarketDescriptionAmendmentResponse{}
+	}
+	result := make([]dto.MarketDescriptionAmendmentResponse, 0, len(amendments))
+	for _, amendment := range amendments {
+		result = append(result, dto.MarketDescriptionAmendmentResponse{
+			ID:              amendment.ID,
+			MarketID:        amendment.MarketID,
+			Version:         amendment.Version,
+			Body:            amendment.Body,
+			BodyFormat:      amendment.BodyFormat,
+			Status:          amendment.Status,
+			CreatedBy:       amendment.CreatedBy,
+			CreatedAt:       amendment.CreatedAt,
+			UpdatedAt:       amendment.UpdatedAt,
+			ApprovedBy:      amendment.ApprovedBy,
+			ApprovedAt:      amendment.ApprovedAt,
+			RejectedBy:      amendment.RejectedBy,
+			RejectedAt:      amendment.RejectedAt,
+			RejectionReason: amendment.RejectionReason,
+			SubmitReason:    amendment.SubmitReason,
+		})
 	}
 	return result
 }

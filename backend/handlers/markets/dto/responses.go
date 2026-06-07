@@ -1,8 +1,6 @@
 package dto
 
-import (
-	"time"
-)
+import "time"
 
 // MarketResponse represents the HTTP response for a market
 type MarketResponse struct {
@@ -157,6 +155,18 @@ type LeaderboardResponse struct {
 	MarketID    int64            `json:"marketId"`
 	Leaderboard []LeaderboardRow `json:"leaderboard"`
 	Total       int              `json:"total"`
+	Freshness   *Freshness       `json:"freshness,omitempty"`
+}
+
+// Freshness represents display/read-model freshness metadata.
+type Freshness struct {
+	GeneratedAt            time.Time  `json:"generatedAt"`
+	Source                 string     `json:"source"`
+	TargetFreshnessSeconds int        `json:"targetFreshnessSeconds"`
+	TransactionSafeRead    bool       `json:"transactionSafeRead"`
+	IsStale                bool       `json:"isStale"`
+	StaleReason            string     `json:"staleReason,omitempty"`
+	MarkedStaleAt          *time.Time `json:"markedStaleAt,omitempty"`
 }
 
 // ProbabilityProjectionResponse represents the HTTP response for probability projection
@@ -170,12 +180,31 @@ type ProbabilityProjectionResponse struct {
 
 // MarketDetailsResponse represents the HTTP response for market details
 type MarketDetailsResponse struct {
-	Market             PublicMarketResponse        `json:"market"`
-	Creator            *CreatorResponse            `json:"creator"`
-	ProbabilityChanges []ProbabilityChangeResponse `json:"probabilityChanges"`
-	NumUsers           int                         `json:"numUsers"`
-	TotalVolume        int64                       `json:"totalVolume"`
-	MarketDust         int64                       `json:"marketDust"`
+	Market                PublicMarketResponse                 `json:"market"`
+	Creator               *CreatorResponse                     `json:"creator"`
+	ProbabilityChanges    []ProbabilityChangeResponse          `json:"probabilityChanges"`
+	NumUsers              int                                  `json:"numUsers"`
+	TotalVolume           int64                                `json:"totalVolume"`
+	MarketDust            int64                                `json:"marketDust"`
+	DescriptionAmendments []MarketDescriptionAmendmentResponse `json:"descriptionAmendments"`
+}
+
+type MarketDescriptionAmendmentResponse struct {
+	ID              int64      `json:"id"`
+	MarketID        int64      `json:"marketId"`
+	Version         int        `json:"version"`
+	Body            string     `json:"body"`
+	BodyFormat      string     `json:"bodyFormat"`
+	Status          string     `json:"status"`
+	CreatedBy       string     `json:"createdBy"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+	ApprovedBy      string     `json:"approvedBy,omitempty"`
+	ApprovedAt      *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy      string     `json:"rejectedBy,omitempty"`
+	RejectedAt      *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason string     `json:"rejectionReason,omitempty"`
+	SubmitReason    string     `json:"submitReason,omitempty"`
 }
 
 // MarketDetailHandlerResponse - backward compatibility type for tests

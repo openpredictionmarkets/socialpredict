@@ -81,6 +81,10 @@ func (failingAnalyticsRepo) UserMarketPositions(context.Context, string) ([]posi
 	return nil, nil
 }
 
+func (failingAnalyticsRepo) UserWorkProfitResolvedMarkets(context.Context, string) ([]analytics.WorkProfitMarketRecord, error) {
+	return nil, nil
+}
+
 func (failingAnalyticsRepo) CountUsersByType(context.Context, string) (int64, error) {
 	return 0, nil
 }

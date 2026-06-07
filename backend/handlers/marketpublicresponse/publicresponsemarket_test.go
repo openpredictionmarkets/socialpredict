@@ -46,7 +46,13 @@ func (m marketServiceStub) GetMarketDetails(context.Context, int64) (*dmarkets.M
 func (m marketServiceStub) GetMarketBets(context.Context, int64) ([]*dmarkets.BetDisplayInfo, error) {
 	panic("not implemented")
 }
+func (m marketServiceStub) GetMarketBetsPage(context.Context, int64, dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
+	panic("not implemented")
+}
 func (m marketServiceStub) GetMarketPositions(context.Context, int64) (dmarkets.MarketPositions, error) {
+	panic("not implemented")
+}
+func (m marketServiceStub) GetMarketPositionsPage(context.Context, int64, dmarkets.Page) (dmarkets.MarketPositions, error) {
 	panic("not implemented")
 }
 func (m marketServiceStub) GetUserPositionInMarket(context.Context, int64, string) (*dmarkets.UserPosition, error) {

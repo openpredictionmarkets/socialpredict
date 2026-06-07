@@ -91,6 +91,7 @@ type SellValidator interface {
 // SaleCalculator encapsulates sale pricing and dust rules.
 type SaleCalculator interface {
 	Calculate(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error)
+	Quote(pos *dmarkets.UserPosition, sharesOwned int64, creditsRequested int64) (SaleQuote, error)
 }
 
 // FeeCalculator encapsulates buy fee calculations.
@@ -128,6 +129,7 @@ func (serviceClock) Now() time.Time { return time.Now() }
 // ServiceInterface defines the behaviour offered by the bets domain.
 type ServiceInterface interface {
 	Place(ctx context.Context, req PlaceRequest) (*PlacedBet, error)
+	QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteResult, error)
 	Sell(ctx context.Context, req SellRequest) (*SellResult, error)
 }
 

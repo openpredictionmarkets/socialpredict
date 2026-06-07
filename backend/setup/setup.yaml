@@ -13,7 +13,7 @@ economics:
     maximumDebtAllowed: 500
   betting:
     minimumBet: 1
-    maxDustPerSale: 2
+    maxDustPerSale: 1
     betFees:
       initialBetFee: 1
       buySharesFee: 0

@@ -112,7 +112,7 @@ func GenerateEconomicConfig() *setup.EconomicConfig {
 			},
 			Betting: setup.Betting{
 				MinimumBet:     1,
-				MaxDustPerSale: 2,
+				MaxDustPerSale: 1,
 				BetFees: setup.BetFees{
 					InitialBetFee: 1,
 					BuySharesFee:  0,

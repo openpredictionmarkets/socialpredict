@@ -108,6 +108,10 @@ func (c DefaultVolumeCalculator) Calculate(ctx context.Context, repo VolumeRepos
 type DefaultFeeCalculator struct{}
 
 func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, repo FeeRepository, config Config) (int64, error) {
+	markets, err := repo.ListMarkets(ctx)
+	if err != nil {
+		return 0, err
+	}
 	betsOrdered, err := repo.ListBetsOrdered(ctx)
 	if err != nil {
 		return 0, err
@@ -118,11 +122,18 @@ func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, re
 		username string
 	}
 
+	paidOutMarket := make(map[uint]bool, len(markets))
+	for _, market := range markets {
+		if market.IsResolved && market.ResolutionResult != "N/A" {
+			paidOutMarket[market.ID] = true
+		}
+	}
+
 	seen := make(map[userMarket]bool)
 	var participationFees int64
 
 	for _, b := range betsOrdered {
-		if b.Amount <= 0 {
+		if b.Amount <= 0 || paidOutMarket[b.MarketID] {
 			continue
 		}
 		key := userMarket{marketID: b.MarketID, username: b.Username}
@@ -153,7 +164,7 @@ func (a DefaultMetricsAssembler) Assemble(debt *DebtStats, volume *MarketVolumeS
 			UnusedDebt:         NewInt64Metric(debt.UnusedDebt, "Σ(maxDebtPerUser - max(0, -balance))", "Remaining borrowing capacity available to users"),
 			ActiveBetVolume:    NewInt64Metric(volume.ActiveBetVolume, "Σ(unresolved_market_volumes)", "Total value of bets currently active in unresolved markets (excludes fees and subsidies)"),
 			MarketCreationFees: NewInt64Metric(volume.MarketCreationFees, "number_of_markets × creation_fee_per_market", "Fees collected from users creating new markets"),
-			ParticipationFees:  NewInt64Metric(participationFees, "Σ(first_bet_per_user_per_market × participation_fee)", "Fees collected from first-time participation in each market"),
+			ParticipationFees:  NewInt64Metric(participationFees, "Σ(unpaid_first_bet_per_user_per_market × participation_fee)", "Retained fees collected from first-time participation before eligible resolved markets redistribute them as steward work profit"),
 			BonusesPaid:        NewInt64Metric(bonusesPaid, "", "System bonuses paid to users and realized profits currently held in user balances"),
 			TotalUtilized:      NewInt64Metric(totalUtilized, "unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid", "Total debt capacity that has been utilized across all categories"),
 		},

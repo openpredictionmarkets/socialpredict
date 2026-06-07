@@ -18,9 +18,28 @@ import (
 )
 
 type fakeSellService struct {
-	req  bets.SellRequest
-	resp *bets.SellResult
-	err  error
+	req       bets.SellRequest
+	quoteReq  bets.SellRequest
+	resp      *bets.SellResult
+	quoteResp *bets.SellQuoteResult
+	err       error
+	quoteErr  error
+}
+
+type fakeReadModelInvalidator struct {
+	username string
+	marketID int64
+	reason   string
+	calls    int
+	err      error
+}
+
+func (f *fakeReadModelInvalidator) InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error {
+	f.username = username
+	f.marketID = marketID
+	f.reason = reason
+	f.calls++
+	return f.err
 }
 
 func (f *fakeSellService) Place(ctx context.Context, req bets.PlaceRequest) (*bets.PlacedBet, error) {
@@ -29,6 +48,10 @@ func (f *fakeSellService) Place(ctx context.Context, req bets.PlaceRequest) (*be
 func (f *fakeSellService) Sell(ctx context.Context, req bets.SellRequest) (*bets.SellResult, error) {
 	f.req = req
 	return f.resp, f.err
+}
+func (f *fakeSellService) QuoteSell(ctx context.Context, req bets.SellRequest) (*bets.SellQuoteResult, error) {
+	f.quoteReq = req
+	return f.quoteResp, f.quoteErr
 }
 
 type fakeUsersService struct {
@@ -153,6 +176,125 @@ func TestSellPositionHandler_Success(t *testing.T) {
 	}
 }
 
+func TestSellPositionHandler_InvalidatesReadModelsAfterSuccess(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	svc := &fakeSellService{resp: &bets.SellResult{
+		Username:      "alice",
+		MarketID:      99,
+		Outcome:       "YES",
+		SharesSold:    2,
+		SaleValue:     10,
+		Dust:          1,
+		TransactionAt: time.Now(),
+	}}
+	invalidator := &fakeReadModelInvalidator{}
+	handler := SellPositionHandlerWithInvalidator(svc, users, invalidator)
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 99, Amount: 11, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if invalidator.calls != 1 || invalidator.username != "alice" || invalidator.marketID != 99 || invalidator.reason != "sale_accepted" {
+		t.Fatalf("unexpected invalidation call: %+v", invalidator)
+	}
+}
+
+func TestSellQuoteHandler_Success(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	quotedAt := time.Date(2026, time.June, 6, 10, 0, 0, 0, time.UTC)
+	svc := &fakeSellService{quoteResp: &bets.SellQuoteResult{
+		Username:         "alice",
+		MarketID:         7,
+		Outcome:          "YES",
+		RequestedCredits: 32,
+		SharesSold:       3,
+		SaleValue:        30,
+		Dust:             2,
+		MaxDust:          2,
+		ValuePerShare:    10,
+		DustCapCoverage:  0.3,
+		Allowed:          true,
+		SuggestedAmounts: []int64{30, 31, 32, 40, 41, 42},
+		Message:          "This sale can be submitted.",
+		QuotedAt:         quotedAt,
+	}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 7, Amount: 32, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell/quote", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellQuoteHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+	if svc.quoteReq.Username != "alice" || svc.quoteReq.MarketID != 7 || svc.quoteReq.Amount != 32 || svc.quoteReq.Outcome != "YES" {
+		t.Fatalf("unexpected quote request: %+v", svc.quoteReq)
+	}
+
+	var resp handlers.SuccessEnvelope[dto.SellQuoteResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !resp.Result.Allowed || resp.Result.Dust != 2 || resp.Result.MaxDust != 2 || resp.Result.ValuePerShare != 10 {
+		t.Fatalf("unexpected quote response: %+v", resp.Result)
+	}
+	if len(resp.Result.SuggestedAmounts) != 6 {
+		t.Fatalf("expected suggestions, got %+v", resp.Result.SuggestedAmounts)
+	}
+}
+
+func TestSellQuoteHandler_RoundedDustQuoteReturnsAllowedPreview(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{quoteResp: &bets.SellQuoteResult{
+		Username:         "alice",
+		MarketID:         7,
+		Outcome:          "YES",
+		RequestedCredits: 32,
+		SharesSold:       3,
+		SaleValue:        30,
+		Dust:             2,
+		MaxDust:          2,
+		ValuePerShare:    10,
+		DustCapCoverage:  0.3,
+		Allowed:          true,
+		SuggestedAmounts: []int64{30, 31, 32},
+		Message:          "This Sale Order can be submitted. It would include a 2 credit dust fee from whole-share rounding.",
+	}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 7, Amount: 33, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell/quote", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellQuoteHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+	var resp handlers.SuccessEnvelope[dto.SellQuoteResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !resp.Result.Allowed || resp.Result.DustCapExceeded || resp.Result.DustCapExceededBy != 0 || resp.Result.Dust != 2 {
+		t.Fatalf("unexpected rounded quote: %+v", resp.Result)
+	}
+}
+
 func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
@@ -195,6 +337,38 @@ func TestSellPositionHandler_ErrorMapping(t *testing.T) {
 				t.Fatalf("expected reason %q, got %q", tc.reason, resp.Reason)
 			}
 		})
+	}
+}
+
+func TestSellPositionHandler_DustCapExceededIncludesUserGuidance(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{err: bets.ErrDustCapExceeded{Cap: 2, Requested: 3}}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 1, Amount: 10, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellPositionHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonDustCapExceeded) {
+		t.Fatalf("expected dust cap reason, got %q", resp.Reason)
+	}
+	if resp.Message == "" {
+		t.Fatalf("expected user-facing guidance message")
+	}
+	if resp.Details["dust"] != float64(3) || resp.Details["maxDust"] != float64(2) {
+		t.Fatalf("expected dust details, got %+v", resp.Details)
 	}
 }
 

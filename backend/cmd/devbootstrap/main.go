@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	appruntime "socialpredict/internal/app/runtime"
 	"socialpredict/models"
@@ -21,13 +22,22 @@ const (
 )
 
 type bootstrapUser struct {
-	username    string
-	displayName string
-	email       string
-	apiKey      string
-	userType    string
-	emoji       string
+	username        string
+	displayName     string
+	email           string
+	apiKey          string
+	userType        string
+	moderatorStatus string
+	emoji           string
+	description     string
+}
+
+type bootstrapMarket struct {
+	title       string
 	description string
+	tagSlug     string
+	tagName     string
+	tagColorKey string
 }
 
 func main() {
@@ -71,38 +81,55 @@ func run() error {
 
 	users := []bootstrapUser{
 		{
-			username:    "admin",
-			displayName: "Dev Admin",
-			email:       "admin+dev@example.com",
-			apiKey:      "dev-admin-api-key",
-			userType:    "ADMIN",
-			emoji:       "NONE",
-			description: "Development admin user",
+			username:        "admin",
+			displayName:     "Dev Admin",
+			email:           "admin+dev@example.com",
+			apiKey:          "dev-admin-api-key",
+			userType:        "ADMIN",
+			moderatorStatus: "none",
+			emoji:           "NONE",
+			description:     "Development admin user",
 		},
 	}
 	for i := 1; i <= count; i++ {
 		username := fmt.Sprintf("%s%02d", prefix, i)
+		userType := "REGULAR"
+		moderatorStatus := "none"
+		if i == 1 {
+			userType = "MODERATOR"
+			moderatorStatus = "active"
+		}
 		users = append(users, bootstrapUser{
-			username:    username,
-			displayName: fmt.Sprintf("Dev %s User %02d", prefix, i),
-			email:       fmt.Sprintf("%s%02d@example.com", prefix, i),
-			apiKey:      fmt.Sprintf("dev-%s%02d-api-key", prefix, i),
-			userType:    "REGULAR",
-			emoji:       "😀",
-			description: "Development test user",
+			username:        username,
+			displayName:     fmt.Sprintf("Dev %s User %02d", prefix, i),
+			email:           fmt.Sprintf("%s%02d@example.com", prefix, i),
+			apiKey:          fmt.Sprintf("dev-%s%02d-api-key", prefix, i),
+			userType:        userType,
+			moderatorStatus: moderatorStatus,
+			emoji:           "😀",
+			description:     "Development test user",
 		})
 	}
 
-	for _, user := range users {
-		if err := upsertBootstrapUser(db, user, password, initialBalance); err != nil {
-			return err
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		for _, user := range users {
+			if err := upsertBootstrapUser(tx, user, password, initialBalance); err != nil {
+				return err
+			}
 		}
+
+		return upsertBootstrapMarkets(tx, prefix, config.Economics().MarketCreation.InitialMarketProbability)
+	}); err != nil {
+		return err
 	}
 
 	fmt.Printf("Development bootstrap complete.\n")
 	fmt.Printf("Password: %s\n", password)
 	fmt.Printf("Admin: admin\n")
 	fmt.Printf("Users: %s01 through %s%02d\n", prefix, prefix, count)
+	fmt.Printf("Moderator fixture: %s01\n", prefix)
+	fmt.Printf("Markets: Market A, Market B, Market C owned by %s01\n", prefix)
+	fmt.Printf("Tags: Category A, Category B, Category C\n")
 	fmt.Printf("InitialAccountBalance: %d\n", initialBalance)
 	fmt.Printf("CreditAvailableBeforeBets: %d\n", initialBalance+maximumDebtAllowed)
 	fmt.Printf("MustChangePassword: false\n")
@@ -110,6 +137,10 @@ func run() error {
 }
 
 func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initialBalance int64) error {
+	moderatorStatus := strings.TrimSpace(seed.moderatorStatus)
+	if moderatorStatus == "" {
+		moderatorStatus = "none"
+	}
 	user := models.User{
 		PublicUser: models.PublicUser{
 			Username:              seed.username,
@@ -125,7 +156,7 @@ func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initi
 			APIKey: seed.apiKey,
 		},
 		ModeratorGovernance: models.ModeratorGovernance{
-			ModeratorStatus: "none",
+			ModeratorStatus: moderatorStatus,
 		},
 		MustChangePassword: false,
 	}
@@ -160,12 +191,195 @@ func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initi
 		"api_key":                 seed.apiKey,
 		"password":                user.Password,
 		"must_change_password":    false,
-		"moderator_status":        "none",
+		"moderator_status":        moderatorStatus,
 	}
 	if err := db.Model(&models.User{}).Where("username = ?", seed.username).Updates(updates).Error; err != nil {
 		return fmt.Errorf("update %s: %w", seed.username, err)
 	}
 	fmt.Printf("updated %s (%s)\n", seed.username, seed.userType)
+	return nil
+}
+
+func upsertBootstrapMarkets(db *gorm.DB, prefix string, initialProbability float64) error {
+	if initialProbability == 0 {
+		initialProbability = 0.5
+	}
+	owner := fmt.Sprintf("%s01", prefix)
+	markets := []bootstrapMarket{
+		{
+			title:       "Market A",
+			description: "Development fixture market A.",
+			tagSlug:     "category-a",
+			tagName:     "Category A",
+			tagColorKey: "sky",
+		},
+		{
+			title:       "Market B",
+			description: "Development fixture market B.",
+			tagSlug:     "category-b",
+			tagName:     "Category B",
+			tagColorKey: "emerald",
+		},
+		{
+			title:       "Market C",
+			description: "Development fixture market C.",
+			tagSlug:     "category-c",
+			tagName:     "Category C",
+			tagColorKey: "amber",
+		},
+	}
+
+	for index, seed := range markets {
+		tag, err := upsertBootstrapMarketTag(db, seed, index)
+		if err != nil {
+			return err
+		}
+		marketID, err := upsertBootstrapMarket(db, seed, owner, initialProbability)
+		if err != nil {
+			return err
+		}
+		if err := upsertBootstrapMarketTagAssignment(db, marketID, tag.ID, owner); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func upsertBootstrapMarketTag(db *gorm.DB, seed bootstrapMarket, index int) (*models.MarketTag, error) {
+	tag := models.MarketTag{
+		Slug:        seed.tagSlug,
+		DisplayName: seed.tagName,
+		Description: fmt.Sprintf("Development fixture tag for %s.", seed.title),
+		ColorKey:    seed.tagColorKey,
+		SortOrder:   index + 1,
+		IsActive:    true,
+		CreatedBy:   "devbootstrap",
+	}
+
+	var existing models.MarketTag
+	err := db.Where("slug = ?", tag.Slug).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := db.Create(&tag).Error; err != nil {
+			return nil, fmt.Errorf("create tag %s: %w", tag.Slug, err)
+		}
+		fmt.Printf("created tag %s\n", tag.DisplayName)
+		return &tag, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load tag %s: %w", tag.Slug, err)
+	}
+
+	updates := map[string]any{
+		"display_name": tag.DisplayName,
+		"description":  tag.Description,
+		"color_key":    tag.ColorKey,
+		"sort_order":   tag.SortOrder,
+		"is_active":    true,
+		"created_by":   tag.CreatedBy,
+	}
+	if err := db.Model(&models.MarketTag{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
+		return nil, fmt.Errorf("update tag %s: %w", tag.Slug, err)
+	}
+	existing.DisplayName = tag.DisplayName
+	existing.Description = tag.Description
+	existing.ColorKey = tag.ColorKey
+	existing.SortOrder = tag.SortOrder
+	existing.IsActive = true
+	existing.CreatedBy = tag.CreatedBy
+	fmt.Printf("updated tag %s\n", tag.DisplayName)
+	return &existing, nil
+}
+
+func upsertBootstrapMarket(db *gorm.DB, seed bootstrapMarket, owner string, initialProbability float64) (int64, error) {
+	now := time.Now().UTC()
+	approvedAt := now
+	market := models.Market{
+		QuestionTitle:      seed.title,
+		Description:        seed.description,
+		OutcomeType:        "BINARY",
+		ResolutionDateTime: now.AddDate(0, 0, 30),
+		UTCOffset:          0,
+		IsResolved:         false,
+		ResolutionResult:   "",
+		InitialProbability: initialProbability,
+		YesLabel:           "YES",
+		NoLabel:            "NO",
+		LifecycleStatus:    "published",
+		ApprovedBy:         "devbootstrap",
+		ApprovedAt:         &approvedAt,
+		RejectedBy:         "",
+		RejectedAt:         nil,
+		RejectionReason:    "",
+		ProposalCost:       0,
+		CreatorUsername:    owner,
+		StewardUsername:    owner,
+	}
+
+	var existing models.Market
+	err := db.Where("question_title = ? AND creator_username = ?", market.QuestionTitle, market.CreatorUsername).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := db.Create(&market).Error; err != nil {
+			return 0, fmt.Errorf("create market %s: %w", market.QuestionTitle, err)
+		}
+		fmt.Printf("created %s\n", market.QuestionTitle)
+		return market.ID, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("load market %s: %w", market.QuestionTitle, err)
+	}
+
+	updates := map[string]any{
+		"description":                market.Description,
+		"outcome_type":               market.OutcomeType,
+		"resolution_date_time":       market.ResolutionDateTime,
+		"final_resolution_date_time": time.Time{},
+		"utc_offset":                 0,
+		"is_resolved":                false,
+		"resolution_result":          "",
+		"initial_probability":        market.InitialProbability,
+		"yes_label":                  market.YesLabel,
+		"no_label":                   market.NoLabel,
+		"lifecycle_status":           market.LifecycleStatus,
+		"approved_by":                market.ApprovedBy,
+		"approved_at":                market.ApprovedAt,
+		"rejected_by":                "",
+		"rejected_at":                nil,
+		"rejection_reason":           "",
+		"proposal_cost":              int64(0),
+		"steward_username":           owner,
+	}
+	if err := db.Model(&models.Market{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
+		return 0, fmt.Errorf("update market %s: %w", market.QuestionTitle, err)
+	}
+	fmt.Printf("updated %s\n", market.QuestionTitle)
+	return existing.ID, nil
+}
+
+func upsertBootstrapMarketTagAssignment(db *gorm.DB, marketID int64, tagID int64, owner string) error {
+	assignment := models.MarketTagAssignment{
+		MarketID:   marketID,
+		TagID:      tagID,
+		AssignedBy: owner,
+		Source:     "devbootstrap",
+	}
+
+	var existing models.MarketTagAssignment
+	err := db.Where("market_id = ? AND tag_id = ?", marketID, tagID).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := db.Create(&assignment).Error; err != nil {
+			return fmt.Errorf("assign tag %d to market %d: %w", tagID, marketID, err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load tag assignment %d/%d: %w", marketID, tagID, err)
+	}
+	if err := db.Model(&models.MarketTagAssignment{}).Where("id = ?", existing.ID).Updates(map[string]any{
+		"assigned_by": owner,
+		"source":      "devbootstrap",
+	}).Error; err != nil {
+		return fmt.Errorf("update tag assignment %d/%d: %w", marketID, tagID, err)
+	}
 	return nil
 }
 

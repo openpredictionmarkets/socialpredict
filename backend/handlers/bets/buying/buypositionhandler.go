@@ -1,6 +1,7 @@
 package buybetshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,10 +13,21 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/logger"
 )
+
+type readModelInvalidator interface {
+	InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error
+}
 
 // PlaceBetHandler returns an HTTP handler that delegates bet placement to the bets domain service.
 func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+	return PlaceBetHandlerWithInvalidator(betsSvc, usersSvc, nil)
+}
+
+// PlaceBetHandlerWithInvalidator returns an HTTP handler that delegates bet
+// placement and then marks display read models stale after a successful write.
+func PlaceBetHandlerWithInvalidator(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInterface, invalidator readModelInvalidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
@@ -41,6 +53,11 @@ func PlaceBetHandler(betsSvc dbets.ServiceInterface, usersSvc dusers.ServiceInte
 		}
 
 		writePlaceBetResponse(w, placedBet)
+		if invalidator != nil {
+			if err := invalidator.InvalidateAfterMarketTransaction(r.Context(), placedBet.Username, int64(placedBet.MarketID), "bet_accepted"); err != nil {
+				logger.LogError("PlaceBet", "InvalidateReadModels", err)
+			}
+		}
 	}
 }
 

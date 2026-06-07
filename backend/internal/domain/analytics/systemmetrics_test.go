@@ -106,6 +106,53 @@ func TestComputeSystemMetrics_WithData(t *testing.T) {
 	}
 }
 
+func TestComputeSystemMetrics_ParticipationFeesExcludeResolvedWorkProfitMarkets(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.Betting.BetFees.InitialBetFee = 5
+
+	creator := modelstesting.GenerateUser("creator", 0)
+	participant := modelstesting.GenerateUser("participant", 0)
+	for _, user := range []models.User{creator, participant} {
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("create user: %v", err)
+		}
+	}
+
+	activeMarket := modelstesting.GenerateMarket(11, creator.Username)
+	activeMarket.IsResolved = false
+	resolvedWorkProfitMarket := modelstesting.GenerateMarket(12, creator.Username)
+	resolvedWorkProfitMarket.IsResolved = true
+	resolvedWorkProfitMarket.ResolutionResult = "YES"
+	resolvedNAMarket := modelstesting.GenerateMarket(13, creator.Username)
+	resolvedNAMarket.IsResolved = true
+	resolvedNAMarket.ResolutionResult = "N/A"
+	for _, market := range []models.Market{activeMarket, resolvedWorkProfitMarket, resolvedNAMarket} {
+		if err := db.Create(&market).Error; err != nil {
+			t.Fatalf("create market: %v", err)
+		}
+	}
+
+	bets := []models.Bet{
+		modelstesting.GenerateBet(10, "YES", participant.Username, uint(activeMarket.ID), 0),
+		modelstesting.GenerateBet(10, "YES", participant.Username, uint(resolvedWorkProfitMarket.ID), 0),
+		modelstesting.GenerateBet(10, "YES", participant.Username, uint(resolvedNAMarket.ID), 0),
+	}
+	for _, bet := range bets {
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("create bet: %v", err)
+		}
+	}
+
+	svc := newAnalyticsService(t, db, econ)
+	metrics := requireSystemMetrics(t, svc)
+
+	expectedRetainedFees := int64(10)
+	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != expectedRetainedFees {
+		t.Fatalf("retained participation fees = %d, want %d", got, expectedRetainedFees)
+	}
+}
+
 func TestComputeSystemMetrics_UsesInjectedSnapshot(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()

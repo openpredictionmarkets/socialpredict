@@ -17,11 +17,24 @@ import {
   updateAdminMarketTag,
 } from '../../../api/marketTagsApi';
 import MarketTagChips, { MARKET_TAG_COLOR_OPTIONS } from '../../markets/MarketTagChips';
+import MarkdownLite from '../../markdown/MarkdownLite';
+import {
+  getMarketGovernanceSettings,
+  listAdminMarketDescriptionAmendments,
+  reviewMarketDescriptionAmendment,
+  updateMarketGovernanceSettings,
+} from '../../../api/marketDescriptionAmendmentsApi';
 
 const reviewTabs = [
   { label: 'Proposed Markets', status: 'proposed' },
   { label: 'Approved Markets', status: 'published' },
   { label: 'Rejected Markets', status: 'rejected' },
+];
+
+const amendmentReviewTabs = [
+  { label: 'Pending Amendments', status: 'pending' },
+  { label: 'Approved Amendments', status: 'approved' },
+  { label: 'Rejected Amendments', status: 'rejected' },
 ];
 
 const maxMarketTagsPerMarket = 5;
@@ -324,6 +337,296 @@ const AdminMarketQueue = ({ status }) => {
         showSteward
         actions={tagEditingEnabled ? renderActions : null}
       />
+    </div>
+  );
+};
+
+const DescriptionAmendmentStatusQueue = ({ status }) => {
+  const { token } = useAuth();
+  const [amendments, setAmendments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [busyAmendmentId, setBusyAmendmentId] = useState(null);
+  const [reasonById, setReasonById] = useState({});
+  const canReview = status === 'pending';
+
+  const loadAmendments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await listAdminMarketDescriptionAmendments({
+        token,
+        status,
+        limit: 100,
+      });
+      setAmendments(data.amendments || []);
+    } catch (err) {
+      setError(err.message || 'Unable to load description amendments.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    loadAmendments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, status]);
+
+  const setReason = (amendmentId, reason) => {
+    setReasonById((current) => ({
+      ...current,
+      [amendmentId]: reason,
+    }));
+  };
+
+  const reviewAmendment = async (amendment, nextStatus) => {
+    const reason = String(reasonById[amendment.id] || '').trim();
+    setBusyAmendmentId(amendment.id);
+    setError('');
+    setSuccessMessage('');
+    try {
+      await reviewMarketDescriptionAmendment({
+        token,
+        amendmentId: amendment.id,
+        status: nextStatus,
+        reason,
+      });
+      setReason(amendment.id, '');
+      setSuccessMessage(`Amendment v${amendment.version} ${nextStatus}.`);
+      await loadAmendments();
+    } catch (err) {
+      setError(err.message || 'Unable to review description amendment.');
+    } finally {
+      setBusyAmendmentId(null);
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="grid gap-4">
+      {error && (
+        <div className="rounded-md bg-red-700 p-3 text-sm text-white">
+          {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">
+          {successMessage}
+        </div>
+      )}
+      {amendments.length === 0 && (
+        <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
+          No {status} description amendments found.
+        </div>
+      )}
+      {amendments.map((amendment) => {
+        const reason = reasonById[amendment.id] || '';
+        const marketTitle = amendment.marketTitle || `Market #${amendment.marketId}`;
+        const previousAmendments = Array.isArray(amendment.previousApprovedAmendments)
+          ? amendment.previousApprovedAmendments
+          : [];
+        return (
+          <article key={amendment.id} className="grid gap-4 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+            <div className="grid gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
+                <span className="rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 text-xs font-semibold text-sky-100">
+                  Market #{amendment.marketId}
+                </span>
+                <span className="rounded-full border border-gray-600 bg-gray-800 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-gray-200">
+                  Amendment {amendment.version}
+                </span>
+                <span>Submitted by @{amendment.createdBy}</span>
+                <span>{amendment.createdAt ? new Date(amendment.createdAt).toLocaleString() : ''}</span>
+              </div>
+              <a
+                href={`/markets/${amendment.marketId}`}
+                className="text-lg font-semibold text-white underline decoration-sky-500/40 underline-offset-4 transition hover:text-sky-200"
+              >
+                {marketTitle}
+              </a>
+            </div>
+            {amendment.submitReason && (
+              <div className="rounded-md border border-gray-700 bg-gray-950 p-3 text-sm text-gray-300">
+                <span className="font-semibold text-gray-100">Submit reason:</span> {amendment.submitReason}
+              </div>
+            )}
+            <div className="grid gap-3 rounded-md border border-gray-700 bg-gray-950 p-4">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400">Description</p>
+                <p className="whitespace-pre-wrap text-sm leading-6 text-gray-200">
+                  {amendment.marketDescription || 'No market description was returned.'}
+                </p>
+              </div>
+              {previousAmendments.length > 0 && (
+                <div className="grid gap-2">
+                  {previousAmendments.map((previous) => (
+                    <article key={previous.id || previous.version} className="rounded-md border border-gray-700 bg-gray-900 p-3">
+                      <div className="mb-2 flex flex-wrap gap-2 text-xs text-gray-400">
+                        <span>Amendment {previous.version}</span>
+                        <span>Approved by @{previous.approvedBy || 'admin'}</span>
+                        {previous.approvedAt && <span>{new Date(previous.approvedAt).toLocaleString()}</span>}
+                      </div>
+                      <MarkdownLite>{previous.body}</MarkdownLite>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="rounded-md border border-sky-900/70 bg-sky-950/20 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">
+                Proposed Amendment {amendment.version}
+              </p>
+              <MarkdownLite>{amendment.body}</MarkdownLite>
+            </div>
+            {status === 'rejected' && amendment.rejectionReason && (
+              <div className="rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-sm text-rose-100">
+                Rejection reason: {amendment.rejectionReason}
+              </div>
+            )}
+            {canReview && (
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto,auto] md:items-start">
+                <textarea
+                  value={reason}
+                  onChange={(event) => setReason(amendment.id, event.target.value)}
+                  rows={3}
+                  placeholder="Decision reason required"
+                  className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                />
+                <button
+                  type="button"
+                  disabled={busyAmendmentId === amendment.id || !reason.trim()}
+                  onClick={() => reviewAmendment(amendment, 'approved')}
+                  className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  disabled={busyAmendmentId === amendment.id || !reason.trim()}
+                  onClick={() => reviewAmendment(amendment, 'rejected')}
+                  className="rounded-md bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+};
+
+const DescriptionAmendmentQueue = () => {
+  const { token } = useAuth();
+  const [settings, setSettings] = useState({
+    autoApproveDescriptionAmendments: false,
+    version: 0,
+  });
+  const [settingsDraft, setSettingsDraft] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
+  const tabsData = amendmentReviewTabs.map((tab) => ({
+    label: tab.label,
+    content: <DescriptionAmendmentStatusQueue status={tab.status} />,
+  }));
+
+  useEffect(() => {
+    if (!token) return;
+    let ignore = false;
+    const loadSettings = async () => {
+      setSettingsLoading(true);
+      setSettingsError('');
+      try {
+        const data = await getMarketGovernanceSettings({ token });
+        if (!ignore) {
+          setSettings(data);
+          setSettingsDraft(Boolean(data.autoApproveDescriptionAmendments));
+        }
+      } catch (err) {
+        if (!ignore) {
+          setSettingsError(err.message || 'Unable to load governance settings.');
+        }
+      } finally {
+        if (!ignore) {
+          setSettingsLoading(false);
+        }
+      }
+    };
+    loadSettings();
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  const saveSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsError('');
+    setSettingsMessage('');
+    try {
+      const saved = await updateMarketGovernanceSettings({
+        token,
+        autoApproveDescriptionAmendments: settingsDraft,
+        version: settings.version,
+      });
+      setSettings(saved);
+      setSettingsDraft(Boolean(saved.autoApproveDescriptionAmendments));
+      setSettingsMessage('Amendment auto-approval setting saved.');
+    } catch (err) {
+      setSettingsError(err.message || 'Unable to save governance settings.');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const settingsChanged = settingsDraft !== Boolean(settings.autoApproveDescriptionAmendments);
+
+  return (
+    <div className="grid gap-4">
+      <div className="rounded-lg border border-sky-800/70 bg-sky-950/30 p-4 text-sm text-sky-100">
+        Description amendments are append-only contract clarifications. Approving one makes it visible on the public market page.
+      </div>
+      <div className="grid gap-3 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-semibold text-white">Auto-approve new amendments</p>
+            <p className="mt-1 text-sm text-gray-400">
+              When enabled, newly proposed steward amendments are immediately accepted. Turn it off and save to restore manual admin review.
+            </p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-3 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={settingsDraft}
+              disabled={settingsLoading || settingsSaving}
+              onChange={(event) => setSettingsDraft(event.target.checked)}
+              className="h-5 w-5 rounded border-gray-600 bg-gray-800 text-primary-pink focus:ring-primary-pink"
+            />
+            <span>{settingsDraft ? 'Auto-accept on' : 'Auto-accept off'}</span>
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={settingsLoading || settingsSaving || !settingsChanged}
+            onClick={saveSettings}
+            className="rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {settingsSaving ? 'Saving...' : 'Save Auto-Approval Setting'}
+          </button>
+          <span className="text-xs text-gray-500">Version {settings.version || 1}</span>
+        </div>
+        {settingsError && <div className="rounded-md bg-red-700 p-3 text-sm text-white">{settingsError}</div>}
+        {settingsMessage && <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">{settingsMessage}</div>}
+      </div>
+      <SiteTabs tabs={tabsData} defaultTab="Pending Amendments" />
     </div>
   );
 };
@@ -849,6 +1152,10 @@ function ModeratorMarketReview() {
     {
       label: 'Stewardship',
       content: <MarketStewardshipQueue />,
+    },
+    {
+      label: 'Description Amendments',
+      content: <DescriptionAmendmentQueue />,
     },
     {
       label: 'Tags',
