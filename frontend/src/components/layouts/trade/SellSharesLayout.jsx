@@ -207,9 +207,6 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     <div className="flex items-center space-x-4 mb-4">
                         <div>
                             <h2 className="text-xl">Sale Order</h2>
-                            <p className="text-xs text-blue-100">
-                                Share values are rounded, you may change your Sale Order to reduce dust fees.
-                            </p>
                         </div>
                         <SaleInputAmount
                             value={sellAmount}
