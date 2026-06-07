@@ -434,7 +434,7 @@ function Markets() {
             <div className='Center-content'>
                 <div className='Center-content-header'>
                     {isTopicPage ? (
-                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-start">
+                        <div className="mb-6 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(260px,420px)] md:items-start">
                             <div>
                                 <h1 className='text-2xl font-semibold text-gray-300 mb-2'>{discoveryLayout.title || 'Markets'}</h1>
                                 {discoveryLayout.description && (
