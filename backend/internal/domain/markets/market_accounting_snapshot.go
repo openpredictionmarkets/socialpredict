@@ -23,12 +23,25 @@ type MarketAccountingSnapshot struct {
 	LastProcessedBetAt  time.Time
 	Source              string
 	TransactionSafeRead bool
+	IsStale             bool
+	StaleReason         string
+	MarkedStaleAt       *time.Time
 }
 
 const MarketAccountingSnapshotTargetFreshness = time.Minute
 
 // Freshness returns display metadata for this market accounting read model.
 func (s MarketAccountingSnapshot) Freshness() readmodels.Freshness {
+	if s.IsStale {
+		return readmodels.NewStaleFreshness(
+			s.GeneratedAt,
+			s.Source,
+			MarketAccountingSnapshotTargetFreshness,
+			s.TransactionSafeRead,
+			s.StaleReason,
+			s.MarkedStaleAt,
+		)
+	}
 	return readmodels.NewFreshness(
 		s.GeneratedAt,
 		s.Source,

@@ -41,17 +41,23 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
   const pageSize = 20;
   const [positions, setPositions] = useState([]);
   const [page, setPage] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const { token } = useAuth();
+
+  useEffect(() => {
+    setPage(0);
+  }, [marketId, refreshTrigger, token]);
 
   useEffect(() => {
     const fetchPositions = async () => {
       if (!token) {
         setPositions([]);
-        setPage(0);
+        setHasNextPage(false);
         return;
       }
 
-      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}`, {
+      const offset = page * pageSize;
+      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}?limit=${pageSize}&offset=${offset}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -60,7 +66,7 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
 
       if (!response.ok) {
         setPositions([]);
-        setPage(0);
+        setHasNextPage(false);
         return;
       }
 
@@ -70,23 +76,22 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
         .sort((a, b) => (b.noSharesOwned + b.yesSharesOwned) - (a.noSharesOwned + a.yesSharesOwned));
 
       setPositions(filteredSorted);
-      setPage(0);
+      setHasNextPage(rawData.length === pageSize);
     };
 
     fetchPositions();
-  }, [marketId, refreshTrigger, token]);
+  }, [marketId, refreshTrigger, token, page]);
 
   const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
   const pageStart = page * pageSize;
-  const visiblePositions = positions.slice(pageStart, pageStart + pageSize);
   const canPageBack = page > 0;
-  const canPageForward = pageStart + pageSize < positions.length;
+  const canPageForward = hasNextPage;
 
   return (
     <div className="p-4">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
-          Showing positions {positions.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, positions.length)} of {positions.length}
+          Showing positions page {page + 1}{positions.length ? ` (${pageStart + 1}-${pageStart + positions.length})` : ''}
         </div>
         <div className="flex gap-2">
           <button
@@ -112,7 +117,7 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
         <div className="flex-1">
           <h2 className="text-center font-bold mb-2">Shares for: <span className="text-red-500">{labels.no}</span></h2>
           <div className="flex flex-col gap-2">
-            {visiblePositions.filter(pos => pos.noSharesOwned > 0).map((pos, index) => (
+            {positions.filter(pos => pos.noSharesOwned > 0).map((pos, index) => (
               <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">
                 <Link
                   to={`/user/${pos.username}`}
@@ -131,7 +136,7 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
         <div className="flex-1">
           <h2 className="text-center font-bold mb-2">Shares for: <span className="text-green-500">{labels.yes}</span></h2>
           <div className="flex flex-col gap-2">
-            {visiblePositions.filter(pos => pos.yesSharesOwned > 0).map((pos, index) => (
+            {positions.filter(pos => pos.yesSharesOwned > 0).map((pos, index) => (
               <div key={index} className="bg-gray-800 p-3 rounded-lg shadow flex flex-col">
                 <Link
                   to={`/user/${pos.username}`}

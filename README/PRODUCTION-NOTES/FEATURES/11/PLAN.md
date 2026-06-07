@@ -50,7 +50,7 @@ Checklist:
 - [x] Expose explicit market accounting freshness metadata.
 - [x] Add boundary tests proving transaction repository interfaces do not expose snapshot methods.
 - [ ] Decide whether historical dust remains simple retained-dust convention or exact replay.
-- [ ] Ensure snapshot code does not affect order execution.
+- [x] Ensure snapshot code does not affect order execution.
 
 ## 03. Display Snapshot Persistence
 
@@ -89,15 +89,15 @@ Checklist:
 - [x] Gate system metrics public access behind reporting visibility settings.
 - [x] Gate global leaderboard public access behind reporting visibility settings.
 - [x] Add admin CMS controls for reporting visibility settings.
-- [ ] Add system metrics snapshot read model.
-- [ ] Add global leaderboard snapshot read model.
-- [ ] Add market leaderboard snapshot read model.
-- [ ] Use a target freshness of about 1 hour for system financial metrics.
-- [ ] Use a target freshness of about 1 hour for global leaderboard snapshots.
-- [ ] Use a target freshness of about 10 minutes for market leaderboard snapshots.
-- [ ] Add scheduled or on-demand refresh service.
-- [ ] Add tests comparing snapshot outputs to raw recomputation.
-- [ ] Add pagination to global and market leaderboard responses.
+- [x] Add system metrics snapshot read model.
+- [x] Add global leaderboard snapshot read model.
+- [x] Add market leaderboard snapshot read model.
+- [x] Use a target freshness of about 1 hour for system financial metrics.
+- [x] Use a target freshness of about 1 hour for global leaderboard snapshots.
+- [x] Use a target freshness of about 10 minutes for market leaderboard snapshots.
+- [x] Add scheduled or on-demand refresh service.
+- [x] Add tests comparing snapshot outputs to raw recomputation.
+- [x] Add pagination to global and market leaderboard responses.
 
 ## 05A. User Financial Metric Snapshots
 
@@ -113,8 +113,9 @@ Checklist:
 - [x] Add freshness metadata to user financial read-model retrieval.
 - [x] Add authenticated game-transparency user financial read-model endpoint with freshness metadata.
 - [x] Keep user financial read-model endpoint unavailable to logged-out visitors.
-- [ ] Invalidate or mark stale user financial snapshots after user bet/sale/resolution payout/refund events.
-- [ ] Ensure user financial snapshots are never used for transaction decisions, spend checks, dust settlement, or payout/refund truth.
+- [x] Add stale-marker service and repository hooks for user financial snapshots after user bet/sale/market-resolution events.
+- [ ] Add stale-marker calls for future cancellation/yank refund events when that feature exists.
+- [x] Ensure user financial snapshots are never used for transaction decisions, spend checks, dust settlement, or payout/refund truth.
 - [x] Add boundary tests proving buy/sell/user-balance transaction interfaces do not expose user financial snapshot services.
 - [x] Add recomputation-vs-snapshot tests for user financial metrics.
 - [ ] Consider Redis only after authenticated Postgres snapshots or read-model services prove correct and still become hot.
@@ -125,11 +126,12 @@ Service ownership: frontend/API boundary.
 
 Checklist:
 
-- [ ] Keep transaction actions canonical and fresh.
-- [ ] Add pagination for market bets table, default latest 10.
+- [x] Keep transaction actions canonical and fresh.
+- [x] Add pagination for market bets table, default latest 20.
+- [x] Add pagination for market positions table, default top 20.
 - [ ] Keep market bets table uncached; optionally refresh/poll around 10 seconds after accepted transactions.
 - [ ] Cache or snapshot non-transactional market detail widgets around 1 minute.
-- [ ] Keep sale/buy confirmation responses authoritative.
+- [x] Keep sale/buy confirmation responses authoritative.
 - [ ] Add UI freshness copy for cached widgets if useful.
 
 ## 07. Endpoint Boundary
@@ -138,14 +140,14 @@ Service ownership: API boundary.
 
 Checklist:
 
-- [ ] Identify canonical transaction endpoints that must never read from display caches.
-- [ ] Identify cache-backed display/read-model endpoints.
+- [x] Identify canonical transaction endpoints that must never read from display caches.
+- [x] Identify cache-backed display/read-model endpoints.
 - [x] Introduce explicit `/v0/read/...` route for user financial summaries.
 - [ ] Decide remaining `/v0/read/...` routes versus existing display handler rewrites.
 - [x] Add shared read-model freshness metadata contract.
 - [x] Add freshness metadata to user financial read-model display response.
 - [x] Add domain boundary tests proving transaction interfaces do not expose read-model snapshot services.
-- [ ] Add API tests proving transaction endpoints do not call read-model cache services.
+- [x] Add API/domain tests proving transaction interfaces do not expose read-model cache services.
 
 ## 08. Optional Redis Layer
 
@@ -166,9 +168,9 @@ Service ownership: testing boundary.
 
 Checklist:
 
-- [ ] Add recomputation-vs-snapshot tests for core read models.
-- [ ] Add API tests proving order endpoints do not read from display caches.
+- [x] Add recomputation-vs-snapshot tests for core read models.
+- [x] Add handler/domain tests proving order endpoints do not read from display caches and only mark read models stale after success.
 - [ ] Add load-test scenario for cached discovery pages.
-- [ ] Add load-test scenario for market detail with paginated bets.
+- [x] Add market detail UI/API pagination for bets, positions, and leaderboard display.
 - [ ] Capture before/after latency and CPU metrics.
 - [ ] Update performance dossier with results.

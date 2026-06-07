@@ -40,6 +40,16 @@ type FinancialsRepository interface {
 type UserFinancialMetricSnapshotRepository interface {
 	GetUserFinancialMetricSnapshot(ctx context.Context, username string) (*UserFinancialMetricSnapshot, error)
 	UpsertUserFinancialMetricSnapshot(ctx context.Context, snapshot UserFinancialMetricSnapshot) error
+	MarkUserFinancialMetricSnapshotStale(ctx context.Context, username string, reason string) error
+}
+
+// AnalyticsReadModelSnapshotRepository persists display-only aggregate
+// analytics snapshots. It is intentionally separate from transaction-facing
+// repository interfaces.
+type AnalyticsReadModelSnapshotRepository interface {
+	GetAnalyticsReadModelSnapshot(ctx context.Context, key string) (*AnalyticsReadModelSnapshot, error)
+	UpsertAnalyticsReadModelSnapshot(ctx context.Context, snapshot AnalyticsReadModelSnapshot) error
+	MarkAnalyticsReadModelSnapshotStale(ctx context.Context, key string, reason string) error
 }
 
 // StatsRepository exposes aggregate account data required by stats reporting.

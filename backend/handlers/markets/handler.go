@@ -37,6 +37,11 @@ type Handler struct {
 	service         Service
 	auth            authsvc.Authenticator
 	securityService *security.SecurityService
+	invalidator     readModelInvalidator
+}
+
+type readModelInvalidator interface {
+	InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error
 }
 
 // NewHandler creates a new markets handler
@@ -46,6 +51,12 @@ func NewHandler(service Service, auth authsvc.Authenticator, securityService *se
 		auth:            auth,
 		securityService: securityService,
 	}
+}
+
+// SetReadModelInvalidator wires optional post-mutation display read-model
+// invalidation without making it part of the market transaction service.
+func (h *Handler) SetReadModelInvalidator(invalidator readModelInvalidator) {
+	h.invalidator = invalidator
 }
 
 // CreateMarket handles POST /markets
@@ -316,6 +327,11 @@ func (h *Handler) ResolveMarket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	if h.invalidator != nil {
+		if err := h.invalidator.InvalidateAfterMarketTransaction(r.Context(), user.Username, id, "market_resolved"); err != nil {
+			logger.LogError("ResolveMarket", "InvalidateReadModels", err)
+		}
+	}
 }
 
 // ListByStatus handles GET /markets/status/{status}

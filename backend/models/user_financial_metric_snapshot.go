@@ -31,4 +31,7 @@ type UserFinancialMetricSnapshot struct {
 	PositionCount      int       `json:"positionCount" gorm:"not null;default:0"`
 	GeneratedAt        time.Time `json:"generatedAt" gorm:"not null;index"`
 	Source             string    `json:"source" gorm:"not null;default:read_model;size:32"`
+	IsStale            bool      `json:"isStale" gorm:"not null;default:false;index"`
+	StaleReason        string    `json:"staleReason" gorm:"not null;default:'';size:128"`
+	MarkedStaleAt      time.Time `json:"markedStaleAt" gorm:"index"`
 }

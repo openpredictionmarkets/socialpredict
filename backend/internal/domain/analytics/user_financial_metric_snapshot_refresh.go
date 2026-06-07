@@ -59,3 +59,18 @@ func (s *Service) GetUserFinancialMetricReadModel(ctx context.Context, username 
 		Freshness: snapshot.Freshness(),
 	}, nil
 }
+
+// MarkUserFinancialMetricSnapshotStale marks an authenticated display snapshot
+// stale after canonical user-affecting activity. It does not mutate balances,
+// positions, payouts, or any transaction truth.
+func (s *Service) MarkUserFinancialMetricSnapshotStale(ctx context.Context, username string, reason string) error {
+	if username == "" {
+		return errors.New("username is required")
+	}
+
+	snapshotRepo, ok := s.repo.(UserFinancialMetricSnapshotRepository)
+	if !ok {
+		return errors.New("user financial metric snapshot repository not provided")
+	}
+	return snapshotRepo.MarkUserFinancialMetricSnapshotStale(ctx, username, reason)
+}

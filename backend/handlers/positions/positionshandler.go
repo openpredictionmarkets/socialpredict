@@ -26,7 +26,7 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 			return
 		}
 
-		positions, err := svc.GetMarketPositions(r.Context(), marketID)
+		positions, err := getMarketPositions(r, svc, marketID)
 		if err != nil {
 			writePositionsError(w, marketID, err)
 			return
@@ -39,6 +39,13 @@ func MarketPositionsHandlerWithService(svc dmarkets.ServiceInterface) http.Handl
 			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
 		}
 	}
+}
+
+func getMarketPositions(r *http.Request, svc dmarkets.ServiceInterface, marketID int64) (dmarkets.MarketPositions, error) {
+	if !hasPaginationQuery(r) {
+		return svc.GetMarketPositions(r.Context(), marketID)
+	}
+	return svc.GetMarketPositionsPage(r.Context(), marketID, parsePage(r, 20))
 }
 
 // MarketUserPositionHandlerWithService creates a service-injected handler for a specific user's position
@@ -78,6 +85,28 @@ func parseMarketID(marketIDStr string) (int64, error) {
 		return 0, errors.New("Invalid market ID")
 	}
 	return marketID, nil
+}
+
+func hasPaginationQuery(r *http.Request) bool {
+	query := r.URL.Query()
+	return query.Get("limit") != "" || query.Get("offset") != ""
+}
+
+func parsePage(r *http.Request, defaultLimit int) dmarkets.Page {
+	query := r.URL.Query()
+	limit := defaultLimit
+	if raw := query.Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+	offset := 0
+	if raw := query.Get("offset"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			offset = parsed
+		}
+	}
+	return dmarkets.Page{Limit: limit, Offset: offset}
 }
 
 func writePositionsError(w http.ResponseWriter, marketID int64, err error) {

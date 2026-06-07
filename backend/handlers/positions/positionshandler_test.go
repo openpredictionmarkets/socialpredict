@@ -21,8 +21,10 @@ import (
 )
 
 type mockPositionsService struct {
-	positions dmarkets.MarketPositions
-	err       error
+	positions     dmarkets.MarketPositions
+	positionsPage dmarkets.MarketPositions
+	err           error
+	page          *dmarkets.Page
 }
 
 func boundaryBetsFromModels(dbBets []models.Bet) []boundary.Bet {
@@ -103,8 +105,20 @@ func (m *mockPositionsService) GetMarketBets(ctx context.Context, marketID int64
 	return nil, nil
 }
 
+func (m *mockPositionsService) GetMarketBetsPage(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
+	return nil, nil
+}
+
 func (m *mockPositionsService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
 	return m.positions, m.err
+}
+
+func (m *mockPositionsService) GetMarketPositionsPage(ctx context.Context, marketID int64, p dmarkets.Page) (dmarkets.MarketPositions, error) {
+	m.page = &p
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.positionsPage, nil
 }
 
 func (m *mockPositionsService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
@@ -254,6 +268,31 @@ func TestMarketPositionsHandlerWithService_FailureEnvelope(t *testing.T) {
 	}
 	if resp.Reason != string(handlers.ReasonMarketNotFound) {
 		t.Fatalf("expected reason %q, got %q", handlers.ReasonMarketNotFound, resp.Reason)
+	}
+}
+
+func TestMarketPositionsHandlerWithService_UsesPaginationQuery(t *testing.T) {
+	mockSvc := &mockPositionsService{
+		positionsPage: dmarkets.MarketPositions{
+			{Username: "alice", MarketID: 7, YesSharesOwned: 3},
+		},
+	}
+	handler := MarketPositionsHandlerWithService(mockSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/positions/7?limit=20&offset=40", nil)
+	req = mux.SetURLVars(req, map[string]string{"marketId": "7"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if mockSvc.page == nil {
+		t.Fatalf("expected paginated service method to be called")
+	}
+	if mockSvc.page.Limit != 20 || mockSvc.page.Offset != 40 {
+		t.Fatalf("expected page limit=20 offset=40, got %+v", *mockSvc.page)
 	}
 }
 

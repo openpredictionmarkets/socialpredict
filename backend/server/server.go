@@ -34,6 +34,7 @@ import (
 	privateuser "socialpredict/handlers/users/privateuser"
 	publicuser "socialpredict/handlers/users/publicuser"
 	"socialpredict/internal/app"
+	"socialpredict/internal/app/readmodelinvalidation"
 	appruntime "socialpredict/internal/app/runtime"
 	dmarkets "socialpredict/internal/domain/markets"
 	authsvc "socialpredict/internal/service/auth"
@@ -339,9 +340,11 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	analyticsService := container.GetAnalyticsService()
 	authService := container.GetAuthService()
 	requestSecurityService := container.GetSecurityService()
+	readModelInvalidator := readmodelinvalidation.New(marketsService, analyticsService)
 
 	// Create Handler instances
 	marketsHandler := marketshandlers.NewHandler(marketsService, authService, requestSecurityService)
+	marketsHandler.SetReadModelInvalidator(readModelInvalidator)
 
 	// Define endpoint handlers using Gorilla Mux router
 	// This defines all functions starting with /api/
@@ -463,10 +466,10 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/profilechange/links", securityMiddleware(usershandlers.ChangePersonalLinksHandler(usersService))).Methods("POST")
 
 	// handle private user actions such as make a bet, sell positions, get user position
-	router.Handle("/v0/bet", privateActionMiddleware(buybetshandlers.PlaceBetHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
+	router.Handle("/v0/bet", privateActionMiddleware(buybetshandlers.PlaceBetHandlerWithInvalidator(container.GetBetsService(), container.GetUsersService(), readModelInvalidator))).Methods("POST")
 	router.Handle("/v0/userposition/{marketId}", privateActionMiddleware(usershandlers.UserMarketPositionHandlerWithService(marketsService, usersService))).Methods("GET")
 	router.Handle("/v0/sell/quote", privateActionMiddleware(sellbetshandlers.SellQuoteHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
-	router.Handle("/v0/sell", privateActionMiddleware(sellbetshandlers.SellPositionHandler(container.GetBetsService(), container.GetUsersService()))).Methods("POST")
+	router.Handle("/v0/sell", privateActionMiddleware(sellbetshandlers.SellPositionHandlerWithInvalidator(container.GetBetsService(), container.GetUsersService(), readModelInvalidator))).Methods("POST")
 
 	// admin stuff - apply security middleware
 	router.Handle("/v0/admin/createuser", securityMiddleware(http.HandlerFunc(adminhandlers.AddUserHandler(usersService, container.GetConfigService(), authService, requestSecurityService)))).Methods("POST")

@@ -90,12 +90,25 @@ type UserFinancialMetricSnapshot struct {
 	Financial           FinancialSnapshot
 	Source              string
 	TransactionSafeRead bool
+	IsStale             bool
+	StaleReason         string
+	MarkedStaleAt       *time.Time
 }
 
 const UserFinancialMetricSnapshotTargetFreshness = 10 * time.Minute
 
 // Freshness returns display metadata for this user financial read model.
 func (s UserFinancialMetricSnapshot) Freshness() readmodels.Freshness {
+	if s.IsStale {
+		return readmodels.NewStaleFreshness(
+			s.GeneratedAt,
+			s.Source,
+			UserFinancialMetricSnapshotTargetFreshness,
+			s.TransactionSafeRead,
+			s.StaleReason,
+			s.MarkedStaleAt,
+		)
+	}
 	return readmodels.NewFreshness(
 		s.GeneratedAt,
 		s.Source,
@@ -108,6 +121,58 @@ func (s UserFinancialMetricSnapshot) Freshness() readmodels.Freshness {
 // metadata for future display endpoints.
 type UserFinancialMetricReadModel struct {
 	Snapshot  UserFinancialMetricSnapshot
+	Freshness readmodels.Freshness
+}
+
+// AnalyticsReadModelSnapshot stores display-only aggregate analytics payloads.
+// PayloadJSON is intentionally opaque to repository code; the analytics service
+// owns marshal/unmarshal semantics.
+type AnalyticsReadModelSnapshot struct {
+	Key                 string
+	Kind                string
+	PayloadJSON         []byte
+	GeneratedAt         time.Time
+	Source              string
+	TransactionSafeRead bool
+	IsStale             bool
+	StaleReason         string
+	MarkedStaleAt       *time.Time
+}
+
+const (
+	AnalyticsSnapshotKindSystemMetrics     = "system_metrics"
+	AnalyticsSnapshotKindGlobalLeaderboard = "global_leaderboard"
+
+	SystemMetricsSnapshotKey     = "system_metrics:default"
+	GlobalLeaderboardSnapshotKey = "global_leaderboard:default"
+)
+
+const (
+	SystemMetricsSnapshotTargetFreshness     = time.Hour
+	GlobalLeaderboardSnapshotTargetFreshness = time.Hour
+)
+
+func (s AnalyticsReadModelSnapshot) Freshness(target time.Duration) readmodels.Freshness {
+	if s.IsStale {
+		return readmodels.NewStaleFreshness(
+			s.GeneratedAt,
+			s.Source,
+			target,
+			s.TransactionSafeRead,
+			s.StaleReason,
+			s.MarkedStaleAt,
+		)
+	}
+	return readmodels.NewFreshness(s.GeneratedAt, s.Source, target, s.TransactionSafeRead)
+}
+
+type SystemMetricsReadModel struct {
+	Metrics   SystemMetrics
+	Freshness readmodels.Freshness
+}
+
+type GlobalLeaderboardReadModel struct {
+	Entries   []GlobalUserProfitability
 	Freshness readmodels.Freshness
 }
 

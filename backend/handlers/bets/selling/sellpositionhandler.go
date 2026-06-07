@@ -1,6 +1,7 @@
 package sellbetshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,10 +13,21 @@ import (
 	dmarkets "socialpredict/internal/domain/markets"
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
+	"socialpredict/logger"
 )
+
+type readModelInvalidator interface {
+	InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error
+}
 
 // SellPositionHandler returns an HTTP handler that delegates sales to the bets service.
 func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface) http.HandlerFunc {
+	return SellPositionHandlerWithInvalidator(betsSvc, usersSvc, nil)
+}
+
+// SellPositionHandlerWithInvalidator returns an HTTP handler that delegates
+// sales and then marks display read models stale after a successful write.
+func SellPositionHandlerWithInvalidator(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceInterface, invalidator readModelInvalidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			_ = handlers.WriteFailure(w, http.StatusMethodNotAllowed, handlers.ReasonMethodNotAllowed)
@@ -41,6 +53,11 @@ func SellPositionHandler(betsSvc bets.ServiceInterface, usersSvc dusers.ServiceI
 		}
 
 		writeSellResponse(w, result)
+		if invalidator != nil {
+			if err := invalidator.InvalidateAfterMarketTransaction(r.Context(), result.Username, int64(result.MarketID), "sale_accepted"); err != nil {
+				logger.LogError("SellPosition", "InvalidateReadModels", err)
+			}
+		}
 	}
 }
 

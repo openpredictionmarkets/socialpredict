@@ -3,6 +3,7 @@ package analytics
 import (
 	"context"
 	"errors"
+	"time"
 
 	"socialpredict/models"
 
@@ -66,9 +67,34 @@ func (r *GormRepository) UpsertUserFinancialMetricSnapshot(ctx context.Context, 
 			"position_count",
 			"generated_at",
 			"source",
+			"is_stale",
+			"stale_reason",
+			"marked_stale_at",
 			"updated_at",
 		}),
 	}).Create(&dbSnapshot).Error
+}
+
+// MarkUserFinancialMetricSnapshotStale marks an existing authenticated display
+// snapshot stale after a canonical user-affecting mutation. Missing snapshots
+// are ignored because refresh can recreate them later.
+func (r *GormRepository) MarkUserFinancialMetricSnapshotStale(ctx context.Context, username string, reason string) error {
+	if username == "" {
+		return errors.New("username is required")
+	}
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	return db.Model(&models.UserFinancialMetricSnapshot{}).
+		Where("username = ?", username).
+		Updates(map[string]interface{}{
+			"is_stale":        true,
+			"stale_reason":    reason,
+			"marked_stale_at": now,
+			"updated_at":      now,
+		}).Error
 }
 
 func domainUserFinancialMetricSnapshotToModel(snapshot UserFinancialMetricSnapshot) models.UserFinancialMetricSnapshot {
@@ -98,6 +124,9 @@ func domainUserFinancialMetricSnapshotToModel(snapshot UserFinancialMetricSnapsh
 		PositionCount:      snapshot.PositionCount,
 		GeneratedAt:        snapshot.GeneratedAt,
 		Source:             source,
+		IsStale:            snapshot.IsStale,
+		StaleReason:        snapshot.StaleReason,
+		MarkedStaleAt:      userFinancialTimeFromPointer(snapshot.MarkedStaleAt),
 	}
 }
 
@@ -129,5 +158,22 @@ func modelUserFinancialMetricSnapshotToDomain(snapshot *models.UserFinancialMetr
 		},
 		Source:              snapshot.Source,
 		TransactionSafeRead: false,
+		IsStale:             snapshot.IsStale,
+		StaleReason:         snapshot.StaleReason,
+		MarkedStaleAt:       userFinancialTimePointerFromValue(snapshot.MarkedStaleAt),
 	}
+}
+
+func userFinancialTimeFromPointer(value *time.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return *value
+}
+
+func userFinancialTimePointerFromValue(value time.Time) *time.Time {
+	if value.IsZero() {
+		return nil
+	}
+	return &value
 }

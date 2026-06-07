@@ -138,6 +138,7 @@ const Stats = () => {
   const [leaderboardError, setLeaderboardError] = useState(null);
   const [leaderboardLoginRequired, setLeaderboardLoginRequired] = useState(false);
   const [leaderboardPage, setLeaderboardPage] = useState(0);
+  const [leaderboardHasNextPage, setLeaderboardHasNextPage] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -196,12 +197,13 @@ const Stats = () => {
     }
   };
 
-  const fetchGlobalLeaderboard = async () => {
+  const fetchGlobalLeaderboard = async (page = 0) => {
     setLeaderboardLoading(true);
     setLeaderboardError(null);
     setLeaderboardLoginRequired(false);
     try {
-      const response = await fetch(`${API_URL}/v0/global/leaderboard`, {
+      const offset = page * LEADERBOARD_PAGE_SIZE;
+      const response = await fetch(`${API_URL}/v0/global/leaderboard?limit=${LEADERBOARD_PAGE_SIZE}&offset=${offset}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -218,23 +220,22 @@ const Stats = () => {
       }
 
       const data = await response.json();
-      setGlobalLeaderboard(unwrapApiResponse(data));
-      setLeaderboardPage(0);
+      const rows = unwrapApiResponse(data);
+      setGlobalLeaderboard(rows);
+      setLeaderboardPage(page);
+      setLeaderboardHasNextPage(Array.isArray(rows) && rows.length === LEADERBOARD_PAGE_SIZE);
     } catch (err) {
       setLeaderboardError(err.message);
       setLeaderboardLoginRequired(Boolean(err.loginRequired));
+      setLeaderboardHasNextPage(false);
     } finally {
       setLeaderboardLoading(false);
     }
   };
 
   const leaderboardStart = leaderboardPage * LEADERBOARD_PAGE_SIZE;
-  const visibleGlobalLeaderboard = Array.isArray(globalLeaderboard)
-    ? globalLeaderboard.slice(leaderboardStart, leaderboardStart + LEADERBOARD_PAGE_SIZE)
-    : [];
   const canPageLeaderboardBack = leaderboardPage > 0;
-  const canPageLeaderboardForward = Array.isArray(globalLeaderboard)
-    && leaderboardStart + LEADERBOARD_PAGE_SIZE < globalLeaderboard.length;
+  const canPageLeaderboardForward = leaderboardHasNextPage;
 
   const toggleFormula = (key) => {
     setShowFormulas(prev => ({
@@ -501,7 +502,7 @@ const Stats = () => {
           Global Leaderboard <span className="text-warning-orange text-lg">(Beta)</span>
         </h2>
         <SiteButton
-          onClick={fetchGlobalLeaderboard}
+          onClick={() => fetchGlobalLeaderboard(0)}
           isSelected={false}
           disabled={leaderboardLoading}
           className="bg-info-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors w-full sm:w-auto"
@@ -550,12 +551,12 @@ const Stats = () => {
         <div>
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
-              Showing leaderboard {leaderboardStart + 1}-{Math.min(leaderboardStart + LEADERBOARD_PAGE_SIZE, globalLeaderboard.length)} of {globalLeaderboard.length}
+              Showing leaderboard page {leaderboardPage + 1}{globalLeaderboard.length ? ` (${leaderboardStart + 1}-${leaderboardStart + globalLeaderboard.length})` : ''}
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setLeaderboardPage(current => Math.max(0, current - 1))}
+                onClick={() => fetchGlobalLeaderboard(Math.max(0, leaderboardPage - 1))}
                 disabled={!canPageLeaderboardBack}
                 className={paginationButtonClass}
               >
@@ -563,7 +564,7 @@ const Stats = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setLeaderboardPage(current => current + 1)}
+                onClick={() => fetchGlobalLeaderboard(leaderboardPage + 1)}
                 disabled={!canPageLeaderboardForward}
                 className={paginationButtonClass}
               >
@@ -585,7 +586,7 @@ const Stats = () => {
                 </tr>
               </thead>
               <tbody>
-                {visibleGlobalLeaderboard.map((user) => {
+                {globalLeaderboard.map((user) => {
                   const getRankDisplay = (rank) => {
                     if (rank === 1) return '🥇';
                     if (rank === 2) return '🥈';

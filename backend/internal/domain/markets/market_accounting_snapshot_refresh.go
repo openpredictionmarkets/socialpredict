@@ -34,3 +34,16 @@ func (s *Service) RefreshMarketAccountingSnapshot(ctx context.Context, marketID 
 	}
 	return &snapshot, nil
 }
+
+// MarkMarketAccountingSnapshotStale marks a market accounting read model stale
+// after canonical market activity. It does not update market/bet truth.
+func (s *Service) MarkMarketAccountingSnapshotStale(ctx context.Context, marketID int64, reason string) error {
+	if marketID <= 0 {
+		return ErrInvalidInput
+	}
+	snapshotRepo, ok := s.repo.(MarketAccountingSnapshotRepository)
+	if !ok {
+		return ErrInvalidState
+	}
+	return snapshotRepo.MarkMarketAccountingSnapshotStale(ctx, marketID, reason)
+}

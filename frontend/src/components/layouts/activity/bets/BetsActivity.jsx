@@ -26,33 +26,40 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
     const pageSize = 20;
     const [bets, setBets] = useState([]);
     const [page, setPage] = useState(0);
+    const [hasNextPage, setHasNextPage] = useState(false);
+
+    useEffect(() => {
+        setPage(0);
+    }, [marketId, refreshTrigger]);
 
     useEffect(() => {
         const fetchBets = async () => {
-            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}`, {
+            const offset = page * pageSize;
+            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}?limit=${pageSize}&offset=${offset}`, {
             });
             if (response.ok) {
                 const data = unwrapApiResponse(await response.json());
                 setBets(data
                     .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt)));
-                setPage(0);
+                setHasNextPage(data.length === pageSize);
             } else {
                 console.error('Error fetching bets:', response.statusText);
+                setBets([]);
+                setHasNextPage(false);
             }
         };
         fetchBets();
-    }, [marketId, refreshTrigger]);
+    }, [marketId, refreshTrigger, page]);
 
     const pageStart = page * pageSize;
-    const visibleBets = bets.slice(pageStart, pageStart + pageSize);
     const canPageBack = page > 0;
-    const canPageForward = pageStart + pageSize < bets.length;
+    const canPageForward = hasNextPage;
 
     return (
         <div className="p-4">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
-                    Showing bets {bets.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, bets.length)} of {bets.length}
+                    Showing bets page {page + 1}{bets.length ? ` (${pageStart + 1}-${pageStart + bets.length})` : ''}
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -80,7 +87,7 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
                 <div className="text-right">After</div>
                 <div className="text-right">Placed</div>
             </div>
-            {visibleBets.map((bet, index) => (
+            {bets.map((bet, index) => (
                 <div key={index} className="sp-grid-bets-row mt-2">
                     {/* Username */}
                     <div className="sp-cell-username">

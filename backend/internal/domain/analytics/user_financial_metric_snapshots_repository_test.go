@@ -92,6 +92,49 @@ func TestGormRepositoryUserFinancialMetricSnapshotMissingAndInvalid(t *testing.T
 	}
 }
 
+func TestGormRepositoryUserFinancialMetricSnapshotCanBeMarkedStaleAndRefreshed(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	snapshot := UserFinancialMetricSnapshot{
+		Username:    "alice",
+		GeneratedAt: time.Date(2026, 6, 7, 11, 0, 0, 0, time.UTC),
+		Financial:   FinancialSnapshot{AccountBalance: 500},
+		Source:      "read_model",
+	}
+	if err := repo.UpsertUserFinancialMetricSnapshot(ctx, snapshot); err != nil {
+		t.Fatalf("upsert snapshot: %v", err)
+	}
+	if err := repo.MarkUserFinancialMetricSnapshotStale(ctx, snapshot.Username, "bet_accepted"); err != nil {
+		t.Fatalf("mark stale: %v", err)
+	}
+
+	stale, err := repo.GetUserFinancialMetricSnapshot(ctx, snapshot.Username)
+	if err != nil {
+		t.Fatalf("get stale snapshot: %v", err)
+	}
+	if !stale.IsStale || stale.StaleReason != "bet_accepted" || stale.MarkedStaleAt == nil {
+		t.Fatalf("expected stale marker, got %+v", stale)
+	}
+	if !stale.Freshness().IsStale {
+		t.Fatalf("freshness should report stale marker")
+	}
+
+	refreshed := snapshot
+	refreshed.GeneratedAt = snapshot.GeneratedAt.Add(time.Minute)
+	if err := repo.UpsertUserFinancialMetricSnapshot(ctx, refreshed); err != nil {
+		t.Fatalf("refresh upsert: %v", err)
+	}
+	fresh, err := repo.GetUserFinancialMetricSnapshot(ctx, snapshot.Username)
+	if err != nil {
+		t.Fatalf("get refreshed snapshot: %v", err)
+	}
+	if fresh.IsStale || fresh.StaleReason != "" || fresh.MarkedStaleAt != nil {
+		t.Fatalf("expected refresh to clear stale marker, got %+v", fresh)
+	}
+}
+
 func assertUserFinancialMetricSnapshotEqual(t *testing.T, got *UserFinancialMetricSnapshot, want UserFinancialMetricSnapshot) {
 	t.Helper()
 	if got == nil {

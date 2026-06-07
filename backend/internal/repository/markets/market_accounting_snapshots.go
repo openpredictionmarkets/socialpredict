@@ -3,6 +3,7 @@ package markets
 import (
 	"context"
 	"errors"
+	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/models"
@@ -53,10 +54,32 @@ func (r *GormRepository) UpsertMarketAccountingSnapshot(ctx context.Context, sna
 				"last_processed_bet_at",
 				"generated_at",
 				"source",
+				"is_stale",
+				"stale_reason",
+				"marked_stale_at",
 				"updated_at",
 			}),
 		}).
 		Create(&dbSnapshot).Error
+}
+
+// MarkMarketAccountingSnapshotStale marks an existing display snapshot stale
+// after a canonical mutation. Missing snapshots are ignored because refresh can
+// recreate them later.
+func (r *GormRepository) MarkMarketAccountingSnapshotStale(ctx context.Context, marketID int64, reason string) error {
+	if marketID <= 0 {
+		return dmarkets.ErrInvalidInput
+	}
+	now := time.Now().UTC()
+	return r.db.WithContext(ctx).
+		Model(&models.MarketAccountingSnapshot{}).
+		Where("market_id = ?", marketID).
+		Updates(map[string]interface{}{
+			"is_stale":        true,
+			"stale_reason":    reason,
+			"marked_stale_at": now,
+			"updated_at":      now,
+		}).Error
 }
 
 func domainAccountingSnapshotToModel(snapshot dmarkets.MarketAccountingSnapshot) models.MarketAccountingSnapshot {
@@ -76,6 +99,9 @@ func domainAccountingSnapshotToModel(snapshot dmarkets.MarketAccountingSnapshot)
 		LastProcessedBetAt: snapshot.LastProcessedBetAt,
 		GeneratedAt:        snapshot.GeneratedAt,
 		Source:             source,
+		IsStale:            snapshot.IsStale,
+		StaleReason:        snapshot.StaleReason,
+		MarkedStaleAt:      timeFromPointer(snapshot.MarkedStaleAt),
 	}
 }
 
@@ -96,5 +122,22 @@ func modelAccountingSnapshotToDomain(snapshot *models.MarketAccountingSnapshot) 
 		LastProcessedBetAt:  snapshot.LastProcessedBetAt,
 		Source:              snapshot.Source,
 		TransactionSafeRead: false,
+		IsStale:             snapshot.IsStale,
+		StaleReason:         snapshot.StaleReason,
+		MarkedStaleAt:       timePointerFromValue(snapshot.MarkedStaleAt),
 	}
+}
+
+func timeFromPointer(value *time.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return *value
+}
+
+func timePointerFromValue(value time.Time) *time.Time {
+	if value.IsZero() {
+		return nil
+	}
+	return &value
 }

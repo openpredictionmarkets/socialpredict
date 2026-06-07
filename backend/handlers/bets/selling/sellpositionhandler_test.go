@@ -26,6 +26,22 @@ type fakeSellService struct {
 	quoteErr  error
 }
 
+type fakeReadModelInvalidator struct {
+	username string
+	marketID int64
+	reason   string
+	calls    int
+	err      error
+}
+
+func (f *fakeReadModelInvalidator) InvalidateAfterMarketTransaction(ctx context.Context, username string, marketID int64, reason string) error {
+	f.username = username
+	f.marketID = marketID
+	f.reason = reason
+	f.calls++
+	return f.err
+}
+
 func (f *fakeSellService) Place(ctx context.Context, req bets.PlaceRequest) (*bets.PlacedBet, error) {
 	return nil, nil
 }
@@ -157,6 +173,38 @@ func TestSellPositionHandler_Success(t *testing.T) {
 	}
 	if resp.Result.SharesSold != 3 || resp.Result.SaleValue != 60 || resp.Result.Dust != 5 {
 		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestSellPositionHandler_InvalidatesReadModelsAfterSuccess(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+	svc := &fakeSellService{resp: &bets.SellResult{
+		Username:      "alice",
+		MarketID:      99,
+		Outcome:       "YES",
+		SharesSold:    2,
+		SaleValue:     10,
+		Dust:          1,
+		TransactionAt: time.Now(),
+	}}
+	invalidator := &fakeReadModelInvalidator{}
+	handler := SellPositionHandlerWithInvalidator(svc, users, invalidator)
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 99, Amount: 11, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if invalidator.calls != 1 || invalidator.username != "alice" || invalidator.marketID != 99 || invalidator.reason != "sale_accepted" {
+		t.Fatalf("unexpected invalidation call: %+v", invalidator)
 	}
 }
 

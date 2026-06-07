@@ -129,7 +129,15 @@ func (m *MockService) GetMarketBets(ctx context.Context, marketID int64) ([]*dma
 	return []*dmarkets.BetDisplayInfo{}, nil
 }
 
+func (m *MockService) GetMarketBetsPage(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
+	return []*dmarkets.BetDisplayInfo{}, nil
+}
+
 func (m *MockService) GetMarketPositions(ctx context.Context, marketID int64) (dmarkets.MarketPositions, error) {
+	return nil, nil
+}
+
+func (m *MockService) GetMarketPositionsPage(ctx context.Context, marketID int64, p dmarkets.Page) (dmarkets.MarketPositions, error) {
 	return nil, nil
 }
 

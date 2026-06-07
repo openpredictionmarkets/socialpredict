@@ -94,6 +94,49 @@ func TestGormRepositoryMarketAccountingSnapshotMissingAndInvalid(t *testing.T) {
 	}
 }
 
+func TestGormRepositoryMarketAccountingSnapshotCanBeMarkedStaleAndRefreshed(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	snapshot := dmarkets.MarketAccountingSnapshot{
+		MarketID:        42,
+		GeneratedAt:     time.Date(2026, 6, 7, 9, 30, 0, 0, time.UTC),
+		LastProbability: 0.62,
+		Source:          "read_model",
+	}
+	if err := repo.UpsertMarketAccountingSnapshot(ctx, snapshot); err != nil {
+		t.Fatalf("upsert snapshot: %v", err)
+	}
+	if err := repo.MarkMarketAccountingSnapshotStale(ctx, snapshot.MarketID, "bet_accepted"); err != nil {
+		t.Fatalf("mark stale: %v", err)
+	}
+
+	stale, err := repo.GetMarketAccountingSnapshot(ctx, snapshot.MarketID)
+	if err != nil {
+		t.Fatalf("get stale snapshot: %v", err)
+	}
+	if !stale.IsStale || stale.StaleReason != "bet_accepted" || stale.MarkedStaleAt == nil {
+		t.Fatalf("expected stale marker, got %+v", stale)
+	}
+	if !stale.Freshness().IsStale {
+		t.Fatalf("freshness should report stale marker")
+	}
+
+	refreshed := snapshot
+	refreshed.GeneratedAt = snapshot.GeneratedAt.Add(time.Minute)
+	if err := repo.UpsertMarketAccountingSnapshot(ctx, refreshed); err != nil {
+		t.Fatalf("refresh upsert: %v", err)
+	}
+	fresh, err := repo.GetMarketAccountingSnapshot(ctx, snapshot.MarketID)
+	if err != nil {
+		t.Fatalf("get refreshed snapshot: %v", err)
+	}
+	if fresh.IsStale || fresh.StaleReason != "" || fresh.MarkedStaleAt != nil {
+		t.Fatalf("expected refresh to clear stale marker, got %+v", fresh)
+	}
+}
+
 func assertAccountingSnapshotEqual(t *testing.T, got *dmarkets.MarketAccountingSnapshot, want dmarkets.MarketAccountingSnapshot) {
 	t.Helper()
 	if got == nil {
