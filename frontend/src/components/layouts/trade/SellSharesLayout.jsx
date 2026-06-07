@@ -88,54 +88,50 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             .finally(() => setSharesLoading(false));
     }, [marketId, token]);
 
-    useEffect(() => {
-        if (!token || !selectedOutcome || sellAmount < 1 || sharesLoading) {
-            setSaleQuote(null);
-            setQuoteError('');
-            setIsQuoteLoading(false);
-            return undefined;
-        }
-
-        let cancelled = false;
-        setIsQuoteLoading(true);
-        setQuoteError('');
-
-        const timeoutId = window.setTimeout(() => {
-            fetchSaleQuote({ marketId, outcome: selectedOutcome, amount: sellAmount }, token)
-                .then((quote) => {
-                    if (!cancelled) {
-                        setSaleQuote(quote);
-                    }
-                })
-                .catch((error) => {
-                    if (!cancelled) {
-                        setSaleQuote(null);
-                        setQuoteError(error.message);
-                    }
-                })
-                .finally(() => {
-                    if (!cancelled) {
-                        setIsQuoteLoading(false);
-                    }
-                });
-        }, 300);
-
-        return () => {
-            cancelled = true;
-            window.clearTimeout(timeoutId);
-        };
-    }, [marketId, selectedOutcome, sellAmount, sharesLoading, token]);
-
     const handleSellAmountChange = (event) => {
         const newAmount = parseInt(event.target.value, 10) || 0; // Ensure it defaults to 0 if conversion fails
         if (newAmount < 0) {
             return;
         }
+        setSaleQuote(null);
+        setQuoteError('');
         if (maxSaleCredits > 0 && newAmount > maxSaleCredits) {
             setSellAmount(maxSaleCredits);
             return;
         }
         setSellAmount(newAmount);
+    };
+
+    const requestSaleQuote = (outcomeOverride, amountOverride = sellAmount) => {
+        const outcomeToUse = outcomeOverride || selectedOutcome;
+        if (!outcomeToUse) {
+            alert('Please select which shares you would like to sell.');
+            return Promise.resolve(null);
+        }
+
+        const saleData = {
+            marketId,
+            outcome: outcomeToUse,
+            amount: amountOverride,
+        };
+
+        setSelectedOutcome(outcomeToUse);
+        setIsQuoteLoading(true);
+        setQuoteError('');
+
+        return fetchSaleQuote(saleData, token)
+            .then((quote) => {
+                setSaleQuote(quote);
+                return quote;
+            })
+            .catch((error) => {
+                setSaleQuote(null);
+                setQuoteError(error.message);
+                return null;
+            })
+            .finally(() => {
+                setIsQuoteLoading(false);
+            });
     };
 
     const handleSaleSubmission = (outcomeOverride) => {
@@ -184,7 +180,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             });
     };
 
-    const isActionDisabled = sharesLoading || isSubmitting;
+    const isActionDisabled = sharesLoading || isSubmitting || isQuoteLoading;
 
     return (
         <div className="p-6 bg-blue-900 rounded-lg text-white">
@@ -227,31 +223,36 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         quoteError={quoteError}
                         isLoading={isQuoteLoading}
                         selectedOutcome={selectedOutcome}
-                        onSelectAmount={setSellAmount}
+                        onSelectAmount={(amount) => {
+                            setSellAmount(amount);
+                            requestSaleQuote(selectedOutcome, amount);
+                        }}
                     />
-                    <div className="flex justify-center">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
                         {shares.noSharesOwned > 0 &&
-                            <ConfirmSaleButton
-                                onClick={() => {
+                            <SaleActionGroup
+                                outcome="NO"
+                                label={noLabel}
+                                disabled={isActionDisabled}
+                                isQuoteLoading={isQuoteLoading && selectedOutcome === 'NO'}
+                                onTerms={() => requestSaleQuote('NO')}
+                                onSubmit={() => {
                                     setSelectedOutcome('NO');
                                     handleSaleSubmission('NO');
                                 }}
-                                selectedDirection="NO"
-                                disabled={isActionDisabled}
-                            >
-                                Sell NO
-                            </ConfirmSaleButton>}
+                            />}
                         {shares.yesSharesOwned > 0 &&
-                            <ConfirmSaleButton
-                                onClick={() => {
+                            <SaleActionGroup
+                                outcome="YES"
+                                label={yesLabel}
+                                disabled={isActionDisabled}
+                                isQuoteLoading={isQuoteLoading && selectedOutcome === 'YES'}
+                                onTerms={() => requestSaleQuote('YES')}
+                                onSubmit={() => {
                                     setSelectedOutcome('YES');
                                     handleSaleSubmission('YES');
                                 }}
-                                selectedDirection="YES"
-                                disabled={isActionDisabled}
-                            >
-                                Sell YES
-                            </ConfirmSaleButton>}
+                            />}
                     </div>
                 </>
             )}
@@ -315,12 +316,8 @@ const buildSaleSuccessMessage = (data) => {
 };
 
 const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelectAmount }) => {
-    if (!selectedOutcome) {
-        return (
-            <div className="mb-4 rounded-lg border border-blue-700 bg-blue-950/40 p-3 text-sm text-blue-100">
-                Select YES or NO shares to preview how many whole shares will be sold and whether any dust fee applies.
-            </div>
-        );
+    if (!selectedOutcome && !quoteError && !isLoading) {
+        return null;
     }
 
     if (isLoading) {
@@ -385,6 +382,31 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const SaleActionGroup = ({ outcome, label, disabled, isQuoteLoading, onTerms, onSubmit }) => {
+    const displayLabel = label || outcome;
+
+    return (
+        <div className="flex w-full flex-col gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
+            <div className="text-center text-xs font-semibold uppercase tracking-wide text-blue-100">
+                {displayLabel}
+            </div>
+            <button
+                type="button"
+                onClick={onTerms}
+                disabled={disabled || isQuoteLoading}
+                className={`w-full rounded border border-blue-200/60 px-4 py-2 text-sm font-semibold text-blue-50 hover:bg-white/10 ${disabled || isQuoteLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+            >
+                {isQuoteLoading ? 'Loading Terms' : 'Terms'}
+            </button>
+            <ConfirmSaleButton
+                onClick={onSubmit}
+                selectedDirection={outcome}
+                disabled={disabled || isQuoteLoading}
+            />
         </div>
     );
 };
