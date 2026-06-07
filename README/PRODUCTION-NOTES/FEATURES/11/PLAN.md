@@ -42,10 +42,11 @@ Service ownership: prediction market context and repository boundary.
 
 Checklist:
 
-- [ ] Define domain type for market accounting snapshots.
-- [ ] Include net volume, market dust, volume with dust, probability, user count, bet count, and generated timestamp.
-- [ ] Add raw recomputation calculator for the snapshot.
-- [ ] Add tests proving snapshot fields match raw recomputation.
+- [x] Define domain type for market accounting snapshots.
+- [x] Include net volume, market dust, volume with dust, probability, user count, bet count, and generated timestamp.
+- [x] Add raw recomputation calculator for the snapshot.
+- [x] Add tests proving snapshot fields match raw recomputation.
+- [x] Keep display dust in the read model while preserving canonical transaction-time sale dust calculation.
 - [ ] Decide whether historical dust remains simple retained-dust convention or exact replay.
 - [ ] Ensure snapshot code does not affect order execution.
 

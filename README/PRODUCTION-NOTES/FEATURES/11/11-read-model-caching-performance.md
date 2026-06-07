@@ -81,6 +81,7 @@ The following table defines which decisions are transaction-critical and which a
 | Individual market probability display | No, unless used for order execution | Cache briefly for display, roughly 1 minute; order confirmation must use canonical path. | Users need fresher UI on a market page, but displayed value should not settle trades. |
 | Individual market volume/user count display | No | Cache briefly, roughly 1 minute, with freshness metadata. | Informational display only. |
 | Market bet table display | No | Paginate; do not cache, or at most poll/refresh around 10 seconds. | Users should see their accepted bet appear quickly after transaction success. |
+| Market dust display | No | Cache only as display/read-model dust; never use display dust for transaction-time sale dust. | Dust can be displayed as retained accounting value, but confirmed sales must calculate dust from canonical current position. |
 
 ## Cacheable Display Candidates
 
@@ -96,6 +97,7 @@ These are good early candidates because they are read-heavy and not directly res
 | `/markets/topic/:slug` page | filtered topic cards and pinned topic markets | about 10m |
 | Pinned charts | compact probability history snapshots | about 10m |
 | Individual market widgets | probability, volume, user count, compact summary metrics | about 1m |
+| Market dust display | retained dust, net volume, volume with dust | about 1m on market detail; about 10m on cards/discovery |
 | Bet table display | paginated recent bets, first page only by default | not cached; refresh/poll around 10s if needed |
 
 ## Less Cacheable Or Non-Cacheable Paths

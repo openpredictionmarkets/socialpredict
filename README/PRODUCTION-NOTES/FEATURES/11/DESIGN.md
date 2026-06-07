@@ -50,6 +50,7 @@ Primary inputs:
 |---|---|---|
 | Transaction-critical | buy, sell, dust settlement, user balance mutation, resolution payout, cancellation/yank refund, admin mutation | Never use stale cache for decision-making. |
 | Market-page display | market detail probability, volume, user count, compact widgets | Cache around 1 minute with freshness metadata. |
+| Market dust display | retained dust, net volume, volume with dust | Cache only as display/read-model dust; never use for transaction-time sale dust. |
 | Market bet table display | recent bets | Paginate; do not cache, or refresh/poll around 10 seconds so accepted bets appear quickly. |
 | Discovery display | `/markets`, topic pages, pinned cards, compact charts | Cache around 10 minutes. |
 | Market leaderboard display | participant ranking for one market | Cache around 10 minutes and paginate. |
@@ -158,6 +159,7 @@ Baseline TTL/freshness classes:
 | Transaction | buy/sell/dust/balance/resolution/refund/admin mutations | never cached |
 | Fast display refresh | market bet table first page | not cached; refresh/poll around 10s |
 | Market detail widgets | probability, volume, user count, compact summary | about 1m |
+| Market detail dust display | net volume, retained dust, volume with dust | about 1m |
 | Page-level discovery | `/markets`, topic pages, pinned chart cards, market cards | about 10m |
 | Leaderboard snapshots | market leaderboards | about 10m |
 | Slow dashboard snapshots | system financial metrics, global leaderboard | about 1h |
