@@ -46,6 +46,9 @@ func (r *GormRepository) ListMarketDescriptionAmendments(ctx context.Context, fi
 	if filters.Status != "" {
 		query = query.Where("status = ?", dmarkets.NormalizeDescriptionAmendmentStatus(filters.Status))
 	}
+	if filters.CreatedBy != "" {
+		query = query.Where("created_by = ?", filters.CreatedBy)
+	}
 	if filters.Limit <= 0 {
 		filters.Limit = 50
 	}
@@ -127,7 +130,7 @@ func (r *GormRepository) GetMarketGovernanceSettings(ctx context.Context) (*dmar
 }
 
 func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, update dmarkets.MarketGovernanceSettingsUpdate) (*dmarkets.MarketGovernanceSettings, error) {
-	if update.AutoApproveDescriptionAmendments == nil {
+	if update.AutoApproveDescriptionAmendments == nil && update.AutoApproveMarketProposals == nil {
 		return nil, dmarkets.ErrInvalidInput
 	}
 	var saved models.MarketGovernanceSettings
@@ -141,7 +144,12 @@ func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, upd
 		} else if update.Version != 0 && update.Version != row.Version {
 			return dmarkets.ErrInvalidState
 		}
-		row.AutoApproveDescriptionAmendments = *update.AutoApproveDescriptionAmendments
+		if update.AutoApproveDescriptionAmendments != nil {
+			row.AutoApproveDescriptionAmendments = *update.AutoApproveDescriptionAmendments
+		}
+		if update.AutoApproveMarketProposals != nil {
+			row.AutoApproveMarketProposals = *update.AutoApproveMarketProposals
+		}
 		row.UpdatedBy = update.UpdatedBy
 		if row.ID == 0 {
 			row.ID = 1
@@ -186,6 +194,7 @@ func domainDescriptionAmendmentToModel(amendment dmarkets.MarketDescriptionAmend
 func modelMarketGovernanceSettingsToDomain(row models.MarketGovernanceSettings) dmarkets.MarketGovernanceSettings {
 	return dmarkets.MarketGovernanceSettings{
 		AutoApproveDescriptionAmendments: row.AutoApproveDescriptionAmendments,
+		AutoApproveMarketProposals:       row.AutoApproveMarketProposals,
 		Version:                          row.Version,
 		UpdatedBy:                        row.UpdatedBy,
 		UpdatedAt:                        row.UpdatedAt,

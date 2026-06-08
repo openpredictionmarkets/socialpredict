@@ -38,6 +38,7 @@ func TestSellBetDTOJSONRoundTrip(t *testing.T) {
 		SharesSold:    5,
 		SaleValue:     125,
 		Dust:          1,
+		NetProceeds:   124,
 		Outcome:       "NO",
 		TransactionAt: ts,
 	}

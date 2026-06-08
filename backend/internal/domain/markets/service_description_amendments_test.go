@@ -151,9 +151,13 @@ func TestProposeMarketDescriptionAmendmentAutoApprovesWhenEnabled(t *testing.T) 
 	if defaultSettings.AutoApproveDescriptionAmendments {
 		t.Fatalf("auto approval should be disabled by default")
 	}
+	if defaultSettings.AutoApproveMarketProposals {
+		t.Fatalf("market proposal auto approval should be disabled by default")
+	}
 	enabled := true
 	saved, err := service.UpdateMarketGovernanceSettings(context.Background(), markets.MarketGovernanceSettingsUpdate{
 		AutoApproveDescriptionAmendments: &enabled,
+		AutoApproveMarketProposals:       &enabled,
 		Version:                          defaultSettings.Version,
 		UpdatedBy:                        "admin",
 	})
@@ -162,6 +166,9 @@ func TestProposeMarketDescriptionAmendmentAutoApprovesWhenEnabled(t *testing.T) 
 	}
 	if !saved.AutoApproveDescriptionAmendments {
 		t.Fatalf("expected auto approval setting to be enabled")
+	}
+	if !saved.AutoApproveMarketProposals {
+		t.Fatalf("expected market proposal auto approval setting to be enabled")
 	}
 
 	amendment, err := service.ProposeMarketDescriptionAmendment(context.Background(), original.ID, "moderator", markets.MarketDescriptionAmendmentRequest{Body: "Auto-approved clarification."})

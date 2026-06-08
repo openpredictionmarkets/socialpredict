@@ -203,7 +203,7 @@ const Stats = () => {
     setLeaderboardLoginRequired(false);
     try {
       const offset = page * LEADERBOARD_PAGE_SIZE;
-      const response = await fetch(`${API_URL}/v0/global/leaderboard?limit=${LEADERBOARD_PAGE_SIZE}&offset=${offset}`, {
+      const response = await fetch(`${API_URL}/v0/global/leaderboard?limit=${LEADERBOARD_PAGE_SIZE + 1}&offset=${offset}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -221,9 +221,10 @@ const Stats = () => {
 
       const data = await response.json();
       const rows = unwrapApiResponse(data);
-      setGlobalLeaderboard(rows);
+      const leaderboardRows = Array.isArray(rows) ? rows : [];
+      setGlobalLeaderboard(leaderboardRows.slice(0, LEADERBOARD_PAGE_SIZE));
       setLeaderboardPage(page);
-      setLeaderboardHasNextPage(Array.isArray(rows) && rows.length === LEADERBOARD_PAGE_SIZE);
+      setLeaderboardHasNextPage(leaderboardRows.length > LEADERBOARD_PAGE_SIZE);
     } catch (err) {
       setLeaderboardError(err.message);
       setLeaderboardLoginRequired(Boolean(err.loginRequired));

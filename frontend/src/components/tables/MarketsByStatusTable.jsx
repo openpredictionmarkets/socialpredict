@@ -200,7 +200,7 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', dis
         params.set('status', status.toLowerCase());
       }
 
-      params.set('limit', String(pageSize));
+      params.set('limit', String(pageSize + 1));
       params.set('offset', String(offset));
       if (tagSlug) {
         params.set('tagSlug', tagSlug);
@@ -219,18 +219,19 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', dis
       const normalized = rawMarkets
         .map(normalizeMarketOverview)
         .filter((item) => item !== null);
+      const visibleMarkets = normalized.slice(0, pageSize);
 
       setMarketsData((current) => {
         if (!append) {
-          return normalized;
+          return visibleMarkets;
         }
         const seen = new Set(current.map((item) => item.market?.id ?? item.market?.marketId));
         return [
           ...current,
-          ...normalized.filter((item) => !seen.has(item.market?.id ?? item.market?.marketId)),
+          ...visibleMarkets.filter((item) => !seen.has(item.market?.id ?? item.market?.marketId)),
         ];
       });
-      setHasMore(normalized.length === pageSize);
+      setHasMore(normalized.length > pageSize);
     } catch (err) {
       if (err.name === 'AbortError') {
         return;

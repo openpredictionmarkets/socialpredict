@@ -16,6 +16,7 @@ const (
 	DescriptionAmendmentStatusApproved     = "approved"
 	DescriptionAmendmentStatusRejected     = "rejected"
 	DescriptionAmendmentApprovedByAuto     = "auto-approval"
+	MarketProposalApprovedByAuto           = "auto-approval"
 	MaxDescriptionAmendmentLength          = 2000
 	MaxDescriptionAmendmentReasonLength    = 500
 )
@@ -50,10 +51,11 @@ type MarketDescriptionAmendmentRequest struct {
 }
 
 type MarketDescriptionAmendmentFilters struct {
-	MarketID int64
-	Status   string
-	Limit    int
-	Offset   int
+	MarketID  int64
+	Status    string
+	CreatedBy string
+	Limit     int
+	Offset    int
 }
 
 type MarketDescriptionAmendmentRepository interface {
@@ -64,6 +66,7 @@ type MarketDescriptionAmendmentRepository interface {
 
 type MarketGovernanceSettings struct {
 	AutoApproveDescriptionAmendments bool
+	AutoApproveMarketProposals       bool
 	Version                          uint
 	UpdatedBy                        string
 	UpdatedAt                        time.Time
@@ -71,6 +74,7 @@ type MarketGovernanceSettings struct {
 
 type MarketGovernanceSettingsUpdate struct {
 	AutoApproveDescriptionAmendments *bool
+	AutoApproveMarketProposals       *bool
 	Version                          uint
 	UpdatedBy                        string
 }
@@ -156,6 +160,7 @@ func (s *Service) ProposeMarketDescriptionAmendment(ctx context.Context, marketI
 
 func (s *Service) ListMarketDescriptionAmendments(ctx context.Context, filters MarketDescriptionAmendmentFilters) ([]MarketDescriptionAmendment, error) {
 	filters.Status = NormalizeDescriptionAmendmentStatus(filters.Status)
+	filters.CreatedBy = strings.TrimSpace(filters.CreatedBy)
 	if filters.Status != DescriptionAmendmentStatusPending && filters.Status != DescriptionAmendmentStatusApproved && filters.Status != DescriptionAmendmentStatusRejected {
 		return nil, ErrInvalidInput
 	}
@@ -206,7 +211,7 @@ func (s *Service) GetMarketGovernanceSettings(ctx context.Context) (*MarketGover
 
 func (s *Service) UpdateMarketGovernanceSettings(ctx context.Context, update MarketGovernanceSettingsUpdate) (*MarketGovernanceSettings, error) {
 	update.UpdatedBy = strings.TrimSpace(update.UpdatedBy)
-	if update.UpdatedBy == "" || update.AutoApproveDescriptionAmendments == nil {
+	if update.UpdatedBy == "" || (update.AutoApproveDescriptionAmendments == nil && update.AutoApproveMarketProposals == nil) {
 		return nil, ErrInvalidInput
 	}
 	repo, err := s.marketGovernanceSettingsRepository()

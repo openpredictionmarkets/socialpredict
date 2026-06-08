@@ -87,6 +87,14 @@ func (s *Service) applyCreationLifecycle(ctx context.Context, market *Market, cr
 	}
 
 	if s.config.MarketApprovalRequired {
+		if s.autoApproveMarketProposalsEnabled(ctx) {
+			market.LifecycleStatus = MarketLifecyclePublished
+			market.Status = MarketStatusActive
+			market.ApprovedBy = MarketProposalApprovedByAuto
+			approvedAt := s.clock.Now()
+			market.ApprovedAt = &approvedAt
+			return nil
+		}
 		market.LifecycleStatus = MarketLifecycleProposed
 		market.Status = MarketLifecycleProposed
 		return nil
@@ -99,6 +107,14 @@ func (s *Service) applyCreationLifecycle(ctx context.Context, market *Market, cr
 
 func (s *Service) moderatorModeEnabled() bool {
 	return strings.EqualFold(strings.TrimSpace(s.config.GameMode), "moderator")
+}
+
+func (s *Service) autoApproveMarketProposalsEnabled(ctx context.Context) bool {
+	settings, err := s.GetMarketGovernanceSettings(ctx)
+	if err != nil || settings == nil {
+		return false
+	}
+	return settings.AutoApproveMarketProposals
 }
 
 // SetCustomLabels updates the custom labels for a market.

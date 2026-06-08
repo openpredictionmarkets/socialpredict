@@ -59,7 +59,7 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
       }
 
       const offset = page * pageSize;
-      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}?limit=${pageSize}&offset=${offset}`, {
+      const response = await fetch(`${API_URL}/v0/markets/positions/${marketId}?limit=${pageSize + 1}&offset=${offset}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -80,12 +80,13 @@ const PositionsActivityLayout = ({ marketId, market, refreshTrigger }) => {
           ? rawData
           : [];
       const filteredSorted = positionRows
+        .slice(0, pageSize)
         .filter(user => user.noSharesOwned > 0 || user.yesSharesOwned > 0)
         .sort((a, b) => (b.noSharesOwned + b.yesSharesOwned) - (a.noSharesOwned + a.yesSharesOwned));
 
       setPositions(filteredSorted);
       setFreshness(rawData?.freshness || null);
-      setHasNextPage(positionRows.length === pageSize);
+      setHasNextPage(positionRows.length > pageSize);
     };
 
     fetchPositions();

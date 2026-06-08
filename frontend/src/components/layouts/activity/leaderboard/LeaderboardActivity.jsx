@@ -30,6 +30,7 @@ const LeaderboardActivity = ({ marketId, market, refreshTrigger }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [page, setPage] = useState(0);
+    const [hasNextPage, setHasNextPage] = useState(false);
 
     useEffect(() => {
         setPage(0);
@@ -40,21 +41,24 @@ const LeaderboardActivity = ({ marketId, market, refreshTrigger }) => {
             try {
                 setLoading(true);
                 const offset = page * pageSize;
-                const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard?limit=${pageSize}&offset=${offset}`);
+                const response = await fetch(`${API_URL}/v0/markets/${marketId}/leaderboard?limit=${pageSize + 1}&offset=${offset}`);
                 if (response.ok) {
                     const data = unwrapApiResponse(await response.json());
                     const rows = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
-                    setLeaderboard(rows);
+                    setLeaderboard(rows.slice(0, pageSize));
+                    setHasNextPage(rows.length > pageSize);
                     setFreshness(data?.freshness || null);
                     setError(null);
                 } else {
                     console.error('Error fetching leaderboard:', response.statusText);
                     setError('Failed to load leaderboard data');
+                    setHasNextPage(false);
                     setFreshness(null);
                 }
             } catch (err) {
                 console.error('Error fetching leaderboard:', err);
                 setError('Failed to load leaderboard data');
+                setHasNextPage(false);
                 setFreshness(null);
             } finally {
                 setLoading(false);
@@ -127,7 +131,7 @@ const LeaderboardActivity = ({ marketId, market, refreshTrigger }) => {
 
     const labels = market ? getMarketLabels(market) : { yes: "YES", no: "NO" };
     const canPageBack = page > 0;
-    const canPageForward = leaderboard.length === pageSize;
+    const canPageForward = hasNextPage;
 
     return (
         <div className="p-4">
