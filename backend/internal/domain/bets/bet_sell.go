@@ -83,7 +83,7 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 
 		now := s.clock.Now()
 		bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
-		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, sale.SaleValue); err != nil {
+		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, netSaleProceeds(sale)); err != nil {
 			return err
 		}
 
@@ -206,6 +206,14 @@ func calculateDust(requested, saleValue int64) int64 {
 		return 0
 	}
 	return dust
+}
+
+func netSaleProceeds(sale SaleQuote) int64 {
+	net := sale.SaleValue - sale.Dust
+	if net < 0 {
+		return 0
+	}
+	return net
 }
 
 func validateDustCap(dust int64, cap int64) error {

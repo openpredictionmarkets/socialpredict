@@ -148,6 +148,7 @@ func writeSellResponse(w http.ResponseWriter, result *bets.SellResult) {
 		SharesSold:    result.SharesSold,
 		SaleValue:     result.SaleValue,
 		Dust:          result.Dust,
+		NetProceeds:   result.NetProceeds,
 		Outcome:       result.Outcome,
 		TransactionAt: result.TransactionAt,
 	}
@@ -164,6 +165,7 @@ func writeSellQuoteResponse(w http.ResponseWriter, result *bets.SellQuoteResult)
 		SharesSold:        result.SharesSold,
 		SaleValue:         result.SaleValue,
 		Dust:              result.Dust,
+		NetProceeds:       result.NetProceeds,
 		MaxDust:           result.MaxDust,
 		ValuePerShare:     result.ValuePerShare,
 		DustCapCoverage:   result.DustCapCoverage,

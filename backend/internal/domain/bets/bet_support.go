@@ -114,8 +114,8 @@ type betLedger struct {
 	users TransactionRecorder
 }
 
-func (l betLedger) CreditSale(ctx context.Context, bet *boundary.Bet, saleValue int64) error {
-	if err := l.users.ApplyTransaction(ctx, bet.Username, saleValue, dusers.TransactionSale); err != nil {
+func (l betLedger) CreditSale(ctx context.Context, bet *boundary.Bet, netProceeds int64) error {
+	if err := l.users.ApplyTransaction(ctx, bet.Username, netProceeds, dusers.TransactionSale); err != nil {
 		return err
 	}
 	return l.repo.Create(ctx, bet)

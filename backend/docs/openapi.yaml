@@ -5249,11 +5249,15 @@ components:
         saleValue:
           type: integer
           format: int64
-          description: Actual credits deposited after whole-share rounding.
+          description: Gross whole-share sale value before dust is retained.
         dust:
           type: integer
           format: int64
-          description: Requested credits minus actual saleValue, retained by the market due to rounding.
+          description: Dust fee retained by the market due to whole-share rounding.
+        netProceeds:
+          type: integer
+          format: int64
+          description: Actual credits deposited to the seller wallet after subtracting dust from saleValue.
         outcome:
           type: string
         transactionAt:
@@ -5280,11 +5284,15 @@ components:
         saleValue:
           type: integer
           format: int64
-          description: Credits that would be deposited after whole-share rounding.
+          description: Gross whole-share sale value before dust would be retained.
         dust:
           type: integer
           format: int64
           description: Capped rounding remainder retained by the market if submitted.
+        netProceeds:
+          type: integer
+          format: int64
+          description: Credits that would be deposited to the seller wallet after subtracting dust from saleValue.
         maxDust:
           type: integer
           format: int64
