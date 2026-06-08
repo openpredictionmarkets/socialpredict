@@ -83,6 +83,10 @@ Current feature specs:
 6. **Temporary Load-Test Droplets** - [`FEATURES/06/06-temporary-loadtest-droplets.md`](./FEATURES/06/06-temporary-loadtest-droplets.md), [`FEATURES/06/DESIGN.md`](./FEATURES/06/DESIGN.md), [`FEATURES/06/PLAN.md`](./FEATURES/06/PLAN.md)
 7. **Market Stewardship** - [`FEATURES/07/07-market-stewardship.md`](./FEATURES/07/07-market-stewardship.md), [`FEATURES/07/DESIGN.md`](./FEATURES/07/DESIGN.md), [`FEATURES/07/PLAN.md`](./FEATURES/07/PLAN.md)
 9. **Market Taxonomy And Hierarchical Navigation** - [`FEATURES/09/09-market-taxonomy-navigation.md`](./FEATURES/09/09-market-taxonomy-navigation.md), [`FEATURES/09/DESIGN.md`](./FEATURES/09/DESIGN.md), [`FEATURES/09/PLAN.md`](./FEATURES/09/PLAN.md)
+10. **Market Description Amendments** - [`FEATURES/10/10-market-description-amendments.md`](./FEATURES/10/10-market-description-amendments.md), [`FEATURES/10/DESIGN.md`](./FEATURES/10/DESIGN.md), [`FEATURES/10/PLAN.md`](./FEATURES/10/PLAN.md)
+11. **Read Model Caching And Performance** - [`FEATURES/11/11-read-model-caching-performance.md`](./FEATURES/11/11-read-model-caching-performance.md), [`FEATURES/11/DESIGN.md`](./FEATURES/11/DESIGN.md), [`FEATURES/11/PLAN.md`](./FEATURES/11/PLAN.md)
+12. **Moderator Work Profits** - [`FEATURES/12/12-moderator-work-profits.md`](./FEATURES/12/12-moderator-work-profits.md), [`FEATURES/12/DESIGN.md`](./FEATURES/12/DESIGN.md), [`FEATURES/12/PLAN.md`](./FEATURES/12/PLAN.md)
+14. **Container Security Scanning** - [`FEATURES/14/14-container-security-scanning.md`](./FEATURES/14/14-container-security-scanning.md), [`FEATURES/14/DESIGN.md`](./FEATURES/14/DESIGN.md), [`FEATURES/14/PLAN.md`](./FEATURES/14/PLAN.md)
 
 ## Implementation Priority
 
