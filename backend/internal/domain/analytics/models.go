@@ -19,6 +19,7 @@ type MarketRecord struct {
 	CreatedAt        time.Time
 	IsResolved       bool
 	ResolutionResult string
+	ProposalCost     int64
 }
 
 // WorkProfitMarketRecord captures the resolved market fields needed to derive

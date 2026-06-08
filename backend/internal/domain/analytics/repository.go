@@ -104,7 +104,7 @@ func (r *GormRepository) ListMarkets(ctx context.Context) ([]MarketRecord, error
 	}
 	var markets []analyticsMarketRow
 	if err := db.Table("markets").
-		Select("id", "created_at", "is_resolved", "resolution_result").
+		Select("id", "created_at", "is_resolved", "resolution_result", "proposal_cost").
 		Find(&markets).Error; err != nil {
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func (r *GormRepository) listMarketsByIDs(db *gorm.DB, marketIDs []uint) ([]Mark
 	}
 	var markets []analyticsMarketRow
 	if err := db.Table("markets").
-		Select("id", "created_at", "is_resolved", "resolution_result").
+		Select("id", "created_at", "is_resolved", "resolution_result", "proposal_cost").
 		Where("id IN ?", marketIDs).
 		Find(&markets).Error; err != nil {
 		return nil, err
@@ -315,6 +315,7 @@ type analyticsMarketRow struct {
 	CreatedAt        time.Time
 	IsResolved       bool
 	ResolutionResult string
+	ProposalCost     int64
 }
 
 type analyticsWorkProfitMarketRow struct {
@@ -355,6 +356,7 @@ func mapMarkets(dbMarkets []analyticsMarketRow) []MarketRecord {
 			CreatedAt:        market.CreatedAt,
 			IsResolved:       market.IsResolved,
 			ResolutionResult: market.ResolutionResult,
+			ProposalCost:     market.ProposalCost,
 		}
 	}
 	return markets

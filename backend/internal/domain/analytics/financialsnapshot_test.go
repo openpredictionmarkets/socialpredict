@@ -205,7 +205,7 @@ func TestComputeUserFinancials_DerivesModeratorWorkProfitsFromResolvedStewardedM
 
 	stewardSnapshot := requireFinancialSnapshot(t, svc, steward)
 
-	expectedWorkProfits := int64(14)
+	expectedWorkProfits := int64(4)
 	if stewardSnapshot.WorkProfits != expectedWorkProfits {
 		t.Fatalf("steward work profits = %d, want %d", stewardSnapshot.WorkProfits, expectedWorkProfits)
 	}
@@ -253,5 +253,46 @@ func TestComputeUserFinancials_SubtractsCreationCostWhenCreatorRemainsSteward(t 
 	expectedWorkProfits := int64(4)
 	if snapshot.WorkProfits != expectedWorkProfits {
 		t.Fatalf("creator-steward work profits = %d, want %d", snapshot.WorkProfits, expectedWorkProfits)
+	}
+}
+
+func TestComputeUserFinancials_WorkProfitsRemainZeroBelowCreationCostThreshold(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	creator := modelstesting.GenerateUser("threshold_creator", 500)
+	steward := modelstesting.GenerateUser("threshold_steward", 500)
+	alice := modelstesting.GenerateUser("threshold_alice", 500)
+	bob := modelstesting.GenerateUser("threshold_bob", 500)
+	for _, user := range []models.User{creator, steward, alice, bob} {
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("create user %s: %v", user.Username, err)
+		}
+	}
+
+	market := modelstesting.GenerateMarket(3, creator.Username)
+	market.IsResolved = true
+	market.ResolutionResult = "YES"
+	market.ProposalCost = 10
+	market.StewardUsername = steward.Username
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+
+	bets := []models.Bet{
+		modelstesting.GenerateBet(100, "YES", alice.Username, uint(market.ID), 0),
+		modelstesting.GenerateBet(50, "NO", bob.Username, uint(market.ID), time.Minute),
+	}
+	for _, bet := range bets {
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("create bet: %v", err)
+		}
+	}
+
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.Betting.BetFees.InitialBetFee = 3
+	svc := newAnalyticsService(t, db, econ)
+
+	snapshot := requireFinancialSnapshot(t, svc, steward)
+	if snapshot.WorkProfits != 0 {
+		t.Fatalf("steward work profits below threshold = %d, want 0", snapshot.WorkProfits)
 	}
 }

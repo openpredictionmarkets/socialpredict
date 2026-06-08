@@ -33,6 +33,7 @@ Checklist:
 - [x] Wire `InitialBetFee` into the market service config.
 - [x] Derive unique positive-bet participants from canonical bet history.
 - [x] Credit work income after ordinary winner payout.
+- [x] Pay only the surplus above the market creation/proposal cost threshold.
 - [x] Skip work-profit payout for `N/A` refund resolution.
 - [x] Add service tests for payout ordering and unique participant counting.
 
@@ -43,6 +44,7 @@ Checklist:
 - [x] Derive user `workProfits` from resolved markets stewarded by that user.
 - [x] Use stored `ProposalCost` as the market creation fee when available.
 - [x] Fall back to configured `CreateMarketCost` for legacy rows with no proposal cost.
+- [x] Apply the market creation/proposal cost threshold regardless of whether the current steward is the original creator.
 - [x] Include work profits in direct financial calculations.
 - [x] Include work profits in user financial read-model refresh.
 - [x] Update retained participation-fee system metric semantics to avoid double-counting paid-out steward work income.

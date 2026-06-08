@@ -52,10 +52,7 @@ func (s *Service) computeUserWorkProfits(ctx context.Context, username string) (
 		if err != nil {
 			return 0, err
 		}
-		creationCost := int64(0)
-		if market.CreatorUsername == username {
-			creationCost = creationCostForWorkProfit(market.ProposalCost, s.config.CreateMarketCost)
-		}
+		creationCost := creationCostForWorkProfit(market.ProposalCost, s.config.CreateMarketCost)
 		total += stewardMarketWorkProfit(bets, s.config.InitialBetFee, creationCost)
 	}
 
@@ -63,7 +60,11 @@ func (s *Service) computeUserWorkProfits(ctx context.Context, username string) (
 }
 
 func stewardMarketWorkProfit(bets []boundary.Bet, initialBetFee int64, creationCost int64) int64 {
-	return participationFeeIncome(bets, initialBetFee) - creationCost
+	income := participationFeeIncome(bets, initialBetFee) - creationCost
+	if income < 0 {
+		return 0
+	}
+	return income
 }
 
 func participationFeeIncome(bets []boundary.Bet, initialBetFee int64) int64 {
