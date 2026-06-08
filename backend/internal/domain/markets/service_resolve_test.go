@@ -358,11 +358,55 @@ func TestResolveMarketPaysWinners(t *testing.T) {
 	}
 }
 
-func TestResolveMarketPaysStewardWorkProfitAfterWinnerPayouts(t *testing.T) {
+func TestResolveMarketSkipsStewardWorkProfitUntilCreationCostThresholdIsMet(t *testing.T) {
 	market := &markets.Market{
 		ID:              42,
 		CreatorUsername: "creator",
 		StewardUsername: "backup",
+		ProposalCost:    10,
+		Status:          "active",
+	}
+	repo := newResolveRepo(
+		withResolveRepoMarket(market),
+		withResolveRepoResolve(func(context.Context, int64, string) error {
+			market.Status = "resolved"
+			return nil
+		}),
+		withResolveRepoPayouts([]*markets.PayoutPosition{
+			{Username: "winner", Value: 120},
+			{Username: "loser", Value: 0},
+		}),
+		withResolveRepoBets([]*markets.Bet{
+			{Username: "alice", Amount: 100},
+			{Username: "alice", Amount: -20},
+			{Username: "bob", Amount: 50},
+			{Username: "bob", Amount: 10},
+			{Username: "creator", Amount: 0},
+		}),
+	)
+	userSvc := newResolveUserService()
+	service := markets.NewService(repo, userSvc, newNopClock(marketsTestTime()), markets.Config{InitialBetFee: 3})
+
+	if err := service.ResolveMarket(context.Background(), 42, "YES", "backup"); err != nil {
+		t.Fatalf("ResolveMarket returned error: %v", err)
+	}
+
+	if len(userSvc.applied) != 1 {
+		t.Fatalf("expected winner payout only below work-profit threshold, got %d: %+v", len(userSvc.applied), userSvc.applied)
+	}
+
+	winnerCall := userSvc.applied[0]
+	if winnerCall.username != "winner" || winnerCall.amount != 120 || winnerCall.txType != users.TransactionWin {
+		t.Fatalf("unexpected winner payout %+v", winnerCall)
+	}
+}
+
+func TestResolveMarketPaysStewardWorkProfitSurplusAfterCreationCostThreshold(t *testing.T) {
+	market := &markets.Market{
+		ID:              42,
+		CreatorUsername: "creator",
+		StewardUsername: "backup",
+		ProposalCost:    5,
 		Status:          "active",
 	}
 	repo := newResolveRepo(
@@ -391,7 +435,7 @@ func TestResolveMarketPaysStewardWorkProfitAfterWinnerPayouts(t *testing.T) {
 	}
 
 	if len(userSvc.applied) != 2 {
-		t.Fatalf("expected winner payout and work-profit payout, got %d: %+v", len(userSvc.applied), userSvc.applied)
+		t.Fatalf("expected winner payout and work-profit surplus payout, got %d: %+v", len(userSvc.applied), userSvc.applied)
 	}
 
 	winnerCall := userSvc.applied[0]
@@ -400,7 +444,7 @@ func TestResolveMarketPaysStewardWorkProfitAfterWinnerPayouts(t *testing.T) {
 	}
 
 	workProfitCall := userSvc.applied[1]
-	if workProfitCall.username != "backup" || workProfitCall.amount != 6 || workProfitCall.txType != users.TransactionWorkProfit {
+	if workProfitCall.username != "backup" || workProfitCall.amount != 1 || workProfitCall.txType != users.TransactionWorkProfit {
 		t.Fatalf("unexpected work-profit payout %+v", workProfitCall)
 	}
 }

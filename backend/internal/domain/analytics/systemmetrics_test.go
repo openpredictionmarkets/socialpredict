@@ -106,9 +106,10 @@ func TestComputeSystemMetrics_WithData(t *testing.T) {
 	}
 }
 
-func TestComputeSystemMetrics_ParticipationFeesExcludeResolvedWorkProfitMarkets(t *testing.T) {
+func TestComputeSystemMetrics_ParticipationFeesRetainResolvedCreationCostThreshold(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.MarketIncentives.CreateMarketCost = 10
 	econ.Economics.Betting.BetFees.InitialBetFee = 5
 
 	creator := modelstesting.GenerateUser("creator", 0)
@@ -137,6 +138,52 @@ func TestComputeSystemMetrics_ParticipationFeesExcludeResolvedWorkProfitMarkets(
 		modelstesting.GenerateBet(10, "YES", participant.Username, uint(activeMarket.ID), 0),
 		modelstesting.GenerateBet(10, "YES", participant.Username, uint(resolvedWorkProfitMarket.ID), 0),
 		modelstesting.GenerateBet(10, "YES", participant.Username, uint(resolvedNAMarket.ID), 0),
+	}
+	for _, bet := range bets {
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("create bet: %v", err)
+		}
+	}
+
+	svc := newAnalyticsService(t, db, econ)
+	metrics := requireSystemMetrics(t, svc)
+
+	expectedRetainedFees := int64(15)
+	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != expectedRetainedFees {
+		t.Fatalf("retained participation fees = %d, want %d", got, expectedRetainedFees)
+	}
+}
+
+func TestComputeSystemMetrics_ParticipationFeesExcludeOnlyPaidWorkProfitSurplus(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.MarketIncentives.CreateMarketCost = 10
+	econ.Economics.Betting.BetFees.InitialBetFee = 5
+
+	creator := modelstesting.GenerateUser("surplus_creator", 0)
+	for _, user := range []models.User{
+		creator,
+		modelstesting.GenerateUser("surplus_alice", 0),
+		modelstesting.GenerateUser("surplus_bob", 0),
+		modelstesting.GenerateUser("surplus_carol", 0),
+	} {
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("create user %s: %v", user.Username, err)
+		}
+	}
+
+	market := modelstesting.GenerateMarket(14, creator.Username)
+	market.IsResolved = true
+	market.ResolutionResult = "YES"
+	market.ProposalCost = 10
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+
+	bets := []models.Bet{
+		modelstesting.GenerateBet(10, "YES", "surplus_alice", uint(market.ID), 0),
+		modelstesting.GenerateBet(10, "YES", "surplus_bob", uint(market.ID), 0),
+		modelstesting.GenerateBet(10, "YES", "surplus_carol", uint(market.ID), 0),
 	}
 	for _, bet := range bets {
 		if err := db.Create(&bet).Error; err != nil {

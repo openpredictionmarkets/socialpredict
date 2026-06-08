@@ -117,33 +117,55 @@ func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, re
 		return 0, err
 	}
 
-	type userMarket struct {
+	marketByID := make(map[uint]MarketRecord, len(markets))
+	for _, market := range markets {
+		marketByID[market.ID] = market
+	}
+
+	feesByMarket := make(map[uint]int64)
+	seen := make(map[struct {
 		marketID uint
 		username string
-	}
-
-	paidOutMarket := make(map[uint]bool, len(markets))
-	for _, market := range markets {
-		if market.IsResolved && market.ResolutionResult != "N/A" {
-			paidOutMarket[market.ID] = true
-		}
-	}
-
-	seen := make(map[userMarket]bool)
-	var participationFees int64
+	}]bool)
 
 	for _, b := range betsOrdered {
-		if b.Amount <= 0 || paidOutMarket[b.MarketID] {
+		if b.Amount <= 0 {
 			continue
 		}
-		key := userMarket{marketID: b.MarketID, username: b.Username}
+		key := struct {
+			marketID uint
+			username string
+		}{marketID: b.MarketID, username: b.Username}
 		if !seen[key] {
-			participationFees += config.InitialBetFee
+			feesByMarket[b.MarketID] += config.InitialBetFee
 			seen[key] = true
 		}
 	}
 
+	var participationFees int64
+	for marketID, feeIncome := range feesByMarket {
+		market := marketByID[marketID]
+		if market.IsResolved && market.ResolutionResult != "N/A" {
+			participationFees += retainedParticipationFeesAfterWorkProfit(feeIncome, creationCostForWorkProfit(market.ProposalCost, config.CreateMarketCost))
+			continue
+		}
+		participationFees += feeIncome
+	}
+
 	return participationFees, nil
+}
+
+func retainedParticipationFeesAfterWorkProfit(feeIncome int64, creationCost int64) int64 {
+	if feeIncome <= 0 {
+		return 0
+	}
+	if creationCost <= 0 {
+		return 0
+	}
+	if feeIncome < creationCost {
+		return feeIncome
+	}
+	return creationCost
 }
 
 // DefaultMetricsAssembler builds the SystemMetrics DTO from calculator outputs.
@@ -164,7 +186,7 @@ func (a DefaultMetricsAssembler) Assemble(debt *DebtStats, volume *MarketVolumeS
 			UnusedDebt:         NewInt64Metric(debt.UnusedDebt, "Σ(maxDebtPerUser - max(0, -balance))", "Remaining borrowing capacity available to users"),
 			ActiveBetVolume:    NewInt64Metric(volume.ActiveBetVolume, "Σ(unresolved_market_volumes)", "Total value of bets currently active in unresolved markets (excludes fees and subsidies)"),
 			MarketCreationFees: NewInt64Metric(volume.MarketCreationFees, "number_of_markets × creation_fee_per_market", "Fees collected from users creating new markets"),
-			ParticipationFees:  NewInt64Metric(participationFees, "Σ(unpaid_first_bet_per_user_per_market × participation_fee)", "Retained fees collected from first-time participation before eligible resolved markets redistribute them as steward work profit"),
+			ParticipationFees:  NewInt64Metric(participationFees, "Σ(retained_first_bet_per_user_per_market × participation_fee)", "Retained fees collected from first-time participation; resolved markets only redistribute surplus above the market creation-cost threshold as steward work profit"),
 			BonusesPaid:        NewInt64Metric(bonusesPaid, "", "System bonuses paid to users and realized profits currently held in user balances"),
 			TotalUtilized:      NewInt64Metric(totalUtilized, "unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid", "Total debt capacity that has been utilized across all categories"),
 		},
