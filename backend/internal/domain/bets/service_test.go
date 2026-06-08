@@ -466,7 +466,7 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sell returned error: %v", err)
 	}
-	if res.SharesSold != 2 || res.SaleValue != 20 || res.Dust != 0 {
+	if res.SharesSold != 2 || res.SaleValue != 20 || res.Dust != 0 || res.NetProceeds != 20 {
 		t.Fatalf("unexpected sell result: %+v", res)
 	}
 	if !res.TransactionAt.Equal(now) {
@@ -484,7 +484,7 @@ func TestServiceSell_Succeeds(t *testing.T) {
 	}
 }
 
-func TestServiceSell_DustAtCapCreditsSaleValue(t *testing.T) {
+func TestServiceSell_DustAtCapCreditsNetProceeds(t *testing.T) {
 	now := serviceTestTime()
 	fixture, svc := newServiceFixture(
 		now,
@@ -498,13 +498,13 @@ func TestServiceSell_DustAtCapCreditsSaleValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sell returned error: %v", err)
 	}
-	if res.SharesSold != 3 || res.SaleValue != 30 || res.Dust != 2 {
+	if res.SharesSold != 3 || res.SaleValue != 30 || res.Dust != 2 || res.NetProceeds != 28 {
 		t.Fatalf("unexpected sell result: %+v", res)
 	}
 	if fixture.repo.created == nil || fixture.repo.created.Amount != -3 {
 		t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
 	}
-	if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != 30 {
+	if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != 28 {
 		t.Fatalf("unexpected user transaction: %+v", fixture.users.calls)
 	}
 }
@@ -542,7 +542,7 @@ func TestServiceSell_RoundsDustDownToCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sell returned error: %v", err)
 	}
-	if result.SharesSold != 3 || result.SaleValue != 30 || result.Dust != 2 {
+	if result.SharesSold != 3 || result.SaleValue != 30 || result.Dust != 2 || result.NetProceeds != 28 {
 		t.Fatalf("unexpected rounded sale result: %+v", result)
 	}
 	if fixture.repo.created == nil || fixture.repo.created.Amount != -3 {
@@ -564,7 +564,7 @@ func TestServiceQuoteSell_AllowsDustAtCapWithoutMutatingState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("QuoteSell returned error: %v", err)
 	}
-	if !quote.Allowed || quote.SaleValue != 30 || quote.Dust != 2 || quote.MaxDust != 2 || quote.ValuePerShare != 10 {
+	if !quote.Allowed || quote.SaleValue != 30 || quote.Dust != 2 || quote.NetProceeds != 28 || quote.MaxDust != 2 || quote.ValuePerShare != 10 {
 		t.Fatalf("unexpected quote: %+v", quote)
 	}
 	if quote.DustCapCoverage != 0.3 {
@@ -595,7 +595,7 @@ func TestServiceQuoteSell_OverCapRoundsPreviewToCap(t *testing.T) {
 	if !quote.Allowed || quote.DustCapExceeded || quote.DustCapExceededBy != 0 {
 		t.Fatalf("expected rounded allowed quote, got %+v", quote)
 	}
-	if quote.SaleValue != 30 || quote.Dust != 2 || quote.MaxDust != 2 {
+	if quote.SaleValue != 30 || quote.Dust != 2 || quote.NetProceeds != 28 || quote.MaxDust != 2 {
 		t.Fatalf("unexpected over-cap quote amounts: %+v", quote)
 	}
 	for _, want := range []int64{30, 31, 32} {
@@ -747,8 +747,9 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Sell returned error: %v", err)
 			}
-			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust {
-				t.Fatalf("unexpected result: got %+v, want shares=%d saleValue=%d dust=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			wantNetProceeds := tc.wantSaleValue - tc.wantDust
+			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust || result.NetProceeds != wantNetProceeds {
+				t.Fatalf("unexpected result: got %+v, want shares=%d saleValue=%d dust=%d netProceeds=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust, wantNetProceeds)
 			}
 			if fixture.repo.created == nil {
 				t.Fatal("expected stored sale bet")
@@ -756,7 +757,7 @@ func TestServiceSell_DustScenarioMatrix(t *testing.T) {
 			if fixture.repo.created.Amount != -tc.wantShares {
 				t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
 			}
-			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != tc.wantSaleValue {
+			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != wantNetProceeds {
 				t.Fatalf("unexpected user ledger calls: %+v", fixture.users.calls)
 			}
 		})
@@ -839,8 +840,9 @@ func TestServiceSell_MarketHistorySaleOrderDustScenarios(t *testing.T) {
 			if err != nil {
 				t.Fatalf("QuoteSell returned error: %v", err)
 			}
-			if !quote.Allowed || quote.RequestedCredits != tc.wantExecutableOrder || quote.SharesSold != tc.wantShares || quote.SaleValue != tc.wantSaleValue || quote.Dust != tc.wantDust {
-				t.Fatalf("unexpected quote: got %+v, want order=%d shares=%d saleValue=%d dust=%d", quote, tc.wantExecutableOrder, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			wantNetProceeds := tc.wantSaleValue - tc.wantDust
+			if !quote.Allowed || quote.RequestedCredits != tc.wantExecutableOrder || quote.SharesSold != tc.wantShares || quote.SaleValue != tc.wantSaleValue || quote.Dust != tc.wantDust || quote.NetProceeds != wantNetProceeds {
+				t.Fatalf("unexpected quote: got %+v, want order=%d shares=%d saleValue=%d dust=%d netProceeds=%d", quote, tc.wantExecutableOrder, tc.wantShares, tc.wantSaleValue, tc.wantDust, wantNetProceeds)
 			}
 			if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
 				t.Fatalf("quote should not mutate state: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
@@ -855,13 +857,13 @@ func TestServiceSell_MarketHistorySaleOrderDustScenarios(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Sell returned error: %v", err)
 			}
-			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust {
-				t.Fatalf("unexpected sale result: got %+v, want shares=%d saleValue=%d dust=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust || result.NetProceeds != wantNetProceeds {
+				t.Fatalf("unexpected sale result: got %+v, want shares=%d saleValue=%d dust=%d netProceeds=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust, wantNetProceeds)
 			}
 			if fixture.repo.created == nil || fixture.repo.created.Amount != -tc.wantShares || fixture.repo.created.Outcome != "YES" {
 				t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
 			}
-			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != tc.wantSaleValue {
+			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != wantNetProceeds {
 				t.Fatalf("unexpected user ledger calls: %+v", fixture.users.calls)
 			}
 		})
@@ -964,8 +966,9 @@ func TestServiceSell_ActualMixedMarketHistorySaleOrderDustScenarios(t *testing.T
 			if err != nil {
 				t.Fatalf("QuoteSell returned error: %v", err)
 			}
-			if !quote.Allowed || quote.RequestedCredits != tc.wantExecutableOrder || quote.SharesSold != tc.wantShares || quote.SaleValue != tc.wantSaleValue || quote.Dust != tc.wantDust {
-				t.Fatalf("unexpected quote: got %+v, want order=%d shares=%d saleValue=%d dust=%d", quote, tc.wantExecutableOrder, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			wantNetProceeds := tc.wantSaleValue - tc.wantDust
+			if !quote.Allowed || quote.RequestedCredits != tc.wantExecutableOrder || quote.SharesSold != tc.wantShares || quote.SaleValue != tc.wantSaleValue || quote.Dust != tc.wantDust || quote.NetProceeds != wantNetProceeds {
+				t.Fatalf("unexpected quote: got %+v, want order=%d shares=%d saleValue=%d dust=%d netProceeds=%d", quote, tc.wantExecutableOrder, tc.wantShares, tc.wantSaleValue, tc.wantDust, wantNetProceeds)
 			}
 			if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
 				t.Fatalf("quote should not mutate state: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
@@ -980,13 +983,13 @@ func TestServiceSell_ActualMixedMarketHistorySaleOrderDustScenarios(t *testing.T
 			if err != nil {
 				t.Fatalf("Sell returned error: %v", err)
 			}
-			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust {
-				t.Fatalf("unexpected sale result: got %+v, want shares=%d saleValue=%d dust=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust)
+			if result.SharesSold != tc.wantShares || result.SaleValue != tc.wantSaleValue || result.Dust != tc.wantDust || result.NetProceeds != wantNetProceeds {
+				t.Fatalf("unexpected sale result: got %+v, want shares=%d saleValue=%d dust=%d netProceeds=%d", result, tc.wantShares, tc.wantSaleValue, tc.wantDust, wantNetProceeds)
 			}
 			if fixture.repo.created == nil || fixture.repo.created.Amount != -tc.wantShares || fixture.repo.created.Outcome != "YES" {
 				t.Fatalf("unexpected stored sale bet: %+v", fixture.repo.created)
 			}
-			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != tc.wantSaleValue {
+			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != wantNetProceeds {
 				t.Fatalf("unexpected user ledger calls: %+v", fixture.users.calls)
 			}
 		})

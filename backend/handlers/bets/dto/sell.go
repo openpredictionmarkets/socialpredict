@@ -16,6 +16,7 @@ type SellBetResponse struct {
 	SharesSold    int64     `json:"sharesSold"`
 	SaleValue     int64     `json:"saleValue"`
 	Dust          int64     `json:"dust"`
+	NetProceeds   int64     `json:"netProceeds"`
 	Outcome       string    `json:"outcome"`
 	TransactionAt time.Time `json:"transactionAt"`
 }
@@ -29,6 +30,7 @@ type SellQuoteResponse struct {
 	SharesSold        int64     `json:"sharesSold"`
 	SaleValue         int64     `json:"saleValue"`
 	Dust              int64     `json:"dust"`
+	NetProceeds       int64     `json:"netProceeds"`
 	MaxDust           int64     `json:"maxDust"`
 	ValuePerShare     int64     `json:"valuePerShare"`
 	DustCapCoverage   float64   `json:"dustCapCoverage"`

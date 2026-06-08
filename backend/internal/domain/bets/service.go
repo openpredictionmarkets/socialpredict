@@ -106,7 +106,7 @@ type BalanceGuard interface {
 
 // BetLedger encapsulates synchronous persistence and user accounting for non-placement bet flows.
 type BetLedger interface {
-	CreditSale(ctx context.Context, bet *boundary.Bet, saleValue int64) error
+	CreditSale(ctx context.Context, bet *boundary.Bet, netProceeds int64) error
 }
 
 // Clock allows time to be mocked in tests.

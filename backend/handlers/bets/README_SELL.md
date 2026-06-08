@@ -7,7 +7,7 @@ POST /v0/sell
 { marketId, outcome, amount }
 ```
 
-`amount` is the number of credits the user is requesting from the sale. The sell domain calculates the current integer value per share, rounds the sale down to whole shares, credits the user with the actual sale value, and reports any remainder as transaction-time dust.
+`amount` is the number of credits the user is requesting from the sale. The sell domain calculates the current integer value per share, rounds the sale down to whole shares, retains any dust fee, credits the user with net proceeds, and reports the retained remainder as transaction-time dust.
 
 ```text
 valuePerShare = position.Value / sharesOwned
@@ -15,6 +15,7 @@ sharesSold    = requestedCredits / valuePerShare
 saleValue     = sharesSold * valuePerShare
 rawDust       = requestedCredits - saleValue
 dust          = min(rawDust, maxDustPerSale)
+netProceeds   = saleValue - dust
 ```
 
 If the raw remainder exceeds `economics.betting.maxDustPerSale` from `setup.yaml`, the executable Sale Order is rounded down to the nearest allowed value. With the default `maxDustPerSale: 1`, an over-remainder sale is still allowed, but the charged dust fee is capped at `1`.
@@ -37,6 +38,7 @@ The quote endpoint is read-only. It uses the same backend sale calculator as
   "sharesSold": 3,
   "saleValue": 30,
   "dust": 1,
+  "netProceeds": 29,
   "maxDust": 1,
   "valuePerShare": 10,
   "dustCapCoverage": 0.2,
@@ -61,7 +63,8 @@ amount = -sharesSold
 That keeps dust stateless:
 
 - `amount` remains the share/position ledger entry used by the market math.
-- User balance is credited by `saleValue`, not the originally requested credits.
+- User balance is credited by `netProceeds`, not the gross `saleValue` or the originally requested credits.
+- `saleValue` remains the gross whole-share sale value before dust is retained.
 - The transaction response reports `dust`, but dust is not persisted as a separate bet column.
 
 ## API Response
@@ -72,7 +75,8 @@ A successful sale returns:
 {
   "sharesSold": 2,
   "saleValue": 20,
-  "dust": 1
+  "dust": 1,
+  "netProceeds": 19
 }
 ```
 

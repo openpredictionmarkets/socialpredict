@@ -289,7 +289,8 @@ const defaultSaleAmount = (normalized) => {
 
 const buildSaleSuccessMessage = (data) => {
     const dust = Number(data?.dust) || 0;
-    const base = `Sale successful! Sold ${data.sharesSold} shares and credited ${data.saleValue} credits.`;
+    const netProceeds = Number(data?.netProceeds ?? data?.saleValue) || 0;
+    const base = `Sale successful! Sold ${data.sharesSold} shares and credited ${netProceeds} credits.`;
     if (dust <= 0) {
         return base;
     }
@@ -336,7 +337,7 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
                 <QuoteMetric label="Sale order" value={quote.requestedCredits} />
-                <QuoteMetric label="Credits received" value={quote.saleValue} />
+                <QuoteMetric label="Credits received" value={quote.netProceeds ?? quote.saleValue} />
                 <QuoteMetric label="Shares sold" value={quote.sharesSold} />
                 <QuoteMetric label="Dust fee" value={`${quote.dust} / ${quote.maxDust}`} />
                 <QuoteMetric label="Value per share" value={quote.valuePerShare} />

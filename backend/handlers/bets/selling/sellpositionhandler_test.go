@@ -143,6 +143,7 @@ func TestSellPositionHandler_Success(t *testing.T) {
 		SharesSold:    3,
 		SaleValue:     60,
 		Dust:          5,
+		NetProceeds:   55,
 		Outcome:       "YES",
 		TransactionAt: time.Now(),
 	}}
@@ -171,7 +172,7 @@ func TestSellPositionHandler_Success(t *testing.T) {
 	if !resp.OK {
 		t.Fatalf("expected ok=true, got false")
 	}
-	if resp.Result.SharesSold != 3 || resp.Result.SaleValue != 60 || resp.Result.Dust != 5 {
+	if resp.Result.SharesSold != 3 || resp.Result.SaleValue != 60 || resp.Result.Dust != 5 || resp.Result.NetProceeds != 55 {
 		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
@@ -187,6 +188,7 @@ func TestSellPositionHandler_InvalidatesReadModelsAfterSuccess(t *testing.T) {
 		SharesSold:    2,
 		SaleValue:     10,
 		Dust:          1,
+		NetProceeds:   9,
 		TransactionAt: time.Now(),
 	}}
 	invalidator := &fakeReadModelInvalidator{}
@@ -219,6 +221,7 @@ func TestSellQuoteHandler_Success(t *testing.T) {
 		SharesSold:       3,
 		SaleValue:        30,
 		Dust:             2,
+		NetProceeds:      28,
 		MaxDust:          2,
 		ValuePerShare:    10,
 		DustCapCoverage:  0.3,
@@ -248,7 +251,7 @@ func TestSellQuoteHandler_Success(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if !resp.Result.Allowed || resp.Result.Dust != 2 || resp.Result.MaxDust != 2 || resp.Result.ValuePerShare != 10 {
+	if !resp.Result.Allowed || resp.Result.Dust != 2 || resp.Result.NetProceeds != 28 || resp.Result.MaxDust != 2 || resp.Result.ValuePerShare != 10 {
 		t.Fatalf("unexpected quote response: %+v", resp.Result)
 	}
 	if len(resp.Result.SuggestedAmounts) != 6 {
@@ -266,6 +269,7 @@ func TestSellQuoteHandler_RoundedDustQuoteReturnsAllowedPreview(t *testing.T) {
 		SharesSold:       3,
 		SaleValue:        30,
 		Dust:             2,
+		NetProceeds:      28,
 		MaxDust:          2,
 		ValuePerShare:    10,
 		DustCapCoverage:  0.3,
@@ -290,7 +294,7 @@ func TestSellQuoteHandler_RoundedDustQuoteReturnsAllowedPreview(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if !resp.Result.Allowed || resp.Result.DustCapExceeded || resp.Result.DustCapExceededBy != 0 || resp.Result.Dust != 2 {
+	if !resp.Result.Allowed || resp.Result.DustCapExceeded || resp.Result.DustCapExceededBy != 0 || resp.Result.Dust != 2 || resp.Result.NetProceeds != 28 {
 		t.Fatalf("unexpected rounded quote: %+v", resp.Result)
 	}
 }

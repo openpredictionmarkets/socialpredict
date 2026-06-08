@@ -96,6 +96,7 @@ type SellResult struct {
 	SharesSold    int64
 	SaleValue     int64
 	Dust          int64
+	NetProceeds   int64
 	Outcome       string
 	TransactionAt time.Time
 }
@@ -111,6 +112,7 @@ func buildSellResult(target *SellResult, req SellRequest, outcome string, sale S
 		SharesSold:    sale.SharesToSell,
 		SaleValue:     sale.SaleValue,
 		Dust:          sale.Dust,
+		NetProceeds:   netSaleProceeds(sale),
 		Outcome:       outcome,
 		TransactionAt: transactionAt,
 	}
@@ -131,6 +133,7 @@ type SellQuoteResult struct {
 	SharesSold        int64
 	SaleValue         int64
 	Dust              int64
+	NetProceeds       int64
 	MaxDust           int64
 	ValuePerShare     int64
 	DustCapCoverage   float64
@@ -160,6 +163,7 @@ func buildSellQuoteResult(target *SellQuoteResult, req SellRequest, outcome stri
 		SharesSold:        sale.SharesToSell,
 		SaleValue:         sale.SaleValue,
 		Dust:              sale.Dust,
+		NetProceeds:       netSaleProceeds(sale),
 		MaxDust:           maxDust,
 		ValuePerShare:     sale.ValuePerShare,
 		DustCapCoverage:   dustCapCoverage(maxDust, sale.ValuePerShare),
