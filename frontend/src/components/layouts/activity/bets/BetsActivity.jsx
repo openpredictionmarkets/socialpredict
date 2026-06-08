@@ -35,13 +35,15 @@ const BetsActivityLayout = ({ marketId, refreshTrigger }) => {
     useEffect(() => {
         const fetchBets = async () => {
             const offset = page * pageSize;
-            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}?limit=${pageSize}&offset=${offset}`, {
+            const response = await fetch(`${API_URL}/v0/markets/bets/${marketId}?limit=${pageSize + 1}&offset=${offset}`, {
             });
             if (response.ok) {
                 const data = unwrapApiResponse(await response.json());
-                setBets(data
+                const rows = Array.isArray(data) ? data : [];
+                setBets(rows
+                    .slice(0, pageSize)
                     .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt)));
-                setHasNextPage(data.length === pageSize);
+                setHasNextPage(rows.length > pageSize);
             } else {
                 console.error('Error fetching bets:', response.statusText);
                 setBets([]);
