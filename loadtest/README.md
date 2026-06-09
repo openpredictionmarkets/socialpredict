@@ -13,6 +13,7 @@ The boundary is intentionally portable. If the harness later needs independent v
 - `fixtures/`: generated or operator-provided users, credentials, and market IDs. Ignored by default.
 - `results/`: raw k6 outputs. Ignored by default.
 - `dossier/`: release dossier schema and summarizer.
+- `dossier/staging-capacity-2026-06-09.md`: latest kconfs.com staging capacity addendum, including the clean `35/sec for 5m` run.
 - `hostops/`: operator-captured host observations from HostOps, SSH, DigitalOcean, and safe Linux commands. Ignored by default.
 
 ## Prerequisites
