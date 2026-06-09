@@ -8,6 +8,7 @@ The boundary is intentionally portable. If the harness later needs independent v
 
 - `cli/`: wrapper commands for running scenarios and generating dossier summaries.
 - `cli/OPERATING.md`: step-by-step operator/LLM runbook for staging load tests.
+- `STAGING_RUNBOOK.md`: focused kconfs.com staging test ladder and dossier workflow.
 - `k6/`: k6 API load-test scenarios.
 - `fixtures/`: generated or operator-provided users, credentials, and market IDs. Ignored by default.
 - `results/`: raw k6 outputs. Ignored by default.
@@ -119,6 +120,11 @@ market_id,kind
 
 ## Quick Start
 
+For the current OpenPredictionMarkets staging sequence against `https://kconfs.com`,
+start with `STAGING_RUNBOOK.md`. It includes the preflight checks, fixture
+seed/reset commands, recommended hot-market ladder, pass/fail criteria, and
+dossier update workflow.
+
 Start the app, seed a small local fixture set, and check prerequisites:
 
 ```bash
@@ -168,8 +174,8 @@ scenario focuses on concentrated betting throughput:
   --base-url https://kconfs.com \
   --api-prefix /api \
   --duration 1m \
-  --target-rate 50 \
-  --preauth-users 100
+  --target-rate 10 \
+  --preauth-users 25
 ```
 
 Capture host CPU, RAM, disk, and Docker stats during a run:

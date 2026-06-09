@@ -198,6 +198,10 @@ workflow runs cannot accidentally target a stale IP.
 
 ## Command Sequence For Staging
 
+For the shorter current kconfs.com staging ladder and dossier workflow, start
+with `../STAGING_RUNBOOK.md`. This section remains as the expanded operator
+reference.
+
 1. Confirm public readiness:
 
 ```bash
