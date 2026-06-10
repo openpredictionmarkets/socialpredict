@@ -47,7 +47,7 @@ func globalLeaderboardReadModel(ctx context.Context, svc GlobalLeaderboardServic
 	}
 
 	readModel, err := readSvc.GetGlobalLeaderboardReadModel(ctx, limit, offset)
-	if err == nil && readModel != nil && !freshnessExpired(readModel.Freshness, analytics.GlobalLeaderboardSnapshotTargetFreshness) {
+	if err == nil && readModel != nil && freshnessWithinTargetAge(readModel.Freshness, analytics.GlobalLeaderboardSnapshotTargetFreshness) {
 		return readModel.Entries, &readModel.Freshness, nil
 	}
 

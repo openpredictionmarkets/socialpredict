@@ -51,6 +51,9 @@ func freshnessResponseFromDomain(freshness readmodels.Freshness) FreshnessRespon
 	}
 }
 
-func freshnessExpired(freshness readmodels.Freshness, target time.Duration) bool {
-	return freshness.IsStale || freshness.GeneratedAt.IsZero() || time.Since(freshness.GeneratedAt) > target
+func freshnessWithinTargetAge(freshness readmodels.Freshness, target time.Duration) bool {
+	if freshness.GeneratedAt.IsZero() {
+		return false
+	}
+	return time.Since(freshness.GeneratedAt) <= target
 }

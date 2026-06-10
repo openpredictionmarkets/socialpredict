@@ -161,7 +161,7 @@ const (
 
 const (
 	SystemMetricsSnapshotTargetFreshness     = time.Hour
-	GlobalLeaderboardSnapshotTargetFreshness = time.Hour
+	GlobalLeaderboardSnapshotTargetFreshness = 15 * time.Minute
 )
 
 func (s AnalyticsReadModelSnapshot) Freshness(target time.Duration) readmodels.Freshness {

@@ -44,7 +44,7 @@ func systemMetricsReadModel(ctx context.Context, svc SystemMetricsService) (*ana
 	}
 
 	readModel, err := readSvc.GetSystemMetricsReadModel(ctx)
-	if err == nil && readModel != nil && !freshnessExpired(readModel.Freshness, analytics.SystemMetricsSnapshotTargetFreshness) {
+	if err == nil && readModel != nil && freshnessWithinTargetAge(readModel.Freshness, analytics.SystemMetricsSnapshotTargetFreshness) {
 		return &readModel.Metrics, &readModel.Freshness, nil
 	}
 

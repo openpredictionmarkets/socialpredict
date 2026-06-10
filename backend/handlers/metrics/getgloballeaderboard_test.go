@@ -12,6 +12,7 @@ import (
 	analytics "socialpredict/internal/domain/analytics"
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
+	"socialpredict/internal/domain/readmodels"
 	"socialpredict/models/modelstesting"
 )
 
@@ -136,6 +137,66 @@ func TestGetGlobalLeaderboardHandler_RealServiceReturnsFreshness(t *testing.T) {
 	}
 	if payload.Result.Freshness.TransactionSafeRead {
 		t.Fatalf("leaderboard read model must not be transaction safe")
+	}
+	if payload.Result.Freshness.TargetFreshnessSeconds != int((15 * time.Minute).Seconds()) {
+		t.Fatalf("freshness target = %d, want 900", payload.Result.Freshness.TargetFreshnessSeconds)
+	}
+}
+
+type cachedGlobalLeaderboardService struct {
+	readModel    *analytics.GlobalLeaderboardReadModel
+	refreshCalls int
+}
+
+func (s *cachedGlobalLeaderboardService) ComputeGlobalLeaderboardSnapshot(context.Context) (*analytics.GlobalLeaderboardSnapshot, error) {
+	return &analytics.GlobalLeaderboardSnapshot{}, nil
+}
+
+func (s *cachedGlobalLeaderboardService) GetGlobalLeaderboardReadModel(context.Context, int, int) (*analytics.GlobalLeaderboardReadModel, error) {
+	return s.readModel, nil
+}
+
+func (s *cachedGlobalLeaderboardService) RefreshGlobalLeaderboardSnapshot(context.Context) (*analytics.GlobalLeaderboardReadModel, error) {
+	s.refreshCalls++
+	return &analytics.GlobalLeaderboardReadModel{
+		Entries: []analytics.GlobalUserProfitability{{Username: "refreshed", Rank: 1}},
+		Freshness: readmodels.NewFreshness(
+			time.Now().UTC(),
+			"read_model",
+			analytics.GlobalLeaderboardSnapshotTargetFreshness,
+			false,
+		),
+	}, nil
+}
+
+func TestGlobalLeaderboardReadModel_ServesStaleSnapshotUntilAgeExpires(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-5 * time.Minute)
+	svc := &cachedGlobalLeaderboardService{
+		readModel: &analytics.GlobalLeaderboardReadModel{
+			Entries: []analytics.GlobalUserProfitability{{Username: "cached", Rank: 1}},
+			Freshness: readmodels.NewStaleFreshness(
+				generatedAt,
+				"read_model",
+				analytics.GlobalLeaderboardSnapshotTargetFreshness,
+				false,
+				"bet_accepted",
+				nil,
+			),
+		},
+	}
+
+	entries, freshness, err := globalLeaderboardReadModel(context.Background(), svc, 20, 0)
+	if err != nil {
+		t.Fatalf("globalLeaderboardReadModel returned error: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Username != "cached" {
+		t.Fatalf("expected cached entry, got %+v", entries)
+	}
+	if freshness == nil || !freshness.IsStale {
+		t.Fatalf("expected stale freshness to be served, got %+v", freshness)
+	}
+	if svc.refreshCalls != 0 {
+		t.Fatalf("expected no refresh for stale-but-young snapshot, got %d", svc.refreshCalls)
 	}
 }
 
