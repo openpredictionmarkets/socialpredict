@@ -10,6 +10,7 @@ The boundary is intentionally portable. If the harness later needs independent v
 - `cli/OPERATING.md`: step-by-step operator/LLM runbook for staging load tests.
 - `STAGING_RUNBOOK.md`: focused kconfs.com staging test ladder and dossier workflow.
 - `TEMP_DROPLET_RUNBOOK.md`: end-to-end DigitalOcean temporary Droplet workflow for larger raw-IP capacity tests.
+- `NEXT_LARGE_HOST_TEST_PLAN_2026-06-10.md`: planned larger-host rerun and mixed website/API workload plan.
 - `k6/`: k6 API load-test scenarios.
 - `fixtures/`: generated or operator-provided users, credentials, and market IDs. Ignored by default.
 - `results/`: raw k6 outputs. Ignored by default.

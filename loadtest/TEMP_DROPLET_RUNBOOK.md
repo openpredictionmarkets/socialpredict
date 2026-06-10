@@ -350,6 +350,9 @@ Stop the ladder when the first degraded/failure result appears:
 - host CPU idle near `0%`
 - Postgres CPU dominating the host
 
+For the planned June 10 rerun and mixed browsing/trading workload, see
+`NEXT_LARGE_HOST_TEST_PLAN_2026-06-10.md`.
+
 ## 13. Run A Five-Minute Confirmation
 
 Use the highest clean discovery rate, or step down if the discovery run showed warning signs:
