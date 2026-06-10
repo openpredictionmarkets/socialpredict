@@ -17,6 +17,9 @@ This is a staging runbook, not a production proof. It assumes:
 
 Do not run heavy k6 tests from the same Droplet that runs the app and Postgres. Same-host tests consume the resources being measured.
 
+For larger one-off capacity tests on a separate raw-IP DigitalOcean Droplet, use
+`TEMP_DROPLET_RUNBOOK.md` instead of resizing staging.
+
 ## Safety Rules
 
 - Run these tests only against staging unless a separate temporary load-test host has been created.

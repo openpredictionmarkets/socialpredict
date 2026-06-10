@@ -9,6 +9,7 @@ The boundary is intentionally portable. If the harness later needs independent v
 - `cli/`: wrapper commands for running scenarios and generating dossier summaries.
 - `cli/OPERATING.md`: step-by-step operator/LLM runbook for staging load tests.
 - `STAGING_RUNBOOK.md`: focused kconfs.com staging test ladder and dossier workflow.
+- `TEMP_DROPLET_RUNBOOK.md`: end-to-end DigitalOcean temporary Droplet workflow for larger raw-IP capacity tests.
 - `k6/`: k6 API load-test scenarios.
 - `fixtures/`: generated or operator-provided users, credentials, and market IDs. Ignored by default.
 - `results/`: raw k6 outputs. Ignored by default.
@@ -50,24 +51,10 @@ Do not run capacity tests from the same droplet that hosts the app and database.
 ### Temporary Raw-IP Hosts
 
 For short-lived DigitalOcean capacity tests, prefer creating a temporary Droplet
-instead of permanently resizing staging. Install it as a production-style host
-with load-test limits and an HTTP-only raw-IP edge:
+instead of permanently resizing staging. Use:
 
-```bash
-./SocialPredict install \
-  -e production \
-  -d 45.55.227.1 \
-  -r loadtest \
-  --tls-mode http
-
-./SocialPredict up
-```
-
-Then run k6 from a separate load generator against `http://45.55.227.1`.
-Destroy the temporary Droplet after testing to avoid ongoing cost.
-
-For the exact OpenPredictionMarkets `doctl` + GitHub secrets + Ansible workflow
-smoke sequence, see `loadtest/cli/OPERATING.md`.
+- `TEMP_DROPLET_RUNBOOK.md` for the complete `doctl`, GitHub secrets, Ansible deploy, resize, seed, test, dossier, and destroy sequence.
+- `cli/OPERATING.md` for load-test CLI command reference and staging-oriented operations.
 
 ## Authentication Model
 
