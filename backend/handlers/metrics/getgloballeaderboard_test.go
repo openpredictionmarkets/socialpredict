@@ -95,7 +95,7 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var payload handlers.SuccessEnvelope[[]analytics.GlobalUserProfitability]
+	var payload handlers.SuccessEnvelope[GlobalLeaderboardResponse]
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
@@ -103,8 +103,39 @@ func TestGetGlobalLeaderboardHandler_Success(t *testing.T) {
 	if !payload.OK {
 		t.Fatalf("expected ok=true, got false")
 	}
-	if len(payload.Result) == 0 {
+	if len(payload.Result.Entries) == 0 {
 		t.Fatalf("expected non-empty leaderboard")
+	}
+}
+
+func TestGetGlobalLeaderboardHandler_RealServiceReturnsFreshness(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	_, _ = modelstesting.UseStandardTestEconomics(t)
+
+	user := modelstesting.GenerateUser("cached_leaderboard_user", 0)
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	handler := GetGlobalLeaderboardHandler(newAnalyticsService(t, db))
+	req := httptest.NewRequest(http.MethodGet, "/v0/global/leaderboard?limit=21&offset=0", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var payload handlers.SuccessEnvelope[GlobalLeaderboardResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Result.Freshness == nil {
+		t.Fatalf("expected leaderboard freshness in response: %+v", payload.Result)
+	}
+	if payload.Result.Freshness.TransactionSafeRead {
+		t.Fatalf("leaderboard read model must not be transaction safe")
 	}
 }
 
@@ -184,14 +215,17 @@ func TestGetGlobalLeaderboardHandler_PaginatesResult(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	var payload handlers.SuccessEnvelope[[]analytics.GlobalUserProfitability]
+	var payload handlers.SuccessEnvelope[GlobalLeaderboardResponse]
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if len(payload.Result) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(payload.Result))
+	if len(payload.Result.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(payload.Result.Entries))
 	}
-	if payload.Result[0].Username != "user3" || payload.Result[0].Rank != 3 {
-		t.Fatalf("expected first paged entry user3 rank 3, got %+v", payload.Result[0])
+	if payload.Result.Entries[0].Username != "user3" || payload.Result.Entries[0].Rank != 3 {
+		t.Fatalf("expected first paged entry user3 rank 3, got %+v", payload.Result.Entries[0])
+	}
+	if payload.Result.Freshness != nil {
+		t.Fatalf("stub compute fallback should not include freshness, got %+v", payload.Result.Freshness)
 	}
 }

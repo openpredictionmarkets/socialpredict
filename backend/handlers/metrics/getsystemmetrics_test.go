@@ -57,6 +57,9 @@ func TestGetSystemMetricsHandler_Success(t *testing.T) {
 	if payload.Result["moneyCreated"] == nil {
 		t.Fatalf("expected moneyCreated section in response: %+v", payload)
 	}
+	if payload.Result["freshness"] == nil {
+		t.Fatalf("expected freshness section in response: %+v", payload)
+	}
 }
 
 type failingAnalyticsRepo struct{}
