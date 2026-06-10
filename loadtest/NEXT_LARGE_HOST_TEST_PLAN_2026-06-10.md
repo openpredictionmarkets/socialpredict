@@ -189,6 +189,38 @@ Only attempt `300/sec for 5m` if `250/sec for 5m` is strict-clean and host telem
 
 Real users do not only place bets. They browse markets, refresh market pages, inspect positions, visit profile/user pages, view topic pages, and sometimes open statistics/leaderboards. A reasonable first model is at least `10` read actions for every `1` trade execution.
 
+The write-only hot-market burst is still useful because it isolates the transaction path. The mixed workload is a separate test because it answers a different question: "can the same host keep accepting trades while ordinary users are also clicking around the website?"
+
+### Test Types
+
+| Test type | Script | Purpose | Suggested rates | Duration | Endpoints covered | Pass signal |
+| --- | --- | --- | --- | --- | --- | --- |
+| Smoke | `loadtest/k6/smoke.js` | Prove deployment, fixtures, login, and one trade path work before capacity testing. | `3` total iterations | Under `1m` | `/health`, `/readyz`, `/ops/status`, `/v0/markets`, `/v0/markets/{id}`, `/v0/login`, `/v0/bet` | `0` failures, all checks pass |
+| Hot-market discovery ladder | `loadtest/k6/hot-market-burst.js` | Find the short-run write ceiling on a clean host. | `100`, `200`, `250`, `300` bets/sec | `1m` each | `/v0/login` during setup, `/v0/bet` during run, probes | no failed bets; no fixture mismatch |
+| Hot-market sustained confirmation | `loadtest/k6/hot-market-burst.js` | Confirm the strict clean write rate after the short ladder. | Start at `250` bets/sec; only try `300` if `250` is clean | `5m` | same as hot-market discovery | `0` failed bets, p95 preferably below `1s`, no dropped iterations |
+| Existing narrow baseline | `loadtest/k6/baseline.js` | Quick read/write sanity check using current simple browse traffic. | Example: `10` bets/sec + `20` browse/sec | `2m` | `/v0/markets`, `/v0/markets/{id}`, `/v0/bet`, probes | should pass before richer mixed test |
+| New site-mix low | `loadtest/k6/site-mix.js` | First realistic "click around while trading" API simulation. | `25` bets/sec + `250` reads/sec | `5m` | discovery, market detail, market tabs, profile/user, stats, config, trades | `0` failed bets; low read failure rate |
+| New site-mix medium | `loadtest/k6/site-mix.js` | Midpoint mixed workload after low passes. | `50` bets/sec + `500` reads/sec | `5m` | same as site-mix low | same, with p95 and CPU watched closely |
+| New site-mix high | `loadtest/k6/site-mix.js` | Stress mixed workload. | `100` bets/sec + `1000` reads/sec | `5m` | same as site-mix low | likely warning/fail if CPU or Postgres saturates |
+| Optional read-only storm | `loadtest/k6/site-mix.js` with writes disabled | Isolate read-model/page pressure without transaction writes. | `500`, `1000`, `2000` reads/sec | `2m` to `5m` | same read categories, no `/v0/bet` | helps separate read bottlenecks from write bottlenecks |
+
+### Endpoint Categories For Site-Mix
+
+The first mixed test should hit API endpoints directly rather than drive a browser. This is not a full React rendering test. It is a backend/API/database load test that approximates users clicking through the site.
+
+| User action being modeled | Endpoint family | Auth? | Suggested share of read traffic | Notes |
+| --- | --- | --- | ---: | --- |
+| App shell/config loads | `GET /v0/setup/frontend`, `GET /v0/content/home`, `GET /v0/content/social-share`, `GET /v0/market-tags` | Public | `5%` | Models app boot, CMS reads, and tag catalog reads. |
+| Main markets page | `GET /v0/read/market-discovery/markets?limit=21&offset=0`, `GET /v0/markets?status=active`, `GET /v0/markets/search?...` | Public | `20%` | Models `/markets`, status tabs, search, and infinite-scroll page reads. |
+| Topic/category pages | `GET /v0/read/market-discovery/{tagSlug}?limit=21&offset=0`, `GET /v0/content/market-discovery/{tagSlug}` | Public | `10%` | Models `/markets/topic/:slug` and pinned topic navigation. |
+| Market detail page | `GET /v0/markets/{id}`, `GET /v0/read/markets/{id}/summary` | Public | `25%` | Models individual market page loads and chart/summary widgets. |
+| Market tabs | `GET /v0/markets/bets/{id}?limit=21&offset=0`, `GET /v0/markets/positions/{id}?limit=21&offset=0`, `GET /v0/markets/{id}/leaderboard?limit=21&offset=0` | Public | `20%` | Models Bets, Positions, and Leaderboard tab clicks. Pagination should use `limit=21` to detect next page. |
+| User/profile pages | `GET /v0/userinfo/{username}`, `GET /v0/portfolio/{username}`, `GET /v0/users/{username}/owned-markets`, `GET /v0/read/users/{username}/financial-summary` | Mostly logged-in | `10%` | Models profile/user views. Use pre-authenticated users when endpoints require login. |
+| Stats pages | `GET /v0/system/metrics`, `GET /v0/global/leaderboard?limit=21&offset=0` | Public or logged-in depending CMS visibility | `5%` | If public reporting is disabled, run these with an auth token or exclude from public mix. |
+| Trade execution | `POST /v0/bet` | Logged-in | separate write rate | This remains authoritative transaction traffic and should never be cached. |
+
+The initial mix above totals `95%` for reads because the final `5%` should be kept as random jitter across the same categories. That prevents the script from becoming too deterministic.
+
 ### Browser Simulation Versus API Simulation
 
 There are two possible levels:
@@ -213,7 +245,13 @@ That is not enough to model real website navigation after the recent feature wor
 
 ### Scenario To Add Before Or During Tomorrow's Test
 
-Add a new k6 scenario, tentatively:
+The existing scripts are sufficient for:
+
+- deployment smoke testing
+- hot-market write-path capacity
+- narrow list/detail browsing
+
+They are not sufficient for the full mixed workload. Add a new k6 scenario, tentatively:
 
 ```text
 loadtest/k6/site-mix.js
@@ -226,19 +264,9 @@ Target behavior:
 - setup-time pre-auth for users where private/profile endpoints are included
 - random mix of public and logged-in reads
 
-Recommended first endpoint mix:
-
-| Category | Example endpoint family | Suggested share of read traffic |
-| --- | --- | ---: |
-| Market discovery | `/v0/read/market-discovery/markets`, `/v0/markets`, `/v0/markets?status=...` | `30%` |
-| Market detail | `/v0/markets/:id` and probability/history/detail read paths used by market pages | `25%` |
-| Topic pages | `/v0/read/market-discovery/topic/:slug` or equivalent topic route once confirmed | `10%` |
-| Market activity | paginated bets, positions, market leaderboard endpoints | `15%` |
-| User/profile views | public user, portfolio, owned markets, financial summaries where logged-in access is required | `10%` |
-| Stats/read models | global leaderboard/system stats only if visibility and auth permit | `5%` |
-| CMS/static config reads | frontend setup/config/content reads | `5%` |
-
 If an endpoint is not stable or not public, exclude it from the first version rather than blocking the test.
+
+The helper functions should live in `loadtest/k6/lib/common.js` so the same endpoint reads can be reused by `baseline`, `soak`, and future scenarios.
 
 ### Mixed Workload Ladder
 
@@ -320,7 +348,7 @@ Include:
 ## Open Implementation Tasks Before Mixed Test
 
 - [ ] Add `loadtest/k6/site-mix.js` or expand `baseline.js` to support a 10:1 read/write mix.
-- [ ] Confirm exact endpoint paths for topic discovery, paginated bets, paginated positions, global leaderboard, and user financial read models.
-- [ ] Decide whether private/logged-in reads should use pre-authenticated users from setup.
+- [x] Confirm exact endpoint paths for topic discovery, paginated bets, paginated positions, market leaderboard, global leaderboard, and user financial read models.
+- [ ] Use pre-authenticated users for private/logged-in read paths in `site-mix.js`.
 - [ ] Add CLI examples to `TEMP_DROPLET_RUNBOOK.md` after the mixed scenario exists.
 - [ ] Add dossier table fields for read throughput, write throughput, and combined HTTP request rate.
