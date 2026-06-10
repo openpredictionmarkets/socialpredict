@@ -208,18 +208,26 @@ The write-only hot-market burst is still useful because it isolates the transact
 
 The first mixed test should hit API endpoints directly rather than drive a browser. This is not a full React rendering test. It is a backend/API/database load test that approximates users clicking through the site.
 
-| User action being modeled | Endpoint family | Auth? | Suggested share of read traffic | Notes |
-| --- | --- | --- | ---: | --- |
-| App shell/config loads | `GET /v0/setup/frontend`, `GET /v0/content/home`, `GET /v0/content/social-share`, `GET /v0/market-tags` | Public | `5%` | Models app boot, CMS reads, and tag catalog reads. |
-| Main markets page | `GET /v0/read/market-discovery/markets?limit=21&offset=0`, `GET /v0/markets?status=active`, `GET /v0/markets/search?...` | Public | `20%` | Models `/markets`, status tabs, search, and infinite-scroll page reads. |
-| Topic/category pages | `GET /v0/read/market-discovery/{tagSlug}?limit=21&offset=0`, `GET /v0/content/market-discovery/{tagSlug}` | Public | `10%` | Models `/markets/topic/:slug` and pinned topic navigation. |
-| Market detail page | `GET /v0/markets/{id}`, `GET /v0/read/markets/{id}/summary` | Public | `25%` | Models individual market page loads and chart/summary widgets. |
-| Market tabs | `GET /v0/markets/bets/{id}?limit=21&offset=0`, `GET /v0/markets/positions/{id}?limit=21&offset=0`, `GET /v0/markets/{id}/leaderboard?limit=21&offset=0` | Public | `20%` | Models Bets, Positions, and Leaderboard tab clicks. Pagination should use `limit=21` to detect next page. |
-| User/profile pages | `GET /v0/userinfo/{username}`, `GET /v0/portfolio/{username}`, `GET /v0/users/{username}/owned-markets`, `GET /v0/read/users/{username}/financial-summary` | Mostly logged-in | `10%` | Models profile/user views. Use pre-authenticated users when endpoints require login. |
-| Stats pages | `GET /v0/system/metrics`, `GET /v0/global/leaderboard?limit=21&offset=0` | Public or logged-in depending CMS visibility | `5%` | If public reporting is disabled, run these with an auth token or exclude from public mix. |
-| Trade execution | `POST /v0/bet` | Logged-in | separate write rate | This remains authoritative transaction traffic and should never be cached. |
+For this application, browser static-asset pressure should be small after first load because the site is mostly text, CSS, JavaScript, and emoji rather than large image feeds. Treat cold browser/static traffic as an optional `<=5%` slice unless the goal is specifically testing first-visit asset delivery. The primary capacity signal should come from the API/database paths below.
 
-The initial mix above totals `95%` for reads because the final `5%` should be kept as random jitter across the same categories. That prevents the script from becoming too deterministic.
+Prefer public display/read-model endpoints when they exist. Do not intentionally hit raw recomputation endpoints during the normal site-mix test unless the purpose is to measure worst-case cache-miss behavior.
+
+| User action being modeled | Preferred display endpoint family | Cache/read-model posture in current API | Auth? | Suggested share of read traffic | Notes |
+| --- | --- | --- | --- | ---: | --- |
+| App shell/config loads | `GET /v0/setup/frontend`, `GET /v0/content/home`, `GET /v0/content/social-share`, `GET /v0/market-tags` | Lightweight config/CMS reads, not transaction paths | Public | `5%` | Models app boot, CMS reads, and tag catalog reads. This also approximates the small browser/static overhead bucket. |
+| Main markets page | `GET /v0/read/market-discovery/markets?limit=21&offset=0`, `GET /v0/read/market-discovery/markets?status=active&limit=21&offset=0` | Snapshot-backed discovery read model | Public | `20%` | Use `/v0/read/market-discovery/...` for normal page traffic. Avoid raw `/v0/markets` except in control tests. |
+| Topic/category pages | `GET /v0/read/market-discovery/{tagSlug}?limit=21&offset=0`, `GET /v0/read/market-discovery/{tagSlug}?status=active&limit=21&offset=0` | Snapshot-backed discovery read model with tag filtering | Public | `10%` | Models `/markets/topic/:slug` and persistent topic navigation. |
+| Market detail display widgets | `GET /v0/read/markets/{id}/summary` | Display read-model/accounting freshness path, target `1m` | Public | `20%` | Prefer this for card/widget/summary traffic. The full `/v0/markets/{id}` route is heavier and should be sampled separately. |
+| Full market page load | `GET /v0/markets/{id}` | Full live market detail path | Public | `5%` | Keep this smaller than summary reads because it is closer to the full detail contract/chart path. |
+| Market tabs: bets | `GET /v0/markets/bets/{id}?limit=21&offset=0` | Paginated live recent-activity path, intentionally not cached | Public | `7%` | Bets should remain fresh enough for users to see accepted trades. Keep paginated. |
+| Market tabs: positions | `GET /v0/markets/positions/{id}?limit=21&offset=0` | Paginated read-model snapshot when `limit/offset` are present, target `10m` | Public | `7%` | Always include pagination to stay on the read-model path. |
+| Market tabs: leaderboard | `GET /v0/markets/{id}/leaderboard?limit=21&offset=0` | Paginated read-model snapshot, target `10m` | Public | `6%` | Always include pagination to stay on the read-model path. |
+| User/profile pages | `GET /v0/userinfo/{username}`, `GET /v0/portfolio/{username}`, `GET /v0/users/{username}/owned-markets`, `GET /v0/read/users/{username}/financial-summary` | Mixed; financial summary is the display read model | Mostly logged-in | `10%` | Use pre-authenticated users where logged-in visibility is required. |
+| Stats pages | `GET /v0/system/metrics`, `GET /v0/global/leaderboard?limit=21&offset=0` | Important caveat: current public handlers call compute-style services even though snapshot support exists in the domain | Public or logged-in depending CMS visibility | `3%` | Keep low in site-mix until routes are switched to read-model getters or a separate stats-cache test is added. |
+| Optional cold browser/static overhead | frontend route HTML/JS/CSS via browser or HTTP asset fetches | Browser cache should make repeat traffic cheap | Public | `0-5%` | Only include if testing first-load behavior. It should not dominate SocialPredict capacity planning right now. |
+| Trade execution | `POST /v0/bet` | Authoritative transaction path, never cached | Logged-in | separate write rate | This remains the main write-pressure signal. |
+
+The normal read mix should total about `10` reads per `1` trade. Static/browser overhead can be modeled as part of the app shell/config slice or added separately at `<=5%` if we want a cold-visitor test.
 
 ### Browser Simulation Versus API Simulation
 
