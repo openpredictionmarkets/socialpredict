@@ -672,3 +672,132 @@ loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host-profile.json
 | Lower bound | `25/250` passed full `5m` | Clean: `7500` bets, `75000` reads, `0` failures, p95 `109.08ms`. |
 | Upper bound | `50/500` failed | Heavy bet failures, p95 `33.05s`, `34104` dropped iterations. |
 | Next midpoint | `35/350` | Run next to narrow the edge. |
+
+## User-Equivalent Interpretation For v3.4.0 Mixed Tests
+
+The mixed `site-mix` scenario has two different interpretations:
+
+- **Measured server load:** configured API action rate from k6.
+- **Human user equivalent:** estimated active users required to naturally generate that action rate under normal rate limits.
+
+Normal/model-office rate limits are intentionally conservative:
+
+```env
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
+RATE_LIMIT_GENERAL_BURST=10
+```
+
+The load-test profile is intentionally permissive so one k6 source can generate aggregate traffic. Therefore, the user counts below are estimates, not authentication counts. They are best read as **minimum client identities** and **active-user equivalents**.
+
+### Formulas
+
+```text
+total_actions_per_second = bets_per_second + reads_per_second
+minimum_client_identities = ceil(total_actions_per_second / 1 general action per second)
+active_users = total_actions_per_second / actions_per_second_per_active_user
+active_bettors = bets_per_second * seconds_between_bets_per_bettor
+```
+
+Important caveats:
+
+- A client identity is effectively a rate-limit identity, commonly an IP/client identity depending on deployment headers and proxy trust settings.
+- Many human users behind one NAT/proxy can share a limiter identity, so this is not always equal to unique users.
+- A real browser page can issue multiple API actions. The `site-mix` scenario intentionally models API action load, not browser tab count.
+- Public cached reads and authenticated betting both still consume backend/proxy capacity, even if they differ in business risk.
+
+### Clean 25/250 Result: User Equivalents
+
+The confirmed clean `v3.4.0` mixed result was:
+
+```text
+25 bets/sec + 250 reads/sec = 275 API actions/sec
+```
+
+Minimum normal-limit client identities:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `275` |
+| Active users at `1` action/sec each | `275` |
+| Active users at `1` action every `2s` | `550` |
+| Active users at `1` action every `5s` | `1375` |
+| Active users at `1` action every `10s` | `2750` |
+| Active users at `1` action every `30s` | `8250` |
+
+Betting-only equivalents for the same clean run:
+
+| Bettor behavior | Active bettor equivalent |
+| --- | ---: |
+| `1` bet/sec/bettor | `25` bettors |
+| `1` bet every `10s` | `250` bettors |
+| `1` bet every `30s` | `750` bettors |
+| `1` bet every `60s` | `1500` bettors |
+| `1` bet every `5m` | `7500` bettors |
+
+Read-only equivalents for the same clean run:
+
+| Reader behavior | Active reader equivalent |
+| --- | ---: |
+| `1` read/sec/reader | `250` readers |
+| `1` read every `2s` | `500` readers |
+| `1` read every `5s` | `1250` readers |
+| `1` read every `10s` | `2500` readers |
+| `1` read every `30s` | `7500` readers |
+
+Interpretation:
+
+- The clean `25/250` run is not only `25 users`. It is `275` API actions/sec.
+- Under normal per-client rate limits, it requires at least about `275` independent client identities if each identity consumes the full sustained allowance.
+- Under a more realistic active-user model of one API action every `5-10s`, the clean run corresponds to roughly `1375-2750` simultaneously active users generating the modeled site mix.
+- If the hot-market event is mostly users placing one bet per minute, the `25` bets/sec component corresponds to about `1500` active bettors in that minute, plus concurrent readers.
+
+### Failed 50/500 Bracket: User Equivalents
+
+The failed upper bracket attempted:
+
+```text
+50 bets/sec + 500 reads/sec = 550 API actions/sec
+```
+
+Minimum normal-limit client identities and user equivalents:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `550` |
+| Active users at `1` action/sec each | `550` |
+| Active users at `1` action every `2s` | `1100` |
+| Active users at `1` action every `5s` | `2750` |
+| Active users at `1` action every `10s` | `5500` |
+| Active users at `1` action every `30s` | `16500` |
+
+Because `50/500` failed, these are not supported capacity claims. They are the current failed upper-bound target for this single-host topology and current harness behavior.
+
+### Pending Midpoint: 35/350 User Equivalents
+
+The next midpoint being tested is:
+
+```text
+35 bets/sec + 350 reads/sec = 385 API actions/sec
+```
+
+If it passes cleanly, the user-equivalent table will be:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `385` |
+| Active users at `1` action/sec each | `385` |
+| Active users at `1` action every `2s` | `770` |
+| Active users at `1` action every `5s` | `1925` |
+| Active users at `1` action every `10s` | `3850` |
+| Active users at `1` action every `30s` | `11550` |
+
+Betting-only equivalents for `35` bets/sec:
+
+| Bettor behavior | Active bettor equivalent |
+| --- | ---: |
+| `1` bet every `10s` | `350` bettors |
+| `1` bet every `30s` | `1050` bettors |
+| `1` bet every `60s` | `2100` bettors |
+| `1` bet every `5m` | `10500` bettors |
+
+This section should be updated after the `35/350` run completes.
