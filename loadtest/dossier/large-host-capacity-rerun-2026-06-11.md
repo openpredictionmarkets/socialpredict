@@ -331,3 +331,125 @@ Next command:
 - Does cached-read traffic materially affect write-path p95 compared with hot-market-only runs?
 - At what mixed workload do Postgres or backend CPU become dominant?
 - Should separate control tests be added for raw full market detail and live bets table routes after cached-read runs complete?
+
+### Mixed Workload Pass: 10 Bets/sec Plus 50 Reads/sec
+
+After the higher `25` bets/sec plus `250` reads/sec mixed workload saturated the host, the mixed scenario was reduced to a smaller representative read/write baseline. This run completed cleanly.
+
+Command:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url http://159.65.37.166 \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 10 \
+  --browse-rate 50 \
+  --preauth-users 500 \
+  --setup-timeout 5m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@159.65.37.166 \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
+Scenario mix:
+
+| Scenario | Target | Duration | Notes |
+| --- | ---: | --- | --- |
+| Hot-market bets | `10/sec` | `5m` | Pre-authenticated users, hot-market-only writes. |
+| Site reads | `50/sec` | `5m` | Cached/read-model browsing paths only. |
+
+Read distribution for this run:
+
+| Share | Approx/sec at `50` reads/sec | Endpoint family |
+| ---: | ---: | --- |
+| `25%` | `12.5/sec` | `/v0/read/market-discovery/markets?...` |
+| `15%` | `7.5/sec` | `/v0/read/market-discovery/{tagSlug}?...` |
+| `43%` | `21.5/sec` | `/v0/read/markets/{id}/summary` |
+| `10%` | `5.0/sec` | `/v0/markets/positions/{id}?limit=21&offset=0` |
+| `7%` | `3.5/sec` | `/v0/markets/{id}/leaderboard?limit=21&offset=0` |
+
+Result:
+
+| Metric | Value |
+| --- | ---: |
+| Result | Pass |
+| Wall-clock runtime | `5m27.5s` including setup/graceful stop |
+| Measured scenario duration | `5m` |
+| Bets attempted | `3001` |
+| Bets succeeded | `3001` |
+| Failed bets | `0` |
+| Site reads attempted | `15001` |
+| Site reads succeeded | `15001` |
+| HTTP requests | `18506` |
+| HTTP failures | `0` |
+| HTTP request rate | `56.51/sec` |
+| HTTP p95 | `183.83ms` |
+| HTTP max | `364.47ms` |
+| Iteration p95 | `196.95ms` |
+| Dropped/interrupted iterations | `0` |
+| Max VUs observed | `13` |
+
+Endpoint check counts:
+
+| Check | Passes | Fails |
+| --- | ---: | ---: |
+| `bet returned 201` | `3001` | `0` |
+| `market discovery read model returned expected status` | `6050` | `0` |
+| `market summary read model returned expected status` | `6417` | `0` |
+| `market positions read model returned expected status` | `1503` | `0` |
+| `market leaderboard read model returned expected status` | `1031` | `0` |
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `41` |
+| Window | `2026-06-11T03:37:26Z` to `2026-06-11T03:42:53Z` |
+| Max CPU user | `25.35%` |
+| Max CPU system | `9.89%` |
+| Min CPU idle | `65.65%` |
+| Min RAM available | `30867 MiB` |
+| Max RAM used | `1228 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `38616 KiB/s` |
+| Max network RX | `66.34 KiB/s` |
+| Max network TX | `2291.69 KiB/s` |
+| Max Docker CPU sum | `298.01%` |
+| Max Docker RAM sum | `200.94 MiB` |
+| Max backend CPU | `200.21%` |
+| Max Postgres CPU | `89.66%` |
+| Max Traefik CPU | `11.34%` |
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T033720Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T033720Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T033720Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T033720Z-host-profile.json
+```
+
+Interpretation:
+
+- This is the first clean mixed read/write datapoint in the June 10/11 rerun sequence.
+- The host had substantial CPU and RAM headroom at this reduced mix.
+- Backend CPU was the largest app-side slice, while Postgres stayed under `90%` container CPU in the observed maximum sample.
+- This run is not a maximum-capacity claim. It is a stable mixed baseline after the higher `25` bets/sec plus `250` reads/sec attempt exposed read-path pressure.
+- The run was executed before the pure market-summary read-model fix that removes synchronous accounting refresh from `/v0/read/markets/{id}/summary`. After that fix is deployed, rerun this same command first, then ladder upward.
+
+## Current Interpretation After June 10/11 Mixed Runs
+
+- Pure hot-market betting still has a stronger clean datapoint from the earlier large-host experiment than the mixed workload has so far.
+- The mixed workload is more representative of real site behavior because it combines hot-market writes with market discovery, market summary cards, positions pages, and leaderboards.
+- The failed `25` bets/sec plus `250` reads/sec run should not be treated as final capacity evidence until the read-model fixes are deployed, because the market summary endpoint was still capable of synchronous accounting refresh.
+- The clean `10` bets/sec plus `50` reads/sec run is the current mixed baseline for this host and code version.
+
+Recommended next sequence after deploying the pure market-summary read-model fix:
+
+1. Rerun `10` bets/sec plus `50` reads/sec for `5m` as a regression baseline.
+2. Try `15` bets/sec plus `100` reads/sec for `5m`.
+3. Try `20` bets/sec plus `150` reads/sec for `5m` if the previous run is clean.
+4. Only retry `25` bets/sec plus `250` reads/sec after the intermediate runs are clean.
+5. Keep global reporting and user financial summaries out of the default site mix until those paths have explicit warmup/default-snapshot behavior and separate tests.
