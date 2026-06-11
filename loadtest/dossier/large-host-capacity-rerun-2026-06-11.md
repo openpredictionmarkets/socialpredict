@@ -601,3 +601,74 @@ loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-profile.json
 | Next midpoint after full lower confirmation | `35/350` | Run only after full `25/250` completes cleanly. |
 
 The next completed evidence point should be a full five-minute `25/250` run. If clean, run `35/350` next rather than returning to `50/500`.
+
+### Confirmed Pass: 25 Bets/sec Plus 250 Reads/sec
+
+A full `25` bets/sec plus `250` reads/sec confirmation run started at `2026-06-11T04:18:13Z` and completed the five-minute scenario cleanly.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `25` bets/sec + `250` reads/sec |
+| Result | Pass |
+| Scenario duration | `5m` |
+| Wall-clock runtime | `6m24.6s` including setup/graceful stop |
+| Bets attempted | `7500` |
+| Bets succeeded | `7500` |
+| Failed bets | `0` |
+| Site reads attempted | `75000` |
+| Site reads succeeded | `75000` |
+| Site reads failed | `0` |
+| HTTP requests | `84004` |
+| HTTP failures | `0` |
+| HTTP p95 | `109.08ms` |
+| HTTP max | `402.17ms` |
+| Iteration p95 | `121.65ms` |
+| Dropped/interrupted iterations | `0` |
+| Max VUs observed | `34` |
+
+Important interpretation note: k6 custom metric rates include setup and teardown wall time, so `sp_bets_succeeded` reports `19.50/sec` and `sp_site_reads_succeeded` reports `195.03/sec`. The scenario counts confirm the configured rate over the measured five-minute phase: `7500 / 300s = 25` bets/sec and `75000 / 300s = 250` reads/sec.
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `47` |
+| Window | `2026-06-11T04:18:19Z` to `2026-06-11T04:24:35Z` |
+| Max CPU user | `11.52%` |
+| Max CPU system | `31.5%` |
+| Min CPU idle | `56.98%` |
+| Min RAM available | `30824 MiB` |
+| Max RAM used | `1271 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `48864 KiB/s` |
+| Max network RX | `132.35 KiB/s` |
+| Max network TX | `2156.83 KiB/s` |
+| Max Docker CPU sum | `291.16%` |
+| Max Docker RAM sum | `314.44 MiB` |
+| Max backend CPU | `75.44%` |
+| Max Postgres CPU | `57.61%` |
+| Max Traefik CPU | `28.35%` |
+
+Interpretation:
+
+- `25/250` is now a confirmed clean `v3.4.0` mixed workload datapoint on this host.
+- The host still had substantial CPU and RAM headroom.
+- This establishes a solid lower bound below the failed `50/500` upper bracket.
+- The next edge-finding run should be `35/350`, not another `25/250` and not another `50/500`.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T041813Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host-profile.json
+```
+
+### Updated v3.4.0 Bracket After Full 25/250 Pass
+
+| Bound | Status | Evidence |
+| --- | --- | --- |
+| Lower bound | `25/250` passed full `5m` | Clean: `7500` bets, `75000` reads, `0` failures, p95 `109.08ms`. |
+| Upper bound | `50/500` failed | Heavy bet failures, p95 `33.05s`, `34104` dropped iterations. |
+| Next midpoint | `35/350` | Run next to narrow the edge. |
