@@ -696,6 +696,7 @@ total_actions_per_second = bets_per_second + reads_per_second
 minimum_client_identities = ceil(total_actions_per_second / 1 general action per second)
 active_users = total_actions_per_second / actions_per_second_per_active_user
 active_bettors = bets_per_second * seconds_between_bets_per_bettor
+hot_window_bettors = bets_per_second * hot_window_seconds
 ```
 
 Important caveats:
@@ -704,6 +705,35 @@ Important caveats:
 - Many human users behind one NAT/proxy can share a limiter identity, so this is not always equal to unique users.
 - A real browser page can issue multiple API actions. The `site-mix` scenario intentionally models API action load, not browser tab count.
 - Public cached reads and authenticated betting both still consume backend/proxy capacity, even if they differ in business risk.
+- k6 `--preauth-users` is a fixture credential pool. It is not the same as the number of concurrently active human users. The clean full `25/250` run used a larger authenticated fixture pool but only needed `34` max observed VUs to deliver the target arrival rate.
+
+### Actual Measured Throughput To User Equivalents
+
+| Run | Status | Fixture auth pool | Max observed VUs | Measured/target bets/sec | Measured/target reads/sec | Modeled API actions/sec | Minimum normal-limit client identities | Active users at `1` action every `5s` | Active users at `1` action every `10s` |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `25/250`, full `5m`, `v3.4.0` | Pass | `1500` | `34` | `25` actual | `250` actual | `275` | `275` | `1375` | `2750` |
+| `50/500`, aborted `v3.4.0` | Failed upper bracket | `2000` | `2000` ceiling hit | `50` target, not sustained | `500` target, not sustained | `550` target | `550` target only | `2750` target only | `5500` target only |
+| `35/350`, midpoint | Pending | `2000` planned | TBD | `35` target | `350` target | `385` | `385` | `1925` | `3850` |
+
+Interpretation:
+
+- The clean evidence-backed claim is currently `275` modeled API actions/sec for five minutes on this host and release.
+- Under the normal sustained `1` general API action/sec/client-identity policy, that is equivalent to at least `275` independent client identities if every identity is fully active.
+- Under a more human browsing model of one API action every `5-10s`, the same clean run corresponds to roughly `1375-2750` simultaneously active users.
+- The failed `50/500` row is intentionally labeled as a target-only upper bracket. It should not be used as capacity until a clean five-minute pass exists.
+
+### Hot-Window Platform User Interpretation
+
+This table translates betting rate into the number of humans who place one bet during a one-minute hot market window. It ignores read traffic, so it should be read alongside the mixed API-action table above.
+
+| Betting rate | Bettors in `1m` | Share of `10,000` users | Share of `30,000` users | Share of `50,000` users | Evidence status |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| `25` bets/sec | `1500` bettors | `15%` | `5%` | `3%` | Clean full `25/250` mixed pass. |
+| `35` bets/sec | `2100` bettors | `21%` | `7%` | `4.2%` | Current midpoint target. |
+| `50` bets/sec | `3000` bettors | `30%` | `10%` | `6%` | Failed as part of `50/500`; not supported yet. |
+| `100` bets/sec | `6000` bettors | `60%` | `20%` | `12%` | Clean pure hot-market `1m` baseline only; not a mixed five-minute proof. |
+
+The practical read is that the current clean mixed evidence supports a very active `10,000` user event if about `15%` of users place one bet in the same minute, or a broader `30,000-50,000` user event if `3-5%` of the platform is actively betting in that hot minute while other users are browsing cached read paths.
 
 ### Clean 25/250 Result: User Equivalents
 
