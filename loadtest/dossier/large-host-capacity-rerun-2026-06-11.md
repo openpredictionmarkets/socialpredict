@@ -172,12 +172,13 @@ Default read distribution at `250` reads/sec:
 | ---: | ---: | --- |
 | `25%` | `62.5/sec` | `/v0/read/market-discovery/markets?...` |
 | `15%` | `37.5/sec` | `/v0/read/market-discovery/{tagSlug}?...` |
-| `38%` | `95/sec` | `/v0/read/markets/{id}/summary` |
+| `43%` | `107.5/sec` | `/v0/read/markets/{id}/summary` |
 | `10%` | `25/sec` | `/v0/markets/positions/{id}?limit=21&offset=0` |
 | `7%` | `17.5/sec` | `/v0/markets/{id}/leaderboard?limit=21&offset=0` |
-| `5%` | `12.5/sec` | `/v0/system/metrics`, `/v0/global/leaderboard?limit=21&offset=0` |
 
-The default mixed run intentionally excludes the raw full market detail route, the live bets table route, and user financial summaries. Those should be measured separately as control or worst-case paths after the harness can warm the relevant snapshots.
+The default mixed run intentionally excludes the raw full market detail route, the live bets table route, global reporting endpoints, and user financial summaries. Those should be measured separately as control or worst-case paths after the harness can warm the relevant snapshots.
+
+Market positions and market leaderboard requests use cached snapshots only when pagination parameters are present. They may still refresh synchronously when stale, but the work is market-scoped. Global reporting endpoints are excluded because active betting marks analytics snapshots stale, which can cause synchronous global recomputation on read.
 
 ### Aborted Setup Attempt
 
@@ -238,7 +239,11 @@ loadtest/hostops/site-mix-loadtest-basic-amd-20260611T030934Z-host-profile.json
 
 Harness adjustment: user financial summaries were removed from the default `site-mix` distribution. They should be added back only after a snapshot warmup command exists or the endpoint returns a safe zero/default read model for existing users without snapshots.
 
-Next command:
+### Mixed Workload Failure: 25 Bets/sec Plus 250 Reads/sec
+
+A third `site-mix` attempt started at `2026-06-11T03:13:46Z` after user financial summaries were removed from the default mix. This run reached the measured scenario but was manually interrupted after the host saturated and k6 began reporting request timeouts.
+
+Command:
 
 ```bash
 ./loadtest/cli/loadtest run site-mix \
@@ -255,9 +260,74 @@ Next command:
   --monitor-interval 5
 ```
 
+Observed result:
+
+| Metric | Value |
+| --- | ---: |
+| Result | Interrupted failure signal |
+| Checks passed | `98.46%` |
+| HTTP failure rate | `1.84%` |
+| Bets attempted | `1530` |
+| Bets succeeded | `856` |
+| Site reads attempted | `8606` |
+| Site reads succeeded | `7417` |
+| Site reads failed | `192` |
+| HTTP p95 | `10.67s` |
+| Iteration p95 | `13.71s` |
+| Dropped iterations | `13034` |
+| Max active VUs | `1675` |
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Max CPU user | `75.84%` |
+| Max CPU system | `26.39%` |
+| Min CPU idle | `1.34%` |
+| Max Docker CPU sum | `775.15%` |
+| Max backend CPU | `362.8%` |
+| Max Postgres CPU | `400.02%` |
+| Min RAM available | `29952 MiB` |
+
+Interpretation:
+
+- This was not RAM-bound.
+- The host was effectively CPU-bound across backend/Postgres.
+- The reporting slice distorted the default browsing mix because global reporting snapshots can refresh synchronously when stale.
+- Global reporting should be tested as a separate control until it is changed to stale-while-revalidate.
+- This run should not be used as the final mixed-workload capacity ceiling; rerun a lower mix without reporting endpoints first.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T031346Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T031346Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T031346Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T031346Z-host-profile.json
+```
+
+Harness adjustment: global reporting endpoints were removed from the default `site-mix` distribution and the next mixed run was reduced to `10` bets/sec plus `50` reads/sec.
+
+Next command:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url http://159.65.37.166 \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 10 \
+  --browse-rate 50 \
+  --preauth-users 500 \
+  --setup-timeout 5m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@159.65.37.166 \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
 ## Open Questions
 
-- Does `25` bets/sec plus `250` cached reads/sec stay clean for `5m`?
+- Does `10` bets/sec plus `50` cached reads/sec stay clean for `5m` after reporting endpoints are removed?
 - Does cached-read traffic materially affect write-path p95 compared with hot-market-only runs?
 - At what mixed workload do Postgres or backend CPU become dominant?
 - Should separate control tests be added for raw full market detail and live bets table routes after cached-read runs complete?

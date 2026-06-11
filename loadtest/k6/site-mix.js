@@ -10,15 +10,14 @@ import {
   readMarketLeaderboardPage,
   readMarketPositionsPage,
   readMarketSummary,
-  readStatsDisplay,
   requireFixtures,
   secureRandomFraction,
 } from './lib/common.js';
 
 const duration = __ENV.DURATION || '5m';
-const browseRate = Number(__ENV.BROWSE_RATE || '250');
+const browseRate = Number(__ENV.BROWSE_RATE || '50');
 const browseTimeUnit = __ENV.BROWSE_TIME_UNIT || '1s';
-const betRate = Number(__ENV.BET_RATE || '25');
+const betRate = Number(__ENV.BET_RATE || '10');
 const betTimeUnit = __ENV.BET_TIME_UNIT || '1s';
 const preauthUsers = Number(__ENV.PREAUTH_USERS || '500');
 const setupTimeout = __ENV.SETUP_TIMEOUT || '10m';
@@ -70,14 +69,12 @@ export function siteRead(data) {
   } else if (roll < 0.40) {
     const slug = tagSlug || 'markets';
     readMarketDiscovery({ slug, status: 'active', tagSlug });
-  } else if (roll < 0.78) {
+  } else if (roll < 0.83) {
     readMarketSummary(market);
-  } else if (roll < 0.88) {
+  } else if (roll < 0.93) {
     readMarketPositionsPage(market);
-  } else if (roll < 0.95) {
-    readMarketLeaderboardPage(market);
   } else {
-    readStatsDisplay(data.authenticatedUsers);
+    readMarketLeaderboardPage(market);
   }
 
   sleep(0.01);
