@@ -184,6 +184,58 @@ func TestMarketLeaderboardHandler_UsesSnapshotFreshnessWhenAvailable(t *testing.
 	}
 }
 
+func TestMarketLeaderboardHandler_ServesStaleSnapshotWithoutRefresh(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-2 * dmarkets.MarketLeaderboardSnapshotTargetFreshness)
+	svc := &readModelLeaderboardServiceMock{
+		MockService: MockService{
+			MarketLeaderboardFn: func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+				t.Fatalf("raw leaderboard calculator should not be used when stale snapshot is available")
+				return nil, nil
+			},
+		},
+		ReadModelFn: func(ctx context.Context, marketID int64, p dmarkets.Page) (*dmarkets.MarketLeaderboardSnapshot, error) {
+			return &dmarkets.MarketLeaderboardSnapshot{
+				MarketID:    marketID,
+				GeneratedAt: generatedAt,
+				Source:      "read_model",
+				IsStale:     true,
+				StaleReason: "bet_accepted",
+				Rows: []*dmarkets.LeaderboardRow{{
+					Username: "stale_snapshot_alice",
+					Rank:     1,
+				}},
+			}, nil
+		},
+		RefreshFn: func(ctx context.Context, marketID int64) (*dmarkets.MarketLeaderboardSnapshot, error) {
+			t.Fatalf("stale leaderboard snapshot should not refresh on read")
+			return nil, nil
+		},
+	}
+
+	handler := NewHandler(svc, nil, security.NewSecurityService())
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/77/leaderboard?limit=25", nil)
+	rr := httptest.NewRecorder()
+	router := mux.NewRouter()
+	router.HandleFunc("/v0/markets/{id}/leaderboard", handler.MarketLeaderboard)
+
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+
+	var resp handlers.SuccessEnvelope[dto.LeaderboardResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(resp.Result.Leaderboard) != 1 || resp.Result.Leaderboard[0].Username != "stale_snapshot_alice" {
+		t.Fatalf("unexpected leaderboard payload: %+v", resp.Result.Leaderboard)
+	}
+	if resp.Result.Freshness == nil || !resp.Result.Freshness.IsStale {
+		t.Fatalf("expected stale freshness metadata, got %+v", resp.Result.Freshness)
+	}
+}
+
 func TestMarketLeaderboardHandler_FailureEnvelope(t *testing.T) {
 	svc := &MockService{}
 	svc.MarketLeaderboardFn = func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {

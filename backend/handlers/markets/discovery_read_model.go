@@ -214,6 +214,17 @@ func (h *MarketDiscoveryReadModelHandler) pinnedMarketResponses(ctx context.Cont
 		if pin.PinType != marketdiscovery.PinTypeMarket || pin.MarketID <= 0 {
 			continue
 		}
+		if summaryProvider, ok := h.markets.(marketSummaryProvider); ok {
+			summary, err := summaryProvider.GetMarketSummaryReadModel(ctx, pin.MarketID)
+			if err != nil {
+				return nil, fmt.Errorf("pinned market %d: %w", pin.MarketID, err)
+			}
+			responses = append(responses, pinnedMarketResponse{
+				Pin:     pin,
+				Details: marketSummaryToDetailsResponse(summary),
+			})
+			continue
+		}
 		details, err := h.markets.GetMarketDetails(ctx, pin.MarketID)
 		if err != nil {
 			return nil, fmt.Errorf("pinned market %d: %w", pin.MarketID, err)
@@ -227,7 +238,7 @@ func (h *MarketDiscoveryReadModelHandler) pinnedMarketResponses(ctx context.Cont
 }
 
 func (h *MarketDiscoveryReadModelHandler) snapshotUsable(snapshot *readmodelrepo.Snapshot) bool {
-	if snapshot == nil || snapshot.IsStale || snapshot.PayloadJSON == "" {
+	if snapshot == nil || snapshot.PayloadJSON == "" {
 		return false
 	}
 	return h.now().Sub(snapshot.GeneratedAt) <= marketDiscoverySnapshotTargetFreshness

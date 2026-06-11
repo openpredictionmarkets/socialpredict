@@ -12,6 +12,8 @@ type MockService struct {
 	ListByStatusFn      func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
 	ListLifecycleFn     func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
 	MarketLeaderboardFn func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
+	MarketSummaryFn     func(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
+	DetailsCalls        int
 }
 
 func (m *MockService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
@@ -88,6 +90,7 @@ func (m *MockService) ProjectProbability(ctx context.Context, req dmarkets.Proba
 }
 
 func (m *MockService) GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error) {
+	m.DetailsCalls += 1
 	now := time.Now()
 
 	market := &dmarkets.Market{
@@ -122,6 +125,39 @@ func (m *MockService) GetMarketDetails(ctx context.Context, marketID int64) (*dm
 		NumUsers:           numUsers,
 		TotalVolume:        totalVolume,
 		MarketDust:         marketDust,
+	}, nil
+}
+
+func (m *MockService) GetMarketSummaryReadModel(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error) {
+	if m.MarketSummaryFn != nil {
+		return m.MarketSummaryFn(ctx, marketID)
+	}
+	now := time.Now()
+	return &dmarkets.MarketSummaryReadModel{
+		Market: &dmarkets.Market{
+			ID:                 marketID,
+			QuestionTitle:      "Test Market",
+			Description:        "Test market description",
+			OutcomeType:        "BINARY",
+			ResolutionDateTime: now.Add(24 * time.Hour),
+			CreatorUsername:    "testuser",
+			YesLabel:           "YES",
+			NoLabel:            "NO",
+			Status:             "active",
+			CreatedAt:          now,
+			UpdatedAt:          now,
+		},
+		Creator: &dmarkets.CreatorSummary{Username: "testuser"},
+		Accounting: dmarkets.MarketAccountingSnapshot{
+			MarketID:           marketID,
+			GeneratedAt:        now,
+			ProbabilityChanges: []dmarkets.ProbabilityPoint{},
+			LastProbability:    0.5,
+			UserCount:          3,
+			VolumeWithDust:     1000,
+			MarketDust:         50,
+			Source:             "read_model",
+		},
 	}, nil
 }
 
