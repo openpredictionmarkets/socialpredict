@@ -592,7 +592,7 @@ loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-summary.json
 loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-profile.json
 ```
 
-### Current v3.4.0 Bracket
+### Interim v3.4.0 Bracket After Failed 50/500
 
 | Bound | Status | Evidence |
 | --- | --- | --- |
@@ -600,7 +600,7 @@ loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-profile.json
 | Upper bound | `50/500` failed | Too aggressive under current harness/system behavior. |
 | Next midpoint after full lower confirmation | `35/350` | Run only after full `25/250` completes cleanly. |
 
-The next completed evidence point should be a full five-minute `25/250` run. If clean, run `35/350` next rather than returning to `50/500`.
+This was the interim bracket immediately after the failed `50/500` attempt. Later sections record the completed `25/250` and `35/350` passes.
 
 ### Confirmed Pass: 25 Bets/sec Plus 250 Reads/sec
 
@@ -665,13 +665,77 @@ loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host-summary.json
 loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host-profile.json
 ```
 
-### Updated v3.4.0 Bracket After Full 25/250 Pass
+### Confirmed Pass: 35 Bets/sec Plus 350 Reads/sec
+
+A full `35` bets/sec plus `350` reads/sec midpoint run started at `2026-06-11T04:26:37Z` and completed the five-minute scenario cleanly.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `35` bets/sec + `350` reads/sec |
+| Result | Pass |
+| Scenario duration | `5m` |
+| Wall-clock runtime | `6m53.0s` including setup/graceful stop |
+| Bets attempted | `10501` |
+| Bets succeeded | `10501` |
+| Failed bets | `0` |
+| Site reads attempted | `105000` |
+| Site reads succeeded | `105000` |
+| Site reads failed | `0` |
+| HTTP requests | `117505` |
+| HTTP failures | `0` |
+| HTTP p95 | `112.84ms` |
+| HTTP max | `249.85ms` |
+| Iteration p95 | `125.38ms` |
+| Dropped/interrupted iterations | `0` |
+| Max VUs observed | `51` |
+
+Important interpretation note: k6 custom metric rates include setup and teardown wall time, so `sp_bets_succeeded` reports `25.43/sec` and `sp_site_reads_succeeded` reports `254.25/sec`. The scenario counts confirm the configured rate over the measured five-minute phase: `10501 / 300s ~= 35` bets/sec and `105000 / 300s = 350` reads/sec.
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `51` |
+| Window | `2026-06-11T04:26:43Z` to `2026-06-11T04:33:32Z` |
+| Max CPU user | `17.83%` |
+| Max CPU system | `43.88%` |
+| Min CPU idle | `40.94%` |
+| Min RAM available | `31019 MiB` |
+| Max RAM used | `1076 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `40760 KiB/s` |
+| Max network RX | `185.54 KiB/s` |
+| Max network TX | `3002.83 KiB/s` |
+| Max Docker CPU sum | `414.72%` |
+| Max Docker RAM sum | `212.31 MiB` |
+| Max backend CPU | `100.81%` |
+| Max Postgres CPU | `58.1%` |
+| Max Traefik CPU | `40.25%` |
+
+Interpretation:
+
+- `35/350` is now a confirmed clean `v3.4.0` mixed workload datapoint on this host.
+- Latency stayed tight: HTTP p95 remained near `113ms` with zero HTTP failures.
+- Host CPU and RAM still had room, so `35/350` is not the observed edge.
+- The next edge-finding run should test between clean `35/350` and failed `50/500`. A direct midpoint is `42/420`; a more conservative next step is `40/400`.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T042637Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T042637Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T042637Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T042637Z-host-profile.json
+```
+
+### Updated v3.4.0 Bracket After Full 35/350 Pass
 
 | Bound | Status | Evidence |
 | --- | --- | --- |
-| Lower bound | `25/250` passed full `5m` | Clean: `7500` bets, `75000` reads, `0` failures, p95 `109.08ms`. |
+| Lower bound | `35/350` passed full `5m` | Clean: `10501` bets, `105000` reads, `0` failures, p95 `112.84ms`. |
 | Upper bound | `50/500` failed | Heavy bet failures, p95 `33.05s`, `34104` dropped iterations. |
-| Next midpoint | `35/350` | Run next to narrow the edge. |
+| Next midpoint | `42/420` | Direct midpoint between clean `35/350` and failed `50/500`. |
+| Conservative next step | `40/400` | Smaller step if the operator wants less risk of another hard failure. |
 
 ## User-Equivalent Interpretation For v3.4.0 Mixed Tests
 
@@ -712,14 +776,15 @@ Important caveats:
 | Run | Status | Fixture auth pool | Max observed VUs | Measured/target bets/sec | Measured/target reads/sec | Modeled API actions/sec | Minimum normal-limit client identities | Active users at `1` action every `5s` | Active users at `1` action every `10s` |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `25/250`, full `5m`, `v3.4.0` | Pass | `1500` | `34` | `25` actual | `250` actual | `275` | `275` | `1375` | `2750` |
+| `35/350`, full `5m`, `v3.4.0` | Pass | `2000` | `51` | `35` actual | `350` actual | `385` | `385` | `1925` | `3850` |
 | `50/500`, aborted `v3.4.0` | Failed upper bracket | `2000` | `2000` ceiling hit | `50` target, not sustained | `500` target, not sustained | `550` target | `550` target only | `2750` target only | `5500` target only |
-| `35/350`, midpoint | Pending | `2000` planned | TBD | `35` target | `350` target | `385` | `385` | `1925` | `3850` |
+| `42/420`, next midpoint | Pending | `2000` planned | TBD | `42` target | `420` target | `462` | `462` | `2310` | `4620` |
 
 Interpretation:
 
-- The clean evidence-backed claim is currently `275` modeled API actions/sec for five minutes on this host and release.
-- Under the normal sustained `1` general API action/sec/client-identity policy, that is equivalent to at least `275` independent client identities if every identity is fully active.
-- Under a more human browsing model of one API action every `5-10s`, the same clean run corresponds to roughly `1375-2750` simultaneously active users.
+- The clean evidence-backed claim is currently `385` modeled API actions/sec for five minutes on this host and release.
+- Under the normal sustained `1` general API action/sec/client-identity policy, that is equivalent to at least `385` independent client identities if every identity is fully active.
+- Under a more human browsing model of one API action every `5-10s`, the same clean run corresponds to roughly `1925-3850` simultaneously active users.
 - The failed `50/500` row is intentionally labeled as a target-only upper bracket. It should not be used as capacity until a clean five-minute pass exists.
 
 ### Hot-Window Platform User Interpretation
@@ -729,11 +794,12 @@ This table translates betting rate into the number of humans who place one bet d
 | Betting rate | Bettors in `1m` | Share of `10,000` users | Share of `30,000` users | Share of `50,000` users | Evidence status |
 | ---: | ---: | ---: | ---: | ---: | --- |
 | `25` bets/sec | `1500` bettors | `15%` | `5%` | `3%` | Clean full `25/250` mixed pass. |
-| `35` bets/sec | `2100` bettors | `21%` | `7%` | `4.2%` | Current midpoint target. |
+| `35` bets/sec | `2100` bettors | `21%` | `7%` | `4.2%` | Clean full `35/350` mixed pass. |
+| `42` bets/sec | `2520` bettors | `25.2%` | `8.4%` | `5.04%` | Next midpoint target. |
 | `50` bets/sec | `3000` bettors | `30%` | `10%` | `6%` | Failed as part of `50/500`; not supported yet. |
 | `100` bets/sec | `6000` bettors | `60%` | `20%` | `12%` | Clean pure hot-market `1m` baseline only; not a mixed five-minute proof. |
 
-The practical read is that the current clean mixed evidence supports a very active `10,000` user event if about `15%` of users place one bet in the same minute, or a broader `30,000-50,000` user event if `3-5%` of the platform is actively betting in that hot minute while other users are browsing cached read paths.
+The practical read is that the current clean mixed evidence supports a very active `10,000` user event if about `21%` of users place one bet in the same minute, or a broader `30,000-50,000` user event if `4.2-7%` of the platform is actively betting in that hot minute while other users are browsing cached read paths.
 
 ### Clean 25/250 Result: User Equivalents
 
@@ -802,15 +868,15 @@ Minimum normal-limit client identities and user equivalents:
 
 Because `50/500` failed, these are not supported capacity claims. They are the current failed upper-bound target for this single-host topology and current harness behavior.
 
-### Pending Midpoint: 35/350 User Equivalents
+### Clean 35/350 Result: User Equivalents
 
-The next midpoint being tested is:
+The confirmed clean `v3.4.0` mixed result was:
 
 ```text
 35 bets/sec + 350 reads/sec = 385 API actions/sec
 ```
 
-If it passes cleanly, the user-equivalent table will be:
+Minimum normal-limit client identities and user equivalents:
 
 | Assumption | Required identities/users |
 | --- | ---: |
@@ -830,4 +896,30 @@ Betting-only equivalents for `35` bets/sec:
 | `1` bet every `60s` | `2100` bettors |
 | `1` bet every `5m` | `10500` bettors |
 
-This section should be updated after the `35/350` run completes.
+### Next Midpoint Target: 42/420 User Equivalents
+
+The next direct midpoint target is:
+
+```text
+42 bets/sec + 420 reads/sec = 462 API actions/sec
+```
+
+If it passes cleanly, the user-equivalent table will be:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `462` |
+| Active users at `1` action/sec each | `462` |
+| Active users at `1` action every `2s` | `924` |
+| Active users at `1` action every `5s` | `2310` |
+| Active users at `1` action every `10s` | `4620` |
+| Active users at `1` action every `30s` | `13860` |
+
+Betting-only equivalents for `42` bets/sec:
+
+| Bettor behavior | Active bettor equivalent |
+| --- | ---: |
+| `1` bet every `10s` | `420` bettors |
+| `1` bet every `30s` | `1260` bettors |
+| `1` bet every `60s` | `2520` bettors |
+| `1` bet every `5m` | `12600` bettors |
