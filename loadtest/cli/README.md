@@ -176,8 +176,7 @@ The default first ratio is `10` read actions for each `1` bet action:
 
 | Read family | Endpoint pattern | Default read share |
 | --- | --- | ---: |
-| Config/CMS | `/v0/setup/frontend`, `/v0/content/home`, `/v0/content/social-share`, `/v0/market-tags` | `5%` |
-| Main market discovery | `/v0/read/market-discovery/markets?...` | `20%` |
+| Main market discovery | `/v0/read/market-discovery/markets?...` | `25%` |
 | Topic discovery | `/v0/read/market-discovery/{tagSlug}?...` | `15%` |
 | Market summary widgets | `/v0/read/markets/{id}/summary` | `30%` |
 | Market positions | `/v0/markets/positions/{id}?limit=21&offset=0` | `10%` |

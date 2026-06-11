@@ -6,7 +6,6 @@ import {
   pickTagSlug,
   placeBet,
   preAuthenticateUsers,
-  readConfigDisplay,
   readMarketDiscovery,
   readMarketLeaderboardPage,
   readMarketPositionsPage,
@@ -67,9 +66,7 @@ export function siteRead(data) {
   const market = pickMarket();
   const tagSlug = pickTagSlug(data.tagSlugs);
 
-  if (roll < 0.05) {
-    readConfigDisplay();
-  } else if (roll < 0.25) {
+  if (roll < 0.25) {
     readMarketDiscovery({ slug: 'markets', status: secureRandomFraction() < 0.8 ? 'active' : 'all' });
   } else if (roll < 0.40) {
     const slug = tagSlug || 'markets';
