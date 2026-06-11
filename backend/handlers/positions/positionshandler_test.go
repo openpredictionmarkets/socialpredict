@@ -349,6 +349,47 @@ func TestMarketPositionsHandlerWithService_UsesSnapshotFreshnessWhenAvailable(t 
 	}
 }
 
+func TestMarketPositionsHandlerWithService_ServesStaleSnapshotWithoutRefresh(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-2 * dmarkets.MarketPositionsSnapshotTargetFreshness)
+	mockSvc := &readModelPositionsService{
+		readModel: &dmarkets.MarketPositionsSnapshot{
+			MarketID:    7,
+			GeneratedAt: generatedAt,
+			Source:      "read_model",
+			IsStale:     true,
+			StaleReason: "bet_accepted",
+			Positions: dmarkets.MarketPositions{
+				{Username: "stale_snapshot_alice", MarketID: 7, YesSharesOwned: 3},
+			},
+		},
+	}
+	handler := MarketPositionsHandlerWithService(mockSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/positions/7?limit=20&offset=0", nil)
+	req = mux.SetURLVars(req, map[string]string{"marketId": "7"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if mockSvc.refreshCalls != 0 {
+		t.Fatalf("stale positions snapshot should not refresh on read, got %d refreshes", mockSvc.refreshCalls)
+	}
+
+	var resp handlers.SuccessEnvelope[marketPositionsResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if len(resp.Result.Positions) != 1 || resp.Result.Positions[0].Username != "stale_snapshot_alice" {
+		t.Fatalf("unexpected positions payload: %+v", resp.Result.Positions)
+	}
+	if resp.Result.Freshness == nil || !resp.Result.Freshness.IsStale {
+		t.Fatalf("expected stale freshness metadata, got %+v", resp.Result.Freshness)
+	}
+}
+
 func TestMarketUserPositionHandlerWithService_FailureEnvelope(t *testing.T) {
 	handler := MarketUserPositionHandlerWithService(&mockUserPositionService{
 		mockPositionsService: mockPositionsService{err: errors.New("boom")},
@@ -378,7 +419,8 @@ func TestMarketUserPositionHandlerWithService_FailureEnvelope(t *testing.T) {
 
 type readModelPositionsService struct {
 	mockPositionsService
-	readModel *dmarkets.MarketPositionsSnapshot
+	readModel    *dmarkets.MarketPositionsSnapshot
+	refreshCalls int
 }
 
 func (m *readModelPositionsService) GetMarketPositionsReadModel(ctx context.Context, marketID int64, p dmarkets.Page) (*dmarkets.MarketPositionsSnapshot, error) {
@@ -398,6 +440,7 @@ func (m *readModelPositionsService) GetMarketPositionsReadModel(ctx context.Cont
 }
 
 func (m *readModelPositionsService) RefreshMarketPositionsSnapshot(ctx context.Context, marketID int64) (*dmarkets.MarketPositionsSnapshot, error) {
+	m.refreshCalls++
 	return m.readModel, nil
 }
 

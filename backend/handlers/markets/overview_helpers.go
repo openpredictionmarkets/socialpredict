@@ -13,6 +13,10 @@ type marketOverviewProvider interface {
 	GetMarketDetails(ctx context.Context, marketID int64) (*dmarkets.MarketOverview, error)
 }
 
+type marketSummaryProvider interface {
+	GetMarketSummaryReadModel(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
+}
+
 func buildMarketOverviewResponses(ctx context.Context, provider marketOverviewProvider, markets []*dmarkets.Market) ([]*dto.MarketOverviewResponse, error) {
 	if len(markets) == 0 {
 		return []*dto.MarketOverviewResponse{}, nil
@@ -20,6 +24,14 @@ func buildMarketOverviewResponses(ctx context.Context, provider marketOverviewPr
 
 	overviews := make([]*dto.MarketOverviewResponse, 0, len(markets))
 	for _, market := range markets {
+		if summaryProvider, ok := provider.(marketSummaryProvider); ok {
+			summary, err := summaryProvider.GetMarketSummaryReadModel(ctx, market.ID)
+			if err != nil {
+				return nil, fmt.Errorf("market_id=%d: %w", market.ID, err)
+			}
+			overviews = append(overviews, marketSummaryToOverviewResponse(summary))
+			continue
+		}
 		details, err := provider.GetMarketDetails(ctx, market.ID)
 		if err != nil {
 			return nil, fmt.Errorf("market_id=%d: %w", market.ID, err)
@@ -27,6 +39,21 @@ func buildMarketOverviewResponses(ctx context.Context, provider marketOverviewPr
 		overviews = append(overviews, marketOverviewToResponse(details))
 	}
 	return overviews, nil
+}
+
+func marketSummaryToOverviewResponse(summary *dmarkets.MarketSummaryReadModel) *dto.MarketOverviewResponse {
+	if summary == nil {
+		return &dto.MarketOverviewResponse{}
+	}
+
+	return &dto.MarketOverviewResponse{
+		Market:          marketToResponse(summary.Market),
+		Creator:         creatorResponseFromSummary(summary.Creator),
+		LastProbability: summary.Accounting.LastProbability,
+		NumUsers:        summary.Accounting.UserCount,
+		TotalVolume:     summary.Accounting.VolumeWithDust,
+		MarketDust:      summary.Accounting.MarketDust,
+	}
 }
 
 func marketOverviewToResponse(overview *dmarkets.MarketOverview) *dto.MarketOverviewResponse {
@@ -107,6 +134,20 @@ func publicMarketResponseFromDomain(market *dmarkets.Market) dto.PublicMarketRes
 		YesLabel:                market.YesLabel,
 		NoLabel:                 market.NoLabel,
 		Tags:                    marketTagResponsesFromDomain(market.Tags),
+	}
+}
+
+func marketSummaryToDetailsResponse(summary *dmarkets.MarketSummaryReadModel) dto.MarketDetailsResponse {
+	if summary == nil {
+		return dto.MarketDetailsResponse{}
+	}
+	return dto.MarketDetailsResponse{
+		Market:             publicMarketResponseFromDomain(summary.Market),
+		Creator:            creatorResponseFromSummary(summary.Creator),
+		ProbabilityChanges: probabilityChangesToResponse(summary.Accounting.ProbabilityChanges),
+		NumUsers:           summary.Accounting.UserCount,
+		TotalVolume:        summary.Accounting.VolumeWithDust,
+		MarketDust:         summary.Accounting.MarketDust,
 	}
 }
 

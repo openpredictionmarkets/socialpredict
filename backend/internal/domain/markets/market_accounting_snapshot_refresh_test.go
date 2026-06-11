@@ -69,6 +69,88 @@ func TestServiceRefreshMarketAccountingSnapshotPersistsRawRecomputedSnapshot(t *
 	}
 }
 
+func TestServiceGetMarketSummaryReadModelReturnsStaleSnapshotWithoutRecomputing(t *testing.T) {
+	service, db, _ := setupServiceWithDB(t)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("summary_snapshot_creator", 0)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("create creator: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(9092, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+
+	firstBet := modelstesting.GenerateBet(100, "YES", "alice", uint(market.ID), time.Minute)
+	if err := db.Create(&firstBet).Error; err != nil {
+		t.Fatalf("create first bet: %v", err)
+	}
+
+	if _, err := service.RefreshMarketAccountingSnapshot(ctx, market.ID); err != nil {
+		t.Fatalf("refresh snapshot: %v", err)
+	}
+
+	repo := rmarkets.NewGormRepository(db)
+	if err := repo.MarkMarketAccountingSnapshotStale(ctx, market.ID, "bet_accepted"); err != nil {
+		t.Fatalf("mark snapshot stale: %v", err)
+	}
+
+	secondBet := modelstesting.GenerateBet(50, "NO", "bob", uint(market.ID), 2*time.Minute)
+	if err := db.Create(&secondBet).Error; err != nil {
+		t.Fatalf("create second bet: %v", err)
+	}
+
+	summary, err := service.GetMarketSummaryReadModel(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("GetMarketSummaryReadModel returned error: %v", err)
+	}
+	if summary.Accounting.BetCount != 1 || summary.Accounting.UserCount != 1 || summary.Accounting.VolumeWithDust != 100 {
+		t.Fatalf("summary recomputed instead of returning stale snapshot: %+v", summary.Accounting)
+	}
+	freshness := summary.Accounting.Freshness()
+	if !freshness.IsStale || freshness.StaleReason != "bet_accepted" {
+		t.Fatalf("expected stale freshness from stored snapshot, got %+v", freshness)
+	}
+}
+
+func TestServiceGetMarketSummaryReadModelComputesMissingSnapshotOnce(t *testing.T) {
+	service, db, _ := setupServiceWithDB(t)
+	ctx := context.Background()
+
+	creator := modelstesting.GenerateUser("summary_missing_creator", 0)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("create creator: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(9093, creator.Username)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+	bet := modelstesting.GenerateBet(75, "YES", "alice", uint(market.ID), time.Minute)
+	if err := db.Create(&bet).Error; err != nil {
+		t.Fatalf("create bet: %v", err)
+	}
+
+	summary, err := service.GetMarketSummaryReadModel(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("GetMarketSummaryReadModel returned error: %v", err)
+	}
+	if summary.Accounting.BetCount != 1 || summary.Accounting.VolumeWithDust != 75 {
+		t.Fatalf("unexpected computed summary: %+v", summary.Accounting)
+	}
+
+	repo := rmarkets.NewGormRepository(db)
+	stored, err := repo.GetMarketAccountingSnapshot(ctx, market.ID)
+	if err != nil {
+		t.Fatalf("get stored snapshot: %v", err)
+	}
+	if stored == nil {
+		t.Fatalf("expected missing snapshot to be stored after first summary read")
+	}
+}
+
 func TestServiceRefreshMarketAccountingSnapshotRequiresSnapshotRepository(t *testing.T) {
 	service := markets.NewService(&snapshotlessMarketRepo{}, newNoopUserService(), newFixedClock(marketsTestTime()), markets.Config{})
 

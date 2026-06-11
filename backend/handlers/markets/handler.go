@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
@@ -468,11 +467,8 @@ func (h *Handler) marketLeaderboardReadModel(ctx context.Context, marketID int64
 		return nil, err
 	}
 
-	if snapshot == nil || snapshot.IsStale || snapshot.GeneratedAt.IsZero() || time.Since(snapshot.GeneratedAt) > dmarkets.MarketLeaderboardSnapshotTargetFreshness {
+	if snapshot == nil {
 		if _, refreshErr := service.RefreshMarketLeaderboardSnapshot(ctx, marketID); refreshErr != nil {
-			if snapshot != nil {
-				return snapshot, nil
-			}
 			return nil, refreshErr
 		}
 		snapshot, err = service.GetMarketLeaderboardReadModel(ctx, marketID, page)

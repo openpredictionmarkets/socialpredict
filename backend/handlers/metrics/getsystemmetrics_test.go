@@ -90,8 +90,8 @@ func (s *cachedSystemMetricsService) RefreshSystemMetricsSnapshot(context.Contex
 	}, nil
 }
 
-func TestSystemMetricsReadModel_ServesStaleSnapshotUntilAgeExpires(t *testing.T) {
-	generatedAt := time.Now().UTC().Add(-5 * time.Minute)
+func TestSystemMetricsReadModel_ServesStaleSnapshotWithoutRefresh(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-2 * analytics.SystemMetricsSnapshotTargetFreshness)
 	svc := &cachedSystemMetricsService{
 		readModel: &analytics.SystemMetricsReadModel{
 			Metrics: analytics.SystemMetrics{},
@@ -114,7 +114,7 @@ func TestSystemMetricsReadModel_ServesStaleSnapshotUntilAgeExpires(t *testing.T)
 		t.Fatalf("expected stale freshness to be served, got %+v", freshness)
 	}
 	if svc.refreshCalls != 0 {
-		t.Fatalf("expected no refresh for stale-but-young snapshot, got %d", svc.refreshCalls)
+		t.Fatalf("expected no refresh for stale snapshot, got %d", svc.refreshCalls)
 	}
 }
 

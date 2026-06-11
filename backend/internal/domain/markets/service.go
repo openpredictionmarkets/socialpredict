@@ -476,6 +476,14 @@ type MarketOverview struct {
 	DescriptionAmendments []MarketDescriptionAmendment
 }
 
+// MarketSummaryReadModel is a display-only market summary backed by the
+// market accounting snapshot. It must not be used for transaction decisions.
+type MarketSummaryReadModel struct {
+	Market     *Market
+	Creator    *CreatorSummary
+	Accounting MarketAccountingSnapshot
+}
+
 // Page represents pagination parameters.
 type Page struct {
 	Limit  int
