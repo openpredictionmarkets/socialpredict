@@ -172,13 +172,12 @@ Default read distribution at `250` reads/sec:
 | ---: | ---: | --- |
 | `25%` | `62.5/sec` | `/v0/read/market-discovery/markets?...` |
 | `15%` | `37.5/sec` | `/v0/read/market-discovery/{tagSlug}?...` |
-| `30%` | `75/sec` | `/v0/read/markets/{id}/summary` |
+| `38%` | `95/sec` | `/v0/read/markets/{id}/summary` |
 | `10%` | `25/sec` | `/v0/markets/positions/{id}?limit=21&offset=0` |
 | `7%` | `17.5/sec` | `/v0/markets/{id}/leaderboard?limit=21&offset=0` |
-| `8%` | `20/sec` | `/v0/read/users/{username}/financial-summary` |
 | `5%` | `12.5/sec` | `/v0/system/metrics`, `/v0/global/leaderboard?limit=21&offset=0` |
 
-The default mixed run intentionally excludes the raw full market detail route and the live bets table route. Those should be measured separately as control or worst-case paths.
+The default mixed run intentionally excludes the raw full market detail route, the live bets table route, and user financial summaries. Those should be measured separately as control or worst-case paths after the harness can warm the relevant snapshots.
 
 ### Aborted Setup Attempt
 
@@ -205,6 +204,39 @@ loadtest/hostops/site-mix-loadtest-basic-amd-20260611T025801Z-host-profile.json
 ```
 
 Harness adjustment: login token parsing now tolerates null/timeout bodies, and setup logins retry transient failures instead of aborting the entire run.
+
+### Interrupted Fixture-Shape Attempt
+
+A second `site-mix` attempt started at `2026-06-11T03:09:34Z` and reached the measured scenarios, but it was manually interrupted after repeated `404 NOT_FOUND` responses from `/api/v0/read/users/{username}/financial-summary`.
+
+This is also classified as a load-test fixture-shape issue, not a host-capacity failure. The endpoint requires an existing user financial read-model snapshot. Random load-test users did not have those snapshots precomputed, so the endpoint consistently returned `404`.
+
+Partial run observations before interruption:
+
+| Metric | Value |
+| --- | ---: |
+| Runtime before interruption | `~2m02s` wall time, measured scenarios about `6s` |
+| Bets attempted | `159` |
+| Bets succeeded | `152` |
+| Site reads attempted | `1549` |
+| Site read failures | `117` |
+| Failed read family | `user financial read model` |
+| HTTP p95 | `804.28ms` |
+| Dropped iterations | `33` |
+| Max CPU user | `1.61%` |
+| Max Postgres CPU | `2.05%` |
+| Min CPU idle | `97.03%` |
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T030934Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T030934Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T030934Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T030934Z-host-profile.json
+```
+
+Harness adjustment: user financial summaries were removed from the default `site-mix` distribution. They should be added back only after a snapshot warmup command exists or the endpoint returns a safe zero/default read model for existing users without snapshots.
 
 Next command:
 

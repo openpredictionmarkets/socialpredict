@@ -11,7 +11,6 @@ import {
   readMarketPositionsPage,
   readMarketSummary,
   readStatsDisplay,
-  readUserFinancialSummary,
   requireFixtures,
   secureRandomFraction,
 } from './lib/common.js';
@@ -71,14 +70,12 @@ export function siteRead(data) {
   } else if (roll < 0.40) {
     const slug = tagSlug || 'markets';
     readMarketDiscovery({ slug, status: 'active', tagSlug });
-  } else if (roll < 0.70) {
+  } else if (roll < 0.78) {
     readMarketSummary(market);
-  } else if (roll < 0.80) {
+  } else if (roll < 0.88) {
     readMarketPositionsPage(market);
-  } else if (roll < 0.87) {
-    readMarketLeaderboardPage(market);
   } else if (roll < 0.95) {
-    readUserFinancialSummary(data.authenticatedUsers);
+    readMarketLeaderboardPage(market);
   } else {
     readStatsDisplay(data.authenticatedUsers);
   }

@@ -167,10 +167,15 @@ hot-market tests focused on betting throughput instead of measuring login churn.
 `site-mix` runs hot-market betting in parallel with a broader API read mix that
 models users clicking around the site. It uses cached/read-model endpoints for
 market discovery, topic pages, market summary widgets, market positions,
-market leaderboards, system metrics, global leaderboard, and user financial
-summary where those endpoints exist. The default mix intentionally excludes the
+market leaderboards, system metrics, and global leaderboard where those
+endpoints exist. The default mix intentionally excludes the
 raw full market detail route and live bets table route so the test models the
 intended cached display paths rather than worst-case recomputation.
+
+It also excludes the user financial summary read model until the harness has a
+snapshot warmup step. Random load-test users may not have a precomputed
+financial snapshot, which makes that endpoint return `404` and turns the test
+into a fixture-readiness check rather than a browsing-capacity test.
 
 During setup, `site-mix` pre-authenticates users before the measured scenarios
 start. Transient login timeouts are retried and skipped if they still fail, so
@@ -182,10 +187,9 @@ The default first ratio is `10` read actions for each `1` bet action:
 | --- | --- | ---: |
 | Main market discovery | `/v0/read/market-discovery/markets?...` | `25%` |
 | Topic discovery | `/v0/read/market-discovery/{tagSlug}?...` | `15%` |
-| Market summary widgets | `/v0/read/markets/{id}/summary` | `30%` |
+| Market summary widgets | `/v0/read/markets/{id}/summary` | `38%` |
 | Market positions | `/v0/markets/positions/{id}?limit=21&offset=0` | `10%` |
 | Market leaderboard | `/v0/markets/{id}/leaderboard?limit=21&offset=0` | `7%` |
-| User financial summary | `/v0/read/users/{username}/financial-summary` | `8%` |
 | Reporting | `/v0/system/metrics`, `/v0/global/leaderboard?limit=21&offset=0` | `5%` |
 
 ```bash

@@ -199,7 +199,7 @@ The write-only hot-market burst is still useful because it isolates the transact
 | Hot-market discovery ladder | `loadtest/k6/hot-market-burst.js` | Find the short-run write ceiling on a clean host. | `100`, `200`, `250`, `300` bets/sec | `1m` each | `/v0/login` during setup, `/v0/bet` during run, probes | no failed bets; no fixture mismatch |
 | Hot-market sustained confirmation | `loadtest/k6/hot-market-burst.js` | Confirm the strict clean write rate after the short ladder. | Start at `250` bets/sec; only try `300` if `250` is clean | `5m` | same as hot-market discovery | `0` failed bets, p95 preferably below `1s`, no dropped iterations |
 | Existing narrow baseline | `loadtest/k6/baseline.js` | Quick read/write sanity check using current simple browse traffic. | Example: `10` bets/sec + `20` browse/sec | `2m` | `/v0/markets`, `/v0/markets/{id}`, `/v0/bet`, probes | should pass before richer mixed test |
-| New site-mix low | `loadtest/k6/site-mix.js` | First realistic "click around while trading" API simulation. | `25` bets/sec + `250` reads/sec | `5m` | cached discovery, market summary, positions, leaderboards, user financial summaries, stats, trades | `0` failed bets; low read failure rate |
+| New site-mix low | `loadtest/k6/site-mix.js` | First realistic "click around while trading" API simulation. | `25` bets/sec + `250` reads/sec | `5m` | cached discovery, market summary, positions, leaderboards, stats, trades | `0` failed bets; low read failure rate |
 | New site-mix medium | `loadtest/k6/site-mix.js` | Midpoint mixed workload after low passes. | `50` bets/sec + `500` reads/sec | `5m` | same as site-mix low | same, with p95 and CPU watched closely |
 | New site-mix high | `loadtest/k6/site-mix.js` | Stress mixed workload. | `100` bets/sec + `1000` reads/sec | `5m` | same as site-mix low | likely warning/fail if CPU or Postgres saturates |
 | Optional read-only storm | `loadtest/k6/site-mix.js` with writes disabled | Isolate read-model/page pressure without transaction writes. | `500`, `1000`, `2000` reads/sec | `2m` to `5m` | same read categories, no `/v0/bet` | helps separate read bottlenecks from write bottlenecks |
@@ -216,10 +216,9 @@ Prefer public display/read-model endpoints when they exist. Do not intentionally
 | --- | --- | --- | --- | ---: | --- |
 | Main markets page | `GET /v0/read/market-discovery/markets?limit=21&offset=0`, `GET /v0/read/market-discovery/markets?status=active&limit=21&offset=0` | Snapshot-backed discovery read model | Public | `25%` | `62.5/sec` | Use `/v0/read/market-discovery/...` for normal page traffic. Avoid raw `/v0/markets` except in control tests. |
 | Topic/category pages | `GET /v0/read/market-discovery/{tagSlug}?limit=21&offset=0`, `GET /v0/read/market-discovery/{tagSlug}?status=active&limit=21&offset=0` | Snapshot-backed discovery read model with tag filtering | Public | `15%` | `37.5/sec` | Models `/markets/topic/:slug` and persistent topic navigation. |
-| Market detail display widgets | `GET /v0/read/markets/{id}/summary` | Display read-model/accounting freshness path, target `1m` | Public | `30%` | `75/sec` | This is the default market-page/card/pinned-market display path in `site-mix`. |
+| Market detail display widgets | `GET /v0/read/markets/{id}/summary` | Display read-model/accounting freshness path, target `1m` | Public | `38%` | `95/sec` | This is the default market-page/card/pinned-market display path in `site-mix`. |
 | Market tabs: positions | `GET /v0/markets/positions/{id}?limit=21&offset=0` | Paginated read-model snapshot when `limit/offset` are present, target `10m` | Public | `10%` | `25/sec` | Always include pagination to stay on the read-model path. |
 | Market tabs: leaderboard | `GET /v0/markets/{id}/leaderboard?limit=21&offset=0` | Paginated read-model snapshot, target `10m` | Public | `7%` | `17.5/sec` | Always include pagination to stay on the read-model path. |
-| User/profile financial display | `GET /v0/read/users/{username}/financial-summary` | User financial summary read model | Logged-in | `8%` | `20/sec` | Uses pre-authenticated users so logged-in-only visibility is represented without raw portfolio recomputation. |
 | Stats pages | `GET /v0/system/metrics`, `GET /v0/global/leaderboard?limit=21&offset=0` | Cached reporting read models: system metrics target `1h`, global leaderboard target `15m` | Public or logged-in depending CMS visibility | `5%` | `12.5/sec` | These are now wired to cached read models. |
 | Optional cold browser/static/config overhead | frontend route HTML/JS/CSS and low-frequency CMS/config reads | Browser cache should make repeat traffic cheap | Public | `0-5%` | not in default `site-mix` | Only include if testing first-load behavior. It should not dominate SocialPredict capacity planning right now. |
 | Trade execution | `POST /v0/bet` | Authoritative transaction path, never cached | Logged-in | separate write rate | This remains the main write-pressure signal. |
@@ -227,6 +226,8 @@ Prefer public display/read-model endpoints when they exist. Do not intentionally
 The normal read mix should total about `10` reads per `1` trade. Static/browser overhead can be modeled as part of the app shell/config slice or added separately at `<=5%` if we want a cold-visitor test.
 
 The default `site-mix` intentionally does not include the raw full market detail endpoint (`/v0/markets/{id}`) or the live bets table endpoint (`/v0/markets/bets/{id}`). Those remain useful for separate control or worst-case tests, but the default mixed browsing run should measure the intended cached/read-model display paths.
+
+The default `site-mix` also excludes `/v0/read/users/{username}/financial-summary` until the load-test harness has a snapshot warmup step. Random seeded users may not have precomputed financial snapshots, producing expected `404` responses that do not represent browsing capacity.
 
 ### Browser Simulation Versus API Simulation
 
