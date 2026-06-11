@@ -19,6 +19,7 @@ LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --mar
 ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --duration 5m --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
 ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100
 ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100 --monitor-env staging
+./loadtest/cli/loadtest run site-mix --base-url https://kconfs.com --api-prefix /api --duration 5m --bet-rate 25 --browse-rate 250 --preauth-users 500 --monitor-env staging
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --host-summary loadtest/hostops/<run>-host-summary.json --metadata loadtest/dossier/metadata.example.json --out loadtest/dossier/runs/<run>.json
 ```
 
@@ -159,6 +160,46 @@ hot-market tests focused on betting throughput instead of measuring login churn.
   --duration 1m \
   --target-rate 50 \
   --preauth-users 100
+```
+
+## Site Mix
+
+`site-mix` runs hot-market betting in parallel with a broader API read mix that
+models users clicking around the site. It uses cached/read-model endpoints for
+market discovery, topic pages, market summary widgets, market positions,
+market leaderboards, system metrics, global leaderboard, and user financial
+summary where those endpoints exist.
+
+The default first ratio is `10` read actions for each `1` bet action:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 25 \
+  --browse-rate 250 \
+  --preauth-users 500 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+For temporary raw-IP large-host tests, replace `--base-url` and provide the
+remote monitor target:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url "http://$LOADTEST_DROPLET_IP" \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 25 \
+  --browse-rate 250 \
+  --preauth-users 2000 \
+  --setup-timeout 10m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@"$LOADTEST_DROPLET_IP" \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
 ```
 
 ## Low-Rate Runs

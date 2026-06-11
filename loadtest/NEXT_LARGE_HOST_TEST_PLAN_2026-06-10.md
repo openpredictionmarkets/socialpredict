@@ -259,18 +259,19 @@ The existing scripts are sufficient for:
 - hot-market write-path capacity
 - narrow list/detail browsing
 
-They are not sufficient for the full mixed workload. Add a new k6 scenario, tentatively:
+The mixed workload is now covered by:
 
 ```text
 loadtest/k6/site-mix.js
 ```
 
-Target behavior:
+Scenario behavior:
 
 - one `bet` scenario at the chosen write rate
 - one `browse` scenario at roughly `10x` the write rate
 - setup-time pre-auth for users where private/profile endpoints are included
 - random mix of public and logged-in reads
+- cached/read-model endpoints are preferred where available
 
 If an endpoint is not stable or not public, exclude it from the first version rather than blocking the test.
 
@@ -280,15 +281,49 @@ The helper functions should live in `loadtest/k6/lib/common.js` so the same endp
 
 Start conservative:
 
-```text
-25 bets/sec + 250 reads/sec for 5m
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url "http://$LOADTEST_DROPLET_IP" \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 25 \
+  --browse-rate 250 \
+  --preauth-users 2000 \
+  --setup-timeout 10m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@"$LOADTEST_DROPLET_IP" \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
 ```
 
 Then:
 
-```text
-50 bets/sec + 500 reads/sec for 5m
-100 bets/sec + 1000 reads/sec for 5m
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url "http://$LOADTEST_DROPLET_IP" \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 50 \
+  --browse-rate 500 \
+  --preauth-users 5000 \
+  --setup-timeout 10m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@"$LOADTEST_DROPLET_IP" \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+
+./loadtest/cli/loadtest run site-mix \
+  --base-url "http://$LOADTEST_DROPLET_IP" \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 100 \
+  --browse-rate 1000 \
+  --preauth-users 10000 \
+  --setup-timeout 15m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@"$LOADTEST_DROPLET_IP" \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
 ```
 
 Only run the higher mixed workloads if the prior step is clean:
@@ -355,8 +390,8 @@ Include:
 
 ## Open Implementation Tasks Before Mixed Test
 
-- [ ] Add `loadtest/k6/site-mix.js` or expand `baseline.js` to support a 10:1 read/write mix.
+- [x] Add `loadtest/k6/site-mix.js` or expand `baseline.js` to support a 10:1 read/write mix.
 - [x] Confirm exact endpoint paths for topic discovery, paginated bets, paginated positions, market leaderboard, global leaderboard, and user financial read models.
-- [ ] Use pre-authenticated users for private/logged-in read paths in `site-mix.js`.
-- [ ] Add CLI examples to `TEMP_DROPLET_RUNBOOK.md` after the mixed scenario exists.
+- [x] Use pre-authenticated users for private/logged-in read paths in `site-mix.js`.
+- [x] Add CLI examples to `TEMP_DROPLET_RUNBOOK.md` after the mixed scenario exists.
 - [ ] Add dossier table fields for read throughput, write throughput, and combined HTTP request rate.

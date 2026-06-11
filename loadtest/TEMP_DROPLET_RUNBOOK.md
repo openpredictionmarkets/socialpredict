@@ -238,6 +238,35 @@ ssh -i ~/.keys/socialpredict/loadtest/id_ed25519 root@"$LOADTEST_DROPLET_IP" '
   --api-prefix /api
 ```
 
+## 9. Run A Mixed Site/API Test
+
+After smoke passes and larger fixtures are seeded, run the mixed read/write
+scenario. This models users browsing market lists, topic pages, market detail
+widgets, market tabs, user pages, stats, and leaderboards while hot-market bets
+are also being submitted.
+
+Start with the low mixed workload:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url "http://$LOADTEST_DROPLET_IP" \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 25 \
+  --browse-rate 250 \
+  --preauth-users 2000 \
+  --setup-timeout 10m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@"$LOADTEST_DROPLET_IP" \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
+Only increase to `50` bets/sec plus `500` reads/sec, then `100` bets/sec plus
+`1000` reads/sec, if the prior mixed run has no failed bets, near-zero read
+failures, acceptable p95 latency, and host telemetry does not show sustained
+CPU saturation.
+
 Smoke must pass before resizing or running capacity tests.
 
 ## 9. Resize For Larger Tests

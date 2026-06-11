@@ -11,7 +11,7 @@ The boundary is intentionally portable. If the harness later needs independent v
 - `STAGING_RUNBOOK.md`: focused kconfs.com staging test ladder and dossier workflow.
 - `TEMP_DROPLET_RUNBOOK.md`: end-to-end DigitalOcean temporary Droplet workflow for larger raw-IP capacity tests.
 - `NEXT_LARGE_HOST_TEST_PLAN_2026-06-10.md`: planned larger-host rerun and mixed website/API workload plan.
-- `k6/`: k6 API load-test scenarios.
+- `k6/`: k6 API load-test scenarios, including `site-mix.js` for mixed read/write browsing pressure.
 - `fixtures/`: generated or operator-provided users, credentials, and market IDs. Ignored by default.
 - `results/`: raw k6 outputs. Ignored by default.
 - `dossier/`: release dossier schema and summarizer.
@@ -166,6 +166,26 @@ scenario focuses on concentrated betting throughput:
   --target-rate 10 \
   --preauth-users 25
 ```
+
+Run the mixed site/API workload after fixtures are seeded and pulled:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 25 \
+  --browse-rate 250 \
+  --preauth-users 500 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+`site-mix` keeps the transaction path isolated to `/v0/bet` while routing
+ordinary browsing pressure through display/read-model endpoints where they
+exist. This is the preferred API-level approximation for users browsing market
+lists, topic pages, market tabs, user pages, stats, and leaderboards while
+other users are trading.
 
 Capture host CPU, RAM, disk, and Docker stats during a run:
 
