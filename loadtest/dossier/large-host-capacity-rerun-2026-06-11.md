@@ -1055,6 +1055,56 @@ A practical way to read this is:
 - A `50,000` user platform where `25%` of users bet inside one minute would require about `208` bets/sec before counting reads. That is within the previous pure-betting evidence but not within this mixed read/write evidence if browsing scales at a `10:1` read/write ratio.
 - A `50,000` user platform where `50%` of users bet inside one minute would require about `417` bets/sec before counting reads. This remains a scale project, not a single-Droplet claim.
 
+### Gaussian Event-Impulse Interpretation
+
+The one-minute hot-window tables above are intentionally conservative because they assume a sharp rectangular burst: many users act inside the same minute. Real human activity is more likely to be distributed over time. A major event might happen at `t=0`, then users process it, open the site, read, discuss, and act over several minutes. A rough planning model is a truncated post-event Gaussian impulse:
+
+```text
+traffic_rate(t) = peak_rate * exp(-0.5 * ((t - peak_time) / sigma)^2)
+```
+
+Assumptions for this section:
+
+- The peak happens about `5m` after the real-world event, not instantly at the event.
+- Activity ramps up before the peak and ramps down afterward.
+- The mathematical left tail before `t=0` is ignored; this is a post-event planning approximation, not a literal behavioral model.
+- The clean mixed evidence-backed peak is `385` API actions/sec from the `35/350` run.
+- The first failed mixed target is `462` API actions/sec from the `42/420` run.
+- Human users usually do not click or bet every second. A more plausible peak cadence is one API-relevant action every `10-20s`.
+- This is a planning model, not a measured production distribution.
+
+Peak simultaneous active-user equivalents:
+
+| Peak action cadence | Clean `385 actions/sec` equivalent | Failed `462 actions/sec` target equivalent | Interpretation |
+| --- | ---: | ---: | --- |
+| `1` action every `5s` | `1925` active users | `2310` active users | Heavy active use; users are clicking frequently. |
+| `1` action every `10s` | `3850` active users | `4620` active users | Plausible busy-event active browsing cadence. |
+| `1` action every `20s` | `7700` active users | `9240` active users | Plausible if most users read/watch between clicks. |
+| `1` action every `30s` | `11550` active users | `13860` active users | Plausible for calmer read-mostly audiences. |
+
+Gaussian impulse total-audience equivalents:
+
+```text
+total_actions ~= peak_actions_per_second * sigma_seconds * sqrt(2*pi)
+total_event_users ~= total_actions / actions_per_user_during_impulse
+```
+
+Using the clean `385 actions/sec` peak:
+
+| Gaussian spread | Approximate user activity shape | Total API actions under curve | Users if `2` actions/user | Users if `3` actions/user | Users if `5` actions/user |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `sigma=2.5m` | Sharp impulse centered around `+5m`; most action inside roughly `5-10m` | `~144,800` | `~72,400` | `~48,300` | `~29,000` |
+| `sigma=5m` | Moderate event wave; most action inside roughly the first `15-20m` | `~289,500` | `~144,800` | `~96,500` | `~57,900` |
+| `sigma=10m` | Broad event wave; activity spreads across a larger audience over `20-40m` | `~579,000` | `~289,500` | `~193,000` | `~115,800` |
+
+Interpretation:
+
+- If human activity is genuinely spread out over `10-20m`, this host can theoretically serve a much larger total event audience than the one-minute tables suggest.
+- The relevant risk is the peak of the curve, not the total area under the curve. If the peak stays near or below `385 actions/sec`, the clean `35/350` evidence applies.
+- If a social or UI pattern causes synchronized retries, page refreshes, or repeated bet submission, the distribution stops behaving like a smooth Gaussian and starts behaving like a spike. That is closer to the failed `42/420` behavior.
+- The Gaussian model is most credible for read-mostly behavior. Betting bursts are less smooth because users may rush to trade at the same perceived information moment.
+- A practical planning estimate for this host is therefore: thousands of simultaneous active users are plausible if each acts every `10-20s`, and tens of thousands of total event participants are plausible if their activity is spread over a multi-minute wave. The host should not be expected to handle several thousand people all clicking and trading repeatedly at the same instant.
+
 ### Event Behavior Expectations
 
 For a major event such as the final minute of a game, user behavior probably clusters into three waves:
