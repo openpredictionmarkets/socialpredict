@@ -2,7 +2,7 @@
 
 Date opened: 2026-06-11
 
-Status: active experiment; temporary large host is deployed, seeded, smoke-tested, and has one clean hot-market baseline datapoint. The first mixed workload series was run before `v3.4.0`; the next mixed workload series should be labeled as `v3.4.0` after the load-test deploy completes.
+Status: closed experiment; temporary large host was deployed, seeded, smoke-tested, tested through the `35/350` clean mixed workload, and destroyed after the `42/420` failed bracket.
 
 Base URL: `http://159.65.37.166`
 
@@ -22,6 +22,7 @@ This rerun also adds a mixed cached-read workload to model ordinary site browsin
 | Public IPv4 | `159.65.37.166` |
 | Region | `nyc3` |
 | Size slug | `s-8vcpu-32gb-amd` |
+| Destroyed at | `2026-06-11T04:46:22Z` |
 | CPU model observed | `DO-Premium-AMD` |
 | Host CPU count | `8` |
 | Host RAM total | `32095 MiB` |
@@ -1007,3 +1008,107 @@ Betting-only equivalents for `38` bets/sec:
 | `1` bet every `30s` | `1140` bettors |
 | `1` bet every `60s` | `2280` bettors |
 | `1` bet every `5m` | `11400` bettors |
+
+## Conclusion
+
+This experiment closes with a useful mixed-workload range for the `v3.4.0` SocialPredict build on a temporary DigitalOcean Basic AMD shared-CPU `8 vCPU / 32 GiB RAM` single-node host.
+
+The best clean mixed read/write proof is:
+
+```text
+35 bets/sec + 350 cached/read-model reads/sec for 5m
+= 385 modeled API actions/sec
+= 0 failed requests
+= HTTP p95 about 113ms
+```
+
+The next attempted midpoint failed:
+
+```text
+42 bets/sec + 420 cached/read-model reads/sec
+= 462 target API actions/sec
+= failed within the first measured minute
+= HTTP p95 measured in minutes
+= k6 VUs climbed above 1500
+```
+
+That places the current mixed-workload operating envelope somewhere between `385` and `462` modeled API actions/sec for this host, release, data shape, and test harness. The safest evidence-backed number is `385` actions/sec. The first observed mixed failure is `462` target actions/sec.
+
+### What This Means For Human Users
+
+The numbers above are API action rates, not literal user counts. Human interpretation depends on how frequently people click, refresh, open pages, and submit bets.
+
+| Scenario | Approximate behavior | API load estimate | Evidence-based interpretation |
+| --- | --- | ---: | --- |
+| Normal active browsing | Each active user triggers `1` API action every `10s` | `385` actions/sec equals about `3850` active users | Inside the clean `35/350` proof. |
+| Heavy active browsing | Each active user triggers `1` API action every `5s` | `385` actions/sec equals about `1925` active users | Inside the clean `35/350` proof. |
+| Very active hot market | `2100` people place one bet during the same `1m` window, while reads run at `350/sec` | `35` bets/sec + `350` reads/sec | Cleanly supported for `5m`. |
+| Aggressive hot market | `2520` people place one bet during the same `1m` window, while reads run at `420/sec` | `42` bets/sec + `420` reads/sec | Failed quickly. Do not claim. |
+| Read-heavy event with modest betting | Many users open pages, but only `1500-2100` users bet in the same minute | Around `25-35` bets/sec plus up to `250-350` reads/sec | Supported by clean `25/250` and `35/350` runs. |
+| Pure betting burst | Users are already authenticated and mostly submit bets, with minimal browsing | Prior dossier showed `250` bets/sec clean for `5m` | Supported only as a pure betting workload, not as a mixed browsing event. |
+
+A practical way to read this is:
+
+- A `10,000` user platform can likely survive a very active event on this host if around `15-21%` of users place one bet inside the same minute and browsing stays near the modeled cached-read mix.
+- A `30,000` user platform can likely survive a moderately hot event if around `5-7%` of users place one bet inside the same minute and read traffic stays near the clean `350 reads/sec` envelope.
+- A `50,000` user platform can likely survive a smaller hot event if around `3-4.2%` of users place one bet inside the same minute with similar read behavior.
+- A `50,000` user platform where `25%` of users bet inside one minute would require about `208` bets/sec before counting reads. That is within the previous pure-betting evidence but not within this mixed read/write evidence if browsing scales at a `10:1` read/write ratio.
+- A `50,000` user platform where `50%` of users bet inside one minute would require about `417` bets/sec before counting reads. This remains a scale project, not a single-Droplet claim.
+
+### Event Behavior Expectations
+
+For a major event such as the final minute of a game, user behavior probably clusters into three waves:
+
+| Wave | User behavior | Likely system effect on this host |
+| --- | --- | --- |
+| Watch/read wave | Users open market pages, browse topic pages, inspect positions/leaderboards, and refresh cached views | Likely safe if aggregate cached reads stay around `350/sec`; untested above that as a read-only workload. |
+| Bet wave | A subset submits bets rapidly around a key event | Clean through `35/sec` while `350/sec` reads are also active; pure betting has stronger prior evidence, but mixed traffic is the safer planning constraint. |
+| Panic refresh wave | Users repeatedly refresh and retry when latency rises | This can create a feedback loop. The failed `42/420` run shows how quickly VUs and latency can explode once the system starts queueing. |
+
+The dangerous case is not just many users. The dangerous case is many users acting in the same short window while reads and writes rise together. Once the host crosses the mixed-workload edge, failure appears abrupt: the `42/420` run degraded within the first measured minute, request latency moved from milliseconds to minutes, and k6 began accumulating thousands of dropped iterations.
+
+### Safe, Squeak-By, And Failure Zones
+
+| Zone | Approximate mixed workload | Human interpretation | Confidence |
+| --- | ---: | --- | --- |
+| Safe zone | Up to `25/250` for `5m` | About `275` API actions/sec; `1500` one-minute bettors plus `250/sec` reads | High, clean full run. |
+| Strong supported zone | `35/350` for `5m` | About `385` API actions/sec; `2100` one-minute bettors plus `350/sec` reads | High, clean full run. |
+| Squeak-by candidate | `38/380` | About `418` API actions/sec; `2280` one-minute bettors plus `380/sec` reads | Untested, next logical probe. |
+| Likely failure edge | `42/420` | About `462` target API actions/sec; `2520` one-minute bettors plus `420/sec` reads | Failed quickly. |
+| Unsupported | `50/500` and above | About `550+` target API actions/sec | Failed hard; do not claim. |
+
+### Engineering Interpretation
+
+The `42/420` failure did not look like simple memory exhaustion. RAM stayed plentiful. It also did not look like whole-host CPU exhaustion in the simple `idle=0` sense. Instead, the system showed a concurrency/queueing collapse: k6 VUs rose sharply, latency ballooned, and backend/Postgres Docker CPU rose materially.
+
+The practical next engineering work is therefore not only larger hardware. The likely returns are:
+
+1. Reduce transaction-path database work under active betting.
+2. Continue converting display paths to bounded, cached, paginated read models.
+3. Keep raw full-detail and global analytics endpoints out of high-frequency UI paths.
+4. Add more targeted read-only tests so cached browsing capacity can be measured separately from write pressure.
+5. Rerun `38/380` after any query/index/read-model improvements to see whether the mixed edge moves closer to `42/420` or beyond.
+
+### Release/Deployment Recommendation
+
+For a model-office or early public deployment, this host shape is plausible if expectations are set around modest to medium hot-window traffic. It should not be described as ready for a viral event where tens of thousands of users simultaneously refresh and trade.
+
+For product planning, the clean claim should be:
+
+```text
+On v3.4.0, a single Basic AMD 8 vCPU / 32 GiB host cleanly handled
+35 hot-market bets/sec plus 350 cached/read-model reads/sec for five minutes.
+```
+
+The conservative operational cap for this topology should be lower than the demonstrated clean limit, for example around `25/250`, unless active monitoring and retry/backpressure behavior are in place. The demonstrated clean high-water mark is `35/350`; the demonstrated failure region begins by `42/420`.
+
+### Experiment Closure
+
+The temporary DigitalOcean load-test droplet was destroyed after the final failed bracket to avoid ongoing charges.
+
+| Field | Value |
+| --- | --- |
+| Droplet ID | `576807920` |
+| Droplet name | `socialpredict-loadtest-20260611-023140` |
+| Public IPv4 | `159.65.37.166` |
+| Destroyed at | `2026-06-11T04:46:22Z` |
