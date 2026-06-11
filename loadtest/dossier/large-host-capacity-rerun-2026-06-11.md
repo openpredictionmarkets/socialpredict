@@ -2,13 +2,13 @@
 
 Date opened: 2026-06-11
 
-Status: active experiment; temporary large host is deployed, seeded, smoke-tested, and has one clean hot-market baseline datapoint.
+Status: active experiment; temporary large host is deployed, seeded, smoke-tested, and has one clean hot-market baseline datapoint. The first mixed workload series was run before `v3.4.0`; the next mixed workload series should be labeled as `v3.4.0` after the load-test deploy completes.
 
 Base URL: `http://159.65.37.166`
 
 ## Research Question
 
-Can the current `main` build, including cached reporting/read-model improvements, reproduce or improve the previous larger-host SocialPredict capacity evidence on a temporary DigitalOcean Basic AMD host?
+Can the current release build, including cached reporting/read-model improvements and the `v3.4.0` market-summary read-model fix, reproduce or improve the previous larger-host SocialPredict capacity evidence on a temporary DigitalOcean Basic AMD host?
 
 This rerun also adds a mixed cached-read workload to model ordinary site browsing while hot-market betting is active.
 
@@ -43,6 +43,14 @@ Workflow:
 ```text
 https://github.com/openpredictionmarkets/ansible_playbooks/actions/runs/27319946755
 ```
+
+Version boundary:
+
+| Time UTC | Workflow / release | Deployed ref | Interpretation |
+| --- | --- | --- | --- |
+| `2026-06-11T02:33:54Z` | Load-test deploy `27319946755` | `main` before `v3.4.0` | Used for smoke, `100/sec` hot-market baseline, and the first mixed workload attempts below. This is effectively `v3.3.0`-era code plus then-current `main`, but without PR #749's pure market-summary read-model fix. |
+| `2026-06-11T03:59:21Z` | SocialPredict release `v3.4.0` | `v3.4.0` | Adds cached market read-model behavior, including `/v0/read/markets/{id}/summary` avoiding synchronous full market accounting refresh. |
+| `2026-06-11T04:03:31Z` | Load-test deploy `27322972380` | `v3.4.0` | This deploy was dispatched after the release. Mixed workload results after this deploy should be recorded as the `v3.4.0` series. |
 
 External readiness passed:
 
@@ -162,9 +170,9 @@ loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260611T023847Z-host-summa
 loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260611T023847Z-host-profile.json
 ```
 
-## Mixed Cached-Read Workload Plan
+## Pre-v3.4.0 Mixed Cached-Read Workload Plan
 
-The next run should use `site-mix`, which combines hot-market betting with cached/read-model browsing paths.
+The first mixed workload attempts used `site-mix`, which combines hot-market betting with cached/read-model browsing paths. These runs happened before the `v3.4.0` load-test deploy, so they should not be used as final evidence for the `v3.4.0` cache behavior.
 
 Default read distribution at `250` reads/sec:
 
@@ -178,7 +186,7 @@ Default read distribution at `250` reads/sec:
 
 The default mixed run intentionally excludes the raw full market detail route, the live bets table route, global reporting endpoints, and user financial summaries. Those should be measured separately as control or worst-case paths after the harness can warm the relevant snapshots.
 
-Market positions and market leaderboard requests use cached snapshots only when pagination parameters are present. They may still refresh synchronously when stale, but the work is market-scoped. Global reporting endpoints are excluded because active betting marks analytics snapshots stale, which can cause synchronous global recomputation on read.
+Pre-`v3.4.0`, market positions and market leaderboard requests used cached snapshots only when pagination parameters were present, and could still refresh synchronously when stale. Global reporting endpoints were excluded because active betting marked analytics snapshots stale, which could cause synchronous global recomputation on read. The `v3.4.0` release changes the read model behavior so existing stale display snapshots are served without synchronous refresh.
 
 ### Aborted Setup Attempt
 
@@ -439,17 +447,38 @@ Interpretation:
 - This run is not a maximum-capacity claim. It is a stable mixed baseline after the higher `25` bets/sec plus `250` reads/sec attempt exposed read-path pressure.
 - The run was executed before the pure market-summary read-model fix that removes synchronous accounting refresh from `/v0/read/markets/{id}/summary`. After that fix is deployed, rerun this same command first, then ladder upward.
 
-## Current Interpretation After June 10/11 Mixed Runs
+## Current Interpretation After Pre-v3.4.0 June 10/11 Mixed Runs
 
 - Pure hot-market betting still has a stronger clean datapoint from the earlier large-host experiment than the mixed workload has so far.
 - The mixed workload is more representative of real site behavior because it combines hot-market writes with market discovery, market summary cards, positions pages, and leaderboards.
 - The failed `25` bets/sec plus `250` reads/sec run should not be treated as final capacity evidence until the read-model fixes are deployed, because the market summary endpoint was still capable of synchronous accounting refresh.
-- The clean `10` bets/sec plus `50` reads/sec run is the current mixed baseline for this host and code version.
+- The clean `10` bets/sec plus `50` reads/sec run is the current pre-`v3.4.0` mixed baseline for this host.
 
-Recommended next sequence after deploying the pure market-summary read-model fix:
+Recommended next sequence after the `v3.4.0` load-test deploy:
 
-1. Rerun `10` bets/sec plus `50` reads/sec for `5m` as a regression baseline.
-2. Try `15` bets/sec plus `100` reads/sec for `5m`.
-3. Try `20` bets/sec plus `150` reads/sec for `5m` if the previous run is clean.
-4. Only retry `25` bets/sec plus `250` reads/sec after the intermediate runs are clean.
+1. Use a larger bracket, not tiny increments. The pre-`v3.4.0` `10/50` pass had substantial headroom and is too low to estimate the edge.
+2. Rerun a meaningful `v3.4.0` baseline at `25` bets/sec plus `250` reads/sec for `5m`.
+3. If clean, jump to `50` bets/sec plus `500` reads/sec for `5m`.
+4. If that is clean, test `75` bets/sec plus `750` reads/sec for `5m`; if it fails, bisect between the last clean and failed rate.
 5. Keep global reporting and user financial summaries out of the default site mix until those paths have explicit warmup/default-snapshot behavior and separate tests.
+
+## v3.4.0 Mixed Workload Edge-Finding Plan
+
+The goal of the `v3.4.0` series is to bracket the mixed read/write edge quickly.
+
+The prior clean mixed run was `10` bets/sec plus `50` reads/sec. Its host profile showed enough headroom that smaller steps are unlikely to be informative. The next series should use larger jumps and then bisect.
+
+| Step | Command target | Purpose | Decision rule |
+| --- | ---: | --- | --- |
+| A | `25` bets/sec + `250` reads/sec for `5m` | Re-test the prior failed mixed target after `v3.4.0` removes synchronous market-summary refresh. | If clean, move up. If it fails, inspect failure family before assuming host limit. |
+| B | `50` bets/sec + `500` reads/sec for `5m` | Find whether the fix creates substantial new mixed-read headroom. | If p95 stays below `1s`, no failed bets, and no dropped iterations, move up. |
+| C | `75` bets/sec + `750` reads/sec for `5m` | Stress the host near a likely mixed-workload edge. | If it fails, bisect between B and C. |
+| D | `100` bets/sec + `1000` reads/sec for `5m` | Optional only if C is clean and host telemetry still has headroom. | Stop if Postgres/backend CPU pins or request failures appear. |
+
+Pass/fail criteria:
+
+- Pass: zero failed bets, effectively zero HTTP failures, no dropped iterations, p95 below `1s`, and host CPU not pinned near `0%` idle for sustained samples.
+- Degraded: no failed bets but dropped iterations, p95 above `1s`, or CPU pinned for sustained samples.
+- Fail: any meaningful failed bets, sustained HTTP failures, site unreachability, or k6 abort.
+
+The `v3.4.0` series should be documented separately from the pre-`v3.4.0` runs even though it uses the same Droplet and fixtures.
