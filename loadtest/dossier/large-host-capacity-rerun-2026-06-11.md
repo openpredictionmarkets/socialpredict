@@ -482,3 +482,122 @@ Pass/fail criteria:
 - Fail: any meaningful failed bets, sustained HTTP failures, site unreachability, or k6 abort.
 
 The `v3.4.0` series should be documented separately from the pre-`v3.4.0` runs even though it uses the same Droplet and fixtures.
+
+## v3.4.0 Mixed Workload Results
+
+### Invalid Setup Run: Fixture Mismatch After v3.4.0 Deploy
+
+A first post-deploy attempt started at `2026-06-11T04:07:22Z` using `25` bets/sec plus `250` reads/sec, but it never reached the measured scenarios. The load-test users failed authentication during setup.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `25` bets/sec + `250` reads/sec |
+| Result | Invalid setup run |
+| Failed login requests | `8` |
+| Login failure reason | `AUTHORIZATION_DENIED` |
+| HTTP failure rate | `89.28%` during setup only |
+| Host CPU idle | `99.75%` |
+
+Interpretation:
+
+- This is not capacity evidence.
+- The server was idle and ready; the failure was fixture/auth state mismatch after redeploy.
+- Corrective action was to reseed remote load-test fixtures and pull fresh local `users.csv` / `markets.csv` before rerunning.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T040722Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040722Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040722Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040722Z-host-profile.json
+```
+
+### Partial Probe: 25 Bets/sec Plus 250 Reads/sec
+
+A later `25` bets/sec plus `250` reads/sec attempt started at `2026-06-11T04:08:48Z`. It looked clean, but it did not run to the full five-minute confirmation target, so it is recorded as a partial probe rather than proof.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `25` bets/sec + `250` reads/sec |
+| Result | Partial clean probe, not full proof |
+| Bets attempted | `2597` |
+| Bets succeeded | `2595` |
+| Failed bets | `0` recorded in check failures |
+| Site reads attempted | `25967` |
+| Site reads succeeded | `25948` |
+| HTTP failures | `0` |
+| HTTP p95 | `108.23ms` |
+| Max VUs | `200` |
+| Host min CPU idle | `58.24%` |
+| Max Docker CPU sum | `276.41%` |
+| Max backend CPU | `83.18%` |
+| Max Postgres CPU | `42.14%` |
+| Min RAM available | `31091 MiB` |
+
+Interpretation:
+
+- This run suggests `25/250` is plausible on `v3.4.0`, but it must be rerun to completion before being treated as a passing evidence point.
+- The host had meaningful headroom during the partial window.
+- Because the follow-up `50/500` failed badly, the full `25/250` confirmation is still necessary before testing the midpoint.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T040848Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040848Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040848Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040848Z-host-profile.json
+```
+
+### Failed Bracket: 50 Bets/sec Plus 500 Reads/sec
+
+A `50` bets/sec plus `500` reads/sec attempt started at `2026-06-11T04:12:07Z` and was manually aborted after the run degraded heavily.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `50` bets/sec + `500` reads/sec |
+| Result | Fail / upper-bound bracket |
+| Scenario time before abort | About `1m20s` |
+| Bets attempted | `1911` |
+| Bets succeeded | `196` |
+| Bets failed | `715` |
+| Site reads attempted | `8236` |
+| Site reads succeeded | `7229` |
+| Site reads failed | `7` |
+| HTTP failure rate | `6.77%` |
+| HTTP p95 | `33.05s` |
+| HTTP max | `60.26s` |
+| Dropped iterations | `34104` |
+| VUs maxed | `2000/2000` |
+| Host min CPU idle | `88.18%` |
+| Max Docker CPU sum | `117.48%` |
+| Max backend CPU | `38.37%` |
+| Max Postgres CPU | `51.78%` |
+| Min RAM available | `30540 MiB` |
+
+Interpretation:
+
+- `50/500` is above the current mixed workload envelope.
+- The host was mostly idle while k6 reached `2000` VUs and requests timed out, so this does not look like a simple server CPU saturation limit.
+- The failure pattern points toward request queueing, connection pool pressure, client/load-generator saturation, network behavior, or another concurrency bottleneck.
+- This is a useful upper-bound bracket, but it should not be interpreted as the raw CPU capacity of the host.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T041207Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-profile.json
+```
+
+### Current v3.4.0 Bracket
+
+| Bound | Status | Evidence |
+| --- | --- | --- |
+| Lower candidate | `25/250` looked clean but partial | Needs full five-minute confirmation. |
+| Upper bound | `50/500` failed | Too aggressive under current harness/system behavior. |
+| Next midpoint after full lower confirmation | `35/350` | Run only after full `25/250` completes cleanly. |
+
+The next completed evidence point should be a full five-minute `25/250` run. If clean, run `35/350` next rather than returning to `50/500`.
