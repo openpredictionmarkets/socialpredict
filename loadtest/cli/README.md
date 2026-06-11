@@ -168,9 +168,22 @@ hot-market tests focused on betting throughput instead of measuring login churn.
 models users clicking around the site. It uses cached/read-model endpoints for
 market discovery, topic pages, market summary widgets, market positions,
 market leaderboards, system metrics, global leaderboard, and user financial
-summary where those endpoints exist.
+summary where those endpoints exist. The default mix intentionally excludes the
+raw full market detail route and live bets table route so the test models the
+intended cached display paths rather than worst-case recomputation.
 
 The default first ratio is `10` read actions for each `1` bet action:
+
+| Read family | Endpoint pattern | Default read share |
+| --- | --- | ---: |
+| Config/CMS | `/v0/setup/frontend`, `/v0/content/home`, `/v0/content/social-share`, `/v0/market-tags` | `5%` |
+| Main market discovery | `/v0/read/market-discovery/markets?...` | `20%` |
+| Topic discovery | `/v0/read/market-discovery/{tagSlug}?...` | `15%` |
+| Market summary widgets | `/v0/read/markets/{id}/summary` | `30%` |
+| Market positions | `/v0/markets/positions/{id}?limit=21&offset=0` | `10%` |
+| Market leaderboard | `/v0/markets/{id}/leaderboard?limit=21&offset=0` | `7%` |
+| User financial summary | `/v0/read/users/{username}/financial-summary` | `8%` |
+| Reporting | `/v0/system/metrics`, `/v0/global/leaderboard?limit=21&offset=0` | `5%` |
 
 ```bash
 ./loadtest/cli/loadtest run site-mix \

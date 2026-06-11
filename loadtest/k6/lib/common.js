@@ -327,6 +327,20 @@ export function readUserDisplay(authenticatedUsers = []) {
   });
 }
 
+export function readUserFinancialSummary(authenticatedUsers = []) {
+  const authenticatedUser = pickAuthenticatedUser(authenticatedUsers);
+  if (!authenticatedUser) {
+    return readApiPath('/v0/setup/frontend', { name: 'setup frontend fallback' });
+  }
+
+  const username = encodeURIComponent(authenticatedUser.username);
+  return readApiPath(`/v0/read/users/${username}/financial-summary`, {
+    name: 'user financial read model',
+    token: authenticatedUser.token,
+    tags: { username: authenticatedUser.username },
+  });
+}
+
 export function readStatsDisplay(authenticatedUsers = []) {
   const authenticatedUser = pickAuthenticatedUser(authenticatedUsers);
   const token = authenticatedUser ? authenticatedUser.token : '';

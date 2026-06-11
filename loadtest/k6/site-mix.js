@@ -7,14 +7,12 @@ import {
   placeBet,
   preAuthenticateUsers,
   readConfigDisplay,
-  readMarket,
-  readMarketBetsPage,
   readMarketDiscovery,
   readMarketLeaderboardPage,
   readMarketPositionsPage,
   readMarketSummary,
   readStatsDisplay,
-  readUserDisplay,
+  readUserFinancialSummary,
   requireFixtures,
   secureRandomFraction,
 } from './lib/common.js';
@@ -73,21 +71,17 @@ export function siteRead(data) {
     readConfigDisplay();
   } else if (roll < 0.25) {
     readMarketDiscovery({ slug: 'markets', status: secureRandomFraction() < 0.8 ? 'active' : 'all' });
-  } else if (roll < 0.35) {
+  } else if (roll < 0.40) {
     const slug = tagSlug || 'markets';
     readMarketDiscovery({ slug, status: 'active', tagSlug });
-  } else if (roll < 0.55) {
+  } else if (roll < 0.70) {
     readMarketSummary(market);
-  } else if (roll < 0.60) {
-    readMarket();
-  } else if (roll < 0.67) {
-    readMarketBetsPage(market);
-  } else if (roll < 0.74) {
-    readMarketPositionsPage(market);
   } else if (roll < 0.80) {
+    readMarketPositionsPage(market);
+  } else if (roll < 0.87) {
     readMarketLeaderboardPage(market);
-  } else if (roll < 0.90) {
-    readUserDisplay(data.authenticatedUsers);
+  } else if (roll < 0.95) {
+    readUserFinancialSummary(data.authenticatedUsers);
   } else {
     readStatsDisplay(data.authenticatedUsers);
   }
