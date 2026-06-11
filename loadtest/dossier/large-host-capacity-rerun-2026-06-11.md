@@ -180,6 +180,32 @@ Default read distribution at `250` reads/sec:
 
 The default mixed run intentionally excludes the raw full market detail route and the live bets table route. Those should be measured separately as control or worst-case paths.
 
+### Aborted Setup Attempt
+
+An initial `site-mix` attempt started at `2026-06-11T02:58:01Z` but did not reach the measured scenarios. k6 was still in `setup()` pre-authenticating `2000` users when one `/api/v0/login` request timed out. The helper then attempted to parse the timeout response's null body as JSON and aborted the script.
+
+This is classified as a load-test harness failure, not an application capacity failure:
+
+| Metric | Value |
+| --- | ---: |
+| Authenticated logins before abort | `774` |
+| Failed login requests | `1` |
+| HTTP failure rate during setup | `0.12%` |
+| Max host CPU user during setup | `1.24%` |
+| Max Postgres CPU during setup | `1.41%` |
+| Min CPU idle during setup | `97.64%` |
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T025801Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T025801Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T025801Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T025801Z-host-profile.json
+```
+
+Harness adjustment: login token parsing now tolerates null/timeout bodies, and setup logins retry transient failures instead of aborting the entire run.
+
 Next command:
 
 ```bash

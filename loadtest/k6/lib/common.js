@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import { sleep } from 'k6';
 import crypto from 'k6/crypto';
 import { SharedArray } from 'k6/data';
 import { Counter } from 'k6/metrics';
@@ -24,6 +25,9 @@ export const BET_AMOUNT = Number(__ENV.BET_AMOUNT || '1');
 export const HOT_MARKET_WEIGHT = Number(__ENV.HOT_MARKET_WEIGHT || '8');
 export const FAILURE_LOG_LIMIT = Number(__ENV.FAILURE_LOG_LIMIT || '10');
 export const PREAUTH_USERS = Number(__ENV.PREAUTH_USERS || '100');
+export const LOGIN_RETRIES = Number(__ENV.LOGIN_RETRIES || '2');
+export const LOGIN_RETRY_SLEEP_SECONDS = Number(__ENV.LOGIN_RETRY_SLEEP_SECONDS || '0.2');
+export const LOGIN_TIMEOUT = __ENV.LOGIN_TIMEOUT || '10s';
 
 let failureLogCount = 0;
 
@@ -83,6 +87,15 @@ function responseReason(response) {
   if (!response || !response.body) return '';
   try {
     return response.json('reason') || '';
+  } catch {
+    return '';
+  }
+}
+
+function loginToken(response) {
+  if (!response || !response.body) return '';
+  try {
+    return response.json('result.token') || '';
   } catch {
     return '';
   }
@@ -166,24 +179,35 @@ export function authHeaders(token) {
 export function login(user) {
   if (tokenCache[user.username]) return tokenCache[user.username];
 
-  const response = http.post(
-    apiUrl('/v0/login'),
-    JSON.stringify({ username: user.username, password: user.password }),
-    { headers: { 'Content-Type': 'application/json' } },
-  );
+  let response = null;
+  for (let attempt = 1; attempt <= LOGIN_RETRIES + 1; attempt += 1) {
+    response = http.post(
+      apiUrl('/v0/login'),
+      JSON.stringify({ username: user.username, password: user.password }),
+      { headers: { 'Content-Type': 'application/json' }, timeout: LOGIN_TIMEOUT },
+    );
 
-  const ok = check(response, {
-    'login returned 200': (r) => r.status === 200,
-    'login returned token': (r) => Boolean(r.json('result.token')),
-  });
-  if (!ok) {
-    recordFailure('login', response, { user: user.username, url: apiUrl('/v0/login') });
-    return '';
+    const token = response.status === 200 ? loginToken(response) : '';
+    if (token) {
+      check(response, {
+        'login returned 200': (r) => r.status === 200,
+        'login returned token': (r) => Boolean(loginToken(r)),
+      });
+      tokenCache[user.username] = token;
+      return token;
+    }
+
+    if (attempt <= LOGIN_RETRIES) {
+      sleep(LOGIN_RETRY_SLEEP_SECONDS);
+    }
   }
 
-  const token = response.json('result.token');
-  tokenCache[user.username] = token;
-  return token;
+  check(response, {
+    'login returned 200': (r) => r.status === 200,
+    'login returned token': (r) => Boolean(loginToken(r)),
+  });
+  recordFailure('login', response, { user: user.username, url: apiUrl('/v0/login') });
+  return '';
 }
 
 export function preAuthenticateUsers(limit = PREAUTH_USERS) {

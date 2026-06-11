@@ -172,6 +172,10 @@ summary where those endpoints exist. The default mix intentionally excludes the
 raw full market detail route and live bets table route so the test models the
 intended cached display paths rather than worst-case recomputation.
 
+During setup, `site-mix` pre-authenticates users before the measured scenarios
+start. Transient login timeouts are retried and skipped if they still fail, so
+one setup timeout does not abort the entire run.
+
 The default first ratio is `10` read actions for each `1` bet action:
 
 | Read family | Endpoint pattern | Default read share |
