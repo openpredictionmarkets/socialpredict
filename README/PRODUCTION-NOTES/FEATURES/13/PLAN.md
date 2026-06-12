@@ -72,6 +72,9 @@ Checklist:
 - [ ] Add stewardship reassignment for parent and child markets together.
 - [ ] Add audit records for group approval/rejection/stewardship decisions.
 - [ ] Add admin UI to review parent question, description, tags, generated child markets, and answer labels.
+- [ ] Collapse Proposed, Published, and Rejected admin queue rows by parent group.
+- [ ] Collapse Proposed, Published, and Rejected moderator profile rows by parent group.
+- [ ] Ensure grouped queue actions operate on the parent group rather than forcing manual per-child approval/rejection.
 
 ## 05. Trading And Transaction Boundary
 
@@ -90,10 +93,17 @@ Checklist:
 - [x] Add read endpoint for group summary and ordered answers.
 - [x] Add compact answer card payloads with child market probability, volume, and users.
 - [ ] Add freshness metadata to group read responses.
-- [ ] Prefer parent group cards in `/markets` and topic pages.
-- [ ] Decide whether child markets are hidden from normal discovery or shown with group context.
+- [x] Prefer parent group rows in `/markets`, search, and topic pages when child markets carry group metadata.
+- [x] Decide whether child markets are hidden from normal discovery or shown with group context.
 - [ ] Add search behavior for parent title and answer labels.
 - [x] Add tag projection or inheritance behavior for group discovery.
+- [x] Add structural discovery invalidation so newly created groups do not wait behind soft-stale cache windows.
+
+Decision:
+
+- Discovery and search collapse grouped children into one row.
+- The row links to a representative child market URL.
+- The child market page renders a consolidated grouped view when `marketGroup` metadata is present.
 
 ## 07. Frontend Creation And Display
 
@@ -103,10 +113,12 @@ Checklist:
 - [x] Add multiple-choice answer editor with add/remove behavior before submit.
 - [ ] Add answer reorder behavior before submit.
 - [x] Add copy explaining independent binary answer markets.
-- [x] Add parent group page route.
+- [x] Add compatibility parent group route.
 - [x] Render answer cards with child probability, volume, and trade affordance.
-- [ ] Add compact child chart snapshots to answer cards.
+- [x] Add consolidated comparison chart across child answers.
 - [x] Preserve direct child market pages.
+- [x] Make direct child market pages render the consolidated grouped view by default.
+- [x] Add per-answer trade controls on the consolidated grouped view.
 - [x] Add responsive/mobile layout for answer cards.
 - [ ] Add accessibility labels and keyboard support for answer editor and answer cards.
 
@@ -120,6 +132,30 @@ Checklist:
 - [ ] Ensure each helper calls existing child-market resolution/refund/payout logic.
 - [ ] Add tests proving group helper payouts match individually resolving child markets.
 - [ ] Add tests proving resolved children cannot be traded afterward.
+
+## 08A. Group Amendments
+
+Checklist:
+
+- [ ] Decide parent-owned group amendment persistence vs. child-specific amendment projection.
+- [ ] Add group amendment proposal API.
+- [ ] Add group amendment admin review API.
+- [ ] Add group amendment moderator status API.
+- [ ] Show group amendments on parent group pages.
+- [ ] Tie group amendment review rows to the parent group and ordered child answers.
+- [ ] Preserve child-market transaction boundaries; amendments remain display/governance state.
+
+## 08B. Answer Addition Policy
+
+Checklist:
+
+- [ ] Add explicit answer addition policy enum: `NO_ONE`, `CREATOR_ONLY`, `ANY_ACTIVE_MODERATOR`.
+- [ ] Keep answer additions disabled by default.
+- [ ] Add admin control for enabling answer additions.
+- [ ] Add moderator proposal flow for new answers when policy allows.
+- [ ] Create added answers as new normal child binary markets.
+- [ ] Add audit trail for who proposed/approved added answers.
+- [ ] Ensure answer additions never rewrite existing child market bet or payout history.
 
 ## 09. Testing And Verification
 

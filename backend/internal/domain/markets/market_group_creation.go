@@ -135,6 +135,22 @@ func (s *Service) GetMarketGroupOverview(ctx context.Context, groupID int64) (*M
 	}, nil
 }
 
+// GetMarketGroupForMarket resolves a normal binary child market back to its
+// parent group for display binding. It is not used by transaction paths.
+func (s *Service) GetMarketGroupForMarket(ctx context.Context, marketID int64) (*MarketGroup, error) {
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if s == nil || s.repo == nil {
+		return nil, ErrInvalidState
+	}
+	repo, ok := s.repo.(MarketGroupLookupRepository)
+	if !ok {
+		return nil, ErrInvalidState
+	}
+	return repo.GetMarketGroupForMarket(ctx, marketID)
+}
+
 func (s *Service) validateMarketGroupCreateRequest(req MarketGroupCreateRequest) error {
 	if len(strings.TrimSpace(req.QuestionTitle)) == 0 || len(req.QuestionTitle) > MaxQuestionTitleLength {
 		return ErrInvalidQuestionLength

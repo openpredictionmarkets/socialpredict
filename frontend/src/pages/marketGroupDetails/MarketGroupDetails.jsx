@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Redirect, useParams } from 'react-router-dom';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import MarketTagChips from '../../components/markets/MarketTagChips';
 import { getMarketGroupDetails } from '../../api/marketsApi';
@@ -123,6 +123,11 @@ function MarketGroupDetails() {
 
   const group = groupData?.group || {};
   const answers = [...(groupData?.answers || [])].sort((left, right) => left.displayOrder - right.displayOrder);
+  const firstChildMarketId = answers[0]?.marketId;
+
+  if (firstChildMarketId) {
+    return <Redirect to={`/markets/${firstChildMarketId}`} />;
+  }
 
   return (
     <main className='mx-auto max-w-5xl p-4 sm:p-6'>

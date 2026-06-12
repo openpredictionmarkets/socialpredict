@@ -5004,6 +5004,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketTagResponse'
+        marketGroup:
+          $ref: '#/components/schemas/MarketGroupLink'
         total:
           type: integer
 
@@ -5176,6 +5178,28 @@ components:
         answerCount:
           type: integer
 
+    MarketGroupLink:
+      type: object
+      description: Parent group metadata attached to a child binary market response.
+      properties:
+        id:
+          type: integer
+          format: int64
+        questionTitle:
+          type: string
+        groupType:
+          type: string
+          enum: [MULTIPLE_CHOICE_BINARY]
+        lifecycleStatus:
+          type: string
+          enum: [proposed, rejected, published, closed, resolved, cancelled]
+        status:
+          type: string
+        answerLabel:
+          type: string
+        answerCount:
+          type: integer
+
     MarketGroupAnswerResponse:
       type: object
       properties:
@@ -5330,6 +5354,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketTagResponse'
+        marketGroup:
+          $ref: '#/components/schemas/MarketGroupLink'
 
     ProbabilityChange:
       type: object

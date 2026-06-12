@@ -74,6 +74,13 @@ type MarketGroupRepository interface {
 	ListMarketGroupMembers(ctx context.Context, groupID int64) ([]MarketGroupMember, error)
 }
 
+// MarketGroupLookupRepository resolves a child market back to its parent group.
+// Display/read paths use this to bind normal binary child markets into a group
+// without changing child-market transaction ownership.
+type MarketGroupLookupRepository interface {
+	GetMarketGroupForMarket(ctx context.Context, marketID int64) (*MarketGroup, error)
+}
+
 // MarketGroupOverview is the parent group read shape with child market
 // overviews. It is display data, not transaction state.
 type MarketGroupOverview struct {

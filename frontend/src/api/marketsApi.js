@@ -97,3 +97,13 @@ export const getMarketGroupDetails = async (groupId) => {
         fallbackMessage: 'Failed to fetch market group details.',
     });
 };
+
+export const getMarketSummaryReadModel = async (marketId) => {
+    if (!marketId) {
+        throw new Error('Market ID is required');
+    }
+
+    return apiRequest(`/v0/read/markets/${marketId}/summary`, {
+        fallbackMessage: 'Failed to fetch market summary.',
+    });
+};

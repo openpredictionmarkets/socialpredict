@@ -26,6 +26,7 @@ type MarketResponse struct {
 	CreatedAt          time.Time           `json:"createdAt"`
 	UpdatedAt          time.Time           `json:"updatedAt"`
 	Tags               []MarketTagResponse `json:"tags,omitempty"`
+	MarketGroup        *MarketGroupLink    `json:"marketGroup,omitempty"`
 }
 
 // CreateMarketResponse represents the HTTP response after creating a market
@@ -137,6 +138,18 @@ type PublicMarketResponse struct {
 	YesLabel                string              `json:"yesLabel"`
 	NoLabel                 string              `json:"noLabel"`
 	Tags                    []MarketTagResponse `json:"tags,omitempty"`
+	MarketGroup             *MarketGroupLink    `json:"marketGroup,omitempty"`
+}
+
+// MarketGroupLink binds a normal child market back to its parent group.
+type MarketGroupLink struct {
+	ID              int64  `json:"id"`
+	QuestionTitle   string `json:"questionTitle"`
+	GroupType       string `json:"groupType"`
+	LifecycleStatus string `json:"lifecycleStatus"`
+	Status          string `json:"status"`
+	AnswerLabel     string `json:"answerLabel,omitempty"`
+	AnswerCount     int    `json:"answerCount"`
 }
 
 // ProbabilityChangeResponse represents WPAM probability history.

@@ -11,6 +11,7 @@ import (
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/logger"
 
 	"github.com/gorilla/mux"
 )
@@ -67,6 +68,8 @@ func (h *Handler) CreateMarketGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.invalidateCreatedMarketGroup(r.Context(), user.Username, group)
+
 	overview, err := svc.GetMarketGroupOverview(r.Context(), group.ID)
 	if err != nil {
 		response := dto.MarketGroupDetailsResponse{
@@ -78,7 +81,7 @@ func (h *Handler) CreateMarketGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = writeJSON(w, http.StatusCreated, marketGroupOverviewToResponse(overview))
+	_ = writeJSON(w, http.StatusCreated, marketGroupOverviewToResponse(r.Context(), h.service, overview))
 }
 
 // GetMarketGroup handles GET /v0/market-groups/{id}.
@@ -106,7 +109,21 @@ func (h *Handler) GetMarketGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = writeJSON(w, http.StatusOK, marketGroupOverviewToResponse(overview))
+	_ = writeJSON(w, http.StatusOK, marketGroupOverviewToResponse(r.Context(), h.service, overview))
+}
+
+func (h *Handler) invalidateCreatedMarketGroup(ctx context.Context, username string, group *dmarkets.MarketGroup) {
+	if h.invalidator == nil || group == nil {
+		return
+	}
+	for _, member := range group.Members {
+		if member.MarketID <= 0 {
+			continue
+		}
+		if err := h.invalidator.InvalidateAfterMarketTransaction(ctx, username, member.MarketID, "market_group_created"); err != nil {
+			logger.LogError("CreateMarketGroup", "InvalidateReadModels", err)
+		}
+	}
 }
 
 func (h *Handler) sanitizeMarketGroupRequest(req dto.CreateMarketGroupRequest) (dto.CreateMarketGroupRequest, error) {
@@ -152,7 +169,7 @@ func parseMarketGroupIDFromRequest(r *http.Request) (int64, error) {
 	return id, nil
 }
 
-func marketGroupOverviewToResponse(overview *dmarkets.MarketGroupOverview) dto.MarketGroupDetailsResponse {
+func marketGroupOverviewToResponse(ctx context.Context, provider any, overview *dmarkets.MarketGroupOverview) dto.MarketGroupDetailsResponse {
 	if overview == nil {
 		return dto.MarketGroupDetailsResponse{
 			Answers: []dto.MarketGroupAnswerResponse{},
@@ -167,7 +184,7 @@ func marketGroupOverviewToResponse(overview *dmarkets.MarketGroupOverview) dto.M
 			MarketID:     answer.Member.MarketID,
 			AnswerLabel:  answer.Member.AnswerLabel,
 			DisplayOrder: answer.Member.DisplayOrder,
-			Market:       marketOverviewToResponse(answer.Overview),
+			Market:       marketOverviewToResponse(ctx, provider, answer.Overview),
 		})
 	}
 

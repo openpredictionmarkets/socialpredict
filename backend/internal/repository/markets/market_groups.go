@@ -78,6 +78,20 @@ func (r *GormRepository) ListMarketGroupMembers(ctx context.Context, groupID int
 	return modelMarketGroupMembersToDomain(dbMembers), nil
 }
 
+// GetMarketGroupForMarket resolves the parent group for a child market.
+func (r *GormRepository) GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
+	var member models.MarketGroupMember
+	if err := r.db.WithContext(ctx).
+		Where("market_id = ?", marketID).
+		First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, dmarkets.ErrMarketGroupNotFound
+		}
+		return nil, err
+	}
+	return r.GetMarketGroup(ctx, member.GroupID)
+}
+
 func domainMarketGroupToModel(group *dmarkets.MarketGroup) models.MarketGroup {
 	return models.MarketGroup{
 		ID:                 group.ID,

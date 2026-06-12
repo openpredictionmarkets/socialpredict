@@ -191,9 +191,9 @@ function Create() {
         });
 
         window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
-        const groupId = responseData?.group?.id || responseData?.id;
-        if (groupId) {
-          history.push(`/markets/group/${groupId}`);
+        const firstChildMarketId = responseData?.answers?.[0]?.marketId;
+        if (firstChildMarketId) {
+          history.push(`/markets/${firstChildMarketId}`);
           return;
         }
         setCreatedMarket(responseData?.group || responseData);

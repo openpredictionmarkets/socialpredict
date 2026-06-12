@@ -17,6 +17,10 @@ type marketSummaryProvider interface {
 	GetMarketSummaryReadModel(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
 }
 
+type marketGroupLookupProvider interface {
+	GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error)
+}
+
 func buildMarketOverviewResponses(ctx context.Context, provider marketOverviewProvider, markets []*dmarkets.Market) ([]*dto.MarketOverviewResponse, error) {
 	if len(markets) == 0 {
 		return []*dto.MarketOverviewResponse{}, nil
@@ -29,25 +33,25 @@ func buildMarketOverviewResponses(ctx context.Context, provider marketOverviewPr
 			if err != nil {
 				return nil, fmt.Errorf("market_id=%d: %w", market.ID, err)
 			}
-			overviews = append(overviews, marketSummaryToOverviewResponse(summary))
+			overviews = append(overviews, marketSummaryToOverviewResponse(ctx, provider, summary))
 			continue
 		}
 		details, err := provider.GetMarketDetails(ctx, market.ID)
 		if err != nil {
 			return nil, fmt.Errorf("market_id=%d: %w", market.ID, err)
 		}
-		overviews = append(overviews, marketOverviewToResponse(details))
+		overviews = append(overviews, marketOverviewToResponse(ctx, provider, details))
 	}
 	return overviews, nil
 }
 
-func marketSummaryToOverviewResponse(summary *dmarkets.MarketSummaryReadModel) *dto.MarketOverviewResponse {
+func marketSummaryToOverviewResponse(ctx context.Context, provider any, summary *dmarkets.MarketSummaryReadModel) *dto.MarketOverviewResponse {
 	if summary == nil {
 		return &dto.MarketOverviewResponse{}
 	}
 
 	return &dto.MarketOverviewResponse{
-		Market:          marketToResponse(summary.Market),
+		Market:          marketToResponseWithGroup(ctx, provider, summary.Market),
 		Creator:         creatorResponseFromSummary(summary.Creator),
 		LastProbability: summary.Accounting.LastProbability,
 		NumUsers:        summary.Accounting.UserCount,
@@ -56,19 +60,28 @@ func marketSummaryToOverviewResponse(summary *dmarkets.MarketSummaryReadModel) *
 	}
 }
 
-func marketOverviewToResponse(overview *dmarkets.MarketOverview) *dto.MarketOverviewResponse {
+func marketOverviewToResponse(ctx context.Context, provider any, overview *dmarkets.MarketOverview) *dto.MarketOverviewResponse {
 	if overview == nil {
 		return &dto.MarketOverviewResponse{}
 	}
 
 	return &dto.MarketOverviewResponse{
-		Market:          marketToResponse(overview.Market),
+		Market:          marketToResponseWithGroup(ctx, provider, overview.Market),
 		Creator:         creatorResponseFromSummary(overview.Creator),
 		LastProbability: overview.LastProbability,
 		NumUsers:        overview.NumUsers,
 		TotalVolume:     overview.TotalVolume,
 		MarketDust:      overview.MarketDust,
 	}
+}
+
+func marketToResponseWithGroup(ctx context.Context, provider any, market *dmarkets.Market) *dto.MarketResponse {
+	response := marketToResponse(market)
+	if response == nil || market == nil {
+		return response
+	}
+	response.MarketGroup = marketGroupLinkForMarket(ctx, provider, market.ID)
+	return response
 }
 
 func marketToResponse(market *dmarkets.Market) *dto.MarketResponse {
@@ -137,12 +150,20 @@ func publicMarketResponseFromDomain(market *dmarkets.Market) dto.PublicMarketRes
 	}
 }
 
-func marketSummaryToDetailsResponse(summary *dmarkets.MarketSummaryReadModel) dto.MarketDetailsResponse {
+func publicMarketResponseFromDomainWithGroup(ctx context.Context, provider any, market *dmarkets.Market) dto.PublicMarketResponse {
+	response := publicMarketResponseFromDomain(market)
+	if market != nil {
+		response.MarketGroup = marketGroupLinkForMarket(ctx, provider, market.ID)
+	}
+	return response
+}
+
+func marketSummaryToDetailsResponse(ctx context.Context, provider any, summary *dmarkets.MarketSummaryReadModel) dto.MarketDetailsResponse {
 	if summary == nil {
 		return dto.MarketDetailsResponse{}
 	}
 	return dto.MarketDetailsResponse{
-		Market:             publicMarketResponseFromDomain(summary.Market),
+		Market:             publicMarketResponseFromDomainWithGroup(ctx, provider, summary.Market),
 		Creator:            creatorResponseFromSummary(summary.Creator),
 		ProbabilityChanges: probabilityChangesToResponse(summary.Accounting.ProbabilityChanges),
 		NumUsers:           summary.Accounting.UserCount,
@@ -151,12 +172,12 @@ func marketSummaryToDetailsResponse(summary *dmarkets.MarketSummaryReadModel) dt
 	}
 }
 
-func marketDetailsToResponse(details *dmarkets.MarketOverview) dto.MarketDetailsResponse {
+func marketDetailsToResponse(ctx context.Context, provider any, details *dmarkets.MarketOverview) dto.MarketDetailsResponse {
 	if details == nil {
 		return dto.MarketDetailsResponse{}
 	}
 	return dto.MarketDetailsResponse{
-		Market:                publicMarketResponseFromDomain(details.Market),
+		Market:                publicMarketResponseFromDomainWithGroup(ctx, provider, details.Market),
 		Creator:               creatorResponseFromSummary(details.Creator),
 		ProbabilityChanges:    probabilityChangesToResponse(details.ProbabilityChanges),
 		NumUsers:              details.NumUsers,
@@ -164,6 +185,39 @@ func marketDetailsToResponse(details *dmarkets.MarketOverview) dto.MarketDetails
 		MarketDust:            details.MarketDust,
 		DescriptionAmendments: descriptionAmendmentsToResponse(details.DescriptionAmendments),
 	}
+}
+
+func marketGroupLinkForMarket(ctx context.Context, provider any, marketID int64) *dto.MarketGroupLink {
+	if marketID <= 0 {
+		return nil
+	}
+	lookup, ok := provider.(marketGroupLookupProvider)
+	if !ok {
+		return nil
+	}
+	group, err := lookup.GetMarketGroupForMarket(ctx, marketID)
+	if err != nil || group == nil || group.ID <= 0 {
+		return nil
+	}
+	status := group.LifecycleStatus
+	if strings.EqualFold(status, dmarkets.MarketLifecyclePublished) {
+		status = dmarkets.MarketStatusActive
+	}
+	link := &dto.MarketGroupLink{
+		ID:              group.ID,
+		QuestionTitle:   group.QuestionTitle,
+		GroupType:       group.GroupType,
+		LifecycleStatus: group.LifecycleStatus,
+		Status:          status,
+		AnswerCount:     len(group.Members),
+	}
+	for _, member := range group.Members {
+		if member.MarketID == marketID {
+			link.AnswerLabel = member.AnswerLabel
+			break
+		}
+	}
+	return link
 }
 
 func probabilityChangesToResponse(points []dmarkets.ProbabilityPoint) []dto.ProbabilityChangeResponse {

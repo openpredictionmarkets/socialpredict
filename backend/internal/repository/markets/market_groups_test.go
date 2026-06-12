@@ -79,6 +79,17 @@ func TestGormRepositoryCreateAndGetMarketGroup(t *testing.T) {
 	if got.Members[0].MarketID != childA.ID {
 		t.Fatalf("expected first member market ID %d, got %d", childA.ID, got.Members[0].MarketID)
 	}
+
+	lookedUp, err := repo.GetMarketGroupForMarket(ctx, childB.ID)
+	if err != nil {
+		t.Fatalf("GetMarketGroupForMarket returned error: %v", err)
+	}
+	if lookedUp.ID != group.ID || len(lookedUp.Members) != 3 {
+		t.Fatalf("unexpected looked up group: %+v", lookedUp)
+	}
+	if lookedUp.Members[1].AnswerLabel != "Team B" {
+		t.Fatalf("expected looked up group to include ordered members, got %+v", lookedUp.Members)
+	}
 }
 
 func TestGormRepositoryCreateMarketGroupRejectsInvalidMembers(t *testing.T) {
@@ -115,5 +126,8 @@ func TestGormRepositoryGetMarketGroupMissing(t *testing.T) {
 
 	if _, err := repo.GetMarketGroup(context.Background(), 9999); !errors.Is(err, dmarkets.ErrMarketGroupNotFound) {
 		t.Fatalf("GetMarketGroup error = %v, want ErrMarketGroupNotFound", err)
+	}
+	if _, err := repo.GetMarketGroupForMarket(context.Background(), 9999); !errors.Is(err, dmarkets.ErrMarketGroupNotFound) {
+		t.Fatalf("GetMarketGroupForMarket error = %v, want ErrMarketGroupNotFound", err)
 	}
 }

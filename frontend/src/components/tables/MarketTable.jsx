@@ -6,6 +6,13 @@ import ExpandableText from '../utils/ExpandableText';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketTagChips from '../markets/MarketTagChips';
+import {
+  groupMarketRows,
+  groupedMarketBadgeLabel,
+  isGroupedMarketAggregate,
+  marketDisplayRoute,
+  marketProbabilityDisplay,
+} from '../../helpers/marketGroups';
 
 const TableHeader = () => (
   <thead className='bg-gray-900'>
@@ -36,18 +43,18 @@ const MarketRow = ({ marketData }) => (
   <tr className='hover:bg-gray-700 transition-colors duration-200'>
     <td className='px-6 py-4 whitespace-nowrap'>
       <Link
-        to={`/markets/${marketData.market.id}`}
+        to={marketDisplayRoute(marketData)}
         className='text-blue-400 hover:text-blue-300'
       >
         ⬆️⬇️
       </Link>
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-300'>
-      {marketData.lastProbability.toFixed(2)}
+      {marketProbabilityDisplay(marketData)}
     </td>
     <td className='px-6 py-4 text-sm font-medium text-gray-300'>
       <Link
-        to={`/markets/${marketData.market.id}`}
+        to={marketDisplayRoute(marketData)}
         className='hover:text-blue-400 transition-colors duration-200 block max-w-xs'
         title={marketData.market.questionTitle}
       >
@@ -61,7 +68,14 @@ const MarketRow = ({ marketData }) => (
           expandIcon="📐"
         />
       </Link>
-      <MarketTagChips tags={marketData.market.tags || []} className="mt-2" />
+      <div className='mt-2 flex flex-wrap items-center gap-2'>
+        {isGroupedMarketAggregate(marketData) && (
+          <span className='rounded-full border border-cyan-500/40 bg-cyan-950/40 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100'>
+            {groupedMarketBadgeLabel(marketData)}
+          </span>
+        )}
+        <MarketTagChips tags={marketData.market.tags || []} />
+      </div>
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
       {formatResolutionDate(marketData.market.resolutionDateTime)}
@@ -110,12 +124,13 @@ const MarketTable = ({ markets }) => {
       <div className='p-4 text-center text-gray-400'>No markets found.</div>
     );
   }
+  const groupedMarkets = groupMarketRows(markets);
 
   return (
     <>
       {/* Mobile view */}
       <div className='md:hidden'>
-        {markets.map((marketData, index) => (
+        {groupedMarkets.map((marketData, index) => (
           <MobileMarketCard key={index} marketData={marketData} />
         ))}
       </div>
@@ -126,7 +141,7 @@ const MarketTable = ({ markets }) => {
           <table className='min-w-full divide-y divide-gray-700'>
             <TableHeader />
             <tbody className='bg-gray-800 divide-y divide-gray-700'>
-              {markets.map((marketData, index) => (
+              {groupedMarkets.map((marketData, index) => (
                 <MarketRow key={index} marketData={marketData} />
               ))}
             </tbody>

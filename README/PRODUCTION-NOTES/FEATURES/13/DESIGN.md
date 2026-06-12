@@ -46,7 +46,7 @@ If SocialPredict later needs true coupled multi-outcome markets, that should bec
 | Child market trading | Prediction Market Core Context | Existing binary market services own orders, sales, dust, probability, positions, and payout. |
 | Parent market group | Prediction Market Core Context | Owns grouping, governance, answer ordering, and parent contract text. |
 | Persistence | Backend Persistence and Migration Boundary | Additive timestamped migrations and tests. |
-| Frontend display | Frontend Experience Context | Shows group and child markets without inventing market truth. |
+| Frontend display | Frontend Experience Context | Shows grouped child markets as one consolidated market view without inventing market truth. |
 | Discovery/read models | Read-model/display boundary | Can cache group cards, answer summaries, and charts, but not transaction decisions. |
 
 ## Data Model Direction
@@ -118,6 +118,24 @@ Baseline policy: `INDEPENDENT_BINARY`.
 Future policy: `SUM_TO_ONE_EXCLUSIVE`.
 
 This should not be implemented by normalizing display probabilities over independent child markets. It would need a separate design because transaction prices, payout pools, and arbitrage behavior would need to match the displayed sum-to-one semantics.
+
+## Public URL And Display Convention
+
+The parent group can exist as a backend/API concept, but the public UX should default to a normal child market URL.
+
+Preferred convention:
+
+- `/markets/:childMarketId` loads the selected child market.
+- If that child belongs to a multiple-choice binary group, the page switches to a consolidated grouped view.
+- The consolidated view shows the parent question, parent description, all answer children, a shared comparison chart, and per-answer trade controls.
+- `/markets/group/:groupId` can exist as an internal/compatibility route, but it should not be the primary public URL.
+- Discovery, search, and topic pages should collapse grouped children into one row that links to a representative child market URL.
+
+Reason:
+
+- The public page should feel like one market to users.
+- Child markets remain normal tradable entities behind the view.
+- Existing child-market routes keep Open Graph, direct linking, and transaction boundaries simple.
 
 ## Creation Flow
 
@@ -193,6 +211,39 @@ Stewardship:
 - child markets should default to the same steward
 - reassignment should update parent and children together unless a future design allows split stewardship
 
+Admin and moderator review queues should collapse grouped child markets into one group listing.
+
+Grouped queue rows should show:
+
+- parent title and parent description
+- child answer labels and child market IDs
+- tags inherited by the children
+- creator and steward
+- lifecycle status
+- audit trail
+- group-level amendment state
+
+Approve/reject actions should be group-level actions when a group is still proposed. Admins should not need to approve or reject each generated child market one by one.
+
+Moderator views should similarly group Proposed, Published, and Rejected rows so the creator/steward can understand the state of the grouped market as one feature.
+
+## Group Amendments
+
+The amendment model remains append-only and backend-owned.
+
+For grouped binary markets, the baseline should support group-level amendment visibility:
+
+- parent group page shows approved group amendments
+- admin review shows pending/approved/rejected group amendments with child market context
+- moderator profile views show pending/approved/rejected group amendments for groups they steward
+- child market pages can show a link back to the parent group when group amendment context matters
+
+Open implementation decision:
+
+- whether group amendments are persisted as parent-only amendment rows, child-specific amendment rows attached to each generated market, or a dedicated group amendment table
+
+The design preference is parent-owned group amendments with child-market transaction state unchanged. Any child-specific amendment behavior should be a later explicit design, because child-specific contract changes could alter the meaning of a single answer independently from the group.
+
 ## Resolution
 
 Baseline resolution modes:
@@ -204,6 +255,13 @@ Baseline resolution modes:
 | Group N/A | Steward/admin marks the whole group N/A; backend resolves each child N/A through ordinary child-market refund logic. |
 
 Critical rule: parent group resolution never bypasses child market payout/refund services.
+
+Exclusive helper rules:
+
+- "Only one answer can resolve YES" is a group policy, not a probability policy.
+- "After one answer resolves YES, all others resolve NO, and not sooner" means non-winning children stay tradable/unresolved until the exclusive helper is executed.
+- The helper should call the existing child-market resolution service for the winning child and every remaining child.
+- The helper must be idempotent or reject partial/inconsistent resolution state before mutating payouts.
 
 ```mermaid
 flowchart TD
@@ -217,6 +275,32 @@ flowchart TD
   F --> G
   G --> H[Child-market payout/refund ledger]
 ```
+
+## Answer Addition Policy
+
+Future grouped markets may allow additional answer choices after initial creation. The baseline should design for this as an explicit policy instead of leaving it implicit.
+
+Candidate policy enum:
+
+| Policy | Meaning |
+| --- | --- |
+| `NO_ONE` | No new answers can be added after approval. |
+| `CREATOR_ONLY` | Only the original creator/current steward can propose new answers. |
+| `ANY_ACTIVE_MODERATOR` | Any active moderator can propose new answers. |
+
+Admin control:
+
+- answer additions are disabled by default
+- admins can enable the policy per group or through a future game/config setting
+- added answers must be proposed by an active moderator
+- added answers should go through review unless a future auto-approval rule is explicitly designed
+- market creator/steward gating should remain visible in the audit trail
+
+Transaction boundary:
+
+- adding an answer creates another normal child binary market
+- adding an answer must not rewrite existing child market bets, probability history, dust, or payouts
+- existing answer children remain canonical for trades already placed
 
 ## Read Models And Discovery
 
@@ -253,19 +337,19 @@ Routes:
 
 | Route | Purpose |
 | --- | --- |
-| `/markets/group/:id` | Parent multiple-choice page. |
-| `/markets/:id` | Existing child binary market detail page remains valid. |
+| `/markets/:id` | Existing child binary market detail page remains valid and renders the consolidated group view when the child belongs to a group. |
+| `/markets/group/:id` | Compatibility route only; should redirect to a representative child market URL. |
 | `/create` | Adds market type selector. |
 | `/admin` Market Review | Adds grouped proposal review. |
 
-Group page layout:
+Consolidated child-page layout:
 
 - parent title and contract text
 - clear independent-binary explanation
 - answer list/cards ordered by display order
-- probability/charts per answer
-- trade entry per answer, either inline or via child detail panel
-- tabs for group activity, child markets, and resolution status
+- one comparison chart across answer YES probabilities
+- trade entry per answer using existing child market transaction controls
+- future tabs for group activity, child markets, amendments, and resolution status
 
 ## Critical Decisions
 

@@ -10,6 +10,7 @@ import formatResolutionDate from '../../helpers/formatResolutionDate';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketTagChips from '../markets/MarketTagChips';
 import MarkdownLite from '../markdown/MarkdownLite';
+import GroupedMarketDetailsLayout from './GroupedMarketDetailsLayout';
 import { proposeMarketDescriptionAmendment } from '../../api/marketDescriptionAmendmentsApi';
 
 const DEFAULT_CREATOR_EMOJI = '👤';
@@ -106,6 +107,19 @@ function MarketDetailsTable({
       setSubmittingAmendment(false);
     }
   };
+
+  if (safeMarket.marketGroup?.id) {
+    return (
+      <GroupedMarketDetailsLayout
+        marketGroup={safeMarket.marketGroup}
+        fallbackMarket={safeMarket}
+        creator={safeCreator}
+        isLoggedIn={isLoggedIn}
+        token={token}
+        refetchData={refetchData}
+      />
+    );
+  }
 
   return (
     <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
