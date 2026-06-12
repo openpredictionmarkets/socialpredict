@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '../loaders/LoadingSpinner';
 import GroupedMarketChart from '../charts/GroupedMarketChart';
 import MarketTagChips from '../markets/MarketTagChips';
+import SiteTabs from '../tabs/SiteTabs';
 import TradeTabs from '../tabs/TradeTabs';
+import TradeCTA from '../TradeCTA';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import { getMarketGroupDetails, getMarketSummaryReadModel } from '../../api/marketsApi';
 
@@ -37,12 +39,16 @@ const probabilityDisplay = (answer) => {
   return probability.toFixed(2);
 };
 
-const childMarketStatus = (market) => (
-  market?.lifecycleStatus || market?.status || 'unknown'
-);
-
 const canTradeMarket = (market, isLoggedIn) => {
   if (!isLoggedIn || market?.isResolved) {
+    return false;
+  }
+  const lifecycle = String(market?.lifecycleStatus || '').toLowerCase();
+  const status = String(market?.status || '').toLowerCase();
+  if (lifecycle && lifecycle !== 'published') {
+    return false;
+  }
+  if (status && status !== 'active') {
     return false;
   }
   const closeDate = market?.resolutionDateTime ? new Date(market.resolutionDateTime) : null;
@@ -51,63 +57,6 @@ const canTradeMarket = (market, isLoggedIn) => {
   }
   return closeDate > new Date();
 };
-
-function AnswerTradeCard({ answer, isLoggedIn, onTrade }) {
-  const childMarket = answer?.market?.market || {};
-  const users = toNumber(answer?.summary?.numUsers ?? answer?.market?.numUsers);
-  const volume = toNumber(answer?.summary?.totalVolume ?? answer?.market?.totalVolume);
-  const marketDust = toNumber(answer?.summary?.marketDust ?? answer?.market?.marketDust);
-  const answerLabel = answer?.answerLabel || childMarket.marketGroup?.answerLabel || childMarket.questionTitle || 'Answer';
-  const tradable = canTradeMarket(childMarket, isLoggedIn);
-
-  return (
-    <article className='rounded-xl border border-gray-700 bg-gray-900/80 p-4 shadow-lg'>
-      <div className='flex flex-wrap items-start justify-between gap-3'>
-        <div>
-          <p className='text-xs uppercase tracking-[0.18em] text-primary-pink'>Answer</p>
-          <h2 className='mt-1 text-xl font-bold text-white'>{answerLabel}</h2>
-          <p className='mt-1 text-xs text-gray-500'>Child market #{answer.marketId}</p>
-        </div>
-        <span className='rounded-full border border-gray-600 bg-gray-800 px-3 py-1 text-xs font-semibold uppercase text-gray-200'>
-          {childMarketStatus(childMarket)}
-        </span>
-      </div>
-
-      <div className='mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4'>
-        <div className='rounded-lg bg-gray-800/80 p-3'>
-          <p className='text-xs uppercase tracking-[0.14em] text-gray-400'>YES</p>
-          <p className='mt-1 text-lg font-bold text-white'>{probabilityDisplay(answer)}</p>
-        </div>
-        <div className='rounded-lg bg-gray-800/80 p-3'>
-          <p className='text-xs uppercase tracking-[0.14em] text-gray-400'>Users</p>
-          <p className='mt-1 text-lg font-bold text-white'>{users}</p>
-        </div>
-        <div className='rounded-lg bg-gray-800/80 p-3'>
-          <p className='text-xs uppercase tracking-[0.14em] text-gray-400'>Volume</p>
-          <p className='mt-1 text-lg font-bold text-white'>{volume}</p>
-        </div>
-        <div className='rounded-lg bg-gray-800/80 p-3'>
-          <p className='text-xs uppercase tracking-[0.14em] text-gray-400'>Dust</p>
-          <p className='mt-1 text-lg font-bold text-white'>{marketDust}</p>
-        </div>
-      </div>
-
-      <div className='mt-5 flex flex-wrap items-center justify-between gap-3'>
-        <p className='text-sm text-gray-400'>
-          Trade YES/NO on this answer independently.
-        </p>
-        <button
-          type='button'
-          disabled={!tradable}
-          onClick={() => onTrade(answer)}
-          className='rounded-lg bg-primary-pink px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-pink/80 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400'
-        >
-          {tradable ? 'Trade This Answer' : 'Trading Closed'}
-        </button>
-      </div>
-    </article>
-  );
-}
 
 export default function GroupedMarketDetailsLayout({
   marketGroup,
@@ -121,7 +70,8 @@ export default function GroupedMarketDetailsLayout({
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showTradeModal, setShowTradeModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -175,15 +125,50 @@ export default function GroupedMarketDetailsLayout({
   }), [answers]);
 
   const closeDate = fallbackMarket?.resolutionDateTime || group?.resolutionDateTime;
-  const selectedMarket = selectedAnswer?.market?.market || {};
+  const sortedAnswers = useMemo(() => [...answers].sort((left, right) => (
+    Number(left.displayOrder || 0) - Number(right.displayOrder || 0)
+  )), [answers]);
+  const anyTradableAnswer = sortedAnswers.some((answer) => canTradeMarket(answer?.market?.market || {}, isLoggedIn));
+  const tradeButtonLabel = (() => {
+    if (!isLoggedIn) {
+      return 'LOG IN TO TRADE';
+    }
+    if (anyTradableAnswer) {
+      return 'TRADE';
+    }
+    const hasProposed = sortedAnswers.some((answer) => (
+      String(answer?.market?.market?.lifecycleStatus || '').toLowerCase() === 'proposed'
+    ));
+    return hasProposed ? 'AWAITING APPROVAL' : 'TRADING CLOSED';
+  })();
 
   const handleTransactionSuccess = () => {
-    setSelectedAnswer(null);
+    setShowTradeModal(false);
     setRefreshKey((current) => current + 1);
     if (refetchData) {
       refetchData();
     }
   };
+
+  const answerTradeTabs = sortedAnswers.map((answer) => {
+    const childMarket = answer?.market?.market || {};
+    const tradable = canTradeMarket(childMarket, isLoggedIn);
+    return {
+      label: answer.answerLabel || `Answer ${answer.displayOrder + 1}`,
+      content: tradable ? (
+        <TradeTabs
+          marketId={answer.marketId}
+          market={childMarket}
+          token={token}
+          onTransactionSuccess={handleTransactionSuccess}
+        />
+      ) : (
+        <div className='rounded-lg bg-blue-950/70 p-4 text-sm text-blue-50'>
+          This answer is not open for trading.
+        </div>
+      ),
+    };
+  });
 
   if (loading) {
     return (
@@ -205,36 +190,48 @@ export default function GroupedMarketDetailsLayout({
   return (
     <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
       <section className='mb-4'>
-        <p className='text-xs uppercase tracking-[0.2em] text-primary-pink'>
-          Multiple-Choice Binary Market
-        </p>
-        <h1 className='mt-2 text-2xl font-bold text-white sm:text-3xl'>
+        <h1 className='text-xl font-semibold text-white mb-2 break-words line-clamp-2'>
           {group.questionTitle || marketGroup.questionTitle || fallbackMarket.questionTitle}
         </h1>
-        <div className='mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-400'>
+        <div className='flex flex-wrap items-center gap-2 text-sm text-gray-400'>
           <span>@{groupCreator.username || group.creatorUsername || fallbackMarket.creatorUsername}</span>
           <span>•</span>
           <span>{answers.length} answers</span>
           <span>•</span>
           <span>Closes {formatResolutionDate(closeDate)}</span>
         </div>
-        {(group.description || fallbackMarket.description) && (
-          <p className='mt-3 max-w-4xl whitespace-pre-wrap text-sm leading-6 text-gray-300'>
-            {group.description || fallbackMarket.description}
-          </p>
-        )}
         <MarketTagChips tags={tags} className='mt-3' />
-        <div className='mt-4 rounded-xl border border-cyan-500/30 bg-cyan-950/30 p-4 text-sm text-cyan-50'>
-          Each answer below is a separate YES/NO market. The chart compares each answer's YES probability; probabilities are independent and are not forced to add up to 100%.
-        </div>
       </section>
 
-      <div className='mb-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4'>
+      <div className='mb-4'>
+        <GroupedMarketChart answers={answers} title='Probability Changes' />
+      </div>
+
+      {group.description && (
+        <>
+          <div className='mb-4'>
+            <button
+              type='button'
+              onClick={() => setShowFullDescription(!showFullDescription)}
+              className='w-full py-2 bg-gray-700 hover:bg-gray-600 transition-colors duration-200 rounded-lg text-center text-sm'
+            >
+              {showFullDescription ? 'Hide Contract Text' : 'Show Full Contract Text'}
+            </button>
+          </div>
+          {showFullDescription && (
+            <div className='mb-4 rounded-lg bg-gray-800 p-4 text-sm'>
+              <p className='whitespace-pre-wrap'>{group.description}</p>
+            </div>
+          )}
+        </>
+      )}
+
+      <div className='grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-4'>
         {[
           { label: 'Answers', value: answers.length, icon: '▦' },
           { label: 'Users', value: aggregate.users, icon: '👤' },
           { label: 'Volume', value: Math.round(aggregate.volume), icon: '📊' },
-          { label: 'Dust', value: aggregate.dust, icon: '✨' },
+          { label: 'Closes', value: formatResolutionDate(closeDate), icon: '📅' },
         ].map((item) => (
           <div key={item.label} className='rounded-lg bg-gray-800 p-2'>
             <div className='text-xs text-gray-400'>{item.label}</div>
@@ -245,36 +242,48 @@ export default function GroupedMarketDetailsLayout({
         ))}
       </div>
 
-      <div className='mb-5'>
-        <GroupedMarketChart answers={answers} title='Answer Probability Comparison' />
+      {aggregate.dust > 0 && (
+        <div className='grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-4'>
+          <div className='bg-gray-800 p-2 rounded-lg'>
+            <div className='text-xs text-gray-400'>Dust</div>
+            <div className='text-sm font-semibold truncate'>✨ {aggregate.dust}</div>
+          </div>
+        </div>
+      )}
+
+      <div className='mb-4 grid gap-2 sm:grid-cols-3'>
+        {sortedAnswers.map((answer) => (
+          <div key={answer.id || answer.marketId} className='rounded-lg bg-gray-800 p-3 text-center'>
+            <div className='truncate text-sm font-semibold text-white'>{answer.answerLabel}</div>
+            <div className='mt-1 text-xs text-gray-400'>YES {probabilityDisplay(answer)}</div>
+          </div>
+        ))}
       </div>
 
-      <section className='grid gap-4'>
-        {answers.map((answer) => (
-          <AnswerTradeCard
-            key={answer.id || answer.marketId}
-            answer={answer}
-            isLoggedIn={isLoggedIn}
-            onTrade={setSelectedAnswer}
-          />
-        ))}
-      </section>
+      <div className='flex items-center justify-center mb-4 space-x-4 py-4'>
+        <button
+          type='button'
+          disabled={!anyTradableAnswer}
+          onClick={() => setShowTradeModal(true)}
+          className='min-w-32 rounded border bg-custom-gray-light px-4 py-2 text-xs text-white transition hover:bg-neutral-btn disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm md:text-base'
+        >
+          {tradeButtonLabel}
+        </button>
+      </div>
 
-      {selectedAnswer && (
+      {anyTradableAnswer && (
+        <TradeCTA onClick={() => setShowTradeModal(true)} disabled={!token} />
+      )}
+
+      <div className='h-32 md:hidden' />
+
+      {showTradeModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-50'>
           <div className='bet-modal relative m-6 mx-auto rounded-lg bg-blue-900 p-6 text-white' style={{ width: '350px' }}>
-            <div className='mb-3 rounded-md bg-blue-950/70 p-3 text-sm text-blue-50'>
-              Trading answer: <span className='font-semibold'>{selectedAnswer.answerLabel}</span>
-            </div>
-            <TradeTabs
-              marketId={selectedAnswer.marketId}
-              market={selectedMarket}
-              token={token}
-              onTransactionSuccess={handleTransactionSuccess}
-            />
+            <SiteTabs tabs={answerTradeTabs} />
             <button
               type='button'
-              onClick={() => setSelectedAnswer(null)}
+              onClick={() => setShowTradeModal(false)}
               className='absolute right-0 top-0 mr-4 mt-4 text-gray-400 hover:text-white'
             >
               x
