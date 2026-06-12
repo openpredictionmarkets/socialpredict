@@ -46,6 +46,47 @@ type CreateMarketResponse struct {
 	Tags               []MarketTagResponse `json:"tags,omitempty"`
 }
 
+// MarketGroupResponse represents a multiple-choice binary parent market.
+type MarketGroupResponse struct {
+	ID                 int64      `json:"id"`
+	QuestionTitle      string     `json:"questionTitle"`
+	Description        string     `json:"description"`
+	GroupType          string     `json:"groupType"`
+	ProbabilityPolicy  string     `json:"probabilityPolicy"`
+	ResolutionPolicy   string     `json:"resolutionPolicy"`
+	LifecycleStatus    string     `json:"lifecycleStatus"`
+	Status             string     `json:"status"`
+	ProposalCost       int64      `json:"proposalCost"`
+	CreatorUsername    string     `json:"creatorUsername"`
+	StewardUsername    string     `json:"stewardUsername"`
+	ApprovedBy         string     `json:"approvedBy,omitempty"`
+	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy         string     `json:"rejectedBy,omitempty"`
+	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason    string     `json:"rejectionReason,omitempty"`
+	ResolutionDateTime time.Time  `json:"resolutionDateTime"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	AnswerCount        int        `json:"answerCount"`
+}
+
+// MarketGroupAnswerResponse links one answer option to its tradable child market.
+type MarketGroupAnswerResponse struct {
+	ID           int64                   `json:"id"`
+	GroupID      int64                   `json:"groupId"`
+	MarketID     int64                   `json:"marketId"`
+	AnswerLabel  string                  `json:"answerLabel"`
+	DisplayOrder int                     `json:"displayOrder"`
+	Market       *MarketOverviewResponse `json:"market,omitempty"`
+}
+
+// MarketGroupDetailsResponse returns group metadata with child market overviews.
+type MarketGroupDetailsResponse struct {
+	Group   *MarketGroupResponse        `json:"group"`
+	Creator *CreatorResponse            `json:"creator"`
+	Answers []MarketGroupAnswerResponse `json:"answers"`
+}
+
 type MarketTagResponse struct {
 	ID          int64  `json:"id"`
 	Slug        string `json:"slug"`

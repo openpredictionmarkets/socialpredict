@@ -15,6 +15,15 @@ type CreateMarketRequest struct {
 	TagSlugs           []string  `json:"tagSlugs" validate:"omitempty,max=5"`
 }
 
+// CreateMarketGroupRequest represents a grouped multiple-choice binary market.
+type CreateMarketGroupRequest struct {
+	QuestionTitle      string    `json:"questionTitle" validate:"required,max=160"`
+	Description        string    `json:"description" validate:"max=2000"`
+	ResolutionDateTime time.Time `json:"resolutionDateTime" validate:"required"`
+	AnswerLabels       []string  `json:"answerLabels" validate:"required,min=2,max=20"`
+	TagSlugs           []string  `json:"tagSlugs" validate:"omitempty,max=5"`
+}
+
 // UpdateLabelsRequest represents the HTTP request body for updating market labels
 type UpdateLabelsRequest struct {
 	YesLabel string `json:"yesLabel" validate:"required,min=1,max=20"`

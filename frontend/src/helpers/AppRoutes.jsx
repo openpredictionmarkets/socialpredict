@@ -9,6 +9,7 @@ import About from '../pages/about/About';
 import Stats from '../pages/stats/Stats';
 import Home from '../pages/home/Home';
 import MarketDetails from '../pages/marketDetails/MarketDetails';
+import MarketGroupDetails from '../pages/marketGroupDetails/MarketGroupDetails';
 import User from '../pages/user/User';
 import Style from '../pages/style/Style';
 import AdminDashboard from '../pages/admin/AdminDashboard';
@@ -45,6 +46,13 @@ const AppRoutes = () => {
           <Redirect to='/changepassword' />
         ) : (
           <Markets />
+        )}
+      </Route>
+      <Route exact path='/markets/group/:groupId'>
+        {isLoggedIn && mustChangePassword ? (
+          <Redirect to='/changepassword' />
+        ) : (
+          <MarketGroupDetails />
         )}
       </Route>
       <Route exact path='/markets/:marketId'>

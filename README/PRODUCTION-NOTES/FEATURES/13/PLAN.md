@@ -49,14 +49,18 @@ Implementation note:
 
 Checklist:
 
-- [ ] Add request DTO for multiple-choice binary group creation.
-- [ ] Validate parent title and description using existing market rules.
-- [ ] Validate answer labels: minimum count, maximum count, length, uniqueness, and sanitization.
+- [x] Add request DTO for multiple-choice binary group creation.
+- [x] Validate parent title and description using existing market rules.
+- [x] Validate answer labels: minimum count, maximum count, length, uniqueness, and sanitization.
 - [ ] Create parent group and child binary markets transactionally.
-- [ ] Charge one group proposal cost in baseline.
-- [ ] Link child markets through `market_group_members`.
-- [ ] Add service tests for successful group creation.
-- [ ] Add service tests for invalid labels, duplicate labels, too few answers, and too many answers.
+- [x] Charge one group proposal cost in baseline.
+- [x] Link child markets through `market_group_members`.
+- [x] Add service tests for successful group creation.
+- [x] Add service tests for invalid labels, duplicate labels, too few answers, and too many answers.
+
+Implementation note:
+
+- The current vertical slice creates child markets and then links the parent group. A fully atomic repository/service transaction across child-market creation plus group creation remains pending.
 
 ## 04. Admin Review And Governance
 
@@ -83,25 +87,27 @@ Checklist:
 
 Checklist:
 
-- [ ] Add read-model endpoint for group summary and ordered answers.
-- [ ] Add compact answer card payloads with child market probability, volume, users, and chart snapshot.
+- [x] Add read endpoint for group summary and ordered answers.
+- [x] Add compact answer card payloads with child market probability, volume, and users.
 - [ ] Add freshness metadata to group read responses.
 - [ ] Prefer parent group cards in `/markets` and topic pages.
 - [ ] Decide whether child markets are hidden from normal discovery or shown with group context.
 - [ ] Add search behavior for parent title and answer labels.
-- [ ] Add tag projection or inheritance behavior for group discovery.
+- [x] Add tag projection or inheritance behavior for group discovery.
 
 ## 07. Frontend Creation And Display
 
 Checklist:
 
-- [ ] Add market type selector to `/create`.
-- [ ] Add multiple-choice answer editor with add/remove/reorder behavior before submit.
-- [ ] Add copy explaining independent binary answer markets.
-- [ ] Add parent group page route.
-- [ ] Render answer cards with child probability, chart, volume, and trade affordance.
-- [ ] Preserve direct child market pages.
-- [ ] Add responsive/mobile layout for answer cards.
+- [x] Add market type selector to `/create`.
+- [x] Add multiple-choice answer editor with add/remove behavior before submit.
+- [ ] Add answer reorder behavior before submit.
+- [x] Add copy explaining independent binary answer markets.
+- [x] Add parent group page route.
+- [x] Render answer cards with child probability, volume, and trade affordance.
+- [ ] Add compact child chart snapshots to answer cards.
+- [x] Preserve direct child market pages.
+- [x] Add responsive/mobile layout for answer cards.
 - [ ] Add accessibility labels and keyboard support for answer editor and answer cards.
 
 ## 08. Resolution
@@ -119,14 +125,15 @@ Checklist:
 
 Checklist:
 
-- [ ] Add domain tests for creation, approval, rejection, stewardship, resolution, and group read models.
-- [ ] Add repository tests for group/member persistence.
+- [x] Add domain tests for creation and group read models.
+- [ ] Add domain tests for approval, rejection, stewardship, and resolution.
+- [x] Add repository tests for group/member persistence.
 - [ ] Add handler tests for create/review/read endpoints.
-- [ ] Add OpenAPI schema entries and contract tests.
+- [x] Add OpenAPI schema entries and contract tests.
 - [ ] Add frontend smoke path for creating, reviewing, viewing, and trading a group child market.
-- [ ] Add migration tests.
-- [ ] Run relevant Go package tests.
-- [ ] Run frontend build.
+- [x] Add migration tests.
+- [x] Run relevant Go package tests.
+- [x] Run frontend build.
 
 ## 10. Future Decisions
 

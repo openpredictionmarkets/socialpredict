@@ -34,6 +34,9 @@ type projectionRepo struct {
 	setMarketTagsFunc                  func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error)
 	getMarketGovernanceSettingsFunc    func(context.Context) (*markets.MarketGovernanceSettings, error)
 	updateMarketGovernanceSettingsFunc func(context.Context, markets.MarketGovernanceSettingsUpdate) (*markets.MarketGovernanceSettings, error)
+	createMarketGroupFunc              func(context.Context, *markets.MarketGroup, []markets.MarketGroupMember) error
+	getMarketGroupFunc                 func(context.Context, int64) (*markets.MarketGroup, error)
+	listMarketGroupMembersFunc         func(context.Context, int64) ([]markets.MarketGroupMember, error)
 }
 
 func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
@@ -94,6 +97,15 @@ func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
 			return nil, errUnexpectedMarketsTestCall
 		},
 		updateMarketGovernanceSettingsFunc: func(context.Context, markets.MarketGovernanceSettingsUpdate) (*markets.MarketGovernanceSettings, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		createMarketGroupFunc: func(context.Context, *markets.MarketGroup, []markets.MarketGroupMember) error {
+			return errUnexpectedMarketsTestCall
+		},
+		getMarketGroupFunc: func(context.Context, int64) (*markets.MarketGroup, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		listMarketGroupMembersFunc: func(context.Context, int64) ([]markets.MarketGroupMember, error) {
 			return nil, errUnexpectedMarketsTestCall
 		},
 	}
@@ -226,6 +238,27 @@ func (r *projectionRepo) UpdateMarketGovernanceSettings(ctx context.Context, upd
 		return nil, errUnexpectedMarketsTestCall
 	}
 	return r.updateMarketGovernanceSettingsFunc(ctx, update)
+}
+
+func (r *projectionRepo) CreateMarketGroup(ctx context.Context, group *markets.MarketGroup, members []markets.MarketGroupMember) error {
+	if r.createMarketGroupFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.createMarketGroupFunc(ctx, group, members)
+}
+
+func (r *projectionRepo) GetMarketGroup(ctx context.Context, groupID int64) (*markets.MarketGroup, error) {
+	if r.getMarketGroupFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.getMarketGroupFunc(ctx, groupID)
+}
+
+func (r *projectionRepo) ListMarketGroupMembers(ctx context.Context, groupID int64) ([]markets.MarketGroupMember, error) {
+	if r.listMarketGroupMembersFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.listMarketGroupMembersFunc(ctx, groupID)
 }
 
 func (r *projectionRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {

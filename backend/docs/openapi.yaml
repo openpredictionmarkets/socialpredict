@@ -150,6 +150,8 @@ x-route-family-migration-matrix:
         - /v0/markets/closed
         - /v0/markets/resolved
         - /v0/markets/{id}
+        - /v0/market-groups
+        - /v0/market-groups/{id}
         - /v0/markets/{id}/description-amendments
         - /v0/markets/{id}/resolve
         - /v0/markets/{id}/leaderboard
@@ -615,6 +617,121 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error during market creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups:
+    post:
+      tags: [Markets]
+      operationId: createMarketGroup
+      summary: Create a multiple-choice binary market group
+      description: >
+        Creates one parent market group and one normal binary child market per
+        answer option. The parent group charges one proposal cost; child markets
+        are the transaction boundaries and have zero proposal cost.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMarketGroupRequest'
+      responses:
+        '201':
+          description: Market group created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupDetailsResponse'
+        '400':
+          description: Invalid request body, sanitizer rejection, or domain validation failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Authenticated user is not approved to create markets in the active game mode.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Authenticated user could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '422':
+          description: Creator balance does not allow market group creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error during market group creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}:
+    get:
+      tags: [Markets]
+      operationId: getMarketGroup
+      summary: Get a multiple-choice binary market group
+      description: >
+        Returns parent group metadata and child market overviews. Trading,
+        resolution, and payout actions still target the returned child market IDs.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Market group returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupDetailsResponse'
+        '400':
+          description: Invalid group ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market group not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error while reading market group.
           content:
             application/json:
               schema:
@@ -4785,6 +4902,35 @@ components:
             type: string
             pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
 
+    CreateMarketGroupRequest:
+      type: object
+      required: [questionTitle, resolutionDateTime, answerLabels]
+      properties:
+        questionTitle:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+        resolutionDateTime:
+          type: string
+          format: date-time
+        answerLabels:
+          type: array
+          minItems: 2
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 160
+        tagSlugs:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+
     MarketDescriptionAmendmentRequest:
       type: object
       required: [body]
@@ -4973,6 +5119,94 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
+
+    MarketGroupResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        questionTitle:
+          type: string
+        description:
+          type: string
+        groupType:
+          type: string
+          enum: [MULTIPLE_CHOICE_BINARY]
+        probabilityPolicy:
+          type: string
+          enum: [INDEPENDENT_BINARY]
+        resolutionPolicy:
+          type: string
+          enum: [INDEPENDENT_CHILDREN, EXCLUSIVE_HELPER]
+        lifecycleStatus:
+          type: string
+          enum: [proposed, rejected, published, closed, resolved, cancelled]
+        status:
+          type: string
+          description: Display status derived from the parent lifecycle.
+        proposalCost:
+          type: integer
+          format: int64
+        creatorUsername:
+          type: string
+        stewardUsername:
+          type: string
+        approvedBy:
+          type: string
+        approvedAt:
+          type: string
+          format: date-time
+        rejectedBy:
+          type: string
+        rejectedAt:
+          type: string
+          format: date-time
+        rejectionReason:
+          type: string
+        resolutionDateTime:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        answerCount:
+          type: integer
+
+    MarketGroupAnswerResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        groupId:
+          type: integer
+          format: int64
+        marketId:
+          type: integer
+          format: int64
+        answerLabel:
+          type: string
+        displayOrder:
+          type: integer
+        market:
+          $ref: '#/components/schemas/MarketOverviewResponse'
+
+    MarketGroupDetailsResponse:
+      type: object
+      required: [group, answers]
+      properties:
+        group:
+          $ref: '#/components/schemas/MarketGroupResponse'
+        creator:
+          $ref: '#/components/schemas/CreatorResponse'
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketGroupAnswerResponse'
 
     ListMarketsResponse:
       type: object

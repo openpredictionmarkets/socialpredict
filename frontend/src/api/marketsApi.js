@@ -1,4 +1,5 @@
 import { API_URL } from '../config';
+import { apiRequest, authenticatedApiRequest } from './httpClient';
 
 /**
  * Search markets by query and status
@@ -67,4 +68,32 @@ export const getMarketDetails = async (marketId) => {
     }
 
     return await response.json();
+};
+
+export const createMarketGroup = async (marketGroupData) => {
+    return authenticatedApiRequest('/v0/market-groups', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(marketGroupData),
+        reasonMessages: {
+            USER_NOT_APPROVED: 'User does not have approval to create markets in moderator mode.',
+            AUTHORIZATION_DENIED: 'You are not allowed to create this market group.',
+            INSUFFICIENT_BALANCE: 'You do not have enough credit to create this market group.',
+            VALIDATION_FAILED: 'Check the market group fields and try again.',
+            INVALID_REQUEST: 'Check the market group fields and try again.',
+        },
+        fallbackMessage: 'Market group creation failed. Please try again.',
+    });
+};
+
+export const getMarketGroupDetails = async (groupId) => {
+    if (!groupId) {
+        throw new Error('Market group ID is required');
+    }
+
+    return apiRequest(`/v0/market-groups/${groupId}`, {
+        fallbackMessage: 'Failed to fetch market group details.',
+    });
 };

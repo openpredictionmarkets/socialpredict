@@ -44,6 +44,16 @@ type MarketGroup struct {
 	Members            []MarketGroupMember
 }
 
+// MarketGroupCreateRequest captures a participant-created grouped binary
+// market. Each answer label becomes a normal binary child market.
+type MarketGroupCreateRequest struct {
+	QuestionTitle      string
+	Description        string
+	ResolutionDateTime time.Time
+	AnswerLabels       []string
+	TagSlugs           []string
+}
+
 // MarketGroupMember links one normal binary child market to a parent group.
 type MarketGroupMember struct {
 	ID           int64
@@ -62,6 +72,19 @@ type MarketGroupRepository interface {
 	CreateMarketGroup(ctx context.Context, group *MarketGroup, members []MarketGroupMember) error
 	GetMarketGroup(ctx context.Context, groupID int64) (*MarketGroup, error)
 	ListMarketGroupMembers(ctx context.Context, groupID int64) ([]MarketGroupMember, error)
+}
+
+// MarketGroupOverview is the parent group read shape with child market
+// overviews. It is display data, not transaction state.
+type MarketGroupOverview struct {
+	Group   *MarketGroup
+	Creator *CreatorSummary
+	Answers []MarketGroupAnswerOverview
+}
+
+type MarketGroupAnswerOverview struct {
+	Member   MarketGroupMember
+	Overview *MarketOverview
 }
 
 // NormalizeMarketGroupDefaults fills policy defaults while preserving explicit
