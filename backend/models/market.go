@@ -32,6 +32,35 @@ type Market struct {
 	StewardUsername         string     `json:"stewardUsername" gorm:"index"`
 }
 
+type MarketGroup struct {
+	gorm.Model
+	ID                 int64      `json:"id" gorm:"primary_key"`
+	QuestionTitle      string     `json:"questionTitle" gorm:"not null;size:160"`
+	Description        string     `json:"description" gorm:"type:text;not null"`
+	GroupType          string     `json:"groupType" gorm:"not null;default:MULTIPLE_CHOICE_BINARY;index;size:64"`
+	ProbabilityPolicy  string     `json:"probabilityPolicy" gorm:"not null;default:INDEPENDENT_BINARY;size:64"`
+	ResolutionPolicy   string     `json:"resolutionPolicy" gorm:"not null;default:INDEPENDENT_CHILDREN;size:64"`
+	LifecycleStatus    string     `json:"lifecycleStatus" gorm:"not null;default:proposed;index;size:64"`
+	ProposalCost       int64      `json:"proposalCost" gorm:"not null;default:0"`
+	CreatorUsername    string     `json:"creatorUsername" gorm:"not null;index;size:64"`
+	StewardUsername    string     `json:"stewardUsername" gorm:"index;size:64"`
+	ApprovedBy         string     `json:"approvedBy,omitempty" gorm:"index;size:64"`
+	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy         string     `json:"rejectedBy,omitempty" gorm:"index;size:64"`
+	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason    string     `json:"rejectionReason,omitempty" gorm:"type:text"`
+	ResolutionDateTime time.Time  `json:"resolutionDateTime" gorm:"not null;index"`
+}
+
+type MarketGroupMember struct {
+	gorm.Model
+	ID           int64  `json:"id" gorm:"primary_key"`
+	GroupID      int64  `json:"groupId" gorm:"not null;uniqueIndex:uniq_market_group_member_market;uniqueIndex:uniq_market_group_member_order;uniqueIndex:uniq_market_group_member_answer;index:idx_market_group_members_group_order,priority:1"`
+	MarketID     int64  `json:"marketId" gorm:"not null;uniqueIndex:uniq_market_group_member_market;index"`
+	AnswerLabel  string `json:"answerLabel" gorm:"not null;uniqueIndex:uniq_market_group_member_answer;size:160"`
+	DisplayOrder int    `json:"displayOrder" gorm:"not null;default:0;uniqueIndex:uniq_market_group_member_order;index:idx_market_group_members_group_order,priority:2"`
+}
+
 type MarketTag struct {
 	gorm.Model
 	ID          int64  `json:"id" gorm:"primary_key"`

@@ -31,14 +31,19 @@ Checklist:
 
 Checklist:
 
-- [ ] Add domain types for `MarketGroup` and `MarketGroupMember`.
-- [ ] Add persistence models for parent groups and group members.
-- [ ] Add timestamped Go migration for `market_groups`.
-- [ ] Add timestamped Go migration for `market_group_members`.
-- [ ] Register compact migration IDs in backend migration registry.
-- [ ] Add migration tests proving schema creation, indexes, and default values.
-- [ ] Add repository tests for group create/read/list and member ordering.
-- [ ] Keep existing `markets` rows as canonical child trading entities.
+- [x] Add domain types for `MarketGroup` and `MarketGroupMember`.
+- [x] Add persistence models for parent groups and group members.
+- [x] Add timestamped Go migration for `market_groups`.
+- [x] Add timestamped Go migration for `market_group_members`.
+- [x] Register compact migration IDs in backend migration registry.
+- [x] Add migration tests proving schema creation, indexes, and default values.
+- [x] Add repository tests for group create/read/list and member ordering.
+- [x] Keep existing `markets` rows as canonical child trading entities.
+
+Implementation note:
+
+- `20260612090000` creates both `market_groups` and `market_group_members` as one additive schema slice.
+- The `MarketGroupRepository` interface is intentionally separate from the existing binary market `Repository` so buy/sell/resolve transaction paths do not accidentally depend on grouped display state.
 
 ## 03. Creation And Validation
 

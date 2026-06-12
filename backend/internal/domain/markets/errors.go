@@ -22,6 +22,8 @@ func newDomainError(message string) MarketError {
 var (
 	// ErrMarketNotFound indicates that the requested market does not exist.
 	ErrMarketNotFound MarketError = newDomainError("market not found")
+	// ErrMarketGroupNotFound indicates that the requested market group does not exist.
+	ErrMarketGroupNotFound MarketError = newDomainError("market group not found")
 	// ErrInvalidQuestionTitle indicates that the market question title is invalid.
 	ErrInvalidQuestionTitle MarketError = newDomainError("invalid question title")
 	// ErrInvalidQuestionLength indicates that the market question title is blank or too long.
