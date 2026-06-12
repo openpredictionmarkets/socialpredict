@@ -23,7 +23,7 @@ Checklist:
 - [x] Add feature overview.
 - [x] Add design artifact.
 - [x] Add implementation plan.
-- [x] Record Manifold multiple-choice answer editor as a product reference.
+- [x] Keep external platform research out of the production notes unless it becomes an explicit SocialPredict product decision.
 - [x] Decide baseline probability policy: independent binary child markets, not sum-to-one.
 - [x] Align with existing design-plan rules for backend-owned market truth, frontend experience boundaries, and timestamped additive migrations.
 

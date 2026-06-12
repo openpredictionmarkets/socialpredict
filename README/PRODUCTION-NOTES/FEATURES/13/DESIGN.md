@@ -24,6 +24,21 @@ Design rules:
 - Treat frontend presentation as an experience layer over backend-owned market group state.
 - Keep sum-to-one behavior out of the baseline unless the math and payout model are explicitly redesigned.
 
+## Alternative Considered: True Multi-Asset Market
+
+A second possible architecture is a single market with many outcome assets, where each answer is an asset inside one shared market maker and probabilities are coupled across all answers.
+
+That model is useful when the product requires a true mutually-exclusive multi-outcome market whose answer probabilities are expected to sum to `1.0`. It is not the recommended baseline for SocialPredict because it would require a new order, payout, refund, probability, position, charting, and accounting path instead of reusing the existing binary market path.
+
+The grouped-binary-child design is intentionally more conservative:
+
+- it preserves the current binary transaction math
+- it keeps each answer independently auditable
+- it avoids introducing a second payout model during the first implementation slice
+- it keeps migration risk lower because existing `markets` rows remain the canonical tradable entities
+
+If SocialPredict later needs true coupled multi-outcome markets, that should become a separate market class rather than a hidden behavior inside grouped binary markets.
+
 ## Bounded Context Ownership
 
 | Area | Owner | Rule |

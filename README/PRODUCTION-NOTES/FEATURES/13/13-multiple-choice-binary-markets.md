@@ -57,16 +57,6 @@ Product copy should make this explicit:
 Each answer is traded as its own YES/NO market. Probabilities are not normalized to add to 100%.
 ```
 
-## External Convention Note
-
-Manifold's multiple-choice answer editor is useful as a product reference because it treats multiple-choice answers as a distinct creation flow and includes an explicit `shouldAnswersSumToOne` flag, answer add/remove behavior, and answer-add permission controls. See:
-
-```text
-https://github.com/manifoldmarkets/manifold/blob/main/web/components/answers/multiple-choice-answers.tsx
-```
-
-SocialPredict should borrow the explicit creation-flow idea, but should not copy Manifold's sum-to-one behavior until the underlying SocialPredict math and settlement model intentionally support it.
-
 ## Market Class Vocabulary
 
 | Term | Meaning |
