@@ -750,8 +750,9 @@ export default function GroupedMarketDetailsLayout({
             </span>
             @{creatorUsername}
           </Link>
-          <StewardTag username={groupStewardUsername} creatorUsername={creatorUsername} />
+          <span className='text-gray-600' aria-hidden='true'>•</span>
           <span>{answers.length} answers</span>
+          <StewardTag username={groupStewardUsername} creatorUsername={creatorUsername} />
         </div>
         <MarketTagChips tags={tags} className='mt-3' />
       </section>
