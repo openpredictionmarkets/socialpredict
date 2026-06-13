@@ -13,6 +13,10 @@ type MarketStewardshipRepository interface {
 	ReassignMarketSteward(ctx context.Context, marketID int64, fromStewardUsername string, toStewardUsername string, actorUsername string, reason string, changedAt time.Time) error
 }
 
+type MarketGroupStewardshipRepository interface {
+	ReassignMarketGroupSteward(ctx context.Context, groupID int64, fromStewardUsername string, toStewardUsername string, actorUsername string, reason string, changedAt time.Time) error
+}
+
 // MarketStewardshipAuditRecord captures a market stewardship reassignment fact.
 type MarketStewardshipAuditRecord struct {
 	ID                  int64
@@ -71,6 +75,55 @@ func (s *Service) ReassignMarketSteward(ctx context.Context, marketID int64, new
 	return market, nil
 }
 
+func (s *Service) ReassignMarketGroupSteward(ctx context.Context, groupID int64, newStewardUsername string, actorUsername string, reason string) (*MarketGroup, error) {
+	newStewardUsername = strings.TrimSpace(newStewardUsername)
+	actorUsername = strings.TrimSpace(actorUsername)
+	reason = strings.TrimSpace(reason)
+	if groupID <= 0 || newStewardUsername == "" || actorUsername == "" || reason == "" {
+		return nil, ErrInvalidInput
+	}
+
+	groupRepo, err := s.marketGroupRepository()
+	if err != nil {
+		return nil, err
+	}
+	group, err := groupRepo.GetMarketGroup(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, ErrMarketGroupNotFound
+	}
+	switch NormalizeLifecycleStatus(group.LifecycleStatus) {
+	case MarketLifecycleRejected, MarketLifecycleCancelled, MarketLifecycleResolved:
+		return nil, ErrInvalidState
+	}
+
+	if err := s.validateAssignableSteward(ctx, newStewardUsername); err != nil {
+		return nil, err
+	}
+
+	fromSteward := strings.TrimSpace(group.StewardUsername)
+	if fromSteward == "" {
+		fromSteward = strings.TrimSpace(group.CreatorUsername)
+	}
+	if strings.EqualFold(fromSteward, newStewardUsername) {
+		return group, nil
+	}
+
+	groupStewardshipRepo, err := s.marketGroupStewardshipRepository()
+	if err != nil {
+		return nil, err
+	}
+	now := s.clock.Now()
+	if err := groupStewardshipRepo.ReassignMarketGroupSteward(ctx, groupID, fromSteward, newStewardUsername, actorUsername, reason, now); err != nil {
+		return nil, err
+	}
+	group.StewardUsername = newStewardUsername
+	group.UpdatedAt = now
+	return group, nil
+}
+
 func (s *Service) validateAssignableSteward(ctx context.Context, username string) error {
 	if s.userService == nil {
 		return ErrUnauthorized
@@ -119,6 +172,17 @@ func (s *Service) stewardshipRepository() (MarketStewardshipRepository, error) {
 		return nil, ErrInvalidInput
 	}
 	repo, ok := s.repo.(MarketStewardshipRepository)
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+	return repo, nil
+}
+
+func (s *Service) marketGroupStewardshipRepository() (MarketGroupStewardshipRepository, error) {
+	if s == nil || s.repo == nil {
+		return nil, ErrInvalidInput
+	}
+	repo, ok := s.repo.(MarketGroupStewardshipRepository)
 	if !ok {
 		return nil, ErrInvalidInput
 	}

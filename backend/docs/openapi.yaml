@@ -227,6 +227,9 @@ x-route-family-migration-matrix:
         - /v0/admin/markets/{id}/approve
         - /v0/admin/markets/{id}/reject
         - /v0/admin/markets/{id}/steward
+        - /v0/admin/market-groups/{id}/approve
+        - /v0/admin/market-groups/{id}/reject
+        - /v0/admin/market-groups/{id}/steward
         - /v0/admin/markets/{id}/tags
         - /v0/admin/market-description-amendments
         - /v0/admin/market-description-amendments/settings
@@ -3052,6 +3055,222 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/market-groups/{id}/approve:
+    patch:
+      tags: [Markets]
+      operationId: approveProposedMarketGroup
+      summary: Approve proposed market group
+      description: Admin-only endpoint that publishes a proposed multiple-choice binary market group and all child markets together.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminApproveMarketRequest'
+      responses:
+        '200':
+          description: Market group approved and published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupReviewEnvelopeResponse'
+        '400':
+          description: Invalid group ID, malformed request, or missing confirmation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Proposed market group was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market group is not currently proposed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected group approval failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/market-groups/{id}/reject:
+    patch:
+      tags: [Markets]
+      operationId: rejectProposedMarketGroup
+      summary: Reject proposed market group
+      description: Admin-only endpoint that rejects a proposed multiple-choice binary market group and all child markets together.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRejectMarketRequest'
+      responses:
+        '200':
+          description: Market group rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupReviewEnvelopeResponse'
+        '400':
+          description: Invalid group ID, malformed request, or missing rejection reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Proposed market group was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market group is not currently proposed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected group rejection failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/market-groups/{id}/steward:
+    patch:
+      tags: [Markets]
+      operationId: reassignMarketGroupSteward
+      summary: Reassign market group steward
+      description: Admin-only endpoint that assigns operational stewardship for a market group and all child markets to an active moderator without changing immutable creator attribution.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReassignMarketStewardRequest'
+      responses:
+        '200':
+          description: Market group steward reassigned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupReviewEnvelopeResponse'
+        '400':
+          description: Invalid group ID, malformed request, missing steward, or missing reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required or target steward is not an active moderator.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market group or target steward user was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market group is not in a state that allows steward reassignment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected group stewardship reassignment failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/markets/{id}/tags:
     patch:
       tags: [Markets]
@@ -5004,8 +5223,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketTagResponse'
-        marketGroup:
-          $ref: '#/components/schemas/MarketGroupLink'
         total:
           type: integer
 
@@ -5187,6 +5404,8 @@ components:
           format: int64
         questionTitle:
           type: string
+        description:
+          type: string
         groupType:
           type: string
           enum: [MULTIPLE_CHOICE_BINARY]
@@ -5199,6 +5418,13 @@ components:
           type: string
         answerCount:
           type: integer
+        proposalCost:
+          type: integer
+          format: int64
+        creatorUsername:
+          type: string
+        stewardUsername:
+          type: string
 
     MarketGroupAnswerResponse:
       type: object
@@ -5971,6 +6197,8 @@ components:
         marketDescription:
           type: string
           description: Base market description shown as review context.
+        marketGroup:
+          $ref: '#/components/schemas/MarketGroupLink'
         version:
           type: integer
           minimum: 2
@@ -6096,6 +6324,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketTagResponse'
+        marketGroup:
+          $ref: '#/components/schemas/MarketGroupLink'
 
     MarketLifecycleListResponse:
       type: object
@@ -6148,6 +6378,16 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/MarketReviewResponse'
+
+    MarketGroupReviewEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketGroupResponse'
 
     UserFinancialResponse:
       type: object

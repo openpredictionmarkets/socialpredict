@@ -92,6 +92,176 @@ func (r *GormRepository) GetMarketGroupForMarket(ctx context.Context, marketID i
 	return r.GetMarketGroup(ctx, member.GroupID)
 }
 
+// ApproveMarketGroup publishes a proposed parent group and all proposed child
+// markets together. Group lifecycle is a governance concern; child markets
+// remain the transaction boundary after publication.
+func (r *GormRepository) ApproveMarketGroup(ctx context.Context, groupID int64, actorUsername string, approvedAt time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		childIDs, err := marketGroupChildIDs(ctx, tx, groupID)
+		if err != nil {
+			return err
+		}
+		if len(childIDs) == 0 {
+			return dmarkets.ErrInvalidState
+		}
+
+		groupResult := tx.Model(&models.MarketGroup{}).
+			Where("id = ? AND lifecycle_status = ?", groupID, dmarkets.MarketLifecycleProposed).
+			Updates(map[string]any{
+				"lifecycle_status": dmarkets.MarketLifecyclePublished,
+				"approved_by":      actorUsername,
+				"approved_at":      approvedAt,
+				"rejected_by":      "",
+				"rejected_at":      nil,
+				"rejection_reason": "",
+				"updated_at":       approvedAt,
+			})
+		if groupResult.Error != nil {
+			return groupResult.Error
+		}
+		if groupResult.RowsAffected == 0 {
+			return dmarkets.ErrInvalidState
+		}
+
+		childResult := tx.Model(&models.Market{}).
+			Where("id IN ? AND lifecycle_status = ?", childIDs, dmarkets.MarketLifecycleProposed).
+			Updates(map[string]any{
+				"lifecycle_status": dmarkets.MarketLifecyclePublished,
+				"approved_by":      actorUsername,
+				"approved_at":      approvedAt,
+				"rejected_by":      "",
+				"rejected_at":      nil,
+				"rejection_reason": "",
+				"updated_at":       approvedAt,
+			})
+		if childResult.Error != nil {
+			return childResult.Error
+		}
+		if childResult.RowsAffected != int64(len(childIDs)) {
+			return dmarkets.ErrInvalidState
+		}
+		return nil
+	})
+}
+
+// RejectMarketGroup rejects a proposed parent group and all proposed child
+// markets together. The domain service owns the one-time parent cost refund.
+func (r *GormRepository) RejectMarketGroup(ctx context.Context, groupID int64, actorUsername string, rejectedAt time.Time, reason string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		childIDs, err := marketGroupChildIDs(ctx, tx, groupID)
+		if err != nil {
+			return err
+		}
+		if len(childIDs) == 0 {
+			return dmarkets.ErrInvalidState
+		}
+
+		groupResult := tx.Model(&models.MarketGroup{}).
+			Where("id = ? AND lifecycle_status = ?", groupID, dmarkets.MarketLifecycleProposed).
+			Updates(map[string]any{
+				"lifecycle_status": dmarkets.MarketLifecycleRejected,
+				"rejected_by":      actorUsername,
+				"rejected_at":      rejectedAt,
+				"rejection_reason": reason,
+				"updated_at":       rejectedAt,
+			})
+		if groupResult.Error != nil {
+			return groupResult.Error
+		}
+		if groupResult.RowsAffected == 0 {
+			return dmarkets.ErrInvalidState
+		}
+
+		childResult := tx.Model(&models.Market{}).
+			Where("id IN ? AND lifecycle_status = ?", childIDs, dmarkets.MarketLifecycleProposed).
+			Updates(map[string]any{
+				"lifecycle_status": dmarkets.MarketLifecycleRejected,
+				"rejected_by":      actorUsername,
+				"rejected_at":      rejectedAt,
+				"rejection_reason": reason,
+				"updated_at":       rejectedAt,
+			})
+		if childResult.Error != nil {
+			return childResult.Error
+		}
+		if childResult.RowsAffected != int64(len(childIDs)) {
+			return dmarkets.ErrInvalidState
+		}
+		return nil
+	})
+}
+
+// ReassignMarketGroupSteward changes the parent steward and every child market
+// steward in one transaction. Existing child-level audit rows remain the
+// traceable source for stewardship changes on operational market records.
+func (r *GormRepository) ReassignMarketGroupSteward(ctx context.Context, groupID int64, fromStewardUsername string, toStewardUsername string, actorUsername string, reason string, changedAt time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		childIDs, err := marketGroupChildIDs(ctx, tx, groupID)
+		if err != nil {
+			return err
+		}
+		if len(childIDs) == 0 {
+			return dmarkets.ErrInvalidState
+		}
+
+		groupResult := tx.Model(&models.MarketGroup{}).
+			Where("id = ?", groupID).
+			Updates(map[string]any{
+				"steward_username": toStewardUsername,
+				"updated_at":       changedAt,
+			})
+		if groupResult.Error != nil {
+			return groupResult.Error
+		}
+		if groupResult.RowsAffected == 0 {
+			return dmarkets.ErrMarketGroupNotFound
+		}
+
+		childResult := tx.Model(&models.Market{}).
+			Where("id IN ?", childIDs).
+			Updates(map[string]any{
+				"steward_username": toStewardUsername,
+				"updated_at":       changedAt,
+			})
+		if childResult.Error != nil {
+			return childResult.Error
+		}
+		if childResult.RowsAffected != int64(len(childIDs)) {
+			return dmarkets.ErrInvalidState
+		}
+
+		audits := make([]models.MarketStewardshipAudit, 0, len(childIDs))
+		for _, childID := range childIDs {
+			audit := models.MarketStewardshipAudit{
+				MarketID:            childID,
+				FromStewardUsername: fromStewardUsername,
+				ToStewardUsername:   toStewardUsername,
+				ActorUsername:       actorUsername,
+				Reason:              reason,
+			}
+			audit.CreatedAt = changedAt
+			audit.UpdatedAt = changedAt
+			audits = append(audits, audit)
+		}
+		return tx.Create(&audits).Error
+	})
+}
+
+func marketGroupChildIDs(ctx context.Context, tx *gorm.DB, groupID int64) ([]int64, error) {
+	var members []models.MarketGroupMember
+	if err := tx.WithContext(ctx).
+		Where("group_id = ?", groupID).
+		Order("display_order ASC, id ASC").
+		Find(&members).Error; err != nil {
+		return nil, err
+	}
+	childIDs := make([]int64, 0, len(members))
+	for _, member := range members {
+		childIDs = append(childIDs, member.MarketID)
+	}
+	return childIDs, nil
+}
+
 func domainMarketGroupToModel(group *dmarkets.MarketGroup) models.MarketGroup {
 	return models.MarketGroup{
 		ID:                 group.ID,

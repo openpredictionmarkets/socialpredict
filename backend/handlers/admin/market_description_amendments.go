@@ -32,6 +32,7 @@ type marketDescriptionAmendmentResponse struct {
 	MarketID                   int64                                `json:"marketId"`
 	MarketTitle                string                               `json:"marketTitle,omitempty"`
 	MarketDescription          string                               `json:"marketDescription,omitempty"`
+	MarketGroup                *marketGroupReviewLink               `json:"marketGroup,omitempty"`
 	Version                    int                                  `json:"version"`
 	Body                       string                               `json:"body"`
 	BodyFormat                 string                               `json:"bodyFormat"`
@@ -233,6 +234,7 @@ func marketDescriptionAmendmentResponseFromDomain(item dmarkets.MarketDescriptio
 		MarketID:          item.MarketID,
 		MarketTitle:       item.MarketTitle,
 		MarketDescription: item.MarketDescription,
+		MarketGroup:       marketGroupReviewLinkFromGroup(item.MarketGroup, item.MarketID),
 		Version:           item.Version,
 		Body:              item.Body,
 		BodyFormat:        item.BodyFormat,

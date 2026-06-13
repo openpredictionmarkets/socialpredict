@@ -116,6 +116,7 @@ function MarketDetailsTable({
         creator={safeCreator}
         isLoggedIn={isLoggedIn}
         token={token}
+        username={username}
         refetchData={refetchData}
       />
     );

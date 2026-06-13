@@ -18,27 +18,50 @@ import (
 )
 
 type marketReviewServiceMock struct {
-	approveFn  func(context.Context, int64, string, bool) (*dmarkets.Market, error)
-	rejectFn   func(context.Context, int64, string, string) (*dmarkets.Market, error)
-	listFn     func(context.Context, dmarkets.ListFilters) ([]*dmarkets.Market, error)
-	reassignFn func(context.Context, int64, string, string, string) (*dmarkets.Market, error)
-	tagsFn     func(context.Context, int64, []string, string) (*dmarkets.Market, error)
+	approveFn       func(context.Context, int64, string, bool) (*dmarkets.Market, error)
+	groupApproveFn  func(context.Context, int64, string, bool) (*dmarkets.MarketGroup, error)
+	rejectFn        func(context.Context, int64, string, string) (*dmarkets.Market, error)
+	groupRejectFn   func(context.Context, int64, string, string) (*dmarkets.MarketGroup, error)
+	listFn          func(context.Context, dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	groupLookupFn   func(context.Context, int64) (*dmarkets.MarketGroup, error)
+	reassignFn      func(context.Context, int64, string, string, string) (*dmarkets.Market, error)
+	groupReassignFn func(context.Context, int64, string, string, string) (*dmarkets.MarketGroup, error)
+	tagsFn          func(context.Context, int64, []string, string) (*dmarkets.Market, error)
 }
 
 func (m marketReviewServiceMock) ApproveProposedMarket(ctx context.Context, marketID int64, actorUsername string, confirmed bool) (*dmarkets.Market, error) {
 	return m.approveFn(ctx, marketID, actorUsername, confirmed)
 }
 
+func (m marketReviewServiceMock) ApproveProposedMarketGroup(ctx context.Context, groupID int64, actorUsername string, confirmed bool) (*dmarkets.MarketGroup, error) {
+	return m.groupApproveFn(ctx, groupID, actorUsername, confirmed)
+}
+
 func (m marketReviewServiceMock) RejectProposedMarket(ctx context.Context, marketID int64, actorUsername string, reason string) (*dmarkets.Market, error) {
 	return m.rejectFn(ctx, marketID, actorUsername, reason)
+}
+
+func (m marketReviewServiceMock) RejectProposedMarketGroup(ctx context.Context, groupID int64, actorUsername string, reason string) (*dmarkets.MarketGroup, error) {
+	return m.groupRejectFn(ctx, groupID, actorUsername, reason)
 }
 
 func (m marketReviewServiceMock) ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
 	return m.listFn(ctx, filters)
 }
 
+func (m marketReviewServiceMock) GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
+	if m.groupLookupFn == nil {
+		return nil, dmarkets.ErrMarketGroupNotFound
+	}
+	return m.groupLookupFn(ctx, marketID)
+}
+
 func (m marketReviewServiceMock) ReassignMarketSteward(ctx context.Context, marketID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.Market, error) {
 	return m.reassignFn(ctx, marketID, newStewardUsername, actorUsername, reason)
+}
+
+func (m marketReviewServiceMock) ReassignMarketGroupSteward(ctx context.Context, groupID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.MarketGroup, error) {
+	return m.groupReassignFn(ctx, groupID, newStewardUsername, actorUsername, reason)
 }
 
 func (m marketReviewServiceMock) UpdateMarketTags(ctx context.Context, marketID int64, tagSlugs []string, actorUsername string) (*dmarkets.Market, error) {
@@ -89,6 +112,42 @@ func TestApproveMarketHandlerApprovesProposal(t *testing.T) {
 	}
 }
 
+func TestApproveMarketGroupHandlerApprovesProposalGroup(t *testing.T) {
+	svc := marketReviewServiceMock{
+		groupApproveFn: func(_ context.Context, groupID int64, actorUsername string, confirmed bool) (*dmarkets.MarketGroup, error) {
+			if groupID != 50 || actorUsername != "admin" || !confirmed {
+				t.Fatalf("unexpected group approve args: id=%d actor=%q confirmed=%v", groupID, actorUsername, confirmed)
+			}
+			return &dmarkets.MarketGroup{
+				ID:              groupID,
+				QuestionTitle:   "Grouped match winner",
+				LifecycleStatus: dmarkets.MarketLifecyclePublished,
+				ApprovedBy:      actorUsername,
+				Members: []dmarkets.MarketGroupMember{
+					{MarketID: 101, AnswerLabel: "Home", DisplayOrder: 0},
+					{MarketID: 102, AnswerLabel: "Away", DisplayOrder: 1},
+				},
+			}, nil
+		},
+	}
+	handler := ApproveMarketGroupHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := mux.SetURLVars(httptest.NewRequest(http.MethodPatch, "/v0/admin/market-groups/50/approve", bytes.NewBufferString(`{"confirm":true}`)), map[string]string{"id": "50"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketGroupReviewResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !envelope.OK || envelope.Result.ID != 50 || envelope.Result.Status != dmarkets.MarketStatusActive || envelope.Result.AnswerCount != 2 {
+		t.Fatalf("unexpected response: %+v", envelope)
+	}
+}
+
 func TestRejectMarketHandlerRejectsProposal(t *testing.T) {
 	svc := marketReviewServiceMock{
 		rejectFn: func(_ context.Context, marketID int64, actorUsername string, reason string) (*dmarkets.Market, error) {
@@ -112,6 +171,43 @@ func TestRejectMarketHandlerRejectsProposal(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !envelope.OK || envelope.Result.LifecycleStatus != dmarkets.MarketLifecycleRejected || envelope.Result.RejectionReason != "duplicate" {
+		t.Fatalf("unexpected response: %+v", envelope)
+	}
+}
+
+func TestRejectMarketGroupHandlerRejectsProposalGroup(t *testing.T) {
+	svc := marketReviewServiceMock{
+		groupRejectFn: func(_ context.Context, groupID int64, actorUsername string, reason string) (*dmarkets.MarketGroup, error) {
+			if groupID != 51 || actorUsername != "admin" || reason != "duplicate answers" {
+				t.Fatalf("unexpected group reject args: id=%d actor=%q reason=%q", groupID, actorUsername, reason)
+			}
+			return &dmarkets.MarketGroup{
+				ID:              groupID,
+				QuestionTitle:   "Grouped match winner",
+				LifecycleStatus: dmarkets.MarketLifecycleRejected,
+				RejectedBy:      actorUsername,
+				RejectionReason: reason,
+				Members: []dmarkets.MarketGroupMember{
+					{MarketID: 101, AnswerLabel: "Home", DisplayOrder: 0},
+					{MarketID: 102, AnswerLabel: "Away", DisplayOrder: 1},
+				},
+			}, nil
+		},
+	}
+	handler := RejectMarketGroupHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := mux.SetURLVars(httptest.NewRequest(http.MethodPatch, "/v0/admin/market-groups/51/reject", bytes.NewBufferString(`{"reason":"duplicate answers"}`)), map[string]string{"id": "51"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketGroupReviewResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !envelope.OK || envelope.Result.LifecycleStatus != dmarkets.MarketLifecycleRejected || envelope.Result.RejectionReason != "duplicate answers" {
 		t.Fatalf("unexpected response: %+v", envelope)
 	}
 }
@@ -172,6 +268,57 @@ func TestListReviewMarketsHandlerReturnsQueue(t *testing.T) {
 	}
 }
 
+func TestListReviewMarketsHandlerAttachesMarketGroupMetadata(t *testing.T) {
+	svc := marketReviewServiceMock{
+		listFn: func(_ context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+			if filters.Status != dmarkets.MarketLifecyclePublished {
+				t.Fatalf("unexpected filters: %+v", filters)
+			}
+			return []*dmarkets.Market{{
+				ID:              101,
+				QuestionTitle:   "Grouped match winner - Home",
+				CreatorUsername: "moderator",
+				Status:          dmarkets.MarketStatusActive,
+				LifecycleStatus: dmarkets.MarketLifecyclePublished,
+			}}, nil
+		},
+		groupLookupFn: func(_ context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
+			if marketID != 101 {
+				t.Fatalf("unexpected group lookup market id: %d", marketID)
+			}
+			return &dmarkets.MarketGroup{
+				ID:              50,
+				QuestionTitle:   "Grouped match winner",
+				Description:     "One parent review item for answer markets.",
+				LifecycleStatus: dmarkets.MarketLifecyclePublished,
+				CreatorUsername: "moderator",
+				StewardUsername: "backup",
+				Members: []dmarkets.MarketGroupMember{
+					{MarketID: 101, AnswerLabel: "Home", DisplayOrder: 0},
+					{MarketID: 102, AnswerLabel: "Away", DisplayOrder: 1},
+				},
+			}, nil
+		},
+	}
+	handler := ListReviewMarketsHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := httptest.NewRequest(http.MethodGet, "/v0/admin/markets?status=published", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketReviewListResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	group := envelope.Result.Markets[0].MarketGroup
+	if !envelope.OK || group == nil || group.ID != 50 || group.AnswerLabel != "Home" || group.AnswerCount != 2 || group.StewardUsername != "backup" {
+		t.Fatalf("expected group metadata in admin queue response, got %+v", envelope.Result.Markets[0])
+	}
+}
+
 func TestListReviewMarketsHandlerSupportsAllStatusSearch(t *testing.T) {
 	svc := marketReviewServiceMock{
 		listFn: func(_ context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
@@ -201,6 +348,45 @@ func TestListReviewMarketsHandlerSupportsAllStatusSearch(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	if !envelope.OK || envelope.Result.Total != 1 || envelope.Result.Markets[0].LifecycleStatus != dmarkets.MarketLifecycleResolved {
+		t.Fatalf("unexpected response: %+v", envelope)
+	}
+}
+
+func TestReassignMarketGroupStewardHandlerReassignsGroupSteward(t *testing.T) {
+	changedAt := time.Date(2026, 6, 4, 13, 0, 0, 0, time.UTC)
+	svc := marketReviewServiceMock{
+		groupReassignFn: func(_ context.Context, groupID int64, newStewardUsername string, actorUsername string, reason string) (*dmarkets.MarketGroup, error) {
+			if groupID != 52 || newStewardUsername != "backup" || actorUsername != "admin" || reason != "moderator inactive" {
+				t.Fatalf("unexpected group reassign args: id=%d steward=%q actor=%q reason=%q", groupID, newStewardUsername, actorUsername, reason)
+			}
+			return &dmarkets.MarketGroup{
+				ID:              groupID,
+				QuestionTitle:   "Grouped match winner",
+				CreatorUsername: "moderator",
+				StewardUsername: newStewardUsername,
+				LifecycleStatus: dmarkets.MarketLifecyclePublished,
+				UpdatedAt:       changedAt,
+				Members: []dmarkets.MarketGroupMember{
+					{MarketID: 101, AnswerLabel: "Home", DisplayOrder: 0},
+					{MarketID: 102, AnswerLabel: "Away", DisplayOrder: 1},
+				},
+			}, nil
+		},
+	}
+	handler := ReassignMarketGroupStewardHandler(svc, marketReviewAuthMock{admin: &dusers.User{Username: "admin", UserType: string(dusers.UserTypeAdmin)}})
+	req := mux.SetURLVars(httptest.NewRequest(http.MethodPatch, "/v0/admin/market-groups/52/steward", bytes.NewBufferString(`{"stewardUsername":"backup","reason":"moderator inactive"}`)), map[string]string{"id": "52"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var envelope handlers.SuccessEnvelope[marketGroupReviewResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !envelope.OK || envelope.Result.StewardUsername != "backup" || envelope.Result.CreatorUsername != "moderator" || envelope.Result.AnswerCount != 2 {
 		t.Fatalf("unexpected response: %+v", envelope)
 	}
 }

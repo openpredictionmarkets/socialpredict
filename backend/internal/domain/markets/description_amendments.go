@@ -28,6 +28,7 @@ type MarketDescriptionAmendment struct {
 	MarketID                   int64
 	MarketTitle                string
 	MarketDescription          string
+	MarketGroup                *MarketGroup
 	Version                    int
 	Body                       string
 	BodyFormat                 string
@@ -281,6 +282,9 @@ func (s *Service) hydrateDescriptionAmendmentContext(ctx context.Context, items 
 		if market != nil {
 			item.MarketTitle = market.QuestionTitle
 			item.MarketDescription = market.Description
+		}
+		if group, err := s.GetMarketGroupForMarket(ctx, item.MarketID); err == nil && group != nil {
+			item.MarketGroup = group
 		}
 
 		approved, ok := approvedCache[item.MarketID]

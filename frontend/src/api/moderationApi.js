@@ -30,8 +30,36 @@ const reviewMarket = async ({ marketId, token, action, body }) => {
   });
 };
 
+const reviewMarketGroup = async ({ groupId, token, action, body }) => {
+  const normalizedGroupId = String(groupId || '').trim();
+  if (!normalizedGroupId) {
+    throw new Error('Market group ID is required.');
+  }
+  if (!token) {
+    throw new Error('Admin authentication token is missing. Please log in again.');
+  }
+
+  return authenticatedApiRequest(`/v0/admin/market-groups/${normalizedGroupId}/${action}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    authToken: token,
+    reasonMessages: marketReviewReasonMessages,
+    fallbackMessage: 'Market group review failed. Please try again.',
+  });
+};
+
 export const approveProposedMarket = ({ marketId, token }) => reviewMarket({
   marketId,
+  token,
+  action: 'approve',
+  body: { confirm: true },
+});
+
+export const approveProposedMarketGroup = ({ groupId, token }) => reviewMarketGroup({
+  groupId,
   token,
   action: 'approve',
   body: { confirm: true },
@@ -51,6 +79,20 @@ export const rejectProposedMarket = ({ marketId, token, reason }) => {
   });
 };
 
+export const rejectProposedMarketGroup = ({ groupId, token, reason }) => {
+  const normalizedReason = String(reason || '').trim();
+  if (!normalizedReason) {
+    throw new Error('A rejection reason is required.');
+  }
+
+  return reviewMarketGroup({
+    groupId,
+    token,
+    action: 'reject',
+    body: { reason: normalizedReason },
+  });
+};
+
 export const reassignMarketSteward = ({ marketId, token, stewardUsername, reason }) => {
   const normalizedStewardUsername = String(stewardUsername || '').trim();
   const normalizedReason = String(reason || '').trim();
@@ -63,6 +105,27 @@ export const reassignMarketSteward = ({ marketId, token, stewardUsername, reason
 
   return reviewMarket({
     marketId,
+    token,
+    action: 'steward',
+    body: {
+      stewardUsername: normalizedStewardUsername,
+      reason: normalizedReason,
+    },
+  });
+};
+
+export const reassignMarketGroupSteward = ({ groupId, token, stewardUsername, reason }) => {
+  const normalizedStewardUsername = String(stewardUsername || '').trim();
+  const normalizedReason = String(reason || '').trim();
+  if (!normalizedStewardUsername) {
+    throw new Error('A steward username is required.');
+  }
+  if (!normalizedReason) {
+    throw new Error('A reassignment reason is required.');
+  }
+
+  return reviewMarketGroup({
+    groupId,
     token,
     action: 'steward',
     body: {
