@@ -22,6 +22,12 @@ type marketGroupService interface {
 	ResolveMarketGroup(ctx context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error)
 }
 
+type marketGroupActivityService interface {
+	GetMarketGroupBetsPage(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupBetsPage, error)
+	GetMarketGroupPositionsPage(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupPositionsPage, error)
+	GetMarketGroupLeaderboardPage(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupLeaderboardPage, error)
+}
+
 // CreateMarketGroup handles POST /v0/market-groups.
 func (h *Handler) CreateMarketGroup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -169,6 +175,87 @@ func (h *Handler) ResolveMarketGroup(w http.ResponseWriter, r *http.Request) {
 	_ = writeJSON(w, http.StatusOK, marketGroupToResponse(group))
 }
 
+// MarketGroupBets handles GET /v0/market-groups/{id}/bets.
+func (h *Handler) MarketGroupBets(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	svc, ok := h.service.(marketGroupActivityService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+	groupID, err := parseMarketGroupIDFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	page := parsePagination(r, 20)
+	result, err := svc.GetMarketGroupBetsPage(r.Context(), groupID, page)
+	if err != nil {
+		writeMarketGroupDetailsError(w, err)
+		return
+	}
+	if err := handlers.WriteResult(w, http.StatusOK, marketGroupBetsPageToResponse(result)); err != nil {
+		logger.LogError("MarketGroupBets", "WriteResponse", err)
+	}
+}
+
+// MarketGroupPositions handles GET /v0/market-groups/{id}/positions.
+func (h *Handler) MarketGroupPositions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	svc, ok := h.service.(marketGroupActivityService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+	groupID, err := parseMarketGroupIDFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	page := parsePagination(r, 20)
+	result, err := svc.GetMarketGroupPositionsPage(r.Context(), groupID, page)
+	if err != nil {
+		writeMarketGroupDetailsError(w, err)
+		return
+	}
+	if err := handlers.WriteResult(w, http.StatusOK, marketGroupPositionsPageToResponse(result)); err != nil {
+		logger.LogError("MarketGroupPositions", "WriteResponse", err)
+	}
+}
+
+// MarketGroupLeaderboard handles GET /v0/market-groups/{id}/leaderboard.
+func (h *Handler) MarketGroupLeaderboard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	svc, ok := h.service.(marketGroupActivityService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+	groupID, err := parseMarketGroupIDFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	page := parsePagination(r, 20)
+	result, err := svc.GetMarketGroupLeaderboardPage(r.Context(), groupID, page)
+	if err != nil {
+		writeMarketGroupDetailsError(w, err)
+		return
+	}
+	if err := handlers.WriteResult(w, http.StatusOK, marketGroupLeaderboardPageToResponse(result)); err != nil {
+		logger.LogError("MarketGroupLeaderboard", "WriteResponse", err)
+	}
+}
+
 func (h *Handler) invalidateCreatedMarketGroup(ctx context.Context, username string, group *dmarkets.MarketGroup) {
 	if h.invalidator == nil || group == nil {
 		return
@@ -269,6 +356,123 @@ func groupChildResolutionsFromRequest(items []dto.ResolveMarketGroupChildRequest
 		})
 	}
 	return resolutions
+}
+
+func marketGroupBetsPageToResponse(page *dmarkets.MarketGroupBetsPage) dto.MarketGroupBetsResponse {
+	if page == nil {
+		return dto.MarketGroupBetsResponse{Bets: []dto.MarketGroupBetResponse{}}
+	}
+	rows := make([]dto.MarketGroupBetResponse, 0, len(page.Bets))
+	for _, bet := range page.Bets {
+		if bet == nil {
+			continue
+		}
+		rows = append(rows, dto.MarketGroupBetResponse{
+			AnswerMarketID: bet.AnswerMarketID,
+			AnswerLabel:    bet.AnswerLabel,
+			DisplayOrder:   bet.DisplayOrder,
+			Username:       bet.Username,
+			Outcome:        bet.Outcome,
+			Amount:         bet.Amount,
+			Probability:    bet.Probability,
+			PlacedAt:       bet.PlacedAt,
+		})
+	}
+	return dto.MarketGroupBetsResponse{
+		GroupID: page.GroupID,
+		Bets:    rows,
+		Total:   page.Total,
+	}
+}
+
+func marketGroupPositionsPageToResponse(page *dmarkets.MarketGroupPositionsPage) dto.MarketGroupPositionsResponse {
+	if page == nil {
+		return dto.MarketGroupPositionsResponse{Positions: []dto.MarketGroupPositionResponse{}}
+	}
+	rows := make([]dto.MarketGroupPositionResponse, 0, len(page.Positions))
+	for _, position := range page.Positions {
+		if position == nil {
+			continue
+		}
+		answers := make([]dto.MarketGroupPositionAnswerResponse, 0, len(position.Answers))
+		for _, answer := range position.Answers {
+			if answer == nil {
+				continue
+			}
+			answers = append(answers, dto.MarketGroupPositionAnswerResponse{
+				AnswerMarketID:   answer.AnswerMarketID,
+				AnswerLabel:      answer.AnswerLabel,
+				DisplayOrder:     answer.DisplayOrder,
+				MarketID:         answer.MarketID,
+				YesSharesOwned:   answer.YesSharesOwned,
+				NoSharesOwned:    answer.NoSharesOwned,
+				Value:            answer.Value,
+				TotalSpent:       answer.TotalSpent,
+				TotalSpentInPlay: answer.TotalSpentInPlay,
+				IsResolved:       answer.IsResolved,
+				ResolutionResult: answer.ResolutionResult,
+			})
+		}
+		rows = append(rows, dto.MarketGroupPositionResponse{
+			Username:         position.Username,
+			YesSharesOwned:   position.YesSharesOwned,
+			NoSharesOwned:    position.NoSharesOwned,
+			Value:            position.Value,
+			TotalSpent:       position.TotalSpent,
+			TotalSpentInPlay: position.TotalSpentInPlay,
+			Answers:          answers,
+		})
+	}
+	return dto.MarketGroupPositionsResponse{
+		GroupID:   page.GroupID,
+		Positions: rows,
+		Total:     page.Total,
+	}
+}
+
+func marketGroupLeaderboardPageToResponse(page *dmarkets.MarketGroupLeaderboardPage) dto.MarketGroupLeaderboardResponse {
+	if page == nil {
+		return dto.MarketGroupLeaderboardResponse{Leaderboard: []dto.MarketGroupLeaderboardRowResponse{}}
+	}
+	rows := make([]dto.MarketGroupLeaderboardRowResponse, 0, len(page.Leaderboard))
+	for _, entry := range page.Leaderboard {
+		if entry == nil {
+			continue
+		}
+		answers := make([]dto.MarketGroupLeaderboardAnswerResponse, 0, len(entry.Answers))
+		for _, answer := range entry.Answers {
+			if answer == nil {
+				continue
+			}
+			answers = append(answers, dto.MarketGroupLeaderboardAnswerResponse{
+				AnswerMarketID: answer.AnswerMarketID,
+				AnswerLabel:    answer.AnswerLabel,
+				DisplayOrder:   answer.DisplayOrder,
+				Profit:         answer.Profit,
+				CurrentValue:   answer.CurrentValue,
+				TotalSpent:     answer.TotalSpent,
+				Position:       answer.Position,
+				YesSharesOwned: answer.YesSharesOwned,
+				NoSharesOwned:  answer.NoSharesOwned,
+			})
+		}
+		rows = append(rows, dto.MarketGroupLeaderboardRowResponse{
+			Username:       entry.Username,
+			Profit:         entry.Profit,
+			CurrentValue:   entry.CurrentValue,
+			TotalSpent:     entry.TotalSpent,
+			Position:       entry.Position,
+			YesSharesOwned: entry.YesSharesOwned,
+			NoSharesOwned:  entry.NoSharesOwned,
+			Rank:           entry.Rank,
+			Answers:        answers,
+		})
+	}
+	return dto.MarketGroupLeaderboardResponse{
+		GroupID:     page.GroupID,
+		Leaderboard: rows,
+		Total:       page.Total,
+	}
 }
 
 func marketGroupToResponse(group *dmarkets.MarketGroup) *dto.MarketGroupResponse {

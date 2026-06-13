@@ -90,6 +90,85 @@ type MarketGroupDetailsResponse struct {
 	Answers []MarketGroupAnswerResponse `json:"answers"`
 }
 
+type MarketGroupBetResponse struct {
+	AnswerMarketID int64     `json:"answerMarketId"`
+	AnswerLabel    string    `json:"answerLabel"`
+	DisplayOrder   int       `json:"displayOrder"`
+	Username       string    `json:"username"`
+	Outcome        string    `json:"outcome"`
+	Amount         int64     `json:"amount"`
+	Probability    float64   `json:"probability"`
+	PlacedAt       time.Time `json:"placedAt"`
+}
+
+type MarketGroupBetsResponse struct {
+	GroupID int64                    `json:"groupId"`
+	Bets    []MarketGroupBetResponse `json:"bets"`
+	Total   int                      `json:"total"`
+}
+
+type MarketGroupPositionAnswerResponse struct {
+	AnswerMarketID   int64  `json:"answerMarketId"`
+	AnswerLabel      string `json:"answerLabel"`
+	DisplayOrder     int    `json:"displayOrder"`
+	MarketID         int64  `json:"marketId"`
+	YesSharesOwned   int64  `json:"yesSharesOwned"`
+	NoSharesOwned    int64  `json:"noSharesOwned"`
+	Value            int64  `json:"value"`
+	TotalSpent       int64  `json:"totalSpent"`
+	TotalSpentInPlay int64  `json:"totalSpentInPlay"`
+	IsResolved       bool   `json:"isResolved"`
+	ResolutionResult string `json:"resolutionResult"`
+}
+
+type MarketGroupPositionResponse struct {
+	Username         string                              `json:"username"`
+	YesSharesOwned   int64                               `json:"yesSharesOwned"`
+	NoSharesOwned    int64                               `json:"noSharesOwned"`
+	Value            int64                               `json:"value"`
+	TotalSpent       int64                               `json:"totalSpent"`
+	TotalSpentInPlay int64                               `json:"totalSpentInPlay"`
+	Answers          []MarketGroupPositionAnswerResponse `json:"answers"`
+}
+
+type MarketGroupPositionsResponse struct {
+	GroupID   int64                         `json:"groupId"`
+	Positions []MarketGroupPositionResponse `json:"positions"`
+	Total     int                           `json:"total"`
+	Freshness *Freshness                    `json:"freshness,omitempty"`
+}
+
+type MarketGroupLeaderboardAnswerResponse struct {
+	AnswerMarketID int64  `json:"answerMarketId"`
+	AnswerLabel    string `json:"answerLabel"`
+	DisplayOrder   int    `json:"displayOrder"`
+	Profit         int64  `json:"profit"`
+	CurrentValue   int64  `json:"currentValue"`
+	TotalSpent     int64  `json:"totalSpent"`
+	Position       string `json:"position"`
+	YesSharesOwned int64  `json:"yesSharesOwned"`
+	NoSharesOwned  int64  `json:"noSharesOwned"`
+}
+
+type MarketGroupLeaderboardRowResponse struct {
+	Username       string                                 `json:"username"`
+	Profit         int64                                  `json:"profit"`
+	CurrentValue   int64                                  `json:"currentValue"`
+	TotalSpent     int64                                  `json:"totalSpent"`
+	Position       string                                 `json:"position"`
+	YesSharesOwned int64                                  `json:"yesSharesOwned"`
+	NoSharesOwned  int64                                  `json:"noSharesOwned"`
+	Rank           int                                    `json:"rank"`
+	Answers        []MarketGroupLeaderboardAnswerResponse `json:"answers"`
+}
+
+type MarketGroupLeaderboardResponse struct {
+	GroupID     int64                               `json:"groupId"`
+	Leaderboard []MarketGroupLeaderboardRowResponse `json:"leaderboard"`
+	Total       int                                 `json:"total"`
+	Freshness   *Freshness                          `json:"freshness,omitempty"`
+}
+
 type MarketTagResponse struct {
 	ID          int64  `json:"id"`
 	Slug        string `json:"slug"`

@@ -152,6 +152,9 @@ x-route-family-migration-matrix:
         - /v0/markets/{id}
         - /v0/market-groups
         - /v0/market-groups/{id}
+        - /v0/market-groups/{id}/bets
+        - /v0/market-groups/{id}/positions
+        - /v0/market-groups/{id}/leaderboard
         - /v0/markets/{id}/description-amendments
         - /v0/markets/{id}/resolve
         - /v0/markets/{id}/leaderboard
@@ -729,6 +732,180 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '429':
           description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}/bets:
+    get:
+      tags: [Markets]
+      operationId: listMarketGroupBets
+      summary: List grouped market bets
+      description: Returns a single globally sorted bet feed across all child markets in a multiple-choice binary group.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Grouped bets returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupBetsEnvelopeResponse'
+        '400':
+          description: Invalid group ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market group not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error while loading grouped bets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}/positions:
+    get:
+      tags: [Markets]
+      operationId: listMarketGroupPositions
+      summary: List grouped market positions
+      description: Returns user positions aggregated across child markets with per-answer breakdowns.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Grouped positions returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupPositionsEnvelopeResponse'
+        '400':
+          description: Invalid group ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market group not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error while loading grouped positions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}/leaderboard:
+    get:
+      tags: [Markets]
+      operationId: getMarketGroupLeaderboard
+      summary: Get grouped market leaderboard
+      description: Returns an aggregate leaderboard across child markets with per-answer profit breakdowns.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Grouped leaderboard returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupLeaderboardEnvelopeResponse'
+        '400':
+          description: Invalid group ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market group not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected server error while loading grouped leaderboard.
           content:
             application/json:
               schema:
@@ -4862,6 +5039,36 @@ components:
           $ref: '#/components/schemas/MarketLeaderboardResponse'
       required: [ok, result]
 
+    MarketGroupBetsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketGroupBetsResponse'
+      required: [ok, result]
+
+    MarketGroupPositionsEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketGroupPositionsResponse'
+      required: [ok, result]
+
+    MarketGroupLeaderboardEnvelopeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketGroupLeaderboardResponse'
+      required: [ok, result]
+
     MarketPositionsEnvelopeResponse:
       type: object
       properties:
@@ -5555,6 +5762,188 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketGroupAnswerResponse'
+
+    MarketGroupBet:
+      type: object
+      properties:
+        answerMarketId:
+          type: integer
+          format: int64
+        answerLabel:
+          type: string
+        displayOrder:
+          type: integer
+        username:
+          type: string
+        outcome:
+          type: string
+        amount:
+          type: integer
+          format: int64
+        probability:
+          type: number
+          format: float
+        placedAt:
+          type: string
+          format: date-time
+
+    MarketGroupBetsResponse:
+      type: object
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        bets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketGroupBet'
+        total:
+          type: integer
+
+    MarketGroupPositionAnswer:
+      type: object
+      properties:
+        answerMarketId:
+          type: integer
+          format: int64
+        answerLabel:
+          type: string
+        displayOrder:
+          type: integer
+        marketId:
+          type: integer
+          format: int64
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        value:
+          type: integer
+          format: int64
+        totalSpent:
+          type: integer
+          format: int64
+        totalSpentInPlay:
+          type: integer
+          format: int64
+        isResolved:
+          type: boolean
+        resolutionResult:
+          type: string
+
+    MarketGroupPosition:
+      type: object
+      properties:
+        username:
+          type: string
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        value:
+          type: integer
+          format: int64
+        totalSpent:
+          type: integer
+          format: int64
+        totalSpentInPlay:
+          type: integer
+          format: int64
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketGroupPositionAnswer'
+
+    MarketGroupPositionsResponse:
+      type: object
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketGroupPosition'
+        total:
+          type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
+
+    MarketGroupLeaderboardAnswer:
+      type: object
+      properties:
+        answerMarketId:
+          type: integer
+          format: int64
+        answerLabel:
+          type: string
+        displayOrder:
+          type: integer
+        profit:
+          type: integer
+          format: int64
+        currentValue:
+          type: integer
+          format: int64
+        totalSpent:
+          type: integer
+          format: int64
+        position:
+          type: string
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+
+    MarketGroupLeaderboardRow:
+      type: object
+      properties:
+        username:
+          type: string
+        profit:
+          type: integer
+          format: int64
+        currentValue:
+          type: integer
+          format: int64
+        totalSpent:
+          type: integer
+          format: int64
+        position:
+          type: string
+        yesSharesOwned:
+          type: integer
+          format: int64
+        noSharesOwned:
+          type: integer
+          format: int64
+        rank:
+          type: integer
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketGroupLeaderboardAnswer'
+
+    MarketGroupLeaderboardResponse:
+      type: object
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        leaderboard:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketGroupLeaderboardRow'
+        total:
+          type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
 
     ListMarketsResponse:
       type: object

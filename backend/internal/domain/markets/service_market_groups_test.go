@@ -216,6 +216,80 @@ func TestGetMarketGroupOverviewReturnsChildMarketOverviews(t *testing.T) {
 	}
 }
 
+func TestMarketGroupActivityAggregatesChildRows(t *testing.T) {
+	now := marketsTestTime()
+	group := &markets.MarketGroup{
+		ID:              50,
+		QuestionTitle:   "Spain vs Canada",
+		LifecycleStatus: markets.MarketLifecyclePublished,
+		Members: []markets.MarketGroupMember{
+			{ID: 1, GroupID: 50, MarketID: 101, AnswerLabel: "Spain", DisplayOrder: 0},
+			{ID: 2, GroupID: 50, MarketID: 102, AnswerLabel: "Canada", DisplayOrder: 1},
+		},
+	}
+	marketsByID := map[int64]*markets.Market{
+		101: {ID: 101, Status: markets.MarketStatusActive, CreatedAt: now, ResolutionDateTime: now.Add(24 * time.Hour)},
+		102: {ID: 102, Status: markets.MarketStatusActive, CreatedAt: now, ResolutionDateTime: now.Add(24 * time.Hour)},
+	}
+	betsByMarket := map[int64][]*markets.Bet{
+		101: {
+			{Username: "alice", MarketID: 101, Amount: 10, Outcome: "YES", PlacedAt: now.Add(1 * time.Minute), CreatedAt: now.Add(1 * time.Minute)},
+		},
+		102: {
+			{Username: "bob", MarketID: 102, Amount: 7, Outcome: "NO", PlacedAt: now.Add(2 * time.Minute), CreatedAt: now.Add(2 * time.Minute)},
+		},
+	}
+	positionsByMarket := map[int64]markets.MarketPositions{
+		101: {
+			{Username: "alice", MarketID: 101, YesSharesOwned: 3, Value: 3, TotalSpent: 10, TotalSpentInPlay: 10},
+		},
+		102: {
+			{Username: "alice", MarketID: 102, NoSharesOwned: 4, Value: 4, TotalSpent: 7, TotalSpentInPlay: 7},
+		},
+	}
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getMarketGroupFunc = func(_ context.Context, groupID int64) (*markets.MarketGroup, error) {
+			if groupID != group.ID {
+				return nil, markets.ErrMarketGroupNotFound
+			}
+			return group, nil
+		}
+		repo.getByIDFunc = func(_ context.Context, marketID int64) (*markets.Market, error) {
+			return marketsByID[marketID], nil
+		}
+		repo.listBetsForMarketFunc = func(_ context.Context, marketID int64) ([]*markets.Bet, error) {
+			return betsByMarket[marketID], nil
+		}
+		repo.listMarketPositionsFunc = func(_ context.Context, marketID int64) (markets.MarketPositions, error) {
+			return positionsByMarket[marketID], nil
+		}
+	})
+	service := markets.NewService(repo, nil, newProjectionClock(now), markets.Config{})
+
+	bets, err := service.GetMarketGroupBetsPage(context.Background(), group.ID, markets.Page{Limit: 20, Offset: 0})
+	if err != nil {
+		t.Fatalf("GetMarketGroupBetsPage returned error: %v", err)
+	}
+	if bets.Total != 2 || len(bets.Bets) != 2 {
+		t.Fatalf("expected two grouped bets, got total=%d len=%d", bets.Total, len(bets.Bets))
+	}
+	if bets.Bets[0].AnswerLabel != "Canada" {
+		t.Fatalf("expected newest bet first from Canada child, got %+v", bets.Bets[0])
+	}
+
+	positions, err := service.GetMarketGroupPositionsPage(context.Background(), group.ID, markets.Page{Limit: 20, Offset: 0})
+	if err != nil {
+		t.Fatalf("GetMarketGroupPositionsPage returned error: %v", err)
+	}
+	if positions.Total != 1 || len(positions.Positions) != 1 {
+		t.Fatalf("expected one grouped position row, got total=%d len=%d", positions.Total, len(positions.Positions))
+	}
+	alice := positions.Positions[0]
+	if alice.Username != "alice" || alice.YesSharesOwned != 3 || alice.NoSharesOwned != 4 || len(alice.Answers) != 2 {
+		t.Fatalf("unexpected grouped position: %+v", alice)
+	}
+}
+
 func TestResolveMarketGroupExclusiveYesResolvesChildrenAndMarksParent(t *testing.T) {
 	now := marketsTestTime()
 	group := &markets.MarketGroup{

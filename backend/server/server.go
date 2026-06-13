@@ -447,8 +447,11 @@ func registerApplicationRoutes(router *mux.Router, db *gorm.DB, configService co
 	router.Handle("/v0/read/market-discovery/{slug}", securityMiddleware(http.HandlerFunc(marketDiscoveryReadModelHandler.Get))).Methods("GET")
 	router.Handle("/v0/markets", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarket))).Methods("POST")
 	router.Handle("/v0/market-groups", securityMiddleware(http.HandlerFunc(marketsHandler.CreateMarketGroup))).Methods("POST")
-	router.Handle("/v0/market-groups/{id}", securityMiddleware(http.HandlerFunc(marketsHandler.GetMarketGroup))).Methods("GET")
+	router.Handle("/v0/market-groups/{id}/bets", securityMiddleware(http.HandlerFunc(marketsHandler.MarketGroupBets))).Methods("GET")
+	router.Handle("/v0/market-groups/{id}/positions", securityMiddleware(http.HandlerFunc(marketsHandler.MarketGroupPositions))).Methods("GET")
+	router.Handle("/v0/market-groups/{id}/leaderboard", securityMiddleware(http.HandlerFunc(marketsHandler.MarketGroupLeaderboard))).Methods("GET")
 	router.Handle("/v0/market-groups/{id}/resolve", securityMiddleware(http.HandlerFunc(marketsHandler.ResolveMarketGroup))).Methods("POST")
+	router.Handle("/v0/market-groups/{id}", securityMiddleware(http.HandlerFunc(marketsHandler.GetMarketGroup))).Methods("GET")
 	router.Handle("/v0/markets/search", securityMiddleware(http.HandlerFunc(marketsHandler.SearchMarkets))).Methods("GET")
 	router.Handle("/v0/markets/status/{status}", securityMiddleware(http.HandlerFunc(marketsHandler.ListByStatus))).Methods("GET")
 	router.Handle("/v0/markets/status", securityMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

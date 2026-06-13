@@ -86,7 +86,7 @@ const groupedFetchJson = async (path, token = '') => {
     authenticated: Boolean(token),
     authToken: token,
     reasonMessages: {
-      RATE_LIMITED: 'Grouped activity is loading several answer markets. Wait a moment and try again.',
+      RATE_LIMITED: 'Grouped activity is loading. Wait a moment and try again.',
     },
     fallbackMessage: 'Failed to load grouped market activity.',
   });
@@ -94,34 +94,9 @@ const groupedFetchJson = async (path, token = '') => {
 
 const answerLabelFor = (answer) => answer?.answerLabel || `Answer ${Number(answer?.displayOrder || 0) + 1}`;
 
-const childMarketFor = (answer) => answer?.market?.market || {};
-
-const groupedAnswerMeta = (answers = []) => answers.map((answer) => ({
-  answerId: answer.id,
-  answerLabel: answerLabelFor(answer),
-  marketId: answer.marketId,
-  displayOrder: Number(answer.displayOrder || 0),
-  market: childMarketFor(answer),
-}));
-
 const childDescriptionAmendments = (answer) => {
   const amendments = answer?.descriptionAmendments || answer?.DescriptionAmendments || [];
   return Array.isArray(amendments) ? amendments : [];
-};
-
-const fetchSequentially = async (items, fetcher) => {
-  const results = [];
-  for (const [index, item] of items.entries()) {
-    // Avoid bursting one request per answer at the same instant in dev/staging.
-    // The grouped page is display-only, so sequential reads are acceptable here.
-    // eslint-disable-next-line no-await-in-loop
-    results.push(await fetcher(item));
-    if (index < items.length - 1) {
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((resolve) => setTimeout(resolve, 75));
-    }
-  }
-  return results;
 };
 
 const uniqueGroupedAmendments = (answers = []) => {
@@ -181,39 +156,28 @@ const canTradeMarket = (market, isLoggedIn) => {
   return closeDate > new Date();
 };
 
-const GroupedBetsActivity = ({ answers, refreshTrigger }) => {
+const GroupedBetsActivity = ({ groupId, refreshTrigger }) => {
   const pageSize = 20;
   const [bets, setBets] = useState([]);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [error, setError] = useState('');
-  const answerMeta = useMemo(() => groupedAnswerMeta(answers), [answers]);
 
   useEffect(() => {
     setPage(0);
-  }, [answers, refreshTrigger]);
+  }, [groupId, refreshTrigger]);
 
   useEffect(() => {
     let ignore = false;
     const loadBets = async () => {
       const offset = page * pageSize;
-      const fetchLimit = offset + pageSize + 1;
       setError('');
       try {
-        const results = await fetchSequentially(answerMeta, async (answer) => {
-          const rows = await groupedFetchJson(`/v0/markets/bets/${answer.marketId}?limit=${fetchLimit}&offset=0`);
-          return (Array.isArray(rows) ? rows : []).map((bet) => ({
-            ...bet,
-            answerLabel: answer.answerLabel,
-            answerMarketId: answer.marketId,
-          }));
-        });
-        const merged = results.flat().sort((left, right) => (
-          new Date(right.placedAt).getTime() - new Date(left.placedAt).getTime()
-        ));
+        const payload = await groupedFetchJson(`/v0/market-groups/${groupId}/bets?limit=${pageSize + 1}&offset=${offset}`);
+        const rows = Array.isArray(payload?.bets) ? payload.bets : [];
         if (!ignore) {
-          setBets(merged.slice(offset, offset + pageSize));
-          setHasNextPage(merged.length > offset + pageSize);
+          setBets(rows.slice(0, pageSize));
+          setHasNextPage(toNumber(payload?.total) > offset + pageSize || rows.length > pageSize);
         }
       } catch (err) {
         if (!ignore) {
@@ -223,13 +187,13 @@ const GroupedBetsActivity = ({ answers, refreshTrigger }) => {
         }
       }
     };
-    if (answerMeta.length) {
+    if (groupId) {
       loadBets();
     }
     return () => {
       ignore = true;
     };
-  }, [answerMeta, page, refreshTrigger]);
+  }, [groupId, page, refreshTrigger]);
 
   const pageStart = page * pageSize;
 
@@ -297,18 +261,17 @@ const GroupedPositionEntry = ({ entry }) => (
   </div>
 );
 
-const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
+const GroupedPositionsActivity = ({ groupId, token, refreshTrigger }) => {
   const pageSize = 20;
   const [positions, setPositions] = useState([]);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [freshnessLabel, setFreshnessLabel] = useState('');
   const [error, setError] = useState('');
-  const answerMeta = useMemo(() => groupedAnswerMeta(answers), [answers]);
 
   useEffect(() => {
     setPage(0);
-  }, [answers, refreshTrigger, token]);
+  }, [groupId, refreshTrigger, token]);
 
   useEffect(() => {
     let ignore = false;
@@ -322,62 +285,13 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
       }
       setError('');
       try {
-        const results = await fetchSequentially(answerMeta, async (answer) => {
-          const payload = await groupedFetchJson(`/v0/markets/positions/${answer.marketId}?limit=200&offset=0`, token);
-          const rows = Array.isArray(payload?.positions)
-            ? payload.positions
-            : Array.isArray(payload)
-              ? payload
-              : [];
-          return {
-            answer,
-            freshness: payload?.freshness || null,
-            rows: rows.map((position) => ({
-              ...position,
-              answerLabel: answer.answerLabel,
-              answerMarketId: answer.marketId,
-              displayOrder: answer.displayOrder,
-            })),
-          };
-        });
-        const byUser = new Map();
-        results.forEach(({ rows }) => {
-          rows.forEach((position) => {
-            if (!position.username || (toNumber(position.yesSharesOwned) <= 0 && toNumber(position.noSharesOwned) <= 0)) {
-              return;
-            }
-            const current = byUser.get(position.username) || {
-              username: position.username,
-              yesSharesOwned: 0,
-              noSharesOwned: 0,
-              value: 0,
-              totalSpent: 0,
-              totalSpentInPlay: 0,
-              answers: [],
-            };
-            current.yesSharesOwned += toNumber(position.yesSharesOwned);
-            current.noSharesOwned += toNumber(position.noSharesOwned);
-            current.value += toNumber(position.value);
-            current.totalSpent += toNumber(position.totalSpent);
-            current.totalSpentInPlay += toNumber(position.totalSpentInPlay);
-            current.answers.push(position);
-            current.answers.sort((left, right) => toNumber(left.displayOrder) - toNumber(right.displayOrder));
-            byUser.set(position.username, current);
-          });
-        });
-        const merged = [...byUser.values()].sort((left, right) => (
-          (right.yesSharesOwned + right.noSharesOwned) - (left.yesSharesOwned + left.noSharesOwned)
-        ));
-        const generatedTimes = results
-          .map((item) => item.freshness?.generatedAt)
-          .filter(Boolean)
-          .map((value) => new Date(value))
-          .filter((date) => !Number.isNaN(date.getTime()));
+        const offset = page * pageSize;
+        const payload = await groupedFetchJson(`/v0/market-groups/${groupId}/positions?limit=${pageSize + 1}&offset=${offset}`, token);
+        const rows = Array.isArray(payload?.positions) ? payload.positions : [];
         if (!ignore) {
-          const offset = page * pageSize;
-          setPositions(merged.slice(offset, offset + pageSize));
-          setHasNextPage(merged.length > offset + pageSize);
-          setFreshnessLabel(generatedTimes.length ? new Date(Math.min(...generatedTimes.map((date) => date.getTime()))).toLocaleTimeString() : '');
+          setPositions(rows.slice(0, pageSize));
+          setHasNextPage(toNumber(payload?.total) > offset + pageSize || rows.length > pageSize);
+          setFreshnessLabel(payload?.freshness?.generatedAt ? new Date(payload.freshness.generatedAt).toLocaleTimeString() : '');
         }
       } catch (err) {
         if (!ignore) {
@@ -388,13 +302,13 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
         }
       }
     };
-    if (answerMeta.length) {
+    if (groupId) {
       loadPositions();
     }
     return () => {
       ignore = true;
     };
-  }, [answerMeta, page, refreshTrigger, token]);
+  }, [groupId, page, refreshTrigger, token]);
 
   const noPositionRows = positions.flatMap((position) => (
     position.answers
@@ -470,73 +384,30 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
   );
 };
 
-const GroupedLeaderboardActivity = ({ answers, refreshTrigger }) => {
+const GroupedLeaderboardActivity = ({ groupId, refreshTrigger }) => {
   const pageSize = 20;
   const [leaderboard, setLeaderboard] = useState([]);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [freshnessLabel, setFreshnessLabel] = useState('');
   const [error, setError] = useState('');
-  const answerMeta = useMemo(() => groupedAnswerMeta(answers), [answers]);
 
   useEffect(() => {
     setPage(0);
-  }, [answers, refreshTrigger]);
+  }, [groupId, refreshTrigger]);
 
   useEffect(() => {
     let ignore = false;
     const loadLeaderboard = async () => {
       setError('');
       try {
-        const results = await fetchSequentially(answerMeta, async (answer) => {
-          const payload = await groupedFetchJson(`/v0/markets/${answer.marketId}/leaderboard?limit=200&offset=0`);
-          return {
-            answer,
-            freshness: payload?.freshness || null,
-            rows: (Array.isArray(payload?.leaderboard) ? payload.leaderboard : []).map((row) => ({
-              ...row,
-              answerLabel: answer.answerLabel,
-              answerMarketId: answer.marketId,
-            })),
-          };
-        });
-        const byUser = new Map();
-        results.forEach(({ rows }) => {
-          rows.forEach((row) => {
-            if (!row.username) {
-              return;
-            }
-            const current = byUser.get(row.username) || {
-              username: row.username,
-              profit: 0,
-              currentValue: 0,
-              totalSpent: 0,
-              yesSharesOwned: 0,
-              noSharesOwned: 0,
-              answers: [],
-            };
-            current.profit += toNumber(row.profit);
-            current.currentValue += toNumber(row.currentValue);
-            current.totalSpent += toNumber(row.totalSpent);
-            current.yesSharesOwned += toNumber(row.yesSharesOwned);
-            current.noSharesOwned += toNumber(row.noSharesOwned);
-            current.answers.push(row);
-            byUser.set(row.username, current);
-          });
-        });
-        const merged = [...byUser.values()]
-          .sort((left, right) => right.profit - left.profit)
-          .map((row, index) => ({ ...row, rank: index + 1 }));
-        const generatedTimes = results
-          .map((item) => item.freshness?.generatedAt)
-          .filter(Boolean)
-          .map((value) => new Date(value))
-          .filter((date) => !Number.isNaN(date.getTime()));
+        const offset = page * pageSize;
+        const payload = await groupedFetchJson(`/v0/market-groups/${groupId}/leaderboard?limit=${pageSize + 1}&offset=${offset}`);
+        const rows = Array.isArray(payload?.leaderboard) ? payload.leaderboard : [];
         if (!ignore) {
-          const offset = page * pageSize;
-          setLeaderboard(merged.slice(offset, offset + pageSize));
-          setHasNextPage(merged.length > offset + pageSize);
-          setFreshnessLabel(generatedTimes.length ? new Date(Math.min(...generatedTimes.map((date) => date.getTime()))).toLocaleTimeString() : '');
+          setLeaderboard(rows.slice(0, pageSize));
+          setHasNextPage(toNumber(payload?.total) > offset + pageSize || rows.length > pageSize);
+          setFreshnessLabel(payload?.freshness?.generatedAt ? new Date(payload.freshness.generatedAt).toLocaleTimeString() : '');
         }
       } catch (err) {
         if (!ignore) {
@@ -547,13 +418,13 @@ const GroupedLeaderboardActivity = ({ answers, refreshTrigger }) => {
         }
       }
     };
-    if (answerMeta.length) {
+    if (groupId) {
       loadLeaderboard();
     }
     return () => {
       ignore = true;
     };
-  }, [answerMeta, page, refreshTrigger]);
+  }, [groupId, page, refreshTrigger]);
 
   const formatCurrency = (amount) => toNumber(amount).toLocaleString();
   const getProfitColor = (profit) => {
@@ -721,11 +592,11 @@ const GroupedActivityHeader = ({
   </div>
 );
 
-const GroupedActivityTabs = ({ answers, token, refreshTrigger }) => {
+const GroupedActivityTabs = ({ groupId, token, refreshTrigger }) => {
   const tabsData = [
-    { label: 'Bets', content: <GroupedBetsActivity answers={answers} refreshTrigger={refreshTrigger} /> },
-    { label: 'Positions', content: <GroupedPositionsActivity answers={answers} token={token} refreshTrigger={refreshTrigger} /> },
-    { label: 'Leaderboard', content: <GroupedLeaderboardActivity answers={answers} refreshTrigger={refreshTrigger} /> },
+    { label: 'Bets', content: <GroupedBetsActivity groupId={groupId} refreshTrigger={refreshTrigger} /> },
+    { label: 'Positions', content: <GroupedPositionsActivity groupId={groupId} token={token} refreshTrigger={refreshTrigger} /> },
+    { label: 'Leaderboard', content: <GroupedLeaderboardActivity groupId={groupId} refreshTrigger={refreshTrigger} /> },
     { label: 'Comments', content: <div className='p-4 text-gray-400'>Comments Go here...</div> },
   ];
 
@@ -1155,7 +1026,7 @@ export default function GroupedMarketDetailsLayout({
       )}
 
       <div className='mx-auto mb-4 w-full'>
-        <GroupedActivityTabs answers={sortedAnswers} token={token} refreshTrigger={refreshKey} />
+        <GroupedActivityTabs groupId={group.id || marketGroup.id} token={token} refreshTrigger={refreshKey} />
       </div>
 
       <div className='h-32 md:hidden' />

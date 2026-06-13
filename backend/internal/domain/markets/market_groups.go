@@ -109,6 +109,83 @@ type MarketGroupAnswerOverview struct {
 	Overview *MarketOverview
 }
 
+type MarketGroupBetDisplayInfo struct {
+	AnswerMarketID int64
+	AnswerLabel    string
+	DisplayOrder   int
+	Username       string
+	Outcome        string
+	Amount         int64
+	Probability    float64
+	PlacedAt       time.Time
+}
+
+type MarketGroupBetsPage struct {
+	GroupID int64
+	Bets    []*MarketGroupBetDisplayInfo
+	Total   int
+}
+
+type MarketGroupPositionAnswer struct {
+	AnswerMarketID   int64
+	AnswerLabel      string
+	DisplayOrder     int
+	MarketID         int64
+	YesSharesOwned   int64
+	NoSharesOwned    int64
+	Value            int64
+	TotalSpent       int64
+	TotalSpentInPlay int64
+	IsResolved       bool
+	ResolutionResult string
+}
+
+type MarketGroupPositionRow struct {
+	Username         string
+	YesSharesOwned   int64
+	NoSharesOwned    int64
+	Value            int64
+	TotalSpent       int64
+	TotalSpentInPlay int64
+	Answers          []*MarketGroupPositionAnswer
+}
+
+type MarketGroupPositionsPage struct {
+	GroupID   int64
+	Positions []*MarketGroupPositionRow
+	Total     int
+}
+
+type MarketGroupLeaderboardAnswer struct {
+	AnswerMarketID int64
+	AnswerLabel    string
+	DisplayOrder   int
+	Profit         int64
+	CurrentValue   int64
+	TotalSpent     int64
+	Position       string
+	YesSharesOwned int64
+	NoSharesOwned  int64
+}
+
+type MarketGroupLeaderboardRow struct {
+	Username       string
+	Profit         int64
+	CurrentValue   int64
+	TotalSpent     int64
+	Position       string
+	YesSharesOwned int64
+	NoSharesOwned  int64
+	Rank           int
+	Answers        []*MarketGroupLeaderboardAnswer
+}
+
+type MarketGroupLeaderboardPage struct {
+	GroupID     int64
+	Leaderboard []*MarketGroupLeaderboardRow
+	Total       int
+}
+
 // NormalizeMarketGroupDefaults fills policy defaults while preserving explicit
 // values for future market group classes.
 func NormalizeMarketGroupDefaults(group *MarketGroup) {
