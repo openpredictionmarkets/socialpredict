@@ -109,23 +109,38 @@ const fetchSequentially = async (items, fetcher) => {
 };
 
 const uniqueGroupedAmendments = (answers = []) => {
-  const seen = new Set();
+  const grouped = new Map();
   const amendments = [];
   answers.forEach((answer) => {
     (answer.descriptionAmendments || []).forEach((amendment) => {
+      const approvedAt = amendment.approvedAt || amendment.ApprovedAt || '';
+      const approvedAtDate = approvedAt ? new Date(approvedAt) : null;
+      const approvedAtKey = approvedAtDate && !Number.isNaN(approvedAtDate.getTime())
+        ? String(Math.floor(approvedAtDate.getTime() / 1000))
+        : String(approvedAt || '');
       const key = [
-        amendment.body || amendment.Body || '',
-        amendment.createdBy || amendment.CreatedBy || '',
-        amendment.approvedAt || amendment.ApprovedAt || '',
+        String(amendment.body || amendment.Body || '').trim(),
+        String(amendment.createdBy || amendment.CreatedBy || '').trim(),
+        approvedAtKey,
       ].join('|');
-      if (!key.trim() || seen.has(key)) {
+      if (!key.trim()) {
         return;
       }
-      seen.add(key);
-      amendments.push({
+      const answerLabel = answerLabelFor(answer);
+      const existing = grouped.get(key);
+      if (existing) {
+        if (!existing.answerLabels.includes(answerLabel)) {
+          existing.answerLabels.push(answerLabel);
+        }
+        return;
+      }
+      const row = {
         ...amendment,
-        answerLabel: answerLabelFor(answer),
-      });
+        groupKey: key,
+        answerLabels: [answerLabel],
+      };
+      grouped.set(key, row);
+      amendments.push(row);
     });
   });
   return amendments;
@@ -789,12 +804,17 @@ export default function GroupedMarketDetailsLayout({
                   <section className='grid gap-3'>
                     <h2 className='text-sm font-semibold uppercase tracking-[0.14em] text-sky-200'>Amendments</h2>
                     {descriptionAmendments.map((amendment, index) => (
-                      <article key={`${amendment.body || amendment.Body}-${index}`} className='rounded-md border border-sky-900/70 bg-sky-950/30 p-3'>
+                      <article key={amendment.groupKey || `${amendment.body || amendment.Body}-${index}`} className='rounded-md border border-sky-900/70 bg-sky-950/30 p-3'>
                         <div className='mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80'>
                           <span>Amendment {index + 1}</span>
                           <span>Submitted by @{amendment.createdBy || amendment.CreatedBy}</span>
                           {(amendment.approvedAt || amendment.ApprovedAt) && (
                             <span>Approved {new Date(amendment.approvedAt || amendment.ApprovedAt).toLocaleString()}</span>
+                          )}
+                          {amendment.answerLabels?.length > 1 && (
+                            <span>
+                              Applies to {amendment.answerLabels.length} answers: {amendment.answerLabels.join(', ')}
+                            </span>
                           )}
                         </div>
                         <MarkdownLite className='text-gray-200'>{amendment.body || amendment.Body}</MarkdownLite>
