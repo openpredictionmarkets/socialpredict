@@ -48,6 +48,20 @@ const probabilityDisplay = (answer) => {
   return probability.toFixed(2);
 };
 
+const groupedCloseStatusValue = (group, answers, closeDate) => {
+  const lifecycle = String(group?.lifecycleStatus || '').toLowerCase();
+  if (lifecycle === 'resolved' || answers.some((answer) => answer?.market?.market?.isResolved)) {
+    return 'Resolved';
+  }
+
+  const close = closeDate ? new Date(closeDate) : null;
+  if ((lifecycle === 'closed') || (close && !Number.isNaN(close.getTime()) && close <= new Date())) {
+    return 'Closed';
+  }
+
+  return formatResolutionDate(closeDate);
+};
+
 const paginationButtonClass = [
   'rounded',
   'border',
@@ -676,6 +690,10 @@ export default function GroupedMarketDetailsLayout({
   const sortedAnswers = useMemo(() => [...answers].sort((left, right) => (
     Number(left.displayOrder || 0) - Number(right.displayOrder || 0)
   )), [answers]);
+  const closeStatusValue = useMemo(
+    () => groupedCloseStatusValue(group, sortedAnswers, closeDate),
+    [group, sortedAnswers, closeDate],
+  );
   const descriptionAmendments = useMemo(() => uniqueGroupedAmendments(sortedAnswers), [sortedAnswers]);
   const anyTradableAnswer = sortedAnswers.some((answer) => canTradeMarket(answer?.market?.market || {}, isLoggedIn));
   const groupStewardUsername = stewardUsernameFor({
@@ -944,7 +962,7 @@ export default function GroupedMarketDetailsLayout({
           { label: 'Answers', value: answers.length, icon: '▦' },
           { label: 'Users', value: aggregate.users, icon: '👤' },
           { label: 'Volume', value: Math.round(aggregate.volume), icon: '📊' },
-          { label: 'Closes', value: formatResolutionDate(closeDate), icon: '📅' },
+          { label: 'Closes', value: closeStatusValue, icon: '📅' },
         ].map((item) => (
           <div key={item.label} className='rounded-lg bg-gray-800 p-2'>
             <div className='text-xs text-gray-400'>{item.label}</div>
