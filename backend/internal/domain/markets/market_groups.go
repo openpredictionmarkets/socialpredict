@@ -15,6 +15,9 @@ const (
 	MarketGroupResolutionPolicyIndependentChildren = "INDEPENDENT_CHILDREN"
 	MarketGroupResolutionPolicyExclusiveHelper     = "EXCLUSIVE_HELPER"
 
+	MarketGroupResolveModeExclusiveYes = "exclusive_yes"
+	MarketGroupResolveModeManual       = "manual"
+
 	MinMarketGroupAnswers = 2
 	MaxMarketGroupAnswers = 20
 	MaxAnswerLabelLength  = 160
@@ -54,6 +57,17 @@ type MarketGroupCreateRequest struct {
 	TagSlugs           []string
 }
 
+type MarketGroupChildResolution struct {
+	MarketID   int64
+	Resolution string
+}
+
+type MarketGroupResolveRequest struct {
+	Mode            string
+	WinningMarketID int64
+	Resolutions     []MarketGroupChildResolution
+}
+
 // MarketGroupMember links one normal binary child market to a parent group.
 type MarketGroupMember struct {
 	ID           int64
@@ -72,6 +86,7 @@ type MarketGroupRepository interface {
 	CreateMarketGroup(ctx context.Context, group *MarketGroup, members []MarketGroupMember) error
 	GetMarketGroup(ctx context.Context, groupID int64) (*MarketGroup, error)
 	ListMarketGroupMembers(ctx context.Context, groupID int64) ([]MarketGroupMember, error)
+	MarkMarketGroupResolved(ctx context.Context, groupID int64, resolvedAt time.Time) error
 }
 
 // MarketGroupLookupRepository resolves a child market back to its parent group.

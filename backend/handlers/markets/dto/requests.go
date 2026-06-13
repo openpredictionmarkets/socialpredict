@@ -51,6 +51,18 @@ type ResolveMarketRequest struct {
 	Resolution string `json:"resolution" validate:"required"`
 }
 
+type ResolveMarketGroupChildRequest struct {
+	MarketID   int64  `json:"marketId" validate:"required"`
+	Resolution string `json:"resolution" validate:"required"`
+}
+
+// ResolveMarketGroupRequest represents grouped child-market resolution.
+type ResolveMarketGroupRequest struct {
+	Mode            string                           `json:"mode" validate:"required"`
+	WinningMarketID int64                            `json:"winningMarketId,omitempty"`
+	Resolutions     []ResolveMarketGroupChildRequest `json:"resolutions,omitempty"`
+}
+
 type MarketDescriptionAmendmentRequest struct {
 	Body         string `json:"body" validate:"required,max=2000"`
 	BodyFormat   string `json:"bodyFormat,omitempty"`

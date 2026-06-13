@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	dusers "socialpredict/internal/domain/users"
 
 	"github.com/gorilla/mux"
 )
@@ -114,5 +117,53 @@ func TestGetMarketGroupIncludesChildProbabilityHistoryAndAmendments(t *testing.T
 	}
 	if got := answer.DescriptionAmendments[0].Body; got != "Clarifies resolution source." {
 		t.Fatalf("expected amendment body to round trip, got %q", got)
+	}
+}
+
+func TestResolveMarketGroupHandlerAcceptsManualChildResolutions(t *testing.T) {
+	var captured dmarkets.MarketGroupResolveRequest
+	service := &MockService{
+		ResolveMarketGroupFn: func(_ context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error) {
+			if groupID != 9 || username != "moderator" {
+				t.Fatalf("unexpected args groupID=%d username=%q", groupID, username)
+			}
+			captured = req
+			return &dmarkets.MarketGroup{
+				ID:              groupID,
+				QuestionTitle:   "Grouped market",
+				LifecycleStatus: dmarkets.MarketLifecycleResolved,
+				Members: []dmarkets.MarketGroupMember{
+					{MarketID: 101, AnswerLabel: "Home", DisplayOrder: 0},
+					{MarketID: 102, AnswerLabel: "Away", DisplayOrder: 1},
+				},
+			}, nil
+		},
+	}
+	req := mux.SetURLVars(
+		httptest.NewRequest(
+			http.MethodPost,
+			"/v0/market-groups/9/resolve",
+			strings.NewReader(`{"mode":"manual","resolutions":[{"marketId":101,"resolution":"YES"},{"marketId":102,"resolution":"NO"}]}`),
+		),
+		map[string]string{"id": "9"},
+	)
+	rec := httptest.NewRecorder()
+
+	NewHandler(service, lifecycleAuthMock{
+		user: &dusers.User{Username: "moderator", UserType: string(dusers.UserTypeModerator)},
+	}, nil).ResolveMarketGroup(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	expected := dmarkets.MarketGroupResolveRequest{
+		Mode: "manual",
+		Resolutions: []dmarkets.MarketGroupChildResolution{
+			{MarketID: 101, Resolution: "YES"},
+			{MarketID: 102, Resolution: "NO"},
+		},
+	}
+	if !reflect.DeepEqual(captured, expected) {
+		t.Fatalf("captured = %+v, want %+v", captured, expected)
 	}
 }

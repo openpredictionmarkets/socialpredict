@@ -733,6 +733,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}/resolve:
+    post:
+      tags: [Markets]
+      operationId: resolveMarketGroup
+      summary: Resolve a multiple-choice binary market group
+      description: >
+        Resolves every child binary market in a group. In exclusive mode, one
+        selected child resolves YES and every other child resolves NO. In manual
+        mode, each child receives an explicit YES or NO. Child markets use the
+        existing binary market payout path; the parent group is marked resolved
+        after all child resolutions succeed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveMarketGroupRequest'
+      responses:
+        '200':
+          description: Market group resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupResponse'
+        '400':
+          description: Invalid group ID or resolution request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Authenticated user is not authorized to resolve this group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Group or child market state does not allow resolution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while reading market group.
           content:
@@ -5658,6 +5723,37 @@ components:
           type: string
           description: Accepted case-insensitive values are YES, NO, and N/A.
           example: yes
+
+    ResolveMarketGroupRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [exclusive_yes, manual]
+          description: >
+            exclusive_yes resolves the selected child YES and every other child
+            NO. manual requires one YES/NO resolution per child market.
+        winningMarketId:
+          type: integer
+          format: int64
+          description: Required when mode is exclusive_yes.
+        resolutions:
+          type: array
+          description: Required when mode is manual.
+          items:
+            $ref: '#/components/schemas/ResolveMarketGroupChildRequest'
+
+    ResolveMarketGroupChildRequest:
+      type: object
+      required: [marketId, resolution]
+      properties:
+        marketId:
+          type: integer
+          format: int64
+        resolution:
+          type: string
+          enum: [YES, NO]
 
     MarketLeaderboardResponse:
       type: object

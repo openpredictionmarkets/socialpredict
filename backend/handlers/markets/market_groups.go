@@ -19,6 +19,7 @@ import (
 type marketGroupService interface {
 	CreateMarketGroup(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error)
 	GetMarketGroupOverview(ctx context.Context, groupID int64) (*dmarkets.MarketGroupOverview, error)
+	ResolveMarketGroup(ctx context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error)
 }
 
 // CreateMarketGroup handles POST /v0/market-groups.
@@ -112,6 +113,62 @@ func (h *Handler) GetMarketGroup(w http.ResponseWriter, r *http.Request) {
 	_ = writeJSON(w, http.StatusOK, marketGroupOverviewToResponse(r.Context(), h.service, overview))
 }
 
+// ResolveMarketGroup handles POST /v0/market-groups/{id}/resolve.
+func (h *Handler) ResolveMarketGroup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if h.auth == nil {
+		writeInternalError(w)
+		return
+	}
+
+	svc, ok := h.service.(marketGroupService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+
+	groupID, err := parseMarketGroupIDFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+
+	user, authErr := h.auth.CurrentUser(r)
+	if authErr != nil {
+		writeAuthError(w, authErr)
+		return
+	}
+
+	var req dto.ResolveMarketGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+
+	group, err := svc.ResolveMarketGroup(r.Context(), groupID, dmarkets.MarketGroupResolveRequest{
+		Mode:            req.Mode,
+		WinningMarketID: req.WinningMarketID,
+		Resolutions:     groupChildResolutionsFromRequest(req.Resolutions),
+	}, user.Username)
+	if err != nil {
+		writeResolveErrorResponse(w, err)
+		return
+	}
+
+	if h.invalidator != nil && group != nil {
+		for _, member := range group.Members {
+			if err := h.invalidator.InvalidateAfterMarketTransaction(r.Context(), user.Username, member.MarketID, "market_group_resolved"); err != nil {
+				logger.LogError("ResolveMarketGroup", "InvalidateReadModels", err)
+			}
+		}
+	}
+
+	_ = writeJSON(w, http.StatusOK, marketGroupToResponse(group))
+}
+
 func (h *Handler) invalidateCreatedMarketGroup(ctx context.Context, username string, group *dmarkets.MarketGroup) {
 	if h.invalidator == nil || group == nil {
 		return
@@ -201,6 +258,17 @@ func marketGroupOverviewToResponse(ctx context.Context, provider any, overview *
 		Creator: creatorResponseFromSummary(overview.Creator),
 		Answers: answers,
 	}
+}
+
+func groupChildResolutionsFromRequest(items []dto.ResolveMarketGroupChildRequest) []dmarkets.MarketGroupChildResolution {
+	resolutions := make([]dmarkets.MarketGroupChildResolution, 0, len(items))
+	for _, item := range items {
+		resolutions = append(resolutions, dmarkets.MarketGroupChildResolution{
+			MarketID:   item.MarketID,
+			Resolution: item.Resolution,
+		})
+	}
+	return resolutions
 }
 
 func marketGroupToResponse(group *dmarkets.MarketGroup) *dto.MarketGroupResponse {

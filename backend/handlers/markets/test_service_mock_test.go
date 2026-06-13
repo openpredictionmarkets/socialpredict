@@ -15,6 +15,7 @@ type MockService struct {
 	MarketSummaryFn       func(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
 	CreateMarketGroupFn   func(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error)
 	MarketGroupOverviewFn func(ctx context.Context, groupID int64) (*dmarkets.MarketGroupOverview, error)
+	ResolveMarketGroupFn  func(ctx context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error)
 	MarketGroupLookupFn   func(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error)
 	DetailsCalls          int
 }
@@ -35,6 +36,13 @@ func (m *MockService) GetMarketGroupOverview(ctx context.Context, groupID int64)
 		return m.MarketGroupOverviewFn(ctx, groupID)
 	}
 	return nil, dmarkets.ErrMarketGroupNotFound
+}
+
+func (m *MockService) ResolveMarketGroup(ctx context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error) {
+	if m.ResolveMarketGroupFn != nil {
+		return m.ResolveMarketGroupFn(ctx, groupID, req, username)
+	}
+	return nil, dmarkets.ErrInvalidInput
 }
 
 func (m *MockService) GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {

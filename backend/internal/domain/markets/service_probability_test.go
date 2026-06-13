@@ -38,6 +38,7 @@ type projectionRepo struct {
 	getMarketGroupFunc                 func(context.Context, int64) (*markets.MarketGroup, error)
 	listMarketGroupMembersFunc         func(context.Context, int64) ([]markets.MarketGroupMember, error)
 	getMarketGroupForMarketFunc        func(context.Context, int64) (*markets.MarketGroup, error)
+	markMarketGroupResolvedFunc        func(context.Context, int64, time.Time) error
 }
 
 func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
@@ -111,6 +112,9 @@ func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
 		},
 		getMarketGroupForMarketFunc: func(context.Context, int64) (*markets.MarketGroup, error) {
 			return nil, errUnexpectedMarketsTestCall
+		},
+		markMarketGroupResolvedFunc: func(context.Context, int64, time.Time) error {
+			return errUnexpectedMarketsTestCall
 		},
 	}
 	for _, opt := range opts {
@@ -270,6 +274,13 @@ func (r *projectionRepo) GetMarketGroupForMarket(ctx context.Context, marketID i
 		return nil, errUnexpectedMarketsTestCall
 	}
 	return r.getMarketGroupForMarketFunc(ctx, marketID)
+}
+
+func (r *projectionRepo) MarkMarketGroupResolved(ctx context.Context, groupID int64, resolvedAt time.Time) error {
+	if r.markMarketGroupResolvedFunc == nil {
+		return errUnexpectedMarketsTestCall
+	}
+	return r.markMarketGroupResolvedFunc(ctx, groupID, resolvedAt)
 }
 
 func (r *projectionRepo) GetUserPosition(ctx context.Context, marketID int64, username string) (*markets.UserPosition, error) {

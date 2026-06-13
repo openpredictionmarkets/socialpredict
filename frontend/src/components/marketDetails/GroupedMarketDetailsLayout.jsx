@@ -9,6 +9,7 @@ import TradeCTA from '../TradeCTA';
 import MarkdownLite from '../markdown/MarkdownLite';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import { resolveMarketGroup } from '../modals/resolution/ResolveUtils';
 import { getMarketGroupDetails } from '../../api/marketsApi';
 import { proposeMarketDescriptionAmendment } from '../../api/marketDescriptionAmendmentsApi';
 import { apiRequest } from '../../api/httpClient';
@@ -599,6 +600,12 @@ export default function GroupedMarketDetailsLayout({
   const [amendmentMessage, setAmendmentMessage] = useState('');
   const [amendmentError, setAmendmentError] = useState('');
   const [submittingAmendment, setSubmittingAmendment] = useState(false);
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolveMode, setResolveMode] = useState('exclusive_yes');
+  const [winningMarketId, setWinningMarketId] = useState(0);
+  const [manualResolutions, setManualResolutions] = useState({});
+  const [resolveError, setResolveError] = useState('');
+  const [resolvingGroup, setResolvingGroup] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -638,6 +645,22 @@ export default function GroupedMarketDetailsLayout({
     };
   }, [marketGroup?.id, refreshKey]);
 
+  useEffect(() => {
+    if (!answers.length) {
+      setWinningMarketId(0);
+      setManualResolutions({});
+      return;
+    }
+    setWinningMarketId((current) => current || answers[0]?.marketId || 0);
+    setManualResolutions((current) => {
+      const next = {};
+      answers.forEach((answer) => {
+        next[answer.marketId] = current[answer.marketId] || 'NO';
+      });
+      return next;
+    });
+  }, [answers]);
+
   const group = groupData?.group || marketGroup || {};
   const groupCreator = groupData?.creator || creator || {};
   const creatorUsername = group.creatorUsername || groupCreator.username || fallbackMarket.creatorUsername || 'unknown';
@@ -667,6 +690,13 @@ export default function GroupedMarketDetailsLayout({
     closeDate &&
     new Date(closeDate) > new Date() &&
     !['rejected', 'resolved', 'cancelled'].includes(String(group.lifecycleStatus || '').toLowerCase());
+  const canResolveGroup =
+    isLoggedIn &&
+    token &&
+    sortedAnswers.length > 0 &&
+    String(username || '').trim() === String(groupStewardUsername || '').trim() &&
+    String(group.lifecycleStatus || '').toLowerCase() === 'published' &&
+    sortedAnswers.every((answer) => !answer?.market?.market?.isResolved);
   const tradeButtonLabel = (() => {
     if (!isLoggedIn) {
       return 'LOG IN TO TRADE';
@@ -685,6 +715,40 @@ export default function GroupedMarketDetailsLayout({
     setRefreshKey((current) => current + 1);
     if (refetchData) {
       refetchData();
+    }
+  };
+
+  const submitGroupResolution = async () => {
+    setResolveError('');
+    if (!canResolveGroup) {
+      setResolveError('You are not allowed to resolve this grouped market.');
+      return;
+    }
+    const payload = resolveMode === 'exclusive_yes'
+      ? {
+          mode: 'exclusive_yes',
+          winningMarketId: Number(winningMarketId),
+        }
+      : {
+          mode: 'manual',
+          resolutions: sortedAnswers.map((answer) => ({
+            marketId: answer.marketId,
+            resolution: manualResolutions[answer.marketId] || 'NO',
+          })),
+        };
+    setResolvingGroup(true);
+    try {
+      await resolveMarketGroup(group.id || marketGroup.id, token, payload);
+      setShowResolveModal(false);
+      setRefreshKey((current) => current + 1);
+      if (refetchData) {
+        refetchData();
+      }
+      alert('Grouped market resolved successfully.');
+    } catch (err) {
+      setResolveError(err.message || 'Unable to resolve grouped market.');
+    } finally {
+      setResolvingGroup(false);
     }
   };
 
@@ -910,6 +974,15 @@ export default function GroupedMarketDetailsLayout({
       </div>
 
       <div className='flex items-center justify-center mb-4 space-x-4 py-4'>
+        {canResolveGroup && (
+          <button
+            type='button'
+            onClick={() => setShowResolveModal(true)}
+            className='min-w-32 rounded border bg-custom-gray-light px-4 py-2 text-xs text-white transition hover:bg-neutral-btn sm:text-sm md:text-base'
+          >
+            RESOLVE
+          </button>
+        )}
         <button
           type='button'
           disabled={!anyTradableAnswer}
@@ -937,6 +1010,122 @@ export default function GroupedMarketDetailsLayout({
             <button
               type='button'
               onClick={() => setShowTradeModal(false)}
+              className='absolute right-0 top-0 mr-4 mt-4 text-gray-400 hover:text-white'
+            >
+              x
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showResolveModal && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-50'>
+          <div className='relative m-6 mx-auto max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-blue-950 p-6 text-white shadow-xl'>
+            <h2 className='mb-2 text-xl font-semibold'>Resolve Grouped Market</h2>
+            <p className='mb-4 text-sm text-blue-100/80'>
+              Resolution applies to every answer market in this group. Child markets use the normal binary payout path.
+            </p>
+            {resolveError && (
+              <div className='mb-4 rounded-md bg-red-700 p-3 text-sm text-white'>{resolveError}</div>
+            )}
+
+            <div className='mb-4 grid gap-2 sm:grid-cols-2'>
+              <button
+                type='button'
+                onClick={() => setResolveMode('exclusive_yes')}
+                className={`rounded-md border px-3 py-2 text-left text-sm transition ${
+                  resolveMode === 'exclusive_yes'
+                    ? 'border-sky-300 bg-sky-800 text-white'
+                    : 'border-blue-800 bg-blue-900 text-blue-100 hover:bg-blue-800'
+                }`}
+              >
+                <span className='block font-semibold'>One answer resolves YES</span>
+                <span className='mt-1 block text-xs opacity-80'>Selected answer becomes YES; all others become NO.</span>
+              </button>
+              <button
+                type='button'
+                onClick={() => setResolveMode('manual')}
+                className={`rounded-md border px-3 py-2 text-left text-sm transition ${
+                  resolveMode === 'manual'
+                    ? 'border-sky-300 bg-sky-800 text-white'
+                    : 'border-blue-800 bg-blue-900 text-blue-100 hover:bg-blue-800'
+                }`}
+              >
+                <span className='block font-semibold'>Resolve each answer manually</span>
+                <span className='mt-1 block text-xs opacity-80'>Assign YES or NO independently for every answer.</span>
+              </button>
+            </div>
+
+            {resolveMode === 'exclusive_yes' ? (
+              <div className='mb-4 grid gap-2'>
+                {sortedAnswers.map((answer) => (
+                  <label
+                    key={answer.marketId}
+                    className='flex cursor-pointer items-center gap-3 rounded-md border border-blue-800 bg-blue-900 px-3 py-2 text-sm hover:bg-blue-800'
+                  >
+                    <input
+                      type='radio'
+                      name='winningAnswer'
+                      checked={Number(winningMarketId) === Number(answer.marketId)}
+                      onChange={() => setWinningMarketId(answer.marketId)}
+                    />
+                    <span className='font-semibold'>{answer.answerLabel}</span>
+                    <span className='text-xs text-blue-100/70'>Market #{answer.marketId}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className='mb-4 grid gap-2'>
+                {sortedAnswers.map((answer) => (
+                  <div key={answer.marketId} className='rounded-md border border-blue-800 bg-blue-900 p-3'>
+                    <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
+                      <span className='font-semibold'>{answer.answerLabel}</span>
+                      <span className='text-xs text-blue-100/70'>Market #{answer.marketId}</span>
+                    </div>
+                    <div className='grid grid-cols-2 gap-2'>
+                      {['YES', 'NO'].map((resolution) => (
+                        <button
+                          key={resolution}
+                          type='button'
+                          onClick={() => setManualResolutions((current) => ({
+                            ...current,
+                            [answer.marketId]: resolution,
+                          }))}
+                          className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                            manualResolutions[answer.marketId] === resolution
+                              ? 'bg-sky-700 text-white'
+                              : 'bg-blue-800 text-blue-100 hover:bg-blue-700'
+                          }`}
+                        >
+                          {resolution}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className='flex flex-wrap justify-end gap-2 border-t border-blue-800 pt-4'>
+              <button
+                type='button'
+                onClick={() => setShowResolveModal(false)}
+                className='rounded-md border border-blue-700 px-4 py-2 text-sm text-blue-100 transition hover:bg-blue-900'
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                onClick={submitGroupResolution}
+                disabled={resolvingGroup || (resolveMode === 'exclusive_yes' && !winningMarketId)}
+                className='rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50'
+              >
+                {resolvingGroup ? 'Resolving...' : 'Confirm Resolution'}
+              </button>
+            </div>
+            <button
+              type='button'
+              onClick={() => setShowResolveModal(false)}
               className='absolute right-0 top-0 mr-4 mt-4 text-gray-400 hover:text-white'
             >
               x

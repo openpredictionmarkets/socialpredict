@@ -78,6 +78,24 @@ func (r *GormRepository) ListMarketGroupMembers(ctx context.Context, groupID int
 	return modelMarketGroupMembersToDomain(dbMembers), nil
 }
 
+// MarkMarketGroupResolved terminally marks the display/governance parent after
+// all child binary markets have been resolved through normal resolution paths.
+func (r *GormRepository) MarkMarketGroupResolved(ctx context.Context, groupID int64, resolvedAt time.Time) error {
+	result := r.db.WithContext(ctx).Model(&models.MarketGroup{}).
+		Where("id = ? AND lifecycle_status = ?", groupID, dmarkets.MarketLifecyclePublished).
+		Updates(map[string]any{
+			"lifecycle_status": dmarkets.MarketLifecycleResolved,
+			"updated_at":       resolvedAt,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return dmarkets.ErrInvalidState
+	}
+	return nil
+}
+
 // GetMarketGroupForMarket resolves the parent group for a child market.
 func (r *GormRepository) GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
 	var member models.MarketGroupMember
