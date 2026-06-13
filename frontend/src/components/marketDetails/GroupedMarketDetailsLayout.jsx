@@ -278,52 +278,24 @@ const GroupedBetsActivity = ({ answers, refreshTrigger }) => {
   );
 };
 
-const GroupedPositionAnswerCard = ({ answer }) => {
-  const yesShares = toNumber(answer.yesSharesOwned);
-  const noShares = toNumber(answer.noSharesOwned);
-  const positionValue = toNumber(answer.value);
-
-  const outcomePanel = ({ outcome, shares, colorClass, mutedClass }) => (
-    <div className={`rounded-md border p-3 ${shares > 0 ? colorClass : mutedClass}`}>
-      <div className='mb-1 text-xs font-bold uppercase tracking-[0.16em]'>{outcome}</div>
-      <div className='text-sm text-gray-200'>Shares</div>
-      <div className='text-lg font-semibold text-white'>{shares}</div>
-    </div>
-  );
-
-  return (
-    <article className='rounded-lg border border-gray-800 bg-gray-950 p-3 shadow'>
-      <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
-        <Link
-          to={`/markets/${answer.answerMarketId}`}
-          className='font-semibold text-gray-100 underline decoration-primary-pink/40 underline-offset-4 hover:text-primary-pink'
-        >
-          {answer.answerLabel}
-        </Link>
-        <span className='rounded-full border border-gray-700 bg-gray-900 px-2 py-0.5 text-xs text-gray-400'>
-          Market #{answer.answerMarketId}
-        </span>
-      </div>
-      <div className='grid grid-cols-2 gap-2'>
-        {outcomePanel({
-          outcome: 'NO',
-          shares: noShares,
-          colorClass: 'border-red-700/70 bg-red-950/40 text-red-100',
-          mutedClass: 'border-gray-800 bg-gray-900/70 text-gray-500 opacity-70',
-        })}
-        {outcomePanel({
-          outcome: 'YES',
-          shares: yesShares,
-          colorClass: 'border-green-700/70 bg-green-950/40 text-green-100',
-          mutedClass: 'border-gray-800 bg-gray-900/70 text-gray-500 opacity-70',
-        })}
-      </div>
-      <div className='mt-3 rounded-md border border-emerald-900/50 bg-emerald-950/20 px-3 py-2 text-sm text-emerald-100'>
-        Position value: <span className='font-semibold'>{positionValue}</span>
-      </div>
-    </article>
-  );
-};
+const GroupedPositionEntry = ({ entry }) => (
+  <div className='flex flex-col rounded-lg bg-gray-800 p-3 shadow'>
+    <Link
+      to={`/user/${entry.username}`}
+      className='font-bold text-blue-400 underline hover:text-blue-300'
+    >
+      {entry.username}
+    </Link>
+    <Link
+      to={`/markets/${entry.answerMarketId}`}
+      className='mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-gray-400 hover:text-primary-pink'
+    >
+      {entry.answerLabel}
+    </Link>
+    <div className='mt-1 text-sm text-gray-300'>Shares: {entry.shares}</div>
+    <div className='text-sm text-green-400'>Value: {entry.value}</div>
+  </div>
+);
 
 const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
   const pageSize = 20;
@@ -424,6 +396,29 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
     };
   }, [answerMeta, page, refreshTrigger, token]);
 
+  const noPositionRows = positions.flatMap((position) => (
+    position.answers
+      .filter((answer) => toNumber(answer.noSharesOwned) > 0)
+      .map((answer) => ({
+        username: position.username,
+        answerLabel: answer.answerLabel,
+        answerMarketId: answer.answerMarketId,
+        shares: toNumber(answer.noSharesOwned),
+        value: toNumber(answer.value),
+      }))
+  ));
+  const yesPositionRows = positions.flatMap((position) => (
+    position.answers
+      .filter((answer) => toNumber(answer.yesSharesOwned) > 0)
+      .map((answer) => ({
+        username: position.username,
+        answerLabel: answer.answerLabel,
+        answerMarketId: answer.answerMarketId,
+        shares: toNumber(answer.yesSharesOwned),
+        value: toNumber(answer.value),
+      }))
+  ));
+
   return (
     <div className='p-4'>
       <GroupedActivityHeader
@@ -445,34 +440,32 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
       {token && positions.length === 0 && !error && (
         <div className='rounded-md bg-gray-800 p-4 text-center text-sm text-gray-400'>No positions yet</div>
       )}
-      {positions.map((position) => (
-        <article key={position.username} className='mb-4 rounded-lg border border-gray-800 bg-gray-900 p-4'>
-          <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
-            <Link to={`/user/${position.username}`} className='text-lg font-semibold text-blue-400 underline decoration-blue-500/40 underline-offset-4 hover:text-blue-300'>
-              {position.username}
-            </Link>
-            <div className='flex flex-wrap gap-2 text-xs'>
-              <span className='rounded-full border border-green-700/70 bg-green-950/40 px-3 py-1 font-semibold text-green-100'>
-                YES {position.yesSharesOwned}
-              </span>
-              <span className='rounded-full border border-red-700/70 bg-red-950/40 px-3 py-1 font-semibold text-red-100'>
-                NO {position.noSharesOwned}
-              </span>
-              <span className='rounded-full border border-emerald-700/70 bg-emerald-950/30 px-3 py-1 font-semibold text-emerald-100'>
-                Value {position.value}
-              </span>
+      {positions.length > 0 && (
+        <div className='flex flex-row gap-4'>
+          <div className='flex-1'>
+            <h2 className='mb-2 text-center font-bold'>Shares for: <span className='text-red-500'>NO</span></h2>
+            <div className='flex flex-col gap-2'>
+              {noPositionRows.length === 0 && (
+                <div className='rounded-lg bg-gray-800/60 p-3 text-center text-sm text-gray-400'>No NO positions</div>
+              )}
+              {noPositionRows.map((entry) => (
+                <GroupedPositionEntry key={`${entry.username}-${entry.answerMarketId}-no`} entry={entry} />
+              ))}
             </div>
           </div>
-          <div className='grid gap-3 lg:grid-cols-2'>
-            {position.answers.map((answer) => (
-              <GroupedPositionAnswerCard
-                key={`${position.username}-${answer.answerMarketId}`}
-                answer={answer}
-              />
-            ))}
+          <div className='flex-1'>
+            <h2 className='mb-2 text-center font-bold'>Shares for: <span className='text-green-500'>YES</span></h2>
+            <div className='flex flex-col gap-2'>
+              {yesPositionRows.length === 0 && (
+                <div className='rounded-lg bg-gray-800/60 p-3 text-center text-sm text-gray-400'>No YES positions</div>
+              )}
+              {yesPositionRows.map((entry) => (
+                <GroupedPositionEntry key={`${entry.username}-${entry.answerMarketId}-yes`} entry={entry} />
+              ))}
+            </div>
           </div>
-        </article>
-      ))}
+        </div>
+      )}
     </div>
   );
 };
