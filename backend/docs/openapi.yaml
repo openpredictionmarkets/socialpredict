@@ -5444,6 +5444,16 @@ components:
           type: integer
         market:
           $ref: '#/components/schemas/MarketOverviewResponse'
+        probabilityChanges:
+          type: array
+          description: Child-market WPAM probability history for grouped chart display.
+          items:
+            $ref: '#/components/schemas/ProbabilityChange'
+        descriptionAmendments:
+          type: array
+          description: Approved child-market contract amendments for grouped contract display.
+          items:
+            $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
 
     MarketGroupDetailsResponse:
       type: object

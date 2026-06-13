@@ -9,15 +9,31 @@ import (
 
 // MockService provides a reusable test double for markets service interactions.
 type MockService struct {
-	ListByStatusFn      func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
-	ListLifecycleFn     func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
-	MarketLeaderboardFn func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
-	MarketSummaryFn     func(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
-	DetailsCalls        int
+	ListByStatusFn        func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
+	ListLifecycleFn       func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	MarketLeaderboardFn   func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
+	MarketSummaryFn       func(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
+	CreateMarketGroupFn   func(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error)
+	MarketGroupOverviewFn func(ctx context.Context, groupID int64) (*dmarkets.MarketGroupOverview, error)
+	DetailsCalls          int
 }
 
 func (m *MockService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
 	return nil, nil
+}
+
+func (m *MockService) CreateMarketGroup(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error) {
+	if m.CreateMarketGroupFn != nil {
+		return m.CreateMarketGroupFn(ctx, req, creatorUsername)
+	}
+	return nil, dmarkets.ErrInvalidInput
+}
+
+func (m *MockService) GetMarketGroupOverview(ctx context.Context, groupID int64) (*dmarkets.MarketGroupOverview, error) {
+	if m.MarketGroupOverviewFn != nil {
+		return m.MarketGroupOverviewFn(ctx, groupID)
+	}
+	return nil, dmarkets.ErrMarketGroupNotFound
 }
 
 func (m *MockService) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {

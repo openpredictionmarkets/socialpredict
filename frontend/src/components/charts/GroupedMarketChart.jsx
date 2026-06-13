@@ -29,16 +29,19 @@ const answerLabel = (answer, index) => (
 );
 
 const answerProbability = (answer) => toNumber(
-  answer?.summary?.lastProbability
+  answer?.probabilityChanges?.[answer.probabilityChanges.length - 1]?.probability
+    ?? answer?.summary?.lastProbability
     ?? answer?.market?.lastProbability
     ?? answer?.market?.market?.initialProbability,
   0.5,
 );
 
 const answerPoints = (answer) => {
-  const changes = Array.isArray(answer?.summary?.probabilityChanges)
-    ? answer.summary.probabilityChanges
-    : [];
+  const changes = Array.isArray(answer?.probabilityChanges)
+    ? answer.probabilityChanges
+    : Array.isArray(answer?.summary?.probabilityChanges)
+      ? answer.summary.probabilityChanges
+      : [];
   const now = new Date();
   const closeDate = toDate(answer?.market?.market?.resolutionDateTime);
   const isClosed = closeDate && closeDate <= now;

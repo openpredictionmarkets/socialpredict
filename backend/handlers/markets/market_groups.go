@@ -178,13 +178,21 @@ func marketGroupOverviewToResponse(ctx context.Context, provider any, overview *
 
 	answers := make([]dto.MarketGroupAnswerResponse, 0, len(overview.Answers))
 	for _, answer := range overview.Answers {
+		var probabilityChanges []dto.ProbabilityChangeResponse
+		var descriptionAmendments []dto.MarketDescriptionAmendmentResponse
+		if answer.Overview != nil {
+			probabilityChanges = probabilityChangesToResponse(answer.Overview.ProbabilityChanges)
+			descriptionAmendments = descriptionAmendmentsToResponse(answer.Overview.DescriptionAmendments)
+		}
 		answers = append(answers, dto.MarketGroupAnswerResponse{
-			ID:           answer.Member.ID,
-			GroupID:      answer.Member.GroupID,
-			MarketID:     answer.Member.MarketID,
-			AnswerLabel:  answer.Member.AnswerLabel,
-			DisplayOrder: answer.Member.DisplayOrder,
-			Market:       marketOverviewToResponse(ctx, provider, answer.Overview),
+			ID:                    answer.Member.ID,
+			GroupID:               answer.Member.GroupID,
+			MarketID:              answer.Member.MarketID,
+			AnswerLabel:           answer.Member.AnswerLabel,
+			DisplayOrder:          answer.Member.DisplayOrder,
+			Market:                marketOverviewToResponse(ctx, provider, answer.Overview),
+			ProbabilityChanges:    probabilityChanges,
+			DescriptionAmendments: descriptionAmendments,
 		})
 	}
 

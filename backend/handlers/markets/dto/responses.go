@@ -73,12 +73,14 @@ type MarketGroupResponse struct {
 
 // MarketGroupAnswerResponse links one answer option to its tradable child market.
 type MarketGroupAnswerResponse struct {
-	ID           int64                   `json:"id"`
-	GroupID      int64                   `json:"groupId"`
-	MarketID     int64                   `json:"marketId"`
-	AnswerLabel  string                  `json:"answerLabel"`
-	DisplayOrder int                     `json:"displayOrder"`
-	Market       *MarketOverviewResponse `json:"market,omitempty"`
+	ID                    int64                                `json:"id"`
+	GroupID               int64                                `json:"groupId"`
+	MarketID              int64                                `json:"marketId"`
+	AnswerLabel           string                               `json:"answerLabel"`
+	DisplayOrder          int                                  `json:"displayOrder"`
+	Market                *MarketOverviewResponse              `json:"market,omitempty"`
+	ProbabilityChanges    []ProbabilityChangeResponse          `json:"probabilityChanges,omitempty"`
+	DescriptionAmendments []MarketDescriptionAmendmentResponse `json:"descriptionAmendments,omitempty"`
 }
 
 // MarketGroupDetailsResponse returns group metadata with child market overviews.

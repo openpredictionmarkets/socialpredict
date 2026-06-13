@@ -8,10 +8,9 @@ import TradeTabs from '../tabs/TradeTabs';
 import TradeCTA from '../TradeCTA';
 import MarkdownLite from '../markdown/MarkdownLite';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
-import { getMarketDetails, getMarketGroupDetails, getMarketSummaryReadModel } from '../../api/marketsApi';
+import { getMarketGroupDetails } from '../../api/marketsApi';
 import { proposeMarketDescriptionAmendment } from '../../api/marketDescriptionAmendmentsApi';
-import { API_URL } from '../../config';
-import { unwrapApiResponse } from '../../utils/apiResponse';
+import { apiRequest } from '../../api/httpClient';
 
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -36,7 +35,8 @@ const uniqueTagsBySlug = (answers = []) => {
 
 const probabilityDisplay = (answer) => {
   const probability = toNumber(
-    answer?.summary?.lastProbability
+    answer?.probabilityChanges?.[answer.probabilityChanges.length - 1]?.probability
+      ?? answer?.summary?.lastProbability
       ?? answer?.market?.lastProbability
       ?? answer?.market?.market?.initialProbability,
     0.5,
@@ -64,18 +64,14 @@ const paginationButtonClass = [
 ].join(' ');
 
 const groupedFetchJson = async (path, token = '') => {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: token
-      ? {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      }
-      : undefined,
+  return apiRequest(path, {
+    authenticated: Boolean(token),
+    authToken: token,
+    reasonMessages: {
+      RATE_LIMITED: 'Grouped activity is loading several answer markets. Wait a moment and try again.',
+    },
+    fallbackMessage: 'Failed to load grouped market activity.',
   });
-  if (!response.ok) {
-    throw new Error(response.statusText || 'Request failed');
-  }
-  return unwrapApiResponse(await response.json());
 };
 
 const answerLabelFor = (answer) => answer?.answerLabel || `Answer ${Number(answer?.displayOrder || 0) + 1}`;
@@ -89,10 +85,20 @@ const groupedAnswerMeta = (answers = []) => answers.map((answer) => ({
   market: childMarketFor(answer),
 }));
 
-const childDescriptionAmendments = (payload) => {
-  const unwrapped = unwrapApiResponse(payload);
-  const amendments = unwrapped?.descriptionAmendments || unwrapped?.DescriptionAmendments || [];
+const childDescriptionAmendments = (answer) => {
+  const amendments = answer?.descriptionAmendments || answer?.DescriptionAmendments || [];
   return Array.isArray(amendments) ? amendments : [];
+};
+
+const fetchSequentially = async (items, fetcher) => {
+  const results = [];
+  for (const item of items) {
+    // Avoid bursting one request per answer at the same instant in dev/staging.
+    // The grouped page is display-only, so sequential reads are acceptable here.
+    // eslint-disable-next-line no-await-in-loop
+    results.push(await fetcher(item));
+  }
+  return results;
 };
 
 const uniqueGroupedAmendments = (answers = []) => {
@@ -156,14 +162,14 @@ const GroupedBetsActivity = ({ answers, refreshTrigger }) => {
       const fetchLimit = offset + pageSize + 1;
       setError('');
       try {
-        const results = await Promise.all(answerMeta.map(async (answer) => {
+        const results = await fetchSequentially(answerMeta, async (answer) => {
           const rows = await groupedFetchJson(`/v0/markets/bets/${answer.marketId}?limit=${fetchLimit}&offset=0`);
           return (Array.isArray(rows) ? rows : []).map((bet) => ({
             ...bet,
             answerLabel: answer.answerLabel,
             answerMarketId: answer.marketId,
           }));
-        }));
+        });
         const merged = results.flat().sort((left, right) => (
           new Date(right.placedAt).getTime() - new Date(left.placedAt).getTime()
         ));
@@ -259,7 +265,7 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
       }
       setError('');
       try {
-        const results = await Promise.all(answerMeta.map(async (answer) => {
+        const results = await fetchSequentially(answerMeta, async (answer) => {
           const payload = await groupedFetchJson(`/v0/markets/positions/${answer.marketId}?limit=200&offset=0`, token);
           const rows = Array.isArray(payload?.positions)
             ? payload.positions
@@ -271,7 +277,7 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
             freshness: payload?.freshness || null,
             rows: rows.map((position) => ({ ...position, answerLabel: answer.answerLabel, answerMarketId: answer.marketId })),
           };
-        }));
+        });
         const byUser = new Map();
         results.forEach(({ rows }) => {
           rows.forEach((position) => {
@@ -389,7 +395,7 @@ const GroupedLeaderboardActivity = ({ answers, refreshTrigger }) => {
     const loadLeaderboard = async () => {
       setError('');
       try {
-        const results = await Promise.all(answerMeta.map(async (answer) => {
+        const results = await fetchSequentially(answerMeta, async (answer) => {
           const payload = await groupedFetchJson(`/v0/markets/${answer.marketId}/leaderboard?limit=200&offset=0`);
           return {
             answer,
@@ -400,7 +406,7 @@ const GroupedLeaderboardActivity = ({ answers, refreshTrigger }) => {
               answerMarketId: answer.marketId,
             })),
           };
-        }));
+        });
         const byUser = new Map();
         results.forEach(({ rows }) => {
           rows.forEach((row) => {
@@ -583,22 +589,11 @@ export default function GroupedMarketDetailsLayout({
         const rawAnswers = [...(data?.answers || [])].sort((left, right) => (
           Number(left.displayOrder || 0) - Number(right.displayOrder || 0)
         ));
-        const [summaries, detailPayloads] = await Promise.all([
-          Promise.all(rawAnswers.map((answer) => (
-            getMarketSummaryReadModel(answer.marketId).catch(() => null)
-          ))),
-          Promise.all(rawAnswers.map((answer) => (
-            getMarketDetails(answer.marketId).catch(() => null)
-          ))),
-        ]);
         if (!ignore) {
           setGroupData(data);
-          setAnswers(rawAnswers.map((answer, index) => ({
+          setAnswers(rawAnswers.map((answer) => ({
             ...answer,
-            summary: summaries[index],
-            descriptionAmendments: detailPayloads[index]
-              ? childDescriptionAmendments(detailPayloads[index])
-              : [],
+            descriptionAmendments: childDescriptionAmendments(answer),
           })));
         }
       } catch (err) {
