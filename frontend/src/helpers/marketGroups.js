@@ -46,9 +46,17 @@ export const groupMarketRows = (marketRows = []) => {
 
   marketRows.forEach((row) => {
     const market = row?.market || {};
+    const rowNumUsers = toNumber(row?.numUsers ?? market.numUsers);
+    const rowTotalVolume = toNumber(row?.totalVolume ?? market.totalVolume);
+    const rowMarketDust = toNumber(row?.marketDust ?? market.marketDust);
     const group = market.marketGroup;
     if (!group?.id) {
-      groupedRows.push(row);
+      groupedRows.push({
+        ...row,
+        numUsers: rowNumUsers,
+        totalVolume: rowTotalVolume,
+        marketDust: rowMarketDust,
+      });
       return;
     }
 
@@ -64,9 +72,9 @@ export const groupMarketRows = (marketRows = []) => {
           isMarketGroupAggregate: true,
           groupChildMarketIds: [market.id || market.marketId].filter(Boolean),
         },
-        numUsers: toNumber(row.numUsers),
-        totalVolume: toNumber(row.totalVolume),
-        marketDust: toNumber(row.marketDust),
+        numUsers: rowNumUsers,
+        totalVolume: rowTotalVolume,
+        marketDust: rowMarketDust,
       };
       groupsById.set(group.id, aggregate);
       groupedRows.push(aggregate);
@@ -78,9 +86,9 @@ export const groupMarketRows = (marketRows = []) => {
       market.id || market.marketId,
     ].filter(Boolean);
     existing.market.tags = uniqueTagsBySlug([...(existing.market.tags || []), ...(market.tags || [])]);
-    existing.numUsers = Math.max(toNumber(existing.numUsers), toNumber(row.numUsers));
-    existing.totalVolume = toNumber(existing.totalVolume) + toNumber(row.totalVolume);
-    existing.marketDust = toNumber(existing.marketDust) + toNumber(row.marketDust);
+    existing.numUsers = Math.max(toNumber(existing.numUsers), rowNumUsers);
+    existing.totalVolume = toNumber(existing.totalVolume) + rowTotalVolume;
+    existing.marketDust = toNumber(existing.marketDust) + rowMarketDust;
   });
 
   return groupedRows;

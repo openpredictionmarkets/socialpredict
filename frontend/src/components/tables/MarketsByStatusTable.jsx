@@ -33,16 +33,17 @@ const normalizeMarketOverview = (raw) => {
   }
 
   if (raw.market || raw.creator) {
+    const market = raw.market ?? {};
     return {
-      market: raw.market ?? {},
+      market,
       creator: raw.creator ?? {
-        username: raw.market?.creatorUsername ?? 'unknown',
+        username: market.creatorUsername ?? 'unknown',
         personalEmoji: DEFAULT_CREATOR_EMOJI,
       },
-      lastProbability: toNumber(raw.lastProbability),
-      numUsers: toNumber(raw.numUsers),
-      totalVolume: toNumber(raw.totalVolume),
-      marketDust: toNumber(raw.marketDust),
+      lastProbability: toNumber(raw.lastProbability ?? market.lastProbability),
+      numUsers: toNumber(raw.numUsers ?? market.numUsers),
+      totalVolume: toNumber(raw.totalVolume ?? market.totalVolume),
+      marketDust: toNumber(raw.marketDust ?? market.marketDust),
     };
   }
 

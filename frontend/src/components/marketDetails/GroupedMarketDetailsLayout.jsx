@@ -8,9 +8,12 @@ import TradeTabs from '../tabs/TradeTabs';
 import TradeCTA from '../TradeCTA';
 import MarkdownLite from '../markdown/MarkdownLite';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
+import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import { getMarketGroupDetails } from '../../api/marketsApi';
 import { proposeMarketDescriptionAmendment } from '../../api/marketDescriptionAmendmentsApi';
 import { apiRequest } from '../../api/httpClient';
+
+const DEFAULT_CREATOR_EMOJI = '👤';
 
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -92,11 +95,15 @@ const childDescriptionAmendments = (answer) => {
 
 const fetchSequentially = async (items, fetcher) => {
   const results = [];
-  for (const item of items) {
+  for (const [index, item] of items.entries()) {
     // Avoid bursting one request per answer at the same instant in dev/staging.
     // The grouped page is display-only, so sequential reads are acceptable here.
     // eslint-disable-next-line no-await-in-loop
     results.push(await fetcher(item));
+    if (index < items.length - 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, 75));
+    }
   }
   return results;
 };
@@ -346,7 +353,7 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
       />
       {freshnessLabel && (
         <div className='mb-3 text-xs text-gray-500'>
-          Grouped positions combine child-market snapshots generated as early as {freshnessLabel}. Trade confirmations remain authoritative.
+          Grouped positions combine 10-minute child-market display snapshots generated as early as {freshnessLabel}. Trade confirmations remain authoritative.
         </div>
       )}
       {!token && <div className='rounded-md bg-gray-800 p-4 text-center text-sm text-gray-400'>Log in to see grouped positions.</div>}
@@ -475,7 +482,7 @@ const GroupedLeaderboardActivity = ({ answers, refreshTrigger }) => {
       />
       {freshnessLabel && (
         <div className='mb-3 text-xs text-gray-500'>
-          Grouped leaderboard combines child-market snapshots generated as early as {freshnessLabel}. Trade confirmations remain authoritative.
+          Grouped leaderboard combines 10-minute child-market display snapshots generated as early as {freshnessLabel}. Trade confirmations remain authoritative.
         </div>
       )}
       {error && <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{error}</div>}
@@ -618,6 +625,8 @@ export default function GroupedMarketDetailsLayout({
 
   const group = groupData?.group || marketGroup || {};
   const groupCreator = groupData?.creator || creator || {};
+  const creatorUsername = group.creatorUsername || groupCreator.username || fallbackMarket.creatorUsername || 'unknown';
+  const creatorEmoji = groupCreator.personalEmoji || DEFAULT_CREATOR_EMOJI;
   const tags = useMemo(() => uniqueTagsBySlug(answers), [answers]);
   const aggregate = useMemo(() => ({
     users: Math.max(0, ...answers.map((answer) => toNumber(answer?.summary?.numUsers ?? answer?.market?.numUsers))),
@@ -631,7 +640,10 @@ export default function GroupedMarketDetailsLayout({
   )), [answers]);
   const descriptionAmendments = useMemo(() => uniqueGroupedAmendments(sortedAnswers), [sortedAnswers]);
   const anyTradableAnswer = sortedAnswers.some((answer) => canTradeMarket(answer?.market?.market || {}, isLoggedIn));
-  const groupStewardUsername = group.stewardUsername || group.creatorUsername || fallbackMarket?.stewardUsername || fallbackMarket?.creatorUsername || '';
+  const groupStewardUsername = stewardUsernameFor({
+    stewardUsername: group.stewardUsername || fallbackMarket?.stewardUsername,
+    creatorUsername,
+  }, creatorUsername);
   const canProposeDescriptionAmendment =
     isLoggedIn &&
     token &&
@@ -729,11 +741,17 @@ export default function GroupedMarketDetailsLayout({
           {group.questionTitle || marketGroup.questionTitle || fallbackMarket.questionTitle}
         </h1>
         <div className='flex flex-wrap items-center gap-2 text-sm text-gray-400'>
-          <span>@{groupCreator.username || group.creatorUsername || fallbackMarket.creatorUsername}</span>
-          <span>•</span>
+          <Link
+            to={`/user/${creatorUsername}`}
+            className='hover:text-blue-400 transition-colors duration-200'
+          >
+            <span role='img' aria-label='Creator'>
+              {creatorEmoji}
+            </span>
+            @{creatorUsername}
+          </Link>
+          <StewardTag username={groupStewardUsername} creatorUsername={creatorUsername} />
           <span>{answers.length} answers</span>
-          <span>•</span>
-          <span>Closes {formatResolutionDate(closeDate)}</span>
         </div>
         <MarketTagChips tags={tags} className='mt-3' />
       </section>

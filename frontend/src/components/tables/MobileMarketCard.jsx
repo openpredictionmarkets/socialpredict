@@ -73,8 +73,9 @@ const MobileMarketCard = ({ marketData }) => {
         )}
         <MarketTagChips tags={marketData.market.tags || []} />
       </div>
-      <div className='grid grid-cols-3 text-sm text-gray-400'>
+      <div className='grid grid-cols-4 gap-2 text-sm text-gray-400'>
         <span className='truncate'>👤 {marketData.numUsers}</span>
+        <span className='truncate'>📊 {marketData.totalVolume}</span>
         <span className='text-center'>
           {marketProbabilityDisplay(marketData)}
         </span>
