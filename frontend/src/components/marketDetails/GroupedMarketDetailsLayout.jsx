@@ -555,6 +555,43 @@ const GroupedLeaderboardActivity = ({ answers, refreshTrigger }) => {
     };
   }, [answerMeta, page, refreshTrigger]);
 
+  const formatCurrency = (amount) => toNumber(amount).toLocaleString();
+  const getProfitColor = (profit) => {
+    const numericProfit = toNumber(profit);
+    if (numericProfit > 0) return 'text-green-400';
+    if (numericProfit < 0) return 'text-red-400';
+    return 'text-gray-300';
+  };
+  const getPositionBadge = (position) => {
+    const baseClasses = 'rounded px-2 py-1 text-xs font-bold';
+    switch (position) {
+      case 'YES':
+        return `${baseClasses} bg-green-600 text-white`;
+      case 'NO':
+        return `${baseClasses} bg-red-600 text-white`;
+      case 'MIXED':
+        return `${baseClasses} bg-blue-600 text-white`;
+      case 'NEUTRAL':
+        return `${baseClasses} bg-yellow-600 text-white`;
+      default:
+        return `${baseClasses} bg-gray-600 text-white`;
+    }
+  };
+  const getRankDisplay = (rank) => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `#${rank}`;
+  };
+  const getGroupedPosition = (entry) => {
+    const yesShares = toNumber(entry.yesSharesOwned);
+    const noShares = toNumber(entry.noSharesOwned);
+    if (yesShares > 0 && noShares > 0) return 'MIXED';
+    if (yesShares > 0) return 'YES';
+    if (noShares > 0) return 'NO';
+    return 'NEUTRAL';
+  };
+
   return (
     <div className='p-4'>
       <GroupedActivityHeader
@@ -575,30 +612,76 @@ const GroupedLeaderboardActivity = ({ answers, refreshTrigger }) => {
       {leaderboard.length === 0 && !error && (
         <div className='rounded-md bg-gray-800 p-4 text-center text-sm text-gray-400'>No participants yet</div>
       )}
+      {leaderboard.length > 0 && (
+        <div className='sp-grid-leaderboard-header'>
+          <div>Rank</div>
+          <div>User</div>
+          <div>Position</div>
+          <div className='text-right'>Profit</div>
+          <div className='text-right'>Current Value</div>
+          <div className='text-right'>Total Spent</div>
+          <div>Shares</div>
+        </div>
+      )}
       {leaderboard.map((entry) => (
-        <article key={entry.username} className='mb-3 rounded-lg border border-gray-800 bg-gray-900 p-4'>
-          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-            <div className='flex items-center gap-3'>
-              <span className='rounded bg-gray-800 px-2 py-1 text-sm font-semibold text-white'>#{entry.rank}</span>
-              <Link to={`/user/${entry.username}`} className='font-semibold text-blue-400 hover:text-blue-300'>
+        <div key={entry.username} className='sp-grid-leaderboard-row mt-2'>
+          <div className='flex items-center justify-start'>
+            <div className='mr-2 text-lg font-bold text-white'>
+              {getRankDisplay(entry.rank)}
+            </div>
+            <div className='sp-cell-username sm:hidden'>
+              <div className='sp-ellipsis text-xs font-medium'>
+                <Link to={`/user/${entry.username}`} className='text-blue-500 transition-colors hover:text-blue-400'>
+                  {entry.username}
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className='sp-cell-username hidden sm:block'>
+            <div className='sp-ellipsis font-medium'>
+              <Link to={`/user/${entry.username}`} className='text-blue-500 transition-colors hover:text-blue-400'>
                 {entry.username}
               </Link>
             </div>
-            <div className={entry.profit >= 0 ? 'text-green-400' : 'text-red-400'}>
-              {entry.profit >= 0 ? '+' : ''}{entry.profit} profit
+          </div>
+
+          <div className='hidden sm:block'>
+            <span className={getPositionBadge(getGroupedPosition(entry))}>
+              {getGroupedPosition(entry)}
+            </span>
+          </div>
+
+          <div className='text-right'>
+            <div className={`text-sm font-bold ${getProfitColor(entry.profit)}`}>
+              {toNumber(entry.profit) >= 0 ? '+' : ''}{formatCurrency(entry.profit)}
+            </div>
+            <div className='sp-subline sm:hidden'>
+              Pos {getGroupedPosition(entry)} · {entry.yesSharesOwned}Y {entry.noSharesOwned}N
             </div>
           </div>
-          <div className='mt-2 text-sm text-gray-300'>
-            Value {entry.currentValue} · Spent {entry.totalSpent} · Shares {entry.yesSharesOwned}Y/{entry.noSharesOwned}N
+
+          <div className='sp-cell-num hidden text-gray-300 sm:block'>
+            {formatCurrency(entry.currentValue)}
           </div>
-          <div className='mt-3 flex flex-wrap gap-2'>
+
+          <div className='sp-cell-num hidden text-gray-300 sm:block'>
+            {formatCurrency(entry.totalSpent)}
+          </div>
+
+          <div className='hidden text-xs text-gray-300 sm:block'>
+            <div>YES: {entry.yesSharesOwned}</div>
+            <div>NO: {entry.noSharesOwned}</div>
+          </div>
+
+          <div className='col-span-2 flex flex-wrap gap-1 border-t border-slate-700/60 pt-2 sm:col-span-7'>
             {entry.answers.map((answer) => (
-              <span key={`${entry.username}-${answer.answerMarketId}`} className='rounded-full border border-gray-700 bg-gray-800 px-3 py-1 text-xs text-gray-200'>
-                {answer.answerLabel}: {answer.profit >= 0 ? '+' : ''}{answer.profit}
+              <span key={`${entry.username}-${answer.answerMarketId}`} className='rounded-full border border-gray-700 bg-slate-900 px-2 py-0.5 text-[10px] text-gray-200 sm:text-xs'>
+                {answer.answerLabel}: {toNumber(answer.profit) >= 0 ? '+' : ''}{formatCurrency(answer.profit)}
               </span>
             ))}
           </div>
-        </article>
+        </div>
       ))}
     </div>
   );
