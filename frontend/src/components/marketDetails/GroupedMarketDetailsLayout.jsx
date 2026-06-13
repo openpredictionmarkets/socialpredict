@@ -100,6 +100,7 @@ const groupedAnswerMeta = (answers = []) => answers.map((answer) => ({
   answerId: answer.id,
   answerLabel: answerLabelFor(answer),
   marketId: answer.marketId,
+  displayOrder: Number(answer.displayOrder || 0),
   market: childMarketFor(answer),
 }));
 
@@ -277,6 +278,53 @@ const GroupedBetsActivity = ({ answers, refreshTrigger }) => {
   );
 };
 
+const GroupedPositionAnswerCard = ({ answer }) => {
+  const yesShares = toNumber(answer.yesSharesOwned);
+  const noShares = toNumber(answer.noSharesOwned);
+  const positionValue = toNumber(answer.value);
+
+  const outcomePanel = ({ outcome, shares, colorClass, mutedClass }) => (
+    <div className={`rounded-md border p-3 ${shares > 0 ? colorClass : mutedClass}`}>
+      <div className='mb-1 text-xs font-bold uppercase tracking-[0.16em]'>{outcome}</div>
+      <div className='text-sm text-gray-200'>Shares</div>
+      <div className='text-lg font-semibold text-white'>{shares}</div>
+    </div>
+  );
+
+  return (
+    <article className='rounded-lg border border-gray-800 bg-gray-950 p-3 shadow'>
+      <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
+        <Link
+          to={`/markets/${answer.answerMarketId}`}
+          className='font-semibold text-gray-100 underline decoration-primary-pink/40 underline-offset-4 hover:text-primary-pink'
+        >
+          {answer.answerLabel}
+        </Link>
+        <span className='rounded-full border border-gray-700 bg-gray-900 px-2 py-0.5 text-xs text-gray-400'>
+          Market #{answer.answerMarketId}
+        </span>
+      </div>
+      <div className='grid grid-cols-2 gap-2'>
+        {outcomePanel({
+          outcome: 'NO',
+          shares: noShares,
+          colorClass: 'border-red-700/70 bg-red-950/40 text-red-100',
+          mutedClass: 'border-gray-800 bg-gray-900/70 text-gray-500 opacity-70',
+        })}
+        {outcomePanel({
+          outcome: 'YES',
+          shares: yesShares,
+          colorClass: 'border-green-700/70 bg-green-950/40 text-green-100',
+          mutedClass: 'border-gray-800 bg-gray-900/70 text-gray-500 opacity-70',
+        })}
+      </div>
+      <div className='mt-3 rounded-md border border-emerald-900/50 bg-emerald-950/20 px-3 py-2 text-sm text-emerald-100'>
+        Position value: <span className='font-semibold'>{positionValue}</span>
+      </div>
+    </article>
+  );
+};
+
 const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
   const pageSize = 20;
   const [positions, setPositions] = useState([]);
@@ -312,7 +360,12 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
           return {
             answer,
             freshness: payload?.freshness || null,
-            rows: rows.map((position) => ({ ...position, answerLabel: answer.answerLabel, answerMarketId: answer.marketId })),
+            rows: rows.map((position) => ({
+              ...position,
+              answerLabel: answer.answerLabel,
+              answerMarketId: answer.marketId,
+              displayOrder: answer.displayOrder,
+            })),
           };
         });
         const byUser = new Map();
@@ -336,6 +389,7 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
             current.totalSpent += toNumber(position.totalSpent);
             current.totalSpentInPlay += toNumber(position.totalSpentInPlay);
             current.answers.push(position);
+            current.answers.sort((left, right) => toNumber(left.displayOrder) - toNumber(right.displayOrder));
             byUser.set(position.username, current);
           });
         });
@@ -392,20 +446,29 @@ const GroupedPositionsActivity = ({ answers, token, refreshTrigger }) => {
         <div className='rounded-md bg-gray-800 p-4 text-center text-sm text-gray-400'>No positions yet</div>
       )}
       {positions.map((position) => (
-        <article key={position.username} className='mb-3 rounded-lg border border-gray-800 bg-gray-900 p-4'>
-          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-            <Link to={`/user/${position.username}`} className='font-semibold text-blue-400 hover:text-blue-300'>
+        <article key={position.username} className='mb-4 rounded-lg border border-gray-800 bg-gray-900 p-4'>
+          <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <Link to={`/user/${position.username}`} className='text-lg font-semibold text-blue-400 underline decoration-blue-500/40 underline-offset-4 hover:text-blue-300'>
               {position.username}
             </Link>
-            <div className='text-sm text-gray-300'>
-              YES {position.yesSharesOwned} · NO {position.noSharesOwned} · Value {position.value}
+            <div className='flex flex-wrap gap-2 text-xs'>
+              <span className='rounded-full border border-green-700/70 bg-green-950/40 px-3 py-1 font-semibold text-green-100'>
+                YES {position.yesSharesOwned}
+              </span>
+              <span className='rounded-full border border-red-700/70 bg-red-950/40 px-3 py-1 font-semibold text-red-100'>
+                NO {position.noSharesOwned}
+              </span>
+              <span className='rounded-full border border-emerald-700/70 bg-emerald-950/30 px-3 py-1 font-semibold text-emerald-100'>
+                Value {position.value}
+              </span>
             </div>
           </div>
-          <div className='mt-3 flex flex-wrap gap-2'>
+          <div className='grid gap-3 lg:grid-cols-2'>
             {position.answers.map((answer) => (
-              <span key={`${position.username}-${answer.answerMarketId}`} className='rounded-full border border-gray-700 bg-gray-800 px-3 py-1 text-xs text-gray-200'>
-                {answer.answerLabel}: {answer.yesSharesOwned}Y/{answer.noSharesOwned}N
-              </span>
+              <GroupedPositionAnswerCard
+                key={`${position.username}-${answer.answerMarketId}`}
+                answer={answer}
+              />
             ))}
           </div>
         </article>
