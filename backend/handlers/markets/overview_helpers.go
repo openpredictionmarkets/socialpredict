@@ -204,16 +204,29 @@ func marketGroupLinkForMarket(ctx context.Context, provider any, marketID int64)
 		status = dmarkets.MarketStatusActive
 	}
 	link := &dto.MarketGroupLink{
-		ID:              group.ID,
-		QuestionTitle:   group.QuestionTitle,
-		GroupType:       group.GroupType,
-		LifecycleStatus: group.LifecycleStatus,
-		Status:          status,
-		AnswerCount:     len(group.Members),
+		ID:                 group.ID,
+		QuestionTitle:      group.QuestionTitle,
+		Description:        group.Description,
+		GroupType:          group.GroupType,
+		LifecycleStatus:    group.LifecycleStatus,
+		Status:             status,
+		AnswerCount:        len(group.Members),
+		ProposalCost:       group.ProposalCost,
+		CreatorUsername:    group.CreatorUsername,
+		StewardUsername:    group.StewardUsername,
+		ApprovedBy:         group.ApprovedBy,
+		ApprovedAt:         group.ApprovedAt,
+		RejectedBy:         group.RejectedBy,
+		RejectedAt:         group.RejectedAt,
+		RejectionReason:    group.RejectionReason,
+		ResolutionDateTime: group.ResolutionDateTime,
+		CreatedAt:          group.CreatedAt,
+		UpdatedAt:          group.UpdatedAt,
 	}
 	for _, member := range group.Members {
 		if member.MarketID == marketID {
 			link.AnswerLabel = member.AnswerLabel
+			link.DisplayOrder = member.DisplayOrder
 			break
 		}
 	}

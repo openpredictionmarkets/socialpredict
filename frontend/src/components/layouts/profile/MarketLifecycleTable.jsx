@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MarketTagChips from '../../markets/MarketTagChips';
 
@@ -14,6 +14,84 @@ const statusLabel = (market) => market.lifecycleStatus || market.status || 'unkn
 const marketLabel = (value, fallback) => {
   const label = String(value || '').trim();
   return label || fallback;
+};
+
+const uniqueTagsBySlug = (markets = []) => {
+  const seen = new Set();
+  const tags = [];
+  markets.forEach((market) => {
+    (market.tags || []).forEach((tag) => {
+      const key = tag.slug || tag.id || tag.displayName;
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      tags.push(tag);
+    });
+  });
+  return tags;
+};
+
+const groupLifecycleMarketRows = (markets = []) => {
+  const rows = [];
+  const groups = new Map();
+
+  markets.forEach((market) => {
+    if (market.isMarketGroup && market.marketGroup?.id) {
+      rows.push({
+        ...market,
+        rowKey: market.rowKey || `group:${market.marketGroup.id}`,
+        tags: market.tags?.length ? market.tags : uniqueTagsBySlug(market.childMarkets || []),
+      });
+      return;
+    }
+
+    const group = market.marketGroup;
+    if (!group?.id) {
+      rows.push({ ...market, rowKey: `market:${market.id}` });
+      return;
+    }
+
+    const existing = groups.get(group.id);
+    if (!existing) {
+      const row = {
+        ...market,
+        id: group.id,
+        rowKey: `group:${group.id}`,
+        isMarketGroup: true,
+        questionTitle: group.questionTitle || market.questionTitle,
+        description: group.description || market.description || '',
+        creatorUsername: group.creatorUsername || market.creatorUsername,
+        stewardUsername: group.stewardUsername || market.stewardUsername || market.creatorUsername,
+        lifecycleStatus: group.lifecycleStatus || market.lifecycleStatus,
+        status: group.status || market.status,
+        proposalCost: group.proposalCost ?? market.proposalCost,
+        approvedBy: group.approvedBy ?? market.approvedBy,
+        approvedAt: group.approvedAt ?? market.approvedAt,
+        rejectedBy: group.rejectedBy ?? market.rejectedBy,
+        rejectedAt: group.rejectedAt ?? market.rejectedAt,
+        rejectionReason: group.rejectionReason ?? market.rejectionReason,
+        createdAt: group.createdAt || market.createdAt,
+        updatedAt: group.updatedAt || market.updatedAt,
+        marketGroup: group,
+        childMarkets: [market],
+        tags: uniqueTagsBySlug([market]),
+      };
+      groups.set(group.id, row);
+      rows.push(row);
+      return;
+    }
+
+    existing.childMarkets.push(market);
+    existing.childMarkets.sort((left, right) => {
+      const leftOrder = Number(left.marketGroup?.displayOrder ?? left.id ?? 0);
+      const rightOrder = Number(right.marketGroup?.displayOrder ?? right.id ?? 0);
+      return leftOrder - rightOrder;
+    });
+    existing.tags = uniqueTagsBySlug(existing.childMarkets);
+  });
+
+  return rows;
 };
 
 const MarketLabels = ({ market }) => (
@@ -76,6 +154,7 @@ const StewardshipAuditTrail = ({ audits = [] }) => {
 
 const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, showSteward = false, actions }) => {
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
+  const displayMarkets = useMemo(() => groupLifecycleMarketRows(markets), [markets]);
 
   const toggleDescription = (marketId) => {
     setExpandedDescriptions((current) => ({
@@ -84,7 +163,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
     }));
   };
 
-  if (!markets.length) {
+  if (!displayMarkets.length) {
     return (
       <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
         {emptyMessage || 'No markets found.'}
@@ -107,7 +186,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800 text-gray-100">
-          {markets.map((market) => {
+          {displayMarkets.map((market) => {
             const rowKey = market.rowKey || market.id;
             const firstChildId = market.childMarkets?.[0]?.id;
             const viewMarketId = market.isMarketGroup ? firstChildId : market.id;

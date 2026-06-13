@@ -145,13 +145,26 @@ type PublicMarketResponse struct {
 
 // MarketGroupLink binds a normal child market back to its parent group.
 type MarketGroupLink struct {
-	ID              int64  `json:"id"`
-	QuestionTitle   string `json:"questionTitle"`
-	GroupType       string `json:"groupType"`
-	LifecycleStatus string `json:"lifecycleStatus"`
-	Status          string `json:"status"`
-	AnswerLabel     string `json:"answerLabel,omitempty"`
-	AnswerCount     int    `json:"answerCount"`
+	ID                 int64      `json:"id"`
+	QuestionTitle      string     `json:"questionTitle"`
+	Description        string     `json:"description,omitempty"`
+	GroupType          string     `json:"groupType"`
+	LifecycleStatus    string     `json:"lifecycleStatus"`
+	Status             string     `json:"status"`
+	AnswerLabel        string     `json:"answerLabel,omitempty"`
+	DisplayOrder       int        `json:"displayOrder,omitempty"`
+	AnswerCount        int        `json:"answerCount"`
+	ProposalCost       int64      `json:"proposalCost,omitempty"`
+	CreatorUsername    string     `json:"creatorUsername,omitempty"`
+	StewardUsername    string     `json:"stewardUsername,omitempty"`
+	ApprovedBy         string     `json:"approvedBy,omitempty"`
+	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy         string     `json:"rejectedBy,omitempty"`
+	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason    string     `json:"rejectionReason,omitempty"`
+	ResolutionDateTime time.Time  `json:"resolutionDateTime"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
 }
 
 // ProbabilityChangeResponse represents WPAM probability history.

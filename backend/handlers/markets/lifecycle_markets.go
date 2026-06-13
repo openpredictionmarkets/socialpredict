@@ -14,6 +14,7 @@ import (
 
 type lifecycleMarketLister interface {
 	ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error)
 }
 
 type lifecycleMarketsResponse struct {
@@ -51,7 +52,7 @@ func ListMyLifecycleMarketsHandler(svc lifecycleMarketLister, auth authsvc.Authe
 			return
 		}
 
-		_ = handlers.WriteResult(w, http.StatusOK, lifecycleMarketResponseFromMarkets(markets))
+		_ = handlers.WriteResult(w, http.StatusOK, lifecycleMarketResponseFromMarkets(r.Context(), svc, markets))
 	}
 }
 
@@ -112,10 +113,10 @@ func writeLifecycleListError(w http.ResponseWriter, err error) {
 	}
 }
 
-func lifecycleMarketResponseFromMarkets(markets []*dmarkets.Market) lifecycleMarketsResponse {
+func lifecycleMarketResponseFromMarkets(ctx context.Context, provider any, markets []*dmarkets.Market) lifecycleMarketsResponse {
 	items := make([]*dto.MarketResponse, 0, len(markets))
 	for _, market := range markets {
-		items = append(items, marketToResponse(market))
+		items = append(items, marketToResponseWithGroup(ctx, provider, market))
 	}
 	return lifecycleMarketsResponse{Markets: items, Total: len(items)}
 }

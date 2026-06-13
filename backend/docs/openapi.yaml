@@ -5416,6 +5416,8 @@ components:
           type: string
         answerLabel:
           type: string
+        displayOrder:
+          type: integer
         answerCount:
           type: integer
         proposalCost:
@@ -5425,6 +5427,27 @@ components:
           type: string
         stewardUsername:
           type: string
+        approvedBy:
+          type: string
+        approvedAt:
+          type: string
+          format: date-time
+        rejectedBy:
+          type: string
+        rejectedAt:
+          type: string
+          format: date-time
+        rejectionReason:
+          type: string
+        resolutionDateTime:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     MarketGroupAnswerResponse:
       type: object
