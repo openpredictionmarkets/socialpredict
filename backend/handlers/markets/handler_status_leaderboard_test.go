@@ -346,3 +346,85 @@ func TestListUserOwnedMarketsHandlerUsesOwnedByFilter(t *testing.T) {
 		t.Fatalf("unexpected response: %+v", resp)
 	}
 }
+
+func TestListUserOwnedMarketsHandlerAttachesMarketGroupMetadata(t *testing.T) {
+	now := time.Now().UTC()
+	group := &dmarkets.MarketGroup{
+		ID:                 88,
+		QuestionTitle:      "Favorite Tree",
+		Description:        "Grouped favorite tree market",
+		GroupType:          dmarkets.MarketGroupTypeMultipleChoiceBinary,
+		LifecycleStatus:    dmarkets.MarketLifecyclePublished,
+		ProposalCost:       10,
+		CreatorUsername:    "testuser01",
+		StewardUsername:    "testuser01",
+		ApprovedBy:         "auto-approval",
+		ApprovedAt:         &now,
+		ResolutionDateTime: now.Add(24 * time.Hour),
+		CreatedAt:          now,
+		UpdatedAt:          now,
+		Members: []dmarkets.MarketGroupMember{
+			{MarketID: 16, AnswerLabel: "Birch", DisplayOrder: 0},
+			{MarketID: 17, AnswerLabel: "Pine", DisplayOrder: 1},
+			{MarketID: 18, AnswerLabel: "Oak", DisplayOrder: 2},
+		},
+	}
+	svc := &MockService{}
+	svc.ListLifecycleFn = func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+		if filters.OwnedBy != "testuser01" {
+			t.Fatalf("OwnedBy = %q, want testuser01", filters.OwnedBy)
+		}
+		return []*dmarkets.Market{
+			{
+				ID:                 16,
+				QuestionTitle:      "Favorite Tree - Birch",
+				Description:        "Answer choice child market",
+				OutcomeType:        "BINARY",
+				ResolutionDateTime: now.Add(24 * time.Hour),
+				CreatorUsername:    "testuser01",
+				StewardUsername:    "testuser01",
+				YesLabel:           "YES",
+				NoLabel:            "NO",
+				Status:             dmarkets.MarketStatusActive,
+				LifecycleStatus:    dmarkets.MarketLifecyclePublished,
+				CreatedAt:          now,
+				UpdatedAt:          now,
+			},
+		}, nil
+	}
+	svc.MarketGroupLookupFn = func(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
+		if marketID != 16 {
+			t.Fatalf("marketID = %d, want 16", marketID)
+		}
+		return group, nil
+	}
+
+	handler := ListUserOwnedMarketsHandler(svc, &contractAuthMock{user: &dusers.User{Username: "viewer"}})
+	req := httptest.NewRequest(http.MethodGet, "/v0/users/testuser01/owned-markets", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "testuser01"})
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp handlers.SuccessEnvelope[userOwnedMarketsResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if !resp.OK || resp.Result.Total != 1 || len(resp.Result.Markets) != 1 {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+	market := resp.Result.Markets[0]
+	if market.MarketGroup == nil {
+		t.Fatalf("expected owned market response to include grouped-market metadata")
+	}
+	if market.MarketGroup.ID != group.ID ||
+		market.MarketGroup.QuestionTitle != "Favorite Tree" ||
+		market.MarketGroup.AnswerLabel != "Birch" ||
+		market.MarketGroup.AnswerCount != 3 ||
+		market.MarketGroup.DisplayOrder != 0 {
+		t.Fatalf("unexpected market group link: %+v", market.MarketGroup)
+	}
+}
