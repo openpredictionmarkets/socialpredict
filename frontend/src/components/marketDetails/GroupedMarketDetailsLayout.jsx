@@ -960,6 +960,10 @@ export default function GroupedMarketDetailsLayout({
         <MarketTagChips tags={tags} className='mt-3' />
       </section>
 
+      <div className='mb-4'>
+        <GroupedMarketChart answers={answers} title='Probability Changes' />
+      </div>
+
       {(group.description || descriptionAmendments.length > 0) && (
         <>
           <div className='mb-4'>
@@ -1011,10 +1015,6 @@ export default function GroupedMarketDetailsLayout({
           )}
         </>
       )}
-
-      <div className='mb-4'>
-        <GroupedMarketChart answers={answers} title='Probability Changes' />
-      </div>
 
       {canManageAnswerAdditions && (
         <section className='mb-4 grid gap-4 rounded-lg border border-emerald-800/70 bg-emerald-950/20 p-4'>
@@ -1071,6 +1071,47 @@ export default function GroupedMarketDetailsLayout({
         </section>
       )}
 
+      {canProposeAnswerAddition && (
+        <form onSubmit={submitAnswerAddition} className='mb-4 grid gap-3 rounded-lg border border-emerald-800/60 bg-emerald-950/20 p-4'>
+          <div>
+            <p className='text-sm font-semibold text-emerald-100'>
+              {canManageAnswerAdditions ? 'Add Answer Option' : 'Propose Answer Option'}
+            </p>
+            <p className='mt-1 text-xs text-emerald-100/70'>
+              {canManageAnswerAdditions
+                ? `Adds a new YES/NO answer market to this group immediately. You will be charged ${addAnswerCost} credits.`
+                : autoApproveAnswerAdditions
+                  ? `This market auto-approves incoming options. If approved by policy, you are charged ${addAnswerCost} credits.`
+                  : `Submits a new YES/NO answer market to the steward for review. If approved, you are charged ${addAnswerCost} credits.`}
+            </p>
+          </div>
+          {answerAdditionMessage && (
+            <div className='rounded-md bg-emerald-700 p-3 text-sm text-white'>{answerAdditionMessage}</div>
+          )}
+          {answerAdditionError && (
+            <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{answerAdditionError}</div>
+          )}
+          <div className='flex flex-col gap-2 sm:flex-row'>
+            <input
+              type='text'
+              value={answerAdditionLabel}
+              onChange={(event) => setAnswerAdditionLabel(event.target.value)}
+              maxLength={160}
+              placeholder='New answer label'
+              className='min-w-0 flex-1 rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40'
+              required
+            />
+            <button
+              type='submit'
+              disabled={submittingAnswerAddition || !answerAdditionLabel.trim()}
+              className='rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50'
+            >
+              {submittingAnswerAddition ? 'Submitting...' : canManageAnswerAdditions ? 'Add Answer' : 'Submit Answer'}
+            </button>
+          </div>
+        </form>
+      )}
+
       {canProposeDescriptionAmendment && (
         <form onSubmit={submitDescriptionAmendment} className='mb-4 grid gap-3 rounded-lg border border-sky-800/60 bg-sky-950/20 p-4'>
           <div>
@@ -1115,47 +1156,6 @@ export default function GroupedMarketDetailsLayout({
           >
             {submittingAmendment ? 'Submitting...' : 'Submit Amendment for Review'}
           </button>
-        </form>
-      )}
-
-      {canProposeAnswerAddition && (
-        <form onSubmit={submitAnswerAddition} className='mb-4 grid gap-3 rounded-lg border border-emerald-800/60 bg-emerald-950/20 p-4'>
-          <div>
-            <p className='text-sm font-semibold text-emerald-100'>
-              {canManageAnswerAdditions ? 'Add Answer Option' : 'Propose Answer Option'}
-            </p>
-            <p className='mt-1 text-xs text-emerald-100/70'>
-              {canManageAnswerAdditions
-                ? `Adds a new YES/NO answer market to this group immediately. You will be charged ${addAnswerCost} credits.`
-                : autoApproveAnswerAdditions
-                  ? `This market auto-approves incoming options. If approved by policy, you are charged ${addAnswerCost} credits.`
-                  : `Submits a new YES/NO answer market to the steward for review. If approved, you are charged ${addAnswerCost} credits.`}
-            </p>
-          </div>
-          {answerAdditionMessage && (
-            <div className='rounded-md bg-emerald-700 p-3 text-sm text-white'>{answerAdditionMessage}</div>
-          )}
-          {answerAdditionError && (
-            <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{answerAdditionError}</div>
-          )}
-          <div className='flex flex-col gap-2 sm:flex-row'>
-            <input
-              type='text'
-              value={answerAdditionLabel}
-              onChange={(event) => setAnswerAdditionLabel(event.target.value)}
-              maxLength={160}
-              placeholder='New answer label'
-              className='min-w-0 flex-1 rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40'
-              required
-            />
-            <button
-              type='submit'
-              disabled={submittingAnswerAddition || !answerAdditionLabel.trim()}
-              className='rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50'
-            >
-              {submittingAnswerAddition ? 'Submitting...' : canManageAnswerAdditions ? 'Add Answer' : 'Submit Answer'}
-            </button>
-          </div>
         </form>
       )}
 
