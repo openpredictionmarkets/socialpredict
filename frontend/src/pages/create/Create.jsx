@@ -23,6 +23,7 @@ function Create() {
   const [noLabel, setNoLabel] = useState('');
   const [marketType, setMarketType] = useState('binary');
   const [answerLabels, setAnswerLabels] = useState(['', '']);
+  const [autoApproveAnswerAdditions, setAutoApproveAnswerAdditions] = useState(false);
   const [error, setError] = useState('');
   const [createdMarket, setCreatedMarket] = useState(null);
   const [marketCreationCost, setMarketCreationCost] = useState(null);
@@ -205,6 +206,7 @@ function Create() {
           resolutionDateTime: isoDateTime,
           answerLabels: validation.labels,
           tagSlugs: selectedTagSlugs,
+          autoApproveAnswerAdditions,
         });
 
         window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
@@ -489,6 +491,31 @@ function Create() {
             >
               Add Answer
             </button>
+            <div className='mt-4 flex flex-col gap-3 rounded-lg border border-emerald-800/70 bg-emerald-950/20 p-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div>
+                <p className='text-sm font-semibold text-emerald-100'>Auto-approve later answer options</p>
+                <p className='mt-1 text-xs text-emerald-100/70'>
+                  If enabled, active moderators can add later answer options immediately. If disabled, their options wait for your approval.
+                </p>
+              </div>
+              <button
+                type='button'
+                aria-pressed={autoApproveAnswerAdditions}
+                onClick={() => setAutoApproveAnswerAdditions((current) => !current)}
+                className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition ${
+                  autoApproveAnswerAdditions
+                    ? 'border-emerald-300 bg-emerald-700'
+                    : 'border-gray-600 bg-gray-800'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition ${
+                    autoApproveAnswerAdditions ? 'translate-x-8' : 'translate-x-1'
+                  }`}
+                />
+                <span className='sr-only'>Toggle later answer option auto-approval</span>
+              </button>
+            </div>
           </div>
         )}
 

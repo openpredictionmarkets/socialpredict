@@ -90,6 +90,22 @@ func answerAdditionUserService(t *testing.T, charged *[]int64) noopUserService {
 	})
 }
 
+func flexibleAnswerAdditionUserService(charged *[]string) noopUserService {
+	return newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return activeModeratorUser(username), nil
+		}
+		service.validateUserBalanceFunc = func(_ context.Context, username string, amount int64, maxDebt int64) error {
+			*charged = append(*charged, "check:"+username)
+			return nil
+		}
+		service.applyTransactionFunc = func(_ context.Context, username string, amount int64, txType string) error {
+			*charged = append(*charged, "fee:"+username)
+			return nil
+		}
+	})
+}
+
 func TestProposeMarketGroupAnswerAdditionCreatesPendingWithoutCharge(t *testing.T) {
 	now := marketsTestTime()
 	repo, group, _ := seedAnswerAdditionGroup(t, now)
@@ -121,6 +137,136 @@ func TestProposeMarketGroupAnswerAdditionCreatesPendingWithoutCharge(t *testing.
 	}
 	if len(reloaded.Members) != 2 {
 		t.Fatalf("pending proposal should not add child member, got %d members", len(reloaded.Members))
+	}
+}
+
+func TestProposeMarketGroupAnswerAdditionByStewardApprovesImmediately(t *testing.T) {
+	now := marketsTestTime()
+	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	charged := []string{}
+	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
+		GameMode:                                "moderator",
+		MultipleChoiceBinaryAddAnswerCost:       4,
+		MultipleChoiceBinaryHardAnswerSafetyCap: 50,
+		MaximumDebtAllowed:                      500,
+	})
+
+	addition, err := service.ProposeMarketGroupAnswerAddition(context.Background(), group.ID, "steward", markets.MarketGroupAnswerAdditionRequest{
+		AnswerLabel: "Draw",
+	})
+	if err != nil {
+		t.Fatalf("ProposeMarketGroupAnswerAddition returned error: %v", err)
+	}
+	if addition.Status != markets.MarketGroupAnswerAdditionStatusApproved || addition.MarketID <= 0 {
+		t.Fatalf("steward proposal should approve immediately: %+v", addition)
+	}
+	if addition.ReviewedBy != "steward" {
+		t.Fatalf("reviewed by = %q, want steward", addition.ReviewedBy)
+	}
+	if strings.Join(charged, ",") != "check:steward,fee:steward" {
+		t.Fatalf("unexpected charge calls: %v", charged)
+	}
+}
+
+func TestProposeMarketGroupAnswerAdditionGroupAutoApprovesOtherModerator(t *testing.T) {
+	now := marketsTestTime()
+	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	if _, err := repo.UpdateMarketGroupAnswerAdditionAutoApproval(context.Background(), group.ID, true, now); err != nil {
+		t.Fatalf("enable group auto approval: %v", err)
+	}
+	charged := []string{}
+	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
+		GameMode:                                "moderator",
+		MultipleChoiceBinaryAddAnswerCost:       4,
+		MultipleChoiceBinaryHardAnswerSafetyCap: 50,
+		MaximumDebtAllowed:                      500,
+	})
+
+	addition, err := service.ProposeMarketGroupAnswerAddition(context.Background(), group.ID, "proposer", markets.MarketGroupAnswerAdditionRequest{
+		AnswerLabel: "Draw",
+	})
+	if err != nil {
+		t.Fatalf("ProposeMarketGroupAnswerAddition returned error: %v", err)
+	}
+	if addition.Status != markets.MarketGroupAnswerAdditionStatusApproved || addition.MarketID <= 0 {
+		t.Fatalf("group auto-approved proposal should create child market: %+v", addition)
+	}
+	if addition.ReviewedBy != markets.MarketGroupAnswerAdditionApprovedByAuto {
+		t.Fatalf("reviewed by = %q, want auto approval", addition.ReviewedBy)
+	}
+	if strings.Join(charged, ",") != "check:proposer,fee:proposer" {
+		t.Fatalf("unexpected charge calls: %v", charged)
+	}
+}
+
+func TestMarketGroupAnswerAdditionReviewerCanApprovePending(t *testing.T) {
+	now := marketsTestTime()
+	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	charged := []string{}
+	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
+		GameMode:                                "moderator",
+		MultipleChoiceBinaryAddAnswerCost:       4,
+		MultipleChoiceBinaryHardAnswerSafetyCap: 50,
+		MaximumDebtAllowed:                      500,
+	})
+
+	addition, err := service.ProposeMarketGroupAnswerAddition(context.Background(), group.ID, "proposer", markets.MarketGroupAnswerAdditionRequest{AnswerLabel: "Draw"})
+	if err != nil {
+		t.Fatalf("propose returned error: %v", err)
+	}
+	approved, err := service.ApproveMarketGroupAnswerAdditionForReviewer(context.Background(), addition.ID, "steward", true)
+	if err != nil {
+		t.Fatalf("ApproveMarketGroupAnswerAdditionForReviewer returned error: %v", err)
+	}
+	if approved.Status != markets.MarketGroupAnswerAdditionStatusApproved || approved.ReviewedBy != "steward" {
+		t.Fatalf("unexpected approved addition: %+v", approved)
+	}
+	if strings.Join(charged, ",") != "check:proposer,fee:proposer" {
+		t.Fatalf("unexpected charge calls: %v", charged)
+	}
+}
+
+func TestMarketGroupAnswerAdditionReviewerRejectsNonSteward(t *testing.T) {
+	now := marketsTestTime()
+	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	charged := []string{}
+	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
+		GameMode:                                "moderator",
+		MultipleChoiceBinaryAddAnswerCost:       4,
+		MultipleChoiceBinaryHardAnswerSafetyCap: 50,
+	})
+
+	addition, err := service.ProposeMarketGroupAnswerAddition(context.Background(), group.ID, "proposer", markets.MarketGroupAnswerAdditionRequest{AnswerLabel: "Draw"})
+	if err != nil {
+		t.Fatalf("propose returned error: %v", err)
+	}
+	_, err = service.ApproveMarketGroupAnswerAdditionForReviewer(context.Background(), addition.ID, "othermod", true)
+	if !errors.Is(err, markets.ErrUnauthorized) {
+		t.Fatalf("non-steward approve error = %v, want ErrUnauthorized", err)
+	}
+	if len(charged) != 0 {
+		t.Fatalf("unauthorized review should not charge proposer, got %v", charged)
+	}
+}
+
+func TestUpdateMarketGroupAnswerAdditionSettingsRequiresSteward(t *testing.T) {
+	now := marketsTestTime()
+	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&[]string{}), newFixedClock(now), markets.Config{
+		GameMode: "moderator",
+	})
+
+	updated, err := service.UpdateMarketGroupAnswerAdditionSettings(context.Background(), group.ID, "steward", true)
+	if err != nil {
+		t.Fatalf("UpdateMarketGroupAnswerAdditionSettings returned error: %v", err)
+	}
+	if !updated.AutoApproveAnswerAdditions {
+		t.Fatalf("expected auto approve answer additions setting to be enabled")
+	}
+
+	_, err = service.UpdateMarketGroupAnswerAdditionSettings(context.Background(), group.ID, "othermod", false)
+	if !errors.Is(err, markets.ErrUnauthorized) {
+		t.Fatalf("non-steward update error = %v, want ErrUnauthorized", err)
 	}
 }
 

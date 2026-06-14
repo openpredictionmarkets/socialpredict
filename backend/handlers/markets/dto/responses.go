@@ -49,26 +49,27 @@ type CreateMarketResponse struct {
 
 // MarketGroupResponse represents a multiple-choice binary parent market.
 type MarketGroupResponse struct {
-	ID                 int64      `json:"id"`
-	QuestionTitle      string     `json:"questionTitle"`
-	Description        string     `json:"description"`
-	GroupType          string     `json:"groupType"`
-	ProbabilityPolicy  string     `json:"probabilityPolicy"`
-	ResolutionPolicy   string     `json:"resolutionPolicy"`
-	LifecycleStatus    string     `json:"lifecycleStatus"`
-	Status             string     `json:"status"`
-	ProposalCost       int64      `json:"proposalCost"`
-	CreatorUsername    string     `json:"creatorUsername"`
-	StewardUsername    string     `json:"stewardUsername"`
-	ApprovedBy         string     `json:"approvedBy,omitempty"`
-	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
-	RejectedBy         string     `json:"rejectedBy,omitempty"`
-	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
-	RejectionReason    string     `json:"rejectionReason,omitempty"`
-	ResolutionDateTime time.Time  `json:"resolutionDateTime"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	UpdatedAt          time.Time  `json:"updatedAt"`
-	AnswerCount        int        `json:"answerCount"`
+	ID                         int64      `json:"id"`
+	QuestionTitle              string     `json:"questionTitle"`
+	Description                string     `json:"description"`
+	GroupType                  string     `json:"groupType"`
+	ProbabilityPolicy          string     `json:"probabilityPolicy"`
+	ResolutionPolicy           string     `json:"resolutionPolicy"`
+	LifecycleStatus            string     `json:"lifecycleStatus"`
+	Status                     string     `json:"status"`
+	ProposalCost               int64      `json:"proposalCost"`
+	CreatorUsername            string     `json:"creatorUsername"`
+	StewardUsername            string     `json:"stewardUsername"`
+	ApprovedBy                 string     `json:"approvedBy,omitempty"`
+	ApprovedAt                 *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy                 string     `json:"rejectedBy,omitempty"`
+	RejectedAt                 *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason            string     `json:"rejectionReason,omitempty"`
+	ResolutionDateTime         time.Time  `json:"resolutionDateTime"`
+	AutoApproveAnswerAdditions bool       `json:"autoApproveAnswerAdditions"`
+	CreatedAt                  time.Time  `json:"createdAt"`
+	UpdatedAt                  time.Time  `json:"updatedAt"`
+	AnswerCount                int        `json:"answerCount"`
 }
 
 // MarketGroupAnswerResponse links one answer option to its tradable child market.

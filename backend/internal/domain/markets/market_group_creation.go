@@ -45,20 +45,21 @@ func (s *Service) CreateMarketGroup(ctx context.Context, req MarketGroupCreateRe
 	}
 
 	group := &MarketGroup{
-		QuestionTitle:      strings.TrimSpace(req.QuestionTitle),
-		Description:        strings.TrimSpace(req.Description),
-		GroupType:          MarketGroupTypeMultipleChoiceBinary,
-		ProbabilityPolicy:  MarketGroupProbabilityPolicyIndependentBinary,
-		ResolutionPolicy:   MarketGroupResolutionPolicyIndependentChildren,
-		LifecycleStatus:    lifecycleTemplate.LifecycleStatus,
-		ProposalCost:       s.config.CreateMarketCost,
-		CreatorUsername:    creatorUsername,
-		StewardUsername:    creatorUsername,
-		ApprovedBy:         lifecycleTemplate.ApprovedBy,
-		ApprovedAt:         copyDomainTimePtr(lifecycleTemplate.ApprovedAt),
-		ResolutionDateTime: req.ResolutionDateTime,
-		CreatedAt:          now,
-		UpdatedAt:          now,
+		QuestionTitle:              strings.TrimSpace(req.QuestionTitle),
+		Description:                strings.TrimSpace(req.Description),
+		GroupType:                  MarketGroupTypeMultipleChoiceBinary,
+		ProbabilityPolicy:          MarketGroupProbabilityPolicyIndependentBinary,
+		ResolutionPolicy:           MarketGroupResolutionPolicyIndependentChildren,
+		LifecycleStatus:            lifecycleTemplate.LifecycleStatus,
+		ProposalCost:               s.config.CreateMarketCost,
+		CreatorUsername:            creatorUsername,
+		StewardUsername:            creatorUsername,
+		ApprovedBy:                 lifecycleTemplate.ApprovedBy,
+		ApprovedAt:                 copyDomainTimePtr(lifecycleTemplate.ApprovedAt),
+		ResolutionDateTime:         req.ResolutionDateTime,
+		AutoApproveAnswerAdditions: req.AutoApproveAnswerAdditions,
+		CreatedAt:                  now,
+		UpdatedAt:                  now,
 	}
 
 	members := make([]MarketGroupMember, 0, len(req.AnswerLabels))

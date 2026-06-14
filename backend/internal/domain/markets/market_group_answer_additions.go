@@ -39,11 +39,12 @@ type MarketGroupAnswerAdditionRequest struct {
 }
 
 type MarketGroupAnswerAdditionFilters struct {
-	GroupID    int64
-	Status     string
-	ProposedBy string
-	Limit      int
-	Offset     int
+	GroupID          int64
+	Status           string
+	ProposedBy       string
+	ReviewerUsername string
+	Limit            int
+	Offset           int
 }
 
 type MarketGroupAnswerAdditionRepository interface {
@@ -103,7 +104,10 @@ func (s *Service) ProposeMarketGroupAnswerAddition(ctx context.Context, groupID 
 		return nil, err
 	}
 
-	if s.autoApproveMarketGroupAnswersEnabled(ctx) {
+	if group.StewardedBy(actorUsername) {
+		return s.ApproveMarketGroupAnswerAddition(ctx, addition.ID, actorUsername, true)
+	}
+	if group.AutoApproveAnswerAdditions || s.autoApproveMarketGroupAnswersEnabled(ctx) {
 		return s.ApproveMarketGroupAnswerAddition(ctx, addition.ID, MarketGroupAnswerAdditionApprovedByAuto, true)
 	}
 	return addition, nil
@@ -117,6 +121,7 @@ func (s *Service) ListMarketGroupAnswerAdditions(ctx context.Context, filters Ma
 		filters.Status != MarketGroupAnswerAdditionStatusRejected {
 		return nil, ErrInvalidInput
 	}
+	filters.ReviewerUsername = strings.TrimSpace(filters.ReviewerUsername)
 	if filters.Limit <= 0 {
 		filters.Limit = 50
 	}
@@ -131,6 +136,18 @@ func (s *Service) ListMarketGroupAnswerAdditions(ctx context.Context, filters Ma
 		return nil, err
 	}
 	return repo.ListMarketGroupAnswerAdditions(ctx, filters)
+}
+
+func (s *Service) ListMarketGroupAnswerAdditionsForReviewer(ctx context.Context, reviewerUsername string, filters MarketGroupAnswerAdditionFilters) ([]MarketGroupAnswerAddition, error) {
+	reviewerUsername = strings.TrimSpace(reviewerUsername)
+	if reviewerUsername == "" {
+		return nil, ErrInvalidInput
+	}
+	if err := s.ensureActiveModerator(ctx, reviewerUsername); err != nil {
+		return nil, err
+	}
+	filters.ReviewerUsername = reviewerUsername
+	return s.ListMarketGroupAnswerAdditions(ctx, filters)
 }
 
 func (s *Service) ApproveMarketGroupAnswerAddition(ctx context.Context, additionID int64, actorUsername string, confirmed bool) (*MarketGroupAnswerAddition, error) {
@@ -200,6 +217,13 @@ func (s *Service) ApproveMarketGroupAnswerAddition(ctx context.Context, addition
 	return reviewed, nil
 }
 
+func (s *Service) ApproveMarketGroupAnswerAdditionForReviewer(ctx context.Context, additionID int64, actorUsername string, confirmed bool) (*MarketGroupAnswerAddition, error) {
+	if err := s.ensureReviewerCanManageAnswerAddition(ctx, additionID, actorUsername); err != nil {
+		return nil, err
+	}
+	return s.ApproveMarketGroupAnswerAddition(ctx, additionID, actorUsername, confirmed)
+}
+
 func (s *Service) RejectMarketGroupAnswerAddition(ctx context.Context, additionID int64, actorUsername string, reason string) (*MarketGroupAnswerAddition, error) {
 	actorUsername = strings.TrimSpace(actorUsername)
 	reason = strings.TrimSpace(reason)
@@ -211,6 +235,66 @@ func (s *Service) RejectMarketGroupAnswerAddition(ctx context.Context, additionI
 		return nil, err
 	}
 	return repo.ReviewMarketGroupAnswerAddition(ctx, additionID, MarketGroupAnswerAdditionStatusRejected, 0, actorUsername, reason, s.clock.Now())
+}
+
+func (s *Service) RejectMarketGroupAnswerAdditionForReviewer(ctx context.Context, additionID int64, actorUsername string, reason string) (*MarketGroupAnswerAddition, error) {
+	if err := s.ensureReviewerCanManageAnswerAddition(ctx, additionID, actorUsername); err != nil {
+		return nil, err
+	}
+	return s.RejectMarketGroupAnswerAddition(ctx, additionID, actorUsername, reason)
+}
+
+func (s *Service) UpdateMarketGroupAnswerAdditionSettings(ctx context.Context, groupID int64, actorUsername string, enabled bool) (*MarketGroup, error) {
+	actorUsername = strings.TrimSpace(actorUsername)
+	if groupID <= 0 || actorUsername == "" {
+		return nil, ErrInvalidInput
+	}
+	if err := s.ensureActiveModerator(ctx, actorUsername); err != nil {
+		return nil, err
+	}
+	groupRepo, err := s.marketGroupRepository()
+	if err != nil {
+		return nil, err
+	}
+	group, err := groupRepo.GetMarketGroup(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if !group.StewardedBy(actorUsername) {
+		return nil, ErrUnauthorized
+	}
+	if NormalizeLifecycleStatus(group.LifecycleStatus) != MarketLifecyclePublished {
+		return nil, ErrInvalidState
+	}
+	if !group.ResolutionDateTime.IsZero() && !group.ResolutionDateTime.After(s.clock.Now()) {
+		return nil, ErrInvalidState
+	}
+	return groupRepo.UpdateMarketGroupAnswerAdditionAutoApproval(ctx, groupID, enabled, s.clock.Now())
+}
+
+func (s *Service) ensureReviewerCanManageAnswerAddition(ctx context.Context, additionID int64, actorUsername string) error {
+	actorUsername = strings.TrimSpace(actorUsername)
+	if additionID <= 0 || actorUsername == "" {
+		return ErrInvalidInput
+	}
+	if err := s.ensureActiveModerator(ctx, actorUsername); err != nil {
+		return err
+	}
+	repo, err := s.marketGroupAnswerAdditionRepository()
+	if err != nil {
+		return err
+	}
+	addition, err := repo.GetMarketGroupAnswerAddition(ctx, additionID)
+	if err != nil {
+		return err
+	}
+	if addition == nil || addition.MarketGroup == nil {
+		return ErrMarketGroupNotFound
+	}
+	if !addition.MarketGroup.StewardedBy(actorUsername) {
+		return ErrUnauthorized
+	}
+	return nil
 }
 
 func (s *Service) validateGroupAllowsAnswerAddition(ctx context.Context, groupID int64, label string, ignoredAdditionID int64) (*MarketGroup, error) {

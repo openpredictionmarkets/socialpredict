@@ -17,11 +17,12 @@ type CreateMarketRequest struct {
 
 // CreateMarketGroupRequest represents a grouped multiple-choice binary market.
 type CreateMarketGroupRequest struct {
-	QuestionTitle      string    `json:"questionTitle" validate:"required,max=160"`
-	Description        string    `json:"description" validate:"max=2000"`
-	ResolutionDateTime time.Time `json:"resolutionDateTime" validate:"required"`
-	AnswerLabels       []string  `json:"answerLabels" validate:"required,min=2,max=20"`
-	TagSlugs           []string  `json:"tagSlugs" validate:"omitempty,max=5"`
+	QuestionTitle              string    `json:"questionTitle" validate:"required,max=160"`
+	Description                string    `json:"description" validate:"max=2000"`
+	ResolutionDateTime         time.Time `json:"resolutionDateTime" validate:"required"`
+	AnswerLabels               []string  `json:"answerLabels" validate:"required,min=2,max=20"`
+	TagSlugs                   []string  `json:"tagSlugs" validate:"omitempty,max=5"`
+	AutoApproveAnswerAdditions bool      `json:"autoApproveAnswerAdditions"`
 }
 
 // UpdateLabelsRequest represents the HTTP request body for updating market labels
@@ -71,4 +72,14 @@ type MarketDescriptionAmendmentRequest struct {
 
 type MarketGroupAnswerAdditionRequest struct {
 	AnswerLabel string `json:"answerLabel" validate:"required,max=160"`
+}
+
+type MarketGroupAnswerAdditionReviewRequest struct {
+	Status  string `json:"status" validate:"required"`
+	Reason  string `json:"reason,omitempty" validate:"max=500"`
+	Confirm bool   `json:"confirm"`
+}
+
+type MarketGroupAnswerAdditionSettingsRequest struct {
+	AutoApproveAnswerAdditions bool `json:"autoApproveAnswerAdditions"`
 }

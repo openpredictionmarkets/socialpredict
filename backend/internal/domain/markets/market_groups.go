@@ -26,25 +26,26 @@ const (
 // MarketGroup is a display and governance parent for normal binary child markets.
 // It does not own trading math; child markets remain the transaction boundary.
 type MarketGroup struct {
-	ID                 int64
-	QuestionTitle      string
-	Description        string
-	GroupType          string
-	ProbabilityPolicy  string
-	ResolutionPolicy   string
-	LifecycleStatus    string
-	ProposalCost       int64
-	CreatorUsername    string
-	StewardUsername    string
-	ApprovedBy         string
-	ApprovedAt         *time.Time
-	RejectedBy         string
-	RejectedAt         *time.Time
-	RejectionReason    string
-	ResolutionDateTime time.Time
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	Members            []MarketGroupMember
+	ID                         int64
+	QuestionTitle              string
+	Description                string
+	GroupType                  string
+	ProbabilityPolicy          string
+	ResolutionPolicy           string
+	LifecycleStatus            string
+	ProposalCost               int64
+	CreatorUsername            string
+	StewardUsername            string
+	ApprovedBy                 string
+	ApprovedAt                 *time.Time
+	RejectedBy                 string
+	RejectedAt                 *time.Time
+	RejectionReason            string
+	ResolutionDateTime         time.Time
+	AutoApproveAnswerAdditions bool
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	Members                    []MarketGroupMember
 }
 
 // CurrentStewardUsername returns the group steward, falling back to creator for
@@ -70,11 +71,12 @@ func (g *MarketGroup) StewardedBy(username string) bool {
 // MarketGroupCreateRequest captures a participant-created grouped binary
 // market. Each answer label becomes a normal binary child market.
 type MarketGroupCreateRequest struct {
-	QuestionTitle      string
-	Description        string
-	ResolutionDateTime time.Time
-	AnswerLabels       []string
-	TagSlugs           []string
+	QuestionTitle              string
+	Description                string
+	ResolutionDateTime         time.Time
+	AnswerLabels               []string
+	TagSlugs                   []string
+	AutoApproveAnswerAdditions bool
 }
 
 type MarketGroupChildResolution struct {
@@ -107,6 +109,7 @@ type MarketGroupRepository interface {
 	GetMarketGroup(ctx context.Context, groupID int64) (*MarketGroup, error)
 	ListMarketGroupMembers(ctx context.Context, groupID int64) ([]MarketGroupMember, error)
 	MarkMarketGroupResolved(ctx context.Context, groupID int64, resolvedAt time.Time) error
+	UpdateMarketGroupAnswerAdditionAutoApproval(ctx context.Context, groupID int64, enabled bool, updatedAt time.Time) (*MarketGroup, error)
 }
 
 // MarketGroupLookupRepository resolves a child market back to its parent group.

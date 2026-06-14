@@ -30,6 +30,10 @@ type marketGroupActivityService interface {
 
 type marketGroupAnswerAdditionService interface {
 	ProposeMarketGroupAnswerAddition(ctx context.Context, groupID int64, actorUsername string, req dmarkets.MarketGroupAnswerAdditionRequest) (*dmarkets.MarketGroupAnswerAddition, error)
+	ListMarketGroupAnswerAdditionsForReviewer(ctx context.Context, reviewerUsername string, filters dmarkets.MarketGroupAnswerAdditionFilters) ([]dmarkets.MarketGroupAnswerAddition, error)
+	ApproveMarketGroupAnswerAdditionForReviewer(ctx context.Context, additionID int64, actorUsername string, confirmed bool) (*dmarkets.MarketGroupAnswerAddition, error)
+	RejectMarketGroupAnswerAdditionForReviewer(ctx context.Context, additionID int64, actorUsername string, reason string) (*dmarkets.MarketGroupAnswerAddition, error)
+	UpdateMarketGroupAnswerAdditionSettings(ctx context.Context, groupID int64, actorUsername string, enabled bool) (*dmarkets.MarketGroup, error)
 }
 
 // CreateMarketGroup handles POST /v0/market-groups.
@@ -68,11 +72,12 @@ func (h *Handler) CreateMarketGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	group, err := svc.CreateMarketGroup(r.Context(), dmarkets.MarketGroupCreateRequest{
-		QuestionTitle:      sanitizedReq.QuestionTitle,
-		Description:        sanitizedReq.Description,
-		ResolutionDateTime: sanitizedReq.ResolutionDateTime,
-		AnswerLabels:       sanitizedReq.AnswerLabels,
-		TagSlugs:           sanitizedReq.TagSlugs,
+		QuestionTitle:              sanitizedReq.QuestionTitle,
+		Description:                sanitizedReq.Description,
+		ResolutionDateTime:         sanitizedReq.ResolutionDateTime,
+		AnswerLabels:               sanitizedReq.AnswerLabels,
+		TagSlugs:                   sanitizedReq.TagSlugs,
+		AutoApproveAnswerAdditions: sanitizedReq.AutoApproveAnswerAdditions,
 	}, user.Username)
 	if err != nil {
 		writeCreateError(w, err)
@@ -233,6 +238,139 @@ func (h *Handler) ProposeMarketGroupAnswerAddition(w http.ResponseWriter, r *htt
 	_ = writeJSON(w, http.StatusCreated, marketGroupAnswerAdditionToResponse(addition))
 }
 
+// ListMarketGroupAnswerAdditionsForReview handles GET /v0/market-groups/{id}/answer-additions
+// and GET /v0/profile/market-group-answer-additions.
+func (h *Handler) ListMarketGroupAnswerAdditionsForReview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if h.auth == nil {
+		writeInternalError(w)
+		return
+	}
+	svc, ok := h.service.(marketGroupAnswerAdditionService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+	user, authErr := h.auth.CurrentUser(r)
+	if authErr != nil {
+		writeAuthError(w, authErr)
+		return
+	}
+	filters, err := parseMarketGroupAnswerAdditionFiltersFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	items, err := svc.ListMarketGroupAnswerAdditionsForReviewer(r.Context(), user.Username, filters)
+	if err != nil {
+		writeMarketGroupDetailsError(w, err)
+		return
+	}
+	response := dto.MarketGroupAnswerAdditionsResponse{
+		Additions: make([]dto.MarketGroupAnswerAdditionResponse, 0, len(items)),
+		Total:     len(items),
+	}
+	for _, item := range items {
+		itemCopy := item
+		response.Additions = append(response.Additions, marketGroupAnswerAdditionToResponse(&itemCopy))
+	}
+	_ = writeJSON(w, http.StatusOK, response)
+}
+
+// ReviewMarketGroupAnswerAddition handles PATCH /v0/market-group-answer-additions/{additionId}.
+func (h *Handler) ReviewMarketGroupAnswerAddition(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if h.auth == nil {
+		writeInternalError(w)
+		return
+	}
+	svc, ok := h.service.(marketGroupAnswerAdditionService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+	user, authErr := h.auth.CurrentUser(r)
+	if authErr != nil {
+		writeAuthError(w, authErr)
+		return
+	}
+	additionID, err := parseMarketGroupAnswerAdditionIDFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	var req dto.MarketGroupAnswerAdditionReviewRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	status := dmarkets.NormalizeMarketGroupAnswerAdditionStatus(req.Status)
+	var addition *dmarkets.MarketGroupAnswerAddition
+	switch status {
+	case dmarkets.MarketGroupAnswerAdditionStatusApproved:
+		addition, err = svc.ApproveMarketGroupAnswerAdditionForReviewer(r.Context(), additionID, user.Username, req.Confirm)
+	case dmarkets.MarketGroupAnswerAdditionStatusRejected:
+		addition, err = svc.RejectMarketGroupAnswerAdditionForReviewer(r.Context(), additionID, user.Username, req.Reason)
+	default:
+		writeInvalidRequest(w)
+		return
+	}
+	if err != nil {
+		writeMarketGroupDetailsError(w, err)
+		return
+	}
+	if h.invalidator != nil && addition != nil && addition.MarketID > 0 {
+		if err := h.invalidator.InvalidateAfterMarketTransaction(r.Context(), user.Username, addition.MarketID, "market_group_answer_reviewed"); err != nil {
+			logger.LogError("ReviewMarketGroupAnswerAddition", "InvalidateReadModels", err)
+		}
+	}
+	_ = writeJSON(w, http.StatusOK, marketGroupAnswerAdditionToResponse(addition))
+}
+
+// UpdateMarketGroupAnswerAdditionSettings handles PATCH /v0/market-groups/{id}/answer-addition-settings.
+func (h *Handler) UpdateMarketGroupAnswerAdditionSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if h.auth == nil {
+		writeInternalError(w)
+		return
+	}
+	svc, ok := h.service.(marketGroupAnswerAdditionService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+	groupID, err := parseMarketGroupIDFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	user, authErr := h.auth.CurrentUser(r)
+	if authErr != nil {
+		writeAuthError(w, authErr)
+		return
+	}
+	var req dto.MarketGroupAnswerAdditionSettingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	group, err := svc.UpdateMarketGroupAnswerAdditionSettings(r.Context(), groupID, user.Username, req.AutoApproveAnswerAdditions)
+	if err != nil {
+		writeMarketGroupDetailsError(w, err)
+		return
+	}
+	_ = writeJSON(w, http.StatusOK, marketGroupToResponse(group))
+}
+
 // MarketGroupBets handles GET /v0/market-groups/{id}/bets.
 func (h *Handler) MarketGroupBets(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -369,6 +507,52 @@ func parseMarketGroupIDFromRequest(r *http.Request) (int64, error) {
 		return 0, errors.New("invalid market group id")
 	}
 	return id, nil
+}
+
+func parseMarketGroupAnswerAdditionIDFromRequest(r *http.Request) (int64, error) {
+	idStr := mux.Vars(r)["additionId"]
+	if idStr == "" {
+		idStr = mux.Vars(r)["id"]
+	}
+	if idStr == "" {
+		return 0, errors.New("missing market group answer addition id")
+	}
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, errors.New("invalid market group answer addition id")
+	}
+	return id, nil
+}
+
+func parseMarketGroupAnswerAdditionFiltersFromRequest(r *http.Request) (dmarkets.MarketGroupAnswerAdditionFilters, error) {
+	query := r.URL.Query()
+	status := dmarkets.NormalizeMarketGroupAnswerAdditionStatus(query.Get("status"))
+	if status != dmarkets.MarketGroupAnswerAdditionStatusPending &&
+		status != dmarkets.MarketGroupAnswerAdditionStatusApproved &&
+		status != dmarkets.MarketGroupAnswerAdditionStatusRejected {
+		return dmarkets.MarketGroupAnswerAdditionFilters{}, errors.New("invalid answer addition status")
+	}
+	groupID := int64(0)
+	if rawID := mux.Vars(r)["id"]; rawID != "" {
+		parsed, err := strconv.ParseInt(rawID, 10, 64)
+		if err != nil || parsed <= 0 {
+			return dmarkets.MarketGroupAnswerAdditionFilters{}, errors.New("invalid market group id")
+		}
+		groupID = parsed
+	}
+	if rawGroupID := query.Get("groupId"); rawGroupID != "" {
+		parsed, err := strconv.ParseInt(rawGroupID, 10, 64)
+		if err != nil || parsed <= 0 {
+			return dmarkets.MarketGroupAnswerAdditionFilters{}, errors.New("invalid market group id")
+		}
+		groupID = parsed
+	}
+	return dmarkets.MarketGroupAnswerAdditionFilters{
+		GroupID: groupID,
+		Status:  status,
+		Limit:   boundedQueryInt(query.Get("limit"), 50, 1, 200),
+		Offset:  boundedQueryInt(query.Get("offset"), 0, 0, 100000),
+	}, nil
 }
 
 func marketGroupOverviewToResponse(ctx context.Context, provider any, overview *dmarkets.MarketGroupOverview) dto.MarketGroupDetailsResponse {
@@ -542,26 +726,27 @@ func marketGroupToResponse(group *dmarkets.MarketGroup) *dto.MarketGroupResponse
 		status = dmarkets.MarketStatusActive
 	}
 	return &dto.MarketGroupResponse{
-		ID:                 group.ID,
-		QuestionTitle:      group.QuestionTitle,
-		Description:        group.Description,
-		GroupType:          group.GroupType,
-		ProbabilityPolicy:  group.ProbabilityPolicy,
-		ResolutionPolicy:   group.ResolutionPolicy,
-		LifecycleStatus:    group.LifecycleStatus,
-		Status:             status,
-		ProposalCost:       group.ProposalCost,
-		CreatorUsername:    group.CreatorUsername,
-		StewardUsername:    group.StewardUsername,
-		ApprovedBy:         group.ApprovedBy,
-		ApprovedAt:         group.ApprovedAt,
-		RejectedBy:         group.RejectedBy,
-		RejectedAt:         group.RejectedAt,
-		RejectionReason:    group.RejectionReason,
-		ResolutionDateTime: group.ResolutionDateTime,
-		CreatedAt:          group.CreatedAt,
-		UpdatedAt:          group.UpdatedAt,
-		AnswerCount:        len(group.Members),
+		ID:                         group.ID,
+		QuestionTitle:              group.QuestionTitle,
+		Description:                group.Description,
+		GroupType:                  group.GroupType,
+		ProbabilityPolicy:          group.ProbabilityPolicy,
+		ResolutionPolicy:           group.ResolutionPolicy,
+		LifecycleStatus:            group.LifecycleStatus,
+		Status:                     status,
+		ProposalCost:               group.ProposalCost,
+		CreatorUsername:            group.CreatorUsername,
+		StewardUsername:            group.StewardUsername,
+		ApprovedBy:                 group.ApprovedBy,
+		ApprovedAt:                 group.ApprovedAt,
+		RejectedBy:                 group.RejectedBy,
+		RejectedAt:                 group.RejectedAt,
+		RejectionReason:            group.RejectionReason,
+		ResolutionDateTime:         group.ResolutionDateTime,
+		AutoApproveAnswerAdditions: group.AutoApproveAnswerAdditions,
+		CreatedAt:                  group.CreatedAt,
+		UpdatedAt:                  group.UpdatedAt,
+		AnswerCount:                len(group.Members),
 	}
 }
 

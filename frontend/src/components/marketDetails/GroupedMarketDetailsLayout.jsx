@@ -9,8 +9,13 @@ import TradeCTA from '../TradeCTA';
 import MarkdownLite from '../markdown/MarkdownLite';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
+import MarketGroupAnswerAdditionReviewQueue from '../marketGroups/MarketGroupAnswerAdditionReviewQueue';
 import { resolveMarketGroup } from '../modals/resolution/ResolveUtils';
-import { getMarketGroupDetails, proposeMarketGroupAnswerAddition } from '../../api/marketsApi';
+import {
+  getMarketGroupDetails,
+  proposeMarketGroupAnswerAddition,
+  updateMarketGroupAnswerAdditionSettings,
+} from '../../api/marketsApi';
 import { proposeMarketDescriptionAmendment } from '../../api/marketDescriptionAmendmentsApi';
 import { apiRequest } from '../../api/httpClient';
 import useFrontendConfig from '../../hooks/useFrontendConfig';
@@ -632,6 +637,10 @@ export default function GroupedMarketDetailsLayout({
   const [answerAdditionMessage, setAnswerAdditionMessage] = useState('');
   const [answerAdditionError, setAnswerAdditionError] = useState('');
   const [submittingAnswerAddition, setSubmittingAnswerAddition] = useState(false);
+  const [autoApproveAnswerAdditions, setAutoApproveAnswerAdditions] = useState(false);
+  const [answerPolicyMessage, setAnswerPolicyMessage] = useState('');
+  const [answerPolicyError, setAnswerPolicyError] = useState('');
+  const [savingAnswerPolicy, setSavingAnswerPolicy] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolveMode, setResolveMode] = useState('exclusive_yes');
   const [winningMarketId, setWinningMarketId] = useState(0);
@@ -718,10 +727,12 @@ export default function GroupedMarketDetailsLayout({
     stewardUsername: group.stewardUsername || fallbackMarket?.stewardUsername,
     creatorUsername,
   }, creatorUsername);
+  const isCurrentGroupSteward = String(username || '').trim() === String(groupStewardUsername || '').trim();
+  const isActiveModerator = usertype === 'MODERATOR' && moderatorStatus === 'active';
   const canProposeDescriptionAmendment =
     isLoggedIn &&
     token &&
-    String(username || '').trim() === String(groupStewardUsername || '').trim() &&
+    isCurrentGroupSteward &&
     sortedAnswers.length > 0 &&
     closeDate &&
     new Date(closeDate) > new Date() &&
@@ -729,18 +740,18 @@ export default function GroupedMarketDetailsLayout({
   const canProposeAnswerAddition =
     isLoggedIn &&
     token &&
-    usertype === 'MODERATOR' &&
-    moderatorStatus === 'active' &&
+    isActiveModerator &&
     sortedAnswers.length > 0 &&
     closeDate &&
     new Date(closeDate) > new Date() &&
     String(group.lifecycleStatus || '').toLowerCase() === 'published' &&
     sortedAnswers.every((answer) => !answer?.market?.market?.isResolved);
+  const canManageAnswerAdditions = canProposeAnswerAddition && isCurrentGroupSteward;
   const canResolveGroup =
     isLoggedIn &&
     token &&
     sortedAnswers.length > 0 &&
-    String(username || '').trim() === String(groupStewardUsername || '').trim() &&
+    isCurrentGroupSteward &&
     String(group.lifecycleStatus || '').toLowerCase() === 'published' &&
     sortedAnswers.every((answer) => !answer?.market?.market?.isResolved);
   const tradeButtonLabel = (() => {
@@ -759,6 +770,10 @@ export default function GroupedMarketDetailsLayout({
     frontendConfig?.marketGroups?.multipleChoiceBinary?.addAnswerCost,
     0,
   );
+
+  useEffect(() => {
+    setAutoApproveAnswerAdditions(Boolean(group.autoApproveAnswerAdditions));
+  }, [group.id, group.autoApproveAnswerAdditions]);
 
   const handleTransactionSuccess = () => {
     setShowTradeModal(false);
@@ -846,9 +861,9 @@ export default function GroupedMarketDetailsLayout({
       setAnswerAdditionMessage(
         status === 'approved'
           ? `Answer option "${addition?.answerLabel || label}" added and published.`
-          : `Answer option "${addition?.answerLabel || label}" submitted for admin review.`,
+          : `Answer option "${addition?.answerLabel || label}" submitted for steward review.`,
       );
-      if (status === 'approved') {
+      if (status === 'approved' || canManageAnswerAdditions) {
         setRefreshKey((current) => current + 1);
         if (refetchData) {
           refetchData();
@@ -858,6 +873,30 @@ export default function GroupedMarketDetailsLayout({
       setAnswerAdditionError(err.message || 'Unable to propose answer option.');
     } finally {
       setSubmittingAnswerAddition(false);
+    }
+  };
+
+  const toggleAnswerAdditionPolicy = async () => {
+    const nextValue = !autoApproveAnswerAdditions;
+    setAnswerPolicyMessage('');
+    setAnswerPolicyError('');
+    setAutoApproveAnswerAdditions(nextValue);
+    setSavingAnswerPolicy(true);
+    try {
+      await updateMarketGroupAnswerAdditionSettings({
+        groupId: group.id || marketGroup.id,
+        token,
+        autoApproveAnswerAdditions: nextValue,
+      });
+      setAnswerPolicyMessage(nextValue
+        ? 'Incoming answer options will auto-approve.'
+        : 'Incoming answer options now require your approval.');
+      setRefreshKey((current) => current + 1);
+    } catch (err) {
+      setAutoApproveAnswerAdditions(!nextValue);
+      setAnswerPolicyError(err.message || 'Unable to update answer option policy.');
+    } finally {
+      setSavingAnswerPolicy(false);
     }
   };
 
@@ -924,6 +963,61 @@ export default function GroupedMarketDetailsLayout({
       <div className='mb-4'>
         <GroupedMarketChart answers={answers} title='Probability Changes' />
       </div>
+
+      {canManageAnswerAdditions && (
+        <section className='mb-4 grid gap-4 rounded-lg border border-emerald-800/70 bg-emerald-950/20 p-4'>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+            <div>
+              <p className='text-sm font-semibold text-emerald-100'>Answer Option Review</p>
+              <p className='mt-1 text-xs text-emerald-100/70'>
+                When this is on, active moderators can add answer options immediately. When it is off, their options wait for your approval.
+              </p>
+            </div>
+            <button
+              type='button'
+              aria-pressed={autoApproveAnswerAdditions}
+              onClick={toggleAnswerAdditionPolicy}
+              disabled={savingAnswerPolicy}
+              className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition ${
+                autoApproveAnswerAdditions
+                  ? 'border-emerald-300 bg-emerald-700'
+                  : 'border-gray-600 bg-gray-800'
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition ${
+                  autoApproveAnswerAdditions ? 'translate-x-8' : 'translate-x-1'
+                }`}
+              />
+              <span className='sr-only'>Toggle answer option auto-approval</span>
+            </button>
+          </div>
+          <div className='text-xs text-emerald-100/80'>
+            Auto-approval is <span className='font-semibold text-white'>{autoApproveAnswerAdditions ? 'on' : 'off'}</span>.
+          </div>
+          {answerPolicyMessage && (
+            <div className='rounded-md bg-emerald-700 p-3 text-sm text-white'>{answerPolicyMessage}</div>
+          )}
+          {answerPolicyError && (
+            <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{answerPolicyError}</div>
+          )}
+          <div className='grid gap-3 border-t border-emerald-800/60 pt-4'>
+            <p className='text-sm font-semibold text-emerald-100'>Incoming Answer Options</p>
+            <MarketGroupAnswerAdditionReviewQueue
+              token={token}
+              groupId={group.id || marketGroup.id}
+              status='pending'
+              emptyMessage='No pending answer options for this grouped market.'
+              onReviewed={() => {
+                setRefreshKey((current) => current + 1);
+                if (refetchData) {
+                  refetchData();
+                }
+              }}
+            />
+          </div>
+        </section>
+      )}
 
       {(group.description || descriptionAmendments.length > 0) && (
         <>
@@ -1027,9 +1121,15 @@ export default function GroupedMarketDetailsLayout({
       {canProposeAnswerAddition && (
         <form onSubmit={submitAnswerAddition} className='mb-4 grid gap-3 rounded-lg border border-emerald-800/60 bg-emerald-950/20 p-4'>
           <div>
-            <p className='text-sm font-semibold text-emerald-100'>Propose Answer Option</p>
+            <p className='text-sm font-semibold text-emerald-100'>
+              {canManageAnswerAdditions ? 'Add Answer Option' : 'Propose Answer Option'}
+            </p>
             <p className='mt-1 text-xs text-emerald-100/70'>
-              Adds a new YES/NO answer market to this group after admin approval. If approved, the proposer is charged {addAnswerCost} credits.
+              {canManageAnswerAdditions
+                ? `Adds a new YES/NO answer market to this group immediately. You will be charged ${addAnswerCost} credits.`
+                : autoApproveAnswerAdditions
+                  ? `This market auto-approves incoming options. If approved by policy, you are charged ${addAnswerCost} credits.`
+                  : `Submits a new YES/NO answer market to the steward for review. If approved, you are charged ${addAnswerCost} credits.`}
             </p>
           </div>
           {answerAdditionMessage && (
@@ -1053,7 +1153,7 @@ export default function GroupedMarketDetailsLayout({
               disabled={submittingAnswerAddition || !answerAdditionLabel.trim()}
               className='rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50'
             >
-              {submittingAnswerAddition ? 'Submitting...' : 'Submit Answer'}
+              {submittingAnswerAddition ? 'Submitting...' : canManageAnswerAdditions ? 'Add Answer' : 'Submit Answer'}
             </button>
           </div>
         </form>

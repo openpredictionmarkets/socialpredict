@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/loaders/LoadingSpinner';
 import { listMyLifecycleMarkets } from '../../api/lifecycleMarketsApi';
 import { listMyMarketDescriptionAmendments } from '../../api/marketDescriptionAmendmentsApi';
 import MarkdownLite from '../../components/markdown/MarkdownLite';
+import MarketGroupAnswerAdditionReviewQueue from '../../components/marketGroups/MarketGroupAnswerAdditionReviewQueue';
 
 const ErrorMessage = ({ message }) => (
   <div
@@ -32,6 +33,12 @@ const amendmentTabByStatus = {
   pending: 'Pending Amendments',
   approved: 'Approved Amendments',
   rejected: 'Rejected Amendments',
+};
+
+const answerOptionTabByStatus = {
+  pending: 'Pending Answer Options',
+  approved: 'Approved Answer Options',
+  rejected: 'Rejected Answer Options',
 };
 
 const ProfileMarketLifecycleTab = ({ status }) => {
@@ -202,6 +209,18 @@ const ProfileDescriptionAmendmentTab = ({ status }) => {
   );
 };
 
+const ProfileAnswerOptionTab = ({ status }) => {
+  const { token } = useAuth();
+
+  return (
+    <MarketGroupAnswerAdditionReviewQueue
+      token={token}
+      status={status}
+      emptyMessage={`No ${status} grouped answer options found.`}
+    />
+  );
+};
+
 const Profile = () => {
   const { username } = useAuth();
   const location = useLocation();
@@ -256,6 +275,18 @@ const Profile = () => {
       {
         label: amendmentTabByStatus.rejected,
         content: <ProfileDescriptionAmendmentTab status='rejected' />,
+      },
+      {
+        label: answerOptionTabByStatus.pending,
+        content: <ProfileAnswerOptionTab status='pending' />,
+      },
+      {
+        label: answerOptionTabByStatus.approved,
+        content: <ProfileAnswerOptionTab status='approved' />,
+      },
+      {
+        label: answerOptionTabByStatus.rejected,
+        content: <ProfileAnswerOptionTab status='rejected' />,
       },
     ] : []),
     {

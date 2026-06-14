@@ -56,6 +56,10 @@ func (r *GormRepository) ListMarketGroupAnswerAdditions(ctx context.Context, fil
 	if filters.ProposedBy != "" {
 		query = query.Where("proposed_by = ?", filters.ProposedBy)
 	}
+	if filters.ReviewerUsername != "" {
+		query = query.Joins("JOIN market_groups ON market_groups.id = market_group_answer_additions.group_id").
+			Where("COALESCE(NULLIF(market_groups.steward_username, ''), market_groups.creator_username) = ?", filters.ReviewerUsername)
+	}
 	if filters.Limit <= 0 {
 		filters.Limit = 50
 	}

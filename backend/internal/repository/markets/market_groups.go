@@ -96,6 +96,27 @@ func (r *GormRepository) MarkMarketGroupResolved(ctx context.Context, groupID in
 	return nil
 }
 
+// UpdateMarketGroupAnswerAdditionAutoApproval changes per-group answer
+// addition review policy. It is governance state on the parent group only.
+func (r *GormRepository) UpdateMarketGroupAnswerAdditionAutoApproval(ctx context.Context, groupID int64, enabled bool, updatedAt time.Time) (*dmarkets.MarketGroup, error) {
+	if groupID <= 0 {
+		return nil, dmarkets.ErrInvalidInput
+	}
+	result := r.db.WithContext(ctx).Model(&models.MarketGroup{}).
+		Where("id = ?", groupID).
+		Updates(map[string]any{
+			"auto_approve_answer_additions": enabled,
+			"updated_at":                    updatedAt,
+		})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, dmarkets.ErrMarketGroupNotFound
+	}
+	return r.GetMarketGroup(ctx, groupID)
+}
+
 // GetMarketGroupForMarket resolves the parent group for a child market.
 func (r *GormRepository) GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
 	var member models.MarketGroupMember
@@ -282,45 +303,47 @@ func marketGroupChildIDs(ctx context.Context, tx *gorm.DB, groupID int64) ([]int
 
 func domainMarketGroupToModel(group *dmarkets.MarketGroup) models.MarketGroup {
 	return models.MarketGroup{
-		ID:                 group.ID,
-		QuestionTitle:      group.QuestionTitle,
-		Description:        group.Description,
-		GroupType:          group.GroupType,
-		ProbabilityPolicy:  group.ProbabilityPolicy,
-		ResolutionPolicy:   group.ResolutionPolicy,
-		LifecycleStatus:    group.LifecycleStatus,
-		ProposalCost:       group.ProposalCost,
-		CreatorUsername:    group.CreatorUsername,
-		StewardUsername:    group.StewardUsername,
-		ApprovedBy:         group.ApprovedBy,
-		ApprovedAt:         copyTimePtr(group.ApprovedAt),
-		RejectedBy:         group.RejectedBy,
-		RejectedAt:         copyTimePtr(group.RejectedAt),
-		RejectionReason:    group.RejectionReason,
-		ResolutionDateTime: group.ResolutionDateTime,
+		ID:                         group.ID,
+		QuestionTitle:              group.QuestionTitle,
+		Description:                group.Description,
+		GroupType:                  group.GroupType,
+		ProbabilityPolicy:          group.ProbabilityPolicy,
+		ResolutionPolicy:           group.ResolutionPolicy,
+		LifecycleStatus:            group.LifecycleStatus,
+		ProposalCost:               group.ProposalCost,
+		CreatorUsername:            group.CreatorUsername,
+		StewardUsername:            group.StewardUsername,
+		ApprovedBy:                 group.ApprovedBy,
+		ApprovedAt:                 copyTimePtr(group.ApprovedAt),
+		RejectedBy:                 group.RejectedBy,
+		RejectedAt:                 copyTimePtr(group.RejectedAt),
+		RejectionReason:            group.RejectionReason,
+		ResolutionDateTime:         group.ResolutionDateTime,
+		AutoApproveAnswerAdditions: group.AutoApproveAnswerAdditions,
 	}
 }
 
 func modelMarketGroupToDomain(group models.MarketGroup) dmarkets.MarketGroup {
 	return dmarkets.MarketGroup{
-		ID:                 group.ID,
-		QuestionTitle:      group.QuestionTitle,
-		Description:        group.Description,
-		GroupType:          group.GroupType,
-		ProbabilityPolicy:  group.ProbabilityPolicy,
-		ResolutionPolicy:   group.ResolutionPolicy,
-		LifecycleStatus:    dmarkets.NormalizeLifecycleStatus(group.LifecycleStatus),
-		ProposalCost:       group.ProposalCost,
-		CreatorUsername:    group.CreatorUsername,
-		StewardUsername:    group.StewardUsername,
-		ApprovedBy:         group.ApprovedBy,
-		ApprovedAt:         copyTimePtr(group.ApprovedAt),
-		RejectedBy:         group.RejectedBy,
-		RejectedAt:         copyTimePtr(group.RejectedAt),
-		RejectionReason:    group.RejectionReason,
-		ResolutionDateTime: group.ResolutionDateTime,
-		CreatedAt:          group.CreatedAt,
-		UpdatedAt:          group.UpdatedAt,
+		ID:                         group.ID,
+		QuestionTitle:              group.QuestionTitle,
+		Description:                group.Description,
+		GroupType:                  group.GroupType,
+		ProbabilityPolicy:          group.ProbabilityPolicy,
+		ResolutionPolicy:           group.ResolutionPolicy,
+		LifecycleStatus:            dmarkets.NormalizeLifecycleStatus(group.LifecycleStatus),
+		ProposalCost:               group.ProposalCost,
+		CreatorUsername:            group.CreatorUsername,
+		StewardUsername:            group.StewardUsername,
+		ApprovedBy:                 group.ApprovedBy,
+		ApprovedAt:                 copyTimePtr(group.ApprovedAt),
+		RejectedBy:                 group.RejectedBy,
+		RejectedAt:                 copyTimePtr(group.RejectedAt),
+		RejectionReason:            group.RejectionReason,
+		ResolutionDateTime:         group.ResolutionDateTime,
+		AutoApproveAnswerAdditions: group.AutoApproveAnswerAdditions,
+		CreatedAt:                  group.CreatedAt,
+		UpdatedAt:                  group.UpdatedAt,
 	}
 }
 

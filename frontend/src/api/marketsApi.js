@@ -126,6 +126,93 @@ export const proposeMarketGroupAnswerAddition = async ({ groupId, token, answerL
     });
 };
 
+export const listMarketGroupAnswerAdditionsForReview = async ({
+    groupId = '',
+    token,
+    status = 'pending',
+    limit = 50,
+    offset = 0,
+} = {}) => {
+    const params = new URLSearchParams({
+        status,
+        limit: String(limit),
+        offset: String(offset),
+    });
+    const path = groupId
+        ? `/v0/market-groups/${groupId}/answer-additions?${params.toString()}`
+        : `/v0/profile/market-group-answer-additions?${params.toString()}`;
+
+    return authenticatedApiRequest(path, {
+        authToken: token,
+        reasonMessages: {
+            AUTHORIZATION_DENIED: 'Only the grouped market steward can review these answer options.',
+            RATE_LIMITED: 'Too many answer review requests. Wait and try again.',
+        },
+        fallbackMessage: 'Unable to load grouped answer options.',
+    });
+};
+
+export const reviewMarketGroupAnswerAdditionForSteward = async ({
+    additionId,
+    token,
+    status,
+    reason = '',
+    confirm = false,
+}) => {
+    const normalizedAdditionId = String(additionId || '').trim();
+    const normalizedStatus = String(status || '').trim();
+    if (!normalizedAdditionId || !normalizedStatus) {
+        throw new Error('Answer addition ID and review status are required.');
+    }
+
+    return authenticatedApiRequest(`/v0/profile/market-group-answer-additions/${normalizedAdditionId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        authToken: token,
+        body: JSON.stringify({
+            status: normalizedStatus,
+            reason: String(reason || '').trim(),
+            confirm: Boolean(confirm),
+        }),
+        reasonMessages: {
+            AUTHORIZATION_DENIED: 'Only the grouped market steward can review this answer option.',
+            INSUFFICIENT_BALANCE: 'The proposing moderator no longer has enough credit to add this answer.',
+            INVALID_STATE: 'This answer option has already been reviewed or can no longer be added.',
+            RATE_LIMITED: 'Too many answer review requests. Wait and try again.',
+        },
+        fallbackMessage: 'Unable to review grouped answer option.',
+    });
+};
+
+export const updateMarketGroupAnswerAdditionSettings = async ({
+    groupId,
+    token,
+    autoApproveAnswerAdditions,
+}) => {
+    if (!groupId) {
+        throw new Error('Market group ID is required.');
+    }
+
+    return authenticatedApiRequest(`/v0/market-groups/${groupId}/answer-addition-settings`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        authToken: token,
+        body: JSON.stringify({
+            autoApproveAnswerAdditions: Boolean(autoApproveAnswerAdditions),
+        }),
+        reasonMessages: {
+            AUTHORIZATION_DENIED: 'Only the grouped market steward can change this setting.',
+            INVALID_STATE: 'This grouped market can no longer accept answer option changes.',
+            RATE_LIMITED: 'Too many answer setting requests. Wait and try again.',
+        },
+        fallbackMessage: 'Unable to update grouped answer option settings.',
+    });
+};
+
 export const getMarketSummaryReadModel = async (marketId) => {
     if (!marketId) {
         throw new Error('Market ID is required');

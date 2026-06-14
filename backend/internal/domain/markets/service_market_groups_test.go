@@ -104,6 +104,9 @@ func TestCreateMarketGroupCreatesZeroCostChildMarketsAndChargesParentOnce(t *tes
 	if group.LifecycleStatus != markets.MarketLifecycleProposed {
 		t.Fatalf("group lifecycle = %q, want proposed", group.LifecycleStatus)
 	}
+	if group.AutoApproveAnswerAdditions {
+		t.Fatalf("auto approve answer additions should default false")
+	}
 	if len(balanceChecks) != 1 || balanceChecks[0] != 10 || len(deductions) != 1 || deductions[0] != 10 {
 		t.Fatalf("cost should be checked/deducted once: checks=%v deductions=%v", balanceChecks, deductions)
 	}
@@ -126,6 +129,57 @@ func TestCreateMarketGroupCreatesZeroCostChildMarketsAndChargesParentOnce(t *tes
 	}
 	if !reflect.DeepEqual(tagAssignments, []int64{101, 102, 103}) {
 		t.Fatalf("tag assignments = %v, want child market IDs [101 102 103]", tagAssignments)
+	}
+}
+
+func TestCreateMarketGroupPersistsAnswerAdditionPolicy(t *testing.T) {
+	now := marketsTestTime()
+	var createdGroup *markets.MarketGroup
+	nextMarketID := int64(100)
+
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.listMarketTagsFunc = func(context.Context, bool) ([]markets.MarketTag, error) {
+			return []markets.MarketTag{}, nil
+		}
+		repo.createFunc = func(_ context.Context, market *markets.Market) error {
+			nextMarketID++
+			market.ID = nextMarketID
+			return nil
+		}
+		repo.createMarketGroupFunc = func(_ context.Context, group *markets.MarketGroup, members []markets.MarketGroupMember) error {
+			group.ID = 8
+			group.Members = members
+			createdGroup = group
+			return nil
+		}
+	})
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.validateUserBalanceFunc = func(context.Context, string, int64, int64) error { return nil }
+		service.deductBalanceFunc = func(context.Context, string, int64) error { return nil }
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return &dusers.PublicUser{
+				Username:        username,
+				UserType:        string(dusers.UserTypeModerator),
+				ModeratorStatus: dusers.ModeratorStatusActive,
+			}, nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{
+		GameMode:               "moderator",
+		MarketApprovalRequired: true,
+		CreateMarketCost:       10,
+		MaximumDebtAllowed:     500,
+	})
+
+	req := validMarketGroupCreateRequest(now)
+	req.TagSlugs = nil
+	req.AutoApproveAnswerAdditions = true
+	group, err := service.CreateMarketGroup(context.Background(), req, "moderator")
+	if err != nil {
+		t.Fatalf("CreateMarketGroup returned error: %v", err)
+	}
+	if group != createdGroup || !group.AutoApproveAnswerAdditions {
+		t.Fatalf("expected group auto-approval policy to persist: %+v", group)
 	}
 }
 

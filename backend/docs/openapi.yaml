@@ -156,6 +156,10 @@ x-route-family-migration-matrix:
         - /v0/market-groups/{id}/positions
         - /v0/market-groups/{id}/leaderboard
         - /v0/market-groups/{id}/answers
+        - /v0/market-groups/{id}/answer-additions
+        - /v0/market-groups/{id}/answer-addition-settings
+        - /v0/profile/market-group-answer-additions
+        - /v0/profile/market-group-answer-additions/{additionId}
         - /v0/markets/{id}/description-amendments
         - /v0/markets/{id}/resolve
         - /v0/markets/{id}/leaderboard
@@ -1064,6 +1068,308 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected answer-addition failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}/answer-additions:
+    get:
+      tags: [Markets]
+      operationId: listMarketGroupAnswerAdditionsForReview
+      summary: List steward-review answer additions for one group
+      description: >
+        Returns answer additions for a grouped market only when the authenticated
+        active moderator is the current group steward. Used by grouped market
+        pages to show incoming proposed answer options.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+            default: pending
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Answer additions returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupAnswerAdditionListResponse'
+        '400':
+          description: Invalid group ID, status, or pagination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Authenticated user is not the current group steward.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected answer-addition queue failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}/answer-addition-settings:
+    patch:
+      tags: [Markets]
+      operationId: updateMarketGroupAnswerAdditionSettings
+      summary: Update grouped answer-addition review policy
+      description: >
+        Allows the current group steward to toggle whether active moderator
+        answer additions are auto-approved for this grouped market.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketGroupAnswerAdditionSettingsRequest'
+      responses:
+        '200':
+          description: Group answer-addition policy updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupResponse'
+        '400':
+          description: Invalid group ID or request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Authenticated user is not the current group steward.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market group not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected answer-addition settings failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/profile/market-group-answer-additions:
+    get:
+      tags: [Markets]
+      operationId: listProfileMarketGroupAnswerAdditions
+      summary: List answer additions awaiting this moderator
+      description: >
+        Returns answer additions for all grouped markets stewarded by the
+        authenticated active moderator. Used by the private profile review queue.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+            default: pending
+        - in: query
+          name: groupId
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Answer additions returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupAnswerAdditionListResponse'
+        '400':
+          description: Invalid status, group ID, or pagination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Authenticated user is not an active moderator.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected answer-addition queue failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/profile/market-group-answer-additions/{additionId}:
+    patch:
+      tags: [Markets]
+      operationId: reviewProfileMarketGroupAnswerAddition
+      summary: Steward approve or reject a grouped answer addition
+      description: >
+        Allows the current group steward to approve or reject a pending answer
+        option. Approval creates the normal binary child market, charges the
+        proposer, and appends the generated amendment to grouped contracts.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: additionId
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketGroupAnswerAdditionReviewRequest'
+      responses:
+        '200':
+          description: Answer addition reviewed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupAnswerAdditionResponse'
+        '400':
+          description: Invalid answer-addition ID, status, confirmation, or rejection reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Authenticated user is not the current group steward.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Answer addition or group was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Answer addition has already been reviewed or can no longer be added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '422':
+          description: Approved answer could not be charged to the proposer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected answer-addition review failure.
           content:
             application/json:
               schema:
@@ -5643,6 +5949,10 @@ components:
           items:
             type: string
             pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+        autoApproveAnswerAdditions:
+          type: boolean
+          default: false
+          description: When true, active moderator answer additions auto-approve for this grouped market.
 
     CreateMarketGroupRequest:
       type: object
@@ -5700,6 +6010,28 @@ components:
           minLength: 1
           maxLength: 160
           description: New answer label to add as a binary child market after approval.
+
+    MarketGroupAnswerAdditionReviewRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        confirm:
+          type: boolean
+          description: Must be true when approving because approval creates a child market and charges the proposer.
+        reason:
+          type: string
+          maxLength: 500
+          description: Required when rejecting an answer addition.
+
+    MarketGroupAnswerAdditionSettingsRequest:
+      type: object
+      properties:
+        autoApproveAnswerAdditions:
+          type: boolean
+          description: Per-group toggle for active moderator answer-option auto-approval.
 
     AdminMarketTagRequest:
       type: object
@@ -5919,6 +6251,9 @@ components:
         resolutionDateTime:
           type: string
           format: date-time
+        autoApproveAnswerAdditions:
+          type: boolean
+          description: Whether this group auto-approves later answer additions by active moderators.
         createdAt:
           type: string
           format: date-time
