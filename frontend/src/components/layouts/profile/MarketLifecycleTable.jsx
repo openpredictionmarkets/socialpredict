@@ -60,7 +60,7 @@ const groupLifecycleMarketRows = (markets = []) => {
         rowKey: `group:${group.id}`,
         isMarketGroup: true,
         questionTitle: group.questionTitle || market.questionTitle,
-        description: group.description || market.description || '',
+        description: group.description || '',
         creatorUsername: group.creatorUsername || market.creatorUsername,
         stewardUsername: group.stewardUsername || market.stewardUsername || market.creatorUsername,
         lifecycleStatus: group.lifecycleStatus || market.lifecycleStatus,

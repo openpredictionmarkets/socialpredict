@@ -41,6 +41,86 @@ const answerOptionTabByStatus = {
   rejected: 'Rejected Answer Options',
 };
 
+const lifecycleShortLabelByStatus = {
+  proposed: 'Proposed',
+  published: 'Published',
+  rejected: 'Rejected',
+};
+
+const reviewShortLabelByStatus = {
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
+const accountTabLabels = ['User Info', 'Portfolio', 'Financials'];
+
+const statusFromLegacyTab = (label, lookup) => {
+  const entry = Object.entries(lookup).find(([, tabLabel]) => tabLabel === label);
+  return entry?.[0] || '';
+};
+
+const ProfileAccountTabs = ({ username, userData, defaultTab }) => {
+  const tabsData = [
+    {
+      label: 'User Info',
+      content: <PrivateUserInfoLayout userData={userData} />,
+    },
+    {
+      label: 'Portfolio',
+      content: <PortfolioTabContent username={username} />,
+    },
+    {
+      label: 'Financials',
+      content: <UserFinancialStatementsLayout username={username} />,
+    },
+  ];
+
+  return <SiteTabs tabs={tabsData} defaultTab={defaultTab} />;
+};
+
+const ProfileMarketsTabs = ({ defaultStatus }) => {
+  const tabsData = Object.entries(lifecycleShortLabelByStatus).map(([status, label]) => ({
+    label,
+    content: <ProfileMarketLifecycleTab status={status} />,
+  }));
+
+  return <SiteTabs tabs={tabsData} defaultTab={lifecycleShortLabelByStatus[defaultStatus] || 'Proposed'} />;
+};
+
+const ProfileMarketChangesTabs = ({ defaultType, defaultAmendmentStatus, defaultAnswerOptionStatus }) => {
+  const amendmentTabs = Object.entries(reviewShortLabelByStatus).map(([status, label]) => ({
+    label,
+    content: <ProfileDescriptionAmendmentTab status={status} />,
+  }));
+  const answerOptionTabs = Object.entries(reviewShortLabelByStatus).map(([status, label]) => ({
+    label,
+    content: <ProfileAnswerOptionTab status={status} />,
+  }));
+  const tabsData = [
+    {
+      label: 'Amendments',
+      content: (
+        <SiteTabs
+          tabs={amendmentTabs}
+          defaultTab={reviewShortLabelByStatus[defaultAmendmentStatus] || 'Pending'}
+        />
+      ),
+    },
+    {
+      label: 'Answer Options',
+      content: (
+        <SiteTabs
+          tabs={answerOptionTabs}
+          defaultTab={reviewShortLabelByStatus[defaultAnswerOptionStatus] || 'Pending'}
+        />
+      ),
+    },
+  ];
+
+  return <SiteTabs tabs={tabsData} defaultTab={defaultType === 'answerOptions' ? 'Answer Options' : 'Amendments'} />;
+};
+
 const ProfileMarketLifecycleTab = ({ status }) => {
   const { token } = useAuth();
   const [markets, setMarkets] = useState([]);
@@ -244,59 +324,57 @@ const Profile = () => {
   const isActiveModerator =
     String(userData?.usertype || '').toUpperCase() === 'MODERATOR' &&
     String(userData?.moderatorStatus || '').toLowerCase() === 'active';
-  const resolvedDefaultTab = isActiveModerator ? defaultTab : 'User Info';
+  const defaultMarketStatus = statusFromLegacyTab(defaultTab, lifecycleTabByStatus) || 'proposed';
+  const defaultAmendmentStatus = statusFromLegacyTab(defaultTab, amendmentTabByStatus) || 'pending';
+  const defaultAnswerOptionStatus = statusFromLegacyTab(defaultTab, answerOptionTabByStatus) || 'pending';
+  const accountDefaultTab = accountTabLabels.includes(defaultTab) ? defaultTab : 'User Info';
+  const defaultChangeType = statusFromLegacyTab(defaultTab, answerOptionTabByStatus) ? 'answerOptions' : 'amendments';
+  const resolvedDefaultTab = (() => {
+    if (!isActiveModerator) {
+      return 'Account';
+    }
+    if (statusFromLegacyTab(defaultTab, lifecycleTabByStatus)) {
+      return 'Markets';
+    }
+    if (
+      statusFromLegacyTab(defaultTab, amendmentTabByStatus) ||
+      statusFromLegacyTab(defaultTab, answerOptionTabByStatus)
+    ) {
+      return 'Market Changes';
+    }
+    if (accountTabLabels.includes(defaultTab)) {
+      return 'Account';
+    }
+    return 'Markets';
+  })();
 
   const profileTabs = [
     {
-      label: 'User Info',
-      content: <PrivateUserInfoLayout userData={userData} />,
+      label: 'Account',
+      content: (
+        <ProfileAccountTabs
+          username={username}
+          userData={userData}
+          defaultTab={accountDefaultTab}
+        />
+      ),
     },
     ...(isActiveModerator ? [
       {
-        label: lifecycleTabByStatus.proposed,
-        content: <ProfileMarketLifecycleTab status='proposed' />,
+        label: 'Markets',
+        content: <ProfileMarketsTabs defaultStatus={defaultMarketStatus} />,
       },
       {
-        label: lifecycleTabByStatus.published,
-        content: <ProfileMarketLifecycleTab status='published' />,
-      },
-      {
-        label: lifecycleTabByStatus.rejected,
-        content: <ProfileMarketLifecycleTab status='rejected' />,
-      },
-      {
-        label: amendmentTabByStatus.pending,
-        content: <ProfileDescriptionAmendmentTab status='pending' />,
-      },
-      {
-        label: amendmentTabByStatus.approved,
-        content: <ProfileDescriptionAmendmentTab status='approved' />,
-      },
-      {
-        label: amendmentTabByStatus.rejected,
-        content: <ProfileDescriptionAmendmentTab status='rejected' />,
-      },
-      {
-        label: answerOptionTabByStatus.pending,
-        content: <ProfileAnswerOptionTab status='pending' />,
-      },
-      {
-        label: answerOptionTabByStatus.approved,
-        content: <ProfileAnswerOptionTab status='approved' />,
-      },
-      {
-        label: answerOptionTabByStatus.rejected,
-        content: <ProfileAnswerOptionTab status='rejected' />,
+        label: 'Market Changes',
+        content: (
+          <ProfileMarketChangesTabs
+            defaultType={defaultChangeType}
+            defaultAmendmentStatus={defaultAmendmentStatus}
+            defaultAnswerOptionStatus={defaultAnswerOptionStatus}
+          />
+        ),
       },
     ] : []),
-    {
-      label: 'Portfolio',
-      content: <PortfolioTabContent username={username} />,
-    },
-    {
-      label: 'Financials',
-      content: <UserFinancialStatementsLayout username={username} />,
-    },
   ];
 
   return (
@@ -305,7 +383,7 @@ const Profile = () => {
         <div className='mb-6'>
           <p className='text-xs uppercase tracking-[0.22em] text-primary-pink'>Private Profile</p>
           <h1 className='mt-2 text-3xl font-bold'>Profile Details</h1>
-          <p className='mt-2 text-gray-400'>Manage your account, proposals, published markets, rejected markets, portfolio, and financial history.</p>
+          <p className='mt-2 text-gray-400'>Manage your account, markets, change queues, portfolio, and financial history.</p>
         </div>
 
         {isActiveModerator && proposedMarket && (
