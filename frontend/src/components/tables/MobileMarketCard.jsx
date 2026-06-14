@@ -7,6 +7,7 @@ import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketTagChips from '../markets/MarketTagChips';
 import {
   groupedMarketBadgeLabel,
+  groupedMarketResolutionSummary,
   isGroupedMarketAggregate,
   marketDisplayRoute,
   marketProbabilityDisplay,
@@ -19,6 +20,17 @@ const MobileMarketCard = ({ marketData }) => {
     !marketData.market.isResolved &&
     formatResolutionDate(marketData.market.resolutionDateTime) !== 'Closed';
   const stewardUsername = stewardUsernameFor(marketData.market, marketData.creator.username);
+  const groupedResolution = isGroup ? groupedMarketResolutionSummary(marketData) : null;
+  const resolutionClassName = groupedResolution
+    ? groupedResolution.className
+    : marketData.market.isResolved
+      ? getResultCssClass(marketData.market.resolutionResult)
+      : 'text-gray-400';
+  const resolutionLabel = groupedResolution
+    ? groupedResolution.label
+    : marketData.market.isResolved
+      ? getResolvedText(marketData.market.resolutionResult, marketData.market)
+      : 'Pending';
 
   return (
     <div className='bg-gray-800 p-4 mb-4 rounded-lg'>
@@ -80,15 +92,9 @@ const MobileMarketCard = ({ marketData }) => {
           {marketProbabilityDisplay(marketData)}
         </span>
         <span
-          className={`text-right ${
-            marketData.market.isResolved
-              ? getResultCssClass(marketData.market.resolutionResult)
-              : 'text-gray-400'
-          }`}
+          className={`text-right ${resolutionClassName}`}
         >
-          {marketData.market.isResolved
-            ? getResolvedText(marketData.market.resolutionResult, marketData.market)
-            : 'Pending'}
+          {resolutionLabel}
         </span>
       </div>
     </div>

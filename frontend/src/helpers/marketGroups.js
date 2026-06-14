@@ -15,6 +15,48 @@ const uniqueTagsBySlug = (tags = []) => {
   });
 };
 
+const normalizeResolution = (value) => String(value || '').trim().toUpperCase();
+
+const childResolutionFromMarket = (market = {}) => ({
+  marketId: market.id || market.marketId,
+  answerLabel: market.marketGroup?.answerLabel || market.questionTitle || `Market #${market.id || market.marketId}`,
+  isResolved: Boolean(market.isResolved),
+  resolutionResult: normalizeResolution(market.resolutionResult),
+});
+
+export const summarizeGroupedResolutions = (items = []) => {
+  const children = items.filter(Boolean);
+  const isResolved = children.length > 0 && children.every((item) => Boolean(item.isResolved));
+  if (!isResolved) {
+    return null;
+  }
+
+  const yesAnswers = children
+    .filter((item) => normalizeResolution(item.resolutionResult) === 'YES')
+    .map((item) => item.answerLabel)
+    .filter(Boolean);
+
+  if (!yesAnswers.length) {
+    return {
+      isResolved: true,
+      yesAnswers,
+      label: 'Resolved: no YES answers',
+      className: 'text-gray-300',
+    };
+  }
+
+  return {
+    isResolved: true,
+    yesAnswers,
+    label: `YES: ${yesAnswers.join(', ')}`,
+    className: 'text-green-400',
+  };
+};
+
+export const groupedMarketResolutionSummary = (marketData) => (
+  summarizeGroupedResolutions(marketData?.market?.groupChildResolutions || [])
+);
+
 export const isGroupedMarketAggregate = (marketData) => (
   Boolean(marketData?.market?.isMarketGroupAggregate && marketData?.market?.marketGroup?.id)
 );
@@ -49,6 +91,7 @@ export const groupMarketRows = (marketRows = []) => {
     const rowNumUsers = toNumber(row?.numUsers ?? market.numUsers);
     const rowTotalVolume = toNumber(row?.totalVolume ?? market.totalVolume);
     const rowMarketDust = toNumber(row?.marketDust ?? market.marketDust);
+    const childResolution = childResolutionFromMarket(market);
     const group = market.marketGroup;
     if (!group?.id) {
       groupedRows.push({
@@ -71,6 +114,7 @@ export const groupMarketRows = (marketRows = []) => {
           marketGroup: group,
           isMarketGroupAggregate: true,
           groupChildMarketIds: [market.id || market.marketId].filter(Boolean),
+          groupChildResolutions: [childResolution],
         },
         numUsers: rowNumUsers,
         totalVolume: rowTotalVolume,
@@ -85,10 +129,21 @@ export const groupMarketRows = (marketRows = []) => {
       ...(existing.market.groupChildMarketIds || []),
       market.id || market.marketId,
     ].filter(Boolean);
+    existing.market.groupChildResolutions = [
+      ...(existing.market.groupChildResolutions || []),
+      childResolution,
+    ];
     existing.market.tags = uniqueTagsBySlug([...(existing.market.tags || []), ...(market.tags || [])]);
+    existing.market.isResolved = Boolean(summarizeGroupedResolutions(existing.market.groupChildResolutions));
     existing.numUsers = Math.max(toNumber(existing.numUsers), rowNumUsers);
     existing.totalVolume = toNumber(existing.totalVolume) + rowTotalVolume;
     existing.marketDust = toNumber(existing.marketDust) + rowMarketDust;
+  });
+
+  groupedRows.forEach((row) => {
+    if (row?.market?.isMarketGroupAggregate) {
+      row.market.isResolved = Boolean(summarizeGroupedResolutions(row.market.groupChildResolutions || []));
+    }
   });
 
   return groupedRows;

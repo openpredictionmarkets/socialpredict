@@ -11,6 +11,7 @@ import formatResolutionDate from '../../helpers/formatResolutionDate';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketGroupAnswerAdditionReviewQueue from '../marketGroups/MarketGroupAnswerAdditionReviewQueue';
 import { resolveMarketGroup } from '../modals/resolution/ResolveUtils';
+import { summarizeGroupedResolutions } from '../../helpers/marketGroups';
 import {
   getMarketGroupDetails,
   proposeMarketGroupAnswerAddition,
@@ -766,6 +767,12 @@ export default function GroupedMarketDetailsLayout({
     [group, sortedAnswers, closeDate],
   );
   const descriptionAmendments = useMemo(() => uniqueGroupedAmendments(sortedAnswers), [sortedAnswers]);
+  const groupedResolutionSummary = useMemo(() => summarizeGroupedResolutions(sortedAnswers.map((answer) => ({
+    marketId: answer.marketId,
+    answerLabel: answerLabelFor(answer),
+    isResolved: Boolean(answer?.market?.market?.isResolved),
+    resolutionResult: answer?.market?.market?.resolutionResult,
+  }))), [sortedAnswers]);
   const anyTradableAnswer = sortedAnswers.some((answer) => canTradeMarket(answer?.market?.market || {}, isLoggedIn));
   const groupStewardUsername = stewardUsernameFor({
     stewardUsername: group.stewardUsername || fallbackMarket?.stewardUsername,
@@ -1005,6 +1012,18 @@ export default function GroupedMarketDetailsLayout({
         <GroupedMarketChart answers={answers} title='Probability Changes' />
       </div>
 
+      {groupedResolutionSummary && (
+        <section className='mb-4 rounded-lg border border-emerald-800/70 bg-emerald-950/25 p-4'>
+          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200'>Resolution</p>
+          <p className={`mt-2 text-lg font-semibold ${groupedResolutionSummary.className}`}>
+            {groupedResolutionSummary.label}
+          </p>
+          <p className='mt-1 text-sm text-emerald-100/70'>
+            This grouped market has resolved. Child answer markets retain their own YES/NO outcomes.
+          </p>
+        </section>
+      )}
+
       {(group.description || descriptionAmendments.length > 0) && (
         <>
           <div className='mb-4'>
@@ -1226,12 +1245,25 @@ export default function GroupedMarketDetailsLayout({
       )}
 
       <div className='mb-4 grid gap-2 sm:grid-cols-3'>
-        {sortedAnswers.map((answer) => (
-          <div key={answer.id || answer.marketId} className='rounded-lg bg-gray-800 p-3 text-center'>
-            <div className='truncate text-sm font-semibold text-white'>{answer.answerLabel}</div>
-            <div className='mt-1 text-xs text-gray-400'>YES {probabilityDisplay(answer)}</div>
-          </div>
-        ))}
+        {sortedAnswers.map((answer) => {
+          const childMarket = answer?.market?.market || {};
+          const childResolved = Boolean(childMarket.isResolved);
+          const childResolution = String(childMarket.resolutionResult || '').toUpperCase();
+          const resolutionTone = childResolution === 'YES'
+            ? 'border-emerald-600/70 bg-emerald-950/30 text-emerald-100'
+            : 'border-rose-700/70 bg-rose-950/25 text-rose-100';
+          return (
+            <div key={answer.id || answer.marketId} className='rounded-lg bg-gray-800 p-3 text-center'>
+              <div className='truncate text-sm font-semibold text-white'>{answer.answerLabel}</div>
+              <div className='mt-1 text-xs text-gray-400'>YES {probabilityDisplay(answer)}</div>
+              {childResolved && (
+                <div className={`mt-2 rounded-full border px-2 py-1 text-xs font-semibold ${resolutionTone}`}>
+                  Resolved {childResolution || 'N/A'}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className='flex items-center justify-center mb-4 space-x-4 py-4'>

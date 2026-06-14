@@ -10,6 +10,7 @@ import MarketTagChips from '../markets/MarketTagChips';
 import {
   groupMarketRows,
   groupedMarketBadgeLabel,
+  groupedMarketResolutionSummary,
   isGroupedMarketAggregate,
   marketDisplayRoute,
   marketProbabilityDisplay,
@@ -39,6 +40,23 @@ const TableHeader = () => (
     </tr>
   </thead>
 );
+
+const MarketResolutionCell = ({ marketData }) => {
+  const groupedSummary = isGroupedMarketAggregate(marketData)
+    ? groupedMarketResolutionSummary(marketData)
+    : null;
+  if (groupedSummary) {
+    return <span className={groupedSummary.className}>{groupedSummary.label}</span>;
+  }
+
+  return marketData.market.isResolved ? (
+    <span className={getResultCssClass(marketData.market.resolutionResult)}>
+      {getResolvedText(marketData.market.resolutionResult, marketData.market)}
+    </span>
+  ) : (
+    'Pending'
+  );
+};
 
 const MarketRow = ({ marketData }) => (
   <tr className='hover:bg-gray-700 transition-colors duration-200'>
@@ -98,13 +116,7 @@ const MarketRow = ({ marketData }) => (
     </td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>0</td>
     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
-      {marketData.market.isResolved ? (
-        <span className={getResultCssClass(marketData.market.resolutionResult)}>
-          {getResolvedText(marketData.market.resolutionResult, marketData.market)}
-        </span>
-      ) : (
-        'Pending'
-      )}
+      <MarketResolutionCell marketData={marketData} />
     </td>
   </tr>
 );

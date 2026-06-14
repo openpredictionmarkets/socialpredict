@@ -11,6 +11,7 @@ import MarketTagChips from '../markets/MarketTagChips';
 import {
   groupMarketRows,
   groupedMarketBadgeLabel,
+  groupedMarketResolutionSummary,
   isGroupedMarketAggregate,
   marketDisplayRoute,
   marketProbabilityDisplay,
@@ -104,6 +105,9 @@ const MarketRow = ({ marketData }) => {
     ? market.isResolved
     : (typeof market?.status === 'string' && market.status.toLowerCase() === 'resolved');
   const resolutionResult = market?.resolutionResult ?? market?.status ?? '';
+  const groupedResolution = isGroupedMarketAggregate(marketData)
+    ? groupedMarketResolutionSummary(marketData)
+    : null;
 
   return (
     <tr className='hover:bg-gray-700 transition-colors duration-200'>
@@ -162,7 +166,11 @@ const MarketRow = ({ marketData }) => {
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>0</td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
-        {isResolved ? (
+        {groupedResolution ? (
+          <span className={groupedResolution.className}>
+            {groupedResolution.label}
+          </span>
+        ) : isResolved ? (
           <span className={getResultCssClass(resolutionResult)}>
             {getResolvedText(resolutionResult, market)}
           </span>
