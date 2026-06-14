@@ -451,6 +451,8 @@ func writeMarketReviewError(w http.ResponseWriter, err error) {
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
 	case errors.Is(err, dmarkets.ErrUnauthorized):
 		_ = handlers.WriteFailure(w, http.StatusForbidden, handlers.ReasonAuthorizationDenied)
+	case errors.Is(err, dmarkets.ErrInsufficientBalance):
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
 	case errors.Is(err, dmarkets.ErrInvalidState):
 		_ = handlers.WriteFailure(w, http.StatusConflict, handlers.ReasonInvalidState)
 	case errors.Is(err, dmarkets.ErrInvalidInput):

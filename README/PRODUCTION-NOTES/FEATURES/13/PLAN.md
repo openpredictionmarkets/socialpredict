@@ -3,9 +3,9 @@ title: Multiple Choice Binary Markets Plan
 document_type: feature-plan
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-14T00:00:00Z
+updated_at: 2026-06-14T14:46:17Z
 updated_at_display: "Sunday, June 14, 2026"
-update_reason: "Track setup-configured grouped-market economics and group-level work-profit implementation."
+update_reason: "Track grouped-market answer-addition proposal, approval, audit, and shared-amendment implementation."
 status: draft
 ---
 
@@ -154,12 +154,21 @@ Checklist:
 Checklist:
 
 - [ ] Add explicit answer addition policy enum: `NO_ONE`, `CREATOR_ONLY`, `ANY_ACTIVE_MODERATOR`.
-- [ ] Keep answer additions disabled by default.
-- [ ] Add admin control for enabling answer additions.
-- [ ] Add moderator proposal flow for new answers when policy allows.
-- [ ] Create added answers as new normal child binary markets.
-- [ ] Add audit trail for who proposed/approved added answers.
-- [ ] Ensure answer additions never rewrite existing child market bet or payout history.
+- [x] Add global admin control for auto-approving added answers.
+- [x] Add moderator proposal flow for new answers on published/open grouped markets.
+- [x] Create approved added answers as new normal child binary markets.
+- [x] Charge the proposer the setup-configured add-answer cost only when the answer is approved/created.
+- [x] Leave rejected answer additions uncharged.
+- [x] Add audit trail for who proposed/approved/rejected added answers.
+- [x] Generate an approved amendment on every grouped child contract when an answer is added.
+- [x] Render generated shared answer-addition amendments once at the group level.
+- [x] Ensure answer additions never rewrite existing child market bet or payout history.
+
+Implementation note:
+
+- The baseline implements an `ANY_ACTIVE_MODERATOR` proposal model gated by active moderator status. A richer per-group policy enum remains a future extension if we need creator-only or disabled-per-group behavior.
+- Approval ignores the addition's own pending row during duplicate-label validation but still blocks duplicate existing labels and other pending duplicate labels.
+- Proposal-time `additionCost` is the amount charged at approval, so a later setup.yaml change does not silently alter already pending proposals.
 
 ## 09. Testing And Verification
 
@@ -172,6 +181,8 @@ Checklist:
 - [x] Add OpenAPI schema entries and contract tests.
 - [ ] Add frontend smoke path for creating, reviewing, viewing, and trading a group child market.
 - [x] Add migration tests.
+- [x] Run kin-backed OpenAPI validation and route/spec parity tests.
+- [x] Run Schemathesis against added-answer moderator/admin route slice.
 - [x] Run relevant Go package tests.
 - [x] Run frontend build.
 
@@ -182,7 +193,8 @@ Checklist:
 - [ ] Decide whether a true `SUM_TO_ONE_EXCLUSIVE` coupled market type is needed.
 - [ ] Decide whether answer additions after approval are ever allowed.
 - [x] Decide whether group proposal cost should scale with initial answer count: no, initial answers are included in the one group proposal cost.
-- [ ] Implement later answer additions, if enabled, using `multipleChoiceBinary.addAnswerCost`.
+- [x] Implement later answer additions using `multipleChoiceBinary.addAnswerCost`.
+- [ ] Decide whether answer-addition costs should alter group work-profit cost basis in reporting.
 - [ ] Decide whether child markets should support answer-specific amendments.
 - [x] Decide whether group-level work economics should aggregate child market participation fees: yes, unique participants count once across the group.
 - [ ] Decide whether group pages need a normalized illustrative display separate from tradable child probabilities.

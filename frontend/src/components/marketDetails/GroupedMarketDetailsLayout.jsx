@@ -10,9 +10,10 @@ import MarkdownLite from '../markdown/MarkdownLite';
 import formatResolutionDate from '../../helpers/formatResolutionDate';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import { resolveMarketGroup } from '../modals/resolution/ResolveUtils';
-import { getMarketGroupDetails } from '../../api/marketsApi';
+import { getMarketGroupDetails, proposeMarketGroupAnswerAddition } from '../../api/marketsApi';
 import { proposeMarketDescriptionAmendment } from '../../api/marketDescriptionAmendmentsApi';
 import { apiRequest } from '../../api/httpClient';
+import useFrontendConfig from '../../hooks/useFrontendConfig';
 
 const DEFAULT_CREATOR_EMOJI = '👤';
 
@@ -612,6 +613,7 @@ export default function GroupedMarketDetailsLayout({
   username,
   refetchData,
 }) {
+  const { frontendConfig } = useFrontendConfig();
   const [groupData, setGroupData] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -624,6 +626,10 @@ export default function GroupedMarketDetailsLayout({
   const [amendmentMessage, setAmendmentMessage] = useState('');
   const [amendmentError, setAmendmentError] = useState('');
   const [submittingAmendment, setSubmittingAmendment] = useState(false);
+  const [answerAdditionLabel, setAnswerAdditionLabel] = useState('');
+  const [answerAdditionMessage, setAnswerAdditionMessage] = useState('');
+  const [answerAdditionError, setAnswerAdditionError] = useState('');
+  const [submittingAnswerAddition, setSubmittingAnswerAddition] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolveMode, setResolveMode] = useState('exclusive_yes');
   const [winningMarketId, setWinningMarketId] = useState(0);
@@ -718,6 +724,14 @@ export default function GroupedMarketDetailsLayout({
     closeDate &&
     new Date(closeDate) > new Date() &&
     !['rejected', 'resolved', 'cancelled'].includes(String(group.lifecycleStatus || '').toLowerCase());
+  const canProposeAnswerAddition =
+    isLoggedIn &&
+    token &&
+    sortedAnswers.length > 0 &&
+    closeDate &&
+    new Date(closeDate) > new Date() &&
+    String(group.lifecycleStatus || '').toLowerCase() === 'published' &&
+    sortedAnswers.every((answer) => !answer?.market?.market?.isResolved);
   const canResolveGroup =
     isLoggedIn &&
     token &&
@@ -737,6 +751,10 @@ export default function GroupedMarketDetailsLayout({
     ));
     return hasProposed ? 'AWAITING APPROVAL' : 'TRADING CLOSED';
   })();
+  const addAnswerCost = toNumber(
+    frontendConfig?.marketGroups?.multipleChoiceBinary?.addAnswerCost,
+    0,
+  );
 
   const handleTransactionSuccess = () => {
     setShowTradeModal(false);
@@ -801,6 +819,41 @@ export default function GroupedMarketDetailsLayout({
       setAmendmentError(err.message || 'Unable to submit grouped description amendment.');
     } finally {
       setSubmittingAmendment(false);
+    }
+  };
+
+  const submitAnswerAddition = async (event) => {
+    event.preventDefault();
+    const label = answerAdditionLabel.trim();
+    if (!label) {
+      return;
+    }
+    setAnswerAdditionMessage('');
+    setAnswerAdditionError('');
+    setSubmittingAnswerAddition(true);
+    try {
+      const addition = await proposeMarketGroupAnswerAddition({
+        groupId: group.id || marketGroup.id,
+        token,
+        answerLabel: label,
+      });
+      setAnswerAdditionLabel('');
+      const status = String(addition?.status || '').toLowerCase();
+      setAnswerAdditionMessage(
+        status === 'approved'
+          ? `Answer option "${addition?.answerLabel || label}" added and published.`
+          : `Answer option "${addition?.answerLabel || label}" submitted for admin review.`,
+      );
+      if (status === 'approved') {
+        setRefreshKey((current) => current + 1);
+        if (refetchData) {
+          refetchData();
+        }
+      }
+    } catch (err) {
+      setAnswerAdditionError(err.message || 'Unable to propose answer option.');
+    } finally {
+      setSubmittingAnswerAddition(false);
     }
   };
 
@@ -964,6 +1017,41 @@ export default function GroupedMarketDetailsLayout({
           >
             {submittingAmendment ? 'Submitting...' : 'Submit Amendment for Review'}
           </button>
+        </form>
+      )}
+
+      {canProposeAnswerAddition && (
+        <form onSubmit={submitAnswerAddition} className='mb-4 grid gap-3 rounded-lg border border-emerald-800/60 bg-emerald-950/20 p-4'>
+          <div>
+            <p className='text-sm font-semibold text-emerald-100'>Propose Answer Option</p>
+            <p className='mt-1 text-xs text-emerald-100/70'>
+              Adds a new YES/NO answer market to this group after admin approval. If approved, the proposer is charged {addAnswerCost} credits.
+            </p>
+          </div>
+          {answerAdditionMessage && (
+            <div className='rounded-md bg-emerald-700 p-3 text-sm text-white'>{answerAdditionMessage}</div>
+          )}
+          {answerAdditionError && (
+            <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{answerAdditionError}</div>
+          )}
+          <div className='flex flex-col gap-2 sm:flex-row'>
+            <input
+              type='text'
+              value={answerAdditionLabel}
+              onChange={(event) => setAnswerAdditionLabel(event.target.value)}
+              maxLength={160}
+              placeholder='New answer label'
+              className='min-w-0 flex-1 rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40'
+              required
+            />
+            <button
+              type='submit'
+              disabled={submittingAnswerAddition || !answerAdditionLabel.trim()}
+              className='rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50'
+            >
+              {submittingAnswerAddition ? 'Submitting...' : 'Submit Answer'}
+            </button>
+          </div>
         </form>
       )}
 

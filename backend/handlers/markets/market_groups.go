@@ -28,6 +28,10 @@ type marketGroupActivityService interface {
 	GetMarketGroupLeaderboardPage(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupLeaderboardPage, error)
 }
 
+type marketGroupAnswerAdditionService interface {
+	ProposeMarketGroupAnswerAddition(ctx context.Context, groupID int64, actorUsername string, req dmarkets.MarketGroupAnswerAdditionRequest) (*dmarkets.MarketGroupAnswerAddition, error)
+}
+
 // CreateMarketGroup handles POST /v0/market-groups.
 func (h *Handler) CreateMarketGroup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -173,6 +177,60 @@ func (h *Handler) ResolveMarketGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = writeJSON(w, http.StatusOK, marketGroupToResponse(group))
+}
+
+// ProposeMarketGroupAnswerAddition handles POST /v0/market-groups/{id}/answers.
+func (h *Handler) ProposeMarketGroupAnswerAddition(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if h.auth == nil {
+		writeInternalError(w)
+		return
+	}
+	svc, ok := h.service.(marketGroupAnswerAdditionService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+	groupID, err := parseMarketGroupIDFromRequest(r)
+	if err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	user, authErr := h.auth.CurrentUser(r)
+	if authErr != nil {
+		writeAuthError(w, authErr)
+		return
+	}
+	var req dto.MarketGroupAnswerAdditionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeInvalidRequest(w)
+		return
+	}
+	sanitizedLabel := strings.TrimSpace(req.AnswerLabel)
+	if h.securityService != nil && h.securityService.Sanitizer != nil {
+		sanitized, err := h.securityService.Sanitizer.SanitizeMarketTitle(sanitizedLabel)
+		if err != nil {
+			writeInvalidRequest(w)
+			return
+		}
+		sanitizedLabel = sanitized
+	}
+	addition, err := svc.ProposeMarketGroupAnswerAddition(r.Context(), groupID, user.Username, dmarkets.MarketGroupAnswerAdditionRequest{
+		AnswerLabel: sanitizedLabel,
+	})
+	if err != nil {
+		writeMarketGroupDetailsError(w, err)
+		return
+	}
+	if h.invalidator != nil && addition != nil && addition.MarketID > 0 {
+		if err := h.invalidator.InvalidateAfterMarketTransaction(r.Context(), user.Username, addition.MarketID, "market_group_answer_added"); err != nil {
+			logger.LogError("ProposeMarketGroupAnswerAddition", "InvalidateReadModels", err)
+		}
+	}
+	_ = writeJSON(w, http.StatusCreated, marketGroupAnswerAdditionToResponse(addition))
 }
 
 // MarketGroupBets handles GET /v0/market-groups/{id}/bets.
@@ -507,10 +565,40 @@ func marketGroupToResponse(group *dmarkets.MarketGroup) *dto.MarketGroupResponse
 	}
 }
 
+func marketGroupAnswerAdditionToResponse(addition *dmarkets.MarketGroupAnswerAddition) dto.MarketGroupAnswerAdditionResponse {
+	if addition == nil {
+		return dto.MarketGroupAnswerAdditionResponse{}
+	}
+	return dto.MarketGroupAnswerAdditionResponse{
+		ID:              addition.ID,
+		GroupID:         addition.GroupID,
+		MarketID:        addition.MarketID,
+		GroupTitle:      addition.GroupTitle,
+		AnswerLabel:     addition.AnswerLabel,
+		Status:          addition.Status,
+		ProposedBy:      addition.ProposedBy,
+		ReviewedBy:      addition.ReviewedBy,
+		ReviewedAt:      addition.ReviewedAt,
+		RejectionReason: addition.RejectionReason,
+		AdditionCost:    addition.AdditionCost,
+		CreatedAt:       addition.CreatedAt,
+		UpdatedAt:       addition.UpdatedAt,
+		MarketGroup:     marketGroupToResponse(addition.MarketGroup),
+	}
+}
+
 func writeMarketGroupDetailsError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, dmarkets.ErrMarketGroupNotFound):
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
+	case errors.Is(err, dmarkets.ErrUserNotFound):
+		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonUserNotFound)
+	case errors.Is(err, dmarkets.ErrUnauthorized):
+		_ = handlers.WriteFailure(w, http.StatusForbidden, handlers.ReasonAuthorizationDenied)
+	case errors.Is(err, dmarkets.ErrInsufficientBalance):
+		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientBalance)
+	case errors.Is(err, dmarkets.ErrInvalidState):
+		_ = handlers.WriteFailure(w, http.StatusConflict, handlers.ReasonInvalidState)
 	case errors.Is(err, dmarkets.ErrInvalidInput):
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	default:

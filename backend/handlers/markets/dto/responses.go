@@ -90,6 +90,28 @@ type MarketGroupDetailsResponse struct {
 	Answers []MarketGroupAnswerResponse `json:"answers"`
 }
 
+type MarketGroupAnswerAdditionResponse struct {
+	ID              int64                `json:"id"`
+	GroupID         int64                `json:"groupId"`
+	MarketID        int64                `json:"marketId,omitempty"`
+	GroupTitle      string               `json:"groupTitle,omitempty"`
+	AnswerLabel     string               `json:"answerLabel"`
+	Status          string               `json:"status"`
+	ProposedBy      string               `json:"proposedBy"`
+	ReviewedBy      string               `json:"reviewedBy,omitempty"`
+	ReviewedAt      *time.Time           `json:"reviewedAt,omitempty"`
+	RejectionReason string               `json:"rejectionReason,omitempty"`
+	AdditionCost    int64                `json:"additionCost"`
+	CreatedAt       time.Time            `json:"createdAt"`
+	UpdatedAt       time.Time            `json:"updatedAt"`
+	MarketGroup     *MarketGroupResponse `json:"marketGroup,omitempty"`
+}
+
+type MarketGroupAnswerAdditionsResponse struct {
+	Additions []MarketGroupAnswerAdditionResponse `json:"additions"`
+	Total     int                                 `json:"total"`
+}
+
 type MarketGroupBetResponse struct {
 	AnswerMarketID int64     `json:"answerMarketId"`
 	AnswerLabel    string    `json:"answerLabel"`

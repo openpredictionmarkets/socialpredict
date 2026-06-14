@@ -98,6 +98,34 @@ export const getMarketGroupDetails = async (groupId) => {
     });
 };
 
+export const proposeMarketGroupAnswerAddition = async ({ groupId, token, answerLabel }) => {
+    const normalizedAnswerLabel = String(answerLabel || '').trim();
+    if (!groupId) {
+        throw new Error('Market group ID is required.');
+    }
+    if (!normalizedAnswerLabel) {
+        throw new Error('Answer label is required.');
+    }
+
+    return authenticatedApiRequest(`/v0/market-groups/${groupId}/answers`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        authToken: token,
+        body: JSON.stringify({ answerLabel: normalizedAnswerLabel }),
+        reasonMessages: {
+            AUTHORIZATION_DENIED: 'Only active moderators can propose grouped-market answers.',
+            INSUFFICIENT_BALANCE: 'You do not have enough credit to add this answer.',
+            INVALID_STATE: 'This grouped market is not accepting new answers.',
+            VALIDATION_FAILED: 'Check the answer label and try again.',
+            MARKET_NOT_FOUND: 'No market group was found for that ID.',
+            RATE_LIMITED: 'Too many answer requests. Wait and try again.',
+        },
+        fallbackMessage: 'Answer addition request failed. Please try again.',
+    });
+};
+
 export const getMarketSummaryReadModel = async (marketId) => {
     if (!marketId) {
         throw new Error('Market ID is required');

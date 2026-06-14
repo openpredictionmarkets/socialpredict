@@ -1,6 +1,6 @@
 import React from 'react';
 
-const inlineTokenPattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g;
+const inlineTokenPattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|\/)[^\s)]+\))/g;
 
 const renderInlineToken = (token, key) => {
   if (token.startsWith('**') && token.endsWith('**')) {
@@ -12,10 +12,18 @@ const renderInlineToken = (token, key) => {
   if (token.startsWith('`') && token.endsWith('`')) {
     return <code key={key} className="rounded bg-gray-900 px-1 py-0.5 text-xs text-sky-100">{token.slice(1, -1)}</code>;
   }
-  const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+  const linkMatch = token.match(/^\[([^\]]+)\]\(((?:https?:\/\/|\/)[^\s)]+)\)$/);
   if (linkMatch) {
+    const href = linkMatch[2];
+    const isExternal = /^https?:\/\//.test(href);
     return (
-      <a key={key} href={linkMatch[2]} target="_blank" rel="noreferrer" className="text-sky-300 underline decoration-sky-400/50 hover:text-sky-200">
+      <a
+        key={key}
+        href={href}
+        target={isExternal ? '_blank' : undefined}
+        rel={isExternal ? 'noreferrer' : undefined}
+        className="text-sky-300 underline decoration-sky-400/50 hover:text-sky-200"
+      >
         {linkMatch[1]}
       </a>
     );

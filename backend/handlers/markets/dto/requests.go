@@ -68,3 +68,7 @@ type MarketDescriptionAmendmentRequest struct {
 	BodyFormat   string `json:"bodyFormat,omitempty"`
 	SubmitReason string `json:"submitReason,omitempty" validate:"max=500"`
 }
+
+type MarketGroupAnswerAdditionRequest struct {
+	AnswerLabel string `json:"answerLabel" validate:"required,max=160"`
+}

@@ -61,6 +61,20 @@ type MarketGroupMember struct {
 	DisplayOrder int    `json:"displayOrder" gorm:"not null;default:0;uniqueIndex:uniq_market_group_member_order;index:idx_market_group_members_group_order,priority:2"`
 }
 
+type MarketGroupAnswerAddition struct {
+	gorm.Model
+	ID              int64      `json:"id" gorm:"primary_key"`
+	GroupID         int64      `json:"groupId" gorm:"not null;index:idx_market_group_answer_additions_group_status;index"`
+	MarketID        int64      `json:"marketId,omitempty" gorm:"index"`
+	AnswerLabel     string     `json:"answerLabel" gorm:"not null;size:160"`
+	Status          string     `json:"status" gorm:"not null;default:pending;index:idx_market_group_answer_additions_group_status;index:idx_market_group_answer_additions_status_created"`
+	ProposedBy      string     `json:"proposedBy" gorm:"not null;index;size:64"`
+	ReviewedBy      string     `json:"reviewedBy,omitempty" gorm:"index;size:64"`
+	ReviewedAt      *time.Time `json:"reviewedAt,omitempty"`
+	RejectionReason string     `json:"rejectionReason,omitempty" gorm:"type:text"`
+	AdditionCost    int64      `json:"additionCost" gorm:"not null;default:0"`
+}
+
 type MarketTag struct {
 	gorm.Model
 	ID          int64  `json:"id" gorm:"primary_key"`
@@ -114,6 +128,7 @@ type MarketGovernanceSettings struct {
 	ID                               uint   `json:"id" gorm:"primaryKey"`
 	AutoApproveDescriptionAmendments bool   `json:"autoApproveDescriptionAmendments" gorm:"not null;default:false"`
 	AutoApproveMarketProposals       bool   `json:"autoApproveMarketProposals" gorm:"not null;default:false"`
+	AutoApproveMarketGroupAnswers    bool   `json:"autoApproveMarketGroupAnswers" gorm:"not null;default:false"`
 	Version                          uint   `json:"version" gorm:"not null;default:1"`
 	UpdatedBy                        string `json:"updatedBy,omitempty" gorm:"size:64"`
 }

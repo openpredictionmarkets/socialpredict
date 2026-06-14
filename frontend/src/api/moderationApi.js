@@ -145,5 +145,46 @@ export const updateMarketTags = ({ marketId, token, tagSlugs }) => {
     token,
     action: 'tags',
     body: { tagSlugs },
+    });
+};
+
+export const listAdminMarketGroupAnswerAdditions = ({ token, status = 'pending', groupId = '', limit = 100, offset = 0 }) => {
+  const params = new URLSearchParams({
+    status,
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (groupId) {
+    params.set('groupId', String(groupId));
+  }
+  return authenticatedApiRequest(`/v0/admin/market-group-answer-additions?${params.toString()}`, {
+    authToken: token,
+    reasonMessages: marketReviewReasonMessages,
+    fallbackMessage: 'Unable to load grouped answer additions.',
+  });
+};
+
+export const reviewMarketGroupAnswerAddition = ({ additionId, token, status, reason = '', confirm = false }) => {
+  const normalizedAdditionId = String(additionId || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedAdditionId || !normalizedStatus) {
+    throw new Error('Answer addition ID and review status are required.');
+  }
+  return authenticatedApiRequest(`/v0/admin/market-group-answer-additions/${normalizedAdditionId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    authToken: token,
+    body: JSON.stringify({
+      status: normalizedStatus,
+      reason: String(reason || '').trim(),
+      confirm: Boolean(confirm),
+    }),
+    reasonMessages: {
+      ...marketReviewReasonMessages,
+      INSUFFICIENT_BALANCE: 'The proposing moderator no longer has enough credit to add this answer.',
+    },
+    fallbackMessage: 'Unable to review grouped answer addition.',
   });
 };

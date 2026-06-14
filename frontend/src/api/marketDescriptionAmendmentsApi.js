@@ -78,6 +78,7 @@ export const updateMarketGovernanceSettings = ({
   token,
   autoApproveDescriptionAmendments,
   autoApproveMarketProposals,
+  autoApproveMarketGroupAnswers,
   version = 0,
 }) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
   method: 'PUT',
@@ -88,6 +89,7 @@ export const updateMarketGovernanceSettings = ({
   body: JSON.stringify({
     autoApproveDescriptionAmendments: Boolean(autoApproveDescriptionAmendments),
     autoApproveMarketProposals: Boolean(autoApproveMarketProposals),
+    autoApproveMarketGroupAnswers: Boolean(autoApproveMarketGroupAnswers),
     version,
   }),
   reasonMessages: adminAmendmentReasonMessages,

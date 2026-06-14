@@ -155,6 +155,7 @@ x-route-family-migration-matrix:
         - /v0/market-groups/{id}/bets
         - /v0/market-groups/{id}/positions
         - /v0/market-groups/{id}/leaderboard
+        - /v0/market-groups/{id}/answers
         - /v0/markets/{id}/description-amendments
         - /v0/markets/{id}/resolve
         - /v0/markets/{id}/leaderboard
@@ -237,6 +238,8 @@ x-route-family-migration-matrix:
         - /v0/admin/market-description-amendments
         - /v0/admin/market-description-amendments/settings
         - /v0/admin/market-description-amendments/{id}
+        - /v0/admin/market-group-answer-additions
+        - /v0/admin/market-group-answer-additions/{id}
         - /v0/admin/market-tags
         - /v0/admin/market-tags/{slug}
         - /v0/content/home
@@ -977,6 +980,90 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected server error while reading market group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/market-groups/{id}/answers:
+    post:
+      tags: [Markets]
+      operationId: proposeMarketGroupAnswerAddition
+      summary: Propose an added answer for a grouped market
+      description: >
+        Allows an active moderator to propose a new answer option for a
+        published and still-open multiple-choice binary market group. If
+        answer auto-approval is enabled, approval creates a new normal binary
+        child market immediately and appends a shared approved amendment to
+        every child contract. Otherwise the answer remains pending for admin
+        review and no fee is charged yet.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketGroupAnswerAdditionRequest'
+      responses:
+        '201':
+          description: Answer addition proposed, or proposed and auto-approved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupAnswerAdditionResponse'
+        '400':
+          description: Invalid group ID, label, duplicate answer, or malformed request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Authenticated user is not an active moderator.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Group or moderator user was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Group is not published/open or already resolved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '422':
+          description: Auto-approved answer could not be charged to the proposer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected answer-addition failure.
           content:
             application/json:
               schema:
@@ -3513,6 +3600,163 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/market-group-answer-additions:
+    get:
+      tags: [Markets]
+      operationId: listAdminMarketGroupAnswerAdditions
+      summary: List grouped-market answer additions
+      description: Admin-only queue for pending, approved, or rejected answer additions on multiple-choice binary market groups.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+            default: pending
+        - in: query
+          name: groupId
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Answer additions returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupAnswerAdditionListEnvelopeResponse'
+        '400':
+          description: Invalid status, group ID, or pagination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected answer-addition queue failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/market-group-answer-additions/{id}:
+    patch:
+      tags: [Markets]
+      operationId: reviewMarketGroupAnswerAddition
+      summary: Approve or reject a grouped-market answer addition
+      description: >
+        Admin-only endpoint for approving or rejecting a pending answer
+        addition. Approval creates a normal binary child market, links it to
+        the parent group, charges the proposer the proposal-time add-answer
+        cost, and creates a generated approved amendment on every grouped child
+        contract.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReviewMarketGroupAnswerAdditionRequest'
+      responses:
+        '200':
+          description: Answer addition reviewed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketGroupAnswerAdditionEnvelopeResponse'
+        '400':
+          description: Invalid answer-addition ID, status, confirmation, or rejection reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Answer addition or group was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Answer addition has already been reviewed or group state no longer allows the addition.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '422':
+          description: Proposer balance does not allow approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected answer-addition review failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/markets/{id}/tags:
     patch:
       tags: [Markets]
@@ -5447,6 +5691,16 @@ components:
           maxLength: 500
           description: Optional internal reason shown to admins during amendment review.
 
+    MarketGroupAnswerAdditionRequest:
+      type: object
+      required: [answerLabel]
+      properties:
+        answerLabel:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: New answer label to add as a binary child market after approval.
+
     AdminMarketTagRequest:
       type: object
       properties:
@@ -5769,6 +6023,60 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketGroupAnswerResponse'
+
+    MarketGroupAnswerAdditionResponse:
+      type: object
+      required: [id, groupId, answerLabel, status, proposedBy, additionCost]
+      properties:
+        id:
+          type: integer
+          format: int64
+        groupId:
+          type: integer
+          format: int64
+        marketId:
+          type: integer
+          format: int64
+          description: Created child market ID after approval.
+        groupTitle:
+          type: string
+        answerLabel:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        proposedBy:
+          type: string
+        reviewedBy:
+          type: string
+        reviewedAt:
+          type: string
+          format: date-time
+        rejectionReason:
+          type: string
+        additionCost:
+          type: integer
+          format: int64
+          description: Proposal-time add-answer fee charged only when approved.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        marketGroup:
+          $ref: '#/components/schemas/MarketGroupResponse'
+
+    MarketGroupAnswerAdditionListResponse:
+      type: object
+      required: [additions, total]
+      properties:
+        additions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketGroupAnswerAdditionResponse'
+        total:
+          type: integer
 
     MarketGroupBet:
       type: object
@@ -6667,6 +6975,21 @@ components:
           maxLength: 500
           description: Admin-visible decision reason.
 
+    AdminReviewMarketGroupAnswerAdditionRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        confirm:
+          type: boolean
+          description: Must be true when approving because approval creates a child market and charges the proposer.
+        reason:
+          type: string
+          maxLength: 500
+          description: Required when rejecting an answer addition.
+
     MarketGovernanceSettingsUpdateRequest:
       type: object
       properties:
@@ -6676,17 +6999,22 @@ components:
         autoApproveMarketProposals:
           type: boolean
           description: When true, newly created moderator market proposals are immediately published.
+        autoApproveMarketGroupAnswers:
+          type: boolean
+          description: When true, newly proposed grouped-market answers are immediately approved and published.
         version:
           type: integer
           description: Optional optimistic concurrency version returned by the settings read endpoint.
 
     MarketGovernanceSettingsResponse:
       type: object
-      required: [autoApproveDescriptionAmendments, autoApproveMarketProposals, version]
+      required: [autoApproveDescriptionAmendments, autoApproveMarketProposals, autoApproveMarketGroupAnswers, version]
       properties:
         autoApproveDescriptionAmendments:
           type: boolean
         autoApproveMarketProposals:
+          type: boolean
+        autoApproveMarketGroupAnswers:
           type: boolean
         version:
           type: integer
@@ -6913,6 +7241,26 @@ components:
           enum: [true]
         result:
           $ref: '#/components/schemas/MarketGroupResponse'
+
+    MarketGroupAnswerAdditionListEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketGroupAnswerAdditionListResponse'
+
+    MarketGroupAnswerAdditionEnvelopeResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        result:
+          $ref: '#/components/schemas/MarketGroupAnswerAdditionResponse'
 
     UserFinancialResponse:
       type: object

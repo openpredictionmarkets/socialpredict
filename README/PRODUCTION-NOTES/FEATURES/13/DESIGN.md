@@ -3,9 +3,9 @@ title: Multiple Choice Binary Markets Design
 document_type: feature-design
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-14T00:00:00Z
+updated_at: 2026-06-14T14:46:17Z
 updated_at_display: "Sunday, June 14, 2026"
-update_reason: "Record setup-configured grouped-market economics and group-level steward work-profit policy."
+update_reason: "Record grouped-market answer-addition proposal, approval, fee, and audit amendment flow."
 status: draft
 ---
 
@@ -172,7 +172,7 @@ Reason:
 - Charging per initial answer would make thoughtful upfront enumeration expensive and discourage moderators from listing plausible outcomes at creation time.
 - Child markets still collect initial participant fees independently when users trade them.
 - Later answer additions, if enabled, should charge `multipleChoiceBinary.addAnswerCost` from `setup.yaml` because they expand an already-published governance object.
-- Later answer-addition fees should increase the parent group proposal-cost basis so net work profit reflects the total cost paid to create and expand the group.
+- Later answer-addition fees are recorded on answer-addition audit rows and charged only when an answer is approved/created. Expanded proposal-cost-basis accounting remains a future reporting decision.
 
 Configured policy:
 
@@ -294,7 +294,7 @@ flowchart TD
 
 ## Answer Addition Policy
 
-Future grouped markets may allow additional answer choices after initial creation. The baseline should design for this as an explicit policy instead of leaving it implicit.
+Grouped markets allow later answer choices through an explicit proposal and review flow. The added answer becomes a new normal binary child market after approval; existing child market history is never rewritten.
 
 Candidate policy enum:
 
@@ -306,17 +306,29 @@ Candidate policy enum:
 
 Admin control:
 
-- answer additions are disabled by default
-- admins can enable the policy per group or through a future game/config setting
+- active moderators can propose additional answers while the grouped market is published and still open
+- admins can enable global auto-approval for added answers
+- when auto-approval is disabled, admins approve or reject pending answer additions from the market review queue
+- rejected answer additions do not charge the proposer
+- approved answer additions charge `economics.marketincentives.multipleChoiceBinary.addAnswerCost` from the proposal-time audit row
 - added answers must be proposed by an active moderator
-- added answers should go through review unless a future auto-approval rule is explicitly designed
-- market creator/steward gating should remain visible in the audit trail
+- market creator/steward state remains visible separately; the answer-addition audit records who proposed and who approved/rejected
+- approval creates a generated approved amendment on every child contract in the group
+
+Generated amendment body convention:
+
+```text
+Added answer option **{answer_label}** on {utc_timestamp} by [@{username}](/user/{username}).
+```
+
+The frontend renders this once at the group level by deduplicating identical approved amendments across child contracts.
 
 Transaction boundary:
 
 - adding an answer creates another normal child binary market
 - adding an answer must not rewrite existing child market bets, probability history, dust, or payouts
 - existing answer children remain canonical for trades already placed
+- the add-answer proposal/review state is governance state, not transaction state used for buy/sell decisions
 
 ## Read Models And Discovery
 

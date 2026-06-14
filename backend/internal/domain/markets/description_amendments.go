@@ -68,6 +68,7 @@ type MarketDescriptionAmendmentRepository interface {
 type MarketGovernanceSettings struct {
 	AutoApproveDescriptionAmendments bool
 	AutoApproveMarketProposals       bool
+	AutoApproveMarketGroupAnswers    bool
 	Version                          uint
 	UpdatedBy                        string
 	UpdatedAt                        time.Time
@@ -76,6 +77,7 @@ type MarketGovernanceSettings struct {
 type MarketGovernanceSettingsUpdate struct {
 	AutoApproveDescriptionAmendments *bool
 	AutoApproveMarketProposals       *bool
+	AutoApproveMarketGroupAnswers    *bool
 	Version                          uint
 	UpdatedBy                        string
 }
@@ -212,7 +214,10 @@ func (s *Service) GetMarketGovernanceSettings(ctx context.Context) (*MarketGover
 
 func (s *Service) UpdateMarketGovernanceSettings(ctx context.Context, update MarketGovernanceSettingsUpdate) (*MarketGovernanceSettings, error) {
 	update.UpdatedBy = strings.TrimSpace(update.UpdatedBy)
-	if update.UpdatedBy == "" || (update.AutoApproveDescriptionAmendments == nil && update.AutoApproveMarketProposals == nil) {
+	if update.UpdatedBy == "" ||
+		(update.AutoApproveDescriptionAmendments == nil &&
+			update.AutoApproveMarketProposals == nil &&
+			update.AutoApproveMarketGroupAnswers == nil) {
 		return nil, ErrInvalidInput
 	}
 	repo, err := s.marketGovernanceSettingsRepository()
