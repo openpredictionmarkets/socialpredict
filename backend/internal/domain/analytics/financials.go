@@ -83,11 +83,7 @@ func (s *Service) computeUserWorkProfits(ctx context.Context, username string) (
 }
 
 func stewardMarketWorkProfit(bets []boundary.Bet, initialBetFee int64, creationCost int64) int64 {
-	income := participationFeeIncome(bets, initialBetFee) - creationCost
-	if income < 0 {
-		return 0
-	}
-	return income
+	return participationFeeIncome(bets, initialBetFee) - creationCost
 }
 
 func participationFeeIncome(bets []boundary.Bet, initialBetFee int64) int64 {
@@ -117,11 +113,7 @@ func stewardMarketGroupWorkProfit(betsByAnswer [][]boundary.Bet, initialBetFee i
 			participants[bet.Username] = struct{}{}
 		}
 	}
-	income := int64(len(participants))*initialBetFee - creationCost
-	if income < 0 {
-		return 0
-	}
-	return income
+	return int64(len(participants))*initialBetFee - creationCost
 }
 
 func creationCostForWorkProfit(proposalCost int64, fallbackCreateMarketCost int64) int64 {

@@ -172,7 +172,7 @@ Reason:
 - Charging per initial answer would make thoughtful upfront enumeration expensive and discourage moderators from listing plausible outcomes at creation time.
 - Child markets still collect initial participant fees independently when users trade them.
 - Later answer additions, if enabled, should charge `multipleChoiceBinary.addAnswerCost` from `setup.yaml` because they expand an already-published governance object.
-- Later answer-addition fees should increase the parent group proposal-cost threshold so the steward only earns work profit after participant fees exceed the total cost paid to create and expand the group.
+- Later answer-addition fees should increase the parent group proposal-cost basis so net work profit reflects the total cost paid to create and expand the group.
 
 Configured policy:
 
@@ -182,15 +182,15 @@ Configured policy:
 
 ## Work Profit Policy
 
-Normal binary markets already derive moderator work profit at resolution time. The first-entry participant fee is collected when a user first trades a market, but it is not immediately paid to the market creator. On non-`N/A` resolution, surplus participant fees above the market proposal-cost threshold are paid as `WORK_PROFIT` to the current steward, falling back to the creator if no steward is assigned.
+Normal binary markets derive moderator work economics at resolution time. The first-entry participant fee is collected when a user first trades a market, but it is not immediately paid to the market creator. On non-`N/A` resolution, collected participant fee income is paid as `WORK_PROFIT` to the current steward, falling back to the creator if no steward is assigned. User financial reporting then derives net work profit as `collected_participant_fee_income - proposal_cost`, so underperforming markets can show negative work profit even though collected fees are still paid out.
 
 Multiple-choice binary groups should mirror that accounting at the group level:
 
 - child market bettor payouts remain per child market
 - child markets inside a group must not independently pay child work profit
 - participant fee income counts each unique participant once across the whole group
-- group work profit is paid once, after group resolution, to the current group steward
-- group work profit uses the parent group proposal cost as the threshold
+- grouped participant fee income is paid once, after group resolution, to the current group steward
+- group net work profit uses the parent group proposal cost as the cost basis and can be negative
 
 ## Governance And Review
 

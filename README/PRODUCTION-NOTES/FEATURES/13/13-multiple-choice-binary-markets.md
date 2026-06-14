@@ -113,7 +113,7 @@ Resolution flow:
 - Tags on the parent group are visible in market discovery and inherited or projected to children for search/filter behavior.
 - The group page clearly states that each answer is a separate YES/NO market.
 - Resolution does not use stale read models or parent display data for payouts.
-- Group work profit is paid once to the current group steward after group resolution, using unique participants across the child answer markets.
+- Group participant-fee income is paid once to the current group steward after group resolution, using unique participants across the child answer markets; net work profit subtracts the group proposal cost and can be negative.
 - Migrations are additive timestamped Go migrations with package-local tests where practical.
 
 ## Out Of Scope For Baseline

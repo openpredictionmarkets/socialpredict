@@ -177,7 +177,6 @@ func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, re
 	for marketID, feeIncome := range feesByMarket {
 		market := marketByID[marketID]
 		if market.IsResolved && market.ResolutionResult != "N/A" {
-			participationFees += retainedParticipationFeesAfterWorkProfit(feeIncome, creationCostForWorkProfit(market.ProposalCost, config.CreateMarketCost))
 			continue
 		}
 		participationFees += feeIncome
@@ -185,7 +184,6 @@ func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, re
 	for groupID, feeIncome := range feesByGroup {
 		group := groupByID[groupID]
 		if group.LifecycleStatus == "resolved" {
-			participationFees += retainedParticipationFeesAfterWorkProfit(feeIncome, creationCostForWorkProfit(group.ProposalCost, config.CreateMarketCost))
 			continue
 		}
 		participationFees += feeIncome
@@ -224,19 +222,6 @@ func marketGroupFeeLookups(groups []WorkProfitMarketGroupRecord) (map[uint]WorkP
 	return groupByID, childToGroup
 }
 
-func retainedParticipationFeesAfterWorkProfit(feeIncome int64, creationCost int64) int64 {
-	if feeIncome <= 0 {
-		return 0
-	}
-	if creationCost <= 0 {
-		return 0
-	}
-	if feeIncome < creationCost {
-		return feeIncome
-	}
-	return creationCost
-}
-
 // DefaultMetricsAssembler builds the SystemMetrics DTO from calculator outputs.
 type DefaultMetricsAssembler struct{}
 
@@ -255,7 +240,7 @@ func (a DefaultMetricsAssembler) Assemble(debt *DebtStats, volume *MarketVolumeS
 			UnusedDebt:         NewInt64Metric(debt.UnusedDebt, "Σ(maxDebtPerUser - max(0, -balance))", "Remaining borrowing capacity available to users"),
 			ActiveBetVolume:    NewInt64Metric(volume.ActiveBetVolume, "Σ(unresolved_market_volumes)", "Total value of bets currently active in unresolved markets (excludes fees and subsidies)"),
 			MarketCreationFees: NewInt64Metric(volume.MarketCreationFees, "Σ(standalone_market_proposal_costs) + Σ(group_proposal_costs)", "Fees collected from users creating standalone markets or grouped market proposals"),
-			ParticipationFees:  NewInt64Metric(participationFees, "Σ(retained_first_bet_per_user_per_standalone_market_or_group × participation_fee)", "Retained fees collected from first-time participation; resolved markets and groups only redistribute surplus above the proposal-cost threshold as steward work profit"),
+			ParticipationFees:  NewInt64Metric(participationFees, "Σ(retained_first_bet_per_user_per_unresolved_or_na_market_or_group × participation_fee)", "Retained fees collected from first-time participation; resolved non-N/A markets and groups pay collected participation fees to the current steward"),
 			BonusesPaid:        NewInt64Metric(bonusesPaid, "", "System bonuses paid to users and realized profits currently held in user balances"),
 			TotalUtilized:      NewInt64Metric(totalUtilized, "unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid", "Total debt capacity that has been utilized across all categories"),
 		},

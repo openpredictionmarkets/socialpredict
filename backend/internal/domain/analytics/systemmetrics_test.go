@@ -107,7 +107,7 @@ func TestComputeSystemMetrics_WithData(t *testing.T) {
 	}
 }
 
-func TestComputeSystemMetrics_ParticipationFeesRetainResolvedCreationCostThreshold(t *testing.T) {
+func TestComputeSystemMetrics_ParticipationFeesExcludeResolvedNonNAFeePayouts(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.MarketIncentives.CreateMarketCost = 10
@@ -149,13 +149,13 @@ func TestComputeSystemMetrics_ParticipationFeesRetainResolvedCreationCostThresho
 	svc := newAnalyticsService(t, db, econ)
 	metrics := requireSystemMetrics(t, svc)
 
-	expectedRetainedFees := int64(15)
+	expectedRetainedFees := int64(10)
 	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != expectedRetainedFees {
 		t.Fatalf("retained participation fees = %d, want %d", got, expectedRetainedFees)
 	}
 }
 
-func TestComputeSystemMetrics_ParticipationFeesExcludeOnlyPaidWorkProfitSurplus(t *testing.T) {
+func TestComputeSystemMetrics_ParticipationFeesExcludeAllResolvedNonNAFeeIncome(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.MarketIncentives.CreateMarketCost = 10
@@ -195,13 +195,13 @@ func TestComputeSystemMetrics_ParticipationFeesExcludeOnlyPaidWorkProfitSurplus(
 	svc := newAnalyticsService(t, db, econ)
 	metrics := requireSystemMetrics(t, svc)
 
-	expectedRetainedFees := int64(10)
+	expectedRetainedFees := int64(0)
 	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != expectedRetainedFees {
 		t.Fatalf("retained participation fees = %d, want %d", got, expectedRetainedFees)
 	}
 }
 
-func TestComputeSystemMetrics_GroupsRetainFeesAtParentThreshold(t *testing.T) {
+func TestComputeSystemMetrics_GroupsExcludeResolvedFeePayouts(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.MarketIncentives.CreateMarketCost = 1
@@ -276,8 +276,8 @@ func TestComputeSystemMetrics_GroupsRetainFeesAtParentThreshold(t *testing.T) {
 	if got := requireMetricInt64(t, metrics.MoneyUtilized.MarketCreationFees); got != 5 {
 		t.Fatalf("market creation fees = %d, want parent group proposal cost 5", got)
 	}
-	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != 5 {
-		t.Fatalf("retained group participation fees = %d, want 5", got)
+	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != 0 {
+		t.Fatalf("retained group participation fees = %d, want 0", got)
 	}
 }
 

@@ -136,7 +136,7 @@ func (s *Service) applyMarketGroupWorkProfit(ctx context.Context, group *MarketG
 	if group == nil || stewardUsername == "" || s.config.InitialBetFee <= 0 {
 		return nil
 	}
-	income, err := s.calculateMarketGroupWorkProfitIncome(ctx, group)
+	income, err := s.calculateMarketGroupWorkFeePayout(ctx, group)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (s *Service) applyMarketGroupWorkProfit(ctx context.Context, group *MarketG
 	return s.userService.ApplyTransaction(ctx, stewardUsername, income, users.TransactionWorkProfit)
 }
 
-func (s *Service) calculateMarketGroupWorkProfitIncome(ctx context.Context, group *MarketGroup) (int64, error) {
+func (s *Service) calculateMarketGroupWorkFeePayout(ctx context.Context, group *MarketGroup) (int64, error) {
 	if group == nil {
 		return 0, nil
 	}
@@ -158,17 +158,13 @@ func (s *Service) calculateMarketGroupWorkProfitIncome(ctx context.Context, grou
 		}
 		betsByAnswer = append(betsByAnswer, bets)
 	}
-	return ModeratorGroupWorkProfitIncome(
-		betsByAnswer,
-		s.config.InitialBetFee,
-		marketCreationCostForWorkProfit(group.ProposalCost, s.config.CreateMarketCost),
-	), nil
+	return ModeratorGroupWorkFeeIncome(betsByAnswer, s.config.InitialBetFee), nil
 }
 
-// ModeratorGroupWorkProfitIncome derives work-profit income for a grouped
-// multiple-choice binary market. A participant counts once across the group,
-// even if they trade several child answer markets.
-func ModeratorGroupWorkProfitIncome(betsByAnswer [][]*Bet, initialBetFee int64, creationCost int64) int64 {
+// ModeratorGroupWorkFeeIncome derives first-participation fee income for a
+// grouped multiple-choice binary market. A participant counts once across the
+// group, even if they trade several child answer markets.
+func ModeratorGroupWorkFeeIncome(betsByAnswer [][]*Bet, initialBetFee int64) int64 {
 	if initialBetFee <= 0 {
 		return 0
 	}
@@ -181,9 +177,12 @@ func ModeratorGroupWorkProfitIncome(betsByAnswer [][]*Bet, initialBetFee int64, 
 			participants[bet.Username] = struct{}{}
 		}
 	}
-	income := int64(len(participants))*initialBetFee - creationCost
-	if income < 0 {
-		return 0
-	}
-	return income
+	return int64(len(participants)) * initialBetFee
+}
+
+// ModeratorGroupWorkProfitIncome returns net grouped work profit after
+// subtracting the parent proposal cost from collected fee income. It can be
+// negative; the resolution payout itself is fee income.
+func ModeratorGroupWorkProfitIncome(betsByAnswer [][]*Bet, initialBetFee int64, creationCost int64) int64 {
+	return ModeratorGroupWorkFeeIncome(betsByAnswer, initialBetFee) - creationCost
 }

@@ -332,7 +332,7 @@ func TestComputeUserFinancials_SubtractsCreationCostWhenCreatorRemainsSteward(t 
 	}
 }
 
-func TestComputeUserFinancials_WorkProfitsRemainZeroBelowCreationCostThreshold(t *testing.T) {
+func TestComputeUserFinancials_WorkProfitsCanBeNegativeBelowCreationCostThreshold(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	creator := modelstesting.GenerateUser("threshold_creator", 500)
 	steward := modelstesting.GenerateUser("threshold_steward", 500)
@@ -368,7 +368,7 @@ func TestComputeUserFinancials_WorkProfitsRemainZeroBelowCreationCostThreshold(t
 	svc := newAnalyticsService(t, db, econ)
 
 	snapshot := requireFinancialSnapshot(t, svc, steward)
-	if snapshot.WorkProfits != 0 {
-		t.Fatalf("steward work profits below threshold = %d, want 0", snapshot.WorkProfits)
+	if snapshot.WorkProfits != -4 {
+		t.Fatalf("steward work profits below threshold = %d, want -4", snapshot.WorkProfits)
 	}
 }

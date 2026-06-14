@@ -475,7 +475,7 @@ func TestResolveMarketGroupPaysSingleGroupWorkProfit(t *testing.T) {
 	if len(applied) != 1 {
 		t.Fatalf("expected one work-profit transaction, got %+v", applied)
 	}
-	if applied[0].username != "steward" || applied[0].amount != 4 || applied[0].txType != dusers.TransactionWorkProfit {
+	if applied[0].username != "steward" || applied[0].amount != 6 || applied[0].txType != dusers.TransactionWorkProfit {
 		t.Fatalf("unexpected work-profit transaction: %+v", applied[0])
 	}
 }

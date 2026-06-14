@@ -87,8 +87,8 @@ Checklist:
 - [ ] Ensure child market read models and parent group read models are display-only.
 - [ ] Add boundary tests proving transaction interfaces do not depend on market group read models.
 - [x] Prevent child markets inside groups from paying independent child-level work profit at resolution.
-- [x] Pay one group-level work profit to the current group steward after group resolution.
-- [x] Derive group work profit from unique participants across all child answer markets and the parent group proposal-cost threshold.
+- [x] Pay one group-level participant-fee income payout to the current group steward after group resolution.
+- [x] Derive group net work profit from unique participants across all child answer markets minus the parent group proposal-cost basis.
 
 ## 06. Group Read Models And Discovery
 
@@ -184,5 +184,5 @@ Checklist:
 - [x] Decide whether group proposal cost should scale with initial answer count: no, initial answers are included in the one group proposal cost.
 - [ ] Implement later answer additions, if enabled, using `multipleChoiceBinary.addAnswerCost`.
 - [ ] Decide whether child markets should support answer-specific amendments.
-- [x] Decide whether group-level work profits should aggregate child market participation fees: yes, unique participants count once across the group.
+- [x] Decide whether group-level work economics should aggregate child market participation fees: yes, unique participants count once across the group.
 - [ ] Decide whether group pages need a normalized illustrative display separate from tradable child probabilities.
