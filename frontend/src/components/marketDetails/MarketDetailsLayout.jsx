@@ -27,6 +27,8 @@ function MarketDetailsTable({
   descriptionAmendments = [],
   marketId: marketIdProp,
   username,
+  usertype,
+  moderatorStatus,
   isLoggedIn,
   token,
   refetchData,
@@ -117,6 +119,8 @@ function MarketDetailsTable({
         isLoggedIn={isLoggedIn}
         token={token}
         username={username}
+        usertype={usertype}
+        moderatorStatus={moderatorStatus}
         refetchData={refetchData}
       />
     );

@@ -611,6 +611,8 @@ export default function GroupedMarketDetailsLayout({
   isLoggedIn,
   token,
   username,
+  usertype,
+  moderatorStatus,
   refetchData,
 }) {
   const { frontendConfig } = useFrontendConfig();
@@ -727,6 +729,8 @@ export default function GroupedMarketDetailsLayout({
   const canProposeAnswerAddition =
     isLoggedIn &&
     token &&
+    usertype === 'MODERATOR' &&
+    moderatorStatus === 'active' &&
     sortedAnswers.length > 0 &&
     closeDate &&
     new Date(closeDate) > new Date() &&
