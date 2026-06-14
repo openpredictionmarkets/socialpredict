@@ -26,6 +26,11 @@ function Create() {
   const [error, setError] = useState('');
   const [createdMarket, setCreatedMarket] = useState(null);
   const [marketCreationCost, setMarketCreationCost] = useState(null);
+  const [multipleChoicePolicy, setMultipleChoicePolicy] = useState({
+    addAnswerCost: 2,
+    softAnswerReviewThreshold: 12,
+    hardAnswerSafetyCap: 50,
+  });
   const [marketTags, setMarketTags] = useState([]);
   const [selectedTagSlugs, setSelectedTagSlugs] = useState([]);
   const { username } = useAuth();
@@ -48,6 +53,13 @@ function Create() {
         const cost = setup?.marketincentives?.createMarketCost;
         if (!ignore && cost !== undefined && cost !== null) {
           setMarketCreationCost(cost);
+        }
+        const groupPolicy = setup?.marketincentives?.multipleChoiceBinary;
+        if (!ignore && groupPolicy) {
+          setMultipleChoicePolicy((current) => ({
+            ...current,
+            ...groupPolicy,
+          }));
         }
       } catch {
         // The backend still enforces cost; this call only improves the UI.
@@ -104,8 +116,9 @@ function Create() {
 
   const addAnswerLabel = () => {
     setAnswerLabels((current) => {
-      if (current.length >= 20) {
-        setError('Multiple-choice market groups can have up to 20 answers.');
+      const hardCap = multipleChoicePolicy.hardAnswerSafetyCap || 50;
+      if (current.length >= hardCap) {
+        setError(`Multiple-choice market groups can have up to ${hardCap} answers.`);
         return current;
       }
       setError('');
@@ -126,6 +139,10 @@ function Create() {
     const trimmedLabels = answerLabels.map((label) => label.trim()).filter(Boolean);
     if (trimmedLabels.length < 2) {
       return { error: 'Add at least two answer options.', labels: [] };
+    }
+    const hardCap = multipleChoicePolicy.hardAnswerSafetyCap || 50;
+    if (trimmedLabels.length > hardCap) {
+      return { error: `Multiple-choice market groups can have up to ${hardCap} answers.`, labels: [] };
     }
     const seen = new Set();
     for (const label of trimmedLabels) {
@@ -257,6 +274,11 @@ function Create() {
         <p className='mt-2 text-sm text-amber-100'>
           This amount is deducted when you create the proposal. If an admin rejects the proposal, the proposal cost is refunded.
         </p>
+        {marketType === 'group' && (
+          <p className='mt-2 text-sm text-amber-100'>
+            Initial multiple-choice answers are included in the group proposal cost. Later answer additions cost {multipleChoicePolicy.addAnswerCost ?? 0} credits each if enabled.
+          </p>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
@@ -288,7 +310,9 @@ function Create() {
               }`}
             >
               <span className='block text-sm font-semibold'>Multiple-Choice Binary Group</span>
-              <span className='mt-1 block text-xs text-gray-400'>Each answer becomes its own YES/NO market.</span>
+              <span className='mt-1 block text-xs text-gray-400'>
+                Each answer becomes its own YES/NO market. Initial answers do not add proposal cost.
+              </span>
             </button>
           </div>
         </div>
@@ -427,9 +451,14 @@ function Create() {
                 </p>
               </div>
               <span className='rounded-full bg-gray-800 px-3 py-1 text-xs text-gray-300'>
-                {answerLabels.length}/20 answers
+                {answerLabels.length}/{multipleChoicePolicy.hardAnswerSafetyCap || 50} answers
               </span>
             </div>
+            {answerLabels.length >= (multipleChoicePolicy.softAnswerReviewThreshold || 12) && (
+              <p className='mb-3 rounded-md border border-amber-500/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-100'>
+                Large answer sets can be harder for participants to compare. Initial answers are still included in the group proposal cost.
+              </p>
+            )}
             <div className='space-y-3'>
               {answerLabels.map((answerLabel, index) => (
                 <div key={`answer-${index}`} className='flex gap-2'>

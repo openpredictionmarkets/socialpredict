@@ -33,6 +33,18 @@ type WorkProfitMarketRecord struct {
 	ProposalCost     int64
 }
 
+// WorkProfitMarketGroupRecord captures the grouped market fields needed to
+// derive steward work profit from child-market bet history without adding
+// separate accounting state.
+type WorkProfitMarketGroupRecord struct {
+	ID              uint
+	CreatorUsername string
+	StewardUsername string
+	LifecycleStatus string
+	ProposalCost    int64
+	MemberMarketIDs []uint
+}
+
 // Snapshot converts the record into the shared math snapshot.
 func (m MarketRecord) Snapshot() positionsmath.MarketSnapshot {
 	return positionsmath.MarketSnapshot{

@@ -19,7 +19,7 @@ const (
 	MarketGroupResolveModeManual       = "manual"
 
 	MinMarketGroupAnswers = 2
-	MaxMarketGroupAnswers = 20
+	MaxMarketGroupAnswers = 50
 	MaxAnswerLabelLength  = 160
 )
 
@@ -45,6 +45,26 @@ type MarketGroup struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	Members            []MarketGroupMember
+}
+
+// CurrentStewardUsername returns the group steward, falling back to creator for
+// legacy rows or groups created before explicit stewardship existed.
+func (g *MarketGroup) CurrentStewardUsername() string {
+	if g == nil {
+		return ""
+	}
+	if steward := strings.TrimSpace(g.StewardUsername); steward != "" {
+		return steward
+	}
+	return strings.TrimSpace(g.CreatorUsername)
+}
+
+// StewardedBy reports whether username is the current group steward.
+func (g *MarketGroup) StewardedBy(username string) bool {
+	if g == nil {
+		return false
+	}
+	return g.CurrentStewardUsername() == strings.TrimSpace(username)
 }
 
 // MarketGroupCreateRequest captures a participant-created grouped binary

@@ -3,6 +3,8 @@ package markets
 import (
 	"context"
 	"strings"
+
+	users "socialpredict/internal/domain/users"
 )
 
 // ResolveMarketGroup resolves every child binary market in a grouped market.
@@ -35,9 +37,14 @@ func (s *Service) ResolveMarketGroup(ctx context.Context, groupID int64, req Mar
 		return nil, err
 	}
 
+	resolverUsername := username
+	if !group.StewardedBy(username) {
+		resolverUsername = group.CurrentStewardUsername()
+	}
+
 	for _, member := range OrderedMarketGroupMembers(group.Members) {
 		resolution := resolutions[member.MarketID]
-		if err := s.ResolveMarket(ctx, member.MarketID, resolution, username); err != nil {
+		if err := s.resolveMarket(ctx, member.MarketID, resolution, username, false); err != nil {
 			return nil, err
 		}
 	}
@@ -48,6 +55,9 @@ func (s *Service) ResolveMarketGroup(ctx context.Context, groupID int64, req Mar
 	}
 	group.LifecycleStatus = MarketLifecycleResolved
 	group.UpdatedAt = resolvedAt
+	if err := s.applyMarketGroupWorkProfit(ctx, group, resolverUsername); err != nil {
+		return nil, err
+	}
 	return group, nil
 }
 
@@ -120,4 +130,60 @@ func (s *Service) validateMarketGroupResolutionChildren(ctx context.Context, gro
 		}
 	}
 	return nil
+}
+
+func (s *Service) applyMarketGroupWorkProfit(ctx context.Context, group *MarketGroup, stewardUsername string) error {
+	if group == nil || stewardUsername == "" || s.config.InitialBetFee <= 0 {
+		return nil
+	}
+	income, err := s.calculateMarketGroupWorkProfitIncome(ctx, group)
+	if err != nil {
+		return err
+	}
+	if income <= 0 {
+		return nil
+	}
+	return s.userService.ApplyTransaction(ctx, stewardUsername, income, users.TransactionWorkProfit)
+}
+
+func (s *Service) calculateMarketGroupWorkProfitIncome(ctx context.Context, group *MarketGroup) (int64, error) {
+	if group == nil {
+		return 0, nil
+	}
+	betsByAnswer := make([][]*Bet, 0, len(group.Members))
+	for _, member := range OrderedMarketGroupMembers(group.Members) {
+		bets, err := s.repo.ListBetsForMarket(ctx, member.MarketID)
+		if err != nil {
+			return 0, err
+		}
+		betsByAnswer = append(betsByAnswer, bets)
+	}
+	return ModeratorGroupWorkProfitIncome(
+		betsByAnswer,
+		s.config.InitialBetFee,
+		marketCreationCostForWorkProfit(group.ProposalCost, s.config.CreateMarketCost),
+	), nil
+}
+
+// ModeratorGroupWorkProfitIncome derives work-profit income for a grouped
+// multiple-choice binary market. A participant counts once across the group,
+// even if they trade several child answer markets.
+func ModeratorGroupWorkProfitIncome(betsByAnswer [][]*Bet, initialBetFee int64, creationCost int64) int64 {
+	if initialBetFee <= 0 {
+		return 0
+	}
+	participants := make(map[string]struct{})
+	for _, answerBets := range betsByAnswer {
+		for _, bet := range answerBets {
+			if bet == nil || bet.Amount <= 0 || bet.Username == "" {
+				continue
+			}
+			participants[bet.Username] = struct{}{}
+		}
+	}
+	income := int64(len(participants))*initialBetFee - creationCost
+	if income < 0 {
+		return 0
+	}
+	return income
 }

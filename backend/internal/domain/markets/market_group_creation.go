@@ -158,6 +158,9 @@ func (s *Service) validateMarketGroupCreateRequest(req MarketGroupCreateRequest)
 	if len(req.Description) > MaxDescriptionLength {
 		return ErrInvalidDescriptionLength
 	}
+	if len(req.AnswerLabels) > s.multipleChoiceBinaryHardAnswerSafetyCap() {
+		return ErrInvalidInput
+	}
 	members := make([]MarketGroupMember, 0, len(req.AnswerLabels))
 	for index, answer := range req.AnswerLabels {
 		members = append(members, MarketGroupMember{
@@ -167,6 +170,19 @@ func (s *Service) validateMarketGroupCreateRequest(req MarketGroupCreateRequest)
 		})
 	}
 	return ValidateMarketGroupMembers(members)
+}
+
+func (s *Service) multipleChoiceBinaryHardAnswerSafetyCap() int {
+	if s == nil || s.config.MultipleChoiceBinaryHardAnswerSafetyCap <= 0 {
+		return MaxMarketGroupAnswers
+	}
+	if s.config.MultipleChoiceBinaryHardAnswerSafetyCap < MinMarketGroupAnswers {
+		return MinMarketGroupAnswers
+	}
+	if s.config.MultipleChoiceBinaryHardAnswerSafetyCap > MaxMarketGroupAnswers {
+		return MaxMarketGroupAnswers
+	}
+	return s.config.MultipleChoiceBinaryHardAnswerSafetyCap
 }
 
 func (s *Service) marketGroupRepository() (MarketGroupRepository, error) {

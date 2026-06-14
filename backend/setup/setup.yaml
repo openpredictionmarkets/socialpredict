@@ -8,6 +8,10 @@ economics:
   marketincentives:
     createMarketCost: 10
     traderBonus: 1
+    multipleChoiceBinary:
+      addAnswerCost: 2
+      softAnswerReviewThreshold: 12
+      hardAnswerSafetyCap: 50
   user:
     initialAccountBalance: 0
     maximumDebtAllowed: 500

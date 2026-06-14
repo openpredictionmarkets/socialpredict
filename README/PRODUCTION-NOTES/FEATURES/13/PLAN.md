@@ -3,9 +3,9 @@ title: Multiple Choice Binary Markets Plan
 document_type: feature-plan
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-12T00:00:00Z
-updated_at_display: "Friday, June 12, 2026"
-update_reason: "Track implementation slices for multiple-choice binary market groups."
+updated_at: 2026-06-14T00:00:00Z
+updated_at_display: "Sunday, June 14, 2026"
+update_reason: "Track setup-configured grouped-market economics and group-level work-profit implementation."
 status: draft
 ---
 
@@ -52,8 +52,9 @@ Checklist:
 - [x] Add request DTO for multiple-choice binary group creation.
 - [x] Validate parent title and description using existing market rules.
 - [x] Validate answer labels: minimum count, maximum count, length, uniqueness, and sanitization.
+- [x] Add setup-configured multiple-choice binary policy for later answer-addition cost, soft answer review threshold, and hard safety cap.
 - [ ] Create parent group and child binary markets transactionally.
-- [x] Charge one group proposal cost in baseline.
+- [x] Charge one group proposal cost in baseline, with no extra cost for initial answers.
 - [x] Link child markets through `market_group_members`.
 - [x] Add service tests for successful group creation.
 - [x] Add service tests for invalid labels, duplicate labels, too few answers, and too many answers.
@@ -85,6 +86,9 @@ Checklist:
 - [ ] Ensure sale quote and sale execution still use child market canonical state.
 - [ ] Ensure child market read models and parent group read models are display-only.
 - [ ] Add boundary tests proving transaction interfaces do not depend on market group read models.
+- [x] Prevent child markets inside groups from paying independent child-level work profit at resolution.
+- [x] Pay one group-level work profit to the current group steward after group resolution.
+- [x] Derive group work profit from unique participants across all child answer markets and the parent group proposal-cost threshold.
 
 ## 06. Group Read Models And Discovery
 
@@ -177,7 +181,8 @@ Checklist:
 
 - [ ] Decide whether a true `SUM_TO_ONE_EXCLUSIVE` coupled market type is needed.
 - [ ] Decide whether answer additions after approval are ever allowed.
-- [ ] Decide whether group proposal cost should scale with answer count.
+- [x] Decide whether group proposal cost should scale with initial answer count: no, initial answers are included in the one group proposal cost.
+- [ ] Implement later answer additions, if enabled, using `multipleChoiceBinary.addAnswerCost`.
 - [ ] Decide whether child markets should support answer-specific amendments.
-- [ ] Decide whether group-level work profits should aggregate child market participation fees.
+- [x] Decide whether group-level work profits should aggregate child market participation fees: yes, unique participants count once across the group.
 - [ ] Decide whether group pages need a normalized illustrative display separate from tradable child probabilities.

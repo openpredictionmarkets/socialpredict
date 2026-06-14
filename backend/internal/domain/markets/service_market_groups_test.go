@@ -379,3 +379,103 @@ func TestResolveMarketGroupExclusiveYesResolvesChildrenAndMarksParent(t *testing
 		t.Fatalf("resolved group lifecycle = %q, want resolved", resolvedGroup.LifecycleStatus)
 	}
 }
+
+func TestResolveMarketGroupPaysSingleGroupWorkProfit(t *testing.T) {
+	now := marketsTestTime()
+	group := &markets.MarketGroup{
+		ID:              19,
+		QuestionTitle:   "Who wins?",
+		LifecycleStatus: markets.MarketLifecyclePublished,
+		CreatorUsername: "creator",
+		StewardUsername: "steward",
+		ProposalCost:    2,
+		Members: []markets.MarketGroupMember{
+			{ID: 1, GroupID: 19, MarketID: 201, AnswerLabel: "Home", DisplayOrder: 0},
+			{ID: 2, GroupID: 19, MarketID: 202, AnswerLabel: "Away", DisplayOrder: 1},
+		},
+	}
+	marketsByID := map[int64]*markets.Market{}
+	for _, member := range group.Members {
+		marketsByID[member.MarketID] = &markets.Market{
+			ID:              member.MarketID,
+			Status:          markets.MarketStatusActive,
+			LifecycleStatus: markets.MarketLifecyclePublished,
+			CreatorUsername: "creator",
+			StewardUsername: "steward",
+		}
+	}
+	betsByMarket := map[int64][]*markets.Bet{
+		201: {
+			{Username: "alice", Amount: 10, Outcome: "YES"},
+			{Username: "alice", Amount: -2, Outcome: "YES"},
+			{Username: "bob", Amount: 5, Outcome: "NO"},
+		},
+		202: {
+			{Username: "alice", Amount: 4, Outcome: "YES"},
+			{Username: "carol", Amount: 6, Outcome: "YES"},
+		},
+	}
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getMarketGroupFunc = func(context.Context, int64) (*markets.MarketGroup, error) {
+			return group, nil
+		}
+		repo.getByIDFunc = func(_ context.Context, marketID int64) (*markets.Market, error) {
+			return marketsByID[marketID], nil
+		}
+		repo.resolveMarketFunc = func(context.Context, int64, string) error {
+			return nil
+		}
+		repo.calculatePayoutPositionsFunc = func(context.Context, int64) ([]*markets.PayoutPosition, error) {
+			return []*markets.PayoutPosition{}, nil
+		}
+		repo.listBetsForMarketFunc = func(_ context.Context, marketID int64) ([]*markets.Bet, error) {
+			return betsByMarket[marketID], nil
+		}
+		repo.markMarketGroupResolvedFunc = func(context.Context, int64, time.Time) error {
+			return nil
+		}
+	})
+	var applied []struct {
+		username string
+		amount   int64
+		txType   string
+	}
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return &dusers.PublicUser{
+				Username:        username,
+				UserType:        string(dusers.UserTypeModerator),
+				ModeratorStatus: dusers.ModeratorStatusActive,
+			}, nil
+		}
+		service.applyTransactionFunc = func(_ context.Context, username string, amount int64, txType string) error {
+			applied = append(applied, struct {
+				username string
+				amount   int64
+				txType   string
+			}{username: username, amount: amount, txType: txType})
+			return nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{
+		GameMode:               "moderator",
+		InitialBetFee:          2,
+		CreateMarketCost:       10,
+		MarketApprovalRequired: true,
+	})
+
+	_, err := service.ResolveMarketGroup(context.Background(), group.ID, markets.MarketGroupResolveRequest{
+		Mode:            markets.MarketGroupResolveModeExclusiveYes,
+		WinningMarketID: 201,
+	}, "steward")
+	if err != nil {
+		t.Fatalf("ResolveMarketGroup returned error: %v", err)
+	}
+
+	if len(applied) != 1 {
+		t.Fatalf("expected one work-profit transaction, got %+v", applied)
+	}
+	if applied[0].username != "steward" || applied[0].amount != 4 || applied[0].txType != dusers.TransactionWorkProfit {
+		t.Fatalf("unexpected work-profit transaction: %+v", applied[0])
+	}
+}

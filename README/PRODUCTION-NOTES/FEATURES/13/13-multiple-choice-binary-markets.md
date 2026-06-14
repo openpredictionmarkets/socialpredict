@@ -3,9 +3,9 @@ title: Multiple Choice Binary Markets
 document_type: feature-overview
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-12T00:00:00Z
-updated_at_display: "Friday, June 12, 2026"
-update_reason: "Start feature spec for grouped multiple-choice markets implemented as several binary child markets under one parent market group."
+updated_at: 2026-06-14T00:00:00Z
+updated_at_display: "Sunday, June 14, 2026"
+update_reason: "Clarify grouped market economics: initial answers are included in one group proposal cost; later answer additions are controlled by setup policy."
 status: draft
 ---
 
@@ -78,6 +78,7 @@ Moderator creation flow:
 - Moderator adds answer choices, each with a display label.
 - Moderator adds tags at the parent/group level.
 - Moderator submits the group for admin review using the existing market proposal pattern.
+- Initial answer choices are included in the one group proposal cost; future answer additions, if enabled, use setup-configured answer-addition pricing.
 
 Admin review flow:
 
@@ -112,6 +113,7 @@ Resolution flow:
 - Tags on the parent group are visible in market discovery and inherited or projected to children for search/filter behavior.
 - The group page clearly states that each answer is a separate YES/NO market.
 - Resolution does not use stale read models or parent display data for payouts.
+- Group work profit is paid once to the current group steward after group resolution, using unique participants across the child answer markets.
 - Migrations are additive timestamped Go migrations with package-local tests where practical.
 
 ## Out Of Scope For Baseline

@@ -85,11 +85,21 @@ func (c DefaultVolumeCalculator) Calculate(ctx context.Context, repo VolumeRepos
 		return nil, err
 	}
 
-	stats := &MarketVolumeStats{
-		MarketCreationFees: int64(len(markets)) * config.CreateMarketCost,
+	groupRecords, err := listMarketGroupFeeRecords(ctx, repo)
+	if err != nil {
+		return nil, err
+	}
+	groupChildIDs := marketGroupChildIDSet(groupRecords)
+
+	stats := &MarketVolumeStats{}
+	for _, group := range groupRecords {
+		stats.MarketCreationFees += creationCostForWorkProfit(group.ProposalCost, config.CreateMarketCost)
 	}
 
 	for _, market := range markets {
+		if !groupChildIDs[market.ID] {
+			stats.MarketCreationFees += creationCostForWorkProfit(market.ProposalCost, config.CreateMarketCost)
+		}
 		if market.IsResolved {
 			continue
 		}
@@ -116,6 +126,11 @@ func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, re
 	if err != nil {
 		return 0, err
 	}
+	groupRecords, err := listMarketGroupFeeRecords(ctx, repo)
+	if err != nil {
+		return 0, err
+	}
+	groupByID, childToGroup := marketGroupFeeLookups(groupRecords)
 
 	marketByID := make(map[uint]MarketRecord, len(markets))
 	for _, market := range markets {
@@ -127,9 +142,25 @@ func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, re
 		marketID uint
 		username string
 	}]bool)
+	feesByGroup := make(map[uint]int64)
+	seenGroup := make(map[struct {
+		groupID  uint
+		username string
+	}]bool)
 
 	for _, b := range betsOrdered {
 		if b.Amount <= 0 {
+			continue
+		}
+		if groupID, ok := childToGroup[b.MarketID]; ok {
+			key := struct {
+				groupID  uint
+				username string
+			}{groupID: groupID, username: b.Username}
+			if !seenGroup[key] {
+				feesByGroup[groupID] += config.InitialBetFee
+				seenGroup[key] = true
+			}
 			continue
 		}
 		key := struct {
@@ -151,8 +182,46 @@ func (c DefaultFeeCalculator) CalculateParticipationFees(ctx context.Context, re
 		}
 		participationFees += feeIncome
 	}
+	for groupID, feeIncome := range feesByGroup {
+		group := groupByID[groupID]
+		if group.LifecycleStatus == "resolved" {
+			participationFees += retainedParticipationFeesAfterWorkProfit(feeIncome, creationCostForWorkProfit(group.ProposalCost, config.CreateMarketCost))
+			continue
+		}
+		participationFees += feeIncome
+	}
 
 	return participationFees, nil
+}
+
+func listMarketGroupFeeRecords(ctx context.Context, repo any) ([]WorkProfitMarketGroupRecord, error) {
+	groupRepo, ok := repo.(MarketGroupFeeRepository)
+	if !ok {
+		return nil, nil
+	}
+	return groupRepo.ListMarketGroupFeeRecords(ctx)
+}
+
+func marketGroupChildIDSet(groups []WorkProfitMarketGroupRecord) map[uint]bool {
+	childIDs := make(map[uint]bool)
+	for _, group := range groups {
+		for _, marketID := range group.MemberMarketIDs {
+			childIDs[marketID] = true
+		}
+	}
+	return childIDs
+}
+
+func marketGroupFeeLookups(groups []WorkProfitMarketGroupRecord) (map[uint]WorkProfitMarketGroupRecord, map[uint]uint) {
+	groupByID := make(map[uint]WorkProfitMarketGroupRecord, len(groups))
+	childToGroup := make(map[uint]uint)
+	for _, group := range groups {
+		groupByID[group.ID] = group
+		for _, marketID := range group.MemberMarketIDs {
+			childToGroup[marketID] = group.ID
+		}
+	}
+	return groupByID, childToGroup
 }
 
 func retainedParticipationFeesAfterWorkProfit(feeIncome int64, creationCost int64) int64 {
@@ -185,8 +254,8 @@ func (a DefaultMetricsAssembler) Assemble(debt *DebtStats, volume *MarketVolumeS
 		MoneyUtilized: MoneyUtilized{
 			UnusedDebt:         NewInt64Metric(debt.UnusedDebt, "Σ(maxDebtPerUser - max(0, -balance))", "Remaining borrowing capacity available to users"),
 			ActiveBetVolume:    NewInt64Metric(volume.ActiveBetVolume, "Σ(unresolved_market_volumes)", "Total value of bets currently active in unresolved markets (excludes fees and subsidies)"),
-			MarketCreationFees: NewInt64Metric(volume.MarketCreationFees, "number_of_markets × creation_fee_per_market", "Fees collected from users creating new markets"),
-			ParticipationFees:  NewInt64Metric(participationFees, "Σ(retained_first_bet_per_user_per_market × participation_fee)", "Retained fees collected from first-time participation; resolved markets only redistribute surplus above the market creation-cost threshold as steward work profit"),
+			MarketCreationFees: NewInt64Metric(volume.MarketCreationFees, "Σ(standalone_market_proposal_costs) + Σ(group_proposal_costs)", "Fees collected from users creating standalone markets or grouped market proposals"),
+			ParticipationFees:  NewInt64Metric(participationFees, "Σ(retained_first_bet_per_user_per_standalone_market_or_group × participation_fee)", "Retained fees collected from first-time participation; resolved markets and groups only redistribute surplus above the proposal-cost threshold as steward work profit"),
 			BonusesPaid:        NewInt64Metric(bonusesPaid, "", "System bonuses paid to users and realized profits currently held in user balances"),
 			TotalUtilized:      NewInt64Metric(totalUtilized, "unusedDebt + activeBetVolume + marketCreationFees + participationFees + bonusesPaid", "Total debt capacity that has been utilized across all categories"),
 		},

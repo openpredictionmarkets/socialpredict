@@ -437,7 +437,7 @@ paths:
       tags: [Config]
       operationId: getFrontendConfig
       summary: Get frontend configuration
-      description: Returns minimal configuration values needed by the frontend, such as chart precision and game mode.
+      description: Returns minimal configuration values needed by the frontend, such as chart precision, game mode, and market-group policy.
       responses:
         '200':
           description: Frontend configuration returned.
@@ -5288,6 +5288,13 @@ components:
         traderBonus:
           type: integer
           format: int64
+        groupAddAnswerCost:
+          type: integer
+          format: int64
+        groupSoftAnswerThreshold:
+          type: integer
+        groupHardAnswerSafetyCap:
+          type: integer
         initialAccountBalance:
           type: integer
           format: int64
@@ -5310,7 +5317,7 @@ components:
           type: integer
           format: int64
       required:
-        [initialMarketProbability, initialMarketSubsidization, initialMarketYes, initialMarketNo, createMarketCost, traderBonus, initialAccountBalance, maximumDebtAllowed, minimumBet, maxDustPerSale, initialBetFee, buySharesFee, sellSharesFee]
+        [initialMarketProbability, initialMarketSubsidization, initialMarketYes, initialMarketNo, createMarketCost, traderBonus, groupAddAnswerCost, groupSoftAnswerThreshold, groupHardAnswerSafetyCap, initialAccountBalance, maximumDebtAllowed, minimumBet, maxDustPerSale, initialBetFee, buySharesFee, sellSharesFee]
 
     LoginRequest:
       type: object
@@ -7030,6 +7037,22 @@ components:
         traderBonus:
           type: integer
           format: int64
+        multipleChoiceBinary:
+          $ref: '#/components/schemas/MultipleChoiceBinaryMarketPolicy'
+
+    MultipleChoiceBinaryMarketPolicy:
+      type: object
+      properties:
+        addAnswerCost:
+          type: integer
+          format: int64
+          description: Fee charged for later answer additions when that feature is enabled. Initial answers are included in the group proposal cost.
+        softAnswerReviewThreshold:
+          type: integer
+          description: UI/review warning threshold for large answer sets.
+        hardAnswerSafetyCap:
+          type: integer
+          description: Operational hard cap for answer count to protect human comprehension and backend workload.
 
     UserEconomics:
       type: object
@@ -7068,12 +7091,14 @@ components:
 
     FrontendConfig:
       type: object
-      required: [charts, game]
+      required: [charts, game, marketGroups]
       properties:
         charts:
           $ref: '#/components/schemas/FrontendCharts'
         game:
           $ref: '#/components/schemas/FrontendGame'
+        marketGroups:
+          $ref: '#/components/schemas/FrontendMarketGroups'
 
     FrontendCharts:
       type: object
@@ -7091,6 +7116,13 @@ components:
         mode:
           type: string
           enum: [open, moderator]
+
+    FrontendMarketGroups:
+      type: object
+      required: [multipleChoiceBinary]
+      properties:
+        multipleChoiceBinary:
+          $ref: '#/components/schemas/MultipleChoiceBinaryMarketPolicy'
 
     GlobalLeaderboardEntry:
       type: object

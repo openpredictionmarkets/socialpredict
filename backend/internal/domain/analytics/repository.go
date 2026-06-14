@@ -190,11 +190,63 @@ func (r *GormRepository) UserWorkProfitResolvedMarkets(ctx context.Context, user
 	if err := db.Table("markets").
 		Select("id", "creator_username", "steward_username", "is_resolved", "resolution_result", "proposal_cost").
 		Where("COALESCE(NULLIF(steward_username, ''), creator_username) = ? AND is_resolved = ?", username, true).
+		Where("NOT EXISTS (SELECT 1 FROM market_group_members WHERE market_group_members.market_id = markets.id)").
 		Order("id ASC").
 		Find(&markets).Error; err != nil {
 		return nil, err
 	}
 	return mapWorkProfitMarkets(markets), nil
+}
+
+func (r *GormRepository) UserWorkProfitResolvedMarketGroups(ctx context.Context, username string) ([]WorkProfitMarketGroupRecord, error) {
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var groups []analyticsWorkProfitMarketGroupRow
+	if err := db.Table("market_groups").
+		Select("id", "creator_username", "steward_username", "lifecycle_status", "proposal_cost").
+		Where("COALESCE(NULLIF(steward_username, ''), creator_username) = ? AND lifecycle_status = ?", username, "resolved").
+		Order("id ASC").
+		Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	return r.hydrateWorkProfitMarketGroups(ctx, groups)
+}
+
+func (r *GormRepository) ListMarketGroupFeeRecords(ctx context.Context) ([]WorkProfitMarketGroupRecord, error) {
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var groups []analyticsWorkProfitMarketGroupRow
+	if err := db.Table("market_groups").
+		Select("id", "creator_username", "steward_username", "lifecycle_status", "proposal_cost").
+		Order("id ASC").
+		Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	return r.hydrateWorkProfitMarketGroups(ctx, groups)
+}
+
+func (r *GormRepository) hydrateWorkProfitMarketGroups(ctx context.Context, groups []analyticsWorkProfitMarketGroupRow) ([]WorkProfitMarketGroupRecord, error) {
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	records := mapWorkProfitMarketGroups(groups)
+	for index := range records {
+		var members []analyticsMarketGroupMemberRow
+		if err := db.Table("market_group_members").
+			Select("market_id").
+			Where("group_id = ?", records[index].ID).
+			Order("display_order ASC, id ASC").
+			Find(&members).Error; err != nil {
+			return nil, err
+		}
+		records[index].MemberMarketIDs = mapMarketGroupMemberIDs(members)
+	}
+	return records, nil
 }
 
 func (r *GormRepository) listUserBets(db *gorm.DB, username string) ([]boundary.Bet, error) {
@@ -327,6 +379,18 @@ type analyticsWorkProfitMarketRow struct {
 	ProposalCost     int64
 }
 
+type analyticsWorkProfitMarketGroupRow struct {
+	ID              uint
+	CreatorUsername string
+	StewardUsername string
+	LifecycleStatus string
+	ProposalCost    int64
+}
+
+type analyticsMarketGroupMemberRow struct {
+	MarketID uint
+}
+
 type analyticsBetRow struct {
 	ID        uint
 	Username  string
@@ -379,6 +443,35 @@ func mapWorkProfitMarkets(dbMarkets []analyticsWorkProfitMarketRow) []WorkProfit
 		}
 	}
 	return markets
+}
+
+func mapWorkProfitMarketGroups(dbGroups []analyticsWorkProfitMarketGroupRow) []WorkProfitMarketGroupRecord {
+	groups := make([]WorkProfitMarketGroupRecord, len(dbGroups))
+	for i, group := range dbGroups {
+		stewardUsername := group.StewardUsername
+		if stewardUsername == "" {
+			stewardUsername = group.CreatorUsername
+		}
+		groups[i] = WorkProfitMarketGroupRecord{
+			ID:              group.ID,
+			CreatorUsername: group.CreatorUsername,
+			StewardUsername: stewardUsername,
+			LifecycleStatus: group.LifecycleStatus,
+			ProposalCost:    group.ProposalCost,
+		}
+	}
+	return groups
+}
+
+func mapMarketGroupMemberIDs(members []analyticsMarketGroupMemberRow) []uint {
+	ids := make([]uint, 0, len(members))
+	for _, member := range members {
+		if member.MarketID == 0 {
+			continue
+		}
+		ids = append(ids, member.MarketID)
+	}
+	return ids
 }
 
 func mapBets(dbBets []analyticsBetRow) []boundary.Bet {

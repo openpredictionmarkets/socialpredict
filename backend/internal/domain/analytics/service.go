@@ -37,6 +37,20 @@ type FinancialsRepository interface {
 	ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error)
 }
 
+// MarketGroupFinancialsRepository is an optional analytics seam for grouped
+// market work-profit derivation. Implementations that do not support market
+// groups keep the standalone binary behavior.
+type MarketGroupFinancialsRepository interface {
+	UserWorkProfitResolvedMarketGroups(ctx context.Context, username string) ([]WorkProfitMarketGroupRecord, error)
+}
+
+// MarketGroupFeeRepository is an optional analytics seam for grouped market
+// fee retention. It keeps grouped display/accounting extensions out of
+// transaction-path repository interfaces.
+type MarketGroupFeeRepository interface {
+	ListMarketGroupFeeRecords(ctx context.Context) ([]WorkProfitMarketGroupRecord, error)
+}
+
 // UserFinancialMetricSnapshotRepository persists authenticated display-only
 // user financial read models. It is intentionally separate from Repository so
 // transaction paths cannot satisfy their dependencies from financial snapshots.

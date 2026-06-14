@@ -3,9 +3,9 @@ title: Multiple Choice Binary Markets Design
 document_type: feature-design
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-12T00:00:00Z
-updated_at_display: "Friday, June 12, 2026"
-update_reason: "Define parent market-group design, child binary market ownership, probability policy, migrations, and implementation boundaries."
+updated_at: 2026-06-14T00:00:00Z
+updated_at_display: "Sunday, June 14, 2026"
+update_reason: "Record setup-configured grouped-market economics and group-level steward work-profit policy."
 status: draft
 ---
 
@@ -159,22 +159,38 @@ Validation:
 - answer labels follow market label constraints or a new answer-label constraint
 - at least two answers are required
 - answer labels must be unique after trimming/case normalization
-- maximum answer count should be bounded, likely reusing or adapting a `MAX_ANSWERS` constant
+- answer count should use setup-configured guardrails: a soft review threshold for unusually large groups and a hard safety cap for abuse/performance protection
 - no answer deletion after approval in the baseline
 
 ## Cost Policy
 
-Recommended baseline: charge one group proposal cost, not one full market creation cost per child.
+Baseline: charge one group proposal cost at creation time, regardless of the number of initial answers.
 
 Reason:
 
 - A multiple-choice group is one moderator proposal from the participant perspective.
-- Charging per child answer would make normal multiple-choice questions expensive and discourage use.
+- Charging per initial answer would make thoughtful upfront enumeration expensive and discourage moderators from listing plausible outcomes at creation time.
 - Child markets still collect initial participant fees independently when users trade them.
+- Later answer additions, if enabled, should charge `multipleChoiceBinary.addAnswerCost` from `setup.yaml` because they expand an already-published governance object.
+- Later answer-addition fees should increase the parent group proposal-cost threshold so the steward only earns work profit after participant fees exceed the total cost paid to create and expand the group.
 
-Open decision:
+Configured policy:
 
-- Whether group proposal cost should scale modestly with answer count to discourage spam.
+- `economics.marketincentives.multipleChoiceBinary.addAnswerCost`: credit cost for later answer additions after the group exists.
+- `economics.marketincentives.multipleChoiceBinary.softAnswerReviewThreshold`: review/usability warning threshold, not a hard product claim about possible real-world outcomes.
+- `economics.marketincentives.multipleChoiceBinary.hardAnswerSafetyCap`: operational cap for abuse and computational safety, not a philosophical maximum on possible answers.
+
+## Work Profit Policy
+
+Normal binary markets already derive moderator work profit at resolution time. The first-entry participant fee is collected when a user first trades a market, but it is not immediately paid to the market creator. On non-`N/A` resolution, surplus participant fees above the market proposal-cost threshold are paid as `WORK_PROFIT` to the current steward, falling back to the creator if no steward is assigned.
+
+Multiple-choice binary groups should mirror that accounting at the group level:
+
+- child market bettor payouts remain per child market
+- child markets inside a group must not independently pay child work profit
+- participant fee income counts each unique participant once across the whole group
+- group work profit is paid once, after group resolution, to the current group steward
+- group work profit uses the parent group proposal cost as the threshold
 
 ## Governance And Review
 
@@ -360,7 +376,7 @@ Consolidated child-page layout:
 | Child math | Reuse existing WPAM/DBPM binary math. |
 | Payout | Execute existing child-market payout/refund paths. |
 | Resolution | Resolve child markets; group helpers orchestrate child resolutions. |
-| Cost | Charge one group proposal cost in baseline. |
+| Cost | Charge one group proposal cost for initial answers; price later additions through setup policy if enabled. |
 | Tags | Parent tags drive discovery; child projection supports search/filter if needed. |
 | Read models | Cache display payloads only; transaction paths remain canonical. |
 | Migrations | Additive timestamped Go migrations with tests where practical. |
@@ -373,7 +389,7 @@ Consolidated child-page layout:
 | Group resolution accidentally bypasses payout rules. | Group resolution service must call existing child resolution paths and have tests. |
 | Child markets appear as duplicate noise in `/markets`. | Discovery should prefer group cards and optionally hide child markets from top-level lists unless explicitly searched. |
 | Answer edits after trading change the contract. | Answer labels immutable after approval; use amendments for parent description clarifications. |
-| Per-child proposal costs make groups impractical. | Charge one group proposal cost at baseline; revisit abuse controls later. |
+| Per-child proposal costs make groups impractical. | Include initial answers in one group proposal cost; use setup-configured soft/hard answer guardrails for abuse and usability. |
 | Future sum-to-one display drifts from payout math. | Defer until a distinct coupled market design exists. |
 
 ## Open Questions
@@ -382,4 +398,4 @@ Consolidated child-page layout:
 - Should an exclusive group require admin/steward to resolve every child in one transaction?
 - Should parent and child descriptions be identical, or should children have generated descriptions that reference the parent contract?
 - Should child market tags be copied at approval time or projected dynamically from the parent group?
-- What maximum answer count is appropriate for performance and UI clarity?
+- Should later answer additions increase parent proposal cost immediately, or only after admin approval?

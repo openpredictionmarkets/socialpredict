@@ -105,6 +105,11 @@ func GenerateEconomicConfig() *setup.EconomicConfig {
 			MarketIncentives: setup.MarketIncentives{
 				CreateMarketCost: 10,
 				TraderBonus:      1,
+				MultipleChoiceBinary: setup.MultipleChoiceBinaryMarkets{
+					AddAnswerCost:             2,
+					SoftAnswerReviewThreshold: 12,
+					HardAnswerSafetyCap:       50,
+				},
 			},
 			User: setup.User{
 				InitialAccountBalance: 0,

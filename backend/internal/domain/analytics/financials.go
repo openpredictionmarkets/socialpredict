@@ -56,6 +56,29 @@ func (s *Service) computeUserWorkProfits(ctx context.Context, username string) (
 		total += stewardMarketWorkProfit(bets, s.config.InitialBetFee, creationCost)
 	}
 
+	groupRepo, ok := s.financialsRepo.(MarketGroupFinancialsRepository)
+	if !ok {
+		return total, nil
+	}
+	groups, err := groupRepo.UserWorkProfitResolvedMarketGroups(ctx, username)
+	if err != nil {
+		return 0, err
+	}
+	for _, group := range groups {
+		if group.LifecycleStatus != "resolved" {
+			continue
+		}
+		groupBets := make([][]boundary.Bet, 0, len(group.MemberMarketIDs))
+		for _, marketID := range group.MemberMarketIDs {
+			bets, err := s.financialsRepo.ListBetsForMarket(ctx, marketID)
+			if err != nil {
+				return 0, err
+			}
+			groupBets = append(groupBets, bets)
+		}
+		total += stewardMarketGroupWorkProfit(groupBets, s.config.InitialBetFee, creationCostForWorkProfit(group.ProposalCost, s.config.CreateMarketCost))
+	}
+
 	return total, nil
 }
 
@@ -79,6 +102,26 @@ func participationFeeIncome(bets []boundary.Bet, initialBetFee int64) int64 {
 		participants[bet.Username] = struct{}{}
 	}
 	return int64(len(participants)) * initialBetFee
+}
+
+func stewardMarketGroupWorkProfit(betsByAnswer [][]boundary.Bet, initialBetFee int64, creationCost int64) int64 {
+	if initialBetFee <= 0 {
+		return 0
+	}
+	participants := make(map[string]struct{})
+	for _, bets := range betsByAnswer {
+		for _, bet := range bets {
+			if bet.Amount <= 0 || bet.Username == "" {
+				continue
+			}
+			participants[bet.Username] = struct{}{}
+		}
+	}
+	income := int64(len(participants))*initialBetFee - creationCost
+	if income < 0 {
+		return 0
+	}
+	return income
 }
 
 func creationCostForWorkProfit(proposalCost int64, fallbackCreateMarketCost int64) int64 {

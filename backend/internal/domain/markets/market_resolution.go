@@ -10,6 +10,10 @@ import (
 // Resolution updates market state and user balances synchronously and remains
 // outside background execution or retry infrastructure.
 func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
+	return s.resolveMarket(ctx, marketID, resolution, username, true)
+}
+
+func (s *Service) resolveMarket(ctx context.Context, marketID int64, resolution string, username string, applyWorkProfit bool) error {
 	outcome, err := s.resolutionPolicy.NormalizeResolution(resolution)
 	if err != nil {
 		return err
@@ -37,6 +41,10 @@ func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution 
 
 	if err := s.resolutionPolicy.Resolve(ctx, s.repo, s.userService, marketID, outcome); err != nil {
 		return err
+	}
+
+	if !applyWorkProfit {
+		return nil
 	}
 
 	return s.applyModeratorWorkProfit(ctx, market, outcome, resolverUsername)
