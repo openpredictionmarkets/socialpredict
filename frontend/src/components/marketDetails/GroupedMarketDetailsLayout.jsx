@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import LoadingSpinner from '../loaders/LoadingSpinner';
 import GroupedMarketChart from '../charts/GroupedMarketChart';
@@ -87,15 +87,31 @@ const paginationButtonClass = [
   'disabled:opacity-60',
 ].join(' ');
 
+const rateLimitRetryDelayMs = 1200;
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const isRateLimitError = (err) => err?.status === 429 || err?.reason === 'RATE_LIMITED';
+
+const withRateLimitRetry = async (request) => {
+  try {
+    return await request();
+  } catch (err) {
+    if (!isRateLimitError(err)) {
+      throw err;
+    }
+    await wait(rateLimitRetryDelayMs);
+    return request();
+  }
+};
+
 const groupedFetchJson = async (path, token = '') => {
-  return apiRequest(path, {
+  return withRateLimitRetry(() => apiRequest(path, {
     authenticated: Boolean(token),
     authToken: token,
     reasonMessages: {
       RATE_LIMITED: 'Grouped activity is loading. Wait a moment and try again.',
     },
     fallbackMessage: 'Failed to load grouped market activity.',
-  });
+  }));
 };
 
 const answerLabelFor = (answer) => answer?.answerLabel || `Answer ${Number(answer?.displayOrder || 0) + 1}`;
@@ -170,12 +186,15 @@ const GroupedBetsActivity = ({ groupId, refreshTrigger }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setPage(0);
+    setPage((current) => (current === 0 ? current : 0));
   }, [groupId, refreshTrigger]);
 
   useEffect(() => {
     let ignore = false;
     const loadBets = async () => {
+      if (refreshTrigger && page !== 0) {
+        return;
+      }
       const offset = page * pageSize;
       setError('');
       try {
@@ -276,12 +295,15 @@ const GroupedPositionsActivity = ({ groupId, token, refreshTrigger }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setPage(0);
+    setPage((current) => (current === 0 ? current : 0));
   }, [groupId, refreshTrigger, token]);
 
   useEffect(() => {
     let ignore = false;
     const loadPositions = async () => {
+      if (refreshTrigger && page !== 0) {
+        return;
+      }
       if (!token) {
         setPositions([]);
         setHasNextPage(false);
@@ -399,12 +421,15 @@ const GroupedLeaderboardActivity = ({ groupId, refreshTrigger }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setPage(0);
+    setPage((current) => (current === 0 ? current : 0));
   }, [groupId, refreshTrigger]);
 
   useEffect(() => {
     let ignore = false;
     const loadLeaderboard = async () => {
+      if (refreshTrigger && page !== 0) {
+        return;
+      }
       setError('');
       try {
         const offset = page * pageSize;
@@ -647,13 +672,24 @@ export default function GroupedMarketDetailsLayout({
   const [manualResolutions, setManualResolutions] = useState({});
   const [resolveError, setResolveError] = useState('');
   const [resolvingGroup, setResolvingGroup] = useState(false);
+  const hasLoadedGroupRef = useRef(false);
+  const currentGroupIdRef = useRef(null);
 
   useEffect(() => {
     let ignore = false;
+    const currentGroupId = marketGroup?.id;
+
+    if (currentGroupIdRef.current !== currentGroupId) {
+      currentGroupIdRef.current = currentGroupId;
+      hasLoadedGroupRef.current = false;
+    }
 
     const loadGroup = async () => {
-      setLoading(true);
-      setError('');
+      const isInitialLoad = !hasLoadedGroupRef.current;
+      if (isInitialLoad) {
+        setLoading(true);
+        setError('');
+      }
       try {
         const data = await getMarketGroupDetails(marketGroup.id);
         const rawAnswers = [...(data?.answers || [])].sort((left, right) => (
@@ -665,13 +701,21 @@ export default function GroupedMarketDetailsLayout({
             ...answer,
             descriptionAmendments: childDescriptionAmendments(answer),
           })));
+          hasLoadedGroupRef.current = true;
+          setError('');
         }
       } catch (err) {
         if (!ignore) {
-          setError(err.message || 'Failed to load grouped market.');
+          if (!hasLoadedGroupRef.current) {
+            setError(err.message || 'Failed to load grouped market.');
+          } else {
+            console.warn('[grouped-market] background refresh failed', err);
+          }
         }
       } finally {
-        if (!ignore) {
+        if (!ignore && !hasLoadedGroupRef.current) {
+          setLoading(false);
+        } else if (!ignore) {
           setLoading(false);
         }
       }
@@ -778,9 +822,6 @@ export default function GroupedMarketDetailsLayout({
   const handleTransactionSuccess = () => {
     setShowTradeModal(false);
     setRefreshKey((current) => current + 1);
-    if (refetchData) {
-      refetchData();
-    }
   };
 
   const submitGroupResolution = async () => {

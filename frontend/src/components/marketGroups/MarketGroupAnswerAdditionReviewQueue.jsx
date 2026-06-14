@@ -7,6 +7,21 @@ import {
 } from '../../api/marketsApi';
 
 const statusLabel = (status) => String(status || 'pending').toLowerCase();
+const rateLimitRetryDelayMs = 1200;
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const isRateLimitError = (err) => err?.status === 429 || err?.reason === 'RATE_LIMITED';
+
+const withRateLimitRetry = async (request) => {
+  try {
+    return await request();
+  } catch (err) {
+    if (!isRateLimitError(err)) {
+      throw err;
+    }
+    await wait(rateLimitRetryDelayMs);
+    return request();
+  }
+};
 
 export default function MarketGroupAnswerAdditionReviewQueue({
   token,
@@ -33,12 +48,12 @@ export default function MarketGroupAnswerAdditionReviewQueue({
     setLoading(true);
     setError('');
     try {
-      const data = await listMarketGroupAnswerAdditionsForReview({
+      const data = await withRateLimitRetry(() => listMarketGroupAnswerAdditionsForReview({
         groupId,
         token,
         status: normalizedStatus,
         limit: 100,
-      });
+      }));
       setAdditions(data.additions || []);
     } catch (err) {
       setError(err.message || 'Unable to load grouped answer options.');
