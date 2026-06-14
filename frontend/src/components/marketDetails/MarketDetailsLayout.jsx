@@ -159,18 +159,6 @@ function MarketDetailsTable({
       </div>
 
       <div className='mb-4'>
-        <MarketChart
-          data={probabilityChanges}
-          currentProbability={currentProbability}
-          title='Probability Changes'
-          className='w-full'
-          closeDateTime={safeMarket.resolutionDateTime}
-          yesLabel={safeMarket.yesLabel}
-          noLabel={safeMarket.noLabel}
-        />
-      </div>
-
-      <div className='mb-4'>
         <button
           onClick={() => setShowFullDescription(!showFullDescription)}
           className='w-full py-2 bg-gray-700 hover:bg-gray-600 transition-colors duration-200 rounded-lg text-center text-sm'
@@ -216,6 +204,18 @@ function MarketDetailsTable({
           </div>
         </div>
       )}
+
+      <div className='mb-4'>
+        <MarketChart
+          data={probabilityChanges}
+          currentProbability={currentProbability}
+          title='Probability Changes'
+          className='w-full'
+          closeDateTime={safeMarket.resolutionDateTime}
+          yesLabel={safeMarket.yesLabel}
+          noLabel={safeMarket.noLabel}
+        />
+      </div>
 
       {canProposeDescriptionAmendment && (
         <form onSubmit={submitDescriptionAmendment} className="mb-4 grid gap-3 rounded-lg border border-sky-800/60 bg-sky-950/20 p-4">

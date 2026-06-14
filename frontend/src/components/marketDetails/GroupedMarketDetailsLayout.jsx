@@ -960,6 +960,58 @@ export default function GroupedMarketDetailsLayout({
         <MarketTagChips tags={tags} className='mt-3' />
       </section>
 
+      {(group.description || descriptionAmendments.length > 0) && (
+        <>
+          <div className='mb-4'>
+            <button
+              type='button'
+              onClick={() => setShowFullDescription(!showFullDescription)}
+              className='w-full py-2 bg-gray-700 hover:bg-gray-600 transition-colors duration-200 rounded-lg text-center text-sm'
+            >
+              {showFullDescription ? 'Hide Contract Text' : 'Show Full Contract Text'}
+            </button>
+          </div>
+          {showFullDescription && (
+            <div className='mb-4 rounded-lg bg-gray-800 p-4 text-sm'>
+              <div className='grid gap-4'>
+                <section>
+                  <h2 className='mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400'>
+                    Description
+                  </h2>
+                  {group.description ? (
+                    <p className='whitespace-pre-wrap'>{group.description}</p>
+                  ) : (
+                    <p className='text-gray-500 italic'>No description provided.</p>
+                  )}
+                </section>
+                {descriptionAmendments.length > 0 && (
+                  <section className='grid gap-3'>
+                    <h2 className='text-sm font-semibold uppercase tracking-[0.14em] text-sky-200'>Amendments</h2>
+                    {descriptionAmendments.map((amendment, index) => (
+                      <article key={amendment.groupKey || `${amendment.body || amendment.Body}-${index}`} className='rounded-md border border-sky-900/70 bg-sky-950/30 p-3'>
+                        <div className='mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80'>
+                          <span>Amendment {index + 1}</span>
+                          <span>Submitted by @{amendment.createdBy || amendment.CreatedBy}</span>
+                          {(amendment.approvedAt || amendment.ApprovedAt) && (
+                            <span>Approved {new Date(amendment.approvedAt || amendment.ApprovedAt).toLocaleString()}</span>
+                          )}
+                          {amendment.answerLabels?.length > 1 && (
+                            <span>
+                              Applies to {amendment.answerLabels.length} answers: {amendment.answerLabels.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <MarkdownLite className='text-gray-200'>{amendment.body || amendment.Body}</MarkdownLite>
+                      </article>
+                    ))}
+                  </section>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       <div className='mb-4'>
         <GroupedMarketChart answers={answers} title='Probability Changes' />
       </div>
@@ -1017,58 +1069,6 @@ export default function GroupedMarketDetailsLayout({
             />
           </div>
         </section>
-      )}
-
-      {(group.description || descriptionAmendments.length > 0) && (
-        <>
-          <div className='mb-4'>
-            <button
-              type='button'
-              onClick={() => setShowFullDescription(!showFullDescription)}
-              className='w-full py-2 bg-gray-700 hover:bg-gray-600 transition-colors duration-200 rounded-lg text-center text-sm'
-            >
-              {showFullDescription ? 'Hide Contract Text' : 'Show Full Contract Text'}
-            </button>
-          </div>
-          {showFullDescription && (
-            <div className='mb-4 rounded-lg bg-gray-800 p-4 text-sm'>
-              <div className='grid gap-4'>
-                <section>
-                  <h2 className='mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-gray-400'>
-                    Description
-                  </h2>
-                  {group.description ? (
-                    <p className='whitespace-pre-wrap'>{group.description}</p>
-                  ) : (
-                    <p className='text-gray-500 italic'>No description provided.</p>
-                  )}
-                </section>
-                {descriptionAmendments.length > 0 && (
-                  <section className='grid gap-3'>
-                    <h2 className='text-sm font-semibold uppercase tracking-[0.14em] text-sky-200'>Amendments</h2>
-                    {descriptionAmendments.map((amendment, index) => (
-                      <article key={amendment.groupKey || `${amendment.body || amendment.Body}-${index}`} className='rounded-md border border-sky-900/70 bg-sky-950/30 p-3'>
-                        <div className='mb-2 flex flex-wrap gap-2 text-xs text-sky-100/80'>
-                          <span>Amendment {index + 1}</span>
-                          <span>Submitted by @{amendment.createdBy || amendment.CreatedBy}</span>
-                          {(amendment.approvedAt || amendment.ApprovedAt) && (
-                            <span>Approved {new Date(amendment.approvedAt || amendment.ApprovedAt).toLocaleString()}</span>
-                          )}
-                          {amendment.answerLabels?.length > 1 && (
-                            <span>
-                              Applies to {amendment.answerLabels.length} answers: {amendment.answerLabels.join(', ')}
-                            </span>
-                          )}
-                        </div>
-                        <MarkdownLite className='text-gray-200'>{amendment.body || amendment.Body}</MarkdownLite>
-                      </article>
-                    ))}
-                  </section>
-                )}
-              </div>
-            </div>
-          )}
-        </>
       )}
 
       {canProposeDescriptionAmendment && (
