@@ -653,6 +653,7 @@ export default function GroupedMarketDetailsLayout({
   const [error, setError] = useState('');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [selectedTradeMarketId, setSelectedTradeMarketId] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [amendmentBody, setAmendmentBody] = useState('');
   const [amendmentReason, setAmendmentReason] = useState('');
@@ -735,9 +736,18 @@ export default function GroupedMarketDetailsLayout({
     if (!answers.length) {
       setWinningMarketId(0);
       setManualResolutions({});
+      setSelectedTradeMarketId(0);
       return;
     }
     setWinningMarketId((current) => current || answers[0]?.marketId || 0);
+    setSelectedTradeMarketId((current) => {
+      const stillExists = answers.some((answer) => Number(answer.marketId) === Number(current));
+      if (stillExists) {
+        return current;
+      }
+      const firstTradable = answers.find((answer) => canTradeMarket(answer?.market?.market || {}, isLoggedIn));
+      return firstTradable?.marketId || answers[0]?.marketId || 0;
+    });
     setManualResolutions((current) => {
       const next = {};
       answers.forEach((answer) => {
@@ -948,25 +958,11 @@ export default function GroupedMarketDetailsLayout({
     }
   };
 
-  const answerTradeTabs = sortedAnswers.map((answer) => {
-    const childMarket = answer?.market?.market || {};
-    const tradable = canTradeMarket(childMarket, isLoggedIn);
-    return {
-      label: answer.answerLabel || `Answer ${answer.displayOrder + 1}`,
-      content: tradable ? (
-        <TradeTabs
-          marketId={answer.marketId}
-          market={childMarket}
-          token={token}
-          onTransactionSuccess={handleTransactionSuccess}
-        />
-      ) : (
-        <div className='rounded-lg bg-blue-950/70 p-4 text-sm text-blue-50'>
-          This answer is not open for trading.
-        </div>
-      ),
-    };
-  });
+  const selectedTradeAnswer = sortedAnswers.find((answer) => (
+    Number(answer.marketId) === Number(selectedTradeMarketId)
+  )) || sortedAnswers[0];
+  const selectedTradeMarket = selectedTradeAnswer?.market?.market || {};
+  const selectedTradeIsTradable = canTradeMarket(selectedTradeMarket, isLoggedIn);
 
   if (loading) {
     return (
@@ -1298,8 +1294,59 @@ export default function GroupedMarketDetailsLayout({
 
       {showTradeModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-50'>
-          <div className='bet-modal relative m-6 mx-auto rounded-lg bg-blue-900 p-6 text-white' style={{ width: '350px' }}>
-            <SiteTabs tabs={answerTradeTabs} />
+          <div className='relative m-4 mx-auto max-h-[90vh] w-[min(94vw,760px)] overflow-y-auto rounded-lg bg-blue-950 p-5 text-white shadow-xl'>
+            <div className='mb-4 pr-8'>
+              <p className='text-xs font-semibold uppercase tracking-[0.16em] text-blue-200'>Trade Answer</p>
+              <h2 className='mt-1 text-xl font-semibold'>{group.questionTitle || marketGroup.questionTitle}</h2>
+              <p className='mt-1 text-sm text-blue-100/70'>Choose one answer, then purchase or sell shares for that answer.</p>
+            </div>
+            <div className='grid gap-4 md:grid-cols-[220px,minmax(0,1fr)]'>
+              <div className='grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-blue-800 bg-blue-900/50 p-2 md:max-h-[520px]'>
+                {sortedAnswers.map((answer) => {
+                  const childMarket = answer?.market?.market || {};
+                  const tradable = canTradeMarket(childMarket, isLoggedIn);
+                  const active = Number(answer.marketId) === Number(selectedTradeAnswer?.marketId);
+                  return (
+                    <button
+                      key={answer.marketId}
+                      type='button'
+                      onClick={() => setSelectedTradeMarketId(answer.marketId)}
+                      className={`rounded-md border px-3 py-2 text-left transition ${
+                        active
+                          ? 'border-sky-300 bg-sky-800 text-white'
+                          : 'border-blue-800 bg-blue-950/60 text-blue-100 hover:bg-blue-900'
+                      }`}
+                    >
+                      <span className='block truncate text-sm font-semibold'>{answerLabelFor(answer)}</span>
+                      <span className='mt-1 block text-xs text-blue-100/70'>
+                        YES {probabilityDisplay(answer)}
+                        {!tradable ? ' · Closed' : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className='min-w-0 rounded-lg bg-blue-900/60 p-3'>
+                <div className='mb-3 rounded-md border border-blue-800 bg-blue-950/50 px-3 py-2'>
+                  <p className='text-xs font-semibold uppercase tracking-[0.14em] text-blue-200'>Selected Answer</p>
+                  <p className='mt-1 text-lg font-semibold text-white'>
+                    {selectedTradeAnswer ? answerLabelFor(selectedTradeAnswer) : 'No answer selected'}
+                  </p>
+                </div>
+                {selectedTradeIsTradable ? (
+                  <TradeTabs
+                    marketId={selectedTradeAnswer.marketId}
+                    market={selectedTradeMarket}
+                    token={token}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                ) : (
+                  <div className='rounded-lg bg-blue-950/70 p-4 text-sm text-blue-50'>
+                    This answer is not open for trading.
+                  </div>
+                )}
+              </div>
+            </div>
             <button
               type='button'
               onClick={() => setShowTradeModal(false)}
