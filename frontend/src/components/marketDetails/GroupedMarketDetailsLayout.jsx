@@ -1294,42 +1294,46 @@ export default function GroupedMarketDetailsLayout({
 
       {showTradeModal && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-50'>
-          <div className='relative m-4 mx-auto max-h-[90vh] w-[min(94vw,760px)] overflow-y-auto rounded-lg bg-blue-950 p-5 text-white shadow-xl'>
+          <div className='bet-modal relative m-4 mx-auto max-h-[90vh] w-[min(94vw,780px)] overflow-y-auto rounded-lg bg-blue-900 p-6 text-white shadow-xl'>
             <div className='mb-4 pr-8'>
-              <p className='text-xs font-semibold uppercase tracking-[0.16em] text-blue-200'>Trade Answer</p>
-              <h2 className='mt-1 text-xl font-semibold'>{group.questionTitle || marketGroup.questionTitle}</h2>
-              <p className='mt-1 text-sm text-blue-100/70'>Choose one answer, then purchase or sell shares for that answer.</p>
+              <h2 className='text-xl'>Trade</h2>
+              <p className='mt-1 text-sm text-gray-300'>
+                Select an answer, then buy or sell shares.
+              </p>
             </div>
-            <div className='grid gap-4 md:grid-cols-[220px,minmax(0,1fr)]'>
-              <div className='grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-blue-800 bg-blue-900/50 p-2 md:max-h-[520px]'>
-                {sortedAnswers.map((answer) => {
-                  const childMarket = answer?.market?.market || {};
-                  const tradable = canTradeMarket(childMarket, isLoggedIn);
-                  const active = Number(answer.marketId) === Number(selectedTradeAnswer?.marketId);
-                  return (
-                    <button
-                      key={answer.marketId}
-                      type='button'
-                      onClick={() => setSelectedTradeMarketId(answer.marketId)}
-                      className={`rounded-md border px-3 py-2 text-left transition ${
-                        active
-                          ? 'border-sky-300 bg-sky-800 text-white'
-                          : 'border-blue-800 bg-blue-950/60 text-blue-100 hover:bg-blue-900'
-                      }`}
-                    >
-                      <span className='block truncate text-sm font-semibold'>{answerLabelFor(answer)}</span>
-                      <span className='mt-1 block text-xs text-blue-100/70'>
-                        YES {probabilityDisplay(answer)}
-                        {!tradable ? ' · Closed' : ''}
-                      </span>
-                    </button>
-                  );
-                })}
+            <div className='grid gap-4 md:grid-cols-[230px,minmax(0,1fr)]'>
+              <div className='rounded-lg border border-gray-200/30 bg-blue-950/25 p-3'>
+                <h3 className='mb-3 text-sm font-semibold text-gray-200'>Answer</h3>
+                <div className='grid max-h-72 gap-2 overflow-y-auto pr-1 md:max-h-[520px]'>
+                  {sortedAnswers.map((answer) => {
+                    const childMarket = answer?.market?.market || {};
+                    const tradable = canTradeMarket(childMarket, isLoggedIn);
+                    const active = Number(answer.marketId) === Number(selectedTradeAnswer?.marketId);
+                    return (
+                      <button
+                        key={answer.marketId}
+                        type='button'
+                        onClick={() => setSelectedTradeMarketId(answer.marketId)}
+                        className={`w-full rounded border px-4 py-2 text-left text-white transition focus:outline-none ${
+                          active
+                            ? 'border-white/70 bg-neutral-btn'
+                            : 'border-white/20 bg-custom-gray-light hover:bg-neutral-btn'
+                        }`}
+                      >
+                        <span className='block truncate text-sm font-semibold'>{answerLabelFor(answer)}</span>
+                        <span className='mt-1 block text-xs text-gray-300'>
+                          YES {probabilityDisplay(answer)}
+                          {!tradable ? ' · Closed' : ''}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className='min-w-0 rounded-lg bg-blue-900/60 p-3'>
-                <div className='mb-3 rounded-md border border-blue-800 bg-blue-950/50 px-3 py-2'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.14em] text-blue-200'>Selected Answer</p>
-                  <p className='mt-1 text-lg font-semibold text-white'>
+              <div className='min-w-0'>
+                <div className='mb-3 border-b border-gray-200 pb-3'>
+                  <p className='text-sm text-gray-300'>Selected Answer</p>
+                  <p className='mt-1 text-lg text-white'>
                     {selectedTradeAnswer ? answerLabelFor(selectedTradeAnswer) : 'No answer selected'}
                   </p>
                 </div>
@@ -1341,7 +1345,7 @@ export default function GroupedMarketDetailsLayout({
                     onTransactionSuccess={handleTransactionSuccess}
                   />
                 ) : (
-                  <div className='rounded-lg bg-blue-950/70 p-4 text-sm text-blue-50'>
+                  <div className='rounded-lg bg-blue-900 p-6 text-sm text-white'>
                     This answer is not open for trading.
                   </div>
                 )}
