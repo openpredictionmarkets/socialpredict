@@ -61,6 +61,9 @@ func TestListMyLifecycleMarketsAttachesMarketGroupMetadata(t *testing.T) {
 			if filters.Status != dmarkets.MarketLifecyclePublished {
 				t.Fatalf("Status = %q, want published", filters.Status)
 			}
+			if filters.Query != "home" {
+				t.Fatalf("Query = %q, want home", filters.Query)
+			}
 			return []*dmarkets.Market{
 				{
 					ID:                 101,
@@ -87,7 +90,7 @@ func TestListMyLifecycleMarketsAttachesMarketGroupMetadata(t *testing.T) {
 	handler := ListMyLifecycleMarketsHandler(svc, lifecycleAuthMock{
 		user: &dusers.User{Username: "moderator", UserType: string(dusers.UserTypeModerator)},
 	})
-	req := httptest.NewRequest(http.MethodGet, "/v0/profile/markets?status=published", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v0/profile/markets?status=published&query=home", nil)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

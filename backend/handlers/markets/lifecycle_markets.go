@@ -68,6 +68,7 @@ func parseLifecycleMarketFilters(w http.ResponseWriter, r *http.Request) (dmarke
 
 	filters := dmarkets.ListFilters{
 		Status: status,
+		Query:  query.Get("query"),
 		Limit:  limit,
 		Offset: offset,
 	}
