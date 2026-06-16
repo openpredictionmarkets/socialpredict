@@ -29,6 +29,12 @@ func (s *Service) ComputeUserFinancials(ctx context.Context, req FinancialSnapsh
 		return nil, err
 	}
 	req.WorkProfits = workProfits
+	unrealizedWorkIncome, unrealizedWorkProfits, err := s.computeUserUnrealizedWorkFinancials(ctx, req.Username)
+	if err != nil {
+		return nil, err
+	}
+	req.UnrealizedWorkIncome = unrealizedWorkIncome
+	req.UnrealizedWorkProfits = unrealizedWorkProfits
 
 	snapshot := NewUserFinancialMetricSnapshotCalculator(s.config).Calculate(req, positions, time.Time{})
 	return &snapshot.Financial, nil
@@ -82,6 +88,71 @@ func (s *Service) computeUserWorkProfits(ctx context.Context, username string) (
 	return total, nil
 }
 
+func (s *Service) computeUserUnrealizedWorkFinancials(ctx context.Context, username string) (int64, int64, error) {
+	if s.financialsRepo == nil {
+		return 0, 0, errors.New("financials repository not provided")
+	}
+
+	var income int64
+	var profit int64
+	marketRepo, ok := s.financialsRepo.(UnrealizedWorkProfitRepository)
+	if ok {
+		markets, err := marketRepo.UserWorkProfitUnresolvedMarkets(ctx, username)
+		if err != nil {
+			return 0, 0, err
+		}
+		for _, market := range markets {
+			if market.IsResolved || market.ResolutionResult == "N/A" {
+				continue
+			}
+			bets, err := s.financialsRepo.ListBetsForMarket(ctx, market.ID)
+			if err != nil {
+				return 0, 0, err
+			}
+			feeIncome := participationFeeIncome(bets, s.config.InitialBetFee)
+			if market.StewardUsername == username {
+				income += feeIncome
+				profit += feeIncome
+			}
+			if market.CreatorUsername == username {
+				profit -= creationCostForWorkProfit(market.ProposalCost, s.config.CreateMarketCost)
+			}
+		}
+	}
+
+	groupRepo, ok := s.financialsRepo.(UnrealizedMarketGroupFinancialsRepository)
+	if !ok {
+		return income, profit, nil
+	}
+	groups, err := groupRepo.UserWorkProfitUnresolvedMarketGroups(ctx, username)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, group := range groups {
+		if group.LifecycleStatus == "resolved" || group.LifecycleStatus == "rejected" {
+			continue
+		}
+		groupBets := make([][]boundary.Bet, 0, len(group.MemberMarketIDs))
+		for _, marketID := range group.MemberMarketIDs {
+			bets, err := s.financialsRepo.ListBetsForMarket(ctx, marketID)
+			if err != nil {
+				return 0, 0, err
+			}
+			groupBets = append(groupBets, bets)
+		}
+		feeIncome := groupParticipationFeeIncome(groupBets, s.config.InitialBetFee)
+		if group.StewardUsername == username {
+			income += feeIncome
+			profit += feeIncome
+		}
+		if group.CreatorUsername == username {
+			profit -= creationCostForWorkProfit(group.ProposalCost, s.config.CreateMarketCost)
+		}
+	}
+
+	return income, profit, nil
+}
+
 func stewardMarketWorkProfit(bets []boundary.Bet, initialBetFee int64, creationCost int64) int64 {
 	return participationFeeIncome(bets, initialBetFee) - creationCost
 }
@@ -101,6 +172,10 @@ func participationFeeIncome(bets []boundary.Bet, initialBetFee int64) int64 {
 }
 
 func stewardMarketGroupWorkProfit(betsByAnswer [][]boundary.Bet, initialBetFee int64, creationCost int64) int64 {
+	return groupParticipationFeeIncome(betsByAnswer, initialBetFee) - creationCost
+}
+
+func groupParticipationFeeIncome(betsByAnswer [][]boundary.Bet, initialBetFee int64) int64 {
 	if initialBetFee <= 0 {
 		return 0
 	}
@@ -113,7 +188,7 @@ func stewardMarketGroupWorkProfit(betsByAnswer [][]boundary.Bet, initialBetFee i
 			participants[bet.Username] = struct{}{}
 		}
 	}
-	return int64(len(participants))*initialBetFee - creationCost
+	return int64(len(participants)) * initialBetFee
 }
 
 func creationCostForWorkProfit(proposalCost int64, fallbackCreateMarketCost int64) int64 {
@@ -135,9 +210,11 @@ func NewUserFinancialMetricSnapshotCalculator(config Config) UserFinancialMetric
 
 func (c UserFinancialMetricSnapshotCalculator) Calculate(req FinancialSnapshotRequest, positions []positionsmath.MarketPosition, generatedAt time.Time) UserFinancialMetricSnapshot {
 	financial := FinancialSnapshot{
-		AccountBalance:     req.AccountBalance,
-		MaximumDebtAllowed: c.config.MaximumDebtAllowed,
-		WorkProfits:        req.WorkProfits,
+		AccountBalance:        req.AccountBalance,
+		MaximumDebtAllowed:    c.config.MaximumDebtAllowed,
+		WorkProfits:           req.WorkProfits,
+		UnrealizedWorkIncome:  req.UnrealizedWorkIncome,
+		UnrealizedWorkProfits: req.UnrealizedWorkProfits,
 	}
 	for _, pos := range positions {
 		profit := pos.Value - pos.TotalSpent

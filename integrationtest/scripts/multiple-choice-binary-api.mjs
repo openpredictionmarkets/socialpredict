@@ -63,6 +63,11 @@ async function login(username) {
   return (await api('POST', '/login', { body: { username, password } })).token;
 }
 
+async function financial(username, token) {
+  const response = await api('GET', `/users/${username}/financial`, { token });
+  return response.financial || {};
+}
+
 async function main() {
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
   const closeAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -70,6 +75,9 @@ async function main() {
   const bettorToken = await login(bettor);
   const adminToken = await login(admin);
   check('login seeded moderator, bettor, admin', true);
+  const stats = await api('GET', '/stats');
+  const initialBetFee = stats?.setupConfiguration?.initialBetFee || 1;
+  const beforeFinancial = await financial(moderator, modToken);
 
   const duplicate = await api('POST', '/market-groups', {
     token: modToken,
@@ -144,6 +152,11 @@ async function main() {
   const outcomes = details.answers.map((answer) => answer.market.market.resolutionResult);
   check('exclusive resolution resolves one YES', outcomes.filter((x) => x === 'YES').length === 1 && outcomes.filter((x) => x === 'NO').length === outcomes.length - 1, JSON.stringify(outcomes));
   check('parent group resolved', details.group.lifecycleStatus === 'resolved');
+
+  const afterFinancial = await financial(moderator, modToken);
+  const workProfitDelta = (afterFinancial.workProfits || 0) - (beforeFinancial.workProfits || 0);
+  const expectedNetWorkProfit = initialBetFee - (details.group.proposalCost || 0);
+  check('financials report net grouped work profit', workProfitDelta === expectedNetWorkProfit, `delta=${workProfitDelta}, expected=${expectedNetWorkProfit}`);
 }
 
 async function finish() {

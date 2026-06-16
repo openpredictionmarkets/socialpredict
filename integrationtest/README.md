@@ -17,7 +17,9 @@ from `loadtest/`, which is for capacity and performance testing.
 
 - `cases/multiple-choice-binary-markets.md`
 - `reports/multiple-choice-binary-markets-2026-06-15.md`
+- `reports/schemathesis-read-2026-06-16.md`
 - `scripts/multiple-choice-binary-api.mjs`
+- `scripts/schemathesis-read.sh`
 
 ## Quick Start
 
@@ -31,6 +33,25 @@ node integrationtest/scripts/multiple-choice-binary-api.mjs \
 
 Defaults assume seeded users `admin`, `testuser01`, and `testuser02` all use
 password `password`.
+
+Run read-only OpenAPI fuzz/contract checks with Schemathesis:
+
+```bash
+integrationtest/scripts/schemathesis-read.sh
+```
+
+Optional environment variables:
+
+```bash
+BASE_URL=http://localhost:8080
+MAX_EXAMPLES=5
+REPORT=junit
+PHASES=coverage
+AUTH_TOKEN=<bearer-token-for-authenticated-read-routes>
+READ_PATHS='/v0/setup /v0/setup/frontend /v0/stats /v0/market-tags'
+```
+
+The script writes ignored Schemathesis artifacts under `integrationtest/artifacts/`.
 
 ## Operating Notes
 

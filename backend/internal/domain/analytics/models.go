@@ -78,6 +78,8 @@ type FinancialSnapshotExposureReader interface {
 type FinancialSnapshotProfitReader interface {
 	TradingProfitsValue() int64
 	WorkProfitsValue() int64
+	UnrealizedWorkIncomeValue() int64
+	UnrealizedWorkProfitsValue() int64
 	TotalProfitsValue() int64
 	RealizedProfitsValue() int64
 	PotentialProfitsValue() int64
@@ -85,15 +87,17 @@ type FinancialSnapshotProfitReader interface {
 
 // FinancialSnapshot captures a user's financial aggregates.
 type FinancialSnapshot struct {
-	AccountBalance     int64
-	MaximumDebtAllowed int64
-	AmountInPlay       int64
-	AmountBorrowed     int64
-	RetainedEarnings   int64
-	Equity             int64
-	TradingProfits     int64
-	WorkProfits        int64
-	TotalProfits       int64
+	AccountBalance        int64
+	MaximumDebtAllowed    int64
+	AmountInPlay          int64
+	AmountBorrowed        int64
+	RetainedEarnings      int64
+	Equity                int64
+	TradingProfits        int64
+	WorkProfits           int64
+	UnrealizedWorkIncome  int64
+	UnrealizedWorkProfits int64
+	TotalProfits          int64
 
 	AmountInPlayActive int64
 	TotalSpent         int64
@@ -213,9 +217,15 @@ func (s FinancialSnapshot) RealizedValueValue() int64      { return s.RealizedVa
 func (s FinancialSnapshot) PotentialValueValue() int64     { return s.PotentialValue }
 func (s FinancialSnapshot) TradingProfitsValue() int64     { return s.TradingProfits }
 func (s FinancialSnapshot) WorkProfitsValue() int64        { return s.WorkProfits }
-func (s FinancialSnapshot) TotalProfitsValue() int64       { return s.TotalProfits }
-func (s FinancialSnapshot) RealizedProfitsValue() int64    { return s.RealizedProfits }
-func (s FinancialSnapshot) PotentialProfitsValue() int64   { return s.PotentialProfits }
+func (s FinancialSnapshot) UnrealizedWorkIncomeValue() int64 {
+	return s.UnrealizedWorkIncome
+}
+func (s FinancialSnapshot) UnrealizedWorkProfitsValue() int64 {
+	return s.UnrealizedWorkProfits
+}
+func (s FinancialSnapshot) TotalProfitsValue() int64     { return s.TotalProfits }
+func (s FinancialSnapshot) RealizedProfitsValue() int64  { return s.RealizedProfits }
+func (s FinancialSnapshot) PotentialProfitsValue() int64 { return s.PotentialProfits }
 
 // FinancialSnapshotRequestReader exposes only the request data needed to compute a snapshot.
 type FinancialSnapshotRequestReader interface {
@@ -225,9 +235,11 @@ type FinancialSnapshotRequestReader interface {
 
 // FinancialSnapshotRequest is the input for computing user financials.
 type FinancialSnapshotRequest struct {
-	Username       string
-	AccountBalance int64
-	WorkProfits    int64
+	Username              string
+	AccountBalance        int64
+	WorkProfits           int64
+	UnrealizedWorkIncome  int64
+	UnrealizedWorkProfits int64
 }
 
 func (r FinancialSnapshotRequest) UsernameValue() string      { return r.Username }

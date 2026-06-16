@@ -49,7 +49,7 @@ Methodology: each case was exercised through the public HTTP API (`/v0/...`) whe
 | 7 | Independent Probabilities — No Normalization | ✅ PASS |
 | 8 | Exclusive YES Resolution — One Winner | ✅ PASS |
 | 9 | Manual Resolution — Multiple Winners | ✅ PASS |
-| 10 | Steward Work Income Calculation | ⚠️ DISCREPANCY (formula) |
+| 10 | Steward Work Income Calculation | ✅ PASS (formula reconciled) |
 | 11 | Answer Addition — Steward Auto-Approval | ✅ PASS (minor: amendment also on new child) |
 | 12 | Answer Addition — Pending Review | ✅ PASS |
 | 13 | Answer Addition — Rejection | ✅ PASS |
@@ -61,7 +61,7 @@ Methodology: each case was exercised through the public HTTP API (`/v0/...`) whe
 | 19 | Grouped Positions View | ✅ PASS |
 | 20 | Grouped Bets Activity Tab | ✅ PASS |
 
-**17 PASS, 2 PASS-with-caveat, 1 discrepancy.** No crashes or data corruption observed.
+**18 PASS, 2 PASS-with-caveat, 0 discrepancies.** No crashes or data corruption observed.
 
 ---
 
@@ -114,12 +114,22 @@ Resolved group 1 with `mode = exclusive_yes`, `winningMarketId = Spain`.
 ### TC9 — Manual Resolution, Multiple Winners ✅
 New 4-answer group resolved with `mode = manual`: Spain=YES, France=YES, Germany=NO, Brazil=NO. DB confirmed each child resolved to its specified outcome (2 YES, 2 NO) and group `lifecycle_status = resolved`.
 
-### TC10 — Steward Work Income ⚠️ DISCREPANCY
+### TC10 — Steward Work Income ✅ PASS
 Group 1 had **4 unique participants** across its children. After resolution, steward `testuser01`'s balance moved `-30 → -26`, i.e. a `TransactionWorkProfit` of **+4 = 4 participants × initialBetFee(1)**.
 
-The implementation (`ModeratorGroupWorkFeeIncome`, called from `applyMarketGroupWorkProfit`) applies **`unique participants × InitialBetFee`** and does **not** subtract the proposal cost. The TESTCASE expectation `(participants × InitialBetFee) − ProposalCost` does **not** match the code.
+Follow-up reconciliation on 2026-06-16 confirmed this is intended balance behavior. The resolution-time balance transaction pays gross work income:
 
-A separate function `ModeratorGroupWorkProfitIncome` *does* subtract `creationCost`, but it is **not used** on the resolution path. The proposal cost is instead charged up front at group creation (the `-10` seen in TC1), so over the full lifecycle the steward nets `fees − cost`; however the resolution-time work-income transaction itself is fees-only. Either the test case formula or the implementation should be reconciled. (Unique-participant counting itself is correct — a user who trades multiple answers is counted once.)
+```text
+grossWorkIncome = uniqueParticipantsAcrossGroup * InitialBetFee
+```
+
+Financial reporting separately shows net work profit:
+
+```text
+netWorkProfit = grossWorkIncome - groupProposalCost
+```
+
+The proposal cost is charged up front at group creation, so subtracting it again from the resolution-time balance transaction would double-charge the steward/creator path. Unique-participant counting is correct: a user who trades multiple answers is counted once.
 
 ### TC11 — Answer Addition, Steward Auto-Approval ✅
 Steward `testuser01` proposed "Yellow" on a published group → immediately `status = approved` (`reviewedBy = testuser01`). New child market created ("Favorite color? - Yellow", inheriting parent resolution datetime + description). Description amendments written to existing children. Proposer charged `addAnswerCost = 2` (`-46 → -48`).
@@ -186,8 +196,7 @@ total: 7
 
 ## Recommendations
 
-1. **TC10 — reconcile the work-income formula.** Either update the spec to `participants × InitialBetFee` (proposal cost charged separately at creation), or change the resolution path to use `ModeratorGroupWorkProfitIncome` (which subtracts `creationCost`). Currently the spec and code disagree.
-2. **TC17 — make the "unpublished child" error specific.** Return a reason that names the offending child rather than the generic `MARKET_CLOSED`.
-3. **TC3 — fix the dead DTO tag.** `CreateMarketGroupRequest.AnswerLabels` says `validate:"max=20"` but the enforced cap is 50 and the validator isn't even run; align it with `hardAnswerSafetyCap`.
-4. **TC11 — confirm intended amendment scope.** Description amendments are written to the newly added child as well as the pre-existing ones; confirm this is desired.
-5. **TC6 — document share-rounding behavior.** Small stakes against near-certain outcomes can round to 0 shares, which affects position/leaderboard badges. Not grouped-market-specific, but worth noting for QA.
+1. **TC17 — make the "unpublished child" error specific.** Return a reason that names the offending child rather than the generic `MARKET_CLOSED`.
+2. **TC3 — fix the dead DTO tag.** `CreateMarketGroupRequest.AnswerLabels` says `validate:"max=20"` but the enforced cap is 50 and the validator isn't even run; align it with `hardAnswerSafetyCap`.
+3. **TC11 — confirm intended amendment scope.** Description amendments are written to the newly added child as well as the pre-existing ones; confirm this is desired.
+4. **TC6 — document share-rounding behavior.** Small stakes against near-certain outcomes can round to 0 shares, which affects position/leaderboard badges. Not grouped-market-specific, but worth noting for QA.

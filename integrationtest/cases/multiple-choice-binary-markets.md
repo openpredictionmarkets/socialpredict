@@ -115,9 +115,11 @@ Each test case describes a scenario and the expected behaviour.
 **Scenario:** 10 unique users trade across a 5-answer group. Some users trade multiple answers, but unique user count is 10.
 
 **Expected:**
-- Steward work income = `(10 unique participants × InitialBetFee) − ProposalCost`
+- Resolution-time steward work-income transaction = `10 unique participants × InitialBetFee`
+- Reported net steward work profit = `(10 unique participants × InitialBetFee) − ProposalCost`
 - Users who traded 3 answers counted once, not three times
-- Work income applied as `TransactionWorkProfit` to steward's balance
+- Gross work income applied as `TransactionWorkProfit` to steward's balance
+- Net work profit can be negative in financial reporting when fee income is lower than the proposal cost
 
 ---
 

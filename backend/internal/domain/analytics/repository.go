@@ -198,6 +198,24 @@ func (r *GormRepository) UserWorkProfitResolvedMarkets(ctx context.Context, user
 	return mapWorkProfitMarkets(markets), nil
 }
 
+func (r *GormRepository) UserWorkProfitUnresolvedMarkets(ctx context.Context, username string) ([]WorkProfitMarketRecord, error) {
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var markets []analyticsWorkProfitMarketRow
+	if err := db.Table("markets").
+		Select("id", "creator_username", "steward_username", "is_resolved", "resolution_result", "proposal_cost").
+		Where("(creator_username = ? OR steward_username = ?) AND is_resolved = ?", username, username, false).
+		Where("(lifecycle_status = '' OR lifecycle_status <> ?)", "rejected").
+		Where("NOT EXISTS (SELECT 1 FROM market_group_members WHERE market_group_members.market_id = markets.id)").
+		Order("id ASC").
+		Find(&markets).Error; err != nil {
+		return nil, err
+	}
+	return mapWorkProfitMarkets(markets), nil
+}
+
 func (r *GormRepository) UserWorkProfitResolvedMarketGroups(ctx context.Context, username string) ([]WorkProfitMarketGroupRecord, error) {
 	db, err := r.dbWithContext(ctx)
 	if err != nil {
@@ -207,6 +225,22 @@ func (r *GormRepository) UserWorkProfitResolvedMarketGroups(ctx context.Context,
 	if err := db.Table("market_groups").
 		Select("id", "creator_username", "steward_username", "lifecycle_status", "proposal_cost").
 		Where("COALESCE(NULLIF(steward_username, ''), creator_username) = ? AND lifecycle_status = ?", username, "resolved").
+		Order("id ASC").
+		Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	return r.hydrateWorkProfitMarketGroups(ctx, groups)
+}
+
+func (r *GormRepository) UserWorkProfitUnresolvedMarketGroups(ctx context.Context, username string) ([]WorkProfitMarketGroupRecord, error) {
+	db, err := r.dbWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var groups []analyticsWorkProfitMarketGroupRow
+	if err := db.Table("market_groups").
+		Select("id", "creator_username", "steward_username", "lifecycle_status", "proposal_cost").
+		Where("(creator_username = ? OR steward_username = ?) AND lifecycle_status NOT IN ?", username, username, []string{"resolved", "rejected"}).
 		Order("id ASC").
 		Find(&groups).Error; err != nil {
 		return nil, err

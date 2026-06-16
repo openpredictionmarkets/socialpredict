@@ -37,11 +37,23 @@ type FinancialsRepository interface {
 	ListBetsForMarket(ctx context.Context, marketID uint) ([]boundary.Bet, error)
 }
 
+// UnrealizedWorkProfitRepository optionally exposes unresolved stewarded
+// markets for display-only work-profit forecasts.
+type UnrealizedWorkProfitRepository interface {
+	UserWorkProfitUnresolvedMarkets(ctx context.Context, username string) ([]WorkProfitMarketRecord, error)
+}
+
 // MarketGroupFinancialsRepository is an optional analytics seam for grouped
 // market work-profit derivation. Implementations that do not support market
 // groups keep the standalone binary behavior.
 type MarketGroupFinancialsRepository interface {
 	UserWorkProfitResolvedMarketGroups(ctx context.Context, username string) ([]WorkProfitMarketGroupRecord, error)
+}
+
+// UnrealizedMarketGroupFinancialsRepository optionally exposes unresolved
+// stewarded grouped markets for display-only work-profit forecasts.
+type UnrealizedMarketGroupFinancialsRepository interface {
+	UserWorkProfitUnresolvedMarketGroups(ctx context.Context, username string) ([]WorkProfitMarketGroupRecord, error)
 }
 
 // MarketGroupFeeRepository is an optional analytics seam for grouped market
