@@ -21,6 +21,19 @@ from `loadtest/`, which is for capacity and performance testing.
 - `scripts/multiple-choice-binary-api.mjs`
 - `scripts/schemathesis-read.sh`
 
+These files are the current scenario/test-case source of truth for the multiple-choice binary market work. No root-level `TEST_SCENARIO.md`, `scenario.md`, or `TESTCASE.md` file is currently present in this repo.
+
+## Current Passing Baseline
+
+Last updated: 2026-06-16.
+
+| Suite | Command | Current result |
+|-------|---------|----------------|
+| Multiple-choice binary API scenario runner | `node integrationtest/scripts/multiple-choice-binary-api.mjs --base-url http://localhost:8080 --api-prefix /v0` | 17/17 checks passing |
+| Read-only Schemathesis contract smoke | `MAX_EXAMPLES=1 integrationtest/scripts/schemathesis-read.sh` | 4/4 operations passing |
+| Backend tests | `JWT_SIGNING_KEY=test-secret-key-for-testing go test ./...` | Passing |
+| Frontend build | `npm run build:report` | Passing with existing warnings |
+
 ## Quick Start
 
 Run against a local dev stack after `./SocialPredict dev-bootstrap-users`:

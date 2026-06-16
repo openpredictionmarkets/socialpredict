@@ -2,6 +2,39 @@
 
 Each test case describes a scenario and the expected behaviour.
 
+## Current Passing Baseline
+
+As of 2026-06-16, the executable integration runner passes against the local development API:
+
+```bash
+node integrationtest/scripts/multiple-choice-binary-api.mjs \
+  --base-url http://localhost:8080 \
+  --api-prefix /v0
+```
+
+The runner currently validates 17 checks:
+
+| Area | Passing coverage |
+|------|------------------|
+| Seeded access | Moderator, bettor, and admin login succeed |
+| Validation | Duplicate answer labels are rejected |
+| Group creation | Group is created with four child answer markets |
+| Child invariants | Independent binary policy, answer-labelled child titles, and zero child proposal costs |
+| Trading | Children trade independently and probabilities are not normalized |
+| Grouped reads | Grouped bets, positions, and leaderboard include child-market activity |
+| Answer additions | Steward answer addition auto-approves and creates a new child market |
+| Resolution | Exclusive resolution marks one answer YES and the remaining answers NO |
+| Parent state | Parent group resolves after child resolution |
+| Financial reporting | Net grouped work profit is reported as gross work income minus proposal cost |
+
+Read-only Schemathesis contract smoke also passes for the default safe path set:
+
+```bash
+MAX_EXAMPLES=1 integrationtest/scripts/schemathesis-read.sh
+```
+
+See `integrationtest/reports/multiple-choice-binary-markets-2026-06-15.md` and `integrationtest/reports/schemathesis-read-2026-06-16.md` for dated results.
+
 ---
 
 ## 1. Group Creation — Happy Path

@@ -1,7 +1,8 @@
 # Test Report — Multiple Choice Binary Markets
 
 **Date:** 2026-06-15
-**Branch:** `feature/test-binary-market`
+**Original manual branch:** `feature/test-binary-market`
+**Current follow-up branch:** `feature/multiple-choice-binary-markets`
 **Environment:** `APP_ENV=development` (locally built Docker images only)
 
 ## Environment Setup
@@ -62,6 +63,25 @@ Methodology: each case was exercised through the public HTTP API (`/v0/...`) whe
 | 20 | Grouped Bets Activity Tab | ✅ PASS |
 
 **18 PASS, 2 PASS-with-caveat, 0 discrepancies.** No crashes or data corruption observed.
+
+## Current Automated Follow-Up
+
+Follow-up checks run on 2026-06-16 against `feature/multiple-choice-binary-markets` confirm the implementation is passing with the reconciled work-profit behavior.
+
+| Check | Command | Result |
+|-------|---------|--------|
+| Multiple-choice binary API scenario runner | `node integrationtest/scripts/multiple-choice-binary-api.mjs --base-url http://localhost:8080 --api-prefix /v0` | ✅ 17/17 checks passed |
+| Read-only OpenAPI contract smoke | `MAX_EXAMPLES=1 integrationtest/scripts/schemathesis-read.sh` | ✅ 4/4 operations passed |
+| Backend test suite | `JWT_SIGNING_KEY=test-secret-key-for-testing go test ./...` | ✅ Passed |
+| Frontend build report | `npm run build:report` | ✅ Passed with existing Browserslist/chunk-size warnings |
+
+The API scenario runner currently covers seeded login, duplicate answer rejection, grouped market creation, child market invariants, independent trading, non-normalized probabilities, grouped bets/positions/leaderboard reads, steward answer addition, exclusive resolution, parent resolution state, and net grouped work-profit financial reporting.
+
+Latest ignored machine-readable output:
+
+```text
+integrationtest/artifacts/multiple-choice-binary-latest.json
+```
 
 ---
 
