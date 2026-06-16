@@ -92,16 +92,18 @@ const rateLimitRetryDelayMs = 1200;
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const isRateLimitError = (err) => err?.status === 429 || err?.reason === 'RATE_LIMITED';
 
-const withRateLimitRetry = async (request) => {
-  try {
-    return await request();
-  } catch (err) {
-    if (!isRateLimitError(err)) {
-      throw err;
+const withRateLimitRetry = async (request, retries = 2) => {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await request();
+    } catch (err) {
+      if (!isRateLimitError(err) || attempt === retries) {
+        throw err;
+      }
+      await wait(rateLimitRetryDelayMs * (attempt + 1));
     }
-    await wait(rateLimitRetryDelayMs);
-    return request();
   }
+  return request();
 };
 
 const groupedFetchJson = async (path, token = '') => {
@@ -750,7 +752,7 @@ export default function GroupedMarketDetailsLayout({
         setError('');
       }
       try {
-        const data = await getMarketGroupDetails(marketGroup.id);
+        const data = await withRateLimitRetry(() => getMarketGroupDetails(marketGroup.id));
         const rawAnswers = [...(data?.answers || [])].sort((left, right) => (
           Number(left.displayOrder || 0) - Number(right.displayOrder || 0)
         ));

@@ -94,6 +94,9 @@ export const getMarketGroupDetails = async (groupId) => {
     }
 
     return apiRequest(`/v0/market-groups/${groupId}`, {
+        reasonMessages: {
+            RATE_LIMITED: 'Grouped market details are loading. Wait a moment and try again.',
+        },
         fallbackMessage: 'Failed to fetch market group details.',
     });
 };
