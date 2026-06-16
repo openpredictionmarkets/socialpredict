@@ -179,6 +179,63 @@ const canTradeMarket = (market, isLoggedIn) => {
   return closeDate > new Date();
 };
 
+const GroupedResolutionAlert = ({ summary }) => {
+  if (!summary?.isResolved) {
+    return null;
+  }
+
+  const yesAnswers = Array.isArray(summary.yesAnswers) ? summary.yesAnswers : [];
+  const hasYesAnswer = yesAnswers.length > 0;
+  const bgColor = hasYesAnswer ? 'bg-blue-900/30' : 'bg-red-900/30';
+  const borderColor = hasYesAnswer ? 'border-blue-500/50' : 'border-red-500/50';
+  const textColor = hasYesAnswer ? 'text-blue-200' : 'text-red-200';
+  const iconColor = hasYesAnswer ? 'text-blue-400' : 'text-red-400';
+  const strongColor = hasYesAnswer ? 'text-green-300' : 'text-red-300';
+  const answerLabel = yesAnswers.join(', ');
+
+  let message = 'This grouped market has been resolved with no YES answers.';
+  let strongText = '';
+  if (yesAnswers.length === 1) {
+    message = 'This grouped market has been resolved with YES answer:';
+    strongText = answerLabel;
+  } else if (yesAnswers.length > 1) {
+    message = 'This grouped market has multiple YES resolutions:';
+    strongText = answerLabel;
+  }
+
+  return (
+    <div className={`mb-4 rounded-lg border p-4 ${bgColor} ${borderColor} ${textColor}`}>
+      <div className='flex items-center'>
+        <svg
+          className={`mr-2 h-5 w-5 ${iconColor}`}
+          fill='none'
+          viewBox='0 0 24 24'
+          stroke='currentColor'
+        >
+          <path
+            strokeLinecap='round'
+            strokeLinejoin='round'
+            strokeWidth={2}
+            d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+          />
+        </svg>
+        <div>
+          <p className='text-sm font-medium'>Market Resolved</p>
+          <p className='text-sm'>
+            {message}
+            {strongText && (
+              <>
+                {' '}
+                <strong className={strongColor}>{strongText}</strong>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const GroupedBetsActivity = ({ groupId, refreshTrigger }) => {
   const pageSize = 20;
   const [bets, setBets] = useState([]);
@@ -983,6 +1040,8 @@ export default function GroupedMarketDetailsLayout({
 
   return (
     <div className='bg-gray-900 text-gray-300 p-4 rounded-lg shadow-lg w-full'>
+      <GroupedResolutionAlert summary={groupedResolutionSummary} />
+
       <section className='mb-4'>
         <h1 className='text-xl font-semibold text-white mb-2 break-words line-clamp-2'>
           {group.questionTitle || marketGroup.questionTitle || fallbackMarket.questionTitle}
@@ -1007,18 +1066,6 @@ export default function GroupedMarketDetailsLayout({
       <div className='mb-4'>
         <GroupedMarketChart answers={answers} title='Probability Changes' />
       </div>
-
-      {groupedResolutionSummary && (
-        <section className='mb-4 rounded-lg border border-emerald-800/70 bg-emerald-950/25 p-4'>
-          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200'>Resolution</p>
-          <p className={`mt-2 text-lg font-semibold ${groupedResolutionSummary.className}`}>
-            {groupedResolutionSummary.label}
-          </p>
-          <p className='mt-1 text-sm text-emerald-100/70'>
-            This grouped market has resolved. Child answer markets retain their own YES/NO outcomes.
-          </p>
-        </section>
-      )}
 
       {(group.description || descriptionAmendments.length > 0) && (
         <>
