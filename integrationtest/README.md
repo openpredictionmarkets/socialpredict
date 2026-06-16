@@ -17,6 +17,20 @@ from `loadtest/`, which is for capacity and performance testing.
 
 - `cases/multiple-choice-binary-markets.md`
 - `reports/multiple-choice-binary-markets-2026-06-15.md`
+- `scripts/multiple-choice-binary-api.mjs`
+
+## Quick Start
+
+Run against a local dev stack after `./SocialPredict dev-bootstrap-users`:
+
+```bash
+node integrationtest/scripts/multiple-choice-binary-api.mjs \
+  --base-url http://localhost:8080 \
+  --api-prefix /v0
+```
+
+Defaults assume seeded users `admin`, `testuser01`, and `testuser02` all use
+password `password`.
 
 ## Operating Notes
 
