@@ -434,6 +434,91 @@ func TestResolveMarketGroupExclusiveYesResolvesChildrenAndMarksParent(t *testing
 	}
 }
 
+func TestResolveMarketGroupRejectsUnpublishedChildWithDetailsBeforeMutating(t *testing.T) {
+	now := marketsTestTime()
+	group := &markets.MarketGroup{
+		ID:              11,
+		QuestionTitle:   "Match winner",
+		LifecycleStatus: markets.MarketLifecyclePublished,
+		CreatorUsername: "moderator",
+		StewardUsername: "moderator",
+		Members: []markets.MarketGroupMember{
+			{ID: 1, GroupID: 11, MarketID: 111, AnswerLabel: "Home", DisplayOrder: 0},
+			{ID: 2, GroupID: 11, MarketID: 112, AnswerLabel: "Away", DisplayOrder: 1},
+		},
+	}
+	marketsByID := map[int64]*markets.Market{
+		111: &markets.Market{
+			ID:              111,
+			QuestionTitle:   "Home",
+			Status:          markets.MarketStatusActive,
+			LifecycleStatus: markets.MarketLifecyclePublished,
+			CreatorUsername: "moderator",
+			StewardUsername: "moderator",
+		},
+		112: &markets.Market{
+			ID:              112,
+			QuestionTitle:   "Away",
+			Status:          markets.MarketStatusActive,
+			LifecycleStatus: markets.MarketLifecycleProposed,
+			CreatorUsername: "moderator",
+			StewardUsername: "moderator",
+		},
+	}
+	var resolved []int64
+	var markedGroupID int64
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getMarketGroupFunc = func(context.Context, int64) (*markets.MarketGroup, error) {
+			return group, nil
+		}
+		repo.getByIDFunc = func(_ context.Context, marketID int64) (*markets.Market, error) {
+			return marketsByID[marketID], nil
+		}
+		repo.resolveMarketFunc = func(_ context.Context, marketID int64, resolution string) error {
+			resolved = append(resolved, marketID)
+			return nil
+		}
+		repo.markMarketGroupResolvedFunc = func(_ context.Context, groupID int64, resolvedAt time.Time) error {
+			markedGroupID = groupID
+			return nil
+		}
+	})
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return &dusers.PublicUser{
+				Username:        username,
+				UserType:        string(dusers.UserTypeModerator),
+				ModeratorStatus: dusers.ModeratorStatusActive,
+			}, nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{GameMode: "moderator"})
+
+	_, err := service.ResolveMarketGroup(context.Background(), group.ID, markets.MarketGroupResolveRequest{
+		Mode:            markets.MarketGroupResolveModeExclusiveYes,
+		WinningMarketID: 111,
+	}, "moderator")
+	if err == nil {
+		t.Fatalf("ResolveMarketGroup error = nil, want unpublished child error")
+	}
+	if !errors.Is(err, markets.ErrInvalidState) {
+		t.Fatalf("ResolveMarketGroup error = %v, want ErrInvalidState-compatible error", err)
+	}
+	var childErr *markets.MarketGroupChildNotPublishedError
+	if !errors.As(err, &childErr) {
+		t.Fatalf("ResolveMarketGroup error = %T %v, want MarketGroupChildNotPublishedError", err, err)
+	}
+	if childErr.MarketID != 112 || childErr.AnswerLabel != "Away" || childErr.LifecycleStatus != markets.MarketLifecycleProposed {
+		t.Fatalf("unexpected unpublished child details: %+v", childErr)
+	}
+	if len(resolved) != 0 {
+		t.Fatalf("expected no child markets to resolve before validation passes, got %+v", resolved)
+	}
+	if markedGroupID != 0 {
+		t.Fatalf("expected parent group not to be marked resolved, got %d", markedGroupID)
+	}
+}
+
 func TestResolveMarketGroupPaysSingleGroupWorkProfit(t *testing.T) {
 	now := marketsTestTime()
 	group := &markets.MarketGroup{

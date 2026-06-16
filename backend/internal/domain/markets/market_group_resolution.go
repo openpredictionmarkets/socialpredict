@@ -116,7 +116,11 @@ func (s *Service) validateMarketGroupResolutionChildren(ctx context.Context, gro
 			return ErrInvalidInput
 		}
 		if market.LifecycleStatus != "" && NormalizeLifecycleStatus(market.LifecycleStatus) != MarketLifecyclePublished {
-			return ErrInvalidState
+			return &MarketGroupChildNotPublishedError{
+				MarketID:        member.MarketID,
+				AnswerLabel:     member.AnswerLabel,
+				LifecycleStatus: NormalizeLifecycleStatus(market.LifecycleStatus),
+			}
 		}
 		if err := s.ensureMarketGovernanceActor(ctx, market, username); err != nil {
 			return err

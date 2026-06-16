@@ -56,6 +56,7 @@ x-route-family-migration-matrix:
     - USER_NOT_FOUND
     - MARKET_NOT_FOUND
     - INVALID_STATE
+    - MARKET_GROUP_CHILD_UNPUBLISHED
     - VALIDATION_FAILED
     - MARKET_CLOSED
     - INSUFFICIENT_BALANCE
@@ -5400,6 +5401,7 @@ components:
         - PASSWORD_CHANGE_REQUIRED: request blocked until the caller changes their password.
         - USER_NOT_FOUND, MARKET_NOT_FOUND, and NOT_FOUND: stable not-found outcomes for user, market, and generic content/resource lookups.
         - INVALID_STATE: the requested transition is not valid for the resource's current lifecycle state.
+        - MARKET_GROUP_CHILD_UNPUBLISHED: grouped-market resolution was blocked because one answer child is not published yet.
         - VALIDATION_FAILED: syntactically valid input that fails route or business validation.
         - MARKET_CLOSED, INSUFFICIENT_BALANCE, NO_POSITION, INSUFFICIENT_SHARES, and DUST_CAP_EXCEEDED: shared market and bet rule failures.
         - INTERNAL_ERROR: unexpected server-side failure.
@@ -5422,6 +5424,7 @@ components:
             - USER_NOT_FOUND
             - MARKET_NOT_FOUND
             - INVALID_STATE
+            - MARKET_GROUP_CHILD_UNPUBLISHED
             - VALIDATION_FAILED
             - MARKET_CLOSED
             - INSUFFICIENT_BALANCE

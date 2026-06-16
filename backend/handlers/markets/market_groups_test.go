@@ -169,6 +169,53 @@ func TestResolveMarketGroupHandlerAcceptsManualChildResolutions(t *testing.T) {
 	}
 }
 
+func TestResolveMarketGroupHandlerReportsUnpublishedChild(t *testing.T) {
+	service := &MockService{
+		ResolveMarketGroupFn: func(_ context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error) {
+			if groupID != 9 || username != "moderator" {
+				t.Fatalf("unexpected args groupID=%d username=%q", groupID, username)
+			}
+			return nil, &dmarkets.MarketGroupChildNotPublishedError{
+				MarketID:        102,
+				AnswerLabel:     "Away",
+				LifecycleStatus: dmarkets.MarketLifecycleProposed,
+			}
+		},
+	}
+	req := mux.SetURLVars(
+		httptest.NewRequest(
+			http.MethodPost,
+			"/v0/market-groups/9/resolve",
+			strings.NewReader(`{"mode":"exclusive_yes","winningMarketId":101}`),
+		),
+		map[string]string{"id": "9"},
+	)
+	rec := httptest.NewRecorder()
+
+	NewHandler(service, lifecycleAuthMock{
+		user: &dusers.User{Username: "moderator", UserType: string(dusers.UserTypeModerator)},
+	}, nil).ResolveMarketGroup(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusConflict, rec.Code, rec.Body.String())
+	}
+	var response handlers.FailureEnvelope
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Reason != string(handlers.ReasonMarketGroupChildUnpublished) {
+		t.Fatalf("reason = %q, want %q", response.Reason, handlers.ReasonMarketGroupChildUnpublished)
+	}
+	if response.Message == "" || !strings.Contains(response.Message, "Away") || !strings.Contains(response.Message, "not published") {
+		t.Fatalf("unexpected message: %q", response.Message)
+	}
+	if response.Details["marketId"] != float64(102) ||
+		response.Details["answerLabel"] != "Away" ||
+		response.Details["lifecycleStatus"] != dmarkets.MarketLifecycleProposed {
+		t.Fatalf("unexpected details: %+v", response.Details)
+	}
+}
+
 func TestMarketGroupBetsHandlerReturnsGroupedBetRows(t *testing.T) {
 	now := time.Date(2026, 6, 13, 12, 0, 0, 0, time.UTC)
 	service := &MockService{

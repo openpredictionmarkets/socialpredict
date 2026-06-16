@@ -57,21 +57,22 @@ Methodology: each case was exercised through the public HTTP API (`/v0/...`) whe
 | 14 | Answer Addition — Duplicate of Existing | ✅ PASS |
 | 15 | Answer Addition — Duplicate of Pending | ✅ PASS |
 | 16 | Answer Addition After Resolution DateTime | ✅ PASS |
-| 17 | Resolution Blocked by Unpublished Child | ⚠️ PASS w/ caveat (error not specific) |
+| 17 | Resolution Blocked by Unpublished Child | ✅ PASS |
 | 18 | Grouped Leaderboard Aggregation | ✅ PASS |
 | 19 | Grouped Positions View | ✅ PASS |
 | 20 | Grouped Bets Activity Tab | ✅ PASS |
 
-**18 PASS, 2 PASS-with-caveat, 0 discrepancies.** No crashes or data corruption observed.
+**20 PASS, 0 discrepancies.** No crashes or data corruption observed. TC6 and TC11 include informational notes, but no longer require a caveat.
 
 ## Current Automated Follow-Up
 
-Follow-up checks run on 2026-06-16 against `feature/multiple-choice-binary-markets` confirm the implementation is passing with the reconciled work-profit behavior.
+Follow-up checks run on 2026-06-16 against `feature/multiple-choice-binary-markets` confirm the implementation is passing with the reconciled work-profit behavior and the TC17 unpublished-child resolution error fix.
 
 | Check | Command | Result |
 |-------|---------|--------|
 | Multiple-choice binary API scenario runner | `node integrationtest/scripts/multiple-choice-binary-api.mjs --base-url http://localhost:8080 --api-prefix /v0` | ✅ 17/17 checks passed |
 | Read-only OpenAPI contract smoke | `MAX_EXAMPLES=1 integrationtest/scripts/schemathesis-read.sh` | ✅ 4/4 operations passed |
+| Grouped resolution regression tests | `go test ./internal/domain/markets -run 'TestResolveMarketGroup' && go test ./handlers/markets -run 'TestResolveMarketGroupHandler'` | ✅ Passed |
 | Backend test suite | `JWT_SIGNING_KEY=test-secret-key-for-testing go test ./...` | ✅ Passed |
 | Frontend build report | `npm run build:report` | ✅ Passed with existing Browserslist/chunk-size warnings |
 
@@ -171,10 +172,25 @@ With "Orange" pending, proposing "orange" → 400 (case-insensitive `pendingAnsw
 ### TC16 — Answer Addition After Resolution DateTime ✅
 With the group's `resolution_date_time` set to the past, proposing a new answer → **409 INVALID_STATE**. (Past resolution can only occur via DB edit since creation requires a future datetime; the guard `!ResolutionDateTime.After(now)` fires correctly.)
 
-### TC17 — Resolution Blocked by Unpublished Child ⚠️ PASS with caveat
-A published 2-answer group with one child forced back to `proposed` → resolve returned **409 MARKET_CLOSED** and **neither** child was resolved (validation is all-or-nothing, before any mutation). Blocking works correctly.
+### TC17 — Resolution Blocked by Unpublished Child ✅ PASS
+A published 2-answer group with one child forced back to `proposed` → resolve returns **409 MARKET_GROUP_CHILD_UNPUBLISHED** and **neither** child is resolved (validation is all-or-nothing, before any mutation). Blocking works correctly.
 
-**Caveat:** TESTCASE expects the error to "indicate which child is not yet published." The actual response is a generic `MARKET_CLOSED` reason (mapped from `ErrInvalidState`) that names no specific child. The reason string is also slightly misleading (the child is *not-yet-published*, not *closed*). Consider a more specific error including the offending child ID/label.
+Follow-up implementation on 2026-06-16 replaced the generic `MARKET_CLOSED` mapping with a specific `MARKET_GROUP_CHILD_UNPUBLISHED` failure. The response now identifies the blocking answer child:
+
+```json
+{
+  "ok": false,
+  "reason": "MARKET_GROUP_CHILD_UNPUBLISHED",
+  "message": "market group child \"Away\" (market 102) is not published; current status is proposed",
+  "details": {
+    "marketId": 102,
+    "answerLabel": "Away",
+    "lifecycleStatus": "proposed"
+  }
+}
+```
+
+The domain error still unwraps to `ErrInvalidState` for internal compatibility, and validation remains all-or-nothing before any child resolution mutation.
 
 ### TC18 — Grouped Leaderboard Aggregation ✅
 Leaderboard for group 1 (post-resolution):
@@ -216,7 +232,6 @@ total: 7
 
 ## Recommendations
 
-1. **TC17 — make the "unpublished child" error specific.** Return a reason that names the offending child rather than the generic `MARKET_CLOSED`.
-2. **TC3 — fix the dead DTO tag.** `CreateMarketGroupRequest.AnswerLabels` says `validate:"max=20"` but the enforced cap is 50 and the validator isn't even run; align it with `hardAnswerSafetyCap`.
-3. **TC11 — confirm intended amendment scope.** Description amendments are written to the newly added child as well as the pre-existing ones; confirm this is desired.
-4. **TC6 — document share-rounding behavior.** Small stakes against near-certain outcomes can round to 0 shares, which affects position/leaderboard badges. Not grouped-market-specific, but worth noting for QA.
+1. **TC3 — fix the dead DTO tag.** `CreateMarketGroupRequest.AnswerLabels` says `validate:"max=20"` but the enforced cap is 50 and the validator isn't even run; align it with `hardAnswerSafetyCap`.
+2. **TC11 — confirm intended amendment scope.** Description amendments are written to the newly added child as well as the pre-existing ones; confirm this is desired.
+3. **TC6 — document share-rounding behavior.** Small stakes against near-certain outcomes can round to 0 shares, which affects position/leaderboard badges. Not grouped-market-specific, but worth noting for QA.
