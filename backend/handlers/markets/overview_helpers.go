@@ -233,6 +233,44 @@ func marketGroupLinkForMarket(ctx context.Context, provider any, marketID int64)
 	return link
 }
 
+func marketGroupLinkFromDomain(group *dmarkets.MarketGroup, marketID int64) *dto.MarketGroupLink {
+	if group == nil || group.ID <= 0 {
+		return nil
+	}
+	status := group.LifecycleStatus
+	if strings.EqualFold(status, dmarkets.MarketLifecyclePublished) {
+		status = dmarkets.MarketStatusActive
+	}
+	link := &dto.MarketGroupLink{
+		ID:                 group.ID,
+		QuestionTitle:      group.QuestionTitle,
+		Description:        group.Description,
+		GroupType:          group.GroupType,
+		LifecycleStatus:    group.LifecycleStatus,
+		Status:             status,
+		AnswerCount:        len(group.Members),
+		ProposalCost:       group.ProposalCost,
+		CreatorUsername:    group.CreatorUsername,
+		StewardUsername:    group.StewardUsername,
+		ApprovedBy:         group.ApprovedBy,
+		ApprovedAt:         group.ApprovedAt,
+		RejectedBy:         group.RejectedBy,
+		RejectedAt:         group.RejectedAt,
+		RejectionReason:    group.RejectionReason,
+		ResolutionDateTime: group.ResolutionDateTime,
+		CreatedAt:          group.CreatedAt,
+		UpdatedAt:          group.UpdatedAt,
+	}
+	for _, member := range group.Members {
+		if member.MarketID == marketID {
+			link.AnswerLabel = member.AnswerLabel
+			link.DisplayOrder = member.DisplayOrder
+			break
+		}
+	}
+	return link
+}
+
 func probabilityChangesToResponse(points []dmarkets.ProbabilityPoint) []dto.ProbabilityChangeResponse {
 	if len(points) == 0 {
 		return []dto.ProbabilityChangeResponse{}
@@ -258,6 +296,7 @@ func descriptionAmendmentsToResponse(amendments []dmarkets.MarketDescriptionAmen
 			MarketID:                   amendment.MarketID,
 			MarketTitle:                amendment.MarketTitle,
 			MarketDescription:          amendment.MarketDescription,
+			MarketGroup:                marketGroupLinkFromDomain(amendment.MarketGroup, amendment.MarketID),
 			Version:                    amendment.Version,
 			Body:                       amendment.Body,
 			BodyFormat:                 amendment.BodyFormat,

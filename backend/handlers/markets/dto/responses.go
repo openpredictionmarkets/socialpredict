@@ -365,6 +365,7 @@ type MarketDescriptionAmendmentResponse struct {
 	MarketID                   int64                                `json:"marketId"`
 	MarketTitle                string                               `json:"marketTitle,omitempty"`
 	MarketDescription          string                               `json:"marketDescription,omitempty"`
+	MarketGroup                *MarketGroupLink                     `json:"marketGroup,omitempty"`
 	Version                    int                                  `json:"version"`
 	Body                       string                               `json:"body"`
 	BodyFormat                 string                               `json:"bodyFormat"`
