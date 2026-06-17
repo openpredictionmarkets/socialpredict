@@ -32,7 +32,7 @@ const uniqueTagsBySlug = (markets = []) => {
   return tags;
 };
 
-const groupLifecycleMarketRows = (markets = []) => {
+export const groupLifecycleMarketRows = (markets = []) => {
   const rows = [];
   const groups = new Map();
 
