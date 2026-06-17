@@ -198,3 +198,15 @@ Checklist:
 - [ ] Decide whether child markets should support answer-specific amendments.
 - [x] Decide whether group-level work economics should aggregate child market participation fees: yes, unique participants count once across the group.
 - [ ] Decide whether group pages need a normalized illustrative display separate from tradable child probabilities.
+
+## 11. Design-Agent Follow-Up Features
+
+The June 17, 2026 design-agent review identified several follow-up features that should be addressed on this branch or immediately after it:
+
+- [FEATURE/14: Grouped Market Transaction Boundaries](../14/14-grouped-market-transaction-boundaries.md)
+- [FEATURE/15: Grouped Discovery Read Model Pagination](../15/15-grouped-discovery-read-model-pagination.md)
+- [FEATURE/16: Grouped Discovery Cache Invalidation](../16/16-grouped-discovery-cache-invalidation.md)
+- [FEATURE/17: Grouped Activity Freshness Metadata](../17/17-grouped-activity-freshness-metadata.md)
+- [FEATURE/18: Grouped Answer Limit Contract Alignment](../18/18-grouped-answer-limit-contract-alignment.md)
+- [FEATURE/19: Grouped Market N/A And Documentation Alignment](../19/19-grouped-market-na-and-doc-alignment.md)
+- [FEATURE/20: Analytics Repository Boundary](../20/20-analytics-repository-boundary.md)
