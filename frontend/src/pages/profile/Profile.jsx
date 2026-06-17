@@ -4,7 +4,7 @@ import { useAuth } from '../../helpers/AuthContent';
 import PrivateUserInfoLayout from '../../components/layouts/profile/private/PrivateUserInfoLayout';
 import PortfolioTabContent from '../../components/layouts/profile/public/PortfolioTabContent';
 import UserFinancialStatementsLayout from '../../components/layouts/profile/public/UserFinancialStatementsLayout';
-import MarketLifecycleTable from '../../components/layouts/profile/MarketLifecycleTable';
+import MarketLifecycleTable, { groupLifecycleMarketRows } from '../../components/layouts/profile/MarketLifecycleTable';
 import SiteTabs from '../../components/tabs/SiteTabs';
 import useUserData from '../../hooks/useUserData';
 import LoadingSpinner from '../../components/loaders/LoadingSpinner';
@@ -57,6 +57,73 @@ const reviewShortLabelByStatus = {
 };
 
 const accountTabLabels = ['User Info', 'Portfolio', 'Financials'];
+const PROFILE_PAGE_SIZE = 20;
+const PROFILE_FETCH_BATCH_SIZE = 100;
+const paginationButtonClass = [
+  'rounded',
+  'border',
+  'border-transparent',
+  'bg-neutral-btn',
+  'px-3',
+  'py-1.5',
+  'text-xs',
+  'font-semibold',
+  'text-white',
+  'transition-colors',
+  'duration-200',
+  'hover:bg-neutral-btn-hover',
+  'disabled:cursor-not-allowed',
+  'disabled:bg-custom-gray-light',
+  'disabled:text-gray-400',
+  'disabled:opacity-60',
+].join(' ');
+
+const pagedRows = (rows = [], page = 0) => {
+  const total = rows.length;
+  const maxPage = Math.max(0, Math.ceil(total / PROFILE_PAGE_SIZE) - 1);
+  const currentPage = Math.min(Math.max(0, page), maxPage);
+  const start = currentPage * PROFILE_PAGE_SIZE;
+  return {
+    currentPage,
+    start,
+    total,
+    rows: rows.slice(start, start + PROFILE_PAGE_SIZE),
+    hasPrevious: currentPage > 0,
+    hasNext: start + PROFILE_PAGE_SIZE < total,
+  };
+};
+
+const ProfilePaginationControls = ({ label, pageInfo, onPageChange }) => {
+  if (!pageInfo.total) {
+    return null;
+  }
+
+  return (
+    <div className='flex flex-col gap-2 rounded-lg border border-gray-700 bg-gray-900/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'>
+      <div className='text-xs uppercase tracking-[0.16em] text-gray-400'>
+        {label} page {pageInfo.currentPage + 1} ({pageInfo.start + 1}-{pageInfo.start + pageInfo.rows.length} of {pageInfo.total})
+      </div>
+      <div className='flex gap-2'>
+        <button
+          type='button'
+          onClick={() => onPageChange((current) => Math.max(0, current - 1))}
+          disabled={!pageInfo.hasPrevious}
+          className={paginationButtonClass}
+        >
+          Previous
+        </button>
+        <button
+          type='button'
+          onClick={() => onPageChange((current) => current + 1)}
+          disabled={!pageInfo.hasNext}
+          className={paginationButtonClass}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const statusFromLegacyTab = (label, lookup) => {
   const entry = Object.entries(lookup).find(([, tabLabel]) => tabLabel === label);
@@ -282,6 +349,11 @@ const ProfileMarketChangeStatusTab = ({ marketType, status }) => {
   const [busyAdditionId, setBusyAdditionId] = useState(null);
   const [reasonById, setReasonById] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    setPage(0);
+  }, [marketType, status, searchQuery]);
 
   useEffect(() => {
     let ignore = false;
@@ -374,6 +446,7 @@ const ProfileMarketChangeStatusTab = ({ marketType, status }) => {
     () => filterMarketChanges(groupedChanges, searchQuery),
     [groupedChanges, searchQuery],
   );
+  const pageInfo = pagedRows(visibleChanges, page);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -416,21 +489,28 @@ const ProfileMarketChangeStatusTab = ({ marketType, status }) => {
           No {status} {emptyLabel} changes match "{searchQuery}".
         </div>
       ) : (
-        visibleChanges.map((change, index) => (
-          <React.Fragment key={change.key}>
-            {index > 0 && (
-              <div className='my-2 h-px bg-gradient-to-r from-transparent via-primary-pink/50 to-transparent' />
-            )}
-            <ProfileMarketChangeCard
-              change={change}
-              status={status}
-              reasonById={reasonById}
-              busyAdditionId={busyAdditionId}
-              onReasonChange={updateReason}
-              onReviewAddition={reviewAddition}
-            />
-          </React.Fragment>
-        ))
+        <>
+          <ProfilePaginationControls
+            label={`${reviewShortLabelByStatus[status] || status} ${emptyLabel} changes`}
+            pageInfo={pageInfo}
+            onPageChange={setPage}
+          />
+          {pageInfo.rows.map((change, index) => (
+            <React.Fragment key={change.key}>
+              {index > 0 && (
+                <div className='my-2 h-px bg-gradient-to-r from-transparent via-primary-pink/50 to-transparent' />
+              )}
+              <ProfileMarketChangeCard
+                change={change}
+                status={status}
+                reasonById={reasonById}
+                busyAdditionId={busyAdditionId}
+                onReasonChange={updateReason}
+                onReviewAddition={reviewAddition}
+              />
+            </React.Fragment>
+          ))}
+        </>
       )}
     </div>
   );
@@ -641,6 +721,11 @@ const ProfileMarketLifecycleTab = ({ status }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    setPage(0);
+  }, [status, searchQuery]);
 
   useEffect(() => {
     let ignore = false;
@@ -649,14 +734,24 @@ const ProfileMarketLifecycleTab = ({ status }) => {
       setLoading(true);
       setError('');
       try {
-        const data = await listMyLifecycleMarkets({
-          token,
-          status,
-          query: searchQuery,
-          limit: 100,
-        });
+        const rows = [];
+        let offset = 0;
+        let keepFetching = true;
+        while (keepFetching) {
+          const data = await listMyLifecycleMarkets({
+            token,
+            status,
+            query: searchQuery,
+            limit: PROFILE_FETCH_BATCH_SIZE,
+            offset,
+          });
+          const batch = data.markets || [];
+          rows.push(...batch);
+          keepFetching = batch.length === PROFILE_FETCH_BATCH_SIZE;
+          offset += PROFILE_FETCH_BATCH_SIZE;
+        }
         if (!ignore) {
-          setMarkets(data.markets || []);
+          setMarkets(groupLifecycleMarketRows(rows));
         }
       } catch (err) {
         if (!ignore) {
@@ -675,6 +770,8 @@ const ProfileMarketLifecycleTab = ({ status }) => {
       window.clearTimeout(timeoutId);
     };
   }, [status, token, searchQuery]);
+
+  const pageInfo = pagedRows(markets, page);
 
   return (
     <div className='grid gap-4'>
@@ -700,10 +797,17 @@ const ProfileMarketLifecycleTab = ({ status }) => {
       {loading ? (
         <LoadingSpinner />
       ) : (
-        <MarketLifecycleTable
-          markets={markets}
-          emptyMessage={`No ${status} markets found.`}
-        />
+        <>
+          <ProfilePaginationControls
+            label={`${lifecycleShortLabelByStatus[status] || status} markets`}
+            pageInfo={pageInfo}
+            onPageChange={setPage}
+          />
+          <MarketLifecycleTable
+            markets={pageInfo.rows}
+            emptyMessage={`No ${status} markets found.`}
+          />
+        </>
       )}
     </div>
   );
