@@ -11,6 +11,22 @@ import (
 // child markets. The parent charges one proposal cost; child proposal costs are
 // zero because they are implementation details of the group.
 func (s *Service) CreateMarketGroup(ctx context.Context, req MarketGroupCreateRequest, creatorUsername string) (*MarketGroup, error) {
+	if uow, ok := s.groupedMarketUnitOfWork(); ok {
+		var created *MarketGroup
+		err := uow.GroupedMarketTransaction(ctx, func(txCtx context.Context, repo Repository, users UserService) error {
+			var err error
+			created, err = s.withTransactionDependencies(repo, users).createMarketGroup(txCtx, req, creatorUsername)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		return created, nil
+	}
+	return s.createMarketGroup(ctx, req, creatorUsername)
+}
+
+func (s *Service) createMarketGroup(ctx context.Context, req MarketGroupCreateRequest, creatorUsername string) (*MarketGroup, error) {
 	groupRepo, err := s.marketGroupRepository()
 	if err != nil {
 		return nil, err

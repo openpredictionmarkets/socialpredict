@@ -11,6 +11,22 @@ import (
 // The transaction boundary remains the child market; the parent is only marked
 // resolved after all children use the normal binary resolution path.
 func (s *Service) ResolveMarketGroup(ctx context.Context, groupID int64, req MarketGroupResolveRequest, username string) (*MarketGroup, error) {
+	if uow, ok := s.groupedMarketUnitOfWork(); ok {
+		var resolved *MarketGroup
+		err := uow.GroupedMarketTransaction(ctx, func(txCtx context.Context, repo Repository, users UserService) error {
+			var err error
+			resolved, err = s.withTransactionDependencies(repo, users).resolveMarketGroup(txCtx, groupID, req, username)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resolved, nil
+	}
+	return s.resolveMarketGroup(ctx, groupID, req, username)
+}
+
+func (s *Service) resolveMarketGroup(ctx context.Context, groupID int64, req MarketGroupResolveRequest, username string) (*MarketGroup, error) {
 	if groupID <= 0 {
 		return nil, ErrInvalidInput
 	}

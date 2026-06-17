@@ -12,9 +12,11 @@ import (
 	rmarkets "socialpredict/internal/repository/markets"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
+
+	"gorm.io/gorm"
 )
 
-func seedAnswerAdditionGroup(t *testing.T, now time.Time) (*rmarkets.GormRepository, *markets.MarketGroup, []models.Market) {
+func seedAnswerAdditionGroup(t *testing.T, now time.Time) (*gorm.DB, *rmarkets.GormRepository, *markets.MarketGroup, []models.Market) {
 	t.Helper()
 	db := modelstesting.NewFakeDB(t)
 	creator := modelstesting.GenerateUser("creator", 1000)
@@ -22,6 +24,14 @@ func seedAnswerAdditionGroup(t *testing.T, now time.Time) (*rmarkets.GormReposit
 	creator.ModeratorStatus = string(dusers.ModeratorStatusActive)
 	if err := db.Create(&creator).Error; err != nil {
 		t.Fatalf("seed creator: %v", err)
+	}
+	for _, username := range []string{"steward", "proposer", "othermod"} {
+		user := modelstesting.GenerateUser(username, 1000)
+		user.UserType = string(dusers.UserTypeModerator)
+		user.ModeratorStatus = string(dusers.ModeratorStatusActive)
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("seed %s: %v", username, err)
+		}
 	}
 
 	children := []models.Market{
@@ -59,7 +69,7 @@ func seedAnswerAdditionGroup(t *testing.T, now time.Time) (*rmarkets.GormReposit
 	if err := repo.CreateMarketGroup(context.Background(), group, members); err != nil {
 		t.Fatalf("seed group: %v", err)
 	}
-	return repo, group, children
+	return db, repo, group, children
 }
 
 func answerAdditionUserService(t *testing.T, charged *[]int64) noopUserService {
@@ -106,9 +116,20 @@ func flexibleAnswerAdditionUserService(charged *[]string) noopUserService {
 	})
 }
 
+func assertAnswerAdditionUserBalance(t *testing.T, db *gorm.DB, username string, want int64) {
+	t.Helper()
+	var user models.User
+	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
+		t.Fatalf("reload user %q: %v", username, err)
+	}
+	if user.AccountBalance != want {
+		t.Fatalf("%s balance = %d, want %d", username, user.AccountBalance, want)
+	}
+}
+
 func TestProposeMarketGroupAnswerAdditionCreatesPendingWithoutCharge(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	_, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	charged := []int64{}
 	service := markets.NewService(repo, answerAdditionUserService(t, &charged), newFixedClock(now), markets.Config{
 		GameMode:                                "moderator",
@@ -142,7 +163,7 @@ func TestProposeMarketGroupAnswerAdditionCreatesPendingWithoutCharge(t *testing.
 
 func TestProposeMarketGroupAnswerAdditionByStewardApprovesImmediately(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	db, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	charged := []string{}
 	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
 		GameMode:                                "moderator",
@@ -163,14 +184,15 @@ func TestProposeMarketGroupAnswerAdditionByStewardApprovesImmediately(t *testing
 	if addition.ReviewedBy != "steward" {
 		t.Fatalf("reviewed by = %q, want steward", addition.ReviewedBy)
 	}
-	if strings.Join(charged, ",") != "check:steward,fee:steward" {
+	if len(charged) != 0 {
 		t.Fatalf("unexpected charge calls: %v", charged)
 	}
+	assertAnswerAdditionUserBalance(t, db, "steward", 996)
 }
 
 func TestProposeMarketGroupAnswerAdditionGroupAutoApprovesOtherModerator(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	db, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	if _, err := repo.UpdateMarketGroupAnswerAdditionAutoApproval(context.Background(), group.ID, true, now); err != nil {
 		t.Fatalf("enable group auto approval: %v", err)
 	}
@@ -194,14 +216,15 @@ func TestProposeMarketGroupAnswerAdditionGroupAutoApprovesOtherModerator(t *test
 	if addition.ReviewedBy != markets.MarketGroupAnswerAdditionApprovedByAuto {
 		t.Fatalf("reviewed by = %q, want auto approval", addition.ReviewedBy)
 	}
-	if strings.Join(charged, ",") != "check:proposer,fee:proposer" {
+	if len(charged) != 0 {
 		t.Fatalf("unexpected charge calls: %v", charged)
 	}
+	assertAnswerAdditionUserBalance(t, db, "proposer", 996)
 }
 
 func TestMarketGroupAnswerAdditionReviewerCanApprovePending(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	db, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	charged := []string{}
 	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
 		GameMode:                                "moderator",
@@ -221,14 +244,15 @@ func TestMarketGroupAnswerAdditionReviewerCanApprovePending(t *testing.T) {
 	if approved.Status != markets.MarketGroupAnswerAdditionStatusApproved || approved.ReviewedBy != "steward" {
 		t.Fatalf("unexpected approved addition: %+v", approved)
 	}
-	if strings.Join(charged, ",") != "check:proposer,fee:proposer" {
+	if len(charged) != 0 {
 		t.Fatalf("unexpected charge calls: %v", charged)
 	}
+	assertAnswerAdditionUserBalance(t, db, "proposer", 996)
 }
 
 func TestMarketGroupAnswerAdditionReviewerRejectsNonSteward(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	_, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	charged := []string{}
 	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
 		GameMode:                                "moderator",
@@ -251,7 +275,7 @@ func TestMarketGroupAnswerAdditionReviewerRejectsNonSteward(t *testing.T) {
 
 func TestUpdateMarketGroupAnswerAdditionSettingsRequiresSteward(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	_, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&[]string{}), newFixedClock(now), markets.Config{
 		GameMode: "moderator",
 	})
@@ -272,7 +296,7 @@ func TestUpdateMarketGroupAnswerAdditionSettingsRequiresSteward(t *testing.T) {
 
 func TestProposeMarketGroupAnswerAdditionAutoApprovesCreatesChildAndSharedAmendments(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, children := seedAnswerAdditionGroup(t, now)
+	db, repo, group, children := seedAnswerAdditionGroup(t, now)
 	charged := []int64{}
 	service := markets.NewService(repo, answerAdditionUserService(t, &charged), newFixedClock(now), markets.Config{
 		GameMode:                                "moderator",
@@ -305,9 +329,10 @@ func TestProposeMarketGroupAnswerAdditionAutoApprovesCreatesChildAndSharedAmendm
 	if addition.ReviewedBy != markets.MarketGroupAnswerAdditionApprovedByAuto || addition.ReviewedAt == nil {
 		t.Fatalf("unexpected auto approval audit: %+v", addition)
 	}
-	if len(charged) != 1 || charged[0] != 4 {
-		t.Fatalf("approved answer should charge proposal-time add-answer cost once, got %v", charged)
+	if len(charged) != 0 {
+		t.Fatalf("approved answer should charge through the transactional user service, got fake calls %v", charged)
 	}
+	assertAnswerAdditionUserBalance(t, db, "proposer", 996)
 
 	addedMarket, err := repo.GetByID(context.Background(), addition.MarketID)
 	if err != nil {
@@ -348,7 +373,7 @@ func TestProposeMarketGroupAnswerAdditionAutoApprovesCreatesChildAndSharedAmendm
 
 func TestRejectMarketGroupAnswerAdditionDoesNotChargeOrCreateChild(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	_, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	charged := []int64{}
 	service := markets.NewService(repo, answerAdditionUserService(t, &charged), newFixedClock(now), markets.Config{
 		GameMode:                                "moderator",
@@ -383,7 +408,7 @@ func TestRejectMarketGroupAnswerAdditionDoesNotChargeOrCreateChild(t *testing.T)
 
 func TestProposeMarketGroupAnswerAdditionBlocksDuplicatePendingLabel(t *testing.T) {
 	now := marketsTestTime()
-	repo, group, _ := seedAnswerAdditionGroup(t, now)
+	_, repo, group, _ := seedAnswerAdditionGroup(t, now)
 	charged := []int64{}
 	service := markets.NewService(repo, answerAdditionUserService(t, &charged), newFixedClock(now), markets.Config{
 		GameMode:                                "moderator",

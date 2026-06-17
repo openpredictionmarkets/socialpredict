@@ -151,6 +151,22 @@ func (s *Service) ListMarketGroupAnswerAdditionsForReviewer(ctx context.Context,
 }
 
 func (s *Service) ApproveMarketGroupAnswerAddition(ctx context.Context, additionID int64, actorUsername string, confirmed bool) (*MarketGroupAnswerAddition, error) {
+	if uow, ok := s.groupedMarketUnitOfWork(); ok {
+		var approved *MarketGroupAnswerAddition
+		err := uow.GroupedMarketTransaction(ctx, func(txCtx context.Context, repo Repository, users UserService) error {
+			var err error
+			approved, err = s.withTransactionDependencies(repo, users).approveMarketGroupAnswerAddition(txCtx, additionID, actorUsername, confirmed)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		return approved, nil
+	}
+	return s.approveMarketGroupAnswerAddition(ctx, additionID, actorUsername, confirmed)
+}
+
+func (s *Service) approveMarketGroupAnswerAddition(ctx context.Context, additionID int64, actorUsername string, confirmed bool) (*MarketGroupAnswerAddition, error) {
 	actorUsername = strings.TrimSpace(actorUsername)
 	if additionID <= 0 || actorUsername == "" || !confirmed {
 		return nil, ErrInvalidInput

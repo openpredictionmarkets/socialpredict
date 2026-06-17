@@ -53,7 +53,7 @@ Checklist:
 - [x] Validate parent title and description using existing market rules.
 - [x] Validate answer labels: minimum count, maximum count, length, uniqueness, and sanitization.
 - [x] Add setup-configured multiple-choice binary policy for later answer-addition cost, soft answer review threshold, and hard safety cap.
-- [ ] Create parent group and child binary markets transactionally.
+- [x] Create parent group and child binary markets transactionally.
 - [x] Charge one group proposal cost in baseline, with no extra cost for initial answers.
 - [x] Link child markets through `market_group_members`.
 - [x] Add service tests for successful group creation.
@@ -61,7 +61,7 @@ Checklist:
 
 Implementation note:
 
-- The current vertical slice creates child markets and then links the parent group. A fully atomic repository/service transaction across child-market creation plus group creation remains pending.
+- Grouped creation now uses the FEATURE/14 grouped-market unit-of-work boundary so proposal fee, child markets, tags, parent group, and member links commit together.
 
 ## 04. Admin Review And Governance
 
@@ -203,7 +203,7 @@ Checklist:
 
 The June 17, 2026 design-agent review identified several follow-up features that should be addressed on this branch or immediately after it:
 
-- [FEATURE/14: Grouped Market Transaction Boundaries](../14/14-grouped-market-transaction-boundaries.md)
+- [x] [FEATURE/14: Grouped Market Transaction Boundaries](../14/14-grouped-market-transaction-boundaries.md)
 - [FEATURE/15: Grouped Discovery Read Model Pagination](../15/15-grouped-discovery-read-model-pagination.md)
 - [FEATURE/16: Grouped Discovery Cache Invalidation](../16/16-grouped-discovery-cache-invalidation.md)
 - [FEATURE/17: Grouped Activity Freshness Metadata](../17/17-grouped-activity-freshness-metadata.md)
