@@ -208,6 +208,46 @@ const groupProfileMarketChanges = ({ marketType, amendments = [], answerOptions 
   return Array.from(rows.values()).sort((left, right) => left.title.localeCompare(right.title));
 };
 
+const normalizedSearch = (value) => String(value || '').trim().toLowerCase();
+
+const marketChangeSearchText = (change) => [
+  change.title,
+  change.key,
+  change.marketType,
+  change.groupId ? `group ${change.groupId}` : '',
+  change.marketId ? `market ${change.marketId}` : '',
+  ...(change.amendments || []).flatMap((amendment) => [
+    amendment.marketTitle,
+    amendment.marketDescription,
+    amendment.body,
+    amendment.submitReason,
+    amendment.createdBy,
+    amendment.marketId ? `market ${amendment.marketId}` : '',
+    amendment.marketGroup?.questionTitle,
+    amendment.marketGroup?.answerLabel,
+    amendment.marketGroup?.id ? `group ${amendment.marketGroup.id}` : '',
+    ...(amendment.childAmendments || []).map((child) => child.marketGroup?.answerLabel || `market ${child.marketId}`),
+  ]),
+  ...(change.answerOptions || []).flatMap((addition) => [
+    addition.groupTitle,
+    addition.answerLabel,
+    addition.proposedBy,
+    addition.reviewedBy,
+    addition.rejectionReason,
+    addition.groupId ? `group ${addition.groupId}` : '',
+    addition.marketId ? `market ${addition.marketId}` : '',
+    addition.marketGroup?.questionTitle,
+  ]),
+].filter(Boolean).join(' ').toLowerCase();
+
+const filterMarketChanges = (changes, query) => {
+  const needle = normalizedSearch(query);
+  if (!needle) {
+    return changes;
+  }
+  return changes.filter((change) => marketChangeSearchText(change).includes(needle));
+};
+
 const ProfileMarketChangesTabs = ({ defaultMarketType, defaultStatus }) => {
   const tabsData = [
     {
@@ -241,6 +281,7 @@ const ProfileMarketChangeStatusTab = ({ marketType, status }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [busyAdditionId, setBusyAdditionId] = useState(null);
   const [reasonById, setReasonById] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     let ignore = false;
@@ -329,6 +370,10 @@ const ProfileMarketChangeStatusTab = ({ marketType, status }) => {
     amendments,
     answerOptions,
   }), [marketType, amendments, answerOptions]);
+  const visibleChanges = useMemo(
+    () => filterMarketChanges(groupedChanges, searchQuery),
+    [groupedChanges, searchQuery],
+  );
 
   if (loading) {
     return <LoadingSpinner />;
@@ -349,21 +394,42 @@ const ProfileMarketChangeStatusTab = ({ marketType, status }) => {
           Binary markets only support description amendments. Answer options are fixed when the market is created.
         </div>
       )}
+      <div className='grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4'>
+        <label htmlFor={`profile-market-change-search-${marketType}-${status}`} className='text-xs font-mono uppercase tracking-[0.16em] text-gray-400'>
+          Search {reviewShortLabelByStatus[status] || status} {marketType === 'grouped' ? 'grouped market' : 'binary market'} changes
+        </label>
+        <input
+          id={`profile-market-change-search-${marketType}-${status}`}
+          type='search'
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder='Search title, ID, amendment text, answer option, or user'
+          className='w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40'
+        />
+      </div>
       {groupedChanges.length === 0 ? (
         <div className='rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300'>
           No {status} {emptyLabel} changes found.
         </div>
+      ) : visibleChanges.length === 0 ? (
+        <div className='rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300'>
+          No {status} {emptyLabel} changes match "{searchQuery}".
+        </div>
       ) : (
-        groupedChanges.map((change) => (
-          <ProfileMarketChangeCard
-            key={change.key}
-            change={change}
-            status={status}
-            reasonById={reasonById}
-            busyAdditionId={busyAdditionId}
-            onReasonChange={updateReason}
-            onReviewAddition={reviewAddition}
-          />
+        visibleChanges.map((change, index) => (
+          <React.Fragment key={change.key}>
+            {index > 0 && (
+              <div className='my-2 h-px bg-gradient-to-r from-transparent via-primary-pink/50 to-transparent' />
+            )}
+            <ProfileMarketChangeCard
+              change={change}
+              status={status}
+              reasonById={reasonById}
+              busyAdditionId={busyAdditionId}
+              onReasonChange={updateReason}
+              onReviewAddition={reviewAddition}
+            />
+          </React.Fragment>
         ))
       )}
     </div>
@@ -382,7 +448,7 @@ const ProfileMarketChangeCard = ({
   const canReviewAnswerOptions = isGrouped && status === 'pending';
 
   return (
-    <article className='grid gap-4 rounded-lg border border-gray-700 bg-gray-900/70 p-4'>
+    <article className='grid gap-4 rounded-xl border border-gray-600 border-l-4 border-l-primary-pink/70 bg-gray-900/80 p-5 shadow-lg shadow-black/20'>
       <div className='grid gap-2'>
         <div className='flex flex-wrap items-center gap-2 text-sm text-gray-300'>
           <span className='rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 text-xs font-semibold text-sky-100'>
