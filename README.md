@@ -94,11 +94,11 @@ Highlights:
 - CMS-managed social share title, description, image, and image-enable setting
 - Default OpenGraph/social share image support
 
-> Screenshot placeholder: admin dashboard user queue
+<img width="1918" height="957" alt="Screenshot 2026-06-19 120222" src="https://github.com/user-attachments/assets/aec76b28-3788-4b2d-9d48-a7fecff94a2b" />
 
 > Screenshot placeholder: admin market discovery layout / tag management
 
-> Screenshot placeholder: admin social share / CMS settings tab
+<img width="1910" height="953" alt="Screenshot 2026-06-19 115946" src="https://github.com/user-attachments/assets/e355aef0-dd61-404b-92db-07186a867505" />
 
 ### Market Discovery and Governance
 
