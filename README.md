@@ -87,7 +87,7 @@ Admins have expanded operational controls for reviewing users, reviewing propose
 
 Highlights:
 
-- Admin user queue for moderator eligibility/status review
+- Admin user queue for moderator eligibility/status review in the dashboard
 - Market review tools with approval, rejection, review trail, and refund behavior
 - Market stewardship reassignment so admins can move operational responsibility from a suspended or unavailable moderator to another active moderator
 - Admin-managed market tags, topic navigation, market pins, and market discovery layout controls
