@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../helpers/AuthContent';
 import SiteTabs from '../../tabs/SiteTabs';
 import MarketLifecycleTable from '../profile/MarketLifecycleTable';
@@ -67,6 +67,13 @@ const marketGroupAnswerPolicyOptions = [
 ];
 
 const maxMarketTagsPerMarket = 5;
+const reviewPageSize = 20;
+
+const reviewPaginationButtonClass = [
+  'rounded-md border border-primary-pink px-3 py-2 text-xs font-semibold text-white transition',
+  'hover:bg-primary-pink/20 focus:outline-none focus:ring-2 focus:ring-primary-pink/50',
+  'disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500 disabled:hover:bg-transparent',
+].join(' ');
 
 const emptyReviewCounts = {
   pendingMarkets: 0,
@@ -78,6 +85,96 @@ const formatBadgeCount = (count) => {
   const numericCount = Number(count || 0);
   if (numericCount <= 0) return '';
   return numericCount > 99 ? '99+' : String(numericCount);
+};
+
+const normalizeSearchText = (value) => String(value || '').trim().toLowerCase();
+
+const textMatchesQuery = (values, query) => {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+  return values.some((value) => normalizeSearchText(value).includes(normalizedQuery));
+};
+
+const paginateRows = (rows, page) => {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const safePage = Math.max(0, Number(page || 0));
+  const start = safePage * reviewPageSize;
+  return {
+    rows: safeRows.slice(start, start + reviewPageSize),
+    start,
+    hasPrevious: safePage > 0,
+    hasNext: start + reviewPageSize < safeRows.length,
+  };
+};
+
+const ReviewSearchBox = ({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  loading = false,
+}) => (
+  <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+    <label htmlFor={id} className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
+      {label}
+    </label>
+    <div className="relative">
+      <input
+        id={id}
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+      />
+      {loading && (
+        <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
+      )}
+    </div>
+  </div>
+);
+
+const ReviewPaginationControls = ({
+  page,
+  visibleCount,
+  totalCount,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
+  loading = false,
+}) => {
+  const start = totalCount > 0 ? page * reviewPageSize + 1 : 0;
+  const end = totalCount > 0 ? page * reviewPageSize + visibleCount : 0;
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-gray-700 bg-gray-900/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-xs uppercase tracking-[0.18em] text-gray-400">
+        Showing page {page + 1}
+        <span className="ml-2 normal-case tracking-normal text-gray-300">
+          {totalCount > 0 ? `(${start}-${end} of ${totalCount})` : '(0 results)'}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={loading || !hasPrevious}
+          onClick={onPrevious}
+          className={reviewPaginationButtonClass}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={loading || !hasNext}
+          onClick={onNext}
+          className={reviewPaginationButtonClass}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
 };
 
 const isActiveModerator = (user) => (
@@ -217,6 +314,39 @@ const groupDescriptionAmendmentRows = (amendments = []) => {
 
   return rows;
 };
+
+const amendmentMatchesQuery = (amendment, query) => {
+  const children = amendment?.isMarketGroupAmendment
+    ? amendment.childAmendments || []
+    : [amendment];
+  return textMatchesQuery([
+    amendment?.marketTitle,
+    amendment?.marketDescription,
+    amendment?.body,
+    amendment?.createdBy,
+    amendment?.submitReason,
+    amendment?.rejectionReason,
+    amendment?.marketGroup?.questionTitle,
+    ...children.map((child) => child?.marketGroup?.answerLabel),
+    ...children.map((child) => child?.marketTitle),
+  ], query);
+};
+
+const answerAdditionMatchesQuery = (addition, query) => (
+  textMatchesQuery([
+    addition?.answerLabel,
+    addition?.groupTitle,
+    addition?.proposedBy,
+    addition?.reviewedBy,
+    addition?.rejectionReason,
+    addition?.marketGroup?.questionTitle,
+    addition?.marketGroup?.description,
+    addition?.marketGroup?.creatorUsername,
+    addition?.marketGroup?.stewardUsername,
+    addition?.groupId,
+    addition?.marketId,
+  ], query)
+);
 
 const useReviewWorkCounts = () => {
   const { token } = useAuth();
@@ -537,8 +667,11 @@ const AdminMarketQueue = ({ status }) => {
   const [tagForms, setTagForms] = useState({});
   const [busyMarketId, setBusyMarketId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
 
   const tagEditingEnabled = status === 'proposed' || status === 'published';
+  const groupedMarkets = useMemo(() => groupAdminMarketRows(markets), [markets]);
+  const pagedMarkets = useMemo(() => paginateRows(groupedMarkets, page), [groupedMarkets, page]);
 
   const loadMarkets = async (query = searchQuery) => {
     setLoading(true);
@@ -557,6 +690,10 @@ const AdminMarketQueue = ({ status }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setPage(0);
+  }, [status, searchQuery]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -821,26 +958,26 @@ const AdminMarketQueue = ({ status }) => {
           {successMessage}
         </div>
       )}
-      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
-        <label htmlFor={`market-review-search-${status}`} className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
-          Search markets
-        </label>
-        <div className="relative">
-          <input
-            id={`market-review-search-${status}`}
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={`Search ${status} markets by title or description`}
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          />
-          {loading && (
-            <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
-          )}
-        </div>
-      </div>
+      <ReviewSearchBox
+        id={`market-review-search-${status}`}
+        label="Search markets"
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder={`Search ${status} markets by title or description`}
+        loading={loading}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={pagedMarkets.rows.length}
+        totalCount={groupedMarkets.length}
+        hasPrevious={pagedMarkets.hasPrevious}
+        hasNext={pagedMarkets.hasNext}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
       <MarketLifecycleTable
-        markets={groupAdminMarketRows(markets)}
+        markets={pagedMarkets.rows}
         emptyMessage={`No ${status} markets found.`}
         showCreator
         showSteward
@@ -858,7 +995,14 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [busyAmendmentId, setBusyAmendmentId] = useState(null);
   const [reasonById, setReasonById] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
   const canReview = status === 'pending';
+  const groupedAmendments = useMemo(() => groupDescriptionAmendmentRows(amendments), [amendments]);
+  const filteredAmendments = useMemo(() => (
+    groupedAmendments.filter((amendment) => amendmentMatchesQuery(amendment, searchQuery))
+  ), [groupedAmendments, searchQuery]);
+  const pagedAmendments = useMemo(() => paginateRows(filteredAmendments, page), [filteredAmendments, page]);
 
   const loadAmendments = async () => {
     setLoading(true);
@@ -867,7 +1011,7 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
       const data = await listAdminMarketDescriptionAmendments({
         token,
         status,
-        limit: 100,
+        limit: 200,
       });
       setAmendments(data.amendments || []);
     } catch (err) {
@@ -882,6 +1026,10 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
     loadAmendments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, status]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [status, searchQuery]);
 
   const setReason = (amendmentKey, reason) => {
     setReasonById((current) => ({
@@ -934,12 +1082,30 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
           {successMessage}
         </div>
       )}
-      {amendments.length === 0 && (
+      <ReviewSearchBox
+        id={`description-amendment-search-${status}`}
+        label="Search amendments"
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search market title, description, amendment text, submitter, or reason"
+        loading={loading}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={pagedAmendments.rows.length}
+        totalCount={filteredAmendments.length}
+        hasPrevious={pagedAmendments.hasPrevious}
+        hasNext={pagedAmendments.hasNext}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
+      {filteredAmendments.length === 0 && (
         <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
           No {status} description amendments found.
         </div>
       )}
-      {groupDescriptionAmendmentRows(amendments).map((amendment) => {
+      {pagedAmendments.rows.map((amendment) => {
         const key = amendmentRowKey(amendment);
         const childAmendments = amendment.isMarketGroupAmendment
           ? amendment.childAmendments || []
@@ -1081,7 +1247,13 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [busyAdditionId, setBusyAdditionId] = useState(null);
   const [reasonById, setReasonById] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
   const canReview = status === 'pending';
+  const filteredAdditions = useMemo(() => (
+    additions.filter((addition) => answerAdditionMatchesQuery(addition, searchQuery))
+  ), [additions, searchQuery]);
+  const pagedAdditions = useMemo(() => paginateRows(filteredAdditions, page), [filteredAdditions, page]);
 
   const loadAdditions = async () => {
     setLoading(true);
@@ -1090,7 +1262,7 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
       const data = await listAdminMarketGroupAnswerAdditions({
         token,
         status,
-        limit: 100,
+        limit: 200,
       });
       setAdditions(data.additions || []);
     } catch (err) {
@@ -1105,6 +1277,10 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
     loadAdditions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, status]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [status, searchQuery]);
 
   const updateReason = (additionId, reason) => {
     setReasonById((current) => ({
@@ -1156,12 +1332,30 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
           {successMessage}
         </div>
       )}
-      {additions.length === 0 && (
+      <ReviewSearchBox
+        id={`answer-addition-search-${status}`}
+        label="Search answer options"
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search group title, answer label, proposer, reviewer, or reason"
+        loading={loading}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={pagedAdditions.rows.length}
+        totalCount={filteredAdditions.length}
+        hasPrevious={pagedAdditions.hasPrevious}
+        hasNext={pagedAdditions.hasNext}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
+      {filteredAdditions.length === 0 && (
         <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
           No {status} answer additions found.
         </div>
       )}
-      {additions.map((addition) => {
+      {pagedAdditions.rows.map((addition) => {
         const group = addition.marketGroup || {};
         const marketHref = addition.marketId
           ? `/markets/${addition.marketId}`
@@ -1264,6 +1458,13 @@ const MarketStewardshipQueue = () => {
   const [busyMarketId, setBusyMarketId] = useState(null);
   const [stewardForms, setStewardForms] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const groupedMarkets = useMemo(() => groupAdminMarketRows(markets), [markets]);
+  const pagedMarkets = useMemo(() => paginateRows(groupedMarkets, page), [groupedMarkets, page]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!token) {
@@ -1477,23 +1678,15 @@ const MarketStewardshipQueue = () => {
           unavailable, conflicted, or no longer responsible for resolving the market.
         </p>
       </div>
-      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
-        <label htmlFor="stewardship-market-search" className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
-          Search stewardship markets
-        </label>
-        <div className="relative">
-          <input
-            id="stewardship-market-search"
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search title or description across proposed, published, closed, and resolved markets"
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          />
-          {loading && (
-            <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
-          )}
-        </div>
+      <div className="grid gap-2">
+        <ReviewSearchBox
+          id="stewardship-market-search"
+          label="Search stewardship markets"
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search title or description across proposed, published, closed, and resolved markets"
+          loading={loading}
+        />
         <p className="text-xs text-gray-500">
           Rejected and cancelled markets are excluded from stewardship governance.
         </p>
@@ -1513,12 +1706,32 @@ const MarketStewardshipQueue = () => {
           No active moderators are available for stewardship reassignment.
         </div>
       )}
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={pagedMarkets.rows.length}
+        totalCount={groupedMarkets.length}
+        hasPrevious={pagedMarkets.hasPrevious}
+        hasNext={pagedMarkets.hasNext}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
       <MarketLifecycleTable
-        markets={groupAdminMarketRows(markets)}
+        markets={pagedMarkets.rows}
         emptyMessage="No markets found for stewardship governance."
         showCreator
         showSteward
         actions={renderStewardshipActions}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={pagedMarkets.rows.length}
+        totalCount={groupedMarkets.length}
+        hasPrevious={pagedMarkets.hasPrevious}
+        hasNext={pagedMarkets.hasNext}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
       />
     </div>
   );
