@@ -18,15 +18,10 @@ import {
   StatsSVG,
 } from '../../assets/components/SvgIcons';
 import useFrontendConfig from '../../hooks/useFrontendConfig';
-import { listAdminLifecycleMarkets } from '../../api/lifecycleMarketsApi';
-import { listAdminMarketDescriptionAmendments } from '../../api/marketDescriptionAmendmentsApi';
-import { listAdminMarketGroupAnswerAdditions } from '../../api/moderationApi';
-
-const totalPendingReviewCount = (counts) => (
-  Number(counts?.pendingMarkets || 0) +
-  Number(counts?.pendingAmendments || 0) +
-  Number(counts?.pendingAnswers || 0)
-);
+import {
+  getPendingAdminReviewCounts,
+  totalPendingReviewCount,
+} from '../../api/adminReviewCountsApi';
 
 const SidebarBadge = ({ value }) => {
   if (!value) return null;
@@ -111,16 +106,9 @@ const Sidebar = () => {
     let ignore = false;
     const loadPendingWork = async () => {
       try {
-        const [marketsResult, amendmentsResult, answersResult] = await Promise.all([
-          listAdminLifecycleMarkets({ token, status: 'proposed', limit: 100 }),
-          listAdminMarketDescriptionAmendments({ token, status: 'pending', limit: 100 }),
-          listAdminMarketGroupAnswerAdditions({ token, status: 'pending', limit: 100 }),
-        ]);
+        const counts = await getPendingAdminReviewCounts({ token });
         if (ignore) return;
-        const marketCount = Number(marketsResult.total ?? marketsResult.markets?.length ?? 0);
-        const amendmentCount = Number(amendmentsResult.total ?? amendmentsResult.amendments?.length ?? 0);
-        const answerCount = Number(answersResult.total ?? answersResult.additions?.length ?? 0);
-        setPendingReviewCount(marketCount + amendmentCount + answerCount);
+        setPendingReviewCount(totalPendingReviewCount(counts));
       } catch {
         if (!ignore) {
           setPendingReviewCount(0);

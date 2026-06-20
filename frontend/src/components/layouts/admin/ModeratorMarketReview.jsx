@@ -31,6 +31,10 @@ import {
   reviewMarketDescriptionAmendment,
   updateMarketGovernanceSettings,
 } from '../../../api/marketDescriptionAmendmentsApi';
+import {
+  emptyPendingAdminReviewCounts,
+  getPendingAdminReviewCounts,
+} from '../../../api/adminReviewCountsApi';
 
 const reviewTabs = [
   { label: 'Pending Review', status: 'proposed' },
@@ -77,10 +81,26 @@ const reviewPaginationButtonClass = [
   'disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500 disabled:hover:bg-transparent',
 ].join(' ');
 
-const emptyReviewCounts = {
-  pendingMarkets: 0,
-  pendingAmendments: 0,
-  pendingAnswers: 0,
+const adminReviewRetryDelayMs = 1200;
+
+const isRateLimitError = (err) => err?.status === 429 || err?.reason === 'RATE_LIMITED';
+
+const wait = (ms) => new Promise((resolve) => {
+  window.setTimeout(resolve, ms);
+});
+
+const withAdminReviewRateLimitRetry = async (request, retries = 1) => {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await request();
+    } catch (err) {
+      if (!isRateLimitError(err) || attempt === retries) {
+        throw err;
+      }
+      await wait(adminReviewRetryDelayMs);
+    }
+  }
+  return null;
 };
 
 const formatBadgeCount = (count) => {
@@ -203,42 +223,34 @@ const amendmentRowKey = (amendment) => (
 
 const useReviewWorkCounts = () => {
   const { token } = useAuth();
-  const [counts, setCounts] = useState(emptyReviewCounts);
+  const [counts, setCounts] = useState(emptyPendingAdminReviewCounts);
 
   useEffect(() => {
     if (!token) {
-      setCounts(emptyReviewCounts);
+      setCounts(emptyPendingAdminReviewCounts);
       return undefined;
     }
 
     let ignore = false;
     const loadCounts = async () => {
       try {
-        const [marketsResult, amendmentsResult, answersResult] = await Promise.all([
-          listAdminLifecycleMarkets({ token, status: 'proposed', limit: 100 }),
-          listAdminMarketDescriptionAmendments({ token, status: 'pending', limit: 100 }),
-          listAdminMarketGroupAnswerAdditions({ token, status: 'pending', limit: 100 }),
-        ]);
+        const nextCounts = await getPendingAdminReviewCounts({ token });
         if (ignore) return;
-        const nextCounts = {
-          pendingMarkets: Number(marketsResult.total ?? marketsResult.markets?.length ?? 0),
-          pendingAmendments: Number(amendmentsResult.total ?? amendmentsResult.amendments?.length ?? 0),
-          pendingAnswers: Number(answersResult.total ?? answersResult.additions?.length ?? 0),
-        };
         setCounts(nextCounts);
         window.dispatchEvent(new CustomEvent('socialpredict:admin-review-counts', { detail: nextCounts }));
       } catch {
         if (!ignore) {
-          setCounts(emptyReviewCounts);
-          window.dispatchEvent(new CustomEvent('socialpredict:admin-review-counts', { detail: emptyReviewCounts }));
+          setCounts(emptyPendingAdminReviewCounts);
+          window.dispatchEvent(new CustomEvent('socialpredict:admin-review-counts', { detail: emptyPendingAdminReviewCounts }));
         }
       }
     };
 
-    loadCounts();
+    const initialTimeoutId = window.setTimeout(loadCounts, 1500);
     const intervalId = window.setInterval(loadCounts, 60000);
     return () => {
       ignore = true;
+      window.clearTimeout(initialTimeoutId);
       window.clearInterval(intervalId);
     };
   }, [token]);
@@ -529,13 +541,13 @@ const AdminMarketQueue = ({ status }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAdminLifecycleMarkets({
+      const data = await withAdminReviewRateLimitRetry(() => listAdminLifecycleMarkets({
         token,
         status,
         query,
         limit: reviewPageSize,
         offset: pageNumber * reviewPageSize,
-      });
+      }));
       setMarkets(data.markets || []);
       setTotalMarkets(Number(data.total || 0));
     } catch (err) {
@@ -570,7 +582,7 @@ const AdminMarketQueue = ({ status }) => {
     let ignore = false;
     const loadActiveTags = async () => {
       try {
-        const result = await listAdminMarketTags({ token, includeInactive: false });
+        const result = await withAdminReviewRateLimitRetry(() => listAdminMarketTags({ token, includeInactive: false }));
         if (!ignore) {
           setActiveTags(result.tags || []);
         }
@@ -871,13 +883,13 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAdminMarketDescriptionAmendments({
+      const data = await withAdminReviewRateLimitRetry(() => listAdminMarketDescriptionAmendments({
         token,
         status,
         query,
         limit: reviewPageSize,
         offset: pageNumber * reviewPageSize,
-      });
+      }));
       setAmendments(data.amendments || []);
       setTotalAmendments(Number(data.total || 0));
     } catch (err) {
@@ -1136,13 +1148,13 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAdminMarketGroupAnswerAdditions({
+      const data = await withAdminReviewRateLimitRetry(() => listAdminMarketGroupAnswerAdditions({
         token,
         status,
         query,
         limit: reviewPageSize,
         offset: pageNumber * reviewPageSize,
-      });
+      }));
       setAdditions(data.additions || []);
       setTotalAdditions(Number(data.total || 0));
     } catch (err) {
