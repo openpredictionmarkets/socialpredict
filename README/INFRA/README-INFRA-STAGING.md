@@ -305,7 +305,7 @@ After the HostOps public key has been authorized on the staging host, retrieve t
 
 ```bash
 ./HostOps env list
-./HostOps host env get staging ADMIN_PASSWORD
+./HostOps env get staging ADMIN_PASSWORD
 ```
 
 Use the same pattern for production / `mo`, with the `mo` environment directory and `brierfoxforecast.com`.

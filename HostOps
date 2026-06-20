@@ -31,8 +31,9 @@ Purpose:
 
 Commands:
   env list                        List local environments under ~/.keys/socialpredict
+  env get <env> <KEY>             Read remote .env key
   host ssh <env>                  Open SSH session to environment host
-  host env get <env> <KEY>        Read remote .env key
+  host env get <env> <KEY>        Read remote .env key (alias)
   host disk <env>                 Show host disk and Docker usage
   host cleanup <env>              Run remote ./SocialPredict cleanup docker
   host logs <env> <service>       (Planned) Tail remote service logs
@@ -42,8 +43,9 @@ Commands:
 
 Current implementation:
   - env list is implemented
+  - env get is implemented
   - host ssh is implemented
-  - host env get is implemented
+  - host env get is implemented as an alias
   - host disk is implemented
   - host cleanup is implemented
   - all other commands are scaffold placeholders
@@ -94,6 +96,7 @@ Shell overrides also work:
 
 Examples:
   ./HostOps env list
+  ./HostOps env get staging ADMIN_PASSWORD
   ./HostOps host ssh staging
   ./HostOps host env get staging ADMIN_PASSWORD
   ./HostOps host disk staging
@@ -437,9 +440,19 @@ main() {
         list)
           list_envs
           ;;
+        get)
+          local env="${3:-}"
+          local requested_key="${4:-}"
+          if [[ -z "$env" || -z "$requested_key" ]]; then
+            print_error "Usage: ./HostOps env get <env> <KEY>"
+            exit 1
+          fi
+          host_env_get "$env" "$requested_key"
+          ;;
         *)
           print_error "Unknown env subcommand: '${sub:-<none>}'"
           echo "Usage: ./HostOps env list"
+          echo "       ./HostOps env get <env> <KEY>"
           exit 1
           ;;
       esac
