@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -135,5 +136,55 @@ func TestUpsertBootstrapMarketsCreatesPublishedTaggedMarkets(t *testing.T) {
 	}
 	if assignments != 1 {
 		t.Fatalf("expected exactly one Market A/Category A assignment, got %d", assignments)
+	}
+}
+
+func TestExpireBootstrapMarketDiscoverySnapshotsExpiresCachedDiscovery(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	generatedAt := time.Now().UTC()
+	snapshot := models.AnalyticsReadModelSnapshot{
+		SnapshotKey: "market_discovery:v2:markets:status=active:tag=none:limit=21:offset=0",
+		Kind:        "market_discovery",
+		PayloadJSON: `{"markets":[]}`,
+		GeneratedAt: generatedAt,
+		Source:      "read_model",
+		IsStale:     false,
+	}
+	if err := db.Create(&snapshot).Error; err != nil {
+		t.Fatalf("create snapshot: %v", err)
+	}
+	otherSnapshot := models.AnalyticsReadModelSnapshot{
+		SnapshotKey: "global_leaderboard",
+		Kind:        "global_leaderboard",
+		PayloadJSON: `{"users":[]}`,
+		GeneratedAt: generatedAt,
+		Source:      "read_model",
+		IsStale:     false,
+	}
+	if err := db.Create(&otherSnapshot).Error; err != nil {
+		t.Fatalf("create other snapshot: %v", err)
+	}
+
+	if err := expireBootstrapMarketDiscoverySnapshots(db); err != nil {
+		t.Fatalf("expireBootstrapMarketDiscoverySnapshots returned error: %v", err)
+	}
+
+	var updated models.AnalyticsReadModelSnapshot
+	if err := db.Where("snapshot_key = ?", snapshot.SnapshotKey).First(&updated).Error; err != nil {
+		t.Fatalf("load updated snapshot: %v", err)
+	}
+	if !updated.IsStale || updated.StaleReason != "dev_bootstrap" || updated.MarkedStaleAt.IsZero() {
+		t.Fatalf("market discovery snapshot not marked stale correctly: %+v", updated)
+	}
+	if !updated.GeneratedAt.Before(generatedAt.Add(-23 * time.Hour)) {
+		t.Fatalf("market discovery snapshot should be expired, generated_at=%v original=%v", updated.GeneratedAt, generatedAt)
+	}
+
+	var untouched models.AnalyticsReadModelSnapshot
+	if err := db.Where("snapshot_key = ?", otherSnapshot.SnapshotKey).First(&untouched).Error; err != nil {
+		t.Fatalf("load untouched snapshot: %v", err)
+	}
+	if untouched.IsStale || untouched.StaleReason != "" || !untouched.GeneratedAt.Equal(generatedAt) {
+		t.Fatalf("non-discovery snapshot should not change: %+v", untouched)
 	}
 }
