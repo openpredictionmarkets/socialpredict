@@ -30,8 +30,10 @@ Purpose:
   It MUST NOT reimplement app runtime logic owned by ./SocialPredict.
 
 Commands:
+  env help                        Show environment command help
   env list                        List local environments under ~/.keys/socialpredict
   env get <env> <KEY>             Read remote .env key
+  host help                       Show host command help
   host ssh <env>                  Open SSH session to environment host
   host env get <env> <KEY>        Read remote .env key (alias)
   host disk <env>                 Show host disk and Docker usage
@@ -95,8 +97,10 @@ Shell overrides also work:
   HOSTOPS_<ENV>_REPO_PATH  remote repo path, planned deploy/env/log commands
 
 Examples:
+  ./HostOps env help
   ./HostOps env list
   ./HostOps env get staging ADMIN_PASSWORD
+  ./HostOps host help
   ./HostOps host ssh staging
   ./HostOps host env get staging ADMIN_PASSWORD
   ./HostOps host disk staging
@@ -122,6 +126,88 @@ Staging SSH setup:
     -> root@kconfs.com:~/.ssh/authorized_keys
 
   For another environment, use that environment's directory and host.
+EOF
+}
+
+env_usage() {
+  cat <<'EOF'
+Usage: ./HostOps env COMMAND
+
+Environment commands manage local HostOps environment definitions under:
+  ~/.keys/socialpredict/<env>/
+
+Commands:
+  help                  Show this help
+  list                  List local environments
+  get <env> <KEY>       Read a KEY=value line from the remote app .env file
+
+Examples:
+  ./HostOps env list
+  ./HostOps env get staging ADMIN_PASSWORD
+
+Notes:
+  env get uses SSH and reads from HOSTOPS_REPO_PATH/.env on the remote host.
+  The older './HostOps host env get <env> <KEY>' command remains an alias.
+EOF
+}
+
+host_usage() {
+  cat <<'EOF'
+Usage: ./HostOps host COMMAND
+
+Host commands connect to or inspect configured remote hosts.
+
+Commands:
+  help                         Show this help
+  ssh <env>                    Open SSH session to environment host
+  env help                     Show remote environment-file command help
+  env get <env> <KEY>          Read remote .env key; alias for './HostOps env get'
+  disk <env>                   Show host disk and Docker usage
+  cleanup <env> [OPTIONS]      Run remote './SocialPredict cleanup docker'
+  logs <env> <service>         Planned
+
+Examples:
+  ./HostOps host ssh staging
+  ./HostOps host env get staging ADMIN_PASSWORD
+  ./HostOps host disk staging
+  ./HostOps host cleanup staging --all-images
+EOF
+}
+
+host_env_usage() {
+  cat <<'EOF'
+Usage: ./HostOps host env COMMAND
+
+Remote environment-file commands read app configuration on a configured host.
+
+Commands:
+  help                  Show this help
+  get <env> <KEY>       Read a KEY=value line from HOSTOPS_REPO_PATH/.env
+
+Examples:
+  ./HostOps host env get staging ADMIN_PASSWORD
+  ./HostOps env get staging ADMIN_PASSWORD
+
+Notes:
+  './HostOps env get <env> <KEY>' is the preferred shorter form.
+EOF
+}
+
+deploy_usage() {
+  cat <<'EOF'
+Usage: ./HostOps deploy <env>
+
+Planned command. Intended to orchestrate remote SocialPredict deployment without
+reimplementing app runtime logic owned by ./SocialPredict.
+EOF
+}
+
+tf_usage() {
+  cat <<'EOF'
+Usage: ./HostOps tf <plan|apply|destroy> <env>
+
+Planned command. Intended to wrap Terraform workflows for a selected HostOps
+environment.
 EOF
 }
 
@@ -437,6 +523,9 @@ main() {
     env)
       local sub="${2:-}"
       case "$sub" in
+        help|--help|-h|"")
+          env_usage
+          ;;
         list)
           list_envs
           ;;
@@ -451,8 +540,7 @@ main() {
           ;;
         *)
           print_error "Unknown env subcommand: '${sub:-<none>}'"
-          echo "Usage: ./HostOps env list"
-          echo "       ./HostOps env get <env> <KEY>"
+          env_usage
           exit 1
           ;;
       esac
@@ -460,6 +548,9 @@ main() {
     host)
       local sub="${2:-}"
       case "$sub" in
+        help|--help|-h|"")
+          host_usage
+          ;;
         ssh)
           local env="${3:-}"
           if [[ -z "$env" ]]; then
@@ -471,6 +562,9 @@ main() {
         env)
           local env_action="${3:-}"
           case "$env_action" in
+            help|--help|-h|"")
+              host_env_usage
+              ;;
             get)
               local env="${4:-}"
               local requested_key="${5:-}"
@@ -482,7 +576,7 @@ main() {
               ;;
             *)
               print_error "Unknown host env subcommand: '${env_action:-<none>}'"
-              echo "Usage: ./HostOps host env get <env> <KEY>"
+              host_env_usage
               exit 1
               ;;
           esac
@@ -513,13 +607,22 @@ main() {
           ;;
         *)
           print_error "Unknown host subcommand: '${sub:-<none>}'"
-          usage
+          host_usage
           exit 1
           ;;
       esac
       ;;
-    deploy|tf)
-      require_planned
+    deploy)
+      case "${2:-}" in
+        help|--help|-h) deploy_usage ;;
+        *) require_planned ;;
+      esac
+      ;;
+    tf)
+      case "${2:-}" in
+        help|--help|-h) tf_usage ;;
+        *) require_planned ;;
+      esac
       ;;
     *)
       print_error "Unknown command: $cmd"
