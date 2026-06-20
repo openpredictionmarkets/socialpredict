@@ -3,9 +3,9 @@ title: Moderator Work Profits Plan
 document_type: feature-plan
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-07T00:00:00Z
-updated_at_display: "Sunday, June 7, 2026"
-update_reason: "Track implementation slices for moderator work-profit payout and financial reporting."
+updated_at: 2026-06-16T00:00:00Z
+updated_at_display: "Tuesday, June 16, 2026"
+update_reason: "Track gross work-income payout, net work-profit reporting, and unrealized work-profit display."
 status: draft
 ---
 
@@ -33,7 +33,7 @@ Checklist:
 - [x] Wire `InitialBetFee` into the market service config.
 - [x] Derive unique positive-bet participants from canonical bet history.
 - [x] Credit work income after ordinary winner payout.
-- [x] Pay only the surplus above the market creation/proposal cost threshold.
+- [x] Pay gross first-participation fee income at resolution time.
 - [x] Skip work-profit payout for `N/A` refund resolution.
 - [x] Add service tests for payout ordering and unique participant counting.
 
@@ -49,12 +49,15 @@ Checklist:
 - [x] Include work profits in user financial read-model refresh.
 - [x] Update retained participation-fee system metric semantics to avoid double-counting paid-out steward work income.
 - [x] Add tests for net work-profit derivation.
+- [x] Add unrealized work-income and work-profit display for unresolved markets and groups.
 
 ## 04. API And Frontend Surface
 
 Checklist:
 
 - [x] Reuse existing user financial `workProfits` response field.
+- [x] Add `unrealizedWorkIncome` response field for projected unresolved participant-fee income.
+- [x] Add `unrealizedWorkProfits` response field for unresolved stewarded market forecasts.
 - [ ] Add copy or tooltip if users need an explanation of work profits in the financial UI.
 - [ ] Consider market-level steward earnings display after product language is settled.
 

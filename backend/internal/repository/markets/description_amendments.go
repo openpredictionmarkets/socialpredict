@@ -130,7 +130,9 @@ func (r *GormRepository) GetMarketGovernanceSettings(ctx context.Context) (*dmar
 }
 
 func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, update dmarkets.MarketGovernanceSettingsUpdate) (*dmarkets.MarketGovernanceSettings, error) {
-	if update.AutoApproveDescriptionAmendments == nil && update.AutoApproveMarketProposals == nil {
+	if update.AutoApproveDescriptionAmendments == nil &&
+		update.AutoApproveMarketProposals == nil &&
+		update.AutoApproveMarketGroupAnswers == nil {
 		return nil, dmarkets.ErrInvalidInput
 	}
 	var saved models.MarketGovernanceSettings
@@ -149,6 +151,9 @@ func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, upd
 		}
 		if update.AutoApproveMarketProposals != nil {
 			row.AutoApproveMarketProposals = *update.AutoApproveMarketProposals
+		}
+		if update.AutoApproveMarketGroupAnswers != nil {
+			row.AutoApproveMarketGroupAnswers = *update.AutoApproveMarketGroupAnswers
 		}
 		row.UpdatedBy = update.UpdatedBy
 		if row.ID == 0 {
@@ -195,6 +200,7 @@ func modelMarketGovernanceSettingsToDomain(row models.MarketGovernanceSettings) 
 	return dmarkets.MarketGovernanceSettings{
 		AutoApproveDescriptionAmendments: row.AutoApproveDescriptionAmendments,
 		AutoApproveMarketProposals:       row.AutoApproveMarketProposals,
+		AutoApproveMarketGroupAnswers:    row.AutoApproveMarketGroupAnswers,
 		Version:                          row.Version,
 		UpdatedBy:                        row.UpdatedBy,
 		UpdatedAt:                        row.UpdatedAt,

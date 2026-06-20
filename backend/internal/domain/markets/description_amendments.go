@@ -28,6 +28,7 @@ type MarketDescriptionAmendment struct {
 	MarketID                   int64
 	MarketTitle                string
 	MarketDescription          string
+	MarketGroup                *MarketGroup
 	Version                    int
 	Body                       string
 	BodyFormat                 string
@@ -67,6 +68,7 @@ type MarketDescriptionAmendmentRepository interface {
 type MarketGovernanceSettings struct {
 	AutoApproveDescriptionAmendments bool
 	AutoApproveMarketProposals       bool
+	AutoApproveMarketGroupAnswers    bool
 	Version                          uint
 	UpdatedBy                        string
 	UpdatedAt                        time.Time
@@ -75,6 +77,7 @@ type MarketGovernanceSettings struct {
 type MarketGovernanceSettingsUpdate struct {
 	AutoApproveDescriptionAmendments *bool
 	AutoApproveMarketProposals       *bool
+	AutoApproveMarketGroupAnswers    *bool
 	Version                          uint
 	UpdatedBy                        string
 }
@@ -211,7 +214,10 @@ func (s *Service) GetMarketGovernanceSettings(ctx context.Context) (*MarketGover
 
 func (s *Service) UpdateMarketGovernanceSettings(ctx context.Context, update MarketGovernanceSettingsUpdate) (*MarketGovernanceSettings, error) {
 	update.UpdatedBy = strings.TrimSpace(update.UpdatedBy)
-	if update.UpdatedBy == "" || (update.AutoApproveDescriptionAmendments == nil && update.AutoApproveMarketProposals == nil) {
+	if update.UpdatedBy == "" ||
+		(update.AutoApproveDescriptionAmendments == nil &&
+			update.AutoApproveMarketProposals == nil &&
+			update.AutoApproveMarketGroupAnswers == nil) {
 		return nil, ErrInvalidInput
 	}
 	repo, err := s.marketGovernanceSettingsRepository()
@@ -281,6 +287,9 @@ func (s *Service) hydrateDescriptionAmendmentContext(ctx context.Context, items 
 		if market != nil {
 			item.MarketTitle = market.QuestionTitle
 			item.MarketDescription = market.Description
+		}
+		if group, err := s.GetMarketGroupForMarket(ctx, item.MarketID); err == nil && group != nil {
+			item.MarketGroup = group
 		}
 
 		approved, ok := approvedCache[item.MarketID]

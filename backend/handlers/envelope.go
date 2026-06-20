@@ -9,18 +9,19 @@ import (
 type FailureReason string
 
 const (
-	ReasonMethodNotAllowed       FailureReason = "METHOD_NOT_ALLOWED"
-	ReasonInvalidRequest         FailureReason = "INVALID_REQUEST"
-	ReasonInvalidToken           FailureReason = "INVALID_TOKEN"
-	ReasonAuthorizationDenied    FailureReason = "AUTHORIZATION_DENIED"
-	ReasonUserNotApproved        FailureReason = "USER_NOT_APPROVED"
-	ReasonPasswordChangeRequired FailureReason = "PASSWORD_CHANGE_REQUIRED"
-	ReasonNotFound               FailureReason = "NOT_FOUND"
-	ReasonRateLimited            FailureReason = "RATE_LIMITED"
-	ReasonLoginRateLimited       FailureReason = "LOGIN_RATE_LIMITED"
-	ReasonUserNotFound           FailureReason = "USER_NOT_FOUND"
-	ReasonMarketNotFound         FailureReason = "MARKET_NOT_FOUND"
-	ReasonInvalidState           FailureReason = "INVALID_STATE"
+	ReasonMethodNotAllowed            FailureReason = "METHOD_NOT_ALLOWED"
+	ReasonInvalidRequest              FailureReason = "INVALID_REQUEST"
+	ReasonInvalidToken                FailureReason = "INVALID_TOKEN"
+	ReasonAuthorizationDenied         FailureReason = "AUTHORIZATION_DENIED"
+	ReasonUserNotApproved             FailureReason = "USER_NOT_APPROVED"
+	ReasonPasswordChangeRequired      FailureReason = "PASSWORD_CHANGE_REQUIRED"
+	ReasonNotFound                    FailureReason = "NOT_FOUND"
+	ReasonRateLimited                 FailureReason = "RATE_LIMITED"
+	ReasonLoginRateLimited            FailureReason = "LOGIN_RATE_LIMITED"
+	ReasonUserNotFound                FailureReason = "USER_NOT_FOUND"
+	ReasonMarketNotFound              FailureReason = "MARKET_NOT_FOUND"
+	ReasonInvalidState                FailureReason = "INVALID_STATE"
+	ReasonMarketGroupChildUnpublished FailureReason = "MARKET_GROUP_CHILD_UNPUBLISHED"
 
 	ReasonValidationFailed    FailureReason = "VALIDATION_FAILED"
 	ReasonMarketClosed        FailureReason = "MARKET_CLOSED"
@@ -44,6 +45,7 @@ var publicFailureReasons = []FailureReason{
 	ReasonUserNotFound,
 	ReasonMarketNotFound,
 	ReasonInvalidState,
+	ReasonMarketGroupChildUnpublished,
 	ReasonValidationFailed,
 	ReasonMarketClosed,
 	ReasonInsufficientBalance,

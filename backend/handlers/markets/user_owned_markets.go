@@ -16,6 +16,7 @@ import (
 
 type userOwnedMarketLister interface {
 	ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error)
 }
 
 type userOwnedMarketsResponse struct {
@@ -57,13 +58,10 @@ func ListUserOwnedMarketsHandler(svc userOwnedMarketLister, auth authsvc.Authent
 			return
 		}
 
-		items := make([]*dto.MarketResponse, 0, len(markets))
-		for _, market := range markets {
-			items = append(items, marketToResponse(market))
-		}
+		response := lifecycleMarketResponseFromMarkets(r.Context(), svc, markets)
 		_ = handlers.WriteResult(w, http.StatusOK, userOwnedMarketsResponse{
-			Markets: items,
-			Total:   len(items),
+			Markets: response.Markets,
+			Total:   response.Total,
 		})
 	}
 }

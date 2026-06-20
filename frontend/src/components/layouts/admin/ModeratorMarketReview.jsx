@@ -5,8 +5,13 @@ import MarketLifecycleTable from '../profile/MarketLifecycleTable';
 import LoadingSpinner from '../../loaders/LoadingSpinner';
 import {
   approveProposedMarket,
+  approveProposedMarketGroup,
+  listAdminMarketGroupAnswerAdditions,
   rejectProposedMarket,
+  rejectProposedMarketGroup,
+  reassignMarketGroupSteward,
   reassignMarketSteward,
+  reviewMarketGroupAnswerAddition,
   updateMarketTags,
 } from '../../../api/moderationApi';
 import { listAdminLifecycleMarkets } from '../../../api/lifecycleMarketsApi';
@@ -37,6 +42,12 @@ const amendmentReviewTabs = [
   { label: 'Rejected Amendments', status: 'rejected' },
 ];
 
+const answerAdditionReviewTabs = [
+  { label: 'Pending Answers', status: 'pending' },
+  { label: 'Approved Answers', status: 'approved' },
+  { label: 'Rejected Answers', status: 'rejected' },
+];
+
 const maxMarketTagsPerMarket = 5;
 
 const isActiveModerator = (user) => (
@@ -52,6 +63,112 @@ const sameTagSlugs = (left, right) => (
   JSON.stringify([...left].sort()) === JSON.stringify([...right].sort())
 );
 
+const uniqueTagsBySlug = (markets = []) => {
+  const seen = new Set();
+  const tags = [];
+  markets.forEach((market) => {
+    (market.tags || []).forEach((tag) => {
+      const key = tag.slug || tag.id || tag.displayName;
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      tags.push(tag);
+    });
+  });
+  return tags;
+};
+
+const reviewRowKey = (market) => (
+  market?.isMarketGroup ? `group:${market.marketGroup.id}` : `market:${market.id}`
+);
+
+const groupAdminMarketRows = (markets = []) => {
+  const rows = [];
+  const groups = new Map();
+
+  markets.forEach((market) => {
+    const group = market.marketGroup;
+    if (!group?.id) {
+      rows.push({ ...market, rowKey: `market:${market.id}` });
+      return;
+    }
+
+    const existing = groups.get(group.id);
+    if (!existing) {
+      const row = {
+        ...market,
+        id: group.id,
+        rowKey: `group:${group.id}`,
+        isMarketGroup: true,
+        questionTitle: group.questionTitle || market.questionTitle,
+        description: group.description || '',
+        creatorUsername: group.creatorUsername || market.creatorUsername,
+        stewardUsername: group.stewardUsername || market.stewardUsername || market.creatorUsername,
+        lifecycleStatus: group.lifecycleStatus || market.lifecycleStatus,
+        status: group.status || market.status,
+        proposalCost: group.proposalCost ?? market.proposalCost,
+        marketGroup: group,
+        childMarkets: [market],
+        tags: uniqueTagsBySlug([market]),
+      };
+      groups.set(group.id, row);
+      rows.push(row);
+      return;
+    }
+
+    existing.childMarkets.push(market);
+    existing.tags = uniqueTagsBySlug(existing.childMarkets);
+  });
+
+  return rows;
+};
+
+const amendmentRowKey = (amendment) => (
+  amendment?.isMarketGroupAmendment
+    ? `group:${amendment.marketGroup.id}:${amendment.body}:${amendment.createdBy}:${amendment.status}`
+    : `amendment:${amendment.id}`
+);
+
+const groupDescriptionAmendmentRows = (amendments = []) => {
+  const rows = [];
+  const groups = new Map();
+
+  amendments.forEach((amendment) => {
+    const group = amendment.marketGroup;
+    if (!group?.id) {
+      rows.push(amendment);
+      return;
+    }
+
+    const key = [
+      group.id,
+      amendment.status,
+      amendment.body,
+      amendment.createdBy,
+      amendment.submitReason || '',
+    ].join('|');
+    const existing = groups.get(key);
+    if (!existing) {
+      const row = {
+        ...amendment,
+        isMarketGroupAmendment: true,
+        marketTitle: group.questionTitle || amendment.marketTitle,
+        marketDescription: group.description || amendment.marketDescription,
+        childAmendments: [amendment],
+      };
+      groups.set(key, row);
+      rows.push(row);
+      return;
+    }
+
+    existing.childAmendments.push(amendment);
+    existing.childAmendments.sort((left, right) => Number(left.marketId || 0) - Number(right.marketId || 0));
+  });
+
+  return rows;
+};
+
 const GovernanceAutoApprovalSetting = ({
   settingKey,
   title,
@@ -62,6 +179,7 @@ const GovernanceAutoApprovalSetting = ({
   const [settings, setSettings] = useState({
     autoApproveDescriptionAmendments: false,
     autoApproveMarketProposals: false,
+    autoApproveMarketGroupAnswers: false,
     version: 0,
   });
   const [draft, setDraft] = useState(false);
@@ -106,12 +224,14 @@ const GovernanceAutoApprovalSetting = ({
       const nextSettings = {
         autoApproveDescriptionAmendments: Boolean(settings.autoApproveDescriptionAmendments),
         autoApproveMarketProposals: Boolean(settings.autoApproveMarketProposals),
+        autoApproveMarketGroupAnswers: Boolean(settings.autoApproveMarketGroupAnswers),
         [settingKey]: draft,
       };
       const saved = await updateMarketGovernanceSettings({
         token,
         autoApproveDescriptionAmendments: nextSettings.autoApproveDescriptionAmendments,
         autoApproveMarketProposals: nextSettings.autoApproveMarketProposals,
+        autoApproveMarketGroupAnswers: nextSettings.autoApproveMarketGroupAnswers,
         version: settings.version,
       });
       setSettings(saved);
@@ -227,12 +347,17 @@ const AdminMarketQueue = ({ status }) => {
     };
   }, [token, tagEditingEnabled]);
 
-  const approveMarket = async (marketId) => {
-    setBusyMarketId(marketId);
+  const approveMarket = async (market) => {
+    const key = reviewRowKey(market);
+    setBusyMarketId(key);
     setError('');
     setSuccessMessage('');
     try {
-      await approveProposedMarket({ marketId, token });
+      if (market?.isMarketGroup) {
+        await approveProposedMarketGroup({ groupId: market.marketGroup.id, token });
+      } else {
+        await approveProposedMarket({ marketId: market.id, token });
+      }
       await loadMarkets();
     } catch (err) {
       setError(err.message || 'Unable to approve market.');
@@ -241,14 +366,19 @@ const AdminMarketQueue = ({ status }) => {
     }
   };
 
-  const rejectMarket = async (marketId) => {
-    const reason = rejectionReasons[marketId];
-    setBusyMarketId(marketId);
+  const rejectMarket = async (market) => {
+    const key = reviewRowKey(market);
+    const reason = rejectionReasons[key];
+    setBusyMarketId(key);
     setError('');
     setSuccessMessage('');
     try {
-      await rejectProposedMarket({ marketId, token, reason });
-      setRejectionReasons((current) => ({ ...current, [marketId]: '' }));
+      if (market?.isMarketGroup) {
+        await rejectProposedMarketGroup({ groupId: market.marketGroup.id, token, reason });
+      } else {
+        await rejectProposedMarket({ marketId: market.id, token, reason });
+      }
+      setRejectionReasons((current) => ({ ...current, [key]: '' }));
       await loadMarkets();
     } catch (err) {
       setError(err.message || 'Unable to reject market.');
@@ -364,25 +494,26 @@ const AdminMarketQueue = ({ status }) => {
     if (!tagEditingEnabled) {
       return null;
     }
+    const key = reviewRowKey(market);
 
     return (
       <div className="grid min-w-[220px] gap-3">
-        {renderTagEditor(market)}
+        {!market.isMarketGroup && renderTagEditor(market)}
         {status === 'proposed' && (
           <>
             <button
               type="button"
-              disabled={busyMarketId === market.id}
-              onClick={() => approveMarket(market.id)}
+              disabled={busyMarketId === key}
+              onClick={() => approveMarket(market)}
               className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Approve
+              {market.isMarketGroup ? 'Approve Group' : 'Approve'}
             </button>
             <textarea
-              value={rejectionReasons[market.id] || ''}
+              value={rejectionReasons[key] || ''}
               onChange={(event) => setRejectionReasons((current) => ({
                 ...current,
-                [market.id]: event.target.value,
+                [key]: event.target.value,
               }))}
               rows={3}
               placeholder="Reason for rejection"
@@ -390,11 +521,11 @@ const AdminMarketQueue = ({ status }) => {
             />
             <button
               type="button"
-              disabled={busyMarketId === market.id || !(rejectionReasons[market.id] || '').trim()}
-              onClick={() => rejectMarket(market.id)}
+              disabled={busyMarketId === key || !(rejectionReasons[key] || '').trim()}
+              onClick={() => rejectMarket(market)}
               className="rounded-md bg-rose-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Reject and Refund
+              {market.isMarketGroup ? 'Reject Group and Refund' : 'Reject and Refund'}
             </button>
           </>
         )}
@@ -445,7 +576,7 @@ const AdminMarketQueue = ({ status }) => {
         </div>
       </div>
       <MarketLifecycleTable
-        markets={markets}
+        markets={groupAdminMarketRows(markets)}
         emptyMessage={`No ${status} markets found.`}
         showCreator
         showSteward
@@ -488,27 +619,33 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, status]);
 
-  const setReason = (amendmentId, reason) => {
+  const setReason = (amendmentKey, reason) => {
     setReasonById((current) => ({
       ...current,
-      [amendmentId]: reason,
+      [amendmentKey]: reason,
     }));
   };
 
   const reviewAmendment = async (amendment, nextStatus) => {
-    const reason = String(reasonById[amendment.id] || '').trim();
-    setBusyAmendmentId(amendment.id);
+    const key = amendmentRowKey(amendment);
+    const reason = String(reasonById[key] || '').trim();
+    const childAmendments = amendment.isMarketGroupAmendment
+      ? amendment.childAmendments || []
+      : [amendment];
+    setBusyAmendmentId(key);
     setError('');
     setSuccessMessage('');
     try {
-      await reviewMarketDescriptionAmendment({
-        token,
-        amendmentId: amendment.id,
-        status: nextStatus,
-        reason,
-      });
-      setReason(amendment.id, '');
-      setSuccessMessage(`Amendment v${amendment.version} ${nextStatus}.`);
+      await Promise.all(childAmendments.map((child) => (
+        reviewMarketDescriptionAmendment({
+          token,
+          amendmentId: child.id,
+          status: nextStatus,
+          reason,
+        })
+      )));
+      setReason(key, '');
+      setSuccessMessage(`${amendment.isMarketGroupAmendment ? 'Grouped amendment' : `Amendment v${amendment.version}`} ${nextStatus}.`);
       await loadAmendments();
     } catch (err) {
       setError(err.message || 'Unable to review description amendment.');
@@ -538,31 +675,45 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
           No {status} description amendments found.
         </div>
       )}
-      {amendments.map((amendment) => {
-        const reason = reasonById[amendment.id] || '';
+      {groupDescriptionAmendmentRows(amendments).map((amendment) => {
+        const key = amendmentRowKey(amendment);
+        const childAmendments = amendment.isMarketGroupAmendment
+          ? amendment.childAmendments || []
+          : [amendment];
+        const reason = reasonById[key] || '';
         const marketTitle = amendment.marketTitle || `Market #${amendment.marketId}`;
         const previousAmendments = Array.isArray(amendment.previousApprovedAmendments)
           ? amendment.previousApprovedAmendments
           : [];
+        const primaryMarketID = childAmendments[0]?.marketId || amendment.marketId;
         return (
-          <article key={amendment.id} className="grid gap-4 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+          <article key={key} className="grid gap-4 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
             <div className="grid gap-2">
               <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
                 <span className="rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 text-xs font-semibold text-sky-100">
-                  Market #{amendment.marketId}
+                  {amendment.isMarketGroupAmendment ? `Group #${amendment.marketGroup.id}` : `Market #${amendment.marketId}`}
                 </span>
                 <span className="rounded-full border border-gray-600 bg-gray-800 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-gray-200">
-                  Amendment {amendment.version}
+                  {amendment.isMarketGroupAmendment ? 'Grouped Amendment' : `Amendment ${amendment.version}`}
                 </span>
                 <span>Submitted by @{amendment.createdBy}</span>
                 <span>{amendment.createdAt ? new Date(amendment.createdAt).toLocaleString() : ''}</span>
               </div>
               <a
-                href={`/markets/${amendment.marketId}`}
+                href={`/markets/${primaryMarketID}`}
                 className="text-lg font-semibold text-white underline decoration-sky-500/40 underline-offset-4 transition hover:text-sky-200"
               >
                 {marketTitle}
               </a>
+              {amendment.isMarketGroupAmendment && (
+                <div className="flex flex-wrap gap-2">
+                  {childAmendments.map((child) => (
+                    <span key={child.id} className="rounded-full border border-sky-800/70 bg-sky-900/40 px-2.5 py-1 text-xs text-sky-100">
+                      {child.marketGroup?.answerLabel || `Market #${child.marketId}`} · Amendment {child.version}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             {amendment.submitReason && (
               <div className="rounded-md border border-gray-700 bg-gray-950 p-3 text-sm text-gray-300">
@@ -606,26 +757,26 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto,auto] md:items-start">
                 <textarea
                   value={reason}
-                  onChange={(event) => setReason(amendment.id, event.target.value)}
+                  onChange={(event) => setReason(key, event.target.value)}
                   rows={3}
                   placeholder="Decision reason required"
                   className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
                 />
                 <button
                   type="button"
-                  disabled={busyAmendmentId === amendment.id || !reason.trim()}
+                  disabled={busyAmendmentId === key || !reason.trim()}
                   onClick={() => reviewAmendment(amendment, 'approved')}
                   className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Approve
+                  {amendment.isMarketGroupAmendment ? 'Approve Group' : 'Approve'}
                 </button>
                 <button
                   type="button"
-                  disabled={busyAmendmentId === amendment.id || !reason.trim()}
+                  disabled={busyAmendmentId === key || !reason.trim()}
                   onClick={() => reviewAmendment(amendment, 'rejected')}
                   className="rounded-md bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Reject
+                  {amendment.isMarketGroupAmendment ? 'Reject Group' : 'Reject'}
                 </button>
               </div>
             )}
@@ -654,6 +805,191 @@ const DescriptionAmendmentQueue = () => {
         savedMessage="Amendment auto-approval setting saved."
       />
       <SiteTabs tabs={tabsData} defaultTab="Pending Amendments" />
+    </div>
+  );
+};
+
+const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
+  const { token } = useAuth();
+  const [additions, setAdditions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [busyAdditionId, setBusyAdditionId] = useState(null);
+  const [reasonById, setReasonById] = useState({});
+  const canReview = status === 'pending';
+
+  const loadAdditions = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await listAdminMarketGroupAnswerAdditions({
+        token,
+        status,
+        limit: 100,
+      });
+      setAdditions(data.additions || []);
+    } catch (err) {
+      setError(err.message || 'Unable to load grouped answer additions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    loadAdditions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, status]);
+
+  const updateReason = (additionId, reason) => {
+    setReasonById((current) => ({
+      ...current,
+      [additionId]: reason,
+    }));
+  };
+
+  const reviewAddition = async (addition, nextStatus) => {
+    const reason = String(reasonById[addition.id] || '').trim();
+    if (nextStatus === 'rejected' && !reason) {
+      setError('A rejection reason is required.');
+      return;
+    }
+    setBusyAdditionId(addition.id);
+    setError('');
+    setSuccessMessage('');
+    try {
+      await reviewMarketGroupAnswerAddition({
+        token,
+        additionId: addition.id,
+        status: nextStatus,
+        reason,
+        confirm: nextStatus === 'approved',
+      });
+      updateReason(addition.id, '');
+      setSuccessMessage(`Answer option "${addition.answerLabel}" ${nextStatus}.`);
+      await loadAdditions();
+    } catch (err) {
+      setError(err.message || 'Unable to review grouped answer addition.');
+    } finally {
+      setBusyAdditionId(null);
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="grid gap-4">
+      {error && (
+        <div className="rounded-md bg-red-700 p-3 text-sm text-white">
+          {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">
+          {successMessage}
+        </div>
+      )}
+      {additions.length === 0 && (
+        <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
+          No {status} answer additions found.
+        </div>
+      )}
+      {additions.map((addition) => {
+        const group = addition.marketGroup || {};
+        const marketHref = addition.marketId
+          ? `/markets/${addition.marketId}`
+          : (group.id ? `/markets/group/${group.id}` : '#');
+        const reason = reasonById[addition.id] || '';
+        return (
+          <article key={addition.id} className="grid gap-4 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
+              <span className="rounded-full border border-sky-500/40 bg-sky-950/50 px-2 py-0.5 text-xs font-semibold text-sky-100">
+                Group #{addition.groupId}
+              </span>
+              <span className="rounded-full border border-gray-600 bg-gray-800 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-gray-200">
+                {addition.status}
+              </span>
+              <span>Proposed by <a href={`/user/${addition.proposedBy}`} className="text-sky-300 hover:text-sky-200">@{addition.proposedBy}</a></span>
+              <span>{addition.createdAt ? new Date(addition.createdAt).toLocaleString() : ''}</span>
+            </div>
+            <div className="grid gap-2">
+              <a
+                href={marketHref}
+                className="text-lg font-semibold text-white underline decoration-sky-500/40 underline-offset-4 transition hover:text-sky-200"
+              >
+                {group.questionTitle || addition.groupTitle || `Grouped market #${addition.groupId}`}
+              </a>
+              <div className="rounded-md border border-sky-900/70 bg-sky-950/20 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">Answer Option</p>
+                <p className="mt-1 text-xl font-semibold text-white">{addition.answerLabel}</p>
+                <p className="mt-2 text-sm text-sky-100/80">Configured add-answer cost: {addition.additionCost} credits</p>
+              </div>
+            </div>
+            {addition.status === 'rejected' && addition.rejectionReason && (
+              <div className="rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-sm text-rose-100">
+                Rejection reason: {addition.rejectionReason}
+              </div>
+            )}
+            {addition.status === 'approved' && (
+              <div className="rounded-md border border-emerald-800/70 bg-emerald-950/30 p-3 text-sm text-emerald-100">
+                Approved by @{addition.reviewedBy || 'admin'}{addition.reviewedAt ? ` at ${new Date(addition.reviewedAt).toLocaleString()}` : ''}.
+              </div>
+            )}
+            {canReview && (
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto,auto] md:items-start">
+                <textarea
+                  value={reason}
+                  onChange={(event) => updateReason(addition.id, event.target.value)}
+                  rows={3}
+                  placeholder="Decision reason required for rejection"
+                  className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+                />
+                <button
+                  type="button"
+                  disabled={busyAdditionId === addition.id}
+                  onClick={() => reviewAddition(addition, 'approved')}
+                  className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Approve Answer
+                </button>
+                <button
+                  type="button"
+                  disabled={busyAdditionId === addition.id || !reason.trim()}
+                  onClick={() => reviewAddition(addition, 'rejected')}
+                  className="rounded-md bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+};
+
+const MarketGroupAnswerAdditionQueue = () => {
+  const tabsData = answerAdditionReviewTabs.map((tab) => ({
+    label: tab.label,
+    content: <MarketGroupAnswerAdditionStatusQueue status={tab.status} />,
+  }));
+
+  return (
+    <div className="grid gap-4">
+      <div className="rounded-lg border border-sky-800/70 bg-sky-950/30 p-4 text-sm text-sky-100">
+        Added answers create new binary child markets without changing existing child market history.
+      </div>
+      <GovernanceAutoApprovalSetting
+        settingKey="autoApproveMarketGroupAnswers"
+        title="Auto-approve added answers"
+        description="When enabled, active moderator answer additions are immediately published as new child markets."
+        savedMessage="Grouped answer auto-approval setting saved."
+      />
+      <SiteTabs tabs={tabsData} defaultTab="Pending Answers" />
     </div>
   );
 };
@@ -739,52 +1075,78 @@ const MarketStewardshipQueue = () => {
     };
   }, [token, searchQuery]);
 
-  const updateStewardForm = (marketId, updates) => {
+  const updateStewardForm = (marketKey, updates) => {
     setStewardForms((current) => ({
       ...current,
-      [marketId]: {
-        ...(current[marketId] || {}),
+      [marketKey]: {
+        ...(current[marketKey] || {}),
         ...updates,
       },
     }));
   };
 
   const stewardFormFor = (market) => {
+    const key = reviewRowKey(market);
     const currentSteward = market.stewardUsername || market.creatorUsername || '';
     return {
       stewardUsername: currentSteward,
       reason: '',
-      ...(stewardForms[market.id] || {}),
+      ...(stewardForms[key] || {}),
     };
   };
 
-  const updateMarketInQueues = (updatedMarket) => {
+  const updateMarketInQueues = (updatedMarket, originalMarket) => {
+    if (originalMarket?.isMarketGroup) {
+      const groupID = originalMarket.marketGroup?.id || updatedMarket.id;
+      setMarkets((current) => current.map((market) => (
+        market.marketGroup?.id === groupID
+          ? {
+            ...market,
+            stewardUsername: updatedMarket.stewardUsername,
+            marketGroup: {
+              ...(market.marketGroup || {}),
+              stewardUsername: updatedMarket.stewardUsername,
+            },
+          }
+          : market
+      )));
+      return;
+    }
+
     setMarkets((current) => current.map((market) => (
       market.id === updatedMarket.id ? { ...market, ...updatedMarket } : market
     )));
   };
 
   const reassignSteward = async (market) => {
+    const key = reviewRowKey(market);
     const form = stewardFormFor(market);
-    setBusyMarketId(market.id);
+    setBusyMarketId(key);
     setError('');
     setSuccessMessage('');
     try {
-      const updatedMarket = await reassignMarketSteward({
-        marketId: market.id,
-        token,
-        stewardUsername: form.stewardUsername,
-        reason: form.reason,
-      });
-      updateMarketInQueues(updatedMarket);
+      const updatedMarket = market.isMarketGroup
+        ? await reassignMarketGroupSteward({
+          groupId: market.marketGroup.id,
+          token,
+          stewardUsername: form.stewardUsername,
+          reason: form.reason,
+        })
+        : await reassignMarketSteward({
+          marketId: market.id,
+          token,
+          stewardUsername: form.stewardUsername,
+          reason: form.reason,
+        });
+      updateMarketInQueues(updatedMarket, market);
       setStewardForms((current) => ({
         ...current,
-        [market.id]: {
+        [key]: {
           stewardUsername: updatedMarket.stewardUsername || form.stewardUsername,
           reason: '',
         },
       }));
-      setSuccessMessage(`Market ${updatedMarket.id} steward reassigned to ${updatedMarket.stewardUsername}.`);
+      setSuccessMessage(`${market.isMarketGroup ? 'Market group' : 'Market'} ${updatedMarket.id} steward reassigned to ${updatedMarket.stewardUsername}.`);
     } catch (err) {
       setError(err.message || 'Unable to reassign market steward.');
     } finally {
@@ -793,12 +1155,13 @@ const MarketStewardshipQueue = () => {
   };
 
   const renderStewardshipActions = (market) => {
+    const key = reviewRowKey(market);
     const form = stewardFormFor(market);
     const currentSteward = market.stewardUsername || market.creatorUsername || '';
     const selectedSteward = String(form.stewardUsername || '').trim();
     const reason = String(form.reason || '').trim();
     const canSubmit = selectedSteward && reason && selectedSteward !== currentSteward;
-    const stewardListId = `steward-options-${market.id}`;
+    const stewardListId = `steward-options-${key}`;
 
     return (
       <div className="grid min-w-[260px] gap-3">
@@ -807,7 +1170,7 @@ const MarketStewardshipQueue = () => {
           <input
             list={stewardListId}
             value={form.stewardUsername}
-            onChange={(event) => updateStewardForm(market.id, { stewardUsername: event.target.value })}
+            onChange={(event) => updateStewardForm(key, { stewardUsername: event.target.value })}
             placeholder="Search active moderators by username"
             className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
           />
@@ -823,14 +1186,14 @@ const MarketStewardshipQueue = () => {
         </label>
         <textarea
           value={form.reason}
-          onChange={(event) => updateStewardForm(market.id, { reason: event.target.value })}
+          onChange={(event) => updateStewardForm(key, { reason: event.target.value })}
           rows={3}
           placeholder="Reason for stewardship reassignment"
           className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
         />
         <button
           type="button"
-          disabled={busyMarketId === market.id || !canSubmit}
+          disabled={busyMarketId === key || !canSubmit}
           onClick={() => reassignSteward(market)}
           className="rounded-md bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -892,7 +1255,7 @@ const MarketStewardshipQueue = () => {
         </div>
       )}
       <MarketLifecycleTable
-        markets={markets}
+        markets={groupAdminMarketRows(markets)}
         emptyMessage="No markets found for stewardship governance."
         showCreator
         showSteward
@@ -1183,6 +1546,10 @@ function ModeratorMarketReview() {
     {
       label: 'Description Amendments',
       content: <DescriptionAmendmentQueue />,
+    },
+    {
+      label: 'Answer Additions',
+      content: <MarketGroupAnswerAdditionQueue />,
     },
     {
       label: 'Tags',

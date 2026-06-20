@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -106,7 +107,7 @@ func TestComputeSystemMetrics_WithData(t *testing.T) {
 	}
 }
 
-func TestComputeSystemMetrics_ParticipationFeesRetainResolvedCreationCostThreshold(t *testing.T) {
+func TestComputeSystemMetrics_ParticipationFeesExcludeResolvedNonNAFeePayouts(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.MarketIncentives.CreateMarketCost = 10
@@ -148,13 +149,13 @@ func TestComputeSystemMetrics_ParticipationFeesRetainResolvedCreationCostThresho
 	svc := newAnalyticsService(t, db, econ)
 	metrics := requireSystemMetrics(t, svc)
 
-	expectedRetainedFees := int64(15)
+	expectedRetainedFees := int64(10)
 	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != expectedRetainedFees {
 		t.Fatalf("retained participation fees = %d, want %d", got, expectedRetainedFees)
 	}
 }
 
-func TestComputeSystemMetrics_ParticipationFeesExcludeOnlyPaidWorkProfitSurplus(t *testing.T) {
+func TestComputeSystemMetrics_ParticipationFeesExcludeAllResolvedNonNAFeeIncome(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	econ := modelstesting.GenerateEconomicConfig()
 	econ.Economics.MarketIncentives.CreateMarketCost = 10
@@ -194,9 +195,89 @@ func TestComputeSystemMetrics_ParticipationFeesExcludeOnlyPaidWorkProfitSurplus(
 	svc := newAnalyticsService(t, db, econ)
 	metrics := requireSystemMetrics(t, svc)
 
-	expectedRetainedFees := int64(10)
+	expectedRetainedFees := int64(0)
 	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != expectedRetainedFees {
 		t.Fatalf("retained participation fees = %d, want %d", got, expectedRetainedFees)
+	}
+}
+
+func TestComputeSystemMetrics_GroupsExcludeResolvedFeePayouts(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.MarketIncentives.CreateMarketCost = 1
+	econ.Economics.Betting.BetFees.InitialBetFee = 2
+
+	steward := modelstesting.GenerateUser("metrics_group_steward", 0)
+	alice := modelstesting.GenerateUser("metrics_group_alice", 0)
+	bob := modelstesting.GenerateUser("metrics_group_bob", 0)
+	carol := modelstesting.GenerateUser("metrics_group_carol", 0)
+	for _, user := range []models.User{steward, alice, bob, carol} {
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("create user %s: %v", user.Username, err)
+		}
+	}
+
+	childOne := modelstesting.GenerateMarket(301, steward.Username)
+	childOne.IsResolved = true
+	childOne.ResolutionResult = "YES"
+	childOne.ProposalCost = 0
+	childOne.StewardUsername = steward.Username
+	childTwo := modelstesting.GenerateMarket(302, steward.Username)
+	childTwo.IsResolved = true
+	childTwo.ResolutionResult = "NO"
+	childTwo.ProposalCost = 0
+	childTwo.StewardUsername = steward.Username
+	for _, market := range []models.Market{childOne, childTwo} {
+		if err := db.Create(&market).Error; err != nil {
+			t.Fatalf("create child market: %v", err)
+		}
+	}
+
+	group := models.MarketGroup{
+		QuestionTitle:      "Metrics grouped market",
+		Description:        "Parent",
+		GroupType:          "MULTIPLE_CHOICE_BINARY",
+		ProbabilityPolicy:  "INDEPENDENT_BINARY",
+		ResolutionPolicy:   "INDEPENDENT_CHILDREN",
+		LifecycleStatus:    "resolved",
+		ProposalCost:       5,
+		CreatorUsername:    steward.Username,
+		StewardUsername:    steward.Username,
+		ResolutionDateTime: childOne.ResolutionDateTime,
+	}
+	if err := db.Create(&group).Error; err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	members := []models.MarketGroupMember{
+		{GroupID: group.ID, MarketID: childOne.ID, AnswerLabel: "One", DisplayOrder: 0},
+		{GroupID: group.ID, MarketID: childTwo.ID, AnswerLabel: "Two", DisplayOrder: 1},
+	}
+	for _, member := range members {
+		if err := db.Create(&member).Error; err != nil {
+			t.Fatalf("create member: %v", err)
+		}
+	}
+
+	bets := []models.Bet{
+		modelstesting.GenerateBet(10, "YES", alice.Username, uint(childOne.ID), 0),
+		modelstesting.GenerateBet(10, "YES", bob.Username, uint(childOne.ID), time.Minute),
+		modelstesting.GenerateBet(10, "NO", alice.Username, uint(childTwo.ID), 2*time.Minute),
+		modelstesting.GenerateBet(10, "YES", carol.Username, uint(childTwo.ID), 3*time.Minute),
+	}
+	for _, bet := range bets {
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("create bet: %v", err)
+		}
+	}
+
+	svc := newAnalyticsService(t, db, econ)
+	metrics := requireSystemMetrics(t, svc)
+
+	if got := requireMetricInt64(t, metrics.MoneyUtilized.MarketCreationFees); got != 5 {
+		t.Fatalf("market creation fees = %d, want parent group proposal cost 5", got)
+	}
+	if got := requireMetricInt64(t, metrics.MoneyUtilized.ParticipationFees); got != 0 {
+		t.Fatalf("retained group participation fees = %d, want 0", got)
 	}
 }
 

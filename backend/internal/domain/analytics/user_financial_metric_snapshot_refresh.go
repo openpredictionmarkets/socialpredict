@@ -30,6 +30,12 @@ func (s *Service) RefreshUserFinancialMetricSnapshot(ctx context.Context, req Fi
 		return nil, err
 	}
 	req.WorkProfits = workProfits
+	unrealizedWorkIncome, unrealizedWorkProfits, err := s.computeUserUnrealizedWorkFinancials(ctx, req.Username)
+	if err != nil {
+		return nil, err
+	}
+	req.UnrealizedWorkIncome = unrealizedWorkIncome
+	req.UnrealizedWorkProfits = unrealizedWorkProfits
 
 	snapshot := NewUserFinancialMetricSnapshotCalculator(s.config).
 		Calculate(req, positions, generatedAt)

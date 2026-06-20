@@ -26,6 +26,7 @@ type MarketResponse struct {
 	CreatedAt          time.Time           `json:"createdAt"`
 	UpdatedAt          time.Time           `json:"updatedAt"`
 	Tags               []MarketTagResponse `json:"tags,omitempty"`
+	MarketGroup        *MarketGroupLink    `json:"marketGroup,omitempty"`
 }
 
 // CreateMarketResponse represents the HTTP response after creating a market
@@ -44,6 +45,151 @@ type CreateMarketResponse struct {
 	ProposalCost       int64               `json:"proposalCost,omitempty"`
 	CreatedAt          time.Time           `json:"createdAt"`
 	Tags               []MarketTagResponse `json:"tags,omitempty"`
+}
+
+// MarketGroupResponse represents a multiple-choice binary parent market.
+type MarketGroupResponse struct {
+	ID                         int64      `json:"id"`
+	QuestionTitle              string     `json:"questionTitle"`
+	Description                string     `json:"description"`
+	GroupType                  string     `json:"groupType"`
+	ProbabilityPolicy          string     `json:"probabilityPolicy"`
+	ResolutionPolicy           string     `json:"resolutionPolicy"`
+	LifecycleStatus            string     `json:"lifecycleStatus"`
+	Status                     string     `json:"status"`
+	ProposalCost               int64      `json:"proposalCost"`
+	CreatorUsername            string     `json:"creatorUsername"`
+	StewardUsername            string     `json:"stewardUsername"`
+	ApprovedBy                 string     `json:"approvedBy,omitempty"`
+	ApprovedAt                 *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy                 string     `json:"rejectedBy,omitempty"`
+	RejectedAt                 *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason            string     `json:"rejectionReason,omitempty"`
+	ResolutionDateTime         time.Time  `json:"resolutionDateTime"`
+	AutoApproveAnswerAdditions bool       `json:"autoApproveAnswerAdditions"`
+	CreatedAt                  time.Time  `json:"createdAt"`
+	UpdatedAt                  time.Time  `json:"updatedAt"`
+	AnswerCount                int        `json:"answerCount"`
+}
+
+// MarketGroupAnswerResponse links one answer option to its tradable child market.
+type MarketGroupAnswerResponse struct {
+	ID                    int64                                `json:"id"`
+	GroupID               int64                                `json:"groupId"`
+	MarketID              int64                                `json:"marketId"`
+	AnswerLabel           string                               `json:"answerLabel"`
+	DisplayOrder          int                                  `json:"displayOrder"`
+	Market                *MarketOverviewResponse              `json:"market,omitempty"`
+	ProbabilityChanges    []ProbabilityChangeResponse          `json:"probabilityChanges,omitempty"`
+	DescriptionAmendments []MarketDescriptionAmendmentResponse `json:"descriptionAmendments,omitempty"`
+}
+
+// MarketGroupDetailsResponse returns group metadata with child market overviews.
+type MarketGroupDetailsResponse struct {
+	Group   *MarketGroupResponse        `json:"group"`
+	Creator *CreatorResponse            `json:"creator"`
+	Answers []MarketGroupAnswerResponse `json:"answers"`
+}
+
+type MarketGroupAnswerAdditionResponse struct {
+	ID              int64                `json:"id"`
+	GroupID         int64                `json:"groupId"`
+	MarketID        int64                `json:"marketId,omitempty"`
+	GroupTitle      string               `json:"groupTitle,omitempty"`
+	AnswerLabel     string               `json:"answerLabel"`
+	Status          string               `json:"status"`
+	ProposedBy      string               `json:"proposedBy"`
+	ReviewedBy      string               `json:"reviewedBy,omitempty"`
+	ReviewedAt      *time.Time           `json:"reviewedAt,omitempty"`
+	RejectionReason string               `json:"rejectionReason,omitempty"`
+	AdditionCost    int64                `json:"additionCost"`
+	CreatedAt       time.Time            `json:"createdAt"`
+	UpdatedAt       time.Time            `json:"updatedAt"`
+	MarketGroup     *MarketGroupResponse `json:"marketGroup,omitempty"`
+}
+
+type MarketGroupAnswerAdditionsResponse struct {
+	Additions []MarketGroupAnswerAdditionResponse `json:"additions"`
+	Total     int                                 `json:"total"`
+}
+
+type MarketGroupBetResponse struct {
+	AnswerMarketID int64     `json:"answerMarketId"`
+	AnswerLabel    string    `json:"answerLabel"`
+	DisplayOrder   int       `json:"displayOrder"`
+	Username       string    `json:"username"`
+	Outcome        string    `json:"outcome"`
+	Amount         int64     `json:"amount"`
+	Probability    float64   `json:"probability"`
+	PlacedAt       time.Time `json:"placedAt"`
+}
+
+type MarketGroupBetsResponse struct {
+	GroupID int64                    `json:"groupId"`
+	Bets    []MarketGroupBetResponse `json:"bets"`
+	Total   int                      `json:"total"`
+}
+
+type MarketGroupPositionAnswerResponse struct {
+	AnswerMarketID   int64  `json:"answerMarketId"`
+	AnswerLabel      string `json:"answerLabel"`
+	DisplayOrder     int    `json:"displayOrder"`
+	MarketID         int64  `json:"marketId"`
+	YesSharesOwned   int64  `json:"yesSharesOwned"`
+	NoSharesOwned    int64  `json:"noSharesOwned"`
+	Value            int64  `json:"value"`
+	TotalSpent       int64  `json:"totalSpent"`
+	TotalSpentInPlay int64  `json:"totalSpentInPlay"`
+	IsResolved       bool   `json:"isResolved"`
+	ResolutionResult string `json:"resolutionResult"`
+}
+
+type MarketGroupPositionResponse struct {
+	Username         string                              `json:"username"`
+	YesSharesOwned   int64                               `json:"yesSharesOwned"`
+	NoSharesOwned    int64                               `json:"noSharesOwned"`
+	Value            int64                               `json:"value"`
+	TotalSpent       int64                               `json:"totalSpent"`
+	TotalSpentInPlay int64                               `json:"totalSpentInPlay"`
+	Answers          []MarketGroupPositionAnswerResponse `json:"answers"`
+}
+
+type MarketGroupPositionsResponse struct {
+	GroupID   int64                         `json:"groupId"`
+	Positions []MarketGroupPositionResponse `json:"positions"`
+	Total     int                           `json:"total"`
+	Freshness *Freshness                    `json:"freshness,omitempty"`
+}
+
+type MarketGroupLeaderboardAnswerResponse struct {
+	AnswerMarketID int64  `json:"answerMarketId"`
+	AnswerLabel    string `json:"answerLabel"`
+	DisplayOrder   int    `json:"displayOrder"`
+	Profit         int64  `json:"profit"`
+	CurrentValue   int64  `json:"currentValue"`
+	TotalSpent     int64  `json:"totalSpent"`
+	Position       string `json:"position"`
+	YesSharesOwned int64  `json:"yesSharesOwned"`
+	NoSharesOwned  int64  `json:"noSharesOwned"`
+}
+
+type MarketGroupLeaderboardRowResponse struct {
+	Username       string                                 `json:"username"`
+	Profit         int64                                  `json:"profit"`
+	CurrentValue   int64                                  `json:"currentValue"`
+	TotalSpent     int64                                  `json:"totalSpent"`
+	Position       string                                 `json:"position"`
+	YesSharesOwned int64                                  `json:"yesSharesOwned"`
+	NoSharesOwned  int64                                  `json:"noSharesOwned"`
+	Rank           int                                    `json:"rank"`
+	Answers        []MarketGroupLeaderboardAnswerResponse `json:"answers"`
+}
+
+type MarketGroupLeaderboardResponse struct {
+	GroupID     int64                               `json:"groupId"`
+	Leaderboard []MarketGroupLeaderboardRowResponse `json:"leaderboard"`
+	Total       int                                 `json:"total"`
+	Freshness   *Freshness                          `json:"freshness,omitempty"`
 }
 
 type MarketTagResponse struct {
@@ -96,6 +242,31 @@ type PublicMarketResponse struct {
 	YesLabel                string              `json:"yesLabel"`
 	NoLabel                 string              `json:"noLabel"`
 	Tags                    []MarketTagResponse `json:"tags,omitempty"`
+	MarketGroup             *MarketGroupLink    `json:"marketGroup,omitempty"`
+}
+
+// MarketGroupLink binds a normal child market back to its parent group.
+type MarketGroupLink struct {
+	ID                 int64      `json:"id"`
+	QuestionTitle      string     `json:"questionTitle"`
+	Description        string     `json:"description,omitempty"`
+	GroupType          string     `json:"groupType"`
+	LifecycleStatus    string     `json:"lifecycleStatus"`
+	Status             string     `json:"status"`
+	AnswerLabel        string     `json:"answerLabel,omitempty"`
+	DisplayOrder       int        `json:"displayOrder,omitempty"`
+	AnswerCount        int        `json:"answerCount"`
+	ProposalCost       int64      `json:"proposalCost,omitempty"`
+	CreatorUsername    string     `json:"creatorUsername,omitempty"`
+	StewardUsername    string     `json:"stewardUsername,omitempty"`
+	ApprovedBy         string     `json:"approvedBy,omitempty"`
+	ApprovedAt         *time.Time `json:"approvedAt,omitempty"`
+	RejectedBy         string     `json:"rejectedBy,omitempty"`
+	RejectedAt         *time.Time `json:"rejectedAt,omitempty"`
+	RejectionReason    string     `json:"rejectionReason,omitempty"`
+	ResolutionDateTime time.Time  `json:"resolutionDateTime"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
 }
 
 // ProbabilityChangeResponse represents WPAM probability history.
@@ -194,6 +365,7 @@ type MarketDescriptionAmendmentResponse struct {
 	MarketID                   int64                                `json:"marketId"`
 	MarketTitle                string                               `json:"marketTitle,omitempty"`
 	MarketDescription          string                               `json:"marketDescription,omitempty"`
+	MarketGroup                *MarketGroupLink                     `json:"marketGroup,omitempty"`
 	Version                    int                                  `json:"version"`
 	Body                       string                               `json:"body"`
 	BodyFormat                 string                               `json:"bodyFormat"`

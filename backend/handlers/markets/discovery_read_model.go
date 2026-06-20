@@ -221,7 +221,7 @@ func (h *MarketDiscoveryReadModelHandler) pinnedMarketResponses(ctx context.Cont
 			}
 			responses = append(responses, pinnedMarketResponse{
 				Pin:     pin,
-				Details: marketSummaryToDetailsResponse(summary),
+				Details: marketSummaryToDetailsResponse(ctx, h.markets, summary),
 			})
 			continue
 		}
@@ -231,7 +231,7 @@ func (h *MarketDiscoveryReadModelHandler) pinnedMarketResponses(ctx context.Cont
 		}
 		responses = append(responses, pinnedMarketResponse{
 			Pin:     pin,
-			Details: marketDetailsToResponse(details),
+			Details: marketDetailsToResponse(ctx, h.markets, details),
 		})
 	}
 	return responses, nil

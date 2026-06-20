@@ -32,6 +32,7 @@ type marketDescriptionAmendmentResponse struct {
 	MarketID                   int64                                `json:"marketId"`
 	MarketTitle                string                               `json:"marketTitle,omitempty"`
 	MarketDescription          string                               `json:"marketDescription,omitempty"`
+	MarketGroup                *marketGroupReviewLink               `json:"marketGroup,omitempty"`
 	Version                    int                                  `json:"version"`
 	Body                       string                               `json:"body"`
 	BodyFormat                 string                               `json:"bodyFormat"`
@@ -56,6 +57,7 @@ type marketDescriptionAmendmentListResponse struct {
 type marketGovernanceSettingsResponse struct {
 	AutoApproveDescriptionAmendments bool      `json:"autoApproveDescriptionAmendments"`
 	AutoApproveMarketProposals       bool      `json:"autoApproveMarketProposals"`
+	AutoApproveMarketGroupAnswers    bool      `json:"autoApproveMarketGroupAnswers"`
 	Version                          uint      `json:"version"`
 	UpdatedBy                        string    `json:"updatedBy,omitempty"`
 	UpdatedAt                        time.Time `json:"updatedAt"`
@@ -64,6 +66,7 @@ type marketGovernanceSettingsResponse struct {
 type updateMarketGovernanceSettingsRequest struct {
 	AutoApproveDescriptionAmendments *bool `json:"autoApproveDescriptionAmendments"`
 	AutoApproveMarketProposals       *bool `json:"autoApproveMarketProposals"`
+	AutoApproveMarketGroupAnswers    *bool `json:"autoApproveMarketGroupAnswers"`
 	Version                          uint  `json:"version"`
 }
 
@@ -111,6 +114,7 @@ func UpdateMarketGovernanceSettingsHandler(svc marketDescriptionAmendmentReviewe
 		settings, err := svc.UpdateMarketGovernanceSettings(r.Context(), dmarkets.MarketGovernanceSettingsUpdate{
 			AutoApproveDescriptionAmendments: req.AutoApproveDescriptionAmendments,
 			AutoApproveMarketProposals:       req.AutoApproveMarketProposals,
+			AutoApproveMarketGroupAnswers:    req.AutoApproveMarketGroupAnswers,
 			Version:                          req.Version,
 			UpdatedBy:                        admin.Username,
 		})
@@ -221,6 +225,7 @@ func marketGovernanceSettingsResponseFromDomain(settings *dmarkets.MarketGoverna
 	return marketGovernanceSettingsResponse{
 		AutoApproveDescriptionAmendments: settings.AutoApproveDescriptionAmendments,
 		AutoApproveMarketProposals:       settings.AutoApproveMarketProposals,
+		AutoApproveMarketGroupAnswers:    settings.AutoApproveMarketGroupAnswers,
 		Version:                          settings.Version,
 		UpdatedBy:                        settings.UpdatedBy,
 		UpdatedAt:                        settings.UpdatedAt,
@@ -233,6 +238,7 @@ func marketDescriptionAmendmentResponseFromDomain(item dmarkets.MarketDescriptio
 		MarketID:          item.MarketID,
 		MarketTitle:       item.MarketTitle,
 		MarketDescription: item.MarketDescription,
+		MarketGroup:       marketGroupReviewLinkFromGroup(item.MarketGroup, item.MarketID),
 		Version:           item.Version,
 		Body:              item.Body,
 		BodyFormat:        item.BodyFormat,

@@ -5,12 +5,32 @@ import ExpandableText from '../utils/ExpandableText';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketTagChips from '../markets/MarketTagChips';
+import {
+  groupedMarketBadgeLabel,
+  groupedMarketResolutionSummary,
+  isGroupedMarketAggregate,
+  marketDisplayRoute,
+  marketProbabilityDisplay,
+} from '../../helpers/marketGroups';
 
 const MobileMarketCard = ({ marketData }) => {
+  const route = marketDisplayRoute(marketData);
+  const isGroup = isGroupedMarketAggregate(marketData);
   const isMarketOpen =
     !marketData.market.isResolved &&
     formatResolutionDate(marketData.market.resolutionDateTime) !== 'Closed';
   const stewardUsername = stewardUsernameFor(marketData.market, marketData.creator.username);
+  const groupedResolution = isGroup ? groupedMarketResolutionSummary(marketData) : null;
+  const resolutionClassName = groupedResolution
+    ? groupedResolution.className
+    : marketData.market.isResolved
+      ? getResultCssClass(marketData.market.resolutionResult)
+      : 'text-gray-400';
+  const resolutionLabel = groupedResolution
+    ? groupedResolution.label
+    : marketData.market.isResolved
+      ? getResolvedText(marketData.market.resolutionResult, marketData.market)
+      : 'Pending';
 
   return (
     <div className='bg-gray-800 p-4 mb-4 rounded-lg'>
@@ -32,10 +52,10 @@ const MobileMarketCard = ({ marketData }) => {
         </div>
         {isMarketOpen ? (
           <Link
-            to={`/markets/${marketData.market.id}`}
+            to={route}
             className='bg-blue-500 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap'
           >
-            Bet
+            {isGroup ? 'View Group' : 'Bet'}
           </Link>
         ) : (
           <span className='bg-gray-500 text-white px-3 py-1 rounded-full text-sm whitespace-nowrap'>
@@ -44,7 +64,7 @@ const MobileMarketCard = ({ marketData }) => {
         )}
       </div>
       <Link
-        to={`/markets/${marketData.market.id}`}
+        to={route}
         className='text-blue-400 hover:text-blue-300 font-medium block mb-2'
       >
         <ExpandableText
@@ -57,22 +77,24 @@ const MobileMarketCard = ({ marketData }) => {
           expandIcon="📐"
         />
       </Link>
-      <MarketTagChips tags={marketData.market.tags || []} className='mb-3' />
-      <div className='grid grid-cols-3 text-sm text-gray-400'>
+      <div className='mb-3 flex flex-wrap items-center gap-2'>
+        {isGroup && (
+          <span className='rounded-full border border-cyan-500/40 bg-cyan-950/40 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100'>
+            {groupedMarketBadgeLabel(marketData)}
+          </span>
+        )}
+        <MarketTagChips tags={marketData.market.tags || []} />
+      </div>
+      <div className='grid grid-cols-4 gap-2 text-sm text-gray-400'>
         <span className='truncate'>👤 {marketData.numUsers}</span>
+        <span className='truncate'>📊 {marketData.totalVolume}</span>
         <span className='text-center'>
-          {marketData.lastProbability.toFixed(2)}%
+          {marketProbabilityDisplay(marketData)}
         </span>
         <span
-          className={`text-right ${
-            marketData.market.isResolved
-              ? getResultCssClass(marketData.market.resolutionResult)
-              : 'text-gray-400'
-          }`}
+          className={`text-right ${resolutionClassName}`}
         >
-          {marketData.market.isResolved
-            ? getResolvedText(marketData.market.resolutionResult, marketData.market)
-            : 'Pending'}
+          {resolutionLabel}
         </span>
       </div>
     </div>

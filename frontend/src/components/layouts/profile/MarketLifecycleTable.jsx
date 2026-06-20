@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MarketTagChips from '../../markets/MarketTagChips';
 
@@ -16,6 +16,84 @@ const marketLabel = (value, fallback) => {
   return label || fallback;
 };
 
+const uniqueTagsBySlug = (markets = []) => {
+  const seen = new Set();
+  const tags = [];
+  markets.forEach((market) => {
+    (market.tags || []).forEach((tag) => {
+      const key = tag.slug || tag.id || tag.displayName;
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      tags.push(tag);
+    });
+  });
+  return tags;
+};
+
+export const groupLifecycleMarketRows = (markets = []) => {
+  const rows = [];
+  const groups = new Map();
+
+  markets.forEach((market) => {
+    if (market.isMarketGroup && market.marketGroup?.id) {
+      rows.push({
+        ...market,
+        rowKey: market.rowKey || `group:${market.marketGroup.id}`,
+        tags: market.tags?.length ? market.tags : uniqueTagsBySlug(market.childMarkets || []),
+      });
+      return;
+    }
+
+    const group = market.marketGroup;
+    if (!group?.id) {
+      rows.push({ ...market, rowKey: `market:${market.id}` });
+      return;
+    }
+
+    const existing = groups.get(group.id);
+    if (!existing) {
+      const row = {
+        ...market,
+        id: group.id,
+        rowKey: `group:${group.id}`,
+        isMarketGroup: true,
+        questionTitle: group.questionTitle || market.questionTitle,
+        description: group.description || '',
+        creatorUsername: group.creatorUsername || market.creatorUsername,
+        stewardUsername: group.stewardUsername || market.stewardUsername || market.creatorUsername,
+        lifecycleStatus: group.lifecycleStatus || market.lifecycleStatus,
+        status: group.status || market.status,
+        proposalCost: group.proposalCost ?? market.proposalCost,
+        approvedBy: group.approvedBy ?? market.approvedBy,
+        approvedAt: group.approvedAt ?? market.approvedAt,
+        rejectedBy: group.rejectedBy ?? market.rejectedBy,
+        rejectedAt: group.rejectedAt ?? market.rejectedAt,
+        rejectionReason: group.rejectionReason ?? market.rejectionReason,
+        createdAt: group.createdAt || market.createdAt,
+        updatedAt: group.updatedAt || market.updatedAt,
+        marketGroup: group,
+        childMarkets: [market],
+        tags: uniqueTagsBySlug([market]),
+      };
+      groups.set(group.id, row);
+      rows.push(row);
+      return;
+    }
+
+    existing.childMarkets.push(market);
+    existing.childMarkets.sort((left, right) => {
+      const leftOrder = Number(left.marketGroup?.displayOrder ?? left.id ?? 0);
+      const rightOrder = Number(right.marketGroup?.displayOrder ?? right.id ?? 0);
+      return leftOrder - rightOrder;
+    });
+    existing.tags = uniqueTagsBySlug(existing.childMarkets);
+  });
+
+  return rows;
+};
+
 const MarketLabels = ({ market }) => (
   <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
     <div className="rounded-md border border-emerald-700/70 bg-emerald-950/40 px-3 py-2">
@@ -28,6 +106,30 @@ const MarketLabels = ({ market }) => (
     </div>
   </div>
 );
+
+const MarketGroupChildren = ({ market }) => {
+  const children = Array.isArray(market.childMarkets) ? market.childMarkets : [];
+  if (!market.isMarketGroup) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-sky-800/60 bg-sky-950/20 px-3 py-2 text-xs text-sky-100">
+      <div className="font-mono uppercase tracking-[0.14em] text-sky-200">
+        Grouped market · {children.length || market.marketGroup?.answerCount || 0} answers
+      </div>
+      {children.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {children.map((child) => (
+            <span key={child.id} className="rounded-full border border-sky-800/70 bg-sky-900/40 px-2.5 py-1">
+              {child.marketGroup?.answerLabel || child.questionTitle || `Market #${child.id}`} · #{child.id}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const StewardshipAuditTrail = ({ audits = [] }) => {
   if (!audits.length) {
@@ -52,6 +154,7 @@ const StewardshipAuditTrail = ({ audits = [] }) => {
 
 const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false, showSteward = false, actions }) => {
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
+  const displayMarkets = useMemo(() => groupLifecycleMarketRows(markets), [markets]);
 
   const toggleDescription = (marketId) => {
     setExpandedDescriptions((current) => ({
@@ -60,7 +163,7 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
     }));
   };
 
-  if (!markets.length) {
+  if (!displayMarkets.length) {
     return (
       <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
         {emptyMessage || 'No markets found.'}
@@ -83,30 +186,38 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800 text-gray-100">
-          {markets.map((market) => (
-            <tr key={market.id} className="align-top">
+          {displayMarkets.map((market) => {
+            const rowKey = market.rowKey || market.id;
+            const firstChildId = market.childMarkets?.[0]?.id;
+            const viewMarketId = market.isMarketGroup ? firstChildId : market.id;
+
+            return (
+            <tr key={rowKey} className="align-top">
               <td className="px-4 py-4">
                 <div className="font-semibold text-white">{market.questionTitle}</div>
-                <div className="mt-1 font-mono text-xs text-gray-400">ID: {market.id}</div>
+                <div className="mt-1 font-mono text-xs text-gray-400">
+                  {market.isMarketGroup ? `Group ID: ${market.marketGroup?.id || market.id}` : `ID: ${market.id}`}
+                </div>
                 {market.description && (
                   <div className="mt-2 max-w-xl text-xs text-gray-300">
-                    <div className={expandedDescriptions[market.id] ? 'whitespace-pre-wrap break-words' : 'line-clamp-2 break-words'}>
+                    <div className={expandedDescriptions[rowKey] ? 'whitespace-pre-wrap break-words' : 'line-clamp-2 break-words'}>
                       {market.description}
                     </div>
                     <button
                       type="button"
-                      onClick={() => toggleDescription(market.id)}
+                      onClick={() => toggleDescription(rowKey)}
                       className="mt-2 text-primary-pink hover:underline"
                     >
-                      {expandedDescriptions[market.id] ? 'Show less description' : 'Show full description'}
+                      {expandedDescriptions[rowKey] ? 'Show less description' : 'Show full description'}
                     </button>
                   </div>
                 )}
                 <MarketTagChips tags={market.tags || []} className="mt-3" />
-                <MarketLabels market={market} />
-                {statusLabel(market) === 'published' && (
-                  <Link className="mt-2 inline-block text-primary-pink hover:underline" to={`/markets/${market.id}`}>
-                    View market
+                <MarketGroupChildren market={market} />
+                {!market.isMarketGroup && <MarketLabels market={market} />}
+                {statusLabel(market) === 'published' && viewMarketId && (
+                  <Link className="mt-2 inline-block text-primary-pink hover:underline" to={`/markets/${viewMarketId}`}>
+                    {market.isMarketGroup ? 'View grouped market' : 'View market'}
                   </Link>
                 )}
               </td>
@@ -132,7 +243,8 @@ const MarketLifecycleTable = ({ markets = [], emptyMessage, showCreator = false,
               </td>
               {actions && <td className="px-4 py-4">{actions(market)}</td>}
             </tr>
-          ))}
+          );
+          })}
         </tbody>
       </table>
     </div>

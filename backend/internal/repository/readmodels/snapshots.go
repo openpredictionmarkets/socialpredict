@@ -80,15 +80,34 @@ func (r *GormRepository) MarkMarketDiscoverySnapshotsStale(ctx context.Context, 
 		reason = "discovery_changed"
 	}
 	now := time.Now().UTC()
+	updates := map[string]interface{}{
+		"is_stale":        true,
+		"stale_reason":    reason,
+		"marked_stale_at": now,
+		"updated_at":      now,
+	}
+	if marketDiscoveryStructuralChange(reason) {
+		updates["generated_at"] = now.Add(-24 * time.Hour)
+	}
 	return r.db.WithContext(ctx).
 		Model(&models.AnalyticsReadModelSnapshot{}).
 		Where("snapshot_key LIKE ?", "market_discovery:%").
-		Updates(map[string]interface{}{
-			"is_stale":        true,
-			"stale_reason":    reason,
-			"marked_stale_at": now,
-			"updated_at":      now,
-		}).Error
+		Updates(updates).Error
+}
+
+func marketDiscoveryStructuralChange(reason string) bool {
+	switch strings.TrimSpace(reason) {
+	case "market_created",
+		"market_group_created",
+		"market_status_changed",
+		"market_tags_changed",
+		"tag_catalog_changed",
+		"cms_page_changed",
+		"cms_pins_changed":
+		return true
+	default:
+		return false
+	}
 }
 
 func snapshotFromModel(model *models.AnalyticsReadModelSnapshot) *Snapshot {
