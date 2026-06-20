@@ -37,6 +37,8 @@ A grouped discovery row should include:
 
 Filter first by public search/topic/status rules, group child matches under their parent group, then sort and paginate grouped rows.
 
+The current implementation performs this as a backend read-model grouping pass: it queries matching child markets, batch-loads parent group/member metadata and all child answer markets for matched groups, collapses each parent to one display row, and only then applies `limit` and `offset`. That fixes pagination correctness without moving transaction math into SQL.
+
 ## Compatibility Rule
 
 Frontend helpers may still collapse child rows defensively, but that must not be the primary correctness path.

@@ -5,7 +5,6 @@ import LoadingSpinner from '../../../loaders/LoadingSpinner';
 import MarketLifecycleTable, { groupLifecycleMarketRows } from '../MarketLifecycleTable';
 
 const PAGE_SIZE = 20;
-const FETCH_BATCH_SIZE = 100;
 const paginationButtonClass = [
     'rounded',
     'border',
@@ -28,6 +27,7 @@ const paginationButtonClass = [
 const OwnedMarketsTabContent = ({ username }) => {
     const { isLoggedIn, token } = useAuth();
     const [markets, setMarkets] = useState([]);
+    const [totalMarkets, setTotalMarkets] = useState(0);
     const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -43,26 +43,19 @@ const OwnedMarketsTabContent = ({ username }) => {
             setLoading(true);
             setError(null);
             try {
-                const rows = [];
-                let offset = 0;
-                let keepFetching = true;
-                while (keepFetching) {
-                    const params = new URLSearchParams({
-                        limit: String(FETCH_BATCH_SIZE),
-                        offset: String(offset),
-                    });
-                    const data = await apiRequest(`/v0/users/${username}/owned-markets?${params.toString()}`, {
-                        authenticated: true,
-                        authToken: token,
-                        fallbackMessage: 'Error fetching owned markets',
-                    });
-                    const batch = data.markets || [];
-                    rows.push(...batch);
-                    keepFetching = batch.length === FETCH_BATCH_SIZE;
-                    offset += FETCH_BATCH_SIZE;
-                }
+                const params = new URLSearchParams({
+                    limit: String(PAGE_SIZE),
+                    offset: String(page * PAGE_SIZE),
+                });
+                const data = await apiRequest(`/v0/users/${username}/owned-markets?${params.toString()}`, {
+                    authenticated: true,
+                    authToken: token,
+                    fallbackMessage: 'Error fetching owned markets',
+                });
                 if (!ignore) {
-                    setMarkets(groupLifecycleMarketRows(rows));
+                    const rows = groupLifecycleMarketRows(data.markets || []);
+                    setMarkets(rows);
+                    setTotalMarkets(Number.isFinite(Number(data.total)) ? Number(data.total) : rows.length);
                 }
             } catch (err) {
                 if (!ignore) {
@@ -79,6 +72,7 @@ const OwnedMarketsTabContent = ({ username }) => {
             fetchOwnedMarkets();
         } else {
             setMarkets([]);
+            setTotalMarkets(0);
             setError(null);
             setLoading(false);
         }
@@ -86,7 +80,7 @@ const OwnedMarketsTabContent = ({ username }) => {
         return () => {
             ignore = true;
         };
-    }, [username, token]);
+    }, [username, token, page]);
 
     if (loading) {
         return (
@@ -125,14 +119,14 @@ const OwnedMarketsTabContent = ({ username }) => {
     }
 
     const start = page * PAGE_SIZE;
-    const visibleMarkets = markets.slice(start, start + PAGE_SIZE);
-    const hasNextPage = start + PAGE_SIZE < markets.length;
+    const visibleMarkets = markets;
+    const hasNextPage = start + visibleMarkets.length < totalMarkets;
 
     return (
         <div className="space-y-3">
             <div className="flex flex-col gap-2 rounded-lg border border-gray-700 bg-gray-900/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
-                    Showing owned markets page {page + 1}{visibleMarkets.length ? ` (${start + 1}-${start + visibleMarkets.length} of ${markets.length})` : ''}
+                    Showing owned markets page {page + 1}{visibleMarkets.length ? ` (${start + 1}-${start + visibleMarkets.length} of ${totalMarkets})` : ''}
                 </div>
                 <div className="flex gap-2">
                     <button

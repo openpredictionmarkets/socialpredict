@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -129,6 +130,30 @@ func TestCreateMarketGroupCreatesZeroCostChildMarketsAndChargesParentOnce(t *tes
 	}
 	if !reflect.DeepEqual(tagAssignments, []int64{101, 102, 103}) {
 		t.Fatalf("tag assignments = %v, want child market IDs [101 102 103]", tagAssignments)
+	}
+}
+
+func TestValidateMarketGroupMembersEnforcesFiftyAnswerHardCap(t *testing.T) {
+	members := make([]markets.MarketGroupMember, markets.MaxMarketGroupAnswers)
+	for i := range members {
+		members[i] = markets.MarketGroupMember{
+			MarketID:     int64(i + 1),
+			AnswerLabel:  "Answer " + strconv.Itoa(i+1),
+			DisplayOrder: i,
+		}
+	}
+	if err := markets.ValidateMarketGroupMembers(members); err != nil {
+		t.Fatalf("expected %d answers to validate, got %v", markets.MaxMarketGroupAnswers, err)
+	}
+
+	tooMany := append([]markets.MarketGroupMember(nil), members...)
+	tooMany = append(tooMany, markets.MarketGroupMember{
+		MarketID:     int64(markets.MaxMarketGroupAnswers + 1),
+		AnswerLabel:  "Answer 51",
+		DisplayOrder: markets.MaxMarketGroupAnswers,
+	})
+	if err := markets.ValidateMarketGroupMembers(tooMany); !errors.Is(err, markets.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput for too many answers, got %v", err)
 	}
 }
 
@@ -422,6 +447,100 @@ func TestResolveMarketGroupExclusiveYesResolvesChildrenAndMarksParent(t *testing
 		{MarketID: 101, Resolution: "NO"},
 		{MarketID: 102, Resolution: "YES"},
 		{MarketID: 103, Resolution: "NO"},
+	}
+	if !reflect.DeepEqual(resolved, expected) {
+		t.Fatalf("resolved = %+v, want %+v", resolved, expected)
+	}
+	if markedGroupID != group.ID {
+		t.Fatalf("markedGroupID = %d, want %d", markedGroupID, group.ID)
+	}
+	if resolvedGroup.LifecycleStatus != markets.MarketLifecycleResolved {
+		t.Fatalf("resolved group lifecycle = %q, want resolved", resolvedGroup.LifecycleStatus)
+	}
+}
+
+func TestResolveMarketGroupNAResolvesEveryChildAndSkipsWorkProfit(t *testing.T) {
+	now := marketsTestTime()
+	group := &markets.MarketGroup{
+		ID:              10,
+		QuestionTitle:   "Ambiguous event",
+		LifecycleStatus: markets.MarketLifecyclePublished,
+		CreatorUsername: "moderator",
+		StewardUsername: "moderator",
+		ProposalCost:    10,
+		Members: []markets.MarketGroupMember{
+			{ID: 1, GroupID: 10, MarketID: 201, AnswerLabel: "Alpha", DisplayOrder: 0},
+			{ID: 2, GroupID: 10, MarketID: 202, AnswerLabel: "Beta", DisplayOrder: 1},
+		},
+	}
+	marketsByID := map[int64]*markets.Market{}
+	for _, member := range group.Members {
+		marketsByID[member.MarketID] = &markets.Market{
+			ID:              member.MarketID,
+			QuestionTitle:   member.AnswerLabel,
+			Status:          markets.MarketStatusActive,
+			LifecycleStatus: markets.MarketLifecyclePublished,
+			CreatorUsername: "moderator",
+			StewardUsername: "moderator",
+		}
+	}
+	var resolved []markets.MarketGroupChildResolution
+	var markedGroupID int64
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getMarketGroupFunc = func(context.Context, int64) (*markets.MarketGroup, error) {
+			return group, nil
+		}
+		repo.getByIDFunc = func(_ context.Context, marketID int64) (*markets.Market, error) {
+			return marketsByID[marketID], nil
+		}
+		repo.resolveMarketFunc = func(_ context.Context, marketID int64, resolution string) error {
+			resolved = append(resolved, markets.MarketGroupChildResolution{MarketID: marketID, Resolution: resolution})
+			return nil
+		}
+		repo.calculatePayoutPositionsFunc = func(context.Context, int64) ([]*markets.PayoutPosition, error) {
+			return []*markets.PayoutPosition{}, nil
+		}
+		repo.listBetsForMarketFunc = func(context.Context, int64) ([]*markets.Bet, error) {
+			return []*markets.Bet{{Username: "alice", Amount: 10, Outcome: "YES"}}, nil
+		}
+		repo.markMarketGroupResolvedFunc = func(_ context.Context, groupID int64, resolvedAt time.Time) error {
+			markedGroupID = groupID
+			if !resolvedAt.Equal(now) {
+				t.Fatalf("resolvedAt = %s, want %s", resolvedAt, now)
+			}
+			return nil
+		}
+	})
+	usersSvc := newNoopUserService(func(service *noopUserService) {
+		service.getPublicUserFunc = func(_ context.Context, username string) (*dusers.PublicUser, error) {
+			return &dusers.PublicUser{
+				Username:        username,
+				UserType:        string(dusers.UserTypeModerator),
+				ModeratorStatus: dusers.ModeratorStatusActive,
+			}, nil
+		}
+		service.applyTransactionFunc = func(_ context.Context, _ string, _ int64, txType string) error {
+			if txType == dusers.TransactionWorkProfit {
+				t.Fatalf("group N/A resolution should not emit work-profit transactions")
+			}
+			return nil
+		}
+	})
+	service := markets.NewService(repo, usersSvc, newFixedClock(now), markets.Config{
+		GameMode:      "moderator",
+		InitialBetFee: 2,
+	})
+
+	resolvedGroup, err := service.ResolveMarketGroup(context.Background(), group.ID, markets.MarketGroupResolveRequest{
+		Mode: markets.MarketGroupResolveModeNA,
+	}, "moderator")
+	if err != nil {
+		t.Fatalf("ResolveMarketGroup returned error: %v", err)
+	}
+
+	expected := []markets.MarketGroupChildResolution{
+		{MarketID: 201, Resolution: "N/A"},
+		{MarketID: 202, Resolution: "N/A"},
 	}
 	if !reflect.DeepEqual(resolved, expected) {
 		t.Fatalf("resolved = %+v, want %+v", resolved, expected)

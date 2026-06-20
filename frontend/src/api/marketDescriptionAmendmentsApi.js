@@ -79,6 +79,7 @@ export const updateMarketGovernanceSettings = ({
   autoApproveDescriptionAmendments,
   autoApproveMarketProposals,
   autoApproveMarketGroupAnswers,
+  marketGroupAnswerAdditionApprovalPolicy,
   version = 0,
 }) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
   method: 'PUT',
@@ -90,6 +91,7 @@ export const updateMarketGovernanceSettings = ({
     autoApproveDescriptionAmendments: Boolean(autoApproveDescriptionAmendments),
     autoApproveMarketProposals: Boolean(autoApproveMarketProposals),
     autoApproveMarketGroupAnswers: Boolean(autoApproveMarketGroupAnswers),
+    marketGroupAnswerAdditionApprovalPolicy,
     version,
   }),
   reasonMessages: adminAmendmentReasonMessages,

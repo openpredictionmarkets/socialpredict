@@ -58,7 +58,6 @@ const reviewShortLabelByStatus = {
 
 const accountTabLabels = ['User Info', 'Portfolio', 'Financials'];
 const PROFILE_PAGE_SIZE = 20;
-const PROFILE_FETCH_BATCH_SIZE = 100;
 const paginationButtonClass = [
   'rounded',
   'border',
@@ -722,6 +721,7 @@ const ProfileMarketLifecycleTab = ({ status }) => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
+  const [totalMarkets, setTotalMarkets] = useState(0);
 
   useEffect(() => {
     setPage(0);
@@ -734,24 +734,17 @@ const ProfileMarketLifecycleTab = ({ status }) => {
       setLoading(true);
       setError('');
       try {
-        const rows = [];
-        let offset = 0;
-        let keepFetching = true;
-        while (keepFetching) {
-          const data = await listMyLifecycleMarkets({
-            token,
-            status,
-            query: searchQuery,
-            limit: PROFILE_FETCH_BATCH_SIZE,
-            offset,
-          });
-          const batch = data.markets || [];
-          rows.push(...batch);
-          keepFetching = batch.length === PROFILE_FETCH_BATCH_SIZE;
-          offset += PROFILE_FETCH_BATCH_SIZE;
-        }
+        const data = await listMyLifecycleMarkets({
+          token,
+          status,
+          query: searchQuery,
+          limit: PROFILE_PAGE_SIZE,
+          offset: page * PROFILE_PAGE_SIZE,
+        });
         if (!ignore) {
-          setMarkets(groupLifecycleMarketRows(rows));
+          const rows = groupLifecycleMarketRows(data.markets || []);
+          setMarkets(rows);
+          setTotalMarkets(Number.isFinite(Number(data.total)) ? Number(data.total) : rows.length);
         }
       } catch (err) {
         if (!ignore) {
@@ -769,9 +762,16 @@ const ProfileMarketLifecycleTab = ({ status }) => {
       ignore = true;
       window.clearTimeout(timeoutId);
     };
-  }, [status, token, searchQuery]);
+  }, [status, token, searchQuery, page]);
 
-  const pageInfo = pagedRows(markets, page);
+  const pageInfo = {
+    currentPage: page,
+    start: page * PROFILE_PAGE_SIZE,
+    total: totalMarkets,
+    rows: markets,
+    hasPrevious: page > 0,
+    hasNext: page * PROFILE_PAGE_SIZE + markets.length < totalMarkets,
+  };
 
   return (
     <div className='grid gap-4'>

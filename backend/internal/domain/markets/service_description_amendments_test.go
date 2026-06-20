@@ -154,6 +154,9 @@ func TestProposeMarketDescriptionAmendmentAutoApprovesWhenEnabled(t *testing.T) 
 	if defaultSettings.AutoApproveMarketProposals {
 		t.Fatalf("market proposal auto approval should be disabled by default")
 	}
+	if defaultSettings.MarketGroupAnswerAdditionApprovalPolicy != markets.MarketGroupAnswerAdditionApprovalPolicyModerator {
+		t.Fatalf("answer addition policy = %q, want moderator", defaultSettings.MarketGroupAnswerAdditionApprovalPolicy)
+	}
 	enabled := true
 	saved, err := service.UpdateMarketGovernanceSettings(context.Background(), markets.MarketGovernanceSettingsUpdate{
 		AutoApproveDescriptionAmendments: &enabled,

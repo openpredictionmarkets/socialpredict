@@ -5,8 +5,8 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-17T00:00:00Z
 updated_at_display: "Wednesday, June 17, 2026"
-update_reason: "Capture design-agent finding that OpenAPI/DTO answer limits disagree with setup/runtime limits."
-status: draft
+update_reason: "Record answer limit contract alignment implementation."
+status: implemented
 ---
 
 # Grouped Answer Limit Contract Alignment
@@ -31,7 +31,11 @@ Every layer communicates the same hard safety cap behavior.
 
 ## Acceptance Criteria
 
-- OpenAPI schema matches the maximum runtime-supported hard cap.
-- DTO validation matches the domain and setup policy.
-- Frontend copy reflects setup-provided cap.
-- Tests cover too-many-answer validation at API and domain boundaries.
+- [x] OpenAPI schema matches the maximum runtime-supported hard cap.
+- [x] DTO validation matches the domain and setup policy.
+- [x] Frontend copy reflects setup-provided cap.
+- [x] Tests cover too-many-answer validation at API and domain boundaries.
+
+## Implementation Notes
+
+The supported initial answer cap is `50`. Deployment setup may still lower the effective user-facing cap, but the API schema and DTO validation now align with the domain hard cap.

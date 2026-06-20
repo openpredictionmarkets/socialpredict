@@ -55,19 +55,21 @@ type marketDescriptionAmendmentListResponse struct {
 }
 
 type marketGovernanceSettingsResponse struct {
-	AutoApproveDescriptionAmendments bool      `json:"autoApproveDescriptionAmendments"`
-	AutoApproveMarketProposals       bool      `json:"autoApproveMarketProposals"`
-	AutoApproveMarketGroupAnswers    bool      `json:"autoApproveMarketGroupAnswers"`
-	Version                          uint      `json:"version"`
-	UpdatedBy                        string    `json:"updatedBy,omitempty"`
-	UpdatedAt                        time.Time `json:"updatedAt"`
+	AutoApproveDescriptionAmendments        bool      `json:"autoApproveDescriptionAmendments"`
+	AutoApproveMarketProposals              bool      `json:"autoApproveMarketProposals"`
+	AutoApproveMarketGroupAnswers           bool      `json:"autoApproveMarketGroupAnswers"`
+	MarketGroupAnswerAdditionApprovalPolicy string    `json:"marketGroupAnswerAdditionApprovalPolicy"`
+	Version                                 uint      `json:"version"`
+	UpdatedBy                               string    `json:"updatedBy,omitempty"`
+	UpdatedAt                               time.Time `json:"updatedAt"`
 }
 
 type updateMarketGovernanceSettingsRequest struct {
-	AutoApproveDescriptionAmendments *bool `json:"autoApproveDescriptionAmendments"`
-	AutoApproveMarketProposals       *bool `json:"autoApproveMarketProposals"`
-	AutoApproveMarketGroupAnswers    *bool `json:"autoApproveMarketGroupAnswers"`
-	Version                          uint  `json:"version"`
+	AutoApproveDescriptionAmendments        *bool   `json:"autoApproveDescriptionAmendments"`
+	AutoApproveMarketProposals              *bool   `json:"autoApproveMarketProposals"`
+	AutoApproveMarketGroupAnswers           *bool   `json:"autoApproveMarketGroupAnswers"`
+	MarketGroupAnswerAdditionApprovalPolicy *string `json:"marketGroupAnswerAdditionApprovalPolicy"`
+	Version                                 uint    `json:"version"`
 }
 
 func GetMarketGovernanceSettingsHandler(svc marketDescriptionAmendmentReviewer, auth authsvc.Authenticator) http.HandlerFunc {
@@ -112,11 +114,12 @@ func UpdateMarketGovernanceSettingsHandler(svc marketDescriptionAmendmentReviewe
 			return
 		}
 		settings, err := svc.UpdateMarketGovernanceSettings(r.Context(), dmarkets.MarketGovernanceSettingsUpdate{
-			AutoApproveDescriptionAmendments: req.AutoApproveDescriptionAmendments,
-			AutoApproveMarketProposals:       req.AutoApproveMarketProposals,
-			AutoApproveMarketGroupAnswers:    req.AutoApproveMarketGroupAnswers,
-			Version:                          req.Version,
-			UpdatedBy:                        admin.Username,
+			AutoApproveDescriptionAmendments:        req.AutoApproveDescriptionAmendments,
+			AutoApproveMarketProposals:              req.AutoApproveMarketProposals,
+			AutoApproveMarketGroupAnswers:           req.AutoApproveMarketGroupAnswers,
+			MarketGroupAnswerAdditionApprovalPolicy: req.MarketGroupAnswerAdditionApprovalPolicy,
+			Version:                                 req.Version,
+			UpdatedBy:                               admin.Username,
 		})
 		if err != nil {
 			writeMarketReviewError(w, err)
@@ -220,15 +223,19 @@ func parseAdminAmendmentFilters(w http.ResponseWriter, r *http.Request) (dmarket
 
 func marketGovernanceSettingsResponseFromDomain(settings *dmarkets.MarketGovernanceSettings) marketGovernanceSettingsResponse {
 	if settings == nil {
-		return marketGovernanceSettingsResponse{Version: 1}
+		return marketGovernanceSettingsResponse{
+			MarketGroupAnswerAdditionApprovalPolicy: dmarkets.MarketGroupAnswerAdditionApprovalPolicyModerator,
+			Version:                                 1,
+		}
 	}
 	return marketGovernanceSettingsResponse{
-		AutoApproveDescriptionAmendments: settings.AutoApproveDescriptionAmendments,
-		AutoApproveMarketProposals:       settings.AutoApproveMarketProposals,
-		AutoApproveMarketGroupAnswers:    settings.AutoApproveMarketGroupAnswers,
-		Version:                          settings.Version,
-		UpdatedBy:                        settings.UpdatedBy,
-		UpdatedAt:                        settings.UpdatedAt,
+		AutoApproveDescriptionAmendments:        settings.AutoApproveDescriptionAmendments,
+		AutoApproveMarketProposals:              settings.AutoApproveMarketProposals,
+		AutoApproveMarketGroupAnswers:           settings.AutoApproveMarketGroupAnswers,
+		MarketGroupAnswerAdditionApprovalPolicy: dmarkets.NormalizeMarketGroupAnswerAdditionApprovalPolicy(settings.MarketGroupAnswerAdditionApprovalPolicy),
+		Version:                                 settings.Version,
+		UpdatedBy:                               settings.UpdatedBy,
+		UpdatedAt:                               settings.UpdatedAt,
 	}
 }
 

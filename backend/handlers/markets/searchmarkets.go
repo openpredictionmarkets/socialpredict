@@ -25,6 +25,10 @@ type searchRequestParams struct {
 	filters dmarkets.SearchFilters
 }
 
+type marketDiscoverySearchProvider interface {
+	SearchMarketDiscovery(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.MarketDiscoverySearchResults, error)
+}
+
 type httpError struct {
 	message    string
 	statusCode int
@@ -102,6 +106,31 @@ func buildSearchResponse(ctx context.Context, svc dmarkets.ServiceInterface, sea
 	}, nil
 }
 
+func buildDiscoverySearchResponse(ctx context.Context, svc dmarkets.ServiceInterface, searchResults *dmarkets.MarketDiscoverySearchResults) (dto.SearchResponse, error) {
+	primaryOverviews, err := buildMarketDiscoveryOverviewResponses(ctx, svc, searchResults.PrimaryRows)
+	if err != nil {
+		logger.LogError("SearchMarkets", "BuildPrimaryDiscoveryResults", err)
+		return dto.SearchResponse{}, errors.New("Error building primary results")
+	}
+
+	fallbackOverviews, err := buildMarketDiscoveryOverviewResponses(ctx, svc, searchResults.FallbackRows)
+	if err != nil {
+		logger.LogError("SearchMarkets", "BuildFallbackDiscoveryResults", err)
+		return dto.SearchResponse{}, errors.New("Error building fallback results")
+	}
+
+	return dto.SearchResponse{
+		PrimaryResults:  primaryOverviews,
+		FallbackResults: fallbackOverviews,
+		Query:           searchResults.Query,
+		PrimaryStatus:   searchResults.PrimaryStatus,
+		PrimaryCount:    searchResults.PrimaryCount,
+		FallbackCount:   searchResults.FallbackCount,
+		TotalCount:      searchResults.TotalCount,
+		FallbackUsed:    searchResults.FallbackUsed,
+	}, nil
+}
+
 func buildSearchRequestParams(r *http.Request, query string) (searchRequestParams, *httpError) {
 	filters, filtersErr := parseSearchFilters(r)
 	if filtersErr != nil {
@@ -154,6 +183,20 @@ func writeSearchResponse(w http.ResponseWriter, ctx context.Context, svc dmarket
 	return nil
 }
 
+func writeDiscoverySearchResponse(w http.ResponseWriter, ctx context.Context, svc dmarkets.ServiceInterface, searchResults *dmarkets.MarketDiscoverySearchResults) error {
+	response, err := buildDiscoverySearchResponse(ctx, svc, searchResults)
+	if err != nil {
+		return err
+	}
+
+	if err := writeJSON(w, http.StatusOK, response); err != nil {
+		logger.LogError("SearchMarkets", "EncodeDiscoveryResponse", err)
+		return err
+	}
+
+	return nil
+}
+
 func writeSearchError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, dmarkets.ErrInvalidInput):
@@ -177,6 +220,22 @@ func handleSearchMarkets(w http.ResponseWriter, r *http.Request, svc dmarkets.Se
 	params, clientErr := parseSearchRequest(r, securityService)
 	if clientErr != nil {
 		_ = handlers.WriteFailure(w, clientErr.statusCode, handlers.ReasonInvalidRequest)
+		return
+	}
+
+	if provider, ok := svc.(marketDiscoverySearchProvider); ok {
+		searchResults, err := provider.SearchMarketDiscovery(r.Context(), params.query, params.filters)
+		if err != nil {
+			writeSearchError(w, err)
+			return
+		}
+		if err := writeDiscoverySearchResponse(w, r.Context(), svc, searchResults); err != nil {
+			if isRequestCanceled(err) {
+				return
+			}
+			logger.LogError("SearchMarkets", "WriteDiscoveryResponse", err)
+			writeInternalError(w)
+		}
 		return
 	}
 

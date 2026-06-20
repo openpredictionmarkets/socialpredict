@@ -52,12 +52,25 @@ func ListUserOwnedMarketsHandler(svc userOwnedMarketLister, auth authsvc.Authent
 			Limit:   boundedQueryInt(r.URL.Query().Get("limit"), 50, 1, 100),
 			Offset:  boundedQueryInt(r.URL.Query().Get("offset"), 0, 0, 100000),
 		}
+		if discoverySvc, ok := svc.(lifecycleMarketDiscoveryLister); ok {
+			page, err := discoverySvc.ListLifecycleMarketDiscovery(r.Context(), filters)
+			if err != nil {
+				writeLifecycleListError(w, err)
+				return
+			}
+			response := lifecycleMarketResponseFromDiscoveryRows(r.Context(), svc, page)
+			_ = handlers.WriteResult(w, http.StatusOK, userOwnedMarketsResponse{
+				Markets: response.Markets,
+				Total:   response.Total,
+			})
+			return
+		}
+
 		markets, err := svc.ListLifecycleMarkets(r.Context(), filters)
 		if err != nil {
 			writeLifecycleListError(w, err)
 			return
 		}
-
 		response := lifecycleMarketResponseFromMarkets(r.Context(), svc, markets)
 		_ = handlers.WriteResult(w, http.StatusOK, userOwnedMarketsResponse{
 			Markets: response.Markets,

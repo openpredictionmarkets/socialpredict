@@ -11,6 +11,8 @@ import (
 type MockService struct {
 	ListByStatusFn           func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
 	ListLifecycleFn          func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	ListDiscoveryFn          func(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error)
+	ListLifecycleDiscoveryFn func(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error)
 	MarketLeaderboardFn      func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
 	MarketSummaryFn          func(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
 	CreateMarketGroupFn      func(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error)
@@ -93,6 +95,42 @@ func (m *MockService) ListLifecycleMarkets(ctx context.Context, filters dmarkets
 		return m.ListLifecycleFn(ctx, filters)
 	}
 	return []*dmarkets.Market{}, nil
+}
+
+func (m *MockService) ListMarketDiscovery(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error) {
+	if m.ListDiscoveryFn != nil {
+		return m.ListDiscoveryFn(ctx, filters)
+	}
+	var markets []*dmarkets.Market
+	var err error
+	if filters.Status != "" && filters.CreatedBy == "" && filters.TagSlug == "" {
+		markets, err = m.ListByStatus(ctx, filters.Status, dmarkets.Page{Limit: filters.Limit, Offset: filters.Offset})
+	} else {
+		markets, err = m.ListMarkets(ctx, filters)
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]dmarkets.MarketDiscoveryRow, 0, len(markets))
+	for _, market := range markets {
+		rows = append(rows, dmarkets.MarketDiscoveryRow{Market: market})
+	}
+	return &dmarkets.MarketDiscoveryPage{Rows: rows, Total: len(rows)}, nil
+}
+
+func (m *MockService) ListLifecycleMarketDiscovery(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error) {
+	if m.ListLifecycleDiscoveryFn != nil {
+		return m.ListLifecycleDiscoveryFn(ctx, filters)
+	}
+	markets, err := m.ListLifecycleMarkets(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]dmarkets.MarketDiscoveryRow, 0, len(markets))
+	for _, market := range markets {
+		rows = append(rows, dmarkets.MarketDiscoveryRow{Market: market})
+	}
+	return &dmarkets.MarketDiscoveryPage{Rows: rows, Total: len(rows)}, nil
 }
 
 func (m *MockService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {

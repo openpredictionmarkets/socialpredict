@@ -66,20 +66,22 @@ type MarketDescriptionAmendmentRepository interface {
 }
 
 type MarketGovernanceSettings struct {
-	AutoApproveDescriptionAmendments bool
-	AutoApproveMarketProposals       bool
-	AutoApproveMarketGroupAnswers    bool
-	Version                          uint
-	UpdatedBy                        string
-	UpdatedAt                        time.Time
+	AutoApproveDescriptionAmendments        bool
+	AutoApproveMarketProposals              bool
+	AutoApproveMarketGroupAnswers           bool
+	MarketGroupAnswerAdditionApprovalPolicy string
+	Version                                 uint
+	UpdatedBy                               string
+	UpdatedAt                               time.Time
 }
 
 type MarketGovernanceSettingsUpdate struct {
-	AutoApproveDescriptionAmendments *bool
-	AutoApproveMarketProposals       *bool
-	AutoApproveMarketGroupAnswers    *bool
-	Version                          uint
-	UpdatedBy                        string
+	AutoApproveDescriptionAmendments        *bool
+	AutoApproveMarketProposals              *bool
+	AutoApproveMarketGroupAnswers           *bool
+	MarketGroupAnswerAdditionApprovalPolicy *string
+	Version                                 uint
+	UpdatedBy                               string
 }
 
 type MarketGovernanceSettingsRepository interface {
@@ -217,8 +219,16 @@ func (s *Service) UpdateMarketGovernanceSettings(ctx context.Context, update Mar
 	if update.UpdatedBy == "" ||
 		(update.AutoApproveDescriptionAmendments == nil &&
 			update.AutoApproveMarketProposals == nil &&
-			update.AutoApproveMarketGroupAnswers == nil) {
+			update.AutoApproveMarketGroupAnswers == nil &&
+			update.MarketGroupAnswerAdditionApprovalPolicy == nil) {
 		return nil, ErrInvalidInput
+	}
+	if update.MarketGroupAnswerAdditionApprovalPolicy != nil {
+		policy := NormalizeMarketGroupAnswerAdditionApprovalPolicy(*update.MarketGroupAnswerAdditionApprovalPolicy)
+		if !IsValidMarketGroupAnswerAdditionApprovalPolicy(policy) {
+			return nil, ErrInvalidInput
+		}
+		update.MarketGroupAnswerAdditionApprovalPolicy = &policy
 	}
 	repo, err := s.marketGovernanceSettingsRepository()
 	if err != nil {

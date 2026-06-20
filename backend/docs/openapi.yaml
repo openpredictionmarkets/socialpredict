@@ -927,9 +927,10 @@ paths:
       description: >
         Resolves every child binary market in a group. In exclusive mode, one
         selected child resolves YES and every other child resolves NO. In manual
-        mode, each child receives an explicit YES or NO. Child markets use the
-        existing binary market payout path; the parent group is marked resolved
-        after all child resolutions succeed.
+        mode, each child receives an explicit YES or NO. In na mode, every child
+        resolves N/A through the existing child-market refund path. Child markets
+        use the existing binary market payout path; the parent group is marked
+        resolved after all child resolutions succeed.
       security:
         - bearerAuth: []
       parameters:
@@ -5974,7 +5975,8 @@ components:
         answerLabels:
           type: array
           minItems: 2
-          maxItems: 20
+          maxItems: 50
+          description: Deployment configuration may expose a lower effective cap, but the maximum supported API contract is 50 answer labels.
           items:
             type: string
             minLength: 1
@@ -6093,6 +6095,8 @@ components:
             $ref: '#/components/schemas/MarketTagResponse'
         total:
           type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
 
     MarketTagsEnvelopeResponse:
       type: object
@@ -6452,6 +6456,8 @@ components:
             $ref: '#/components/schemas/MarketGroupBet'
         total:
           type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
 
     MarketGroupPositionAnswer:
       type: object
@@ -6772,10 +6778,11 @@ components:
       properties:
         mode:
           type: string
-          enum: [exclusive_yes, manual]
+          enum: [exclusive_yes, manual, na]
           description: >
             exclusive_yes resolves the selected child YES and every other child
-            NO. manual requires one YES/NO resolution per child market.
+            NO. manual requires one YES/NO resolution per child market. na
+            resolves every child N/A and skips grouped work-profit payout.
         winningMarketId:
           type: integer
           format: int64
@@ -7339,14 +7346,18 @@ components:
           description: When true, newly created moderator market proposals are immediately published.
         autoApproveMarketGroupAnswers:
           type: boolean
-          description: When true, newly proposed grouped-market answers are immediately approved and published.
+          description: Legacy compatibility field. Prefer marketGroupAnswerAdditionApprovalPolicy.
+        marketGroupAnswerAdditionApprovalPolicy:
+          type: string
+          enum: [auto, moderator, admin]
+          description: Controls non-steward moderator answer additions. auto publishes all immediately; moderator honors the grouped market steward toggle; admin requires admin review.
         version:
           type: integer
           description: Optional optimistic concurrency version returned by the settings read endpoint.
 
     MarketGovernanceSettingsResponse:
       type: object
-      required: [autoApproveDescriptionAmendments, autoApproveMarketProposals, autoApproveMarketGroupAnswers, version]
+      required: [autoApproveDescriptionAmendments, autoApproveMarketProposals, autoApproveMarketGroupAnswers, marketGroupAnswerAdditionApprovalPolicy, version]
       properties:
         autoApproveDescriptionAmendments:
           type: boolean
@@ -7354,6 +7365,10 @@ components:
           type: boolean
         autoApproveMarketGroupAnswers:
           type: boolean
+          description: Legacy compatibility field. True only when marketGroupAnswerAdditionApprovalPolicy is auto.
+        marketGroupAnswerAdditionApprovalPolicy:
+          type: string
+          enum: [auto, moderator, admin]
         version:
           type: integer
         updatedBy:

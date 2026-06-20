@@ -7,14 +7,18 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
+	"socialpredict/internal/domain/readmodels"
 	"socialpredict/logger"
 
 	"github.com/gorilla/mux"
 )
+
+const groupedActivityLiveTargetFreshness = 0
 
 type marketGroupService interface {
 	CreateMarketGroup(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error)
@@ -621,9 +625,10 @@ func marketGroupBetsPageToResponse(page *dmarkets.MarketGroupBetsPage) dto.Marke
 		})
 	}
 	return dto.MarketGroupBetsResponse{
-		GroupID: page.GroupID,
-		Bets:    rows,
-		Total:   page.Total,
+		GroupID:   page.GroupID,
+		Bets:      rows,
+		Total:     page.Total,
+		Freshness: groupedActivityLiveFreshnessResponse(),
 	}
 }
 
@@ -669,6 +674,7 @@ func marketGroupPositionsPageToResponse(page *dmarkets.MarketGroupPositionsPage)
 		GroupID:   page.GroupID,
 		Positions: rows,
 		Total:     page.Total,
+		Freshness: groupedActivityLiveFreshnessResponse(),
 	}
 }
 
@@ -714,7 +720,18 @@ func marketGroupLeaderboardPageToResponse(page *dmarkets.MarketGroupLeaderboardP
 		GroupID:     page.GroupID,
 		Leaderboard: rows,
 		Total:       page.Total,
+		Freshness:   groupedActivityLiveFreshnessResponse(),
 	}
+}
+
+func groupedActivityLiveFreshnessResponse() *dto.Freshness {
+	freshness := readModelFreshnessToResponse(readmodels.NewFreshness(
+		time.Now().UTC(),
+		"live",
+		groupedActivityLiveTargetFreshness,
+		false,
+	))
+	return &freshness
 }
 
 func marketGroupToResponse(group *dmarkets.MarketGroup) *dto.MarketGroupResponse {

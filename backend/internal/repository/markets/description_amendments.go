@@ -3,6 +3,7 @@ package markets
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
@@ -121,7 +122,10 @@ func (r *GormRepository) GetMarketGovernanceSettings(ctx context.Context) (*dmar
 	var row models.MarketGovernanceSettings
 	if err := r.db.WithContext(ctx).First(&row, 1).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return &dmarkets.MarketGovernanceSettings{Version: 1}, nil
+			return &dmarkets.MarketGovernanceSettings{
+				MarketGroupAnswerAdditionApprovalPolicy: dmarkets.MarketGroupAnswerAdditionApprovalPolicyModerator,
+				Version:                                 1,
+			}, nil
 		}
 		return nil, err
 	}
@@ -132,7 +136,8 @@ func (r *GormRepository) GetMarketGovernanceSettings(ctx context.Context) (*dmar
 func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, update dmarkets.MarketGovernanceSettingsUpdate) (*dmarkets.MarketGovernanceSettings, error) {
 	if update.AutoApproveDescriptionAmendments == nil &&
 		update.AutoApproveMarketProposals == nil &&
-		update.AutoApproveMarketGroupAnswers == nil {
+		update.AutoApproveMarketGroupAnswers == nil &&
+		update.MarketGroupAnswerAdditionApprovalPolicy == nil {
 		return nil, dmarkets.ErrInvalidInput
 	}
 	var saved models.MarketGovernanceSettings
@@ -140,7 +145,11 @@ func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, upd
 		var row models.MarketGovernanceSettings
 		err := tx.First(&row, 1).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			row = models.MarketGovernanceSettings{ID: 1, Version: 1}
+			row = models.MarketGovernanceSettings{
+				ID:                                      1,
+				Version:                                 1,
+				MarketGroupAnswerAdditionApprovalPolicy: dmarkets.MarketGroupAnswerAdditionApprovalPolicyModerator,
+			}
 		} else if err != nil {
 			return err
 		} else if update.Version != 0 && update.Version != row.Version {
@@ -154,6 +163,20 @@ func (r *GormRepository) UpdateMarketGovernanceSettings(ctx context.Context, upd
 		}
 		if update.AutoApproveMarketGroupAnswers != nil {
 			row.AutoApproveMarketGroupAnswers = *update.AutoApproveMarketGroupAnswers
+			if update.MarketGroupAnswerAdditionApprovalPolicy == nil {
+				row.MarketGroupAnswerAdditionApprovalPolicy = marketGroupAnswerAdditionApprovalPolicyFromLegacy(*update.AutoApproveMarketGroupAnswers)
+			}
+		}
+		if update.MarketGroupAnswerAdditionApprovalPolicy != nil {
+			policy := dmarkets.NormalizeMarketGroupAnswerAdditionApprovalPolicy(*update.MarketGroupAnswerAdditionApprovalPolicy)
+			if !dmarkets.IsValidMarketGroupAnswerAdditionApprovalPolicy(policy) {
+				return dmarkets.ErrInvalidInput
+			}
+			row.MarketGroupAnswerAdditionApprovalPolicy = policy
+			row.AutoApproveMarketGroupAnswers = policy == dmarkets.MarketGroupAnswerAdditionApprovalPolicyAuto
+		}
+		if strings.TrimSpace(row.MarketGroupAnswerAdditionApprovalPolicy) == "" {
+			row.MarketGroupAnswerAdditionApprovalPolicy = marketGroupAnswerAdditionApprovalPolicyFromLegacy(row.AutoApproveMarketGroupAnswers)
 		}
 		row.UpdatedBy = update.UpdatedBy
 		if row.ID == 0 {
@@ -197,14 +220,26 @@ func domainDescriptionAmendmentToModel(amendment dmarkets.MarketDescriptionAmend
 }
 
 func modelMarketGovernanceSettingsToDomain(row models.MarketGovernanceSettings) dmarkets.MarketGovernanceSettings {
-	return dmarkets.MarketGovernanceSettings{
-		AutoApproveDescriptionAmendments: row.AutoApproveDescriptionAmendments,
-		AutoApproveMarketProposals:       row.AutoApproveMarketProposals,
-		AutoApproveMarketGroupAnswers:    row.AutoApproveMarketGroupAnswers,
-		Version:                          row.Version,
-		UpdatedBy:                        row.UpdatedBy,
-		UpdatedAt:                        row.UpdatedAt,
+	policy := dmarkets.NormalizeMarketGroupAnswerAdditionApprovalPolicy(row.MarketGroupAnswerAdditionApprovalPolicy)
+	if strings.TrimSpace(row.MarketGroupAnswerAdditionApprovalPolicy) == "" {
+		policy = marketGroupAnswerAdditionApprovalPolicyFromLegacy(row.AutoApproveMarketGroupAnswers)
 	}
+	return dmarkets.MarketGovernanceSettings{
+		AutoApproveDescriptionAmendments:        row.AutoApproveDescriptionAmendments,
+		AutoApproveMarketProposals:              row.AutoApproveMarketProposals,
+		AutoApproveMarketGroupAnswers:           policy == dmarkets.MarketGroupAnswerAdditionApprovalPolicyAuto,
+		MarketGroupAnswerAdditionApprovalPolicy: policy,
+		Version:                                 row.Version,
+		UpdatedBy:                               row.UpdatedBy,
+		UpdatedAt:                               row.UpdatedAt,
+	}
+}
+
+func marketGroupAnswerAdditionApprovalPolicyFromLegacy(enabled bool) string {
+	if enabled {
+		return dmarkets.MarketGroupAnswerAdditionApprovalPolicyAuto
+	}
+	return dmarkets.MarketGroupAnswerAdditionApprovalPolicyModerator
 }
 
 func modelDescriptionAmendmentToDomain(row models.MarketDescriptionAmendment) dmarkets.MarketDescriptionAmendment {

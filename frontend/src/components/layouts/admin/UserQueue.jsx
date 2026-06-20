@@ -6,6 +6,7 @@ import {
   updateModeratorSuspension,
 } from '../../../api/adminUsersApi';
 import SiteTabs from '../../tabs/SiteTabs';
+import AdminAddUser from './AddUser';
 
 const userQueueTabs = [
   {
@@ -280,11 +281,17 @@ const UserQueueTab = ({ config }) => {
   );
 };
 
-function UserQueue() {
-  const tabsData = userQueueTabs.map((tab) => ({
-    label: tab.label,
-    content: <UserQueueTab config={tab} />,
-  }));
+function UserQueue({ defaultTab = 'Non-Moderators' }) {
+  const tabsData = [
+    ...userQueueTabs.map((tab) => ({
+      label: tab.label,
+      content: <UserQueueTab config={tab} />,
+    })),
+    {
+      label: 'Add User',
+      content: <AdminAddUser />,
+    },
+  ];
 
   return (
     <section className="p-6 bg-primary-background shadow-md rounded-lg text-white">
@@ -293,7 +300,7 @@ function UserQueue() {
           <p className="text-xs uppercase tracking-[0.22em] text-primary-pink">
             Moderator governance
           </p>
-          <h1 className="mt-2 text-2xl font-bold">User Queue</h1>
+          <h1 className="mt-2 text-2xl font-bold">User Governance</h1>
           <p className="mt-2 max-w-3xl text-sm text-gray-300">
             Review users by moderator status and perform baseline moderator promotion or suspension actions.
           </p>
@@ -301,7 +308,7 @@ function UserQueue() {
       </div>
 
       <div className="mt-6">
-        <SiteTabs tabs={tabsData} defaultTab="Non-Moderators" />
+        <SiteTabs tabs={tabsData} defaultTab={defaultTab} />
       </div>
     </section>
   );
