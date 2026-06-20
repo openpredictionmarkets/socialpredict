@@ -59,31 +59,25 @@ The CMS layout editor shows internal concepts such as `Persisted Backend Tables`
 
 <img src="./admin-cms-debug.png" alt="CMS Market Discovery editor showing implementation-heavy labels" width="900">
 
-5. Topic navigation labels can be too cryptic.
-
-The topic navigation can show a short label like `A` next to `Markets` while the page title and tag chip say `Category A`. The repeated/short labeling can make the topic state feel redundant or unclear. See [topic-debug.png](./topic-debug.png).
-
-<img src="./topic-debug.png" alt="Topic page with Markets nav and Category A tag state" width="900">
-
-6. Grouped-market steward controls appear before the core trading area.
+5. Grouped-market steward controls appear before the core trading area.
 
 For a steward/moderator, `Answer Option Review`, `Add Answer Option`, and `Propose Description Amendment` appear before the stats and trade controls. This makes the page feel governance-first instead of market-first. Consider collapsing these into a `Market Governance` section or moving them below the main trading panel. See [group-market-detail.png](./group-market-detail.png).
 
 <img src="./group-market-detail.png" alt="Grouped market detail page with governance controls above the trading area" width="900">
 
-7. Profile can default to an empty proposed-markets view.
+6. Profile can default to an empty proposed-markets view.
 
 The focused moderator profile run landed on `Markets > Proposed` with no proposed markets. That is a low-information default. Account, Published Markets, Portfolio, or a last-used tab may be more useful. See [profile-debug.png](./profile-debug.png).
 
 <img src="./profile-debug.png" alt="Moderator profile defaulting to an empty proposed markets tab" width="900">
 
-8. The market list coin column is ambiguous for grouped markets.
+7. The market list coin column is ambiguous for grouped markets.
 
 The `🪙` column displays `Group` for grouped markets, while binary markets display a probability. This mixes type and price/probability in the same column. Consider moving the grouped indicator fully into the question area or renaming the column. See [markets-desktop.png](./markets-desktop.png).
 
 <img src="./markets-desktop.png" alt="Markets page where the coin column displays Group for grouped markets" width="900">
 
-9. The grouped-market trade modal is usable, but dense.
+8. The grouped-market trade modal is usable, but dense.
 
 The grouped trade modal is a major improvement over overlapping tabs, but it still asks the user to parse answer selection, YES/NO direction, amount, confirm, and terms in one dense panel. It may benefit from stronger visual hierarchy between answer choice and trade side. See [group-market-trade.png](./group-market-trade.png).
 
