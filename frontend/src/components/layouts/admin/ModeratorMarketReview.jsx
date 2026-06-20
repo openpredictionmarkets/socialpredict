@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../helpers/AuthContent';
 import SiteTabs from '../../tabs/SiteTabs';
 import MarketLifecycleTable from '../profile/MarketLifecycleTable';
@@ -12,6 +12,7 @@ import {
   reassignMarketGroupSteward,
   reassignMarketSteward,
   reviewMarketGroupAnswerAddition,
+  updateMarketGroupTags,
   updateMarketTags,
 } from '../../../api/moderationApi';
 import { listAdminLifecycleMarkets } from '../../../api/lifecycleMarketsApi';
@@ -26,6 +27,7 @@ import MarkdownLite from '../../markdown/MarkdownLite';
 import {
   getMarketGovernanceSettings,
   listAdminMarketDescriptionAmendments,
+  reviewGroupedMarketDescriptionAmendments,
   reviewMarketDescriptionAmendment,
   updateMarketGovernanceSettings,
 } from '../../../api/marketDescriptionAmendmentsApi';
@@ -85,26 +87,6 @@ const formatBadgeCount = (count) => {
   const numericCount = Number(count || 0);
   if (numericCount <= 0) return '';
   return numericCount > 99 ? '99+' : String(numericCount);
-};
-
-const normalizeSearchText = (value) => String(value || '').trim().toLowerCase();
-
-const textMatchesQuery = (values, query) => {
-  const normalizedQuery = normalizeSearchText(query);
-  if (!normalizedQuery) return true;
-  return values.some((value) => normalizeSearchText(value).includes(normalizedQuery));
-};
-
-const paginateRows = (rows, page) => {
-  const safeRows = Array.isArray(rows) ? rows : [];
-  const safePage = Math.max(0, Number(page || 0));
-  const start = safePage * reviewPageSize;
-  return {
-    rows: safeRows.slice(start, start + reviewPageSize),
-    start,
-    hasPrevious: safePage > 0,
-    hasNext: start + reviewPageSize < safeRows.length,
-  };
 };
 
 const ReviewSearchBox = ({
@@ -198,24 +180,8 @@ const normalizeAnswerAdditionApprovalPolicy = (value, legacyAutoApprove = false)
   return legacyAutoApprove ? 'auto' : 'moderator';
 };
 
-const uniqueTagsBySlug = (markets = []) => {
-  const seen = new Set();
-  const tags = [];
-  markets.forEach((market) => {
-    (market.tags || []).forEach((tag) => {
-      const key = tag.slug || tag.id || tag.displayName;
-      if (!key || seen.has(key)) {
-        return;
-      }
-      seen.add(key);
-      tags.push(tag);
-    });
-  });
-  return tags;
-};
-
 const reviewRowKey = (market) => (
-  market?.isMarketGroup ? `group:${market.marketGroup.id}` : `market:${market.id}`
+  market?.rowKey || (market?.isMarketGroup ? `group:${market.marketGroup.id}` : `market:${market.id}`)
 );
 
 const reviewMarketTagTargetIds = (market) => {
@@ -229,123 +195,10 @@ const reviewMarketTagTargetIds = (market) => {
   return market?.id ? [market.id] : [];
 };
 
-const groupAdminMarketRows = (markets = []) => {
-  const rows = [];
-  const groups = new Map();
-
-  markets.forEach((market) => {
-    const group = market.marketGroup;
-    if (!group?.id) {
-      rows.push({ ...market, rowKey: `market:${market.id}` });
-      return;
-    }
-
-    const existing = groups.get(group.id);
-    if (!existing) {
-      const row = {
-        ...market,
-        id: group.id,
-        rowKey: `group:${group.id}`,
-        isMarketGroup: true,
-        questionTitle: group.questionTitle || market.questionTitle,
-        description: group.description || '',
-        creatorUsername: group.creatorUsername || market.creatorUsername,
-        stewardUsername: group.stewardUsername || market.stewardUsername || market.creatorUsername,
-        lifecycleStatus: group.lifecycleStatus || market.lifecycleStatus,
-        status: group.status || market.status,
-        proposalCost: group.proposalCost ?? market.proposalCost,
-        marketGroup: group,
-        childMarkets: [market],
-        tags: uniqueTagsBySlug([market]),
-      };
-      groups.set(group.id, row);
-      rows.push(row);
-      return;
-    }
-
-    existing.childMarkets.push(market);
-    existing.tags = uniqueTagsBySlug(existing.childMarkets);
-  });
-
-  return rows;
-};
-
 const amendmentRowKey = (amendment) => (
-  amendment?.isMarketGroupAmendment
-    ? `group:${amendment.marketGroup.id}:${amendment.body}:${amendment.createdBy}:${amendment.status}`
-    : `amendment:${amendment.id}`
-);
-
-const groupDescriptionAmendmentRows = (amendments = []) => {
-  const rows = [];
-  const groups = new Map();
-
-  amendments.forEach((amendment) => {
-    const group = amendment.marketGroup;
-    if (!group?.id) {
-      rows.push(amendment);
-      return;
-    }
-
-    const key = [
-      group.id,
-      amendment.status,
-      amendment.body,
-      amendment.createdBy,
-      amendment.submitReason || '',
-    ].join('|');
-    const existing = groups.get(key);
-    if (!existing) {
-      const row = {
-        ...amendment,
-        isMarketGroupAmendment: true,
-        marketTitle: group.questionTitle || amendment.marketTitle,
-        marketDescription: group.description || amendment.marketDescription,
-        childAmendments: [amendment],
-      };
-      groups.set(key, row);
-      rows.push(row);
-      return;
-    }
-
-    existing.childAmendments.push(amendment);
-    existing.childAmendments.sort((left, right) => Number(left.marketId || 0) - Number(right.marketId || 0));
-  });
-
-  return rows;
-};
-
-const amendmentMatchesQuery = (amendment, query) => {
-  const children = amendment?.isMarketGroupAmendment
-    ? amendment.childAmendments || []
-    : [amendment];
-  return textMatchesQuery([
-    amendment?.marketTitle,
-    amendment?.marketDescription,
-    amendment?.body,
-    amendment?.createdBy,
-    amendment?.submitReason,
-    amendment?.rejectionReason,
-    amendment?.marketGroup?.questionTitle,
-    ...children.map((child) => child?.marketGroup?.answerLabel),
-    ...children.map((child) => child?.marketTitle),
-  ], query);
-};
-
-const answerAdditionMatchesQuery = (addition, query) => (
-  textMatchesQuery([
-    addition?.answerLabel,
-    addition?.groupTitle,
-    addition?.proposedBy,
-    addition?.reviewedBy,
-    addition?.rejectionReason,
-    addition?.marketGroup?.questionTitle,
-    addition?.marketGroup?.description,
-    addition?.marketGroup?.creatorUsername,
-    addition?.marketGroup?.stewardUsername,
-    addition?.groupId,
-    addition?.marketId,
-  ], query)
+  amendment?.rowKey || (amendment?.isMarketGroupAmendment
+    ? `group:${amendment.marketGroup.id}:${amendment.body}:${amendment.createdBy}:${amendment.submitReason || ''}:${amendment.status}`
+    : `amendment:${amendment.id}`)
 );
 
 const useReviewWorkCounts = () => {
@@ -368,8 +221,8 @@ const useReviewWorkCounts = () => {
         ]);
         if (ignore) return;
         const nextCounts = {
-          pendingMarkets: groupAdminMarketRows(marketsResult.markets || []).length,
-          pendingAmendments: groupDescriptionAmendmentRows(amendmentsResult.amendments || []).length,
+          pendingMarkets: Number(marketsResult.total ?? marketsResult.markets?.length ?? 0),
+          pendingAmendments: Number(amendmentsResult.total ?? amendmentsResult.amendments?.length ?? 0),
           pendingAnswers: Number(answersResult.total ?? answersResult.additions?.length ?? 0),
         };
         setCounts(nextCounts);
@@ -668,12 +521,11 @@ const AdminMarketQueue = ({ status }) => {
   const [busyMarketId, setBusyMarketId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
+  const [totalMarkets, setTotalMarkets] = useState(0);
 
   const tagEditingEnabled = status === 'proposed' || status === 'published';
-  const groupedMarkets = useMemo(() => groupAdminMarketRows(markets), [markets]);
-  const pagedMarkets = useMemo(() => paginateRows(groupedMarkets, page), [groupedMarkets, page]);
 
-  const loadMarkets = async (query = searchQuery) => {
+  const loadMarkets = async ({ query = searchQuery, pageNumber = page } = {}) => {
     setLoading(true);
     setError('');
     try {
@@ -681,11 +533,15 @@ const AdminMarketQueue = ({ status }) => {
         token,
         status,
         query,
-        limit: 100,
+        limit: reviewPageSize,
+        offset: pageNumber * reviewPageSize,
       });
       setMarkets(data.markets || []);
+      setTotalMarkets(Number(data.total || 0));
     } catch (err) {
       setError(err.message || 'Unable to load market queue.');
+      setMarkets([]);
+      setTotalMarkets(0);
     } finally {
       setLoading(false);
     }
@@ -697,14 +553,14 @@ const AdminMarketQueue = ({ status }) => {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      loadMarkets(searchQuery);
+      loadMarkets({ query: searchQuery, pageNumber: page });
     }, 300);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, token, searchQuery]);
+  }, [status, token, searchQuery, page]);
 
   useEffect(() => {
     if (!token || !tagEditingEnabled) {
@@ -743,7 +599,7 @@ const AdminMarketQueue = ({ status }) => {
       } else {
         await approveProposedMarket({ marketId: market.id, token });
       }
-      await loadMarkets();
+      await loadMarkets({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to approve market.');
     } finally {
@@ -764,7 +620,7 @@ const AdminMarketQueue = ({ status }) => {
         await rejectProposedMarket({ marketId: market.id, token, reason });
       }
       setRejectionReasons((current) => ({ ...current, [key]: '' }));
-      await loadMarkets();
+      await loadMarkets({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to reject market.');
     } finally {
@@ -799,13 +655,24 @@ const AdminMarketQueue = ({ status }) => {
     setError('');
     setSuccessMessage('');
     try {
-      if (!targetIds.length) {
+      if (!market.isMarketGroup && !targetIds.length) {
         throw new Error('No market IDs were found for tag assignment.');
       }
-      const updatedMarkets = await Promise.all(targetIds.map((marketId) => (
-        updateMarketTags({ marketId, token, tagSlugs })
-      )));
-      updatedMarkets.forEach(updateMarketInQueue);
+      if (market.isMarketGroup) {
+        const groupId = market.marketGroup?.id || market.id;
+        if (!groupId) {
+          throw new Error('No market group ID was found for tag assignment.');
+        }
+        const updatedGroup = await updateMarketGroupTags({ groupId, token, tagSlugs });
+        setMarkets((current) => current.map((row) => (
+          reviewRowKey(row) === key
+            ? { ...row, ...updatedGroup }
+            : row
+        )));
+      } else {
+        const updatedMarket = await updateMarketTags({ marketId: market.id, token, tagSlugs });
+        updateMarketInQueue(updatedMarket);
+      }
       setTagForms((current) => {
         const next = { ...current };
         delete next[key];
@@ -968,16 +835,16 @@ const AdminMarketQueue = ({ status }) => {
       />
       <ReviewPaginationControls
         page={page}
-        visibleCount={pagedMarkets.rows.length}
-        totalCount={groupedMarkets.length}
-        hasPrevious={pagedMarkets.hasPrevious}
-        hasNext={pagedMarkets.hasNext}
+        visibleCount={markets.length}
+        totalCount={totalMarkets}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalMarkets}
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
         loading={loading}
       />
       <MarketLifecycleTable
-        markets={pagedMarkets.rows}
+        markets={markets}
         emptyMessage={`No ${status} markets found.`}
         showCreator
         showSteward
@@ -997,25 +864,26 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
   const [reasonById, setReasonById] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
+  const [totalAmendments, setTotalAmendments] = useState(0);
   const canReview = status === 'pending';
-  const groupedAmendments = useMemo(() => groupDescriptionAmendmentRows(amendments), [amendments]);
-  const filteredAmendments = useMemo(() => (
-    groupedAmendments.filter((amendment) => amendmentMatchesQuery(amendment, searchQuery))
-  ), [groupedAmendments, searchQuery]);
-  const pagedAmendments = useMemo(() => paginateRows(filteredAmendments, page), [filteredAmendments, page]);
 
-  const loadAmendments = async () => {
+  const loadAmendments = async ({ query = searchQuery, pageNumber = page } = {}) => {
     setLoading(true);
     setError('');
     try {
       const data = await listAdminMarketDescriptionAmendments({
         token,
         status,
-        limit: 200,
+        query,
+        limit: reviewPageSize,
+        offset: pageNumber * reviewPageSize,
       });
       setAmendments(data.amendments || []);
+      setTotalAmendments(Number(data.total || 0));
     } catch (err) {
       setError(err.message || 'Unable to load description amendments.');
+      setAmendments([]);
+      setTotalAmendments(0);
     } finally {
       setLoading(false);
     }
@@ -1023,9 +891,14 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
 
   useEffect(() => {
     if (!token) return;
-    loadAmendments();
+    const timeoutId = window.setTimeout(() => {
+      loadAmendments({ query: searchQuery, pageNumber: page });
+    }, 300);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, status]);
+  }, [token, status, searchQuery, page]);
 
   useEffect(() => {
     setPage(0);
@@ -1048,17 +921,24 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
     setError('');
     setSuccessMessage('');
     try {
-      await Promise.all(childAmendments.map((child) => (
-        reviewMarketDescriptionAmendment({
+      if (amendment.isMarketGroupAmendment) {
+        await reviewGroupedMarketDescriptionAmendments({
           token,
-          amendmentId: child.id,
+          amendmentIds: childAmendments.map((child) => child.id),
           status: nextStatus,
           reason,
-        })
-      )));
+        });
+      } else {
+        await reviewMarketDescriptionAmendment({
+          token,
+          amendmentId: amendment.id,
+          status: nextStatus,
+          reason,
+        });
+      }
       setReason(key, '');
       setSuccessMessage(`${amendment.isMarketGroupAmendment ? 'Grouped amendment' : `Amendment v${amendment.version}`} ${nextStatus}.`);
-      await loadAmendments();
+      await loadAmendments({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to review description amendment.');
     } finally {
@@ -1092,20 +972,20 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
       />
       <ReviewPaginationControls
         page={page}
-        visibleCount={pagedAmendments.rows.length}
-        totalCount={filteredAmendments.length}
-        hasPrevious={pagedAmendments.hasPrevious}
-        hasNext={pagedAmendments.hasNext}
+        visibleCount={amendments.length}
+        totalCount={totalAmendments}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalAmendments}
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
         loading={loading}
       />
-      {filteredAmendments.length === 0 && (
+      {totalAmendments === 0 && (
         <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
           No {status} description amendments found.
         </div>
       )}
-      {pagedAmendments.rows.map((amendment) => {
+      {amendments.map((amendment) => {
         const key = amendmentRowKey(amendment);
         const childAmendments = amendment.isMarketGroupAmendment
           ? amendment.childAmendments || []
@@ -1249,24 +1129,26 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
   const [reasonById, setReasonById] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
+  const [totalAdditions, setTotalAdditions] = useState(0);
   const canReview = status === 'pending';
-  const filteredAdditions = useMemo(() => (
-    additions.filter((addition) => answerAdditionMatchesQuery(addition, searchQuery))
-  ), [additions, searchQuery]);
-  const pagedAdditions = useMemo(() => paginateRows(filteredAdditions, page), [filteredAdditions, page]);
 
-  const loadAdditions = async () => {
+  const loadAdditions = async ({ query = searchQuery, pageNumber = page } = {}) => {
     setLoading(true);
     setError('');
     try {
       const data = await listAdminMarketGroupAnswerAdditions({
         token,
         status,
-        limit: 200,
+        query,
+        limit: reviewPageSize,
+        offset: pageNumber * reviewPageSize,
       });
       setAdditions(data.additions || []);
+      setTotalAdditions(Number(data.total || 0));
     } catch (err) {
       setError(err.message || 'Unable to load grouped answer additions.');
+      setAdditions([]);
+      setTotalAdditions(0);
     } finally {
       setLoading(false);
     }
@@ -1274,9 +1156,14 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
 
   useEffect(() => {
     if (!token) return;
-    loadAdditions();
+    const timeoutId = window.setTimeout(() => {
+      loadAdditions({ query: searchQuery, pageNumber: page });
+    }, 300);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, status]);
+  }, [token, status, searchQuery, page]);
 
   useEffect(() => {
     setPage(0);
@@ -1308,7 +1195,7 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
       });
       updateReason(addition.id, '');
       setSuccessMessage(`Answer option "${addition.answerLabel}" ${nextStatus}.`);
-      await loadAdditions();
+      await loadAdditions({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to review grouped answer addition.');
     } finally {
@@ -1342,20 +1229,20 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
       />
       <ReviewPaginationControls
         page={page}
-        visibleCount={pagedAdditions.rows.length}
-        totalCount={filteredAdditions.length}
-        hasPrevious={pagedAdditions.hasPrevious}
-        hasNext={pagedAdditions.hasNext}
+        visibleCount={additions.length}
+        totalCount={totalAdditions}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalAdditions}
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
         loading={loading}
       />
-      {filteredAdditions.length === 0 && (
+      {totalAdditions === 0 && (
         <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
           No {status} answer additions found.
         </div>
       )}
-      {pagedAdditions.rows.map((addition) => {
+      {additions.map((addition) => {
         const group = addition.marketGroup || {};
         const marketHref = addition.marketId
           ? `/markets/${addition.marketId}`
@@ -1459,8 +1346,7 @@ const MarketStewardshipQueue = () => {
   const [stewardForms, setStewardForms] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
-  const groupedMarkets = useMemo(() => groupAdminMarketRows(markets), [markets]);
-  const pagedMarkets = useMemo(() => paginateRows(groupedMarkets, page), [groupedMarkets, page]);
+  const [totalMarkets, setTotalMarkets] = useState(0);
 
   useEffect(() => {
     setPage(0);
@@ -1512,15 +1398,19 @@ const MarketStewardshipQueue = () => {
           token,
           status: 'all',
           query: searchQuery,
-          limit: 100,
+          limit: reviewPageSize,
+          offset: page * reviewPageSize,
         });
 
         if (!ignore) {
           setMarkets(result.markets || []);
+          setTotalMarkets(Number(result.total || 0));
         }
       } catch (err) {
         if (!ignore) {
           setError(err.message || 'Unable to load stewardship markets.');
+          setMarkets([]);
+          setTotalMarkets(0);
         }
       } finally {
         if (!ignore) {
@@ -1533,7 +1423,7 @@ const MarketStewardshipQueue = () => {
       ignore = true;
       window.clearTimeout(timeoutId);
     };
-  }, [token, searchQuery]);
+  }, [token, searchQuery, page]);
 
   const updateStewardForm = (marketKey, updates) => {
     setStewardForms((current) => ({
@@ -1708,16 +1598,16 @@ const MarketStewardshipQueue = () => {
       )}
       <ReviewPaginationControls
         page={page}
-        visibleCount={pagedMarkets.rows.length}
-        totalCount={groupedMarkets.length}
-        hasPrevious={pagedMarkets.hasPrevious}
-        hasNext={pagedMarkets.hasNext}
+        visibleCount={markets.length}
+        totalCount={totalMarkets}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalMarkets}
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
         loading={loading}
       />
       <MarketLifecycleTable
-        markets={pagedMarkets.rows}
+        markets={markets}
         emptyMessage="No markets found for stewardship governance."
         showCreator
         showSteward
@@ -1725,10 +1615,10 @@ const MarketStewardshipQueue = () => {
       />
       <ReviewPaginationControls
         page={page}
-        visibleCount={pagedMarkets.rows.length}
-        totalCount={groupedMarkets.length}
-        hasPrevious={pagedMarkets.hasPrevious}
-        hasNext={pagedMarkets.hasNext}
+        visibleCount={markets.length}
+        totalCount={totalMarkets}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalMarkets}
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
         loading={loading}

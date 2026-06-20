@@ -128,6 +128,66 @@ func (r *GormRepository) SetMarketTags(ctx context.Context, marketID int64, tagS
 	return modelTagsToDomain(tags), nil
 }
 
+func (r *GormRepository) SetMarketGroupTags(ctx context.Context, groupID int64, tagSlugs []string, assignedBy string, source string, assignedAt time.Time) ([]dmarkets.MarketTag, error) {
+	if groupID <= 0 {
+		return nil, dmarkets.ErrInvalidInput
+	}
+	normalized, err := dmarkets.NormalizeMarketTagSlugs(tagSlugs)
+	if err != nil {
+		return nil, err
+	}
+
+	var tags []models.MarketTag
+	if len(normalized) > 0 {
+		if err := r.db.WithContext(ctx).
+			Where("slug IN ? AND is_active = ?", normalized, true).
+			Order("sort_order ASC, display_name ASC, slug ASC").
+			Find(&tags).Error; err != nil {
+			return nil, err
+		}
+		if len(tags) != len(normalized) {
+			return nil, dmarkets.ErrInvalidInput
+		}
+	}
+
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var members []models.MarketGroupMember
+		if err := tx.Where("group_id = ?", groupID).Order("display_order ASC, id ASC").Find(&members).Error; err != nil {
+			return err
+		}
+		if len(members) == 0 {
+			return dmarkets.ErrMarketGroupNotFound
+		}
+		marketIDs := make([]int64, 0, len(members))
+		for _, member := range members {
+			marketIDs = append(marketIDs, member.MarketID)
+		}
+		if err := tx.Unscoped().Where("market_id IN ?", marketIDs).Delete(&models.MarketTagAssignment{}).Error; err != nil {
+			return err
+		}
+		for _, marketID := range marketIDs {
+			for _, tag := range tags {
+				assignment := models.MarketTagAssignment{
+					MarketID:   marketID,
+					TagID:      tag.ID,
+					AssignedBy: assignedBy,
+					Source:     source,
+				}
+				assignment.CreatedAt = assignedAt
+				assignment.UpdatedAt = assignedAt
+				if err := tx.Create(&assignment).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return modelTagsToDomain(tags), nil
+}
+
 func (r *GormRepository) hydrateTagsForMarkets(ctx context.Context, markets []*dmarkets.Market) error {
 	if len(markets) == 0 {
 		return nil

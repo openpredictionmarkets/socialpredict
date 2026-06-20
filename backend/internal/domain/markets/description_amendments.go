@@ -63,6 +63,7 @@ type MarketDescriptionAmendmentRepository interface {
 	CreateMarketDescriptionAmendment(ctx context.Context, amendment MarketDescriptionAmendment) (*MarketDescriptionAmendment, error)
 	ListMarketDescriptionAmendments(ctx context.Context, filters MarketDescriptionAmendmentFilters) ([]MarketDescriptionAmendment, error)
 	ReviewMarketDescriptionAmendment(ctx context.Context, id int64, status string, actorUsername string, reason string, reviewedAt time.Time) (*MarketDescriptionAmendment, error)
+	ReviewGroupedMarketDescriptionAmendments(ctx context.Context, ids []int64, status string, actorUsername string, reason string, reviewedAt time.Time) ([]MarketDescriptionAmendment, error)
 }
 
 type MarketGovernanceSettings struct {
@@ -206,6 +207,23 @@ func (s *Service) ReviewMarketDescriptionAmendment(ctx context.Context, amendmen
 	return repo.ReviewMarketDescriptionAmendment(ctx, amendmentID, status, actorUsername, reason, s.clock.Now())
 }
 
+func (s *Service) ReviewGroupedMarketDescriptionAmendments(ctx context.Context, amendmentIDs []int64, status string, actorUsername string, reason string) ([]MarketDescriptionAmendment, error) {
+	actorUsername = strings.TrimSpace(actorUsername)
+	status = NormalizeDescriptionAmendmentStatus(status)
+	reason = strings.TrimSpace(reason)
+	if !validGroupedDescriptionAmendmentIDs(amendmentIDs) || actorUsername == "" || reason == "" || len([]rune(reason)) > MaxDescriptionAmendmentReasonLength {
+		return nil, ErrInvalidInput
+	}
+	if status != DescriptionAmendmentStatusApproved && status != DescriptionAmendmentStatusRejected {
+		return nil, ErrInvalidInput
+	}
+	repo, err := s.descriptionAmendmentRepository()
+	if err != nil {
+		return nil, err
+	}
+	return repo.ReviewGroupedMarketDescriptionAmendments(ctx, amendmentIDs, status, actorUsername, reason, s.clock.Now())
+}
+
 func (s *Service) GetMarketGovernanceSettings(ctx context.Context) (*MarketGovernanceSettings, error) {
 	repo, err := s.marketGovernanceSettingsRepository()
 	if err != nil {
@@ -246,6 +264,20 @@ func (s *Service) descriptionAmendmentRepository() (MarketDescriptionAmendmentRe
 		return nil, ErrInvalidInput
 	}
 	return repo, nil
+}
+
+func validGroupedDescriptionAmendmentIDs(ids []int64) bool {
+	if len(ids) == 0 {
+		return false
+	}
+	seen := map[int64]bool{}
+	for _, id := range ids {
+		if id <= 0 || seen[id] {
+			return false
+		}
+		seen[id] = true
+	}
+	return true
 }
 
 func (s *Service) marketGovernanceSettingsRepository() (MarketGovernanceSettingsRepository, error) {

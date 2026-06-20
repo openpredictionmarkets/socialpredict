@@ -22,43 +22,6 @@ import { listAdminLifecycleMarkets } from '../../api/lifecycleMarketsApi';
 import { listAdminMarketDescriptionAmendments } from '../../api/marketDescriptionAmendmentsApi';
 import { listAdminMarketGroupAnswerAdditions } from '../../api/moderationApi';
 
-const uniqueReviewRowCount = (markets = []) => {
-  const seenGroups = new Set();
-  return markets.reduce((count, market) => {
-    const groupID = market?.marketGroup?.id;
-    if (!groupID) {
-      return count + 1;
-    }
-    if (seenGroups.has(groupID)) {
-      return count;
-    }
-    seenGroups.add(groupID);
-    return count + 1;
-  }, 0);
-};
-
-const uniqueAmendmentRowCount = (amendments = []) => {
-  const seenGroups = new Set();
-  return amendments.reduce((count, amendment) => {
-    const group = amendment?.marketGroup;
-    if (!group?.id) {
-      return count + 1;
-    }
-    const key = [
-      group.id,
-      amendment.status,
-      amendment.body,
-      amendment.createdBy,
-      amendment.submitReason || '',
-    ].join('|');
-    if (seenGroups.has(key)) {
-      return count;
-    }
-    seenGroups.add(key);
-    return count + 1;
-  }, 0);
-};
-
 const totalPendingReviewCount = (counts) => (
   Number(counts?.pendingMarkets || 0) +
   Number(counts?.pendingAmendments || 0) +
@@ -154,8 +117,8 @@ const Sidebar = () => {
           listAdminMarketGroupAnswerAdditions({ token, status: 'pending', limit: 100 }),
         ]);
         if (ignore) return;
-        const marketCount = uniqueReviewRowCount(marketsResult.markets || []);
-        const amendmentCount = uniqueAmendmentRowCount(amendmentsResult.amendments || []);
+        const marketCount = Number(marketsResult.total ?? marketsResult.markets?.length ?? 0);
+        const amendmentCount = Number(amendmentsResult.total ?? amendmentsResult.amendments?.length ?? 0);
         const answerCount = Number(answersResult.total ?? answersResult.additions?.length ?? 0);
         setPendingReviewCount(marketCount + amendmentCount + answerCount);
       } catch {

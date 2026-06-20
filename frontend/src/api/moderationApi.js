@@ -145,10 +145,23 @@ export const updateMarketTags = ({ marketId, token, tagSlugs }) => {
     token,
     action: 'tags',
     body: { tagSlugs },
-    });
+  });
 };
 
-export const listAdminMarketGroupAnswerAdditions = ({ token, status = 'pending', groupId = '', limit = 100, offset = 0 }) => {
+export const updateMarketGroupTags = ({ groupId, token, tagSlugs }) => {
+  if (!Array.isArray(tagSlugs)) {
+    throw new Error('Market tags must be provided as a list.');
+  }
+
+  return reviewMarketGroup({
+    groupId,
+    token,
+    action: 'tags',
+    body: { tagSlugs },
+  });
+};
+
+export const listAdminMarketGroupAnswerAdditions = ({ token, status = 'pending', groupId = '', query = '', limit = 100, offset = 0 }) => {
   const params = new URLSearchParams({
     status,
     limit: String(limit),
@@ -156,6 +169,9 @@ export const listAdminMarketGroupAnswerAdditions = ({ token, status = 'pending',
   });
   if (groupId) {
     params.set('groupId', String(groupId));
+  }
+  if (String(query || '').trim()) {
+    params.set('query', String(query).trim());
   }
   return authenticatedApiRequest(`/v0/admin/market-group-answer-additions?${params.toString()}`, {
     authToken: token,

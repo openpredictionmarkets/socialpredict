@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -15,7 +16,7 @@ import (
 )
 
 type marketGroupAnswerAdditionReviewer interface {
-	ListMarketGroupAnswerAdditions(ctx context.Context, filters dmarkets.MarketGroupAnswerAdditionFilters) ([]dmarkets.MarketGroupAnswerAddition, error)
+	ListAdminMarketGroupAnswerAdditionRows(ctx context.Context, filters dmarkets.AdminAnswerAdditionReviewFilters) (*dmarkets.AdminAnswerAdditionReviewPage, error)
 	ApproveMarketGroupAnswerAddition(ctx context.Context, additionID int64, actorUsername string, confirmed bool) (*dmarkets.MarketGroupAnswerAddition, error)
 	RejectMarketGroupAnswerAddition(ctx context.Context, additionID int64, actorUsername string, reason string) (*dmarkets.MarketGroupAnswerAddition, error)
 }
@@ -46,6 +47,8 @@ type marketGroupAnswerAdditionReviewResponse struct {
 type marketGroupAnswerAdditionListResponse struct {
 	Additions []marketGroupAnswerAdditionReviewResponse `json:"additions"`
 	Total     int                                       `json:"total"`
+	Limit     int                                       `json:"limit,omitempty"`
+	Offset    int                                       `json:"offset,omitempty"`
 }
 
 func ListMarketGroupAnswerAdditionsHandler(svc marketGroupAnswerAdditionReviewer, auth authsvc.Authenticator) http.HandlerFunc {
@@ -65,17 +68,19 @@ func ListMarketGroupAnswerAdditionsHandler(svc marketGroupAnswerAdditionReviewer
 		if !ok {
 			return
 		}
-		items, err := svc.ListMarketGroupAnswerAdditions(r.Context(), filters)
+		page, err := svc.ListAdminMarketGroupAnswerAdditionRows(r.Context(), filters)
 		if err != nil {
 			writeMarketReviewError(w, err)
 			return
 		}
-		response := marketGroupAnswerAdditionListResponse{
-			Additions: make([]marketGroupAnswerAdditionReviewResponse, 0, len(items)),
-			Total:     len(items),
+		if page == nil {
+			page = &dmarkets.AdminAnswerAdditionReviewPage{Limit: filters.Limit, Offset: filters.Offset}
 		}
-		for _, item := range items {
-			response.Additions = append(response.Additions, marketGroupAnswerAdditionReviewResponseFromDomain(item))
+		response := marketGroupAnswerAdditionListResponse{
+			Additions: marketGroupAnswerAdditionResponsesFromDomain(page.Rows),
+			Total:     page.Total,
+			Limit:     page.Limit,
+			Offset:    page.Offset,
 		}
 		_ = handlers.WriteResult(w, http.StatusOK, response)
 	}
@@ -126,29 +131,45 @@ func ReviewMarketGroupAnswerAdditionHandler(svc marketGroupAnswerAdditionReviewe
 	}
 }
 
-func parseAdminAnswerAdditionFilters(w http.ResponseWriter, r *http.Request) (dmarkets.MarketGroupAnswerAdditionFilters, bool) {
+func parseAdminAnswerAdditionFilters(w http.ResponseWriter, r *http.Request) (dmarkets.AdminAnswerAdditionReviewFilters, bool) {
 	query := r.URL.Query()
 	status := dmarkets.NormalizeMarketGroupAnswerAdditionStatus(query.Get("status"))
 	switch status {
 	case dmarkets.MarketGroupAnswerAdditionStatusPending, dmarkets.MarketGroupAnswerAdditionStatusApproved, dmarkets.MarketGroupAnswerAdditionStatusRejected:
 	default:
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
-		return dmarkets.MarketGroupAnswerAdditionFilters{}, false
+		return dmarkets.AdminAnswerAdditionReviewFilters{}, false
 	}
 	groupID := int64(0)
 	if rawGroupID := query.Get("groupId"); rawGroupID != "" {
 		parsed, err := strconv.ParseInt(rawGroupID, 10, 64)
 		if err != nil || parsed <= 0 {
 			_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
-			return dmarkets.MarketGroupAnswerAdditionFilters{}, false
+			return dmarkets.AdminAnswerAdditionReviewFilters{}, false
 		}
 		groupID = parsed
 	}
-	return dmarkets.MarketGroupAnswerAdditionFilters{
+	searchQuery := strings.TrimSpace(query.Get("query"))
+	if len([]rune(searchQuery)) > 100 {
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		return dmarkets.AdminAnswerAdditionReviewFilters{}, false
+	}
+	limit, ok := parseBoundedAdminReviewInt(query.Get("limit"), 50, 1, 200)
+	if !ok {
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		return dmarkets.AdminAnswerAdditionReviewFilters{}, false
+	}
+	offset, ok := parseBoundedAdminReviewInt(query.Get("offset"), 0, 0, 100000)
+	if !ok {
+		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonInvalidRequest)
+		return dmarkets.AdminAnswerAdditionReviewFilters{}, false
+	}
+	return dmarkets.AdminAnswerAdditionReviewFilters{
 		GroupID: groupID,
 		Status:  status,
-		Limit:   boundedAdminReviewInt(query.Get("limit"), 50, 1, 200),
-		Offset:  boundedAdminReviewInt(query.Get("offset"), 0, 0, 100000),
+		Query:   searchQuery,
+		Limit:   limit,
+		Offset:  offset,
 	}, true
 }
 
@@ -166,6 +187,14 @@ func marketGroupAnswerAdditionReviewResponseFromDomainValue(item *dmarkets.Marke
 		return marketGroupAnswerAdditionReviewResponse{}
 	}
 	return marketGroupAnswerAdditionReviewResponseFromDomain(*item)
+}
+
+func marketGroupAnswerAdditionResponsesFromDomain(items []dmarkets.MarketGroupAnswerAddition) []marketGroupAnswerAdditionReviewResponse {
+	responses := make([]marketGroupAnswerAdditionReviewResponse, 0, len(items))
+	for _, item := range items {
+		responses = append(responses, marketGroupAnswerAdditionReviewResponseFromDomain(item))
+	}
+	return responses
 }
 
 func marketGroupAnswerAdditionReviewResponseFromDomain(item dmarkets.MarketGroupAnswerAddition) marketGroupAnswerAdditionReviewResponse {

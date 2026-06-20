@@ -3,6 +3,7 @@ package markets
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	dmarkets "socialpredict/internal/domain/markets"
@@ -46,13 +47,10 @@ func (r *GormRepository) GetMarketGroupAnswerAddition(ctx context.Context, id in
 }
 
 func (r *GormRepository) ListMarketGroupAnswerAdditions(ctx context.Context, filters dmarkets.MarketGroupAnswerAdditionFilters) ([]dmarkets.MarketGroupAnswerAddition, error) {
-	query := r.db.WithContext(ctx).Model(&models.MarketGroupAnswerAddition{})
-	if filters.GroupID > 0 {
-		query = query.Where("group_id = ?", filters.GroupID)
-	}
-	if filters.Status != "" {
-		query = query.Where("status = ?", dmarkets.NormalizeMarketGroupAnswerAdditionStatus(filters.Status))
-	}
+	query := r.marketGroupAnswerAdditionBaseQuery(ctx, dmarkets.AdminAnswerAdditionReviewFilters{
+		GroupID: filters.GroupID,
+		Status:  filters.Status,
+	})
 	if filters.ProposedBy != "" {
 		query = query.Where("proposed_by = ?", filters.ProposedBy)
 	}
@@ -63,11 +61,67 @@ func (r *GormRepository) ListMarketGroupAnswerAdditions(ctx context.Context, fil
 	if filters.Limit <= 0 {
 		filters.Limit = 50
 	}
-	query = query.Order("created_at DESC, id DESC").Limit(filters.Limit)
+	query = query.Limit(filters.Limit).Order("created_at DESC, id DESC")
 	if filters.Offset > 0 {
 		query = query.Offset(filters.Offset)
 	}
+	return r.findMarketGroupAnswerAdditions(ctx, query)
+}
 
+func (r *GormRepository) ListMarketGroupAnswerAdditionsForAdminReview(ctx context.Context, filters dmarkets.AdminAnswerAdditionReviewFilters) ([]dmarkets.MarketGroupAnswerAddition, int, error) {
+	query := r.marketGroupAnswerAdditionBaseQuery(ctx, filters)
+	query = applyMarketGroupAnswerAdditionReviewSearch(query, filters.Query)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if filters.Limit <= 0 {
+		filters.Limit = 50
+	}
+	if filters.Offset < 0 {
+		filters.Offset = 0
+	}
+	query = query.Order("market_group_answer_additions.created_at DESC, market_group_answer_additions.id DESC").Limit(filters.Limit)
+	if filters.Offset > 0 {
+		query = query.Offset(filters.Offset)
+	}
+	items, err := r.findMarketGroupAnswerAdditions(ctx, query)
+	return items, int(total), err
+}
+
+func (r *GormRepository) marketGroupAnswerAdditionBaseQuery(ctx context.Context, filters dmarkets.AdminAnswerAdditionReviewFilters) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&models.MarketGroupAnswerAddition{})
+	if filters.GroupID > 0 {
+		query = query.Where("group_id = ?", filters.GroupID)
+	}
+	if filters.Status != "" {
+		query = query.Where("status = ?", dmarkets.NormalizeMarketGroupAnswerAdditionStatus(filters.Status))
+	}
+	return query
+}
+
+func applyMarketGroupAnswerAdditionReviewSearch(query *gorm.DB, value string) *gorm.DB {
+	term := strings.TrimSpace(value)
+	if term == "" {
+		return query
+	}
+	pattern := "%" + strings.ToLower(term) + "%"
+	return query.
+		Joins("LEFT JOIN market_groups answer_addition_search_groups ON answer_addition_search_groups.id = market_group_answer_additions.group_id").
+		Where(`(
+			LOWER(market_group_answer_additions.answer_label) LIKE ?
+			OR LOWER(market_group_answer_additions.proposed_by) LIKE ?
+			OR LOWER(market_group_answer_additions.reviewed_by) LIKE ?
+			OR LOWER(market_group_answer_additions.rejection_reason) LIKE ?
+			OR LOWER(answer_addition_search_groups.question_title) LIKE ?
+			OR LOWER(answer_addition_search_groups.description) LIKE ?
+			OR LOWER(answer_addition_search_groups.creator_username) LIKE ?
+			OR LOWER(answer_addition_search_groups.steward_username) LIKE ?
+		)`, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern)
+}
+
+func (r *GormRepository) findMarketGroupAnswerAdditions(ctx context.Context, query *gorm.DB) ([]dmarkets.MarketGroupAnswerAddition, error) {
 	var rows []models.MarketGroupAnswerAddition
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, err
@@ -157,11 +211,27 @@ func (r *GormRepository) hydrateAnswerAdditionGroups(ctx context.Context, additi
 	byID := make(map[int64]dmarkets.MarketGroup, len(rows))
 	for _, row := range rows {
 		group := modelMarketGroupToDomain(row)
-		members, err := r.ListMarketGroupMembers(ctx, group.ID)
-		if err == nil {
-			group.Members = members
-		}
 		byID[group.ID] = group
+	}
+	var memberRows []models.MarketGroupMember
+	if err := r.db.WithContext(ctx).
+		Where("group_id IN ?", groupIDs).
+		Order("group_id ASC, display_order ASC, id ASC").
+		Find(&memberRows).Error; err != nil {
+		return additions
+	}
+	membersByGroup := map[int64][]dmarkets.MarketGroupMember{}
+	for _, row := range memberRows {
+		member := modelMarketGroupMemberToDomain(row)
+		membersByGroup[member.GroupID] = append(membersByGroup[member.GroupID], member)
+	}
+	for groupID, members := range membersByGroup {
+		group, ok := byID[groupID]
+		if !ok {
+			continue
+		}
+		group.Members = dmarkets.OrderedMarketGroupMembers(members)
+		byID[groupID] = group
 	}
 	for index := range additions {
 		group, ok := byID[additions[index].GroupID]

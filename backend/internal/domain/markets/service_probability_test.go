@@ -32,8 +32,14 @@ type projectionRepo struct {
 	createMarketTagFunc                             func(context.Context, markets.MarketTag) (*markets.MarketTag, error)
 	updateMarketTagFunc                             func(context.Context, string, markets.MarketTagRequest) (*markets.MarketTag, error)
 	setMarketTagsFunc                               func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error)
+	setMarketGroupTagsFunc                          func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error)
 	getMarketGovernanceSettingsFunc                 func(context.Context) (*markets.MarketGovernanceSettings, error)
 	updateMarketGovernanceSettingsFunc              func(context.Context, markets.MarketGovernanceSettingsUpdate) (*markets.MarketGovernanceSettings, error)
+	listAdminMarketReviewRowsFunc                   func(context.Context, markets.AdminMarketReviewFilters) (*markets.AdminMarketReviewPage, error)
+	listLifecycleMarketDiscoveryFunc                func(context.Context, markets.ListFilters) (*markets.MarketDiscoveryPage, error)
+	listDescriptionAmendmentReviewCandidatesFunc    func(context.Context, markets.AdminDescriptionAmendmentReviewFilters) ([]markets.MarketDescriptionAmendment, int, error)
+	listAnswerAdditionsForAdminReviewFunc           func(context.Context, markets.AdminAnswerAdditionReviewFilters) ([]markets.MarketGroupAnswerAddition, int, error)
+	reviewGroupedDescriptionAmendmentsFunc          func(context.Context, []int64, string, string, string, time.Time) ([]markets.MarketDescriptionAmendment, error)
 	createMarketGroupFunc                           func(context.Context, *markets.MarketGroup, []markets.MarketGroupMember) error
 	getMarketGroupFunc                              func(context.Context, int64) (*markets.MarketGroup, error)
 	listMarketGroupMembersFunc                      func(context.Context, int64) ([]markets.MarketGroupMember, error)
@@ -96,10 +102,28 @@ func newProjectionRepo(opts ...func(*projectionRepo)) *projectionRepo {
 		setMarketTagsFunc: func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error) {
 			return nil, errUnexpectedMarketsTestCall
 		},
+		setMarketGroupTagsFunc: func(context.Context, int64, []string, string, string, time.Time) ([]markets.MarketTag, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
 		getMarketGovernanceSettingsFunc: func(context.Context) (*markets.MarketGovernanceSettings, error) {
 			return nil, errUnexpectedMarketsTestCall
 		},
 		updateMarketGovernanceSettingsFunc: func(context.Context, markets.MarketGovernanceSettingsUpdate) (*markets.MarketGovernanceSettings, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		listAdminMarketReviewRowsFunc: func(context.Context, markets.AdminMarketReviewFilters) (*markets.AdminMarketReviewPage, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		listLifecycleMarketDiscoveryFunc: func(context.Context, markets.ListFilters) (*markets.MarketDiscoveryPage, error) {
+			return nil, errUnexpectedMarketsTestCall
+		},
+		listDescriptionAmendmentReviewCandidatesFunc: func(context.Context, markets.AdminDescriptionAmendmentReviewFilters) ([]markets.MarketDescriptionAmendment, int, error) {
+			return nil, 0, errUnexpectedMarketsTestCall
+		},
+		listAnswerAdditionsForAdminReviewFunc: func(context.Context, markets.AdminAnswerAdditionReviewFilters) ([]markets.MarketGroupAnswerAddition, int, error) {
+			return nil, 0, errUnexpectedMarketsTestCall
+		},
+		reviewGroupedDescriptionAmendmentsFunc: func(context.Context, []int64, string, string, string, time.Time) ([]markets.MarketDescriptionAmendment, error) {
 			return nil, errUnexpectedMarketsTestCall
 		},
 		createMarketGroupFunc: func(context.Context, *markets.MarketGroup, []markets.MarketGroupMember) error {
@@ -238,6 +262,13 @@ func (r *projectionRepo) SetMarketTags(ctx context.Context, marketID int64, tagS
 	return r.setMarketTagsFunc(ctx, marketID, tagSlugs, assignedBy, source, assignedAt)
 }
 
+func (r *projectionRepo) SetMarketGroupTags(ctx context.Context, groupID int64, tagSlugs []string, assignedBy string, source string, assignedAt time.Time) ([]markets.MarketTag, error) {
+	if r.setMarketGroupTagsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.setMarketGroupTagsFunc(ctx, groupID, tagSlugs, assignedBy, source, assignedAt)
+}
+
 func (r *projectionRepo) GetMarketGovernanceSettings(ctx context.Context) (*markets.MarketGovernanceSettings, error) {
 	if r.getMarketGovernanceSettingsFunc == nil {
 		return nil, errUnexpectedMarketsTestCall
@@ -250,6 +281,52 @@ func (r *projectionRepo) UpdateMarketGovernanceSettings(ctx context.Context, upd
 		return nil, errUnexpectedMarketsTestCall
 	}
 	return r.updateMarketGovernanceSettingsFunc(ctx, update)
+}
+
+func (r *projectionRepo) ListMarketDiscovery(ctx context.Context, filters markets.ListFilters) (*markets.MarketDiscoveryPage, error) {
+	if r.listLifecycleMarketDiscoveryFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.listLifecycleMarketDiscoveryFunc(ctx, filters)
+}
+
+func (r *projectionRepo) ListLifecycleMarketDiscovery(ctx context.Context, filters markets.ListFilters) (*markets.MarketDiscoveryPage, error) {
+	if r.listLifecycleMarketDiscoveryFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.listLifecycleMarketDiscoveryFunc(ctx, filters)
+}
+
+func (r *projectionRepo) ListAdminMarketReviewRows(ctx context.Context, filters markets.AdminMarketReviewFilters) (*markets.AdminMarketReviewPage, error) {
+	if r.listAdminMarketReviewRowsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.listAdminMarketReviewRowsFunc(ctx, filters)
+}
+
+func (r *projectionRepo) SearchMarketDiscovery(context.Context, string, markets.SearchFilters) (*markets.MarketDiscoveryPage, error) {
+	return nil, errUnexpectedMarketsTestCall
+}
+
+func (r *projectionRepo) ListMarketDescriptionAmendmentReviewCandidates(ctx context.Context, filters markets.AdminDescriptionAmendmentReviewFilters) ([]markets.MarketDescriptionAmendment, int, error) {
+	if r.listDescriptionAmendmentReviewCandidatesFunc == nil {
+		return nil, 0, errUnexpectedMarketsTestCall
+	}
+	return r.listDescriptionAmendmentReviewCandidatesFunc(ctx, filters)
+}
+
+func (r *projectionRepo) ReviewGroupedMarketDescriptionAmendments(ctx context.Context, ids []int64, status string, actorUsername string, reason string, reviewedAt time.Time) ([]markets.MarketDescriptionAmendment, error) {
+	if r.reviewGroupedDescriptionAmendmentsFunc == nil {
+		return nil, errUnexpectedMarketsTestCall
+	}
+	return r.reviewGroupedDescriptionAmendmentsFunc(ctx, ids, status, actorUsername, reason, reviewedAt)
+}
+
+func (r *projectionRepo) ListMarketGroupAnswerAdditionsForAdminReview(ctx context.Context, filters markets.AdminAnswerAdditionReviewFilters) ([]markets.MarketGroupAnswerAddition, int, error) {
+	if r.listAnswerAdditionsForAdminReviewFunc == nil {
+		return nil, 0, errUnexpectedMarketsTestCall
+	}
+	return r.listAnswerAdditionsForAdminReviewFunc(ctx, filters)
 }
 
 func (r *projectionRepo) CreateMarketGroup(ctx context.Context, group *markets.MarketGroup, members []markets.MarketGroupMember) error {
