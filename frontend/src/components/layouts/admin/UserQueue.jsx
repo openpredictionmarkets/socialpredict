@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../helpers/AuthContent';
 import {
   listAdminUsers,
@@ -7,6 +7,14 @@ import {
 } from '../../../api/adminUsersApi';
 import SiteTabs from '../../tabs/SiteTabs';
 import AdminAddUser from './AddUser';
+
+const USER_QUEUE_PAGE_SIZE = 20;
+
+const paginationButtonClass = [
+  'rounded-md border border-primary-pink px-3 py-2 text-xs font-semibold text-white transition',
+  'hover:bg-primary-pink/20 focus:outline-none focus:ring-2 focus:ring-primary-pink/50',
+  'disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500 disabled:hover:bg-transparent',
+].join(' ');
 
 const userQueueTabs = [
   {
@@ -40,6 +48,8 @@ const userMatchesTab = (user, usertype) => user?.usertype === usertype;
 const UserQueueTab = ({ config }) => {
   const { token } = useAuth();
   const [users, setUsers] = useState([]);
+  const [page, setPage] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingUsername, setPendingUsername] = useState('');
@@ -58,7 +68,7 @@ const UserQueueTab = ({ config }) => {
     return acc;
   }, { candidates: 0, moderators: 0, suspended: 0 }), [users]);
 
-  const loadUsers = async (query = searchQuery) => {
+  const loadUsers = useCallback(async ({ query = searchQuery, pageNumber = page } = {}) => {
     setError('');
     setIsLoading(true);
     try {
@@ -66,15 +76,25 @@ const UserQueueTab = ({ config }) => {
         token,
         usertype: config.usertype,
         query,
-        limit: 250,
+        limit: USER_QUEUE_PAGE_SIZE + 1,
+        offset: pageNumber * USER_QUEUE_PAGE_SIZE,
       });
-      setUsers(result.users || []);
+      const rows = result.users || [];
+      const nextOffset = (pageNumber * USER_QUEUE_PAGE_SIZE) + USER_QUEUE_PAGE_SIZE;
+      setUsers(rows.slice(0, USER_QUEUE_PAGE_SIZE));
+      setHasNextPage(rows.length > USER_QUEUE_PAGE_SIZE || Number(result.total || 0) > nextOffset);
     } catch (err) {
       setError(err.message || 'Failed to load user queue.');
+      setUsers([]);
+      setHasNextPage(false);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [config.usertype, page, searchQuery, token]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [config.usertype, searchQuery]);
 
   useEffect(() => {
     if (!token) {
@@ -82,14 +102,13 @@ const UserQueueTab = ({ config }) => {
     }
 
     const timeoutId = window.setTimeout(() => {
-      loadUsers(searchQuery);
+      loadUsers({ query: searchQuery, pageNumber: page });
     }, 300);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, config.usertype, searchQuery]);
+  }, [config.usertype, loadUsers, page, searchQuery, token]);
 
   const reasonFor = (username) => reasonByUsername[username] || '';
 
@@ -125,6 +144,7 @@ const UserQueueTab = ({ config }) => {
         updatedUser = await updateModeratorSuspension({ token, username, suspended: false, reason });
       }
       updateUserInQueue(updatedUser);
+      await loadUsers({ query: searchQuery, pageNumber: page });
       setReasonFor(username, '');
     } catch (err) {
       setError(err.message || 'User action failed.');
@@ -156,18 +176,18 @@ const UserQueueTab = ({ config }) => {
 
       {config.usertype === 'REGULAR' && (
         <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
-          <p className="text-xs uppercase tracking-wide text-gray-400">Non-moderator users</p>
+          <p className="text-xs uppercase tracking-wide text-gray-400">Non-moderator users on this page</p>
           <p className="mt-1 text-2xl font-bold">{counts.candidates}</p>
         </div>
       )}
       {config.usertype === 'MODERATOR' && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Moderators</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400">Moderators on this page</p>
             <p className="mt-1 text-2xl font-bold">{counts.moderators}</p>
           </div>
           <div className="rounded-md border border-gray-700 bg-gray-900 p-3">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Suspended</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400">Suspended on this page</p>
             <p className="mt-1 text-2xl font-bold">{counts.suspended}</p>
           </div>
         </div>
@@ -180,6 +200,34 @@ const UserQueueTab = ({ config }) => {
       )}
 
       <div className="overflow-x-auto rounded-lg border border-gray-700">
+        <div className="flex flex-col gap-3 border-b border-gray-700 bg-gray-900/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs uppercase tracking-[0.18em] text-gray-400">
+            Showing page {page + 1}
+            {users.length > 0 && (
+              <span className="ml-2 normal-case tracking-normal text-gray-300">
+                ({page * USER_QUEUE_PAGE_SIZE + 1}-{page * USER_QUEUE_PAGE_SIZE + users.length})
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={isLoading || page === 0}
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+              className={paginationButtonClass}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={isLoading || !hasNextPage}
+              onClick={() => setPage((current) => current + 1)}
+              className={paginationButtonClass}
+            >
+              Next
+            </button>
+          </div>
+        </div>
         <table className="min-w-full divide-y divide-gray-700 text-left text-sm">
           <thead className="bg-gray-900 text-xs uppercase tracking-wide text-gray-300">
             <tr>
