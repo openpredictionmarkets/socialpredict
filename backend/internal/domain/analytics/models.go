@@ -33,6 +33,18 @@ type WorkProfitMarketRecord struct {
 	ProposalCost     int64
 }
 
+// WorkProfitMarketGroupRecord captures the grouped market fields needed to
+// derive steward work profit from child-market bet history without adding
+// separate accounting state.
+type WorkProfitMarketGroupRecord struct {
+	ID              uint
+	CreatorUsername string
+	StewardUsername string
+	LifecycleStatus string
+	ProposalCost    int64
+	MemberMarketIDs []uint
+}
+
 // Snapshot converts the record into the shared math snapshot.
 func (m MarketRecord) Snapshot() positionsmath.MarketSnapshot {
 	return positionsmath.MarketSnapshot{
@@ -66,6 +78,8 @@ type FinancialSnapshotExposureReader interface {
 type FinancialSnapshotProfitReader interface {
 	TradingProfitsValue() int64
 	WorkProfitsValue() int64
+	UnrealizedWorkIncomeValue() int64
+	UnrealizedWorkProfitsValue() int64
 	TotalProfitsValue() int64
 	RealizedProfitsValue() int64
 	PotentialProfitsValue() int64
@@ -73,15 +87,17 @@ type FinancialSnapshotProfitReader interface {
 
 // FinancialSnapshot captures a user's financial aggregates.
 type FinancialSnapshot struct {
-	AccountBalance     int64
-	MaximumDebtAllowed int64
-	AmountInPlay       int64
-	AmountBorrowed     int64
-	RetainedEarnings   int64
-	Equity             int64
-	TradingProfits     int64
-	WorkProfits        int64
-	TotalProfits       int64
+	AccountBalance        int64
+	MaximumDebtAllowed    int64
+	AmountInPlay          int64
+	AmountBorrowed        int64
+	RetainedEarnings      int64
+	Equity                int64
+	TradingProfits        int64
+	WorkProfits           int64
+	UnrealizedWorkIncome  int64
+	UnrealizedWorkProfits int64
+	TotalProfits          int64
 
 	AmountInPlayActive int64
 	TotalSpent         int64
@@ -161,7 +177,7 @@ const (
 
 const (
 	SystemMetricsSnapshotTargetFreshness     = time.Hour
-	GlobalLeaderboardSnapshotTargetFreshness = time.Hour
+	GlobalLeaderboardSnapshotTargetFreshness = 15 * time.Minute
 )
 
 func (s AnalyticsReadModelSnapshot) Freshness(target time.Duration) readmodels.Freshness {
@@ -201,9 +217,15 @@ func (s FinancialSnapshot) RealizedValueValue() int64      { return s.RealizedVa
 func (s FinancialSnapshot) PotentialValueValue() int64     { return s.PotentialValue }
 func (s FinancialSnapshot) TradingProfitsValue() int64     { return s.TradingProfits }
 func (s FinancialSnapshot) WorkProfitsValue() int64        { return s.WorkProfits }
-func (s FinancialSnapshot) TotalProfitsValue() int64       { return s.TotalProfits }
-func (s FinancialSnapshot) RealizedProfitsValue() int64    { return s.RealizedProfits }
-func (s FinancialSnapshot) PotentialProfitsValue() int64   { return s.PotentialProfits }
+func (s FinancialSnapshot) UnrealizedWorkIncomeValue() int64 {
+	return s.UnrealizedWorkIncome
+}
+func (s FinancialSnapshot) UnrealizedWorkProfitsValue() int64 {
+	return s.UnrealizedWorkProfits
+}
+func (s FinancialSnapshot) TotalProfitsValue() int64     { return s.TotalProfits }
+func (s FinancialSnapshot) RealizedProfitsValue() int64  { return s.RealizedProfits }
+func (s FinancialSnapshot) PotentialProfitsValue() int64 { return s.PotentialProfits }
 
 // FinancialSnapshotRequestReader exposes only the request data needed to compute a snapshot.
 type FinancialSnapshotRequestReader interface {
@@ -213,9 +235,11 @@ type FinancialSnapshotRequestReader interface {
 
 // FinancialSnapshotRequest is the input for computing user financials.
 type FinancialSnapshotRequest struct {
-	Username       string
-	AccountBalance int64
-	WorkProfits    int64
+	Username              string
+	AccountBalance        int64
+	WorkProfits           int64
+	UnrealizedWorkIncome  int64
+	UnrealizedWorkProfits int64
 }
 
 func (r FinancialSnapshotRequest) UsernameValue() string      { return r.Username }

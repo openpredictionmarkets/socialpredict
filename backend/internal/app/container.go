@@ -14,6 +14,7 @@ import (
 	dusers "socialpredict/internal/domain/users"
 
 	// Repositories
+	ranalytics "socialpredict/internal/repository/analytics"
 	rbets "socialpredict/internal/repository/bets"
 	rmarkets "socialpredict/internal/repository/markets"
 	rusers "socialpredict/internal/repository/users"
@@ -47,7 +48,7 @@ type Container struct {
 	// Repositories
 	marketsRepo   rmarkets.GormRepository
 	usersRepo     rusers.GormRepository
-	analyticsRepo analytics.GormRepository
+	analyticsRepo ranalytics.GormRepository
 	betsRepo      rbets.GormRepository
 
 	// Domain services
@@ -120,19 +121,22 @@ func (c *Container) InitializeServices() {
 		MaximumDebtAllowed: c.config.Economics.User.MaximumDebtAllowed,
 	}
 
-	c.analyticsRepo = *analytics.NewGormRepository(c.db, analytics.WithRepositoryPositionCalculator(positionCalcAdapter))
+	c.analyticsRepo = *ranalytics.NewGormRepository(c.db, ranalytics.WithRepositoryPositionCalculator(positionCalcAdapter))
 	c.analyticsService = analytics.NewService(&c.analyticsRepo, analyticsConfig, analytics.WithPositionCalculator(positionCalcAdapter))
 	c.usersService = dusers.NewService(&c.usersRepo, c.analyticsService, c.securityService.Sanitizer)
 	c.authService = authsvc.NewAuthService(c.usersService, c.jwtSigningKey)
 
 	// Markets service depends on markets repository and users service
 	marketsConfig := dmarkets.Config{
-		MinimumFutureHours:     c.config.Economics.MarketCreation.MinimumFutureHours,
-		CreateMarketCost:       c.config.Economics.MarketIncentives.CreateMarketCost,
-		InitialBetFee:          c.config.Economics.Betting.BetFees.InitialBetFee,
-		MaximumDebtAllowed:     c.config.Economics.User.MaximumDebtAllowed,
-		GameMode:               c.config.Game.Mode,
-		MarketApprovalRequired: c.config.Game.Moderation.MarketApprovalRequired,
+		MinimumFutureHours:                      c.config.Economics.MarketCreation.MinimumFutureHours,
+		CreateMarketCost:                        c.config.Economics.MarketIncentives.CreateMarketCost,
+		InitialBetFee:                           c.config.Economics.Betting.BetFees.InitialBetFee,
+		MaximumDebtAllowed:                      c.config.Economics.User.MaximumDebtAllowed,
+		GameMode:                                c.config.Game.Mode,
+		MarketApprovalRequired:                  c.config.Game.Moderation.MarketApprovalRequired,
+		MultipleChoiceBinaryAddAnswerCost:       c.config.Economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost,
+		MultipleChoiceBinarySoftAnswerThreshold: c.config.Economics.MarketIncentives.MultipleChoiceBinary.SoftAnswerReviewThreshold,
+		MultipleChoiceBinaryHardAnswerSafetyCap: c.config.Economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap,
 	}
 
 	c.marketsService = dmarkets.NewService(

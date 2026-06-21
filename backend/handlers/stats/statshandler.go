@@ -25,6 +25,9 @@ type SetupConfiguration struct {
 	InitialMarketNo            int64   `json:"initialMarketNo"`
 	CreateMarketCost           int64   `json:"createMarketCost"`
 	TraderBonus                int64   `json:"traderBonus"`
+	GroupAddAnswerCost         int64   `json:"groupAddAnswerCost"`
+	GroupSoftAnswerThreshold   int     `json:"groupSoftAnswerThreshold"`
+	GroupHardAnswerSafetyCap   int     `json:"groupHardAnswerSafetyCap"`
 	InitialAccountBalance      int64   `json:"initialAccountBalance"`
 	MaximumDebtAllowed         int64   `json:"maximumDebtAllowed"`
 	MinimumBet                 int64   `json:"minimumBet"`
@@ -99,6 +102,9 @@ func loadSetupConfiguration(economics configsvc.Economics) SetupConfiguration {
 	result.InitialMarketNo = economics.MarketCreation.InitialMarketNo
 	result.CreateMarketCost = economics.MarketIncentives.CreateMarketCost
 	result.TraderBonus = economics.MarketIncentives.TraderBonus
+	result.GroupAddAnswerCost = economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost
+	result.GroupSoftAnswerThreshold = economics.MarketIncentives.MultipleChoiceBinary.SoftAnswerReviewThreshold
+	result.GroupHardAnswerSafetyCap = economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap
 	result.InitialAccountBalance = economics.User.InitialAccountBalance
 	result.MaximumDebtAllowed = economics.User.MaximumDebtAllowed
 	result.MinimumBet = economics.Betting.MinimumBet

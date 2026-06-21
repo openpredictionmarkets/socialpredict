@@ -7,11 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"socialpredict/handlers"
 	analytics "socialpredict/internal/domain/analytics"
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
+	"socialpredict/internal/domain/readmodels"
+	ranalytics "socialpredict/internal/repository/analytics"
 	"socialpredict/models/modelstesting"
 
 	"gorm.io/gorm"
@@ -20,7 +23,7 @@ import (
 func newAnalyticsService(t *testing.T, db *gorm.DB) *analytics.Service {
 	t.Helper()
 	cfg := modelstesting.GenerateEconomicConfig()
-	return analytics.NewService(analytics.NewGormRepository(db), analytics.Config{
+	return analytics.NewService(ranalytics.NewGormRepository(db), analytics.Config{
 		MaximumDebtAllowed: cfg.Economics.User.MaximumDebtAllowed,
 		CreateMarketCost:   cfg.Economics.MarketIncentives.CreateMarketCost,
 		InitialBetFee:      cfg.Economics.Betting.BetFees.InitialBetFee,
@@ -56,6 +59,63 @@ func TestGetSystemMetricsHandler_Success(t *testing.T) {
 	}
 	if payload.Result["moneyCreated"] == nil {
 		t.Fatalf("expected moneyCreated section in response: %+v", payload)
+	}
+	if payload.Result["freshness"] == nil {
+		t.Fatalf("expected freshness section in response: %+v", payload)
+	}
+}
+
+type cachedSystemMetricsService struct {
+	readModel    *analytics.SystemMetricsReadModel
+	refreshCalls int
+}
+
+func (s *cachedSystemMetricsService) ComputeSystemMetrics(context.Context) (*analytics.SystemMetrics, error) {
+	return &analytics.SystemMetrics{}, nil
+}
+
+func (s *cachedSystemMetricsService) GetSystemMetricsReadModel(context.Context) (*analytics.SystemMetricsReadModel, error) {
+	return s.readModel, nil
+}
+
+func (s *cachedSystemMetricsService) RefreshSystemMetricsSnapshot(context.Context) (*analytics.SystemMetricsReadModel, error) {
+	s.refreshCalls++
+	return &analytics.SystemMetricsReadModel{
+		Metrics: analytics.SystemMetrics{},
+		Freshness: readmodels.NewFreshness(
+			time.Now().UTC(),
+			"read_model",
+			analytics.SystemMetricsSnapshotTargetFreshness,
+			false,
+		),
+	}, nil
+}
+
+func TestSystemMetricsReadModel_ServesStaleSnapshotWithoutRefresh(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-2 * analytics.SystemMetricsSnapshotTargetFreshness)
+	svc := &cachedSystemMetricsService{
+		readModel: &analytics.SystemMetricsReadModel{
+			Metrics: analytics.SystemMetrics{},
+			Freshness: readmodels.NewStaleFreshness(
+				generatedAt,
+				"read_model",
+				analytics.SystemMetricsSnapshotTargetFreshness,
+				false,
+				"bet_accepted",
+				nil,
+			),
+		},
+	}
+
+	_, freshness, err := systemMetricsReadModel(context.Background(), svc)
+	if err != nil {
+		t.Fatalf("systemMetricsReadModel returned error: %v", err)
+	}
+	if freshness == nil || !freshness.IsStale {
+		t.Fatalf("expected stale freshness to be served, got %+v", freshness)
+	}
+	if svc.refreshCalls != 0 {
+		t.Fatalf("expected no refresh for stale snapshot, got %d", svc.refreshCalls)
 	}
 }
 

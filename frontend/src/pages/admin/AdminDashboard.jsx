@@ -1,27 +1,26 @@
 import React from 'react';
-import AdminAddUser from '../../components/layouts/admin/AddUser';
 import ModeratorMarketReview from '../../components/layouts/admin/ModeratorMarketReview';
 import UserQueue from '../../components/layouts/admin/UserQueue';
 import CmsDashboard from './CmsDashboard';
 import SiteTabs from '../../components/tabs/SiteTabs';
 
-function AdminDashboard() {
+function AdminDashboard({
+    defaultTab = 'Review Markets',
+    defaultReviewTab = 'Pending Review',
+    defaultUserTab = 'Non-Moderators',
+}) {
     const tabsData = [
-        { 
-            label: 'Add User', 
-            content: <AdminAddUser /> 
+        {
+            label: 'Review Markets',
+            content: <ModeratorMarketReview defaultTab={defaultReviewTab} />
         },
         {
-            label: 'User Queue',
-            content: <UserQueue />
+            label: 'User Governance',
+            content: <UserQueue defaultTab={defaultUserTab} />
         },
         {
             label: 'CMS',
             content: <CmsDashboard />
-        },
-        {
-            label: 'Market Review',
-            content: <ModeratorMarketReview />
         }
     ];
 
@@ -29,7 +28,7 @@ function AdminDashboard() {
         <div className="flex-col min-h-screen">
             <div className="flex-grow flex">
                 <div className="flex-1">
-                    <SiteTabs tabs={tabsData} />
+                    <SiteTabs tabs={tabsData} defaultTab={defaultTab} />
                 </div>
             </div>
         </div>

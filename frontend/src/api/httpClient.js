@@ -62,7 +62,10 @@ export const apiRequest = async (
     const data = parseApiResponseText(text);
 
     if (!response.ok) {
-      throw new Error(getApiErrorMessage(response, data, fallbackMessage, reasonMessages));
+      const error = new Error(getApiErrorMessage(response, data, fallbackMessage, reasonMessages));
+      error.status = response.status;
+      error.reason = data?.reason || '';
+      throw error;
     }
 
     return unwrap ? unwrapApiResponse(data) : data;

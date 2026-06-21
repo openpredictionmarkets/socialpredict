@@ -9,6 +9,16 @@ import (
 
 // GetMarketLeaderboard returns the leaderboard for a specific market.
 func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Page) ([]*LeaderboardRow, error) {
+	rows, err := s.getMarketLeaderboardRows(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+
+	p = s.statusPolicy.NormalizePage(p, 100, 1000)
+	return paginateLeaderboardRows(rows, p), nil
+}
+
+func (s *Service) getMarketLeaderboardRows(ctx context.Context, marketID int64) ([]*LeaderboardRow, error) {
 	if marketID <= 0 {
 		return nil, ErrInvalidInput
 	}
@@ -20,8 +30,6 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 	if market == nil {
 		return nil, ErrMarketNotFound
 	}
-
-	p = s.statusPolicy.NormalizePage(p, 100, 1000)
 
 	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
 	if err != nil {
@@ -44,8 +52,7 @@ func (s *Service) GetMarketLeaderboard(ctx context.Context, marketID int64, p Pa
 		return []*LeaderboardRow{}, nil
 	}
 
-	paged := paginateProfitability(profitability, p)
-	return mapLeaderboardRows(paged), nil
+	return mapLeaderboardRows(profitability), nil
 }
 
 func marketSnapshotFromModel(market *Market) positionsmath.MarketSnapshot {

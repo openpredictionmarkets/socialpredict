@@ -33,8 +33,15 @@ type MarketCreation struct {
 }
 
 type MarketIncentives struct {
-	CreateMarketCost int64 `yaml:"createMarketCost" json:"createMarketCost"`
-	TraderBonus      int64 `yaml:"traderBonus" json:"traderBonus"`
+	CreateMarketCost     int64                       `yaml:"createMarketCost" json:"createMarketCost"`
+	TraderBonus          int64                       `yaml:"traderBonus" json:"traderBonus"`
+	MultipleChoiceBinary MultipleChoiceBinaryMarkets `yaml:"multipleChoiceBinary" json:"multipleChoiceBinary"`
+}
+
+type MultipleChoiceBinaryMarkets struct {
+	AddAnswerCost             int64 `yaml:"addAnswerCost" json:"addAnswerCost"`
+	SoftAnswerReviewThreshold int   `yaml:"softAnswerReviewThreshold" json:"softAnswerReviewThreshold"`
+	HardAnswerSafetyCap       int   `yaml:"hardAnswerSafetyCap" json:"hardAnswerSafetyCap"`
 }
 
 type User struct {

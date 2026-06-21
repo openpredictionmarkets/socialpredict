@@ -54,6 +54,13 @@ const readReportingError = async (response, loginMessage, fallbackMessage) => {
   throw new Error(payload?.message || payload?.reason || `${fallbackMessage}: ${response.status}`);
 };
 
+const freshnessTimeLabel = (freshness) => {
+  if (!freshness?.generatedAt) return '';
+  const generatedAt = new Date(freshness.generatedAt);
+  if (Number.isNaN(generatedAt.getTime())) return '';
+  return generatedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+};
+
 const ReportingNotice = ({ message, loginRequired, errorLabel }) => (
   <div
     className={`rounded-lg border p-4 mb-6 ${
@@ -130,10 +137,12 @@ const Stats = () => {
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [metricsError, setMetricsError] = useState(null);
   const [metricsLoginRequired, setMetricsLoginRequired] = useState(false);
+  const [metricsFreshness, setMetricsFreshness] = useState(null);
   const [showFormulas, setShowFormulas] = useState({});
 
   // Global leaderboard state
   const [globalLeaderboard, setGlobalLeaderboard] = useState(null);
+  const [leaderboardFreshness, setLeaderboardFreshness] = useState(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState(null);
   const [leaderboardLoginRequired, setLeaderboardLoginRequired] = useState(false);
@@ -188,7 +197,9 @@ const Stats = () => {
       }
 
       const data = await response.json();
-      setSystemMetrics(unwrapApiResponse(data));
+      const result = unwrapApiResponse(data);
+      setMetricsFreshness(result?.freshness || null);
+      setSystemMetrics(result ? { ...result, freshness: undefined } : result);
     } catch (err) {
       setMetricsError(err.message);
       setMetricsLoginRequired(Boolean(err.loginRequired));
@@ -220,8 +231,9 @@ const Stats = () => {
       }
 
       const data = await response.json();
-      const rows = unwrapApiResponse(data);
-      const leaderboardRows = Array.isArray(rows) ? rows : [];
+      const result = unwrapApiResponse(data);
+      const leaderboardRows = Array.isArray(result) ? result : (Array.isArray(result?.entries) ? result.entries : []);
+      setLeaderboardFreshness(Array.isArray(result) ? null : (result?.freshness || null));
       setGlobalLeaderboard(leaderboardRows.slice(0, LEADERBOARD_PAGE_SIZE));
       setLeaderboardPage(page);
       setLeaderboardHasNextPage(leaderboardRows.length > LEADERBOARD_PAGE_SIZE);
@@ -237,6 +249,8 @@ const Stats = () => {
   const leaderboardStart = leaderboardPage * LEADERBOARD_PAGE_SIZE;
   const canPageLeaderboardBack = leaderboardPage > 0;
   const canPageLeaderboardForward = leaderboardHasNextPage;
+  const metricsFreshnessLabel = freshnessTimeLabel(metricsFreshness);
+  const leaderboardFreshnessLabel = freshnessTimeLabel(leaderboardFreshness);
 
   const toggleFormula = (key) => {
     setShowFormulas(prev => ({
@@ -375,6 +389,12 @@ const Stats = () => {
 
       {systemMetrics && (
         <div className="space-y-8">
+          {metricsFreshnessLabel && (
+            <p className="rounded-lg border border-gray-700 bg-gray-900/70 px-4 py-3 text-sm text-gray-300">
+              System metrics generated at {metricsFreshnessLabel}. Trade confirmations remain authoritative.
+            </p>
+          )}
+
           {/* Money Created Section */}
           <div className="bg-gray-700 rounded-lg p-6">
             <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
@@ -550,6 +570,12 @@ const Stats = () => {
 
       {globalLeaderboard && globalLeaderboard.length > 0 && (
         <div>
+          {leaderboardFreshnessLabel && (
+            <p className="mb-3 rounded-lg border border-gray-700 bg-gray-900/70 px-4 py-3 text-sm text-gray-300">
+              Global leaderboard generated at {leaderboardFreshnessLabel}. Trade confirmations remain authoritative.
+            </p>
+          )}
+
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
               Showing leaderboard page {leaderboardPage + 1}{globalLeaderboard.length ? ` (${leaderboardStart + 1}-${leaderboardStart + globalLeaderboard.length})` : ''}

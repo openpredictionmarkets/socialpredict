@@ -10,8 +10,11 @@ import (
 func TestUserFinancialMetricSnapshotCalculatorMatchesFinancialSnapshotMath(t *testing.T) {
 	generatedAt := time.Date(2026, 6, 7, 10, 30, 0, 0, time.UTC)
 	req := FinancialSnapshotRequest{
-		Username:       "alice",
-		AccountBalance: 500,
+		Username:              "alice",
+		AccountBalance:        500,
+		WorkProfits:           3,
+		UnrealizedWorkIncome:  11,
+		UnrealizedWorkProfits: -7,
 	}
 	positions := []positionsmath.MarketPosition{
 		{
@@ -72,6 +75,9 @@ func TestUserFinancialMetricSnapshotCalculatorMatchesFinancialSnapshotMath(t *te
 		financial.TotalSpent != 220 ||
 		financial.TotalSpentInPlay != 80 ||
 		financial.TradingProfits != 10 ||
+		financial.WorkProfits != 3 ||
+		financial.UnrealizedWorkIncome != 11 ||
+		financial.UnrealizedWorkProfits != -7 ||
 		financial.PotentialProfits != 40 ||
 		financial.RealizedProfits != -30 ||
 		financial.PotentialValue != 140 ||
@@ -79,7 +85,7 @@ func TestUserFinancialMetricSnapshotCalculatorMatchesFinancialSnapshotMath(t *te
 		financial.AmountInPlayActive != 140 ||
 		financial.RetainedEarnings != 270 ||
 		financial.Equity != 500 ||
-		financial.TotalProfits != 10 {
+		financial.TotalProfits != 13 {
 		t.Fatalf("unexpected financial snapshot: %+v", financial)
 	}
 }

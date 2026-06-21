@@ -20,6 +20,16 @@ const defaultDiscoveryLayout = {
     pins: [],
 };
 const MARKET_LIST_PAGE_SIZE = 20;
+const PINNED_GROUP_COLORS = [
+    '#38bdf8',
+    '#f97316',
+    '#22c55e',
+    '#e879f9',
+    '#facc15',
+    '#a78bfa',
+    '#14b8a6',
+    '#fb7185',
+];
 
 const hasCuratedBlocks = (layout) => (
     layout?.featuredTopicsEnabled || layout?.featuredMarketsEnabled
@@ -142,6 +152,43 @@ const chartSamplesFromDetails = (details) => {
     return validSamples;
 };
 
+const answerLabel = (answer, index) => (
+    answer?.answerLabel || answer?.market?.market?.marketGroup?.answerLabel || `Answer ${index + 1}`
+);
+
+const currentProbabilityFromAnswer = (answer) => {
+    const changes = normalizeProbabilityChanges(answer?.probabilityChanges ?? answer?.ProbabilityChanges);
+    if (changes.length > 0) {
+        return toNumber(changes[changes.length - 1].probability, 0.5);
+    }
+    return toNumber(
+        answer?.summary?.lastProbability
+        ?? answer?.market?.lastProbability
+        ?? answer?.market?.market?.initialProbability,
+        0.5,
+    );
+};
+
+const chartSamplesFromAnswer = (answer) => {
+    const changes = normalizeProbabilityChanges(answer?.probabilityChanges ?? answer?.ProbabilityChanges);
+    const currentProbability = currentProbabilityFromAnswer(answer);
+    const market = answer?.market?.market || {};
+    const fallbackTimestamp = market.createdAt || market.CreatedAt || new Date().toISOString();
+    const samples = changes.length > 0
+        ? changes.map((change) => ({
+            probability: toNumber(change.probability, currentProbability),
+            timestamp: new Date(change.timestamp).getTime(),
+        }))
+        : [{
+            probability: currentProbability,
+            timestamp: new Date(fallbackTimestamp).getTime(),
+        }];
+
+    return samples
+        .filter((sample) => Number.isFinite(sample.timestamp))
+        .sort((left, right) => left.timestamp - right.timestamp);
+};
+
 const sampleToPoint = (sample, minTime, maxTime, width, height, inset) => {
     const usableWidth = width - inset * 2;
     const usableHeight = height - inset * 2;
@@ -171,6 +218,24 @@ const buildStepPath = (points) => {
     }
 
     return commands.join(' ');
+};
+
+const answerLinePath = (answer, minTime, maxTime, width, height, inset) => {
+    const samples = chartSamplesFromAnswer(answer);
+    const fallbackProbability = currentProbabilityFromAnswer(answer);
+    const validSamples = samples.length > 0
+        ? samples
+        : [{ probability: fallbackProbability, timestamp: minTime }];
+    const points = validSamples.map((sample) => sampleToPoint(sample, minTime, maxTime, width, height, inset));
+    const finalPoint = sampleToPoint(
+        { probability: validSamples[validSamples.length - 1]?.probability ?? fallbackProbability, timestamp: maxTime },
+        minTime,
+        maxTime,
+        width,
+        height,
+        inset,
+    );
+    return `${buildStepPath(points)} H ${finalPoint.x.toFixed(2)}`;
 };
 
 const PinnedMarketSparkline = ({ details }) => {
@@ -217,6 +282,118 @@ const PinnedMarketSparkline = ({ details }) => {
     );
 };
 
+const PinnedGroupedMarketSparkline = ({ groupDetails }) => {
+    const width = 960;
+    const height = 260;
+    const inset = 22;
+    const answers = Array.isArray(groupDetails?.answers) ? groupDetails.answers : [];
+    const currentTime = Date.now();
+    const allSamples = answers.flatMap(chartSamplesFromAnswer);
+    const minSampleTime = allSamples.length > 0
+        ? Math.min(...allSamples.map((sample) => sample.timestamp))
+        : currentTime;
+    const maxSampleTime = allSamples.length > 0
+        ? Math.max(...allSamples.map((sample) => sample.timestamp))
+        : currentTime;
+    const minTime = Math.min(minSampleTime, currentTime);
+    const maxTime = Math.max(maxSampleTime, currentTime, minTime + 1);
+
+    if (answers.length === 0) {
+        return <PinnedMarketSparkline details={{ market: {}, probabilityChanges: [] }} />;
+    }
+
+    return (
+        <div className="flex h-full flex-col">
+            <svg
+                viewBox={`0 0 ${width} ${height}`}
+                className="min-h-0 flex-1"
+                preserveAspectRatio="none"
+                role="img"
+                aria-label="Pinned grouped market answer probabilities"
+            >
+                <rect width={width} height={height} rx="18" fill="#101827" />
+                {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+                    const y = inset + (1 - tick) * (height - inset * 2);
+                    return (
+                        <line
+                            key={tick}
+                            x1={inset}
+                            x2={width - inset}
+                            y1={y}
+                            y2={y}
+                            stroke="#334155"
+                            strokeWidth={tick === 0.5 ? 3 : 2}
+                            strokeDasharray={tick === 0.5 ? '10 12' : ''}
+                            opacity={tick === 0.5 ? 0.5 : 0.3}
+                        />
+                    );
+                })}
+                {answers.map((answer, index) => (
+                    <path
+                        key={`${answer.marketId || answer.id || index}-path`}
+                        d={answerLinePath(answer, minTime, maxTime, width, height, inset)}
+                        fill="none"
+                        stroke={PINNED_GROUP_COLORS[index % PINNED_GROUP_COLORS.length]}
+                        strokeWidth="7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                ))}
+                {answers.map((answer, index) => {
+                    const finalPoint = sampleToPoint(
+                        { probability: currentProbabilityFromAnswer(answer), timestamp: maxTime },
+                        minTime,
+                        maxTime,
+                        width,
+                        height,
+                        inset,
+                    );
+                    return (
+                        <circle
+                            key={`${answer.marketId || answer.id || index}-point`}
+                            cx={finalPoint.x}
+                            cy={finalPoint.y}
+                            r="8"
+                            fill={PINNED_GROUP_COLORS[index % PINNED_GROUP_COLORS.length]}
+                        />
+                    );
+                })}
+            </svg>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 px-2 py-2 text-xs font-semibold text-gray-300">
+                {answers.slice(0, 8).map((answer, index) => (
+                    <span key={`${answer.marketId || answer.id || index}-legend`} className="inline-flex items-center gap-1">
+                        <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: PINNED_GROUP_COLORS[index % PINNED_GROUP_COLORS.length] }}
+                        />
+                        <span>{answerLabel(answer, index)}</span>
+                        <span className="text-gray-500">{Math.round(currentProbabilityFromAnswer(answer) * 100)}%</span>
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const pinnedMarketGroup = (details) => details?.market?.marketGroup || null;
+
+const pinnedMarketTitle = (details, pin, fallbackMarketId) => {
+    const group = pinnedMarketGroup(details);
+    if (group?.questionTitle) {
+        return group.questionTitle;
+    }
+    return details?.market?.questionTitle || pin.label || `Market #${fallbackMarketId}`;
+};
+
+const pinnedMarketSubtitle = (details, fallbackMarketId) => {
+    const group = pinnedMarketGroup(details);
+    if (group?.id) {
+        const answerCount = toNumber(group.answerCount, 0);
+        return `Group #${group.id}${answerCount > 0 ? ` · ${answerCount} answers` : ''}`;
+    }
+    return `Market #${fallbackMarketId}`;
+};
+
 const FeaturedMarketPins = ({ marketPins = [], discoverySlug = 'markets' }) => {
     const [pinnedMarkets, setPinnedMarkets] = useState([]);
     const pinKey = marketPins
@@ -240,7 +417,7 @@ const FeaturedMarketPins = ({ marketPins = [], discoverySlug = 'markets' }) => {
             if (!ignore) {
                 const readModelPins = Array.isArray(data.pinnedMarkets) ? data.pinnedMarkets : [];
                 setPinnedMarkets(readModelPins
-                    .map((item) => ({ pin: item.pin, details: item.details }))
+                    .map((item) => ({ pin: item.pin, details: item.details, groupDetails: item.groupDetails }))
                     .filter((item) => item?.details?.market));
             }
         }).catch(() => {
@@ -258,9 +435,10 @@ const FeaturedMarketPins = ({ marketPins = [], discoverySlug = 'markets' }) => {
 
     return (
         <section className="grid gap-3 lg:grid-cols-2" aria-label="Pinned markets">
-            {pinnedMarkets.map(({ pin, details }) => {
+            {pinnedMarkets.map(({ pin, details, groupDetails }) => {
                 const market = details.market || {};
                 const marketId = market.id || pin.marketId;
+                const group = pinnedMarketGroup(details);
                 return (
                     <Link
                         key={`market-${pin.id || marketId || pin.sortOrder}`}
@@ -268,10 +446,18 @@ const FeaturedMarketPins = ({ marketPins = [], discoverySlug = 'markets' }) => {
                         className="block w-full rounded-xl border border-gray-700 bg-gray-950/80 p-3 no-underline shadow-lg transition hover:border-sky-400/60 hover:bg-gray-900"
                     >
                         <h3 className="mb-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 text-white">
-                            {market.questionTitle || pin.label || `Market #${marketId}`}
+                            {pinnedMarketTitle(details, pin, marketId)}
                         </h3>
+                        <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                            {group?.id && <DiscoveryBadge>Grouped market</DiscoveryBadge>}
+                            <span>{pinnedMarketSubtitle(details, marketId)}</span>
+                        </div>
                         <div className="h-36 overflow-hidden rounded-lg border border-gray-800 bg-gray-900/60 sm:h-52">
-                            <PinnedMarketSparkline details={details} />
+                            {group?.id && groupDetails?.answers?.length ? (
+                                <PinnedGroupedMarketSparkline groupDetails={groupDetails} />
+                            ) : (
+                                <PinnedMarketSparkline details={details} />
+                            )}
                         </div>
                     </Link>
                 );

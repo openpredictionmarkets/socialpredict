@@ -214,6 +214,82 @@ func TestComputeUserFinancials_DerivesModeratorWorkProfitsFromResolvedStewardedM
 	}
 }
 
+func TestComputeUserFinancials_DerivesGroupWorkProfitsOnce(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	steward := modelstesting.GenerateUser("group_steward", 500)
+	alice := modelstesting.GenerateUser("group_alice", 500)
+	bob := modelstesting.GenerateUser("group_bob", 500)
+	carol := modelstesting.GenerateUser("group_carol", 500)
+	for _, user := range []models.User{steward, alice, bob, carol} {
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("create user %s: %v", user.Username, err)
+		}
+	}
+
+	childOne := modelstesting.GenerateMarket(101, steward.Username)
+	childOne.IsResolved = true
+	childOne.ResolutionResult = "YES"
+	childOne.ProposalCost = 0
+	childOne.StewardUsername = steward.Username
+	childTwo := modelstesting.GenerateMarket(102, steward.Username)
+	childTwo.IsResolved = true
+	childTwo.ResolutionResult = "NO"
+	childTwo.ProposalCost = 0
+	childTwo.StewardUsername = steward.Username
+	for _, market := range []models.Market{childOne, childTwo} {
+		if err := db.Create(&market).Error; err != nil {
+			t.Fatalf("create child market: %v", err)
+		}
+	}
+
+	group := models.MarketGroup{
+		QuestionTitle:      "Grouped market",
+		Description:        "Parent",
+		GroupType:          "MULTIPLE_CHOICE_BINARY",
+		ProbabilityPolicy:  "INDEPENDENT_BINARY",
+		ResolutionPolicy:   "INDEPENDENT_CHILDREN",
+		LifecycleStatus:    "resolved",
+		ProposalCost:       2,
+		CreatorUsername:    steward.Username,
+		StewardUsername:    steward.Username,
+		ResolutionDateTime: time.Now().UTC().Add(time.Hour),
+	}
+	if err := db.Create(&group).Error; err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	members := []models.MarketGroupMember{
+		{GroupID: group.ID, MarketID: childOne.ID, AnswerLabel: "One", DisplayOrder: 0},
+		{GroupID: group.ID, MarketID: childTwo.ID, AnswerLabel: "Two", DisplayOrder: 1},
+	}
+	for _, member := range members {
+		if err := db.Create(&member).Error; err != nil {
+			t.Fatalf("create member: %v", err)
+		}
+	}
+
+	bets := []models.Bet{
+		modelstesting.GenerateBet(10, "YES", alice.Username, uint(childOne.ID), 0),
+		modelstesting.GenerateBet(10, "YES", bob.Username, uint(childOne.ID), time.Minute),
+		modelstesting.GenerateBet(10, "NO", alice.Username, uint(childTwo.ID), 2*time.Minute),
+		modelstesting.GenerateBet(10, "YES", carol.Username, uint(childTwo.ID), 3*time.Minute),
+	}
+	for _, bet := range bets {
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("create bet: %v", err)
+		}
+	}
+
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.MarketIncentives.CreateMarketCost = 1
+	econ.Economics.Betting.BetFees.InitialBetFee = 2
+	svc := newAnalyticsService(t, db, econ)
+
+	snapshot := requireFinancialSnapshot(t, svc, steward)
+	if snapshot.WorkProfits != 4 {
+		t.Fatalf("group steward work profits = %d, want 4", snapshot.WorkProfits)
+	}
+}
+
 func TestComputeUserFinancials_SubtractsCreationCostWhenCreatorRemainsSteward(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	creator := modelstesting.GenerateUser("creator_steward", 500)
@@ -256,7 +332,7 @@ func TestComputeUserFinancials_SubtractsCreationCostWhenCreatorRemainsSteward(t 
 	}
 }
 
-func TestComputeUserFinancials_WorkProfitsRemainZeroBelowCreationCostThreshold(t *testing.T) {
+func TestComputeUserFinancials_WorkProfitsCanBeNegativeBelowCreationCostThreshold(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	creator := modelstesting.GenerateUser("threshold_creator", 500)
 	steward := modelstesting.GenerateUser("threshold_steward", 500)
@@ -292,7 +368,137 @@ func TestComputeUserFinancials_WorkProfitsRemainZeroBelowCreationCostThreshold(t
 	svc := newAnalyticsService(t, db, econ)
 
 	snapshot := requireFinancialSnapshot(t, svc, steward)
+	if snapshot.WorkProfits != -4 {
+		t.Fatalf("steward work profits below threshold = %d, want -4", snapshot.WorkProfits)
+	}
+}
+
+func TestComputeUserFinancials_DerivesUnrealizedWorkProfitsFromUnresolvedStewardedMarkets(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	steward := modelstesting.GenerateUser("unrealized_steward", 500)
+	alice := modelstesting.GenerateUser("unrealized_alice", 500)
+	bob := modelstesting.GenerateUser("unrealized_bob", 500)
+	for _, user := range []models.User{steward, alice, bob} {
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("create user %s: %v", user.Username, err)
+		}
+	}
+
+	standalone := modelstesting.GenerateMarket(401, steward.Username)
+	standalone.IsResolved = false
+	standalone.LifecycleStatus = "published"
+	standalone.ProposalCost = 10
+	standalone.StewardUsername = steward.Username
+	if err := db.Create(&standalone).Error; err != nil {
+		t.Fatalf("create standalone market: %v", err)
+	}
+
+	childOne := modelstesting.GenerateMarket(402, steward.Username)
+	childOne.IsResolved = false
+	childOne.LifecycleStatus = "published"
+	childOne.ProposalCost = 0
+	childOne.StewardUsername = steward.Username
+	childTwo := modelstesting.GenerateMarket(403, steward.Username)
+	childTwo.IsResolved = false
+	childTwo.LifecycleStatus = "published"
+	childTwo.ProposalCost = 0
+	childTwo.StewardUsername = steward.Username
+	for _, market := range []models.Market{childOne, childTwo} {
+		if err := db.Create(&market).Error; err != nil {
+			t.Fatalf("create child market: %v", err)
+		}
+	}
+
+	group := models.MarketGroup{
+		QuestionTitle:      "Unresolved group",
+		Description:        "Parent",
+		GroupType:          "MULTIPLE_CHOICE_BINARY",
+		ProbabilityPolicy:  "INDEPENDENT_BINARY",
+		ResolutionPolicy:   "INDEPENDENT_CHILDREN",
+		LifecycleStatus:    "published",
+		ProposalCost:       5,
+		CreatorUsername:    steward.Username,
+		StewardUsername:    steward.Username,
+		ResolutionDateTime: time.Now().UTC().Add(time.Hour),
+	}
+	if err := db.Create(&group).Error; err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	for _, member := range []models.MarketGroupMember{
+		{GroupID: group.ID, MarketID: childOne.ID, AnswerLabel: "One", DisplayOrder: 0},
+		{GroupID: group.ID, MarketID: childTwo.ID, AnswerLabel: "Two", DisplayOrder: 1},
+	} {
+		if err := db.Create(&member).Error; err != nil {
+			t.Fatalf("create group member: %v", err)
+		}
+	}
+
+	bets := []models.Bet{
+		modelstesting.GenerateBet(10, "YES", alice.Username, uint(standalone.ID), 0),
+		modelstesting.GenerateBet(10, "NO", bob.Username, uint(standalone.ID), time.Minute),
+		modelstesting.GenerateBet(5, "YES", alice.Username, uint(childOne.ID), 2*time.Minute),
+		modelstesting.GenerateBet(5, "NO", alice.Username, uint(childTwo.ID), 3*time.Minute),
+		modelstesting.GenerateBet(5, "YES", bob.Username, uint(childTwo.ID), 4*time.Minute),
+	}
+	for _, bet := range bets {
+		if err := db.Create(&bet).Error; err != nil {
+			t.Fatalf("create bet: %v", err)
+		}
+	}
+
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.Betting.BetFees.InitialBetFee = 3
+	svc := newAnalyticsService(t, db, econ)
+
+	snapshot := requireFinancialSnapshot(t, svc, steward)
+	// Standalone: 2 unique participants * 3 fee - 10 cost = -4.
+	// Group: 2 unique participants across both children * 3 fee - 5 cost = 1.
+	if snapshot.UnrealizedWorkIncome != 12 {
+		t.Fatalf("unrealized work income = %d, want 12", snapshot.UnrealizedWorkIncome)
+	}
+	if snapshot.UnrealizedWorkProfits != -3 {
+		t.Fatalf("unrealized work profits = %d, want -3", snapshot.UnrealizedWorkProfits)
+	}
 	if snapshot.WorkProfits != 0 {
-		t.Fatalf("steward work profits below threshold = %d, want 0", snapshot.WorkProfits)
+		t.Fatalf("resolved work profits = %d, want 0 for unresolved markets", snapshot.WorkProfits)
+	}
+}
+
+func TestComputeUserFinancials_UnrealizedWorkSeparatesCreatorCostFromStewardIncome(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	creator := modelstesting.GenerateUser("unrealized_creator_only", 500)
+	steward := modelstesting.GenerateUser("unrealized_income_steward", 500)
+	alice := modelstesting.GenerateUser("unrealized_income_alice", 500)
+	for _, user := range []models.User{creator, steward, alice} {
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("create user %s: %v", user.Username, err)
+		}
+	}
+
+	market := modelstesting.GenerateMarket(501, creator.Username)
+	market.IsResolved = false
+	market.LifecycleStatus = "published"
+	market.ProposalCost = 8
+	market.StewardUsername = steward.Username
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+	bet := modelstesting.GenerateBet(10, "YES", alice.Username, uint(market.ID), 0)
+	if err := db.Create(&bet).Error; err != nil {
+		t.Fatalf("create bet: %v", err)
+	}
+
+	econ := modelstesting.GenerateEconomicConfig()
+	econ.Economics.Betting.BetFees.InitialBetFee = 3
+	svc := newAnalyticsService(t, db, econ)
+
+	creatorSnapshot := requireFinancialSnapshot(t, svc, creator)
+	if creatorSnapshot.UnrealizedWorkIncome != 0 || creatorSnapshot.UnrealizedWorkProfits != -8 {
+		t.Fatalf("creator unrealized work = income %d profit %d, want 0/-8", creatorSnapshot.UnrealizedWorkIncome, creatorSnapshot.UnrealizedWorkProfits)
+	}
+
+	stewardSnapshot := requireFinancialSnapshot(t, svc, steward)
+	if stewardSnapshot.UnrealizedWorkIncome != 3 || stewardSnapshot.UnrealizedWorkProfits != 3 {
+		t.Fatalf("steward unrealized work = income %d profit %d, want 3/3", stewardSnapshot.UnrealizedWorkIncome, stewardSnapshot.UnrealizedWorkProfits)
 	}
 }

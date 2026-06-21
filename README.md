@@ -26,8 +26,8 @@ SocialPredict lets **anyone** – individuals, classrooms, companies, and even g
 
 * Kenyon College (Political Science course PSCI 303, Campaigns & Elections; syllabus [here](https://www.zacharymcgee.net/syllabi/PSCI_303_public.pdf))
                         
-## Stargazers over time
-[![Stargazers over time](https://starchart.cc/openpredictionmarkets/socialpredict.svg?variant=adaptive)](https://starchart.cc/openpredictionmarkets/socialpredict)
+## Stargazers Over Time
+[![Star History Chart](https://app.repohistory.com/api/svg?repo=openpredictionmarkets/socialpredict&type=Date&background=0D1117&color=62C3F8)](https://app.repohistory.com/star-history)
 
 ## Licensing
 

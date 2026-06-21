@@ -1,45 +1,59 @@
 ---
-title: Container Security Scanning Design
+title: Grouped Market Transaction Boundaries Design
 document_type: feature-design
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-08T00:00:00Z
-updated_at_display: "Monday, June 8, 2026"
-update_reason: "Specify CI boundaries for container image vulnerability scanning and alerting."
+updated_at: 2026-06-17T00:00:00Z
+updated_at_display: "Wednesday, June 17, 2026"
+update_reason: "Define transaction boundary requirements for grouped-market write paths."
 status: draft
 ---
 
-# Container Security Scanning Design
+# Grouped Market Transaction Boundaries Design
 
-## Boundary
+## Design Posture
 
-Container vulnerability scanning belongs to the CI/release boundary. It does not change application runtime logic, market math, or deployment configuration.
+This feature follows the canonical design plan rule that transaction-time decisions and balance mutations must use backend-owned canonical state and must not be split across unverifiable partial writes.
 
-## Critical Decision
+Grouped markets are display/governance aggregates, but grouped creation, answer addition approval, and grouped resolution are economic/audit write paths. They need a single use-case transaction boundary or an explicit idempotent compensation strategy.
 
-The scan gate is critical for release deployment:
+## Transaction Boundary Candidates
 
-```text
-critical image vulnerability found -> Docker workflow fails -> production deploy workflow does not dispatch
-```
+| Use case | Current risk | Required boundary |
+| --- | --- | --- |
+| Create grouped market | Proposal fee and child markets can be written before parent/member rows. | Fee, child markets, tags, parent group, and member links commit together. |
+| Approve answer addition | Fee, child market, member row, review status, and amendments can diverge. | Approval command commits child, member, review, fee, tags, and amendments together. |
+| Resolve grouped market | Child resolutions, parent resolved state, and work income can diverge. | Resolution command is atomic or idempotent and retry-safe. |
+| Pay grouped work income | Retry can overpay if parent resolved/work income state is not guarded. | Payment is tied to a durable once-only resolution marker or ledger guard. |
 
-This prevents a release image with known critical findings from being automatically deployed to the model-office/production-style environment.
+## Design Direction
 
-## Alerting Model
+Preferred direction: add a grouped-market unit-of-work port owned by the market domain service and implemented by the GORM repository adapter.
 
-SARIF uploads make scanner findings visible in GitHub Code Scanning. The scan uploads all severities so maintainers can inspect the full image posture, while the workflow gate initially blocks only `CRITICAL` findings.
+The port should not move business rules into GORM. The domain service should still decide:
 
-## Image Identity
+- who can create, approve, add, or resolve
+- which child outcomes are valid
+- when fees apply
+- which generated amendments must exist
+- when work income is due
 
-Release scans use immutable image digests from `docker/build-push-action` outputs. This avoids scanning a mutable tag that could drift during the workflow.
+The adapter should own only the database transaction mechanics.
 
-Scheduled scans use tags because they are designed to monitor the current published state of `latest` or a manually selected release tag.
+## Testing Strategy
 
-## Future Hardening
+Add failure-injection tests around each boundary:
 
-- Pin scanner actions by full commit SHA.
-- Add SBOM generation and retention.
-- Sign images with Cosign.
-- Deploy images by digest instead of `latest`.
-- Add policy exceptions with explicit expiry dates for unavoidable base-image CVEs.
-- Raise the blocking threshold from `CRITICAL` to `HIGH,CRITICAL` after baseline cleanup.
+- fail after fee but before child creation
+- fail after child creation but before group/member rows
+- fail after member row but before answer-addition approval
+- fail after answer-addition approval but before amendments
+- fail after one child resolution but before remaining children
+- retry grouped resolution after partial already-resolved matching children
+- retry grouped resolution cannot duplicate work income
+
+## Out Of Scope
+
+- Replacing binary market transaction math.
+- Parent-level pooled liquidity.
+- Moving child buy/sell execution into parent group state.

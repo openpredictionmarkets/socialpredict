@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../helpers/AuthContent'
 import useUserCredit from '../utils/userFinanceTools/FetchUserCredit';
 import LoginModalButton from '../modals/login/LoginModalClick';
@@ -18,8 +18,21 @@ import {
   StatsSVG,
 } from '../../assets/components/SvgIcons';
 import useFrontendConfig from '../../hooks/useFrontendConfig';
+import {
+  getPendingAdminReviewCounts,
+  totalPendingReviewCount,
+} from '../../api/adminReviewCountsApi';
 
-const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
+const SidebarBadge = ({ value }) => {
+  if (!value) return null;
+  return (
+    <span className="ml-auto rounded-full bg-primary-pink px-2 py-0.5 text-[10px] font-bold leading-none text-white">
+      {value > 99 ? '99+' : value}
+    </span>
+  );
+};
+
+const SidebarLink = ({ to, icon: Icon, children, onClick, badge = 0 }) => (
   <li>
     <Link
       to={to}
@@ -28,19 +41,25 @@ const SidebarLink = ({ to, icon: Icon, children, onClick }) => (
     >
       <Icon className='w-5 h-5 text-gray-400 group-hover:text-white transition-colors duration-200' />
       <span className='ml-3 text-sm'>{children}</span>
+      <SidebarBadge value={badge} />
     </Link>
   </li>
 );
 
 const Sidebar = () => {
-  const { isLoggedIn, usertype, moderatorStatus, logout, changePasswordNeeded, username } = useAuth();
+  const { isLoggedIn, token, usertype, moderatorStatus, logout, changePasswordNeeded, username } = useAuth();
+  const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const { userCredit, loading, error } = useUserCredit(username); // Correct destructuring
   const { frontendConfig } = useFrontendConfig();
   const isModeratorMode = frontendConfig?.game?.mode === 'moderator';
   const isActiveModerator = usertype === 'MODERATOR' && moderatorStatus === 'active';
   const isSuspendedModerator = usertype === 'MODERATOR' && moderatorStatus === 'suspended';
   const canCreateMarket = isLoggedIn && usertype !== 'ADMIN' && !changePasswordNeeded && !isSuspendedModerator && (!isModeratorMode || isActiveModerator);
+  const reviewPageOwnsCounts = usertype === 'ADMIN' && (
+    location.pathname === '/admin' || location.pathname.startsWith('/admin/markets')
+  );
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -64,6 +83,46 @@ const Sidebar = () => {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isSidebarOpen]);
+
+  useEffect(() => {
+    const handleReviewCounts = (event) => {
+      setPendingReviewCount(totalPendingReviewCount(event.detail));
+    };
+    window.addEventListener('socialpredict:admin-review-counts', handleReviewCounts);
+    return () => {
+      window.removeEventListener('socialpredict:admin-review-counts', handleReviewCounts);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reviewPageOwnsCounts) {
+      return undefined;
+    }
+    if (!isLoggedIn || usertype !== 'ADMIN' || !token || changePasswordNeeded) {
+      setPendingReviewCount(0);
+      return undefined;
+    }
+
+    let ignore = false;
+    const loadPendingWork = async () => {
+      try {
+        const counts = await getPendingAdminReviewCounts({ token });
+        if (ignore) return;
+        setPendingReviewCount(totalPendingReviewCount(counts));
+      } catch {
+        if (!ignore) {
+          setPendingReviewCount(0);
+        }
+      }
+    };
+
+    loadPendingWork();
+    const intervalId = window.setInterval(loadPendingWork, 60000);
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isLoggedIn, usertype, token, changePasswordNeeded, reviewPageOwnsCounts]);
 
   const handleLogoutClick = () => {
     logout();
@@ -96,8 +155,14 @@ const Sidebar = () => {
     if (usertype === 'ADMIN') {
       return (
         <>
-          <SidebarLink to='/admin' icon={AdminGearSVG}>
-            Dashboard
+          <SidebarLink to='/admin/markets/review' icon={AdminGearSVG} badge={pendingReviewCount}>
+            Review Markets
+          </SidebarLink>
+          <SidebarLink to='/admin/users' icon={ProfileSVG}>
+            User Governance
+          </SidebarLink>
+          <SidebarLink to='/admin/cms' icon={AdminGearSVG}>
+            CMS
           </SidebarLink>
           <SidebarLink to='/markets' icon={MarketsSVG}>
             Markets
@@ -106,7 +171,7 @@ const Sidebar = () => {
             About
           </SidebarLink>
           <SidebarLink to='/stats' icon={StatsSVG}>
-            Stats
+            System Stats
           </SidebarLink>
           <SidebarLink to='/' icon={LogoutSVG} onClick={handleLogoutClick}>
             Logout
@@ -145,6 +210,11 @@ const Sidebar = () => {
         {canCreateMarket && (
           <SidebarLink to='/create' icon={CreateSVG}>
             Create
+          </SidebarLink>
+        )}
+        {isActiveModerator && (
+          <SidebarLink to='/profile?tab=Markets' icon={AdminGearSVG}>
+            My Market Reviews
           </SidebarLink>
         )}
         <SidebarLink to='/about' icon={AboutSVG}>

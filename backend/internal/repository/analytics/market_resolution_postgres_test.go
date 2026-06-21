@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"socialpredict/internal/app"
-	"socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
+	ranalytics "socialpredict/internal/repository/analytics"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -86,7 +86,7 @@ func TestResolveMarketDistributesAllBetVolumePostgres(t *testing.T) {
 		t.Fatalf("expected zero surplus after Postgres resolution, got %d", surplus)
 	}
 
-	repo := analytics.NewGormRepository(db)
+	repo := ranalytics.NewGormRepository(db)
 	for _, user := range users {
 		positions, err := repo.UserMarketPositions(context.Background(), user.Username)
 		if err != nil {

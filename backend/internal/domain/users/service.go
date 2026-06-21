@@ -191,6 +191,8 @@ var financialSnapshotFields = []financialSnapshotField{
 	{key: "equity", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.Equity }},
 	{key: "tradingProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.TradingProfits }},
 	{key: "workProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.WorkProfits }},
+	{key: "unrealizedWorkIncome", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.UnrealizedWorkIncome }},
+	{key: "unrealizedWorkProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.UnrealizedWorkProfits }},
 	{key: "totalProfits", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.TotalProfits }},
 	{key: "amountInPlayActive", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.AmountInPlayActive }},
 	{key: "totalSpent", extract: func(snapshot *analytics.FinancialSnapshot) int64 { return snapshot.TotalSpent }},

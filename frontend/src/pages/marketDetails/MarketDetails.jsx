@@ -7,7 +7,7 @@ import { useDocumentMeta } from '../../hooks/useDocumentMeta';
 import { DOMAIN_URL } from '../../config';
 
 const MarketDetails = () => {
-  const { username } = useAuth();
+  const { username, usertype, moderatorStatus } = useAuth();
   const { details, isLoggedIn, token, refetchData, currentProbability } =
     useMarketDetails();
 
@@ -40,6 +40,8 @@ const MarketDetails = () => {
           descriptionAmendments={details.descriptionAmendments}
           marketId={details.market.id}
           username={username}
+          usertype={usertype}
+          moderatorStatus={moderatorStatus}
           isLoggedIn={isLoggedIn}
           token={token}
           refetchData={refetchData}

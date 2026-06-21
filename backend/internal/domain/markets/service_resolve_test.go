@@ -358,7 +358,7 @@ func TestResolveMarketPaysWinners(t *testing.T) {
 	}
 }
 
-func TestResolveMarketSkipsStewardWorkProfitUntilCreationCostThresholdIsMet(t *testing.T) {
+func TestResolveMarketPaysStewardFeeIncomeBelowCreationCostThreshold(t *testing.T) {
 	market := &markets.Market{
 		ID:              42,
 		CreatorUsername: "creator",
@@ -391,17 +391,22 @@ func TestResolveMarketSkipsStewardWorkProfitUntilCreationCostThresholdIsMet(t *t
 		t.Fatalf("ResolveMarket returned error: %v", err)
 	}
 
-	if len(userSvc.applied) != 1 {
-		t.Fatalf("expected winner payout only below work-profit threshold, got %d: %+v", len(userSvc.applied), userSvc.applied)
+	if len(userSvc.applied) != 2 {
+		t.Fatalf("expected winner payout and work-fee payout below threshold, got %d: %+v", len(userSvc.applied), userSvc.applied)
 	}
 
 	winnerCall := userSvc.applied[0]
 	if winnerCall.username != "winner" || winnerCall.amount != 120 || winnerCall.txType != users.TransactionWin {
 		t.Fatalf("unexpected winner payout %+v", winnerCall)
 	}
+
+	workProfitCall := userSvc.applied[1]
+	if workProfitCall.username != "backup" || workProfitCall.amount != 6 || workProfitCall.txType != users.TransactionWorkProfit {
+		t.Fatalf("unexpected work-fee payout %+v", workProfitCall)
+	}
 }
 
-func TestResolveMarketPaysStewardWorkProfitSurplusAfterCreationCostThreshold(t *testing.T) {
+func TestResolveMarketPaysStewardFullFeeIncomeAfterCreationCostThreshold(t *testing.T) {
 	market := &markets.Market{
 		ID:              42,
 		CreatorUsername: "creator",
@@ -435,7 +440,7 @@ func TestResolveMarketPaysStewardWorkProfitSurplusAfterCreationCostThreshold(t *
 	}
 
 	if len(userSvc.applied) != 2 {
-		t.Fatalf("expected winner payout and work-profit surplus payout, got %d: %+v", len(userSvc.applied), userSvc.applied)
+		t.Fatalf("expected winner payout and work-fee payout, got %d: %+v", len(userSvc.applied), userSvc.applied)
 	}
 
 	winnerCall := userSvc.applied[0]
@@ -444,8 +449,8 @@ func TestResolveMarketPaysStewardWorkProfitSurplusAfterCreationCostThreshold(t *
 	}
 
 	workProfitCall := userSvc.applied[1]
-	if workProfitCall.username != "backup" || workProfitCall.amount != 1 || workProfitCall.txType != users.TransactionWorkProfit {
-		t.Fatalf("unexpected work-profit payout %+v", workProfitCall)
+	if workProfitCall.username != "backup" || workProfitCall.amount != 6 || workProfitCall.txType != users.TransactionWorkProfit {
+		t.Fatalf("unexpected work-fee payout %+v", workProfitCall)
 	}
 }
 

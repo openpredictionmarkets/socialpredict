@@ -10,6 +10,7 @@ import (
 
 	"socialpredict/handlers"
 	analytics "socialpredict/internal/domain/analytics"
+	ranalytics "socialpredict/internal/repository/analytics"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -34,7 +35,9 @@ func TestStatsHandlerReturnsServiceBackedConfiguration(t *testing.T) {
 	config.Economics.User.MaximumDebtAllowed = 900
 	config.Economics.Betting.BetFees.BuySharesFee = 2
 	config.Economics.Betting.BetFees.SellSharesFee = 3
-	repo := analytics.NewGormRepository(db)
+	config.Economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost = 4
+	config.Economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap = 30
+	repo := ranalytics.NewGormRepository(db)
 	statsService := analytics.NewService(repo, analytics.Config{})
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/stats", nil)
@@ -67,6 +70,9 @@ func TestStatsHandlerReturnsServiceBackedConfiguration(t *testing.T) {
 
 	if response.Result.SetupConfiguration.BuySharesFee != 2 || response.Result.SetupConfiguration.SellSharesFee != 3 {
 		t.Fatalf("expected setup fees 2/3, got %d/%d", response.Result.SetupConfiguration.BuySharesFee, response.Result.SetupConfiguration.SellSharesFee)
+	}
+	if response.Result.SetupConfiguration.GroupAddAnswerCost != 4 || response.Result.SetupConfiguration.GroupHardAnswerSafetyCap != 30 {
+		t.Fatalf("expected group answer policy 4/30, got %d/%d", response.Result.SetupConfiguration.GroupAddAnswerCost, response.Result.SetupConfiguration.GroupHardAnswerSafetyCap)
 	}
 }
 

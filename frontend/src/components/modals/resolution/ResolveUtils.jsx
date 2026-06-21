@@ -34,3 +34,27 @@ export const resolveMarket = (marketId, token, selectedResolution) => {
             throw error;
         });
 };
+
+export const resolveMarketGroup = (groupId, token, resolutionData) => {
+    const requestOptions = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(resolutionData),
+    };
+
+    return fetch(`${API_URL}/v0/market-groups/${groupId}/resolve`, requestOptions)
+        .then(async response => {
+            if (!response.ok) {
+                const payload = parseApiResponseText(await response.text());
+                throw new Error(getApiErrorMessage(response, payload, 'Failed to resolve grouped market.'));
+            }
+            return response.json();
+        })
+        .then(data => data)
+        .catch(error => {
+            throw error;
+        });
+};

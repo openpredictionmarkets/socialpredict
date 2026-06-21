@@ -4,6 +4,13 @@ import { apiRequest } from '../api/httpClient';
 const defaultFrontendConfig = {
   charts: { sigFigs: 2 },
   game: { mode: 'moderator' },
+  marketGroups: {
+    multipleChoiceBinary: {
+      addAnswerCost: 2,
+      softAnswerReviewThreshold: 12,
+      hardAnswerSafetyCap: 50,
+    },
+  },
 };
 
 const useFrontendConfig = () => {
@@ -27,6 +34,14 @@ const useFrontendConfig = () => {
             ...data,
             charts: { ...defaultFrontendConfig.charts, ...(data.charts || {}) },
             game: { ...defaultFrontendConfig.game, ...(data.game || {}) },
+            marketGroups: {
+              ...defaultFrontendConfig.marketGroups,
+              ...(data.marketGroups || {}),
+              multipleChoiceBinary: {
+                ...defaultFrontendConfig.marketGroups.multipleChoiceBinary,
+                ...(data.marketGroups?.multipleChoiceBinary || {}),
+              },
+            },
           });
         }
       } catch (err) {

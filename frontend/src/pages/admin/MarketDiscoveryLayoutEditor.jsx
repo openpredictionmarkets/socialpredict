@@ -132,12 +132,56 @@ const tagOptionsWithCurrent = (tags, currentSlug) => {
 };
 
 const marketOverviewTitle = (overview) => (
-  overview?.market?.questionTitle
+  overview?.market?.marketGroup?.questionTitle
+  || overview?.market?.questionTitle
   || overview?.questionTitle
   || `Market #${overview?.market?.id || overview?.id || 'unknown'}`
 );
 
 const marketOverviewId = (overview) => overview?.market?.id || overview?.id || overview?.marketId || 0;
+
+const marketOverviewGroup = (overview) => overview?.market?.marketGroup || null;
+
+const marketOverviewDescriptor = (overview) => {
+  const group = marketOverviewGroup(overview);
+  const id = marketOverviewId(overview);
+  if (group?.id) {
+    const answerCount = Number(group.answerCount || 0);
+    return `Grouped market #${group.id}${answerCount > 0 ? ` · ${answerCount} answers` : ''}`;
+  }
+  return `Active market #${id}`;
+};
+
+const uniqueMarketPinResults = (overviews = []) => {
+  const seen = new Set();
+  const results = [];
+  overviews.forEach((overview) => {
+    const group = marketOverviewGroup(overview);
+    const id = marketOverviewId(overview);
+    const key = group?.id ? `group:${group.id}` : `market:${id}`;
+    if (!id || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    results.push(overview);
+  });
+  return results;
+};
+
+const marketDetailsSelectedTitle = (details, marketId) => (
+  details?.market?.marketGroup?.questionTitle
+  || details?.market?.questionTitle
+  || `Market #${marketId}`
+);
+
+const marketDetailsSelectedDescriptor = (details, marketId) => {
+  const group = details?.market?.marketGroup;
+  if (group?.id) {
+    const answerCount = Number(group.answerCount || 0);
+    return `Grouped market #${group.id}${answerCount > 0 ? ` · ${answerCount} answers` : ''}`;
+  }
+  return `Market #${marketId}`;
+};
 
 const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
   const [query, setQuery] = useState('');
@@ -145,12 +189,14 @@ const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [selectedTitle, setSelectedTitle] = useState('');
+  const [selectedDescriptor, setSelectedDescriptor] = useState('');
   const [loadingSelectedTitle, setLoadingSelectedTitle] = useState(false);
 
   useEffect(() => {
     const marketId = Number(pin.marketId);
     if (!marketId) {
       setSelectedTitle('');
+      setSelectedDescriptor('');
       setLoadingSelectedTitle(false);
       return undefined;
     }
@@ -160,12 +206,14 @@ const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
     getMarketDetails(marketId)
       .then((details) => {
         if (!ignore) {
-          setSelectedTitle(details?.market?.questionTitle || `Market #${marketId}`);
+          setSelectedTitle(marketDetailsSelectedTitle(details, marketId));
+          setSelectedDescriptor(marketDetailsSelectedDescriptor(details, marketId));
         }
       })
       .catch(() => {
         if (!ignore) {
           setSelectedTitle(`Market #${marketId}`);
+          setSelectedDescriptor(`Market #${marketId}`);
         }
       })
       .finally(() => {
@@ -192,9 +240,9 @@ const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
       setSearching(true);
       setSearchError('');
       try {
-        const response = await searchMarkets(trimmed, 'active', 8, tagSlug ? { tagSlug } : {});
+        const response = await searchMarkets(trimmed, 'active', 24, tagSlug ? { tagSlug } : {});
         if (!ignore) {
-          setResults(response.primaryResults || []);
+          setResults(uniqueMarketPinResults(response.primaryResults || []).slice(0, 8));
         }
       } catch (err) {
         if (!ignore) {
@@ -223,7 +271,7 @@ const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
             <div className="mt-1 text-sm font-semibold text-white">
               {loadingSelectedTitle ? 'Loading selected market...' : selectedTitle || `Market #${pin.marketId}`}
             </div>
-            <div className="mt-1 text-xs text-gray-400">Market #{pin.marketId}</div>
+            <div className="mt-1 text-xs text-gray-400">{selectedDescriptor || `Market #${pin.marketId}`}</div>
           </>
         ) : (
           <div className="mt-1 text-sm text-white">No market selected yet.</div>
@@ -249,6 +297,7 @@ const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
                 type="button"
                 onClick={() => {
                   setSelectedTitle(marketOverviewTitle(overview));
+                  setSelectedDescriptor(marketOverviewDescriptor(overview));
                   onSelect(id);
                   setQuery('');
                   setResults([]);
@@ -260,7 +309,7 @@ const MarketPinSearch = ({ pin, onSelect, tagSlug = '' }) => {
                 }`}
               >
                 <span className="block font-semibold">{marketOverviewTitle(overview)}</span>
-                <span className="mt-1 block text-xs text-gray-400">Active market #{id}</span>
+                <span className="mt-1 block text-xs text-gray-400">{marketOverviewDescriptor(overview)}</span>
               </button>
             );
           })}
