@@ -23,7 +23,7 @@ jobs:
     outputs:
       matrix: ${{ steps.build.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: build
         name: Build Go version matrix JSON
         uses: actions/github-script@v9
@@ -58,7 +58,7 @@ jobs:
       matrix:
         go-version: [ '1.25.x' ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Setup Go ${{ matrix.go-version }}
         uses: actions/setup-go@v6
         with:
@@ -92,7 +92,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         if: ${{ !startsWith(github.head_ref, 'doc/') }}
       # Use go-version-file when mode == file, otherwise go-version
       - name: Setup Go (from go.mod)
