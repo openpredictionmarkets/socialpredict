@@ -17,6 +17,7 @@ const (
 
 	MarketGroupResolveModeExclusiveYes = "exclusive_yes"
 	MarketGroupResolveModeManual       = "manual"
+	MarketGroupResolveModeNA           = "na"
 
 	MinMarketGroupAnswers = 2
 	MaxMarketGroupAnswers = 50

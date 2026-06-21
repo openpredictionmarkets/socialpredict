@@ -130,10 +130,10 @@ Checklist:
 
 Checklist:
 
-- [ ] Add independent child resolution flow from group page/admin page.
-- [ ] Add optional exclusive helper that resolves one child YES and remaining children NO.
-- [ ] Add group N/A helper that resolves every child N/A.
-- [ ] Ensure each helper calls existing child-market resolution/refund/payout logic.
+- [x] Add independent child resolution flow from group page/admin page.
+- [x] Add optional exclusive helper that resolves one child YES and remaining children NO.
+- [x] Add group N/A helper that resolves every child N/A.
+- [x] Ensure each helper calls existing child-market resolution/refund/payout logic.
 - [ ] Add tests proving group helper payouts match individually resolving child markets.
 - [ ] Add tests proving resolved children cannot be traded afterward.
 
@@ -153,8 +153,8 @@ Checklist:
 
 Checklist:
 
-- [ ] Add explicit answer addition policy enum: `NO_ONE`, `CREATOR_ONLY`, `ANY_ACTIVE_MODERATOR`.
-- [x] Add global admin control for auto-approving added answers.
+- [x] Add global answer-addition approval policy enum: `auto`, `moderator`, `admin`.
+- [x] Add global admin controls for auto-approving all added answers, honoring the steward's per-market toggle, or requiring admin approval.
 - [x] Add moderator proposal flow for new answers on published/open grouped markets.
 - [x] Create approved added answers as new normal child binary markets.
 - [x] Charge the proposer the setup-configured add-answer cost only when the answer is approved/created.
@@ -191,7 +191,7 @@ Checklist:
 Checklist:
 
 - [ ] Decide whether a true `SUM_TO_ONE_EXCLUSIVE` coupled market type is needed.
-- [ ] Decide whether answer additions after approval are ever allowed.
+- [x] Decide whether answer additions after approval are ever allowed.
 - [x] Decide whether group proposal cost should scale with initial answer count: no, initial answers are included in the one group proposal cost.
 - [x] Implement later answer additions using `multipleChoiceBinary.addAnswerCost`.
 - [ ] Decide whether answer-addition costs should alter group work-profit cost basis in reporting.
@@ -204,9 +204,9 @@ Checklist:
 The June 17, 2026 design-agent review identified several follow-up features that should be addressed on this branch or immediately after it:
 
 - [x] [FEATURE/14: Grouped Market Transaction Boundaries](../14/14-grouped-market-transaction-boundaries.md)
-- [FEATURE/15: Grouped Discovery Read Model Pagination](../15/15-grouped-discovery-read-model-pagination.md)
-- [FEATURE/16: Grouped Discovery Cache Invalidation](../16/16-grouped-discovery-cache-invalidation.md)
-- [FEATURE/17: Grouped Activity Freshness Metadata](../17/17-grouped-activity-freshness-metadata.md)
-- [FEATURE/18: Grouped Answer Limit Contract Alignment](../18/18-grouped-answer-limit-contract-alignment.md)
-- [FEATURE/19: Grouped Market N/A And Documentation Alignment](../19/19-grouped-market-na-and-doc-alignment.md)
-- [FEATURE/20: Analytics Repository Boundary](../20/20-analytics-repository-boundary.md)
+- [x] [FEATURE/15: Grouped Discovery Read Model Pagination](../15/15-grouped-discovery-read-model-pagination.md)
+- [x] [FEATURE/16: Grouped Discovery Cache Invalidation](../16/16-grouped-discovery-cache-invalidation.md)
+- [x] [FEATURE/17: Grouped Activity Freshness Metadata](../17/17-grouped-activity-freshness-metadata.md)
+- [x] [FEATURE/18: Grouped Answer Limit Contract Alignment](../18/18-grouped-answer-limit-contract-alignment.md)
+- [x] [FEATURE/19: Grouped Market N/A And Documentation Alignment](../19/19-grouped-market-na-and-doc-alignment.md)
+- [x] [FEATURE/20: Analytics Repository Boundary](../20/20-analytics-repository-boundary.md)

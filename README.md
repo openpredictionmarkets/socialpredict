@@ -87,18 +87,18 @@ Admins have expanded operational controls for reviewing users, reviewing propose
 
 Highlights:
 
-- Admin user queue for moderator eligibility/status review in the dashboard
+- Admin user queue for moderator eligibility/status review
 - Market review tools with approval, rejection, review trail, and refund behavior
 - Market stewardship reassignment so admins can move operational responsibility from a suspended or unavailable moderator to another active moderator
 - Admin-managed market tags, topic navigation, market pins, and market discovery layout controls
 - CMS-managed social share title, description, image, and image-enable setting
 - Default OpenGraph/social share image support
 
-<img width="1918" height="957" alt="Screenshot 2026-06-19 120222" src="https://github.com/user-attachments/assets/aec76b28-3788-4b2d-9d48-a7fecff94a2b" />
+> Screenshot placeholder: admin dashboard user queue
 
 > Screenshot placeholder: admin market discovery layout / tag management
 
-<img width="1910" height="953" alt="Screenshot 2026-06-19 115946" src="https://github.com/user-attachments/assets/e355aef0-dd61-404b-92db-07186a867505" />
+> Screenshot placeholder: admin social share / CMS settings tab
 
 ### Market Discovery and Governance
 

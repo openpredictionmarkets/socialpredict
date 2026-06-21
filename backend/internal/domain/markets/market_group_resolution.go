@@ -71,10 +71,24 @@ func (s *Service) resolveMarketGroup(ctx context.Context, groupID int64, req Mar
 	}
 	group.LifecycleStatus = MarketLifecycleResolved
 	group.UpdatedAt = resolvedAt
-	if err := s.applyMarketGroupWorkProfit(ctx, group, resolverUsername); err != nil {
-		return nil, err
+	if marketGroupResolutionPaysWorkProfit(resolutions) {
+		if err := s.applyMarketGroupWorkProfit(ctx, group, resolverUsername); err != nil {
+			return nil, err
+		}
 	}
 	return group, nil
+}
+
+func marketGroupResolutionPaysWorkProfit(resolutions map[int64]string) bool {
+	if len(resolutions) == 0 {
+		return false
+	}
+	for _, resolution := range resolutions {
+		if resolution != "N/A" {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) resolveGroupChildOutcomes(group *MarketGroup, req MarketGroupResolveRequest) (map[int64]string, error) {
@@ -115,6 +129,12 @@ func (s *Service) resolveGroupChildOutcomes(group *MarketGroup, req MarketGroupR
 		}
 		if len(resolutions) != len(childIDs) {
 			return nil, ErrInvalidInput
+		}
+		return resolutions, nil
+	case MarketGroupResolveModeNA:
+		resolutions := make(map[int64]string, len(childIDs))
+		for childID := range childIDs {
+			resolutions[childID] = "N/A"
 		}
 		return resolutions, nil
 	default:

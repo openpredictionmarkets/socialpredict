@@ -8,6 +8,7 @@ import (
 	"socialpredict/internal/domain/analytics"
 	dbets "socialpredict/internal/domain/bets"
 	"socialpredict/internal/domain/boundary"
+	ranalytics "socialpredict/internal/repository/analytics"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -25,7 +26,7 @@ func analyticsConfigFromSetup(cfg *setup.EconomicConfig) analytics.Config {
 }
 
 func newAnalyticsMetricsService(db *gorm.DB, config analytics.Config, opts ...analytics.ServiceOption) *analytics.Service {
-	repo := analytics.NewGormRepository(db)
+	repo := ranalytics.NewGormRepository(db)
 	return analytics.NewService(repo, config, opts...)
 }
 
@@ -142,7 +143,7 @@ func TestComputeSystemMetrics_BalancedAfterFinalLockedBet(t *testing.T) {
 		expectedUnusedDebt += maxDebt - used
 	}
 
-	bets, err := analytics.NewGormRepository(db).ListBetsForMarket(context.Background(), uint(market.ID))
+	bets, err := ranalytics.NewGormRepository(db).ListBetsForMarket(context.Background(), uint(market.ID))
 	if err != nil {
 		t.Fatalf("list bets: %v", err)
 	}
@@ -233,7 +234,7 @@ func TestResolveMarket_DistributesAllBetVolume(t *testing.T) {
 		t.Fatalf("ResolveMarket: %v", err)
 	}
 
-	repo := analytics.NewGormRepository(db)
+	repo := ranalytics.NewGormRepository(db)
 	metricsSvc := newAnalyticsMetricsService(db, analyticsConfigFromSetup(econConfig))
 	metrics := requireAnalyticsSystemMetrics(t, metricsSvc)
 

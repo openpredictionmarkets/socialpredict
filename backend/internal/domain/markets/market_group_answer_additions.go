@@ -15,6 +15,10 @@ const (
 	MarketGroupAnswerAdditionStatusRejected = "rejected"
 
 	MarketGroupAnswerAdditionApprovedByAuto = "auto-approval"
+
+	MarketGroupAnswerAdditionApprovalPolicyAuto      = "auto"
+	MarketGroupAnswerAdditionApprovalPolicyModerator = "moderator"
+	MarketGroupAnswerAdditionApprovalPolicyAdmin     = "admin"
 )
 
 type MarketGroupAnswerAddition struct {
@@ -68,6 +72,30 @@ func NormalizeMarketGroupAnswerAdditionStatus(value string) string {
 	}
 }
 
+func NormalizeMarketGroupAnswerAdditionApprovalPolicy(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", MarketGroupAnswerAdditionApprovalPolicyModerator, "moderator_choice", "steward", "steward_choice":
+		return MarketGroupAnswerAdditionApprovalPolicyModerator
+	case MarketGroupAnswerAdditionApprovalPolicyAuto, "auto_approve", "auto_apply":
+		return MarketGroupAnswerAdditionApprovalPolicyAuto
+	case MarketGroupAnswerAdditionApprovalPolicyAdmin, "admin_only":
+		return MarketGroupAnswerAdditionApprovalPolicyAdmin
+	default:
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+}
+
+func IsValidMarketGroupAnswerAdditionApprovalPolicy(value string) bool {
+	switch NormalizeMarketGroupAnswerAdditionApprovalPolicy(value) {
+	case MarketGroupAnswerAdditionApprovalPolicyAuto,
+		MarketGroupAnswerAdditionApprovalPolicyModerator,
+		MarketGroupAnswerAdditionApprovalPolicyAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Service) ProposeMarketGroupAnswerAddition(ctx context.Context, groupID int64, actorUsername string, req MarketGroupAnswerAdditionRequest) (*MarketGroupAnswerAddition, error) {
 	actorUsername = strings.TrimSpace(actorUsername)
 	if groupID <= 0 || actorUsername == "" {
@@ -107,7 +135,9 @@ func (s *Service) ProposeMarketGroupAnswerAddition(ctx context.Context, groupID 
 	if group.StewardedBy(actorUsername) {
 		return s.ApproveMarketGroupAnswerAddition(ctx, addition.ID, actorUsername, true)
 	}
-	if group.AutoApproveAnswerAdditions || s.autoApproveMarketGroupAnswersEnabled(ctx) {
+	policy := s.marketGroupAnswerAdditionApprovalPolicy(ctx)
+	if policy == MarketGroupAnswerAdditionApprovalPolicyAuto ||
+		(policy == MarketGroupAnswerAdditionApprovalPolicyModerator && group.AutoApproveAnswerAdditions) {
 		return s.ApproveMarketGroupAnswerAddition(ctx, addition.ID, MarketGroupAnswerAdditionApprovedByAuto, true)
 	}
 	return addition, nil
@@ -450,12 +480,12 @@ func (s *Service) marketGroupAddAnswerCost() int64 {
 	return s.config.MultipleChoiceBinaryAddAnswerCost
 }
 
-func (s *Service) autoApproveMarketGroupAnswersEnabled(ctx context.Context) bool {
+func (s *Service) marketGroupAnswerAdditionApprovalPolicy(ctx context.Context) string {
 	settings, err := s.GetMarketGovernanceSettings(ctx)
 	if err != nil || settings == nil {
-		return false
+		return MarketGroupAnswerAdditionApprovalPolicyModerator
 	}
-	return settings.AutoApproveMarketGroupAnswers
+	return NormalizeMarketGroupAnswerAdditionApprovalPolicy(settings.MarketGroupAnswerAdditionApprovalPolicy)
 }
 
 func (s *Service) marketGroupAnswerAdditionRepository() (MarketGroupAnswerAdditionRepository, error) {

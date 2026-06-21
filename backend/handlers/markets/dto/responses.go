@@ -4,29 +4,41 @@ import "time"
 
 // MarketResponse represents the HTTP response for a market
 type MarketResponse struct {
-	ID                 int64               `json:"id"`
-	QuestionTitle      string              `json:"questionTitle"`
-	Description        string              `json:"description"`
-	OutcomeType        string              `json:"outcomeType"`
-	ResolutionDateTime time.Time           `json:"resolutionDateTime"`
-	CreatorUsername    string              `json:"creatorUsername"`
-	StewardUsername    string              `json:"stewardUsername"`
-	YesLabel           string              `json:"yesLabel"`
-	NoLabel            string              `json:"noLabel"`
-	Status             string              `json:"status"`
-	LifecycleStatus    string              `json:"lifecycleStatus,omitempty"`
-	ApprovedBy         string              `json:"approvedBy,omitempty"`
-	ApprovedAt         *time.Time          `json:"approvedAt,omitempty"`
-	RejectedBy         string              `json:"rejectedBy,omitempty"`
-	RejectedAt         *time.Time          `json:"rejectedAt,omitempty"`
-	RejectionReason    string              `json:"rejectionReason,omitempty"`
-	ProposalCost       int64               `json:"proposalCost,omitempty"`
-	IsResolved         bool                `json:"isResolved"`
-	ResolutionResult   string              `json:"resolutionResult"`
-	CreatedAt          time.Time           `json:"createdAt"`
-	UpdatedAt          time.Time           `json:"updatedAt"`
-	Tags               []MarketTagResponse `json:"tags,omitempty"`
-	MarketGroup        *MarketGroupLink    `json:"marketGroup,omitempty"`
+	ID                     int64                                `json:"id"`
+	QuestionTitle          string                               `json:"questionTitle"`
+	Description            string                               `json:"description"`
+	OutcomeType            string                               `json:"outcomeType"`
+	ResolutionDateTime     time.Time                            `json:"resolutionDateTime"`
+	CreatorUsername        string                               `json:"creatorUsername"`
+	StewardUsername        string                               `json:"stewardUsername"`
+	YesLabel               string                               `json:"yesLabel"`
+	NoLabel                string                               `json:"noLabel"`
+	Status                 string                               `json:"status"`
+	LifecycleStatus        string                               `json:"lifecycleStatus,omitempty"`
+	ApprovedBy             string                               `json:"approvedBy,omitempty"`
+	ApprovedAt             *time.Time                           `json:"approvedAt,omitempty"`
+	RejectedBy             string                               `json:"rejectedBy,omitempty"`
+	RejectedAt             *time.Time                           `json:"rejectedAt,omitempty"`
+	RejectionReason        string                               `json:"rejectionReason,omitempty"`
+	ProposalCost           int64                                `json:"proposalCost,omitempty"`
+	IsResolved             bool                                 `json:"isResolved"`
+	ResolutionResult       string                               `json:"resolutionResult"`
+	CreatedAt              time.Time                            `json:"createdAt"`
+	UpdatedAt              time.Time                            `json:"updatedAt"`
+	Tags                   []MarketTagResponse                  `json:"tags,omitempty"`
+	MarketGroup            *MarketGroupLink                     `json:"marketGroup,omitempty"`
+	IsMarketGroup          bool                                 `json:"isMarketGroup,omitempty"`
+	ChildMarkets           []*MarketResponse                    `json:"childMarkets,omitempty"`
+	IsMarketGroupAggregate bool                                 `json:"isMarketGroupAggregate,omitempty"`
+	GroupChildMarketIDs    []int64                              `json:"groupChildMarketIds,omitempty"`
+	GroupChildResolutions  []MarketGroupChildResolutionResponse `json:"groupChildResolutions,omitempty"`
+}
+
+type MarketGroupChildResolutionResponse struct {
+	MarketID         int64  `json:"marketId"`
+	AnswerLabel      string `json:"answerLabel"`
+	IsResolved       bool   `json:"isResolved"`
+	ResolutionResult string `json:"resolutionResult"`
 }
 
 // CreateMarketResponse represents the HTTP response after creating a market
@@ -125,9 +137,10 @@ type MarketGroupBetResponse struct {
 }
 
 type MarketGroupBetsResponse struct {
-	GroupID int64                    `json:"groupId"`
-	Bets    []MarketGroupBetResponse `json:"bets"`
-	Total   int                      `json:"total"`
+	GroupID   int64                    `json:"groupId"`
+	Bets      []MarketGroupBetResponse `json:"bets"`
+	Total     int                      `json:"total"`
+	Freshness *Freshness               `json:"freshness,omitempty"`
 }
 
 type MarketGroupPositionAnswerResponse struct {

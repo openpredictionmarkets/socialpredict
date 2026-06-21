@@ -20,7 +20,7 @@ type CreateMarketGroupRequest struct {
 	QuestionTitle              string    `json:"questionTitle" validate:"required,max=160"`
 	Description                string    `json:"description" validate:"max=2000"`
 	ResolutionDateTime         time.Time `json:"resolutionDateTime" validate:"required"`
-	AnswerLabels               []string  `json:"answerLabels" validate:"required,min=2,max=20"`
+	AnswerLabels               []string  `json:"answerLabels" validate:"required,min=2,max=50"`
 	TagSlugs                   []string  `json:"tagSlugs" validate:"omitempty,max=5"`
 	AutoApproveAnswerAdditions bool      `json:"autoApproveAnswerAdditions"`
 }

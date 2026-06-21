@@ -10,6 +10,7 @@ import (
 
 	"socialpredict/handlers"
 	analytics "socialpredict/internal/domain/analytics"
+	ranalytics "socialpredict/internal/repository/analytics"
 	configsvc "socialpredict/internal/service/config"
 	"socialpredict/models"
 	"socialpredict/models/modelstesting"
@@ -36,7 +37,7 @@ func TestStatsHandlerReturnsServiceBackedConfiguration(t *testing.T) {
 	config.Economics.Betting.BetFees.SellSharesFee = 3
 	config.Economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost = 4
 	config.Economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap = 30
-	repo := analytics.NewGormRepository(db)
+	repo := ranalytics.NewGormRepository(db)
 	statsService := analytics.NewService(repo, analytics.Config{})
 
 	req := httptest.NewRequest(http.MethodGet, "/v0/stats", nil)

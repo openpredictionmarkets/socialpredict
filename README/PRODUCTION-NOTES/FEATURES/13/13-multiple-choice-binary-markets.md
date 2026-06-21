@@ -67,7 +67,7 @@ Each answer is traded as its own YES/NO market. Probabilities are not normalized
 | Answer choice | Moderator-authored label such as `Team A`. |
 | Probability policy | Group-level rule declaring whether child markets are independent or future sum-to-one/exclusive. |
 | Independent binary policy | Baseline policy: every answer is a separate YES/NO market and probabilities do not need to sum to `1.0`. |
-| Exclusive resolution helper | Future or optional workflow that resolves one child YES and remaining children NO, without changing the trading math. |
+| Exclusive resolution helper | Workflow that resolves one child YES and remaining children NO, without changing the trading math. |
 
 ## Product Behavior
 
@@ -98,8 +98,9 @@ Participant display flow:
 Resolution flow:
 
 - Baseline: steward/admin resolves each child market independently as YES, NO, or N/A.
-- Optional helper: if a group is marked as an exclusive real-world outcome, steward/admin can pick one winner and the system resolves that child YES and remaining children NO.
-- The helper must still execute normal child-market resolution paths for each child.
+- Exclusive helper: steward/admin can pick one winner and the system resolves that child YES and remaining children NO.
+- Group N/A helper: steward/admin can mark the whole group N/A and the system resolves every child N/A.
+- Helpers must still execute normal child-market resolution/refund/payout paths for each child.
 - Payouts remain child-market payouts; there is no parent-level pooled payout in the baseline.
 
 ## Acceptance Criteria
@@ -114,6 +115,7 @@ Resolution flow:
 - The group page clearly states that each answer is a separate YES/NO market.
 - Resolution does not use stale read models or parent display data for payouts.
 - Group participant-fee income is paid once to the current group steward after group resolution, using unique participants across the child answer markets; net work profit subtracts the group proposal cost and can be negative.
+- Later answer additions use an admin-level approval policy: auto-approve all moderator additions, allow the group steward's per-market toggle to decide, or require admin approval for all non-steward additions.
 - Migrations are additive timestamped Go migrations with package-local tests where practical.
 
 ## Out Of Scope For Baseline
@@ -123,5 +125,5 @@ Resolution flow:
 - Parent-level pooled liquidity.
 - Cross-answer arbitrage balancing.
 - Allowing users to buy a bundle across all answers in one transaction.
-- Dynamic answer additions after trading has started.
+- Unauthorized or unreviewed answer additions after trading has started.
 - Deleting answer choices after approval.

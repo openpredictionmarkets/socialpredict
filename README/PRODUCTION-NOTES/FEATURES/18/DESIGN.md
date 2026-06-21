@@ -5,8 +5,8 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-17T00:00:00Z
 updated_at_display: "Wednesday, June 17, 2026"
-update_reason: "Define one answer-count contract across API, setup, domain, and frontend."
-status: draft
+update_reason: "Record one answer-count contract across API, setup, domain, and frontend."
+status: implemented
 ---
 
 # Grouped Answer Limit Contract Alignment Design
@@ -25,3 +25,7 @@ The maximum representable contract should be the domain/runtime maximum. Deploym
 - Setup may configure a lower hard safety cap.
 - OpenAPI documents the maximum supported cap and notes deployment configuration may lower it.
 - Frontend uses setup-provided cap for user-facing controls.
+
+## Implemented Contract
+
+The API contract now advertises the maximum supported representation of `50` initial answers. Runtime/setup configuration can still expose a lower operational cap to users, but the request DTO and OpenAPI no longer reject valid configured deployments at `20`.
