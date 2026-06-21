@@ -1,0 +1,69 @@
+name: Container Security Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Container image tag to scan.
+        required: false
+        default: latest
+  schedule:
+    - cron: '23 7 * * 1'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  SCAN_TAG: ${{ github.event.inputs.tag || 'latest' }}
+
+jobs:
+  scan-ghcr-images:
+    name: Scan GHCR images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - frontend
+          - backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to the Github Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan ${{ matrix.image }} image for SARIF security alerts
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.image }}:${{ env.SCAN_TAG }}
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          scanners: vuln,secret
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+
+      - name: Upload ${{ matrix.image }} image scan SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}-${{ env.SCAN_TAG }}
+
+      - name: Block on critical ${{ matrix.image }} image vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.image }}:${{ env.SCAN_TAG }}
+          format: table
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
