@@ -31,8 +31,8 @@ Discovery snapshots become stale immediately when grouped-market structure chang
 
 ## Acceptance Criteria
 
-- `market_group_answer_added` is structural.
-- `market_group_resolved` is structural.
-- group approval/rejection invalidates discovery.
-- group answer auto-approval that creates a child market invalidates discovery.
-- tests prove structural group events are not served as fresh snapshots.
+- [x] `market_group_answer_added` is structural.
+- [x] `market_group_resolved` is structural.
+- [x] Group approval/rejection invalidates discovery through `market_group_approved` and `market_group_rejected`.
+- [x] Group answer auto-approval that creates a child market invalidates discovery.
+- [x] Tests prove structural group events are not served as fresh snapshots.

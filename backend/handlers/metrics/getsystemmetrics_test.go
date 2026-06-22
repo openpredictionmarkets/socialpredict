@@ -14,6 +14,7 @@ import (
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/internal/domain/readmodels"
+	ranalytics "socialpredict/internal/repository/analytics"
 	"socialpredict/models/modelstesting"
 
 	"gorm.io/gorm"
@@ -22,7 +23,7 @@ import (
 func newAnalyticsService(t *testing.T, db *gorm.DB) *analytics.Service {
 	t.Helper()
 	cfg := modelstesting.GenerateEconomicConfig()
-	return analytics.NewService(analytics.NewGormRepository(db), analytics.Config{
+	return analytics.NewService(ranalytics.NewGormRepository(db), analytics.Config{
 		MaximumDebtAllowed: cfg.Economics.User.MaximumDebtAllowed,
 		CreateMarketCost:   cfg.Economics.MarketIncentives.CreateMarketCost,
 		InitialBetFee:      cfg.Economics.Betting.BetFees.InitialBetFee,

@@ -28,6 +28,22 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const freshnessTimeLabel = (freshness) => {
+  if (!freshness?.generatedAt) return '';
+  const generatedAt = new Date(freshness.generatedAt);
+  if (Number.isNaN(generatedAt.getTime())) return '';
+  return generatedAt.toLocaleTimeString();
+};
+
+const groupedActivityFreshnessMessage = (label, freshness) => {
+  const timeLabel = freshnessTimeLabel(freshness);
+  if (!timeLabel) return '';
+  if (freshness.source === 'live') {
+    return `Grouped ${label} computed live at ${timeLabel}. Trade confirmations remain authoritative.`;
+  }
+  return `Grouped ${label} display data generated at ${timeLabel}. Trade confirmations remain authoritative.`;
+};
+
 const uniqueTagsBySlug = (answers = []) => {
   const seen = new Set();
   const tags = [];
@@ -86,6 +102,12 @@ const paginationButtonClass = [
   'disabled:bg-custom-gray-light',
   'disabled:text-gray-400',
   'disabled:opacity-60',
+].join(' ');
+
+const groupedBetsGridColumns = [
+  'grid',
+  'grid-cols-[minmax(9rem,1.2fr)_minmax(8rem,1fr)_minmax(5rem,0.65fr)_minmax(5rem,0.65fr)_minmax(5rem,0.65fr)_minmax(12rem,1.4fr)]',
+  'gap-3',
 ].join(' ');
 
 const rateLimitRetryDelayMs = 1200;
@@ -188,14 +210,17 @@ const GroupedResolutionAlert = ({ summary }) => {
 
   const yesAnswers = Array.isArray(summary.yesAnswers) ? summary.yesAnswers : [];
   const hasYesAnswer = yesAnswers.length > 0;
-  const bgColor = hasYesAnswer ? 'bg-blue-900/30' : 'bg-red-900/30';
-  const borderColor = hasYesAnswer ? 'border-blue-500/50' : 'border-red-500/50';
-  const textColor = hasYesAnswer ? 'text-blue-200' : 'text-red-200';
-  const iconColor = hasYesAnswer ? 'text-blue-400' : 'text-red-400';
-  const strongColor = hasYesAnswer ? 'text-green-300' : 'text-red-300';
+  const naResolved = Boolean(summary.naResolved);
+  const bgColor = hasYesAnswer ? 'bg-blue-900/30' : naResolved ? 'bg-gray-800/70' : 'bg-red-900/30';
+  const borderColor = hasYesAnswer ? 'border-blue-500/50' : naResolved ? 'border-gray-600' : 'border-red-500/50';
+  const textColor = hasYesAnswer ? 'text-blue-200' : naResolved ? 'text-gray-200' : 'text-red-200';
+  const iconColor = hasYesAnswer ? 'text-blue-400' : naResolved ? 'text-gray-300' : 'text-red-400';
+  const strongColor = hasYesAnswer ? 'text-green-300' : naResolved ? 'text-gray-100' : 'text-red-300';
   const answerLabel = yesAnswers.join(', ');
 
-  let message = 'This grouped market has been resolved with no YES answers.';
+  let message = naResolved
+    ? 'This grouped market has been resolved N/A. Child markets were refunded through the normal N/A path.'
+    : 'This grouped market has been resolved with no YES answers.';
   let strongText = '';
   if (yesAnswers.length === 1) {
     message = 'This grouped market has been resolved with YES answer:';
@@ -243,6 +268,7 @@ const GroupedBetsActivity = ({ groupId, refreshTrigger }) => {
   const [bets, setBets] = useState([]);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
+  const [freshnessMessage, setFreshnessMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -263,11 +289,13 @@ const GroupedBetsActivity = ({ groupId, refreshTrigger }) => {
         if (!ignore) {
           setBets(rows.slice(0, pageSize));
           setHasNextPage(toNumber(payload?.total) > offset + pageSize || rows.length > pageSize);
+          setFreshnessMessage(groupedActivityFreshnessMessage('bets', payload?.freshness));
         }
       } catch (err) {
         if (!ignore) {
           setBets([]);
           setHasNextPage(false);
+          setFreshnessMessage('');
           setError(err.message || 'Failed to load grouped bets.');
         }
       }
@@ -293,36 +321,43 @@ const GroupedBetsActivity = ({ groupId, refreshTrigger }) => {
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
       />
-      {error && <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{error}</div>}
-      <div className='grid grid-cols-[minmax(0,1fr),minmax(0,1fr),auto,auto] gap-2 rounded-t bg-gray-800 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-300 sm:grid-cols-[minmax(0,1fr),minmax(0,1fr),auto,auto,auto,auto]'>
-        <div>User</div>
-        <div>Answer</div>
-        <div>Outcome</div>
-        <div className='text-right'>Amount</div>
-        <div className='hidden text-right sm:block'>After</div>
-        <div className='hidden text-right sm:block'>Placed</div>
-      </div>
-      {bets.length === 0 && !error && (
-        <div className='rounded-b bg-gray-800/60 p-4 text-center text-sm text-gray-400'>No bets yet</div>
+      {freshnessMessage && (
+        <div className='mb-3 text-xs text-gray-500'>{freshnessMessage}</div>
       )}
-      {bets.map((bet, index) => (
-        <div key={`${bet.answerMarketId}-${bet.placedAt}-${index}`} className='grid grid-cols-[minmax(0,1fr),minmax(0,1fr),auto,auto] gap-2 border-t border-gray-800 bg-gray-900 px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr),minmax(0,1fr),auto,auto,auto,auto]'>
-          <Link to={`/user/${bet.username}`} className='truncate text-blue-400 hover:text-blue-300'>
-            {bet.username}
-          </Link>
-          <Link to={`/markets/${bet.answerMarketId}`} className='truncate text-gray-200 hover:text-primary-pink'>
-            {bet.answerLabel}
-          </Link>
-          <span className={`justify-self-start rounded px-2 py-1 text-xs font-bold text-white ${bet.outcome === 'YES' ? 'bg-green-600' : 'bg-red-600'}`}>
-            {bet.outcome}
-          </span>
-          <div className='text-right text-gray-300'>{bet.amount}</div>
-          <div className='hidden text-right text-gray-300 sm:block'>{toNumber(bet.probability, 0).toFixed(2)}</div>
-          <div className='col-span-4 text-right text-xs text-gray-500 sm:col-span-1'>
-            {bet.placedAt ? new Date(bet.placedAt).toLocaleString() : ''}
+      {error && <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{error}</div>}
+      <div className='overflow-x-auto rounded-lg'>
+        <div className='min-w-[760px]'>
+          <div className={`${groupedBetsGridColumns} rounded-t bg-gray-800 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-300`}>
+            <div className='min-w-0'>User</div>
+            <div className='min-w-0'>Answer</div>
+            <div>Outcome</div>
+            <div className='text-right'>Amount</div>
+            <div className='text-right'>After</div>
+            <div className='text-right'>Placed</div>
           </div>
+          {bets.length === 0 && !error && (
+            <div className='rounded-b bg-gray-800/60 p-4 text-center text-sm text-gray-400'>No bets yet</div>
+          )}
+          {bets.map((bet, index) => (
+            <div key={`${bet.answerMarketId}-${bet.placedAt}-${index}`} className={`${groupedBetsGridColumns} border-t border-gray-800 bg-gray-900 px-3 py-3 text-sm`}>
+              <Link to={`/user/${bet.username}`} className='min-w-0 truncate text-blue-400 hover:text-blue-300'>
+                {bet.username}
+              </Link>
+              <Link to={`/markets/${bet.answerMarketId}`} className='min-w-0 truncate text-gray-200 hover:text-primary-pink'>
+                {bet.answerLabel}
+              </Link>
+              <span className={`justify-self-start rounded px-2 py-1 text-xs font-bold text-white ${bet.outcome === 'YES' ? 'bg-green-600' : 'bg-red-600'}`}>
+                {bet.outcome}
+              </span>
+              <div className='text-right tabular-nums text-gray-300'>{bet.amount}</div>
+              <div className='text-right tabular-nums text-gray-300'>{toNumber(bet.probability, 0).toFixed(2)}</div>
+              <div className='text-right text-xs text-gray-500'>
+                {bet.placedAt ? new Date(bet.placedAt).toLocaleString() : ''}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   );
 };
@@ -351,7 +386,7 @@ const GroupedPositionsActivity = ({ groupId, token, refreshTrigger }) => {
   const [positions, setPositions] = useState([]);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [freshnessLabel, setFreshnessLabel] = useState('');
+  const [freshnessMessage, setFreshnessMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -367,7 +402,7 @@ const GroupedPositionsActivity = ({ groupId, token, refreshTrigger }) => {
       if (!token) {
         setPositions([]);
         setHasNextPage(false);
-        setFreshnessLabel('');
+        setFreshnessMessage('');
         setError('');
         return;
       }
@@ -379,13 +414,13 @@ const GroupedPositionsActivity = ({ groupId, token, refreshTrigger }) => {
         if (!ignore) {
           setPositions(rows.slice(0, pageSize));
           setHasNextPage(toNumber(payload?.total) > offset + pageSize || rows.length > pageSize);
-          setFreshnessLabel(payload?.freshness?.generatedAt ? new Date(payload.freshness.generatedAt).toLocaleTimeString() : '');
+          setFreshnessMessage(groupedActivityFreshnessMessage('positions', payload?.freshness));
         }
       } catch (err) {
         if (!ignore) {
           setPositions([]);
           setHasNextPage(false);
-          setFreshnessLabel('');
+          setFreshnessMessage('');
           setError(err.message || 'Failed to load grouped positions.');
         }
       }
@@ -432,10 +467,8 @@ const GroupedPositionsActivity = ({ groupId, token, refreshTrigger }) => {
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
       />
-      {freshnessLabel && (
-        <div className='mb-3 text-xs text-gray-500'>
-          Grouped positions combine 10-minute child-market display snapshots generated as early as {freshnessLabel}. Trade confirmations remain authoritative.
-        </div>
+      {freshnessMessage && (
+        <div className='mb-3 text-xs text-gray-500'>{freshnessMessage}</div>
       )}
       {!token && <div className='rounded-md bg-gray-800 p-4 text-center text-sm text-gray-400'>Log in to see grouped positions.</div>}
       {error && <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{error}</div>}
@@ -477,7 +510,7 @@ const GroupedLeaderboardActivity = ({ groupId, refreshTrigger }) => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [freshnessLabel, setFreshnessLabel] = useState('');
+  const [freshnessMessage, setFreshnessMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -498,13 +531,13 @@ const GroupedLeaderboardActivity = ({ groupId, refreshTrigger }) => {
         if (!ignore) {
           setLeaderboard(rows.slice(0, pageSize));
           setHasNextPage(toNumber(payload?.total) > offset + pageSize || rows.length > pageSize);
-          setFreshnessLabel(payload?.freshness?.generatedAt ? new Date(payload.freshness.generatedAt).toLocaleTimeString() : '');
+          setFreshnessMessage(groupedActivityFreshnessMessage('leaderboard', payload?.freshness));
         }
       } catch (err) {
         if (!ignore) {
           setLeaderboard([]);
           setHasNextPage(false);
-          setFreshnessLabel('');
+          setFreshnessMessage('');
           setError(err.message || 'Failed to load grouped leaderboard.');
         }
       }
@@ -565,10 +598,8 @@ const GroupedLeaderboardActivity = ({ groupId, refreshTrigger }) => {
         onPrevious={() => setPage((current) => Math.max(0, current - 1))}
         onNext={() => setPage((current) => current + 1)}
       />
-      {freshnessLabel && (
-        <div className='mb-3 text-xs text-gray-500'>
-          Grouped leaderboard combines 10-minute child-market display snapshots generated as early as {freshnessLabel}. Trade confirmations remain authoritative.
-        </div>
+      {freshnessMessage && (
+        <div className='mb-3 text-xs text-gray-500'>{freshnessMessage}</div>
       )}
       {error && <div className='rounded-md bg-red-700 p-3 text-sm text-white'>{error}</div>}
       {leaderboard.length === 0 && !error && (
@@ -906,18 +937,24 @@ export default function GroupedMarketDetailsLayout({
       setResolveError('You are not allowed to resolve this grouped market.');
       return;
     }
-    const payload = resolveMode === 'exclusive_yes'
-      ? {
+    const payload = (() => {
+      if (resolveMode === 'exclusive_yes') {
+        return {
           mode: 'exclusive_yes',
           winningMarketId: Number(winningMarketId),
-        }
-      : {
-          mode: 'manual',
-          resolutions: sortedAnswers.map((answer) => ({
-            marketId: answer.marketId,
-            resolution: manualResolutions[answer.marketId] || 'NO',
-          })),
         };
+      }
+      if (resolveMode === 'na') {
+        return { mode: 'na' };
+      }
+      return {
+        mode: 'manual',
+        resolutions: sortedAnswers.map((answer) => ({
+          marketId: answer.marketId,
+          resolution: manualResolutions[answer.marketId] || 'NO',
+        })),
+      };
+    })();
     setResolvingGroup(true);
     try {
       await resolveMarketGroup(group.id || marketGroup.id, token, payload);
@@ -1127,7 +1164,8 @@ export default function GroupedMarketDetailsLayout({
             <div>
               <p className='text-sm font-semibold text-emerald-100'>Answer Option Review</p>
               <p className='mt-1 text-xs text-emerald-100/70'>
-                When this is on, active moderators can add answer options immediately. When it is off, their options wait for your approval.
+                This market-level toggle is honored when admins allow stewards to choose answer option approvals.
+                If admins require review, incoming options wait for admin approval.
               </p>
             </div>
             <button
@@ -1186,7 +1224,7 @@ export default function GroupedMarketDetailsLayout({
               {canManageAnswerAdditions
                 ? `Adds a new YES/NO answer market to this group immediately. You will be charged ${addAnswerCost} credits.`
                 : autoApproveAnswerAdditions
-                  ? `This market auto-approves incoming options. If approved by policy, you are charged ${addAnswerCost} credits.`
+                  ? `This market allows steward auto-approval when admin policy permits it. If approved, you are charged ${addAnswerCost} credits.`
                   : `Submits a new YES/NO answer market to the steward for review. If approved, you are charged ${addAnswerCost} credits.`}
             </p>
           </div>
@@ -1422,7 +1460,7 @@ export default function GroupedMarketDetailsLayout({
               <div className='mb-4 rounded-md bg-red-700 p-3 text-sm text-white'>{resolveError}</div>
             )}
 
-            <div className='mb-4 grid gap-2 sm:grid-cols-2'>
+            <div className='mb-4 grid gap-2 sm:grid-cols-3'>
               <button
                 type='button'
                 onClick={() => setResolveMode('exclusive_yes')}
@@ -1447,6 +1485,18 @@ export default function GroupedMarketDetailsLayout({
                 <span className='block font-semibold'>Resolve each answer manually</span>
                 <span className='mt-1 block text-xs opacity-80'>Assign YES or NO independently for every answer.</span>
               </button>
+              <button
+                type='button'
+                onClick={() => setResolveMode('na')}
+                className={`rounded-md border px-3 py-2 text-left text-sm transition ${
+                  resolveMode === 'na'
+                    ? 'border-sky-300 bg-sky-800 text-white'
+                    : 'border-blue-800 bg-blue-900 text-blue-100 hover:bg-blue-800'
+                }`}
+              >
+                <span className='block font-semibold'>Resolve group N/A</span>
+                <span className='mt-1 block text-xs opacity-80'>Refund every child market through normal N/A resolution.</span>
+              </button>
             </div>
 
             {resolveMode === 'exclusive_yes' ? (
@@ -1466,6 +1516,10 @@ export default function GroupedMarketDetailsLayout({
                     <span className='text-xs text-blue-100/70'>Market #{answer.marketId}</span>
                   </label>
                 ))}
+              </div>
+            ) : resolveMode === 'na' ? (
+              <div className='mb-4 rounded-md border border-amber-500/50 bg-amber-950/40 p-3 text-sm text-amber-50'>
+                N/A resolution cancels the grouped outcome by resolving every answer child market N/A. It does not pay grouped work-profit income.
               </div>
             ) : (
               <div className='mb-4 grid gap-2'>

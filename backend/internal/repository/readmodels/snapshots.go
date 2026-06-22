@@ -99,7 +99,13 @@ func marketDiscoveryStructuralChange(reason string) bool {
 	switch strings.TrimSpace(reason) {
 	case "market_created",
 		"market_group_created",
+		"market_group_approved",
+		"market_group_rejected",
+		"market_group_answer_added",
+		"market_group_answer_reviewed",
+		"market_group_resolved",
 		"market_status_changed",
+		"market_steward_changed",
 		"market_tags_changed",
 		"tag_catalog_changed",
 		"cms_page_changed",

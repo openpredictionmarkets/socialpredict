@@ -5,8 +5,8 @@ domain: features
 author: Patrick Delaney
 updated_at: 2026-06-17T00:00:00Z
 updated_at_display: "Wednesday, June 17, 2026"
-update_reason: "Capture design-agent finding that grouped N/A and answer-addition scope docs drift from implementation."
-status: draft
+update_reason: "Record grouped N/A implementation and answer-addition doc alignment."
+status: implemented
 ---
 
 # Grouped Market N/A And Documentation Alignment
@@ -36,7 +36,13 @@ Feature docs, OpenAPI, frontend copy, and backend behavior all describe the same
 
 ## Acceptance Criteria
 
-- If group `N/A` is supported, implementation includes endpoint behavior and payout/refund tests.
-- If group `N/A` is deferred, docs and UI do not imply it exists.
-- Answer additions are described consistently as implemented baseline behavior when enabled by governance policy.
-- `FEATURES/13` checklists are updated to reflect completed vs deferred work.
+- [x] Group `N/A` implementation includes endpoint behavior and payout/refund tests.
+- [x] Docs and UI describe group `N/A` as a supported resolution helper.
+- [x] Answer additions are described consistently as implemented baseline behavior when enabled by governance policy.
+- [x] `FEATURES/13` checklists are updated to reflect completed vs deferred work.
+
+## Implementation Notes
+
+Group `N/A` is supported through the grouped resolution endpoint with `mode = na`. It resolves each child answer market N/A through the existing child-market refund logic, marks the parent group resolved, and skips grouped work-profit payout.
+
+Answer additions after initial approval are implemented baseline governance behavior. They do not rewrite existing child history.

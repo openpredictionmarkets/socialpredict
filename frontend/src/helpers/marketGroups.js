@@ -35,6 +35,20 @@ export const summarizeGroupedResolutions = (items = []) => {
     .filter((item) => normalizeResolution(item.resolutionResult) === 'YES')
     .map((item) => item.answerLabel)
     .filter(Boolean);
+  const naAnswers = children
+    .filter((item) => normalizeResolution(item.resolutionResult) === 'N/A')
+    .map((item) => item.answerLabel)
+    .filter(Boolean);
+
+  if (naAnswers.length === children.length) {
+    return {
+      isResolved: true,
+      yesAnswers: [],
+      naResolved: true,
+      label: 'Resolved: N/A',
+      className: 'text-gray-300',
+    };
+  }
 
   if (!yesAnswers.length) {
     return {
@@ -93,6 +107,21 @@ export const groupMarketRows = (marketRows = []) => {
     const rowMarketDust = toNumber(row?.marketDust ?? market.marketDust);
     const childResolution = childResolutionFromMarket(market);
     const group = market.marketGroup;
+    if (market.isMarketGroupAggregate && group?.id) {
+      groupedRows.push({
+        ...row,
+        market: {
+          ...market,
+          groupChildMarketIds: market.groupChildMarketIds || [],
+          groupChildResolutions: market.groupChildResolutions || [],
+          isMarketGroupAggregate: true,
+        },
+        numUsers: rowNumUsers,
+        totalVolume: rowTotalVolume,
+        marketDust: rowMarketDust,
+      });
+      return;
+    }
     if (!group?.id) {
       groupedRows.push({
         ...row,

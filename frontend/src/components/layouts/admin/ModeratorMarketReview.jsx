@@ -12,6 +12,7 @@ import {
   reassignMarketGroupSteward,
   reassignMarketSteward,
   reviewMarketGroupAnswerAddition,
+  updateMarketGroupTags,
   updateMarketTags,
 } from '../../../api/moderationApi';
 import { listAdminLifecycleMarkets } from '../../../api/lifecycleMarketsApi';
@@ -26,14 +27,19 @@ import MarkdownLite from '../../markdown/MarkdownLite';
 import {
   getMarketGovernanceSettings,
   listAdminMarketDescriptionAmendments,
+  reviewGroupedMarketDescriptionAmendments,
   reviewMarketDescriptionAmendment,
   updateMarketGovernanceSettings,
 } from '../../../api/marketDescriptionAmendmentsApi';
+import {
+  emptyPendingAdminReviewCounts,
+  getPendingAdminReviewCounts,
+} from '../../../api/adminReviewCountsApi';
 
 const reviewTabs = [
-  { label: 'Proposed Markets', status: 'proposed' },
-  { label: 'Approved Markets', status: 'published' },
-  { label: 'Rejected Markets', status: 'rejected' },
+  { label: 'Pending Review', status: 'proposed' },
+  { label: 'Published', status: 'published' },
+  { label: 'Rejected', status: 'rejected' },
 ];
 
 const amendmentReviewTabs = [
@@ -48,7 +54,130 @@ const answerAdditionReviewTabs = [
   { label: 'Rejected Answers', status: 'rejected' },
 ];
 
+const marketGroupAnswerPolicyOptions = [
+  {
+    value: 'auto',
+    title: 'Auto-approve all answer options',
+    description: 'Every active moderator answer option is immediately added to its grouped market.',
+  },
+  {
+    value: 'moderator',
+    title: 'Let the steward choose per market',
+    description: 'Default. The grouped market steward controls auto-approval with the toggle on that market page.',
+  },
+  {
+    value: 'admin',
+    title: 'Only admins approve answer options',
+    description: 'Answer options from other moderators stay pending for admin review, regardless of the steward toggle.',
+  },
+];
+
 const maxMarketTagsPerMarket = 5;
+const reviewPageSize = 20;
+
+const reviewPaginationButtonClass = [
+  'rounded-md border border-primary-pink px-3 py-2 text-xs font-semibold text-white transition',
+  'hover:bg-primary-pink/20 focus:outline-none focus:ring-2 focus:ring-primary-pink/50',
+  'disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500 disabled:hover:bg-transparent',
+].join(' ');
+
+const adminReviewRetryDelayMs = 1200;
+
+const isRateLimitError = (err) => err?.status === 429 || err?.reason === 'RATE_LIMITED';
+
+const wait = (ms) => new Promise((resolve) => {
+  window.setTimeout(resolve, ms);
+});
+
+const withAdminReviewRateLimitRetry = async (request, retries = 1) => {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await request();
+    } catch (err) {
+      if (!isRateLimitError(err) || attempt === retries) {
+        throw err;
+      }
+      await wait(adminReviewRetryDelayMs);
+    }
+  }
+  return null;
+};
+
+const formatBadgeCount = (count) => {
+  const numericCount = Number(count || 0);
+  if (numericCount <= 0) return '';
+  return numericCount > 99 ? '99+' : String(numericCount);
+};
+
+const ReviewSearchBox = ({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  loading = false,
+}) => (
+  <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+    <label htmlFor={id} className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
+      {label}
+    </label>
+    <div className="relative">
+      <input
+        id={id}
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
+      />
+      {loading && (
+        <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
+      )}
+    </div>
+  </div>
+);
+
+const ReviewPaginationControls = ({
+  page,
+  visibleCount,
+  totalCount,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
+  loading = false,
+}) => {
+  const start = totalCount > 0 ? page * reviewPageSize + 1 : 0;
+  const end = totalCount > 0 ? page * reviewPageSize + visibleCount : 0;
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-gray-700 bg-gray-900/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-xs uppercase tracking-[0.18em] text-gray-400">
+        Showing page {page + 1}
+        <span className="ml-2 normal-case tracking-normal text-gray-300">
+          {totalCount > 0 ? `(${start}-${end} of ${totalCount})` : '(0 results)'}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={loading || !hasPrevious}
+          onClick={onPrevious}
+          className={reviewPaginationButtonClass}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={loading || !hasNext}
+          onClick={onNext}
+          className={reviewPaginationButtonClass}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const isActiveModerator = (user) => (
   user?.usertype === 'MODERATOR' && (user.moderatorStatus || 'active') === 'active'
@@ -63,110 +192,70 @@ const sameTagSlugs = (left, right) => (
   JSON.stringify([...left].sort()) === JSON.stringify([...right].sort())
 );
 
-const uniqueTagsBySlug = (markets = []) => {
-  const seen = new Set();
-  const tags = [];
-  markets.forEach((market) => {
-    (market.tags || []).forEach((tag) => {
-      const key = tag.slug || tag.id || tag.displayName;
-      if (!key || seen.has(key)) {
-        return;
-      }
-      seen.add(key);
-      tags.push(tag);
-    });
-  });
-  return tags;
+const normalizeAnswerAdditionApprovalPolicy = (value, legacyAutoApprove = false) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'auto' || normalized === 'admin' || normalized === 'moderator') {
+    return normalized;
+  }
+  return legacyAutoApprove ? 'auto' : 'moderator';
 };
 
 const reviewRowKey = (market) => (
-  market?.isMarketGroup ? `group:${market.marketGroup.id}` : `market:${market.id}`
+  market?.rowKey || (market?.isMarketGroup ? `group:${market.marketGroup.id}` : `market:${market.id}`)
 );
 
-const groupAdminMarketRows = (markets = []) => {
-  const rows = [];
-  const groups = new Map();
-
-  markets.forEach((market) => {
-    const group = market.marketGroup;
-    if (!group?.id) {
-      rows.push({ ...market, rowKey: `market:${market.id}` });
-      return;
-    }
-
-    const existing = groups.get(group.id);
-    if (!existing) {
-      const row = {
-        ...market,
-        id: group.id,
-        rowKey: `group:${group.id}`,
-        isMarketGroup: true,
-        questionTitle: group.questionTitle || market.questionTitle,
-        description: group.description || '',
-        creatorUsername: group.creatorUsername || market.creatorUsername,
-        stewardUsername: group.stewardUsername || market.stewardUsername || market.creatorUsername,
-        lifecycleStatus: group.lifecycleStatus || market.lifecycleStatus,
-        status: group.status || market.status,
-        proposalCost: group.proposalCost ?? market.proposalCost,
-        marketGroup: group,
-        childMarkets: [market],
-        tags: uniqueTagsBySlug([market]),
-      };
-      groups.set(group.id, row);
-      rows.push(row);
-      return;
-    }
-
-    existing.childMarkets.push(market);
-    existing.tags = uniqueTagsBySlug(existing.childMarkets);
-  });
-
-  return rows;
+const reviewMarketTagTargetIds = (market) => {
+  if (market?.isMarketGroup) {
+    return Array.from(new Set(
+      (market.childMarkets || [])
+        .map((child) => child.id)
+        .filter(Boolean),
+    ));
+  }
+  return market?.id ? [market.id] : [];
 };
 
 const amendmentRowKey = (amendment) => (
-  amendment?.isMarketGroupAmendment
-    ? `group:${amendment.marketGroup.id}:${amendment.body}:${amendment.createdBy}:${amendment.status}`
-    : `amendment:${amendment.id}`
+  amendment?.rowKey || (amendment?.isMarketGroupAmendment
+    ? `group:${amendment.marketGroup.id}:${amendment.body}:${amendment.createdBy}:${amendment.submitReason || ''}:${amendment.status}`
+    : `amendment:${amendment.id}`)
 );
 
-const groupDescriptionAmendmentRows = (amendments = []) => {
-  const rows = [];
-  const groups = new Map();
+const useReviewWorkCounts = () => {
+  const { token } = useAuth();
+  const [counts, setCounts] = useState(emptyPendingAdminReviewCounts);
 
-  amendments.forEach((amendment) => {
-    const group = amendment.marketGroup;
-    if (!group?.id) {
-      rows.push(amendment);
-      return;
+  useEffect(() => {
+    if (!token) {
+      setCounts(emptyPendingAdminReviewCounts);
+      return undefined;
     }
 
-    const key = [
-      group.id,
-      amendment.status,
-      amendment.body,
-      amendment.createdBy,
-      amendment.submitReason || '',
-    ].join('|');
-    const existing = groups.get(key);
-    if (!existing) {
-      const row = {
-        ...amendment,
-        isMarketGroupAmendment: true,
-        marketTitle: group.questionTitle || amendment.marketTitle,
-        marketDescription: group.description || amendment.marketDescription,
-        childAmendments: [amendment],
-      };
-      groups.set(key, row);
-      rows.push(row);
-      return;
-    }
+    let ignore = false;
+    const loadCounts = async () => {
+      try {
+        const nextCounts = await getPendingAdminReviewCounts({ token });
+        if (ignore) return;
+        setCounts(nextCounts);
+        window.dispatchEvent(new CustomEvent('socialpredict:admin-review-counts', { detail: nextCounts }));
+      } catch {
+        if (!ignore) {
+          setCounts(emptyPendingAdminReviewCounts);
+          window.dispatchEvent(new CustomEvent('socialpredict:admin-review-counts', { detail: emptyPendingAdminReviewCounts }));
+        }
+      }
+    };
 
-    existing.childAmendments.push(amendment);
-    existing.childAmendments.sort((left, right) => Number(left.marketId || 0) - Number(right.marketId || 0));
-  });
+    const initialTimeoutId = window.setTimeout(loadCounts, 1500);
+    const intervalId = window.setInterval(loadCounts, 60000);
+    return () => {
+      ignore = true;
+      window.clearTimeout(initialTimeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [token]);
 
-  return rows;
+  return counts;
 };
 
 const GovernanceAutoApprovalSetting = ({
@@ -180,6 +269,7 @@ const GovernanceAutoApprovalSetting = ({
     autoApproveDescriptionAmendments: false,
     autoApproveMarketProposals: false,
     autoApproveMarketGroupAnswers: false,
+    marketGroupAnswerAdditionApprovalPolicy: 'moderator',
     version: 0,
   });
   const [draft, setDraft] = useState(false);
@@ -197,7 +287,13 @@ const GovernanceAutoApprovalSetting = ({
       try {
         const data = await getMarketGovernanceSettings({ token });
         if (!ignore) {
-          setSettings(data);
+          setSettings({
+            ...data,
+            marketGroupAnswerAdditionApprovalPolicy: normalizeAnswerAdditionApprovalPolicy(
+              data.marketGroupAnswerAdditionApprovalPolicy,
+              data.autoApproveMarketGroupAnswers,
+            ),
+          });
           setDraft(Boolean(data[settingKey]));
         }
       } catch (err) {
@@ -225,6 +321,10 @@ const GovernanceAutoApprovalSetting = ({
         autoApproveDescriptionAmendments: Boolean(settings.autoApproveDescriptionAmendments),
         autoApproveMarketProposals: Boolean(settings.autoApproveMarketProposals),
         autoApproveMarketGroupAnswers: Boolean(settings.autoApproveMarketGroupAnswers),
+        marketGroupAnswerAdditionApprovalPolicy: normalizeAnswerAdditionApprovalPolicy(
+          settings.marketGroupAnswerAdditionApprovalPolicy,
+          settings.autoApproveMarketGroupAnswers,
+        ),
         [settingKey]: draft,
       };
       const saved = await updateMarketGovernanceSettings({
@@ -232,9 +332,16 @@ const GovernanceAutoApprovalSetting = ({
         autoApproveDescriptionAmendments: nextSettings.autoApproveDescriptionAmendments,
         autoApproveMarketProposals: nextSettings.autoApproveMarketProposals,
         autoApproveMarketGroupAnswers: nextSettings.autoApproveMarketGroupAnswers,
+        marketGroupAnswerAdditionApprovalPolicy: nextSettings.marketGroupAnswerAdditionApprovalPolicy,
         version: settings.version,
       });
-      setSettings(saved);
+      setSettings({
+        ...saved,
+        marketGroupAnswerAdditionApprovalPolicy: normalizeAnswerAdditionApprovalPolicy(
+          saved.marketGroupAnswerAdditionApprovalPolicy,
+          saved.autoApproveMarketGroupAnswers,
+        ),
+      });
       setDraft(Boolean(saved[settingKey]));
       setMessage(savedMessage);
     } catch (err) {
@@ -278,6 +385,142 @@ const GovernanceAutoApprovalSetting = ({
   );
 };
 
+const AnswerAdditionApprovalPolicySetting = () => {
+  const { token } = useAuth();
+  const [settings, setSettings] = useState({
+    autoApproveDescriptionAmendments: false,
+    autoApproveMarketProposals: false,
+    autoApproveMarketGroupAnswers: false,
+    marketGroupAnswerAdditionApprovalPolicy: 'moderator',
+    version: 0,
+  });
+  const [draft, setDraft] = useState('moderator');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let ignore = false;
+    const loadSettings = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await getMarketGovernanceSettings({ token });
+        if (!ignore) {
+          const policy = normalizeAnswerAdditionApprovalPolicy(
+            data.marketGroupAnswerAdditionApprovalPolicy,
+            data.autoApproveMarketGroupAnswers,
+          );
+          setSettings({
+            ...data,
+            marketGroupAnswerAdditionApprovalPolicy: policy,
+          });
+          setDraft(policy);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Unable to load answer option approval settings.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+    loadSettings();
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  const saveSettings = async () => {
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const saved = await updateMarketGovernanceSettings({
+        token,
+        autoApproveDescriptionAmendments: Boolean(settings.autoApproveDescriptionAmendments),
+        autoApproveMarketProposals: Boolean(settings.autoApproveMarketProposals),
+        autoApproveMarketGroupAnswers: draft === 'auto',
+        marketGroupAnswerAdditionApprovalPolicy: draft,
+        version: settings.version,
+      });
+      const policy = normalizeAnswerAdditionApprovalPolicy(
+        saved.marketGroupAnswerAdditionApprovalPolicy,
+        saved.autoApproveMarketGroupAnswers,
+      );
+      setSettings({
+        ...saved,
+        marketGroupAnswerAdditionApprovalPolicy: policy,
+      });
+      setDraft(policy);
+      setMessage('Answer option approval policy saved.');
+    } catch (err) {
+      setError(err.message || 'Unable to save answer option approval policy.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changed = draft !== normalizeAnswerAdditionApprovalPolicy(
+    settings.marketGroupAnswerAdditionApprovalPolicy,
+    settings.autoApproveMarketGroupAnswers,
+  );
+
+  return (
+    <div className="grid gap-3 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-white">Answer Option Approval Policy</h3>
+        <p className="mt-1 text-sm text-gray-400">
+          Controls what happens when active moderators add answer options to grouped markets.
+        </p>
+      </div>
+      <div className="grid gap-2">
+        {marketGroupAnswerPolicyOptions.map((option) => (
+          <label
+            key={option.value}
+            className={`flex cursor-pointer gap-3 rounded-md border p-3 text-sm transition ${
+              draft === option.value
+                ? 'border-sky-500 bg-sky-950/50 text-white'
+                : 'border-gray-700 bg-gray-950/50 text-gray-300 hover:border-gray-500'
+            }`}
+          >
+            <input
+              type="radio"
+              name="marketGroupAnswerAdditionApprovalPolicy"
+              value={option.value}
+              checked={draft === option.value}
+              disabled={loading || saving}
+              onChange={(event) => setDraft(event.target.value)}
+              className="mt-1 h-4 w-4 border-gray-600 bg-gray-800 text-primary-pink focus:ring-primary-pink"
+            />
+            <span>
+              <span className="block font-semibold">{option.title}</span>
+              <span className="mt-1 block text-xs text-gray-400">{option.description}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <span className="text-xs text-gray-500">Version {settings.version || 1}</span>
+        <button
+          type="button"
+          disabled={loading || saving || !changed}
+          onClick={saveSettings}
+          className="rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save Policy'}
+        </button>
+      </div>
+      {error && <div className="rounded-md bg-red-700 p-3 text-sm text-white">{error}</div>}
+      {message && <div className="rounded-md bg-emerald-700 p-3 text-sm text-white">{message}</div>}
+    </div>
+  );
+};
+
 const AdminMarketQueue = ({ status }) => {
   const { token } = useAuth();
   const [markets, setMarkets] = useState([]);
@@ -289,37 +532,47 @@ const AdminMarketQueue = ({ status }) => {
   const [tagForms, setTagForms] = useState({});
   const [busyMarketId, setBusyMarketId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [totalMarkets, setTotalMarkets] = useState(0);
 
   const tagEditingEnabled = status === 'proposed' || status === 'published';
 
-  const loadMarkets = async (query = searchQuery) => {
+  const loadMarkets = async ({ query = searchQuery, pageNumber = page } = {}) => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAdminLifecycleMarkets({
+      const data = await withAdminReviewRateLimitRetry(() => listAdminLifecycleMarkets({
         token,
         status,
         query,
-        limit: 100,
-      });
+        limit: reviewPageSize,
+        offset: pageNumber * reviewPageSize,
+      }));
       setMarkets(data.markets || []);
+      setTotalMarkets(Number(data.total || 0));
     } catch (err) {
       setError(err.message || 'Unable to load market queue.');
+      setMarkets([]);
+      setTotalMarkets(0);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setPage(0);
+  }, [status, searchQuery]);
+
+  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      loadMarkets(searchQuery);
+      loadMarkets({ query: searchQuery, pageNumber: page });
     }, 300);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, token, searchQuery]);
+  }, [status, token, searchQuery, page]);
 
   useEffect(() => {
     if (!token || !tagEditingEnabled) {
@@ -329,7 +582,7 @@ const AdminMarketQueue = ({ status }) => {
     let ignore = false;
     const loadActiveTags = async () => {
       try {
-        const result = await listAdminMarketTags({ token, includeInactive: false });
+        const result = await withAdminReviewRateLimitRetry(() => listAdminMarketTags({ token, includeInactive: false }));
         if (!ignore) {
           setActiveTags(result.tags || []);
         }
@@ -358,7 +611,7 @@ const AdminMarketQueue = ({ status }) => {
       } else {
         await approveProposedMarket({ marketId: market.id, token });
       }
-      await loadMarkets();
+      await loadMarkets({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to approve market.');
     } finally {
@@ -379,7 +632,7 @@ const AdminMarketQueue = ({ status }) => {
         await rejectProposedMarket({ marketId: market.id, token, reason });
       }
       setRejectionReasons((current) => ({ ...current, [key]: '' }));
-      await loadMarkets();
+      await loadMarkets({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to reject market.');
     } finally {
@@ -393,32 +646,55 @@ const AdminMarketQueue = ({ status }) => {
     )));
   };
 
-  const tagSlugsForForm = (market) => tagForms[market.id] || marketTagSlugs(market);
+  const tagSlugsForForm = (market) => tagForms[reviewRowKey(market)] || marketTagSlugs(market);
 
   const toggleMarketTag = (market, slug) => {
+    const key = reviewRowKey(market);
     setTagForms((current) => {
-      const selected = current[market.id] || marketTagSlugs(market);
+      const selected = current[key] || marketTagSlugs(market);
       const next = selected.includes(slug)
         ? selected.filter((item) => item !== slug)
         : [...selected, slug].sort();
-      return { ...current, [market.id]: next };
+      return { ...current, [key]: next };
     });
   };
 
   const saveMarketTags = async (market) => {
+    const key = reviewRowKey(market);
+    const targetIds = reviewMarketTagTargetIds(market);
     const tagSlugs = tagSlugsForForm(market);
-    setBusyMarketId(market.id);
+    setBusyMarketId(key);
     setError('');
     setSuccessMessage('');
     try {
-      const updatedMarket = await updateMarketTags({ marketId: market.id, token, tagSlugs });
-      updateMarketInQueue(updatedMarket);
+      if (!market.isMarketGroup && !targetIds.length) {
+        throw new Error('No market IDs were found for tag assignment.');
+      }
+      if (market.isMarketGroup) {
+        const groupId = market.marketGroup?.id || market.id;
+        if (!groupId) {
+          throw new Error('No market group ID was found for tag assignment.');
+        }
+        const updatedGroup = await updateMarketGroupTags({ groupId, token, tagSlugs });
+        setMarkets((current) => current.map((row) => (
+          reviewRowKey(row) === key
+            ? { ...row, ...updatedGroup }
+            : row
+        )));
+      } else {
+        const updatedMarket = await updateMarketTags({ marketId: market.id, token, tagSlugs });
+        updateMarketInQueue(updatedMarket);
+      }
       setTagForms((current) => {
         const next = { ...current };
-        delete next[market.id];
+        delete next[key];
         return next;
       });
-      setSuccessMessage(`Updated tags for market ${updatedMarket.id}.`);
+      setSuccessMessage(
+        market.isMarketGroup
+          ? `Updated tags for grouped market ${market.marketGroup?.id || market.id}.`
+          : `Updated tags for market ${market.id}.`,
+      );
     } catch (err) {
       setError(err.message || 'Unable to update market tags.');
     } finally {
@@ -439,6 +715,8 @@ const AdminMarketQueue = ({ status }) => {
     const originalSlugs = marketTagSlugs(market);
     const changed = !sameTagSlugs(selectedSlugs, originalSlugs);
     const atLimit = selectedSlugs.length >= maxMarketTagsPerMarket;
+    const key = reviewRowKey(market);
+    const targetCount = reviewMarketTagTargetIds(market).length;
 
     return (
       <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/80 p-3">
@@ -447,7 +725,9 @@ const AdminMarketQueue = ({ status }) => {
             Admin tag adjustment
           </div>
           <p className="mt-1 text-xs text-gray-500">
-            Add or remove active tags before or after publication.
+            {market.isMarketGroup
+              ? `Add or remove active tags across all ${targetCount || 'grouped'} answer markets.`
+              : 'Add or remove active tags before or after publication.'}
           </p>
         </div>
         {tagChoices.length ? (
@@ -459,7 +739,7 @@ const AdminMarketQueue = ({ status }) => {
                 <button
                   key={tag.slug}
                   type="button"
-                  disabled={disabled || busyMarketId === market.id}
+                  disabled={disabled || busyMarketId === key}
                   onClick={() => toggleMarketTag(market, tag.slug)}
                   className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     selected
@@ -480,7 +760,7 @@ const AdminMarketQueue = ({ status }) => {
         )}
         <button
           type="button"
-          disabled={busyMarketId === market.id || !changed}
+          disabled={busyMarketId === key || !changed}
           onClick={() => saveMarketTags(market)}
           className="justify-self-start rounded-md bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -498,7 +778,7 @@ const AdminMarketQueue = ({ status }) => {
 
     return (
       <div className="grid min-w-[220px] gap-3">
-        {!market.isMarketGroup && renderTagEditor(market)}
+        {renderTagEditor(market)}
         {status === 'proposed' && (
           <>
             <button
@@ -557,26 +837,26 @@ const AdminMarketQueue = ({ status }) => {
           {successMessage}
         </div>
       )}
-      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
-        <label htmlFor={`market-review-search-${status}`} className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
-          Search markets
-        </label>
-        <div className="relative">
-          <input
-            id={`market-review-search-${status}`}
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={`Search ${status} markets by title or description`}
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          />
-          {loading && (
-            <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
-          )}
-        </div>
-      </div>
+      <ReviewSearchBox
+        id={`market-review-search-${status}`}
+        label="Search markets"
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder={`Search ${status} markets by title or description`}
+        loading={loading}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={markets.length}
+        totalCount={totalMarkets}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalMarkets}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
       <MarketLifecycleTable
-        markets={groupAdminMarketRows(markets)}
+        markets={markets}
         emptyMessage={`No ${status} markets found.`}
         showCreator
         showSteward
@@ -594,20 +874,28 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [busyAmendmentId, setBusyAmendmentId] = useState(null);
   const [reasonById, setReasonById] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [totalAmendments, setTotalAmendments] = useState(0);
   const canReview = status === 'pending';
 
-  const loadAmendments = async () => {
+  const loadAmendments = async ({ query = searchQuery, pageNumber = page } = {}) => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAdminMarketDescriptionAmendments({
+      const data = await withAdminReviewRateLimitRetry(() => listAdminMarketDescriptionAmendments({
         token,
         status,
-        limit: 100,
-      });
+        query,
+        limit: reviewPageSize,
+        offset: pageNumber * reviewPageSize,
+      }));
       setAmendments(data.amendments || []);
+      setTotalAmendments(Number(data.total || 0));
     } catch (err) {
       setError(err.message || 'Unable to load description amendments.');
+      setAmendments([]);
+      setTotalAmendments(0);
     } finally {
       setLoading(false);
     }
@@ -615,9 +903,18 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
 
   useEffect(() => {
     if (!token) return;
-    loadAmendments();
+    const timeoutId = window.setTimeout(() => {
+      loadAmendments({ query: searchQuery, pageNumber: page });
+    }, 300);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, status]);
+  }, [token, status, searchQuery, page]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [status, searchQuery]);
 
   const setReason = (amendmentKey, reason) => {
     setReasonById((current) => ({
@@ -636,17 +933,24 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
     setError('');
     setSuccessMessage('');
     try {
-      await Promise.all(childAmendments.map((child) => (
-        reviewMarketDescriptionAmendment({
+      if (amendment.isMarketGroupAmendment) {
+        await reviewGroupedMarketDescriptionAmendments({
           token,
-          amendmentId: child.id,
+          amendmentIds: childAmendments.map((child) => child.id),
           status: nextStatus,
           reason,
-        })
-      )));
+        });
+      } else {
+        await reviewMarketDescriptionAmendment({
+          token,
+          amendmentId: amendment.id,
+          status: nextStatus,
+          reason,
+        });
+      }
       setReason(key, '');
       setSuccessMessage(`${amendment.isMarketGroupAmendment ? 'Grouped amendment' : `Amendment v${amendment.version}`} ${nextStatus}.`);
-      await loadAmendments();
+      await loadAmendments({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to review description amendment.');
     } finally {
@@ -670,12 +974,30 @@ const DescriptionAmendmentStatusQueue = ({ status }) => {
           {successMessage}
         </div>
       )}
-      {amendments.length === 0 && (
+      <ReviewSearchBox
+        id={`description-amendment-search-${status}`}
+        label="Search amendments"
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search market title, description, amendment text, submitter, or reason"
+        loading={loading}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={amendments.length}
+        totalCount={totalAmendments}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalAmendments}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
+      {totalAmendments === 0 && (
         <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
           No {status} description amendments found.
         </div>
       )}
-      {groupDescriptionAmendmentRows(amendments).map((amendment) => {
+      {amendments.map((amendment) => {
         const key = amendmentRowKey(amendment);
         const childAmendments = amendment.isMarketGroupAmendment
           ? amendment.childAmendments || []
@@ -817,20 +1139,28 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [busyAdditionId, setBusyAdditionId] = useState(null);
   const [reasonById, setReasonById] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [totalAdditions, setTotalAdditions] = useState(0);
   const canReview = status === 'pending';
 
-  const loadAdditions = async () => {
+  const loadAdditions = async ({ query = searchQuery, pageNumber = page } = {}) => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAdminMarketGroupAnswerAdditions({
+      const data = await withAdminReviewRateLimitRetry(() => listAdminMarketGroupAnswerAdditions({
         token,
         status,
-        limit: 100,
-      });
+        query,
+        limit: reviewPageSize,
+        offset: pageNumber * reviewPageSize,
+      }));
       setAdditions(data.additions || []);
+      setTotalAdditions(Number(data.total || 0));
     } catch (err) {
       setError(err.message || 'Unable to load grouped answer additions.');
+      setAdditions([]);
+      setTotalAdditions(0);
     } finally {
       setLoading(false);
     }
@@ -838,9 +1168,18 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
 
   useEffect(() => {
     if (!token) return;
-    loadAdditions();
+    const timeoutId = window.setTimeout(() => {
+      loadAdditions({ query: searchQuery, pageNumber: page });
+    }, 300);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, status]);
+  }, [token, status, searchQuery, page]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [status, searchQuery]);
 
   const updateReason = (additionId, reason) => {
     setReasonById((current) => ({
@@ -868,7 +1207,7 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
       });
       updateReason(addition.id, '');
       setSuccessMessage(`Answer option "${addition.answerLabel}" ${nextStatus}.`);
-      await loadAdditions();
+      await loadAdditions({ query: searchQuery, pageNumber: page });
     } catch (err) {
       setError(err.message || 'Unable to review grouped answer addition.');
     } finally {
@@ -892,7 +1231,25 @@ const MarketGroupAnswerAdditionStatusQueue = ({ status }) => {
           {successMessage}
         </div>
       )}
-      {additions.length === 0 && (
+      <ReviewSearchBox
+        id={`answer-addition-search-${status}`}
+        label="Search answer options"
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search group title, answer label, proposer, reviewer, or reason"
+        loading={loading}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={additions.length}
+        totalCount={totalAdditions}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalAdditions}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
+      {totalAdditions === 0 && (
         <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-6 text-center text-gray-300">
           No {status} answer additions found.
         </div>
@@ -983,12 +1340,7 @@ const MarketGroupAnswerAdditionQueue = () => {
       <div className="rounded-lg border border-sky-800/70 bg-sky-950/30 p-4 text-sm text-sky-100">
         Added answers create new binary child markets without changing existing child market history.
       </div>
-      <GovernanceAutoApprovalSetting
-        settingKey="autoApproveMarketGroupAnswers"
-        title="Auto-approve added answers"
-        description="When enabled, active moderator answer additions are immediately published as new child markets."
-        savedMessage="Grouped answer auto-approval setting saved."
-      />
+      <AnswerAdditionApprovalPolicySetting />
       <SiteTabs tabs={tabsData} defaultTab="Pending Answers" />
     </div>
   );
@@ -1005,6 +1357,12 @@ const MarketStewardshipQueue = () => {
   const [busyMarketId, setBusyMarketId] = useState(null);
   const [stewardForms, setStewardForms] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [totalMarkets, setTotalMarkets] = useState(0);
+
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!token) {
@@ -1052,15 +1410,19 @@ const MarketStewardshipQueue = () => {
           token,
           status: 'all',
           query: searchQuery,
-          limit: 100,
+          limit: reviewPageSize,
+          offset: page * reviewPageSize,
         });
 
         if (!ignore) {
           setMarkets(result.markets || []);
+          setTotalMarkets(Number(result.total || 0));
         }
       } catch (err) {
         if (!ignore) {
           setError(err.message || 'Unable to load stewardship markets.');
+          setMarkets([]);
+          setTotalMarkets(0);
         }
       } finally {
         if (!ignore) {
@@ -1073,7 +1435,7 @@ const MarketStewardshipQueue = () => {
       ignore = true;
       window.clearTimeout(timeoutId);
     };
-  }, [token, searchQuery]);
+  }, [token, searchQuery, page]);
 
   const updateStewardForm = (marketKey, updates) => {
     setStewardForms((current) => ({
@@ -1218,23 +1580,15 @@ const MarketStewardshipQueue = () => {
           unavailable, conflicted, or no longer responsible for resolving the market.
         </p>
       </div>
-      <div className="grid gap-2 rounded-lg border border-gray-700 bg-gray-900/70 p-4">
-        <label htmlFor="stewardship-market-search" className="text-xs font-mono uppercase tracking-[0.16em] text-gray-400">
-          Search stewardship markets
-        </label>
-        <div className="relative">
-          <input
-            id="stewardship-market-search"
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search title or description across proposed, published, closed, and resolved markets"
-            className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 pr-10 text-sm text-white focus:border-primary-pink focus:outline-none focus:ring-2 focus:ring-primary-pink/40"
-          />
-          {loading && (
-            <div className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-b-2 border-primary-pink" />
-          )}
-        </div>
+      <div className="grid gap-2">
+        <ReviewSearchBox
+          id="stewardship-market-search"
+          label="Search stewardship markets"
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search title or description across proposed, published, closed, and resolved markets"
+          loading={loading}
+        />
         <p className="text-xs text-gray-500">
           Rejected and cancelled markets are excluded from stewardship governance.
         </p>
@@ -1254,12 +1608,32 @@ const MarketStewardshipQueue = () => {
           No active moderators are available for stewardship reassignment.
         </div>
       )}
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={markets.length}
+        totalCount={totalMarkets}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalMarkets}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
+      />
       <MarketLifecycleTable
-        markets={groupAdminMarketRows(markets)}
+        markets={markets}
         emptyMessage="No markets found for stewardship governance."
         showCreator
         showSteward
         actions={renderStewardshipActions}
+      />
+      <ReviewPaginationControls
+        page={page}
+        visibleCount={markets.length}
+        totalCount={totalMarkets}
+        hasPrevious={page > 0}
+        hasNext={(page + 1) * reviewPageSize < totalMarkets}
+        onPrevious={() => setPage((current) => Math.max(0, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+        loading={loading}
       />
     </div>
   );
@@ -1533,10 +1907,97 @@ const MarketTaxonomyAdmin = () => {
   );
 };
 
-function ModeratorMarketReview() {
+const ReviewShortcutCard = ({ eyebrow, title, description, count, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`grid gap-2 rounded-xl border p-4 text-left transition ${
+      active
+        ? 'border-primary-pink bg-primary-pink/15 shadow-lg shadow-primary-pink/10'
+        : 'border-gray-700 bg-gray-900/70 hover:border-sky-500/70 hover:bg-gray-900'
+    }`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">{eyebrow}</span>
+      {count !== null && count !== undefined ? (
+        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+          count > 0 ? 'bg-primary-pink text-white' : 'bg-gray-800 text-gray-400'
+        }`}
+        >
+          {count > 99 ? '99+' : count}
+        </span>
+      ) : null}
+    </div>
+    <div className="text-lg font-semibold text-white">{title}</div>
+    <p className="text-sm leading-5 text-gray-400">{description}</p>
+  </button>
+);
+
+const ReviewQueueShortcuts = ({ activeTab, counts, onSelect }) => {
+  const cards = [
+    {
+      tab: 'Pending Review',
+      eyebrow: 'Market Queue',
+      title: 'Pending Markets',
+      description: 'Approve, reject, and tag proposed binary or grouped markets.',
+      count: counts.pendingMarkets,
+    },
+    {
+      tab: 'Description Amendments',
+      eyebrow: 'Contract Changes',
+      title: 'Pending Amendments',
+      description: 'Review append-only market description changes before publication.',
+      count: counts.pendingAmendments,
+    },
+    {
+      tab: 'Answer Additions',
+      eyebrow: 'Grouped Markets',
+      title: 'Pending Answer Options',
+      description: 'Review added answer options for multiple-choice binary markets.',
+      count: counts.pendingAnswers,
+    },
+    {
+      tab: 'Stewardship',
+      eyebrow: 'Operations',
+      title: 'Stewardship',
+      description: 'Reassign operational responsibility when markets need a new steward.',
+      count: null,
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {cards.map((card) => (
+        <ReviewShortcutCard
+          key={card.tab}
+          {...card}
+          active={activeTab === card.tab}
+          onClick={() => onSelect(card.tab)}
+        />
+      ))}
+    </div>
+  );
+};
+
+function ModeratorMarketReview({ defaultTab = 'Pending Review' }) {
+  const counts = useReviewWorkCounts();
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  useEffect(() => {
+    setActiveTab(defaultTab || 'Pending Review');
+  }, [defaultTab]);
+
+  const badgeForTab = (label) => {
+    if (label === 'Pending Review') return formatBadgeCount(counts.pendingMarkets);
+    if (label === 'Description Amendments') return formatBadgeCount(counts.pendingAmendments);
+    if (label === 'Answer Additions') return formatBadgeCount(counts.pendingAnswers);
+    return '';
+  };
+
   const tabsData = [
     ...reviewTabs.map((tab) => ({
       label: tab.label,
+      badge: badgeForTab(tab.label),
       content: <AdminMarketQueue status={tab.status} />,
     })),
     {
@@ -1545,10 +2006,12 @@ function ModeratorMarketReview() {
     },
     {
       label: 'Description Amendments',
+      badge: badgeForTab('Description Amendments'),
       content: <DescriptionAmendmentQueue />,
     },
     {
       label: 'Answer Additions',
+      badge: badgeForTab('Answer Additions'),
       content: <MarketGroupAnswerAdditionQueue />,
     },
     {
@@ -1563,10 +2026,25 @@ function ModeratorMarketReview() {
         <p className="text-xs uppercase tracking-[0.22em] text-primary-pink">
           Moderator mode
         </p>
-        <h1 className="text-2xl font-bold mt-2">Market Review Queue</h1>
+        <h1 className="text-2xl font-bold mt-2">Review Markets</h1>
+        <p className="mt-2 max-w-3xl text-sm text-gray-300">
+          Review markets, amendments, answer options, stewardship, and tags from one operational queue.
+        </p>
       </div>
 
-      <SiteTabs tabs={tabsData} defaultTab="Proposed Markets" />
+      <ReviewQueueShortcuts
+        activeTab={activeTab}
+        counts={counts}
+        onSelect={setActiveTab}
+      />
+
+      <div className="mt-6">
+        <SiteTabs
+          tabs={tabsData}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+      </div>
     </section>
   );
 }

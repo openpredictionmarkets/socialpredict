@@ -36,7 +36,7 @@ export const proposeMarketDescriptionAmendment = ({ token, marketId, body, submi
   });
 };
 
-export const listAdminMarketDescriptionAmendments = ({ token, status = 'pending', marketId = '', limit = 100, offset = 0 }) => {
+export const listAdminMarketDescriptionAmendments = ({ token, status = 'pending', marketId = '', query = '', limit = 100, offset = 0 }) => {
   const params = new URLSearchParams({
     status,
     limit: String(limit),
@@ -44,6 +44,9 @@ export const listAdminMarketDescriptionAmendments = ({ token, status = 'pending'
   });
   if (marketId) {
     params.set('marketId', String(marketId));
+  }
+  if (String(query || '').trim()) {
+    params.set('query', String(query).trim());
   }
   return authenticatedApiRequest(`/v0/admin/market-description-amendments?${params.toString()}`, {
     authToken: token,
@@ -79,6 +82,7 @@ export const updateMarketGovernanceSettings = ({
   autoApproveDescriptionAmendments,
   autoApproveMarketProposals,
   autoApproveMarketGroupAnswers,
+  marketGroupAnswerAdditionApprovalPolicy,
   version = 0,
 }) => authenticatedApiRequest('/v0/admin/market-description-amendments/settings', {
   method: 'PUT',
@@ -90,6 +94,7 @@ export const updateMarketGovernanceSettings = ({
     autoApproveDescriptionAmendments: Boolean(autoApproveDescriptionAmendments),
     autoApproveMarketProposals: Boolean(autoApproveMarketProposals),
     autoApproveMarketGroupAnswers: Boolean(autoApproveMarketGroupAnswers),
+    marketGroupAnswerAdditionApprovalPolicy,
     version,
   }),
   reasonMessages: adminAmendmentReasonMessages,
@@ -111,5 +116,26 @@ export const reviewMarketDescriptionAmendment = ({ token, amendmentId, status, r
     body: JSON.stringify({ status: normalizedStatus, reason: normalizedReason }),
     reasonMessages: adminAmendmentReasonMessages,
     fallbackMessage: 'Unable to review description amendment.',
+  });
+};
+
+export const reviewGroupedMarketDescriptionAmendments = ({ token, amendmentIds, status, reason }) => {
+  const normalizedStatus = String(status || '').trim();
+  const normalizedReason = String(reason || '').trim();
+  const normalizedIds = Array.from(new Set((amendmentIds || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0)));
+  if (!normalizedStatus || !normalizedReason || normalizedIds.length === 0) {
+    throw new Error('Grouped review status, reason, and amendment IDs are required.');
+  }
+  return authenticatedApiRequest('/v0/admin/market-description-amendments/grouped-review', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    authToken: token,
+    body: JSON.stringify({ amendmentIds: normalizedIds, status: normalizedStatus, reason: normalizedReason }),
+    reasonMessages: adminAmendmentReasonMessages,
+    fallbackMessage: 'Unable to review grouped description amendment.',
   });
 };

@@ -189,7 +189,7 @@ func applyLifecycleAdminStatusFilter(query *gorm.DB, status string) *gorm.DB {
 	switch normalized {
 	case dmarkets.MarketStatusAll:
 		return query.Where(
-			"lifecycle_status IN ? OR lifecycle_status = '' OR lifecycle_status IS NULL",
+			"markets.lifecycle_status IN ? OR markets.lifecycle_status = '' OR markets.lifecycle_status IS NULL",
 			[]string{
 				dmarkets.MarketLifecycleProposed,
 				dmarkets.MarketLifecyclePublished,
@@ -198,16 +198,16 @@ func applyLifecycleAdminStatusFilter(query *gorm.DB, status string) *gorm.DB {
 			},
 		)
 	case dmarkets.MarketLifecycleClosed:
-		return query.Where("lifecycle_status = ? OR (lifecycle_status = ? AND is_resolved = ? AND resolution_date_time <= ?)",
+		return query.Where("markets.lifecycle_status = ? OR (markets.lifecycle_status = ? AND markets.is_resolved = ? AND markets.resolution_date_time <= ?)",
 			dmarkets.MarketLifecycleClosed,
 			dmarkets.MarketLifecyclePublished,
 			false,
 			time.Now(),
 		)
 	case dmarkets.MarketLifecycleResolved:
-		return query.Where("is_resolved = ? OR lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
+		return query.Where("markets.is_resolved = ? OR markets.lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
 	default:
-		return query.Where("lifecycle_status = ?", normalized)
+		return query.Where("markets.lifecycle_status = ?", normalized)
 	}
 }
 
@@ -227,7 +227,7 @@ func applyCreatedByFilter(query *gorm.DB, createdBy string) *gorm.DB {
 	if createdBy == "" {
 		return query
 	}
-	return query.Where("creator_username = ?", createdBy)
+	return query.Where("markets.creator_username = ?", createdBy)
 }
 
 func applyOwnedByFilter(query *gorm.DB, ownedBy string) *gorm.DB {
@@ -236,7 +236,7 @@ func applyOwnedByFilter(query *gorm.DB, ownedBy string) *gorm.DB {
 		return query
 	}
 	return query.Where(
-		"creator_username = ? OR COALESCE(NULLIF(steward_username, ''), creator_username) = ?",
+		"markets.creator_username = ? OR COALESCE(NULLIF(markets.steward_username, ''), markets.creator_username) = ?",
 		ownedBy,
 		ownedBy,
 	)
@@ -257,11 +257,11 @@ func applyTagSlugFilter(query *gorm.DB, tagSlug string) *gorm.DB {
 func applyStatusByResolution(query *gorm.DB, status string, now time.Time) *gorm.DB {
 	switch status {
 	case dmarkets.MarketStatusActive:
-		return publicLifecycleScope(query).Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+		return publicLifecycleScope(query).Where("markets.is_resolved = ? AND markets.resolution_date_time > ?", false, now)
 	case dmarkets.MarketStatusClosed:
-		return publicLifecycleScope(query).Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+		return publicLifecycleScope(query).Where("markets.is_resolved = ? AND markets.resolution_date_time <= ?", false, now)
 	case dmarkets.MarketStatusResolved:
-		return publicLifecycleScope(query).Where("is_resolved = ? OR lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
+		return publicLifecycleScope(query).Where("markets.is_resolved = ? OR markets.lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
 	default:
 		return publicLifecycleScope(query)
 	}
@@ -303,18 +303,18 @@ func applyStatusFilter(dbQuery *gorm.DB, status string) *gorm.DB {
 	now := time.Now()
 	switch status {
 	case dmarkets.MarketStatusActive:
-		return publicLifecycleScope(dbQuery).Where("is_resolved = ? AND resolution_date_time > ?", false, now)
+		return publicLifecycleScope(dbQuery).Where("markets.is_resolved = ? AND markets.resolution_date_time > ?", false, now)
 	case dmarkets.MarketStatusClosed:
-		return publicLifecycleScope(dbQuery).Where("is_resolved = ? AND resolution_date_time <= ?", false, now)
+		return publicLifecycleScope(dbQuery).Where("markets.is_resolved = ? AND markets.resolution_date_time <= ?", false, now)
 	case dmarkets.MarketStatusResolved:
-		return publicLifecycleScope(dbQuery).Where("is_resolved = ? OR lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
+		return publicLifecycleScope(dbQuery).Where("markets.is_resolved = ? OR markets.lifecycle_status = ?", true, dmarkets.MarketLifecycleResolved)
 	default:
 		return publicLifecycleScope(dbQuery)
 	}
 }
 
 func publicLifecycleScope(query *gorm.DB) *gorm.DB {
-	return query.Where("lifecycle_status = ? OR lifecycle_status = ? OR lifecycle_status = '' OR lifecycle_status IS NULL",
+	return query.Where("markets.lifecycle_status = ? OR markets.lifecycle_status = ? OR markets.lifecycle_status = '' OR markets.lifecycle_status IS NULL",
 		dmarkets.MarketLifecyclePublished,
 		dmarkets.MarketLifecycleResolved,
 	)

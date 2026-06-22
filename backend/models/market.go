@@ -126,10 +126,11 @@ type MarketDescriptionAmendment struct {
 
 type MarketGovernanceSettings struct {
 	gorm.Model
-	ID                               uint   `json:"id" gorm:"primaryKey"`
-	AutoApproveDescriptionAmendments bool   `json:"autoApproveDescriptionAmendments" gorm:"not null;default:false"`
-	AutoApproveMarketProposals       bool   `json:"autoApproveMarketProposals" gorm:"not null;default:false"`
-	AutoApproveMarketGroupAnswers    bool   `json:"autoApproveMarketGroupAnswers" gorm:"not null;default:false"`
-	Version                          uint   `json:"version" gorm:"not null;default:1"`
-	UpdatedBy                        string `json:"updatedBy,omitempty" gorm:"size:64"`
+	ID                                      uint   `json:"id" gorm:"primaryKey"`
+	AutoApproveDescriptionAmendments        bool   `json:"autoApproveDescriptionAmendments" gorm:"not null;default:false"`
+	AutoApproveMarketProposals              bool   `json:"autoApproveMarketProposals" gorm:"not null;default:false"`
+	AutoApproveMarketGroupAnswers           bool   `json:"autoApproveMarketGroupAnswers" gorm:"not null;default:false"`
+	MarketGroupAnswerAdditionApprovalPolicy string `json:"marketGroupAnswerAdditionApprovalPolicy" gorm:"not null;default:moderator;size:32"`
+	Version                                 uint   `json:"version" gorm:"not null;default:1"`
+	UpdatedBy                               string `json:"updatedBy,omitempty" gorm:"size:64"`
 }

@@ -257,6 +257,12 @@ func TestMarketGroupBetsHandlerReturnsGroupedBetRows(t *testing.T) {
 	if !response.OK || response.Result.Total != 22 || len(response.Result.Bets) != 1 {
 		t.Fatalf("unexpected response: %+v", response)
 	}
+	if response.Result.Freshness == nil ||
+		response.Result.Freshness.Source != "live" ||
+		response.Result.Freshness.TransactionSafeRead ||
+		response.Result.Freshness.TargetFreshnessSeconds != 0 {
+		t.Fatalf("unexpected freshness metadata: %+v", response.Result.Freshness)
+	}
 	if got := response.Result.Bets[0].AnswerLabel; got != "Spain" {
 		t.Fatalf("expected answer label Spain, got %q", got)
 	}
@@ -301,6 +307,12 @@ func TestMarketGroupPositionsHandlerReturnsGroupedPositionRows(t *testing.T) {
 	if !response.OK || len(response.Result.Positions) != 1 || len(response.Result.Positions[0].Answers) != 1 {
 		t.Fatalf("unexpected response: %+v", response)
 	}
+	if response.Result.Freshness == nil ||
+		response.Result.Freshness.Source != "live" ||
+		response.Result.Freshness.TransactionSafeRead ||
+		response.Result.Freshness.TargetFreshnessSeconds != 0 {
+		t.Fatalf("unexpected freshness metadata: %+v", response.Result.Freshness)
+	}
 }
 
 func TestMarketGroupLeaderboardHandlerReturnsGroupedLeaderboardRows(t *testing.T) {
@@ -343,5 +355,11 @@ func TestMarketGroupLeaderboardHandlerReturnsGroupedLeaderboardRows(t *testing.T
 	}
 	if !response.OK || len(response.Result.Leaderboard) != 1 || len(response.Result.Leaderboard[0].Answers) != 1 {
 		t.Fatalf("unexpected response: %+v", response)
+	}
+	if response.Result.Freshness == nil ||
+		response.Result.Freshness.Source != "live" ||
+		response.Result.Freshness.TransactionSafeRead ||
+		response.Result.Freshness.TargetFreshnessSeconds != 0 {
+		t.Fatalf("unexpected freshness metadata: %+v", response.Result.Freshness)
 	}
 }

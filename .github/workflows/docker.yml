@@ -18,9 +18,10 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+      security-events: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Log in to the Github Container registry
         uses: docker/login-action@v4
@@ -60,11 +61,39 @@ jobs:
           labels: ${{ steps.frontend-meta.outputs.labels }}
 
       - name: Generate artifact attestation Frontend
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-frontend
           subject-digest: ${{ steps.push-frontend.outputs.digest }}
           push-to-registry: true
+
+      - name: Scan Frontend image for SARIF security alerts
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend@${{ steps.push-frontend.outputs.digest }}
+          format: sarif
+          output: trivy-frontend.sarif
+          scanners: vuln,secret
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+
+      - name: Upload Frontend image scan SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-frontend.sarif
+          category: trivy-frontend-image
+
+      - name: Block Frontend release image on critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend@${{ steps.push-frontend.outputs.digest }}
+          format: table
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
 
       - name: Extract metadata (tags, labels) for Backend
         id: backend-meta
@@ -91,8 +120,36 @@ jobs:
           labels: ${{ steps.backend-meta.outputs.labels }}
 
       - name: Generate artifact attestation Backend
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-backend
           subject-digest: ${{ steps.push-backend.outputs.digest }}
           push-to-registry: true
+
+      - name: Scan Backend image for SARIF security alerts
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend@${{ steps.push-backend.outputs.digest }}
+          format: sarif
+          output: trivy-backend.sarif
+          scanners: vuln,secret
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+
+      - name: Upload Backend image scan SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-backend.sarif
+          category: trivy-backend-image
+
+      - name: Block Backend release image on critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend@${{ steps.push-backend.outputs.digest }}
+          format: table
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'

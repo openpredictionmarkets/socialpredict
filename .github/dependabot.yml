@@ -1,0 +1,38 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Chicago
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: /docker/backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:30"
+      timezone: America/Chicago
+    groups:
+      backend-container-base-images:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: /docker/frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:45"
+      timezone: America/Chicago
+    groups:
+      frontend-container-base-images:
+        patterns:
+          - "*"

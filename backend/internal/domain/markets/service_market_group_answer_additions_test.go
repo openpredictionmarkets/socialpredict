@@ -222,6 +222,94 @@ func TestProposeMarketGroupAnswerAdditionGroupAutoApprovesOtherModerator(t *test
 	assertAnswerAdditionUserBalance(t, db, "proposer", 996)
 }
 
+func TestProposeMarketGroupAnswerAdditionGlobalAutoApprovesOtherModerator(t *testing.T) {
+	now := marketsTestTime()
+	db, repo, group, _ := seedAnswerAdditionGroup(t, now)
+	charged := []string{}
+	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
+		GameMode:                                "moderator",
+		MultipleChoiceBinaryAddAnswerCost:       4,
+		MultipleChoiceBinaryHardAnswerSafetyCap: 50,
+		MaximumDebtAllowed:                      500,
+	})
+	settings, err := service.GetMarketGovernanceSettings(context.Background())
+	if err != nil {
+		t.Fatalf("GetMarketGovernanceSettings returned error: %v", err)
+	}
+	policy := markets.MarketGroupAnswerAdditionApprovalPolicyAuto
+	if _, err := service.UpdateMarketGovernanceSettings(context.Background(), markets.MarketGovernanceSettingsUpdate{
+		MarketGroupAnswerAdditionApprovalPolicy: &policy,
+		Version:                                 settings.Version,
+		UpdatedBy:                               "admin",
+	}); err != nil {
+		t.Fatalf("enable global answer auto approval: %v", err)
+	}
+
+	addition, err := service.ProposeMarketGroupAnswerAddition(context.Background(), group.ID, "proposer", markets.MarketGroupAnswerAdditionRequest{
+		AnswerLabel: "Draw",
+	})
+	if err != nil {
+		t.Fatalf("ProposeMarketGroupAnswerAddition returned error: %v", err)
+	}
+	if addition.Status != markets.MarketGroupAnswerAdditionStatusApproved || addition.MarketID <= 0 {
+		t.Fatalf("global auto-approved proposal should create child market: %+v", addition)
+	}
+	if addition.ReviewedBy != markets.MarketGroupAnswerAdditionApprovedByAuto {
+		t.Fatalf("reviewed by = %q, want auto approval", addition.ReviewedBy)
+	}
+	if len(charged) != 0 {
+		t.Fatalf("unexpected charge calls: %v", charged)
+	}
+	assertAnswerAdditionUserBalance(t, db, "proposer", 996)
+}
+
+func TestProposeMarketGroupAnswerAdditionGlobalAdminOverridesGroupToggle(t *testing.T) {
+	now := marketsTestTime()
+	_, repo, group, _ := seedAnswerAdditionGroup(t, now)
+	if _, err := repo.UpdateMarketGroupAnswerAdditionAutoApproval(context.Background(), group.ID, true, now); err != nil {
+		t.Fatalf("enable group auto approval: %v", err)
+	}
+	charged := []string{}
+	service := markets.NewService(repo, flexibleAnswerAdditionUserService(&charged), newFixedClock(now), markets.Config{
+		GameMode:                                "moderator",
+		MultipleChoiceBinaryAddAnswerCost:       4,
+		MultipleChoiceBinaryHardAnswerSafetyCap: 50,
+		MaximumDebtAllowed:                      500,
+	})
+	settings, err := service.GetMarketGovernanceSettings(context.Background())
+	if err != nil {
+		t.Fatalf("GetMarketGovernanceSettings returned error: %v", err)
+	}
+	policy := markets.MarketGroupAnswerAdditionApprovalPolicyAdmin
+	if _, err := service.UpdateMarketGovernanceSettings(context.Background(), markets.MarketGovernanceSettingsUpdate{
+		MarketGroupAnswerAdditionApprovalPolicy: &policy,
+		Version:                                 settings.Version,
+		UpdatedBy:                               "admin",
+	}); err != nil {
+		t.Fatalf("enable admin-only answer approval: %v", err)
+	}
+
+	addition, err := service.ProposeMarketGroupAnswerAddition(context.Background(), group.ID, "proposer", markets.MarketGroupAnswerAdditionRequest{
+		AnswerLabel: "Draw",
+	})
+	if err != nil {
+		t.Fatalf("ProposeMarketGroupAnswerAddition returned error: %v", err)
+	}
+	if addition.Status != markets.MarketGroupAnswerAdditionStatusPending || addition.MarketID != 0 {
+		t.Fatalf("admin-only policy should leave proposal pending despite group toggle: %+v", addition)
+	}
+	if len(charged) != 0 {
+		t.Fatalf("pending proposal should not charge proposer, charged=%v", charged)
+	}
+	reloaded, err := repo.GetMarketGroup(context.Background(), group.ID)
+	if err != nil {
+		t.Fatalf("reload group: %v", err)
+	}
+	if len(reloaded.Members) != 2 {
+		t.Fatalf("admin-only pending proposal should not add child member, got %d members", len(reloaded.Members))
+	}
+}
+
 func TestMarketGroupAnswerAdditionReviewerCanApprovePending(t *testing.T) {
 	now := marketsTestTime()
 	db, repo, group, _ := seedAnswerAdditionGroup(t, now)

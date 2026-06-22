@@ -27,6 +27,15 @@ const AppRoutes = () => {
   const isSuspendedModerator = auth.usertype === 'MODERATOR' && auth.moderatorStatus === 'suspended';
   const canCreateMarket = isRegularUser && !isSuspendedModerator && (!isModeratorMode || isActiveModerator);
   const mustChangePassword = isLoggedIn && auth.changePasswordNeeded;
+  const renderAdminDashboard = (props = {}) => (
+    isLoggedIn && mustChangePassword ? (
+      <Redirect to='/changepassword' />
+    ) : isLoggedIn && auth.usertype === 'ADMIN' ? (
+      <AdminDashboard {...props} />
+    ) : (
+      <Redirect to='/' />
+    )
+  );
 
   return (
     <Switch>
@@ -110,14 +119,32 @@ const AppRoutes = () => {
       </Route>
 
       {/* Admin Routes */}
+      <Route exact path='/admin/markets/review'>
+        {renderAdminDashboard({ defaultTab: 'Review Markets', defaultReviewTab: 'Pending Review' })}
+      </Route>
+      <Route exact path='/admin/markets/stewardship'>
+        {renderAdminDashboard({ defaultTab: 'Review Markets', defaultReviewTab: 'Stewardship' })}
+      </Route>
+      <Route exact path='/admin/markets/amendments'>
+        {renderAdminDashboard({ defaultTab: 'Review Markets', defaultReviewTab: 'Description Amendments' })}
+      </Route>
+      <Route exact path='/admin/markets/answer-additions'>
+        {renderAdminDashboard({ defaultTab: 'Review Markets', defaultReviewTab: 'Answer Additions' })}
+      </Route>
+      <Route exact path='/admin/markets/tags'>
+        {renderAdminDashboard({ defaultTab: 'Review Markets', defaultReviewTab: 'Tags' })}
+      </Route>
+      <Route exact path='/admin/users'>
+        {renderAdminDashboard({ defaultTab: 'User Governance' })}
+      </Route>
+      <Route exact path='/admin/users/add'>
+        {renderAdminDashboard({ defaultTab: 'User Governance', defaultUserTab: 'Add User' })}
+      </Route>
+      <Route exact path='/admin/cms'>
+        {renderAdminDashboard({ defaultTab: 'CMS' })}
+      </Route>
       <Route exact path='/admin'>
-        {isLoggedIn && mustChangePassword ? (
-	  <Redirect to='/changepassword' />
-	) : isLoggedIn && auth.usertype === 'ADMIN' ? (
-          <AdminDashboard />
-        ) : (
-          <Redirect to='/' />
-        )}
+        {renderAdminDashboard()}
       </Route>
 
       {/* Home Route */}

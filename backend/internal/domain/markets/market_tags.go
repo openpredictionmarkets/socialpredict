@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -53,6 +54,7 @@ type MarketTagRepository interface {
 	CreateMarketTag(ctx context.Context, tag MarketTag) (*MarketTag, error)
 	UpdateMarketTag(ctx context.Context, slug string, update MarketTagRequest) (*MarketTag, error)
 	SetMarketTags(ctx context.Context, marketID int64, tagSlugs []string, assignedBy string, source string, assignedAt time.Time) ([]MarketTag, error)
+	SetMarketGroupTags(ctx context.Context, groupID int64, tagSlugs []string, assignedBy string, source string, assignedAt time.Time) ([]MarketTag, error)
 }
 
 func (s *Service) ListMarketTags(ctx context.Context, includeInactive bool) ([]MarketTag, error) {
@@ -130,6 +132,56 @@ func (s *Service) UpdateMarketTags(ctx context.Context, marketID int64, tagSlugs
 	return market, nil
 }
 
+func (s *Service) UpdateMarketGroupTags(ctx context.Context, groupID int64, tagSlugs []string, actorUsername string) (*AdminMarketReviewRow, error) {
+	if groupID <= 0 || strings.TrimSpace(actorUsername) == "" {
+		return nil, ErrInvalidInput
+	}
+	groupRepo, err := s.marketGroupRepository()
+	if err != nil {
+		return nil, err
+	}
+	group, err := groupRepo.GetMarketGroup(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	switch NormalizeLifecycleStatus(group.LifecycleStatus) {
+	case MarketLifecycleProposed, MarketLifecyclePublished:
+	default:
+		return nil, ErrInvalidState
+	}
+
+	normalized, err := s.validateCreateTagSlugs(ctx, tagSlugs)
+	if err != nil {
+		return nil, err
+	}
+	tagRepo, err := s.marketTagRepository()
+	if err != nil {
+		return nil, err
+	}
+	tags, err := tagRepo.SetMarketGroupTags(ctx, groupID, normalized, actorUsername, MarketTagAssignmentSourceAdmin, s.clock.Now())
+	if err != nil {
+		return nil, err
+	}
+
+	children := make([]*Market, 0, len(group.Members))
+	for _, member := range OrderedMarketGroupMembers(group.Members) {
+		child, err := s.GetMarket(ctx, member.MarketID)
+		if err != nil {
+			return nil, err
+		}
+		child.Tags = tags
+		children = append(children, child)
+	}
+	return &AdminMarketReviewRow{
+		RowKey:        "group:" + strconv.FormatInt(group.ID, 10),
+		IsMarketGroup: true,
+		Market:        firstMarket(children),
+		Group:         group,
+		Children:      children,
+		Tags:          tags,
+	}, nil
+}
+
 func (s *Service) assignTagsToMarket(ctx context.Context, market *Market, tagSlugs []string, assignedBy string) error {
 	normalized, err := NormalizeMarketTagSlugs(tagSlugs)
 	if err != nil {
@@ -148,6 +200,15 @@ func (s *Service) assignTagsToMarket(ctx context.Context, market *Market, tagSlu
 		return err
 	}
 	market.Tags = tags
+	return nil
+}
+
+func firstMarket(markets []*Market) *Market {
+	for _, market := range markets {
+		if market != nil {
+			return market
+		}
+	}
 	return nil
 }
 

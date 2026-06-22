@@ -239,9 +239,11 @@ x-route-family-migration-matrix:
         - /v0/admin/market-groups/{id}/approve
         - /v0/admin/market-groups/{id}/reject
         - /v0/admin/market-groups/{id}/steward
+        - /v0/admin/market-groups/{id}/tags
         - /v0/admin/markets/{id}/tags
         - /v0/admin/market-description-amendments
         - /v0/admin/market-description-amendments/settings
+        - /v0/admin/market-description-amendments/grouped-review
         - /v0/admin/market-description-amendments/{id}
         - /v0/admin/market-group-answer-additions
         - /v0/admin/market-group-answer-additions/{id}
@@ -927,9 +929,10 @@ paths:
       description: >
         Resolves every child binary market in a group. In exclusive mode, one
         selected child resolves YES and every other child resolves NO. In manual
-        mode, each child receives an explicit YES or NO. Child markets use the
-        existing binary market payout path; the parent group is marked resolved
-        after all child resolutions succeed.
+        mode, each child receives an explicit YES or NO. In na mode, every child
+        resolves N/A through the existing child-market refund path. Child markets
+        use the existing binary market payout path; the parent group is marked
+        resolved after all child resolutions succeed.
       security:
         - bearerAuth: []
       parameters:
@@ -3421,6 +3424,8 @@ paths:
         Admin-only queue for proposed, published, and rejected moderator markets.
         Responses include creator and review metadata so admins do not need to
         manually enter market IDs.
+        Grouped-market child rows are collapsed before pagination; pagination
+        applies to the admin review row, not the child market row.
       security:
         - bearerAuth: []
       parameters:
@@ -3429,7 +3434,14 @@ paths:
           required: true
           schema:
             type: string
-            enum: [proposed, published, rejected]
+            enum: [all, proposed, published, rejected, closed, resolved]
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+          description: Search market title or description before grouped-row pagination.
         - in: query
           name: limit
           required: false
@@ -3907,12 +3919,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReasonResponse'
 
+  /v0/admin/market-groups/{id}/tags:
+    patch:
+      tags: [Markets]
+      operationId: updateAdminMarketGroupTags
+      summary: Update grouped market tag assignments
+      description: >
+        Admin-only endpoint that transactionally rewrites active tag assignments
+        for every child market in a proposed or published market group.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateMarketTagsRequest'
+      responses:
+        '200':
+          description: Grouped market tag assignments updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketReviewEnvelopeResponse'
+        '400':
+          description: Invalid group ID, malformed request, unknown tag, inactive tag, or too many tags.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: Market group was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: Market group is not proposed or published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected grouped tag assignment update failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
   /v0/admin/market-group-answer-additions:
     get:
       tags: [Markets]
       operationId: listAdminMarketGroupAnswerAdditions
       summary: List grouped-market answer additions
-      description: Admin-only queue for pending, approved, or rejected answer additions on multiple-choice binary market groups.
+      description: Admin-only queue for pending, approved, or rejected answer additions on multiple-choice binary market groups. Search and pagination are applied server-side.
       security:
         - bearerAuth: []
       parameters:
@@ -3930,6 +4016,13 @@ paths:
             type: integer
             format: int64
             minimum: 1
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+          description: Search group title, answer label, proposer, reviewer, or reason before pagination.
         - in: query
           name: limit
           required: false
@@ -4144,7 +4237,7 @@ paths:
       tags: [Markets]
       operationId: listAdminMarketDescriptionAmendments
       summary: List market description amendments
-      description: Admin-only queue for pending, approved, or rejected append-only market description amendments.
+      description: Admin-only queue for pending, approved, or rejected append-only market description amendments. Grouped-market child amendments are collapsed before pagination.
       security:
         - bearerAuth: []
       parameters:
@@ -4162,6 +4255,13 @@ paths:
             type: integer
             format: int64
             minimum: 1
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+          description: Search market title, description, amendment body, submitter, or reason before pagination.
         - in: query
           name: limit
           required: false
@@ -4304,6 +4404,74 @@ paths:
                 $ref: '#/components/schemas/ReasonResponse'
         '500':
           description: Unexpected settings update failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+
+  /v0/admin/market-description-amendments/grouped-review:
+    patch:
+      tags: [Markets]
+      operationId: reviewGroupedMarketDescriptionAmendments
+      summary: Approve or reject a grouped market description amendment
+      description: >
+        Admin-only endpoint for reviewing all child amendments belonging to one
+        grouped-market description amendment as one backend operation. The update
+        is all-or-nothing: if any child amendment is missing or no longer pending,
+        no child amendment is reviewed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReviewGroupedMarketDescriptionAmendmentRequest'
+      responses:
+        '200':
+          description: Grouped amendment reviewed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDescriptionAmendmentListEnvelopeResponse'
+        '400':
+          description: Invalid amendment IDs, status, or missing reason.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '401':
+          description: Authentication failed or token invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '403':
+          description: Admin privileges required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '404':
+          description: One or more amendment IDs were not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '409':
+          description: One or more child amendments are no longer pending.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '429':
+          description: Rate limit exceeded by shared security middleware.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasonResponse'
+        '500':
+          description: Unexpected grouped amendment review failure.
           content:
             application/json:
               schema:
@@ -5974,7 +6142,8 @@ components:
         answerLabels:
           type: array
           minItems: 2
-          maxItems: 20
+          maxItems: 50
+          description: Deployment configuration may expose a lower effective cap, but the maximum supported API contract is 50 answer labels.
           items:
             type: string
             minLength: 1
@@ -6093,6 +6262,8 @@ components:
             $ref: '#/components/schemas/MarketTagResponse'
         total:
           type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
 
     MarketTagsEnvelopeResponse:
       type: object
@@ -6415,6 +6586,11 @@ components:
             $ref: '#/components/schemas/MarketGroupAnswerAdditionResponse'
         total:
           type: integer
+          description: Total matching answer-addition rows before limit/offset.
+        limit:
+          type: integer
+        offset:
+          type: integer
 
     MarketGroupBet:
       type: object
@@ -6452,6 +6628,8 @@ components:
             $ref: '#/components/schemas/MarketGroupBet'
         total:
           type: integer
+        freshness:
+          $ref: '#/components/schemas/ReadModelFreshness'
 
     MarketGroupPositionAnswer:
       type: object
@@ -6772,10 +6950,11 @@ components:
       properties:
         mode:
           type: string
-          enum: [exclusive_yes, manual]
+          enum: [exclusive_yes, manual, na]
           description: >
             exclusive_yes resolves the selected child YES and every other child
-            NO. manual requires one YES/NO resolution per child market.
+            NO. manual requires one YES/NO resolution per child market. na
+            resolves every child N/A and skips grouped work-profit payout.
         winningMarketId:
           type: integer
           format: int64
@@ -7313,6 +7492,28 @@ components:
           maxLength: 500
           description: Admin-visible decision reason.
 
+    AdminReviewGroupedMarketDescriptionAmendmentRequest:
+      type: object
+      required: [amendmentIds, status, reason]
+      properties:
+        amendmentIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          description: Child amendment IDs for one grouped-market amendment review row.
+        status:
+          type: string
+          enum: [approved, rejected]
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Admin-visible decision reason applied to every child amendment atomically.
+
     AdminReviewMarketGroupAnswerAdditionRequest:
       type: object
       required: [status]
@@ -7339,14 +7540,18 @@ components:
           description: When true, newly created moderator market proposals are immediately published.
         autoApproveMarketGroupAnswers:
           type: boolean
-          description: When true, newly proposed grouped-market answers are immediately approved and published.
+          description: Legacy compatibility field. Prefer marketGroupAnswerAdditionApprovalPolicy.
+        marketGroupAnswerAdditionApprovalPolicy:
+          type: string
+          enum: [auto, moderator, admin]
+          description: Controls non-steward moderator answer additions. auto publishes all immediately; moderator honors the grouped market steward toggle; admin requires admin review.
         version:
           type: integer
           description: Optional optimistic concurrency version returned by the settings read endpoint.
 
     MarketGovernanceSettingsResponse:
       type: object
-      required: [autoApproveDescriptionAmendments, autoApproveMarketProposals, autoApproveMarketGroupAnswers, version]
+      required: [autoApproveDescriptionAmendments, autoApproveMarketProposals, autoApproveMarketGroupAnswers, marketGroupAnswerAdditionApprovalPolicy, version]
       properties:
         autoApproveDescriptionAmendments:
           type: boolean
@@ -7354,6 +7559,10 @@ components:
           type: boolean
         autoApproveMarketGroupAnswers:
           type: boolean
+          description: Legacy compatibility field. True only when marketGroupAnswerAdditionApprovalPolicy is auto.
+        marketGroupAnswerAdditionApprovalPolicy:
+          type: string
+          enum: [auto, moderator, admin]
         version:
           type: integer
         updatedBy:
@@ -7376,6 +7585,12 @@ components:
       type: object
       required: [id, marketId, version, body, bodyFormat, status, createdBy, createdAt]
       properties:
+        rowKey:
+          type: string
+          description: Stable frontend row key for admin grouped review rows.
+        isMarketGroupAmendment:
+          type: boolean
+          description: True when this row represents a grouped-market amendment collapsed from child amendments.
         id:
           type: integer
           format: int64
@@ -7428,6 +7643,11 @@ components:
           description: Approved amendments lower than this amendment version, included for admin review context.
           items:
             $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
+        childAmendments:
+          type: array
+          description: Child amendment rows represented by a grouped-market admin review row.
+          items:
+            $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
 
     MarketDescriptionAmendmentListResponse:
       type: object
@@ -7438,6 +7658,11 @@ components:
           items:
             $ref: '#/components/schemas/MarketDescriptionAmendmentResponse'
         total:
+          type: integer
+          description: Total matching amendment review rows before limit/offset.
+        limit:
+          type: integer
+        offset:
           type: integer
 
     MarketDescriptionAmendmentListEnvelopeResponse:
@@ -7464,6 +7689,12 @@ components:
       type: object
       required: [id, status, lifecycleStatus]
       properties:
+        rowKey:
+          type: string
+          description: Stable frontend row key for admin grouped review rows.
+        isMarketGroup:
+          type: boolean
+          description: True when this row is a grouped-market parent review row.
         id:
           type: integer
           format: int64
@@ -7517,6 +7748,11 @@ components:
             $ref: '#/components/schemas/MarketTagResponse'
         marketGroup:
           $ref: '#/components/schemas/MarketGroupLink'
+        childMarkets:
+          type: array
+          description: Child market rows represented by a grouped-market admin review row.
+          items:
+            $ref: '#/components/schemas/MarketReviewResponse'
 
     MarketLifecycleListResponse:
       type: object
@@ -7548,6 +7784,11 @@ components:
           items:
             $ref: '#/components/schemas/MarketReviewResponse'
         total:
+          type: integer
+          description: Total matching admin review rows before limit/offset.
+        limit:
+          type: integer
+        offset:
           type: integer
 
     MarketReviewListEnvelopeResponse:
