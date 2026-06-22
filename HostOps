@@ -151,6 +151,24 @@ Notes:
 EOF
 }
 
+env_get_usage() {
+  cat <<'EOF'
+Usage: ./HostOps env get <env> <KEY>
+
+Read a KEY=value line from the remote app .env file for a configured host.
+
+Examples:
+  ./HostOps env get staging ADMIN_PASSWORD
+  ./HostOps env get mo ADMIN_PASSWORD
+  ./HostOps host env get staging ADMIN_PASSWORD
+
+Notes:
+  Environment definitions live under ~/.keys/socialpredict/<env>/.
+  The remote file is read from HOSTOPS_REPO_PATH/.env.
+  The older './HostOps host env get <env> <KEY>' command remains an alias.
+EOF
+}
+
 host_usage() {
   cat <<'EOF'
 Usage: ./HostOps host COMMAND
@@ -532,9 +550,13 @@ main() {
         get)
           local env="${3:-}"
           local requested_key="${4:-}"
-          if [[ -z "$env" || -z "$requested_key" ]]; then
-            print_error "Usage: ./HostOps env get <env> <KEY>"
-            exit 1
+          if [[ -z "$env" || "$env" == "help" || "$env" == "--help" || "$env" == "-h" || "$requested_key" == "help" || "$requested_key" == "--help" || "$requested_key" == "-h" ]]; then
+            env_get_usage
+            exit 0
+          fi
+          if [[ -z "$requested_key" ]]; then
+            env_get_usage
+            exit 0
           fi
           host_env_get "$env" "$requested_key"
           ;;
@@ -568,9 +590,13 @@ main() {
             get)
               local env="${4:-}"
               local requested_key="${5:-}"
-              if [[ -z "$env" || -z "$requested_key" ]]; then
-                print_error "Usage: ./HostOps host env get <env> <KEY>"
-                exit 1
+              if [[ -z "$env" || "$env" == "help" || "$env" == "--help" || "$env" == "-h" || "$requested_key" == "help" || "$requested_key" == "--help" || "$requested_key" == "-h" ]]; then
+                env_get_usage
+                exit 0
+              fi
+              if [[ -z "$requested_key" ]]; then
+                env_get_usage
+                exit 0
               fi
               host_env_get "$env" "$requested_key"
               ;;
