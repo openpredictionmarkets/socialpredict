@@ -21,7 +21,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Log in to the Github Container registry
         uses: docker/login-action@v4
@@ -61,7 +61,7 @@ jobs:
           labels: ${{ steps.frontend-meta.outputs.labels }}
 
       - name: Generate artifact attestation Frontend
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-frontend
           subject-digest: ${{ steps.push-frontend.outputs.digest }}
@@ -120,7 +120,7 @@ jobs:
           labels: ${{ steps.backend-meta.outputs.labels }}
 
       - name: Generate artifact attestation Backend
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-backend
           subject-digest: ${{ steps.push-backend.outputs.digest }}
