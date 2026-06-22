@@ -147,7 +147,7 @@ Detailed setup lives in [`README-INFRA-HOSTOPS.md`](./README-INFRA-HOSTOPS.md). 
 Expected production settings are `HOSTOPS_HOST=brierfoxforecast.com`, `HOSTOPS_HOST_IP=143.198.177.112`, `HOSTOPS_USER=root`, `HOSTOPS_PORT=22`, and `HOSTOPS_REPO_PATH=/opt/socialpredict`. If HostOps SSH is authorized for `mo`, retrieve the generated admin password with:
 
 ```bash
-./HostOps host env get mo ADMIN_PASSWORD
+./HostOps env get mo ADMIN_PASSWORD
 ```
 
 ## Operator Checks
