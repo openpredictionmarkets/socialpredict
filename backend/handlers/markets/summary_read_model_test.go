@@ -99,7 +99,7 @@ func TestMarketOverviewResponsesPreferSummaryReadModel(t *testing.T) {
 
 func TestMarketSummaryToDetailsResponseDoesNotIncludeAmendments(t *testing.T) {
 	generatedAt := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
-	response := marketSummaryToDetailsResponse(&dmarkets.MarketSummaryReadModel{
+	response := marketSummaryToDetailsResponse(context.Background(), nil, &dmarkets.MarketSummaryReadModel{
 		Market: &dmarkets.Market{ID: 3, QuestionTitle: "Pinned", CreatorUsername: "creator", CreatedAt: generatedAt},
 		Creator: &dmarkets.CreatorSummary{
 			Username: "creator",

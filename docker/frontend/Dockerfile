@@ -1,4 +1,4 @@
-FROM node:22.20.0-alpine3.22 AS builder
+FROM node:26.3.0-alpine3.22 AS builder
 
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./frontend/
@@ -7,7 +7,7 @@ RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
-FROM nginx:1.29.1-alpine3.22
+FROM nginx:1.29.3-alpine3.22
 
 COPY --from=builder /app/frontend/build /usr/share/nginx/html
 COPY frontend/public/env-config.js.template /usr/share/nginx/html/env-config.js.template

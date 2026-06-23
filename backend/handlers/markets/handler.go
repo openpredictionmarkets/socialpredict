@@ -115,6 +115,12 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.invalidator != nil {
+		if err := h.invalidator.InvalidateAfterMarketTransaction(r.Context(), user.Username, market.ID, "market_created"); err != nil {
+			logger.LogError("CreateMarket", "InvalidateReadModels", err)
+		}
+	}
+
 	response := marketToResponse(market)
 
 	_ = writeJSON(w, http.StatusCreated, response)
@@ -406,7 +412,7 @@ func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := marketDetailsToResponse(details)
+	response := marketDetailsToResponse(r.Context(), h.service, details)
 
 	_ = writeJSON(w, http.StatusOK, response)
 }

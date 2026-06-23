@@ -100,14 +100,27 @@ type UserService interface {
 	GetPublicUser(ctx context.Context, username string) (*users.PublicUser, error)
 }
 
+// GroupedMarketTransactionFunc runs a grouped-market mutation with
+// transaction-scoped market and user dependencies.
+type GroupedMarketTransactionFunc func(ctx context.Context, repo Repository, users UserService) error
+
+// GroupedMarketUnitOfWork commits grouped-market structural writes, child
+// market writes, and user balance mutations as one unit.
+type GroupedMarketUnitOfWork interface {
+	GroupedMarketTransaction(ctx context.Context, fn GroupedMarketTransactionFunc) error
+}
+
 // Config holds configuration for the markets service.
 type Config struct {
-	MinimumFutureHours     float64
-	CreateMarketCost       int64
-	InitialBetFee          int64
-	MaximumDebtAllowed     int64
-	GameMode               string
-	MarketApprovalRequired bool
+	MinimumFutureHours                      float64
+	CreateMarketCost                        int64
+	InitialBetFee                           int64
+	MaximumDebtAllowed                      int64
+	GameMode                                string
+	MarketApprovalRequired                  bool
+	MultipleChoiceBinaryAddAnswerCost       int64
+	MultipleChoiceBinarySoftAnswerThreshold int
+	MultipleChoiceBinaryHardAnswerSafetyCap int
 }
 
 // CreationPolicy governs validation and construction of markets.
@@ -457,6 +470,24 @@ func (s *Service) ensureDefaults() {
 	s.metricsCalculator = metricsCalculatorOrDefault(s.metricsCalculator)
 	s.leaderboardCalculator = leaderboardCalculatorOrDefault(s.leaderboardCalculator)
 	s.statusPolicy = statusPolicyOrDefault(s.statusPolicy)
+}
+
+func (s *Service) groupedMarketUnitOfWork() (GroupedMarketUnitOfWork, bool) {
+	if s == nil || s.repo == nil {
+		return nil, false
+	}
+	uow, ok := s.repo.(GroupedMarketUnitOfWork)
+	return uow, ok
+}
+
+func (s *Service) withTransactionDependencies(repo Repository, userService UserService) *Service {
+	if s == nil {
+		return nil
+	}
+	clone := *s
+	clone.repo = repo
+	clone.userService = userService
+	return &clone
 }
 
 var (

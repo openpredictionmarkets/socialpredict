@@ -227,6 +227,11 @@ func TestSetupCompatibilityTranslation(t *testing.T) {
 			MarketIncentives: setup.MarketIncentives{
 				CreateMarketCost: 15,
 				TraderBonus:      20,
+				MultipleChoiceBinary: setup.MultipleChoiceBinaryMarkets{
+					AddAnswerCost:             3,
+					SoftAnswerReviewThreshold: 11,
+					HardAnswerSafetyCap:       40,
+				},
 			},
 			User: setup.User{
 				InitialAccountBalance: 900,
@@ -266,6 +271,9 @@ func TestSetupCompatibilityTranslation(t *testing.T) {
 	if owned.Game.Mode != GameModeModerator {
 		t.Fatalf("owned game mode = %q, want moderator", owned.Game.Mode)
 	}
+	if owned.Economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost != 3 {
+		t.Fatalf("owned add answer cost = %d, want 3", owned.Economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost)
+	}
 
 	roundTrip := owned.ToSetup()
 	if roundTrip.Economics.MarketIncentives.TraderBonus != 20 {
@@ -273,6 +281,9 @@ func TestSetupCompatibilityTranslation(t *testing.T) {
 	}
 	if roundTrip.Economics.Betting.BetFees.SellSharesFee != 4 {
 		t.Fatalf("round trip sell shares fee = %d, want 4", roundTrip.Economics.Betting.BetFees.SellSharesFee)
+	}
+	if roundTrip.Economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap != 40 {
+		t.Fatalf("round trip hard answer safety cap = %d, want 40", roundTrip.Economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap)
 	}
 	if roundTrip.Game.Mode != GameModeModerator {
 		t.Fatalf("round trip game mode = %q, want moderator", roundTrip.Game.Mode)

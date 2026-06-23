@@ -154,6 +154,9 @@ func TestProposeMarketDescriptionAmendmentAutoApprovesWhenEnabled(t *testing.T) 
 	if defaultSettings.AutoApproveMarketProposals {
 		t.Fatalf("market proposal auto approval should be disabled by default")
 	}
+	if defaultSettings.MarketGroupAnswerAdditionApprovalPolicy != markets.MarketGroupAnswerAdditionApprovalPolicyModerator {
+		t.Fatalf("answer addition policy = %q, want moderator", defaultSettings.MarketGroupAnswerAdditionApprovalPolicy)
+	}
 	enabled := true
 	saved, err := service.UpdateMarketGovernanceSettings(context.Background(), markets.MarketGovernanceSettingsUpdate{
 		AutoApproveDescriptionAmendments: &enabled,
@@ -311,3 +314,199 @@ func TestReviewMarketDescriptionAmendmentRequiresPendingState(t *testing.T) {
 }
 
 var _ = models.MarketDescriptionAmendment{}
+
+func TestReviewGroupedMarketDescriptionAmendmentsReviewsChildrenAtomically(t *testing.T) {
+	repo, group := seedGroupedDescriptionAmendmentMarket(t, "moderator", []string{"Apples", "Pears"})
+	now := marketsTestTime()
+	first, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:     group.Members[0].MarketID,
+		Body:         "Grouped clarification",
+		BodyFormat:   markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:       markets.DescriptionAmendmentStatusPending,
+		CreatedBy:    "moderator",
+		SubmitReason: "same grouped proposal",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		t.Fatalf("create first amendment: %v", err)
+	}
+	second, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:     group.Members[1].MarketID,
+		Body:         "Grouped clarification",
+		BodyFormat:   markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:       markets.DescriptionAmendmentStatusPending,
+		CreatedBy:    "moderator",
+		SubmitReason: "same grouped proposal",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		t.Fatalf("create second amendment: %v", err)
+	}
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(now), markets.Config{})
+
+	approved, err := service.ReviewGroupedMarketDescriptionAmendments(context.Background(), []int64{first.ID, second.ID}, markets.DescriptionAmendmentStatusApproved, "admin", "approved together")
+	if err != nil {
+		t.Fatalf("ReviewGroupedMarketDescriptionAmendments returned error: %v", err)
+	}
+	if len(approved) != 2 {
+		t.Fatalf("approved count = %d, want 2", len(approved))
+	}
+	for _, amendment := range approved {
+		if amendment.Status != markets.DescriptionAmendmentStatusApproved || amendment.ApprovedBy != "admin" || amendment.ApprovedAt == nil {
+			t.Fatalf("unexpected approved amendment: %+v", amendment)
+		}
+	}
+}
+
+func TestReviewGroupedMarketDescriptionAmendmentsRollsBackWhenChildNotPending(t *testing.T) {
+	repo, group := seedGroupedDescriptionAmendmentMarket(t, "moderator", []string{"Apples", "Pears"})
+	now := marketsTestTime()
+	alreadyReviewed, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:     group.Members[0].MarketID,
+		Body:         "Grouped clarification",
+		BodyFormat:   markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:       markets.DescriptionAmendmentStatusPending,
+		CreatedBy:    "moderator",
+		SubmitReason: "same grouped proposal",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		t.Fatalf("create reviewed amendment: %v", err)
+	}
+	pending, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:     group.Members[1].MarketID,
+		Body:         "Grouped clarification",
+		BodyFormat:   markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:       markets.DescriptionAmendmentStatusPending,
+		CreatedBy:    "moderator",
+		SubmitReason: "same grouped proposal",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		t.Fatalf("create pending amendment: %v", err)
+	}
+	if _, err := repo.ReviewMarketDescriptionAmendment(context.Background(), alreadyReviewed.ID, markets.DescriptionAmendmentStatusRejected, "admin", "reject one first", now); err != nil {
+		t.Fatalf("pre-review amendment: %v", err)
+	}
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(now), markets.Config{})
+
+	_, err = service.ReviewGroupedMarketDescriptionAmendments(context.Background(), []int64{alreadyReviewed.ID, pending.ID}, markets.DescriptionAmendmentStatusApproved, "admin", "should fail")
+	if !errors.Is(err, markets.ErrInvalidState) {
+		t.Fatalf("grouped review error = %v, want ErrInvalidState", err)
+	}
+	items, err := repo.ListMarketDescriptionAmendments(context.Background(), markets.MarketDescriptionAmendmentFilters{
+		MarketID: pending.MarketID,
+		Status:   markets.DescriptionAmendmentStatusPending,
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("reload pending amendment: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != pending.ID || items[0].Status != markets.DescriptionAmendmentStatusPending {
+		t.Fatalf("pending child should not have changed: %+v", items)
+	}
+}
+
+func TestReviewGroupedMarketDescriptionAmendmentsRejectsPartialChildSet(t *testing.T) {
+	repo, group := seedGroupedDescriptionAmendmentMarket(t, "moderator", []string{"Apples", "Pears"})
+	now := marketsTestTime()
+	first, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:     group.Members[0].MarketID,
+		Body:         "Grouped clarification",
+		BodyFormat:   markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:       markets.DescriptionAmendmentStatusPending,
+		CreatedBy:    "moderator",
+		SubmitReason: "same grouped proposal",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		t.Fatalf("create first amendment: %v", err)
+	}
+	second, err := repo.CreateMarketDescriptionAmendment(context.Background(), markets.MarketDescriptionAmendment{
+		MarketID:     group.Members[1].MarketID,
+		Body:         "Grouped clarification",
+		BodyFormat:   markets.DescriptionAmendmentFormatMarkdownLite,
+		Status:       markets.DescriptionAmendmentStatusPending,
+		CreatedBy:    "moderator",
+		SubmitReason: "same grouped proposal",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		t.Fatalf("create second amendment: %v", err)
+	}
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(now), markets.Config{})
+
+	_, err = service.ReviewGroupedMarketDescriptionAmendments(context.Background(), []int64{first.ID}, markets.DescriptionAmendmentStatusApproved, "admin", "partial should fail")
+	if !errors.Is(err, markets.ErrInvalidState) {
+		t.Fatalf("partial grouped review error = %v, want ErrInvalidState", err)
+	}
+	for _, item := range []struct {
+		name     string
+		marketID int64
+		wantID   int64
+	}{
+		{name: "first", marketID: first.MarketID, wantID: first.ID},
+		{name: "second", marketID: second.MarketID, wantID: second.ID},
+	} {
+		items, err := repo.ListMarketDescriptionAmendments(context.Background(), markets.MarketDescriptionAmendmentFilters{
+			MarketID: item.marketID,
+			Status:   markets.DescriptionAmendmentStatusPending,
+			Limit:    10,
+		})
+		if err != nil {
+			t.Fatalf("reload %s amendment: %v", item.name, err)
+		}
+		if len(items) != 1 || items[0].ID != item.wantID || items[0].Status != markets.DescriptionAmendmentStatusPending {
+			t.Fatalf("%s child should remain pending: %+v", item.name, items)
+		}
+	}
+}
+
+func seedGroupedDescriptionAmendmentMarket(t *testing.T, username string, labels []string) (*rmarkets.GormRepository, *markets.MarketGroup) {
+	t.Helper()
+	db := modelstesting.NewFakeDB(t)
+	user := modelstesting.GenerateUser(username, 1000)
+	user.UserType = string(dusers.UserTypeModerator)
+	user.ModeratorStatus = string(dusers.ModeratorStatusActive)
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	repo := rmarkets.NewGormRepository(db)
+	members := make([]markets.MarketGroupMember, 0, len(labels))
+	for index, label := range labels {
+		child := modelstesting.GenerateMarket(0, username)
+		child.QuestionTitle = "Grouped amendment market - " + label
+		child.Description = "Grouped child description"
+		child.StewardUsername = username
+		child.LifecycleStatus = markets.MarketLifecyclePublished
+		child.ResolutionDateTime = time.Now().UTC().Add(48 * time.Hour)
+		if err := db.Create(&child).Error; err != nil {
+			t.Fatalf("seed child market %q: %v", label, err)
+		}
+		members = append(members, markets.MarketGroupMember{
+			MarketID:     child.ID,
+			AnswerLabel:  label,
+			DisplayOrder: index,
+		})
+	}
+	group := &markets.MarketGroup{
+		QuestionTitle:      "Grouped amendment market",
+		Description:        "Grouped parent description",
+		LifecycleStatus:    markets.MarketLifecyclePublished,
+		CreatorUsername:    username,
+		StewardUsername:    username,
+		ResolutionDateTime: time.Now().UTC().Add(48 * time.Hour),
+		CreatedAt:          time.Now().UTC(),
+		UpdatedAt:          time.Now().UTC(),
+	}
+	if err := repo.CreateMarketGroup(context.Background(), group, members); err != nil {
+		t.Fatalf("seed market group: %v", err)
+	}
+	return repo, group
+}

@@ -86,7 +86,14 @@ func writeDetailsError(w http.ResponseWriter, err error) {
 }
 
 func writeResolveErrorResponse(w http.ResponseWriter, err error) {
+	var unpublishedChild *dmarkets.MarketGroupChildNotPublishedError
 	switch {
+	case errors.As(err, &unpublishedChild):
+		_ = handlers.WriteFailureWithDetails(w, http.StatusConflict, handlers.ReasonMarketGroupChildUnpublished, unpublishedChild.Error(), map[string]any{
+			"marketId":        unpublishedChild.MarketID,
+			"answerLabel":     unpublishedChild.AnswerLabel,
+			"lifecycleStatus": unpublishedChild.LifecycleStatus,
+		})
 	case errors.Is(err, dmarkets.ErrMarketNotFound):
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	case errors.Is(err, dmarkets.ErrUserNotFound):

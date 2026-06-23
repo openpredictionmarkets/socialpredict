@@ -10,6 +10,10 @@ import (
 // Resolution updates market state and user balances synchronously and remains
 // outside background execution or retry infrastructure.
 func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution string, username string) error {
+	return s.resolveMarket(ctx, marketID, resolution, username, true)
+}
+
+func (s *Service) resolveMarket(ctx context.Context, marketID int64, resolution string, username string, applyWorkProfit bool) error {
 	outcome, err := s.resolutionPolicy.NormalizeResolution(resolution)
 	if err != nil {
 		return err
@@ -39,6 +43,10 @@ func (s *Service) ResolveMarket(ctx context.Context, marketID int64, resolution 
 		return err
 	}
 
+	if !applyWorkProfit {
+		return nil
+	}
+
 	return s.applyModeratorWorkProfit(ctx, market, outcome, resolverUsername)
 }
 
@@ -47,7 +55,7 @@ func (s *Service) applyModeratorWorkProfit(ctx context.Context, market *Market, 
 		return nil
 	}
 
-	income, err := s.calculateModeratorWorkProfitIncome(ctx, market)
+	income, err := s.calculateModeratorWorkFeePayout(ctx, market)
 	if err != nil {
 		return err
 	}
@@ -58,7 +66,7 @@ func (s *Service) applyModeratorWorkProfit(ctx context.Context, market *Market, 
 	return s.userService.ApplyTransaction(ctx, stewardUsername, income, users.TransactionWorkProfit)
 }
 
-func (s *Service) calculateModeratorWorkProfitIncome(ctx context.Context, market *Market) (int64, error) {
+func (s *Service) calculateModeratorWorkFeePayout(ctx context.Context, market *Market) (int64, error) {
 	if market == nil {
 		return 0, nil
 	}
@@ -66,7 +74,7 @@ func (s *Service) calculateModeratorWorkProfitIncome(ctx context.Context, market
 	if err != nil {
 		return 0, err
 	}
-	return ModeratorWorkProfitIncome(bets, s.config.InitialBetFee, marketCreationCostForWorkProfit(market.ProposalCost, s.config.CreateMarketCost)), nil
+	return ModeratorWorkFeeIncome(bets, s.config.InitialBetFee), nil
 }
 
 // ModeratorWorkFeeIncome derives the first-participation fee income for a
@@ -88,15 +96,11 @@ func ModeratorWorkFeeIncome(bets []*Bet, initialBetFee int64) int64 {
 	return int64(len(participants)) * initialBetFee
 }
 
-// ModeratorWorkProfitIncome returns the work-profit payout after the market's
-// creation cost threshold has been met. The first participation fees offset the
-// market creation subsidy; only surplus fee income is paid to the steward.
+// ModeratorWorkProfitIncome returns net work profit after subtracting the
+// market creation/proposal cost from collected first-participation fee income.
+// It can be negative; the resolution payout itself is fee income.
 func ModeratorWorkProfitIncome(bets []*Bet, initialBetFee int64, creationCost int64) int64 {
-	income := ModeratorWorkFeeIncome(bets, initialBetFee) - creationCost
-	if income < 0 {
-		return 0
-	}
-	return income
+	return ModeratorWorkFeeIncome(bets, initialBetFee) - creationCost
 }
 
 func marketCreationCostForWorkProfit(proposalCost int64, fallbackCreateMarketCost int64) int64 {

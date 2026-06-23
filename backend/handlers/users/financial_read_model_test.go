@@ -70,8 +70,10 @@ func TestGetUserFinancialReadModelHandlerReturnsFreshness(t *testing.T) {
 		GeneratedAt:   generatedAt,
 		PositionCount: 2,
 		Financial: analytics.FinancialSnapshot{
-			AccountBalance: 500,
-			AmountInPlay:   120,
+			AccountBalance:        500,
+			AmountInPlay:          120,
+			UnrealizedWorkIncome:  4,
+			UnrealizedWorkProfits: -9,
 		},
 		Source:              "read_model",
 		TransactionSafeRead: false,
@@ -98,7 +100,10 @@ func TestGetUserFinancialReadModelHandlerReturnsFreshness(t *testing.T) {
 	if resp.Result.Username != "alice" {
 		t.Fatalf("username = %q, want alice", resp.Result.Username)
 	}
-	if resp.Result.Financial["accountBalance"] != 500 || resp.Result.Financial["amountInPlay"] != 120 {
+	if resp.Result.Financial["accountBalance"] != 500 ||
+		resp.Result.Financial["amountInPlay"] != 120 ||
+		resp.Result.Financial["unrealizedWorkIncome"] != 4 ||
+		resp.Result.Financial["unrealizedWorkProfits"] != -9 {
 		t.Fatalf("unexpected financial map: %+v", resp.Result.Financial)
 	}
 	if resp.Result.PositionCount != 2 {

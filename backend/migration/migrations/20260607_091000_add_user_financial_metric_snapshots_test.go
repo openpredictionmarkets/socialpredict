@@ -28,6 +28,8 @@ func TestMigrateAddUserFinancialMetricSnapshotsCreatesTable(t *testing.T) {
 		"Equity",
 		"TradingProfits",
 		"WorkProfits",
+		"UnrealizedWorkIncome",
+		"UnrealizedWorkProfits",
 		"TotalProfits",
 		"AmountInPlayActive",
 		"TotalSpent",

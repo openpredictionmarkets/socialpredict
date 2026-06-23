@@ -9,15 +9,73 @@ import (
 
 // MockService provides a reusable test double for markets service interactions.
 type MockService struct {
-	ListByStatusFn      func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
-	ListLifecycleFn     func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
-	MarketLeaderboardFn func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
-	MarketSummaryFn     func(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
-	DetailsCalls        int
+	ListByStatusFn           func(ctx context.Context, status string, p dmarkets.Page) ([]*dmarkets.Market, error)
+	ListLifecycleFn          func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	ListDiscoveryFn          func(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error)
+	ListLifecycleDiscoveryFn func(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error)
+	MarketLeaderboardFn      func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error)
+	MarketSummaryFn          func(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
+	CreateMarketGroupFn      func(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error)
+	MarketGroupOverviewFn    func(ctx context.Context, groupID int64) (*dmarkets.MarketGroupOverview, error)
+	ResolveMarketGroupFn     func(ctx context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error)
+	MarketGroupLookupFn      func(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error)
+	MarketGroupBetsFn        func(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupBetsPage, error)
+	MarketGroupPositionsFn   func(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupPositionsPage, error)
+	MarketGroupLeaderboardFn func(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupLeaderboardPage, error)
+	DetailsCalls             int
 }
 
 func (m *MockService) CreateMarket(ctx context.Context, req dmarkets.MarketCreateRequest, creatorUsername string) (*dmarkets.Market, error) {
 	return nil, nil
+}
+
+func (m *MockService) CreateMarketGroup(ctx context.Context, req dmarkets.MarketGroupCreateRequest, creatorUsername string) (*dmarkets.MarketGroup, error) {
+	if m.CreateMarketGroupFn != nil {
+		return m.CreateMarketGroupFn(ctx, req, creatorUsername)
+	}
+	return nil, dmarkets.ErrInvalidInput
+}
+
+func (m *MockService) GetMarketGroupOverview(ctx context.Context, groupID int64) (*dmarkets.MarketGroupOverview, error) {
+	if m.MarketGroupOverviewFn != nil {
+		return m.MarketGroupOverviewFn(ctx, groupID)
+	}
+	return nil, dmarkets.ErrMarketGroupNotFound
+}
+
+func (m *MockService) ResolveMarketGroup(ctx context.Context, groupID int64, req dmarkets.MarketGroupResolveRequest, username string) (*dmarkets.MarketGroup, error) {
+	if m.ResolveMarketGroupFn != nil {
+		return m.ResolveMarketGroupFn(ctx, groupID, req, username)
+	}
+	return nil, dmarkets.ErrInvalidInput
+}
+
+func (m *MockService) GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
+	if m.MarketGroupLookupFn != nil {
+		return m.MarketGroupLookupFn(ctx, marketID)
+	}
+	return nil, dmarkets.ErrMarketGroupNotFound
+}
+
+func (m *MockService) GetMarketGroupBetsPage(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupBetsPage, error) {
+	if m.MarketGroupBetsFn != nil {
+		return m.MarketGroupBetsFn(ctx, groupID, p)
+	}
+	return &dmarkets.MarketGroupBetsPage{GroupID: groupID, Bets: []*dmarkets.MarketGroupBetDisplayInfo{}}, nil
+}
+
+func (m *MockService) GetMarketGroupPositionsPage(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupPositionsPage, error) {
+	if m.MarketGroupPositionsFn != nil {
+		return m.MarketGroupPositionsFn(ctx, groupID, p)
+	}
+	return &dmarkets.MarketGroupPositionsPage{GroupID: groupID, Positions: []*dmarkets.MarketGroupPositionRow{}}, nil
+}
+
+func (m *MockService) GetMarketGroupLeaderboardPage(ctx context.Context, groupID int64, p dmarkets.Page) (*dmarkets.MarketGroupLeaderboardPage, error) {
+	if m.MarketGroupLeaderboardFn != nil {
+		return m.MarketGroupLeaderboardFn(ctx, groupID, p)
+	}
+	return &dmarkets.MarketGroupLeaderboardPage{GroupID: groupID, Leaderboard: []*dmarkets.MarketGroupLeaderboardRow{}}, nil
 }
 
 func (m *MockService) SetCustomLabels(ctx context.Context, marketID int64, yesLabel, noLabel string) error {
@@ -37,6 +95,42 @@ func (m *MockService) ListLifecycleMarkets(ctx context.Context, filters dmarkets
 		return m.ListLifecycleFn(ctx, filters)
 	}
 	return []*dmarkets.Market{}, nil
+}
+
+func (m *MockService) ListMarketDiscovery(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error) {
+	if m.ListDiscoveryFn != nil {
+		return m.ListDiscoveryFn(ctx, filters)
+	}
+	var markets []*dmarkets.Market
+	var err error
+	if filters.Status != "" && filters.CreatedBy == "" && filters.TagSlug == "" {
+		markets, err = m.ListByStatus(ctx, filters.Status, dmarkets.Page{Limit: filters.Limit, Offset: filters.Offset})
+	} else {
+		markets, err = m.ListMarkets(ctx, filters)
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]dmarkets.MarketDiscoveryRow, 0, len(markets))
+	for _, market := range markets {
+		rows = append(rows, dmarkets.MarketDiscoveryRow{Market: market})
+	}
+	return &dmarkets.MarketDiscoveryPage{Rows: rows, Total: len(rows)}, nil
+}
+
+func (m *MockService) ListLifecycleMarketDiscovery(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error) {
+	if m.ListLifecycleDiscoveryFn != nil {
+		return m.ListLifecycleDiscoveryFn(ctx, filters)
+	}
+	markets, err := m.ListLifecycleMarkets(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]dmarkets.MarketDiscoveryRow, 0, len(markets))
+	for _, market := range markets {
+		rows = append(rows, dmarkets.MarketDiscoveryRow{Market: market})
+	}
+	return &dmarkets.MarketDiscoveryPage{Rows: rows, Total: len(rows)}, nil
 }
 
 func (m *MockService) SearchMarkets(ctx context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.SearchResults, error) {

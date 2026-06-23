@@ -10,6 +10,7 @@ import SiteButton from '../../components/buttons/SiteButtons';
 import { USER_CREDIT_REFRESH_EVENT } from '../../components/utils/userFinanceTools/FetchUserCredit';
 import { apiRequest, authenticatedApiRequest } from '../../api/httpClient';
 import { listMarketTags } from '../../api/marketTagsApi';
+import { createMarketGroup } from '../../api/marketsApi';
 import MarketTagChips from '../../components/markets/MarketTagChips';
 
 function Create() {
@@ -20,9 +21,17 @@ function Create() {
   );
   const [yesLabel, setYesLabel] = useState('');
   const [noLabel, setNoLabel] = useState('');
+  const [marketType, setMarketType] = useState('binary');
+  const [answerLabels, setAnswerLabels] = useState(['', '']);
+  const [autoApproveAnswerAdditions, setAutoApproveAnswerAdditions] = useState(false);
   const [error, setError] = useState('');
   const [createdMarket, setCreatedMarket] = useState(null);
   const [marketCreationCost, setMarketCreationCost] = useState(null);
+  const [multipleChoicePolicy, setMultipleChoicePolicy] = useState({
+    addAnswerCost: 2,
+    softAnswerReviewThreshold: 12,
+    hardAnswerSafetyCap: 50,
+  });
   const [marketTags, setMarketTags] = useState([]);
   const [selectedTagSlugs, setSelectedTagSlugs] = useState([]);
   const { username } = useAuth();
@@ -45,6 +54,13 @@ function Create() {
         const cost = setup?.marketincentives?.createMarketCost;
         if (!ignore && cost !== undefined && cost !== null) {
           setMarketCreationCost(cost);
+        }
+        const groupPolicy = setup?.marketincentives?.multipleChoiceBinary;
+        if (!ignore && groupPolicy) {
+          setMultipleChoicePolicy((current) => ({
+            ...current,
+            ...groupPolicy,
+          }));
         }
       } catch {
         // The backend still enforces cost; this call only improves the UI.
@@ -93,23 +109,74 @@ function Create() {
     });
   };
 
+  const updateAnswerLabel = (index, value) => {
+    setAnswerLabels((current) => current.map((label, labelIndex) => (
+      labelIndex === index ? value : label
+    )));
+  };
+
+  const addAnswerLabel = () => {
+    setAnswerLabels((current) => {
+      const hardCap = multipleChoicePolicy.hardAnswerSafetyCap || 50;
+      if (current.length >= hardCap) {
+        setError(`Multiple-choice market groups can have up to ${hardCap} answers.`);
+        return current;
+      }
+      setError('');
+      return [...current, ''];
+    });
+  };
+
+  const removeAnswerLabel = (index) => {
+    setAnswerLabels((current) => {
+      if (current.length <= 2) {
+        return current;
+      }
+      return current.filter((_, labelIndex) => labelIndex !== index);
+    });
+  };
+
+  const validateAnswerLabels = () => {
+    const trimmedLabels = answerLabels.map((label) => label.trim()).filter(Boolean);
+    if (trimmedLabels.length < 2) {
+      return { error: 'Add at least two answer options.', labels: [] };
+    }
+    const hardCap = multipleChoicePolicy.hardAnswerSafetyCap || 50;
+    if (trimmedLabels.length > hardCap) {
+      return { error: `Multiple-choice market groups can have up to ${hardCap} answers.`, labels: [] };
+    }
+    const seen = new Set();
+    for (const label of trimmedLabels) {
+      if (label.length > 160) {
+        return { error: 'Answer labels must be 160 characters or fewer.', labels: [] };
+      }
+      const key = label.toLowerCase();
+      if (seen.has(key)) {
+        return { error: 'Answer labels must be unique.', labels: [] };
+      }
+      seen.add(key);
+    }
+    return { error: '', labels: trimmedLabels };
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setCreatedMarket(null);
 
-    // Validate custom labels
     const trimmedYesLabel = yesLabel.trim();
     const trimmedNoLabel = noLabel.trim();
-    
-    if (trimmedYesLabel && (trimmedYesLabel.length < 1 || trimmedYesLabel.length > 20)) {
-      setError('Yes label must be between 1 and 20 characters');
-      return;
-    }
-    
-    if (trimmedNoLabel && (trimmedNoLabel.length < 1 || trimmedNoLabel.length > 20)) {
-      setError('No label must be between 1 and 20 characters');
-      return;
+
+    if (marketType === 'binary') {
+      if (trimmedYesLabel && (trimmedYesLabel.length < 1 || trimmedYesLabel.length > 20)) {
+        setError('Yes label must be between 1 and 20 characters');
+        return;
+      }
+
+      if (trimmedNoLabel && (trimmedNoLabel.length < 1 || trimmedNoLabel.length > 20)) {
+        setError('No label must be between 1 and 20 characters');
+        return;
+      }
     }
 
     let isoDateTime = resolutionDateTime;
@@ -126,6 +193,32 @@ function Create() {
     }
 
     try {
+      if (marketType === 'group') {
+        const validation = validateAnswerLabels();
+        if (validation.error) {
+          setError(validation.error);
+          return;
+        }
+
+        const responseData = await createMarketGroup({
+          questionTitle,
+          description,
+          resolutionDateTime: isoDateTime,
+          answerLabels: validation.labels,
+          tagSlugs: selectedTagSlugs,
+          autoApproveAnswerAdditions,
+        });
+
+        window.dispatchEvent(new Event(USER_CREDIT_REFRESH_EVENT));
+        const firstChildMarketId = responseData?.answers?.[0]?.marketId;
+        if (firstChildMarketId) {
+          history.push(`/markets/${firstChildMarketId}`);
+          return;
+        }
+        setCreatedMarket(responseData?.group || responseData);
+        return;
+      }
+
       const marketData = {
         questionTitle,
         description,
@@ -183,9 +276,49 @@ function Create() {
         <p className='mt-2 text-sm text-amber-100'>
           This amount is deducted when you create the proposal. If an admin rejects the proposal, the proposal cost is refunded.
         </p>
+        {marketType === 'group' && (
+          <p className='mt-2 text-sm text-amber-100'>
+            Initial multiple-choice answers are included in the group proposal cost. Later answer additions cost {multipleChoicePolicy.addAnswerCost ?? 0} credits each if enabled.
+          </p>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className='space-y-4 sm:space-y-6'>
+        <div className='rounded-lg border border-gray-700 bg-gray-900/70 p-4'>
+          <p className='text-sm font-medium text-gray-200'>Market Type</p>
+          <p className='mt-1 text-xs text-gray-400'>
+            Multiple-choice binary groups create one parent page and a normal YES/NO child market for each answer.
+          </p>
+          <div className='mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2'>
+            <button
+              type='button'
+              onClick={() => setMarketType('binary')}
+              className={`rounded-lg border p-4 text-left transition ${
+                marketType === 'binary'
+                  ? 'border-primary-pink bg-primary-pink/20 text-white'
+                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-primary-pink/70'
+              }`}
+            >
+              <span className='block text-sm font-semibold'>Binary Market</span>
+              <span className='mt-1 block text-xs text-gray-400'>One YES/NO market.</span>
+            </button>
+            <button
+              type='button'
+              onClick={() => setMarketType('group')}
+              className={`rounded-lg border p-4 text-left transition ${
+                marketType === 'group'
+                  ? 'border-primary-pink bg-primary-pink/20 text-white'
+                  : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-primary-pink/70'
+              }`}
+            >
+              <span className='block text-sm font-semibold'>Multiple-Choice Binary Group</span>
+              <span className='mt-1 block text-xs text-gray-400'>
+                Each answer becomes its own YES/NO market. Initial answers do not add proposal cost.
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div>
           <label htmlFor='market-question-title' className='block text-sm font-medium text-gray-300 mb-1'>
             Question Title
@@ -253,57 +386,135 @@ function Create() {
           </div>
         )}
 
-        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-          <div>
-            <label htmlFor='market-yes-label' className='block text-sm font-medium text-gray-300 mb-1'>
-              Yes Label (Optional)
-            </label>
-            <EmojiPickerInput
-              id='market-yes-label'
-              type='text'
-              value={yesLabel}
-              onChange={(e) => setYesLabel(e.target.value)}
-              placeholder='e.g., BULL 🚀, WIN, PASS'
-              maxLength={20}
-              aria-describedby='market-yes-label-hint'
-              className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-            />
-            <p id='market-yes-label-hint' className='text-xs text-gray-400 mt-1'>
-              Custom label for positive outcome (defaults to "YES")
-            </p>
-          </div>
-          
-          <div>
-            <label htmlFor='market-no-label' className='block text-sm font-medium text-gray-300 mb-1'>
-              No Label (Optional)
-            </label>
-            <EmojiPickerInput
-              id='market-no-label'
-              type='text'
-              value={noLabel}
-              onChange={(e) => setNoLabel(e.target.value)}
-              placeholder='e.g., BEAR 📉, LOSE, FAIL'
-              maxLength={20}
-              aria-describedby='market-no-label-hint'
-              className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-            />
-            <p id='market-no-label-hint' className='text-xs text-gray-400 mt-1'>
-              Custom label for negative outcome (defaults to "NO")
-            </p>
-          </div>
-        </div>
+        {marketType === 'binary' ? (
+          <>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              <div>
+                <label htmlFor='market-yes-label' className='block text-sm font-medium text-gray-300 mb-1'>
+                  Yes Label (Optional)
+                </label>
+                <EmojiPickerInput
+                  id='market-yes-label'
+                  type='text'
+                  value={yesLabel}
+                  onChange={(e) => setYesLabel(e.target.value)}
+                  placeholder='e.g., BULL 🚀, WIN, PASS'
+                  maxLength={20}
+                  aria-describedby='market-yes-label-hint'
+                  className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                />
+                <p id='market-yes-label-hint' className='text-xs text-gray-400 mt-1'>
+                  Custom label for positive outcome (defaults to "YES")
+                </p>
+              </div>
 
-        {(yesLabel.trim() || noLabel.trim()) && (
-          <div className='bg-gray-700 p-3 rounded-md' aria-label='Outcome label preview'>
-            <p className='text-sm font-medium text-gray-300 mb-2'>Preview:</p>
-            <div className='flex space-x-2'>
-              <span className='px-3 py-1 bg-green-600 text-white text-sm rounded'>
-                {yesLabel.trim() || 'YES'}
+              <div>
+                <label htmlFor='market-no-label' className='block text-sm font-medium text-gray-300 mb-1'>
+                  No Label (Optional)
+                </label>
+                <EmojiPickerInput
+                  id='market-no-label'
+                  type='text'
+                  value={noLabel}
+                  onChange={(e) => setNoLabel(e.target.value)}
+                  placeholder='e.g., BEAR 📉, LOSE, FAIL'
+                  maxLength={20}
+                  aria-describedby='market-no-label-hint'
+                  className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                />
+                <p id='market-no-label-hint' className='text-xs text-gray-400 mt-1'>
+                  Custom label for negative outcome (defaults to "NO")
+                </p>
+              </div>
+            </div>
+
+            {(yesLabel.trim() || noLabel.trim()) && (
+              <div className='bg-gray-700 p-3 rounded-md' aria-label='Outcome label preview'>
+                <p className='text-sm font-medium text-gray-300 mb-2'>Preview:</p>
+                <div className='flex space-x-2'>
+                  <span className='px-3 py-1 bg-green-600 text-white text-sm rounded'>
+                    {yesLabel.trim() || 'YES'}
+                  </span>
+                  <span className='text-gray-400'>vs</span>
+                  <span className='px-3 py-1 bg-red-600 text-white text-sm rounded'>
+                    {noLabel.trim() || 'NO'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className='rounded-lg border border-gray-700 bg-gray-900/60 p-4'>
+            <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
+              <div>
+                <p className='text-sm font-medium text-gray-200'>Answer Options</p>
+                <p className='mt-1 text-xs text-gray-400'>
+                  Each answer becomes a separate YES/NO child market under one parent page.
+                </p>
+              </div>
+              <span className='rounded-full bg-gray-800 px-3 py-1 text-xs text-gray-300'>
+                {answerLabels.length}/{multipleChoicePolicy.hardAnswerSafetyCap || 50} answers
               </span>
-              <span className='text-gray-400'>vs</span>
-              <span className='px-3 py-1 bg-red-600 text-white text-sm rounded'>
-                {noLabel.trim() || 'NO'}
-              </span>
+            </div>
+            {answerLabels.length >= (multipleChoicePolicy.softAnswerReviewThreshold || 12) && (
+              <p className='mb-3 rounded-md border border-amber-500/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-100'>
+                Large answer sets can be harder for participants to compare. Initial answers are still included in the group proposal cost.
+              </p>
+            )}
+            <div className='space-y-3'>
+              {answerLabels.map((answerLabel, index) => (
+                <div key={`answer-${index}`} className='flex gap-2'>
+                  <EmojiPickerInput
+                    id={`market-answer-label-${index}`}
+                    type='text'
+                    value={answerLabel}
+                    onChange={(e) => updateAnswerLabel(index, e.target.value)}
+                    placeholder={`Answer ${index + 1}`}
+                    maxLength={160}
+                    className='w-full bg-gray-700 border border-gray-600 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+                  />
+                  <button
+                    type='button'
+                    onClick={() => removeAnswerLabel(index)}
+                    disabled={answerLabels.length <= 2}
+                    className='rounded-md border border-gray-600 px-3 py-2 text-sm font-semibold text-gray-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-40'
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type='button'
+              onClick={addAnswerLabel}
+              className='mt-3 rounded-md border border-primary-pink px-4 py-2 text-sm font-semibold text-primary-pink transition hover:bg-primary-pink/10'
+            >
+              Add Answer
+            </button>
+            <div className='mt-4 flex flex-col gap-3 rounded-lg border border-emerald-800/70 bg-emerald-950/20 p-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div>
+                <p className='text-sm font-semibold text-emerald-100'>Auto-approve later answer options</p>
+                <p className='mt-1 text-xs text-emerald-100/70'>
+                  If enabled, active moderators can add later answer options immediately. If disabled, their options wait for your approval.
+                </p>
+              </div>
+              <button
+                type='button'
+                aria-pressed={autoApproveAnswerAdditions}
+                onClick={() => setAutoApproveAnswerAdditions((current) => !current)}
+                className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition ${
+                  autoApproveAnswerAdditions
+                    ? 'border-emerald-300 bg-emerald-700'
+                    : 'border-gray-600 bg-gray-800'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition ${
+                    autoApproveAnswerAdditions ? 'translate-x-8' : 'translate-x-1'
+                  }`}
+                />
+                <span className='sr-only'>Toggle later answer option auto-approval</span>
+              </button>
             </div>
           </div>
         )}
@@ -349,7 +560,7 @@ function Create() {
         )}
 
         <SiteButton type='submit' className='w-full'>
-          Create Market
+          {marketType === 'group' ? 'Create Market Group' : 'Create Market'}
         </SiteButton>
       </form>
     </div>

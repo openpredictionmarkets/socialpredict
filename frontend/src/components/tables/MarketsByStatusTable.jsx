@@ -8,6 +8,14 @@ import ExpandableLink from '../utils/ExpandableLink';
 import { getResolvedText, getResultCssClass } from '../../utils/labelMapping';
 import StewardTag, { stewardUsernameFor } from '../markets/StewardTag';
 import MarketTagChips from '../markets/MarketTagChips';
+import {
+  groupMarketRows,
+  groupedMarketBadgeLabel,
+  groupedMarketResolutionSummary,
+  isGroupedMarketAggregate,
+  marketDisplayRoute,
+  marketProbabilityDisplay,
+} from '../../helpers/marketGroups';
 
 const DEFAULT_LIMIT = 20;
 const DEFAULT_CREATOR_EMOJI = '👤';
@@ -26,16 +34,17 @@ const normalizeMarketOverview = (raw) => {
   }
 
   if (raw.market || raw.creator) {
+    const market = raw.market ?? {};
     return {
-      market: raw.market ?? {},
+      market,
       creator: raw.creator ?? {
-        username: raw.market?.creatorUsername ?? 'unknown',
+        username: market.creatorUsername ?? 'unknown',
         personalEmoji: DEFAULT_CREATOR_EMOJI,
       },
-      lastProbability: toNumber(raw.lastProbability),
-      numUsers: toNumber(raw.numUsers),
-      totalVolume: toNumber(raw.totalVolume),
-      marketDust: toNumber(raw.marketDust),
+      lastProbability: toNumber(raw.lastProbability ?? market.lastProbability),
+      numUsers: toNumber(raw.numUsers ?? market.numUsers),
+      totalVolume: toNumber(raw.totalVolume ?? market.totalVolume),
+      marketDust: toNumber(raw.marketDust ?? market.marketDust),
     };
   }
 
@@ -82,15 +91,12 @@ const TableHeader = () => (
 
 const MarketRow = ({ marketData }) => {
   const market = marketData?.market ?? {};
-  const marketId = market.id ?? market.marketId;
+  const route = marketDisplayRoute(marketData);
   const creator = marketData?.creator ?? {};
   const creatorUsername = creator.username ?? market.creatorUsername ?? 'unknown';
   const creatorEmoji = creator.personalEmoji ?? DEFAULT_CREATOR_EMOJI;
   const stewardUsername = stewardUsernameFor(market, creatorUsername);
-  const probability = toNumber(marketData?.lastProbability);
-  const probabilityDisplay = Number.isFinite(probability)
-    ? probability.toFixed(2)
-    : '—';
+  const probabilityDisplay = marketProbabilityDisplay(marketData);
   const numUsers = toNumber(marketData?.numUsers);
   const totalVolume = toNumber(marketData?.totalVolume);
   const resolutionDate = market?.resolutionDateTime;
@@ -99,12 +105,15 @@ const MarketRow = ({ marketData }) => {
     ? market.isResolved
     : (typeof market?.status === 'string' && market.status.toLowerCase() === 'resolved');
   const resolutionResult = market?.resolutionResult ?? market?.status ?? '';
+  const groupedResolution = isGroupedMarketAggregate(marketData)
+    ? groupedMarketResolutionSummary(marketData)
+    : null;
 
   return (
     <tr className='hover:bg-gray-700 transition-colors duration-200'>
       <td className='px-6 py-4 whitespace-nowrap'>
         <Link
-          to={marketId ? `/markets/${marketId}` : '#'}
+          to={route}
           className='text-blue-400 hover:text-blue-300'
         >
           ⬆️⬇️
@@ -117,13 +126,18 @@ const MarketRow = ({ marketData }) => {
         <div className='flex max-w-md flex-wrap items-center gap-2'>
           <ExpandableLink
             text={questionTitle}
-            to={marketId ? `/markets/${marketId}` : '#'}
+            to={route}
             maxLength={45}
             className=''
             linkClassName='hover:text-blue-400 transition-colors duration-200'
             buttonClassName='text-xs text-blue-400 hover:text-blue-300 transition-colors ml-1'
             expandIcon='📐'
           />
+          {isGroupedMarketAggregate(marketData) && (
+            <span className='rounded-full border border-cyan-500/40 bg-cyan-950/40 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100'>
+              {groupedMarketBadgeLabel(marketData)}
+            </span>
+          )}
           <MarketTagChips tags={market.tags || []} />
         </div>
       </td>
@@ -152,7 +166,11 @@ const MarketRow = ({ marketData }) => {
       </td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>0</td>
       <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-400'>
-        {isResolved ? (
+        {groupedResolution ? (
+          <span className={groupedResolution.className}>
+            {groupedResolution.label}
+          </span>
+        ) : isResolved ? (
           <span className={getResultCssClass(resolutionResult)}>
             {getResolvedText(resolutionResult, market)}
           </span>
@@ -174,6 +192,7 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', dis
   const observerRef = useRef(null);
   const inFlightRef = useRef(false);
   const activeRequestRef = useRef(null);
+  const nextOffsetRef = useRef(0);
   const pageSize = limit || DEFAULT_LIMIT;
 
   const fetchMarketsPage = useCallback(async ({ offset, append, signal }) => {
@@ -216,22 +235,31 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', dis
       const data = await response.json();
       const payload = data?.result && typeof data.result === 'object' ? data.result : data;
       const rawMarkets = Array.isArray(payload.markets) ? payload.markets : [];
-      const normalized = rawMarkets
+      const rawPage = rawMarkets.slice(0, pageSize);
+      const normalized = rawPage
         .map(normalizeMarketOverview)
         .filter((item) => item !== null);
-      const visibleMarkets = normalized.slice(0, pageSize);
+      const visibleMarkets = groupMarketRows(normalized);
+      nextOffsetRef.current = offset + rawPage.length;
 
       setMarketsData((current) => {
         if (!append) {
           return visibleMarkets;
         }
-        const seen = new Set(current.map((item) => item.market?.id ?? item.market?.marketId));
+        const seen = new Set(current.map((item) => item.market?.marketGroup?.id
+          ? `group:${item.market.marketGroup.id}`
+          : `market:${item.market?.id ?? item.market?.marketId}`));
         return [
           ...current,
-          ...visibleMarkets.filter((item) => !seen.has(item.market?.id ?? item.market?.marketId)),
+          ...visibleMarkets.filter((item) => {
+            const key = item.market?.marketGroup?.id
+              ? `group:${item.market.marketGroup.id}`
+              : `market:${item.market?.id ?? item.market?.marketId}`;
+            return !seen.has(key);
+          }),
         ];
       });
-      setHasMore(normalized.length > pageSize);
+      setHasMore(rawMarkets.length > pageSize);
     } catch (err) {
       if (err.name === 'AbortError') {
         return;
@@ -255,6 +283,7 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', dis
     const controller = new AbortController();
     setMarketsData([]);
     setHasMore(true);
+    nextOffsetRef.current = 0;
 
     fetchMarketsPage({ offset: 0, append: false, signal: controller.signal });
 
@@ -277,7 +306,7 @@ function MarketsByStatusTable({ status, limit = DEFAULT_LIMIT, tagSlug = '', dis
 
       const controller = new AbortController();
       fetchMarketsPage({
-        offset: marketsData.length,
+        offset: nextOffsetRef.current,
         append: true,
         signal: controller.signal,
       });

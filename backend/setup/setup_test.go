@@ -81,6 +81,25 @@ game:
 	}
 }
 
+func TestParseEconomicConfigParsesMultipleChoiceBinaryPolicy(t *testing.T) {
+	cfg, err := ParseEconomicConfig([]byte(`
+economics:
+  marketincentives:
+    createMarketCost: 10
+    multipleChoiceBinary:
+      addAnswerCost: 2
+      softAnswerReviewThreshold: 12
+      hardAnswerSafetyCap: 50
+`))
+	if err != nil {
+		t.Fatalf("ParseEconomicConfig returned error: %v", err)
+	}
+	policy := cfg.Economics.MarketIncentives.MultipleChoiceBinary
+	if policy.AddAnswerCost != 2 || policy.SoftAnswerReviewThreshold != 12 || policy.HardAnswerSafetyCap != 50 {
+		t.Fatalf("unexpected multiple choice policy: %+v", policy)
+	}
+}
+
 func TestLoadEconomicsConfigSingleton(t *testing.T) {
 	resetLegacyLoadState()
 

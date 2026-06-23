@@ -16,6 +16,7 @@ import (
 
 type userOwnedMarketLister interface {
 	ListLifecycleMarkets(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error)
+	GetMarketGroupForMarket(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error)
 }
 
 type userOwnedMarketsResponse struct {
@@ -51,19 +52,29 @@ func ListUserOwnedMarketsHandler(svc userOwnedMarketLister, auth authsvc.Authent
 			Limit:   boundedQueryInt(r.URL.Query().Get("limit"), 50, 1, 100),
 			Offset:  boundedQueryInt(r.URL.Query().Get("offset"), 0, 0, 100000),
 		}
+		if discoverySvc, ok := svc.(lifecycleMarketDiscoveryLister); ok {
+			page, err := discoverySvc.ListLifecycleMarketDiscovery(r.Context(), filters)
+			if err != nil {
+				writeLifecycleListError(w, err)
+				return
+			}
+			response := lifecycleMarketResponseFromDiscoveryRows(r.Context(), svc, page)
+			_ = handlers.WriteResult(w, http.StatusOK, userOwnedMarketsResponse{
+				Markets: response.Markets,
+				Total:   response.Total,
+			})
+			return
+		}
+
 		markets, err := svc.ListLifecycleMarkets(r.Context(), filters)
 		if err != nil {
 			writeLifecycleListError(w, err)
 			return
 		}
-
-		items := make([]*dto.MarketResponse, 0, len(markets))
-		for _, market := range markets {
-			items = append(items, marketToResponse(market))
-		}
+		response := lifecycleMarketResponseFromMarkets(r.Context(), svc, markets)
 		_ = handlers.WriteResult(w, http.StatusOK, userOwnedMarketsResponse{
-			Markets: items,
-			Total:   len(items),
+			Markets: response.Markets,
+			Total:   response.Total,
 		})
 	}
 }

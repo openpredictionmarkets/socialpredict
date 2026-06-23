@@ -197,6 +197,73 @@ func TestUpdateMarketTagsRejectsRejectedMarkets(t *testing.T) {
 	}
 }
 
+func TestUpdateMarketGroupTagsRewritesAllChildAssignments(t *testing.T) {
+	now := marketsTestTime()
+	var assignedGroupID int64
+	var assignedSlugs []string
+	var assignedBy string
+	var assignmentSource string
+	group := &markets.MarketGroup{
+		ID:              77,
+		QuestionTitle:   "Grouped tagged market",
+		LifecycleStatus: markets.MarketLifecyclePublished,
+		Members: []markets.MarketGroupMember{
+			{MarketID: 771, AnswerLabel: "A", DisplayOrder: 0},
+			{MarketID: 772, AnswerLabel: "B", DisplayOrder: 1},
+		},
+	}
+	repo := newProjectionRepo(func(repo *projectionRepo) {
+		repo.getMarketGroupFunc = func(_ context.Context, groupID int64) (*markets.MarketGroup, error) {
+			if groupID != 77 {
+				t.Fatalf("groupID = %d, want 77", groupID)
+			}
+			return group, nil
+		}
+		repo.getByIDFunc = func(_ context.Context, marketID int64) (*markets.Market, error) {
+			return &markets.Market{ID: marketID, QuestionTitle: "Child", LifecycleStatus: markets.MarketLifecyclePublished}, nil
+		}
+		repo.listMarketTagsFunc = func(_ context.Context, includeInactive bool) ([]markets.MarketTag, error) {
+			if includeInactive {
+				t.Fatalf("group tag assignment validation should request active tags only")
+			}
+			return []markets.MarketTag{
+				{ID: 1, Slug: "policy", DisplayName: "Policy", IsActive: true},
+				{ID: 2, Slug: "sports", DisplayName: "Sports", IsActive: true},
+			}, nil
+		}
+		repo.setMarketGroupTagsFunc = func(_ context.Context, groupID int64, tagSlugs []string, by string, source string, assignedAt time.Time) ([]markets.MarketTag, error) {
+			assignedGroupID = groupID
+			assignedSlugs = append([]string(nil), tagSlugs...)
+			assignedBy = by
+			assignmentSource = source
+			if !assignedAt.Equal(now) {
+				t.Fatalf("assignedAt = %s, want %s", assignedAt, now)
+			}
+			return []markets.MarketTag{{ID: 1, Slug: "policy", DisplayName: "Policy", IsActive: true}}, nil
+		}
+	})
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(now), markets.Config{})
+
+	row, err := service.UpdateMarketGroupTags(context.Background(), 77, []string{"sports", "policy"}, "admin")
+	if err != nil {
+		t.Fatalf("UpdateMarketGroupTags returned error: %v", err)
+	}
+	if assignedGroupID != 77 || assignedBy != "admin" || assignmentSource != markets.MarketTagAssignmentSourceAdmin {
+		t.Fatalf("unexpected assignment metadata id=%d by=%q source=%q", assignedGroupID, assignedBy, assignmentSource)
+	}
+	if !reflect.DeepEqual(assignedSlugs, []string{"policy", "sports"}) {
+		t.Fatalf("assigned slugs = %+v", assignedSlugs)
+	}
+	if row == nil || !row.IsMarketGroup || row.Group.ID != 77 || len(row.Children) != 2 || len(row.Tags) != 1 {
+		t.Fatalf("unexpected grouped review row: %+v", row)
+	}
+	for _, child := range row.Children {
+		if len(child.Tags) != 1 || child.Tags[0].Slug != "policy" {
+			t.Fatalf("expected child tags on returned row, got %+v", row.Children)
+		}
+	}
+}
+
 func TestNormalizeMarketTagSlugsRejectsTooManyOrInvalidSlugs(t *testing.T) {
 	if _, err := markets.NormalizeMarketTagSlugs([]string{"valid", "not valid"}); !errors.Is(err, markets.ErrInvalidInput) {
 		t.Fatalf("invalid slug error = %v, want ErrInvalidInput", err)

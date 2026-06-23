@@ -28,7 +28,7 @@ func TestGetSetupHandler(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedResponse: `{
 				"marketcreation":{"initialMarketProbability":0.5,"initialMarketSubsidization":10,"initialMarketYes":0,"initialMarketNo":0,"minimumFutureHours":1},
-				"marketincentives":{"createMarketCost":10,"traderBonus":1},
+				"marketincentives":{"createMarketCost":10,"traderBonus":1,"multipleChoiceBinary":{"addAnswerCost":2,"softAnswerReviewThreshold":12,"hardAnswerSafetyCap":50}},
 				"user":{"initialAccountBalance":0,"maximumDebtAllowed":500},
 				"betting":{"minimumBet":1,"maxDustPerSale":1,"betFees":{"initialBetFee":1,"buySharesFee":0,"sellSharesFee":0}}}`,
 			IsJSONResponse: true,
@@ -107,6 +107,13 @@ func TestGetFrontendSetupHandler(t *testing.T) {
 		Game struct {
 			Mode string `json:"mode"`
 		} `json:"game"`
+		MarketGroups struct {
+			MultipleChoiceBinary struct {
+				AddAnswerCost             int64 `json:"addAnswerCost"`
+				SoftAnswerReviewThreshold int   `json:"softAnswerReviewThreshold"`
+				HardAnswerSafetyCap       int   `json:"hardAnswerSafetyCap"`
+			} `json:"multipleChoiceBinary"`
+		} `json:"marketGroups"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -117,6 +124,9 @@ func TestGetFrontendSetupHandler(t *testing.T) {
 	}
 	if got := response.Game.Mode; got != configsvc.GameModeModerator {
 		t.Fatalf("expected game mode moderator, got %q", got)
+	}
+	if got := response.MarketGroups.MultipleChoiceBinary.HardAnswerSafetyCap; got != 50 {
+		t.Fatalf("expected hard answer safety cap 50, got %d", got)
 	}
 }
 
@@ -138,6 +148,13 @@ func TestGetFrontendSetupHandlerUsesChartSigFigsAccessor(t *testing.T) {
 		Game struct {
 			Mode string `json:"mode"`
 		} `json:"game"`
+		MarketGroups struct {
+			MultipleChoiceBinary struct {
+				AddAnswerCost             int64 `json:"addAnswerCost"`
+				SoftAnswerReviewThreshold int   `json:"softAnswerReviewThreshold"`
+				HardAnswerSafetyCap       int   `json:"hardAnswerSafetyCap"`
+			} `json:"multipleChoiceBinary"`
+		} `json:"marketGroups"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -203,7 +220,15 @@ func (chartSigFigsOnlyConfigService) Current() *configsvc.AppConfig {
 }
 
 func (chartSigFigsOnlyConfigService) Economics() configsvc.Economics {
-	panic("Economics should not be called")
+	return configsvc.Economics{
+		MarketIncentives: configsvc.MarketIncentives{
+			MultipleChoiceBinary: configsvc.MultipleChoiceBinaryMarkets{
+				AddAnswerCost:             2,
+				SoftAnswerReviewThreshold: 12,
+				HardAnswerSafetyCap:       50,
+			},
+		},
+	}
 }
 
 func (chartSigFigsOnlyConfigService) Frontend() configsvc.Frontend {
