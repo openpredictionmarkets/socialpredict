@@ -17,6 +17,7 @@ The boundary is intentionally portable. If the harness later needs independent v
 - `dossier/`: release dossier schema and summarizer.
 - `dossier/staging-capacity-2026-06-09.md`: latest kconfs.com staging capacity addendum, including the clean `35/sec for 5m` run.
 - `dossier/large-host-capacity-rerun-2026-06-11.md`: June 11 temporary large-host notebook for rerunning hot-market and mixed cached-read tests.
+- `dossier/socialpredict-capacity-flyer.html`: printable platform-capacity flyer derived from the load-test dossiers.
 - `hostops/`: operator-captured host observations from HostOps, SSH, DigitalOcean, and safe Linux commands. Ignored by default.
 
 ## Prerequisites
