@@ -8,10 +8,16 @@ The boundary is intentionally portable. If the harness later needs independent v
 
 - `cli/`: wrapper commands for running scenarios and generating dossier summaries.
 - `cli/OPERATING.md`: step-by-step operator/LLM runbook for staging load tests.
-- `k6/`: k6 API load-test scenarios.
+- `STAGING_RUNBOOK.md`: focused kconfs.com staging test ladder and dossier workflow.
+- `TEMP_DROPLET_RUNBOOK.md`: end-to-end DigitalOcean temporary Droplet workflow for larger raw-IP capacity tests.
+- `NEXT_LARGE_HOST_TEST_PLAN_2026-06-10.md`: planned larger-host rerun and mixed website/API workload plan.
+- `k6/`: k6 API load-test scenarios, including `site-mix.js` for mixed read/write browsing pressure.
 - `fixtures/`: generated or operator-provided users, credentials, and market IDs. Ignored by default.
 - `results/`: raw k6 outputs. Ignored by default.
 - `dossier/`: release dossier schema and summarizer.
+- `dossier/staging-capacity-2026-06-09.md`: latest kconfs.com staging capacity addendum, including the clean `35/sec for 5m` run.
+- `dossier/large-host-capacity-rerun-2026-06-11.md`: June 11 temporary large-host notebook for rerunning hot-market and mixed cached-read tests.
+- `dossier/socialpredict-capacity-flyer.html`: printable platform-capacity flyer derived from the load-test dossiers.
 - `hostops/`: operator-captured host observations from HostOps, SSH, DigitalOcean, and safe Linux commands. Ignored by default.
 
 ## Prerequisites
@@ -48,24 +54,10 @@ Do not run capacity tests from the same droplet that hosts the app and database.
 ### Temporary Raw-IP Hosts
 
 For short-lived DigitalOcean capacity tests, prefer creating a temporary Droplet
-instead of permanently resizing staging. Install it as a production-style host
-with load-test limits and an HTTP-only raw-IP edge:
+instead of permanently resizing staging. Use:
 
-```bash
-./SocialPredict install \
-  -e production \
-  -d 45.55.227.1 \
-  -r loadtest \
-  --tls-mode http
-
-./SocialPredict up
-```
-
-Then run k6 from a separate load generator against `http://45.55.227.1`.
-Destroy the temporary Droplet after testing to avoid ongoing cost.
-
-For the exact OpenPredictionMarkets `doctl` + GitHub secrets + Ansible workflow
-smoke sequence, see `loadtest/cli/OPERATING.md`.
+- `TEMP_DROPLET_RUNBOOK.md` for the complete `doctl`, GitHub secrets, Ansible deploy, resize, seed, test, dossier, and destroy sequence.
+- `cli/OPERATING.md` for load-test CLI command reference and staging-oriented operations.
 
 ## Authentication Model
 
@@ -119,6 +111,11 @@ market_id,kind
 
 ## Quick Start
 
+For the current OpenPredictionMarkets staging sequence against `https://kconfs.com`,
+start with `STAGING_RUNBOOK.md`. It includes the preflight checks, fixture
+seed/reset commands, recommended hot-market ladder, pass/fail criteria, and
+dossier update workflow.
+
 Start the app, seed a small local fixture set, and check prerequisites:
 
 ```bash
@@ -168,9 +165,29 @@ scenario focuses on concentrated betting throughput:
   --base-url https://kconfs.com \
   --api-prefix /api \
   --duration 1m \
-  --target-rate 50 \
-  --preauth-users 100
+  --target-rate 10 \
+  --preauth-users 25
 ```
+
+Run the mixed site/API workload after fixtures are seeded and pulled:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 25 \
+  --browse-rate 250 \
+  --preauth-users 500 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+`site-mix` keeps the transaction path isolated to `/v0/bet` while routing
+ordinary browsing pressure through display/read-model endpoints where they
+exist. This is the preferred API-level approximation for users browsing market
+lists, topic pages, market tabs, user pages, stats, and leaderboards while
+other users are trading.
 
 Capture host CPU, RAM, disk, and Docker stats during a run:
 

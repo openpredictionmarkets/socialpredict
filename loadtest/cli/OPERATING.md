@@ -47,156 +47,26 @@ Override those when needed with:
 --repo-path /opt/socialpredict
 ```
 
-For temporary raw-IP load-test hosts, create an arbitrary HostOps environment
-directory such as:
+For temporary raw-IP load-test hosts, use the dedicated runbook:
 
 ```text
-~/.keys/socialpredict/loadtest/
+loadtest/TEMP_DROPLET_RUNBOOK.md
 ```
 
-with `hostops.env` pointing at the temporary Droplet IP. The app install on that
-host should use production topology, load-test rate limits, and HTTP-only edge:
+That document owns the complete `doctl`, GitHub secrets, Ansible load-test
+workflow, CPU/RAM-only resize, fixture seed/pull, k6 run, dossier, and destroy
+sequence.
 
-```bash
-./SocialPredict install \
-  -e production \
-  -d 45.55.227.1 \
-  -r loadtest \
-  --tls-mode http
+## Temporary DigitalOcean Hosts
 
-./SocialPredict up
-```
-
-Run tests against `http://45.55.227.1`, not `https://...`, unless you attach a
-real DNS name and use the default `--tls-mode https`.
-
-## Temporary DigitalOcean Host Smoke Path
-
-This sequence documents the OpenPredictionMarkets raw-IP smoke path used for
-short-lived load-test hosts. It intentionally starts with the cheapest useful
-Droplet to prove SSH, Docker, Ansible, and HTTP deploy wiring before resizing or
-creating a larger host.
-
-1. Create a dedicated local SSH key for the temporary host:
-
-```bash
-mkdir -p ~/.keys/socialpredict/loadtest
-chmod 700 ~/.keys/socialpredict/loadtest
-ssh-keygen -t ed25519 \
-  -f ~/.keys/socialpredict/loadtest/id_ed25519 \
-  -N '' \
-  -C socialpredict-loadtest-YYYYMMDD
-```
-
-2. Import the public key into DigitalOcean:
-
-```bash
-doctl compute ssh-key import socialpredict-loadtest-YYYYMMDD \
-  --public-key-file ~/.keys/socialpredict/loadtest/id_ed25519.pub
-```
-
-3. Create a temporary Ubuntu 24.04 Droplet with Docker bootstrap cloud-init:
-
-```bash
-doctl compute droplet create socialpredict-loadtest-YYYYMMDD \
-  --region nyc3 \
-  --image ubuntu-24-04-x64 \
-  --size s-1vcpu-1gb \
-  --ssh-keys <DIGITALOCEAN_SSH_KEY_ID> \
-  --tag-names socialpredict-loadtest,socialpredict \
-  --user-data-file loadtest/hostops/cloud-init-docker-ubuntu2404.yml \
-  --wait
-```
-
-The initial `s-1vcpu-1gb` host is for smoke only. It has a 25GB disk and can be
-resized later to DigitalOcean sizes with at least a 25GB disk, such as
-`g-2vcpu-8gb`, without permanently increasing disk. Avoid disk resize unless the
-test specifically requires it because DigitalOcean disk increases are not
-reversible.
-
-4. Attach the normal HTTP/HTTPS/SSH firewall:
-
-```bash
-doctl compute firewall add-droplets <FIREWALL_ID> --droplet-ids <DROPLET_ID>
-```
-
-For OpenPredictionMarkets, the current shared firewall is `port80-access`.
-
-5. Verify SSH and Docker:
-
-```bash
-ssh -i ~/.keys/socialpredict/loadtest/id_ed25519 root@<DROPLET_IP> '
-  lsb_release -ds
-  docker --version
-  docker compose version
-  free -h
-  df -h /
-'
-```
-
-6. Point the Ansible load-test workflow at the temporary host:
-
-```bash
-gh secret set LOADTEST_HOST --repo openpredictionmarkets/ansible_playbooks --body '<DROPLET_IP>'
-gh secret set LOADTEST_PORT --repo openpredictionmarkets/ansible_playbooks --body '22'
-gh secret set LOADTEST_USER --repo openpredictionmarkets/ansible_playbooks --body 'root'
-gh secret set LOADTEST_DOMAIN_OR_IP --repo openpredictionmarkets/ansible_playbooks --body '<DROPLET_IP>'
-gh secret set LOADTEST_RATE_LIMIT_PROFILE --repo openpredictionmarkets/ansible_playbooks --body 'loadtest'
-gh secret set LOADTEST_PRIVATE_KEY --repo openpredictionmarkets/ansible_playbooks < ~/.keys/socialpredict/loadtest/id_ed25519
-```
-
-7. Run the manual Ansible workflow:
-
-```bash
-gh workflow run deploy_loadtest.yml \
-  --repo openpredictionmarkets/ansible_playbooks \
-  -f socialpredict_ref=main \
-  -f tls_mode=http \
-  -f domain_or_ip=<DROPLET_IP>
-```
-
-8. Verify the raw-IP deployment:
-
-```bash
-curl -sS http://<DROPLET_IP>/health
-curl -sS http://<DROPLET_IP>/readyz
-curl -sS http://<DROPLET_IP>/api/ops/status
-```
-
-9. Run a smoke test from the local load generator:
-
-```bash
-./loadtest/cli/loadtest fixtures seed loadtest \
-  --host root@<DROPLET_IP> \
-  --key ~/.keys/socialpredict/loadtest/id_ed25519 \
-  --repo-path /opt/socialpredict \
-  --users 100 \
-  --moderators 5 \
-  --markets 20 \
-  --hot-markets 2 \
-  --reset
-
-./loadtest/cli/loadtest fixtures pull loadtest \
-  --host root@<DROPLET_IP> \
-  --key ~/.keys/socialpredict/loadtest/id_ed25519 \
-  --remote-path /opt/socialpredict/loadtest/fixtures \
-  --local-path loadtest/fixtures
-
-./loadtest/cli/loadtest run smoke \
-  --base-url http://<DROPLET_IP> \
-  --api-prefix /api
-```
-
-10. Destroy the temporary host after testing:
-
-```bash
-doctl compute droplet delete <DROPLET_ID>
-```
-
-Clean up or rotate `LOADTEST_*` secrets after deleting the host so future manual
-workflow runs cannot accidentally target a stale IP.
+The old inline smoke path has been consolidated into
+`loadtest/TEMP_DROPLET_RUNBOOK.md`. Use that file for temporary host setup.
 
 ## Command Sequence For Staging
+
+For the shorter current kconfs.com staging ladder and dossier workflow, start
+with `../STAGING_RUNBOOK.md`. This section remains as the expanded operator
+reference.
 
 1. Confirm public readiness:
 

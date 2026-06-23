@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import { sleep } from 'k6';
 import crypto from 'k6/crypto';
 import { SharedArray } from 'k6/data';
 import { Counter } from 'k6/metrics';
@@ -9,6 +10,9 @@ export const betsSucceeded = new Counter('sp_bets_succeeded');
 export const betsFailed = new Counter('sp_bets_failed');
 export const loginFailures = new Counter('sp_login_failures');
 export const marketReadFailures = new Counter('sp_market_read_failures');
+export const siteReadsAttempted = new Counter('sp_site_reads_attempted');
+export const siteReadsSucceeded = new Counter('sp_site_reads_succeeded');
+export const siteReadsFailed = new Counter('sp_site_reads_failed');
 export const rateLimited = new Counter('sp_rate_limited');
 export const loginRateLimited = new Counter('sp_login_rate_limited');
 
@@ -21,6 +25,9 @@ export const BET_AMOUNT = Number(__ENV.BET_AMOUNT || '1');
 export const HOT_MARKET_WEIGHT = Number(__ENV.HOT_MARKET_WEIGHT || '8');
 export const FAILURE_LOG_LIMIT = Number(__ENV.FAILURE_LOG_LIMIT || '10');
 export const PREAUTH_USERS = Number(__ENV.PREAUTH_USERS || '100');
+export const LOGIN_RETRIES = Number(__ENV.LOGIN_RETRIES || '2');
+export const LOGIN_RETRY_SLEEP_SECONDS = Number(__ENV.LOGIN_RETRY_SLEEP_SECONDS || '0.2');
+export const LOGIN_TIMEOUT = __ENV.LOGIN_TIMEOUT || '10s';
 
 let failureLogCount = 0;
 
@@ -85,6 +92,15 @@ function responseReason(response) {
   }
 }
 
+function loginToken(response) {
+  if (!response || !response.body) return '';
+  try {
+    return response.json('result.token') || '';
+  } catch {
+    return '';
+  }
+}
+
 function recordFailure(kind, response, context = {}) {
   const status = response ? String(response.status) : 'unknown';
   const reason = context.reason || responseReason(response);
@@ -101,6 +117,8 @@ function recordFailure(kind, response, context = {}) {
     betsFailed.add(1, tags);
   } else if (kind === 'market_read') {
     marketReadFailures.add(1, tags);
+  } else if (kind === 'site_read') {
+    siteReadsFailed.add(1, tags);
   }
 
   if (failureLogCount >= FAILURE_LOG_LIMIT) return;
@@ -161,24 +179,35 @@ export function authHeaders(token) {
 export function login(user) {
   if (tokenCache[user.username]) return tokenCache[user.username];
 
-  const response = http.post(
-    apiUrl('/v0/login'),
-    JSON.stringify({ username: user.username, password: user.password }),
-    { headers: { 'Content-Type': 'application/json' } },
-  );
+  let response = null;
+  for (let attempt = 1; attempt <= LOGIN_RETRIES + 1; attempt += 1) {
+    response = http.post(
+      apiUrl('/v0/login'),
+      JSON.stringify({ username: user.username, password: user.password }),
+      { headers: { 'Content-Type': 'application/json' }, timeout: LOGIN_TIMEOUT },
+    );
 
-  const ok = check(response, {
-    'login returned 200': (r) => r.status === 200,
-    'login returned token': (r) => Boolean(r.json('result.token')),
-  });
-  if (!ok) {
-    recordFailure('login', response, { user: user.username, url: apiUrl('/v0/login') });
-    return '';
+    const token = response.status === 200 ? loginToken(response) : '';
+    if (token) {
+      check(response, {
+        'login returned 200': (r) => r.status === 200,
+        'login returned token': (r) => Boolean(loginToken(r)),
+      });
+      tokenCache[user.username] = token;
+      return token;
+    }
+
+    if (attempt <= LOGIN_RETRIES) {
+      sleep(LOGIN_RETRY_SLEEP_SECONDS);
+    }
   }
 
-  const token = response.json('result.token');
-  tokenCache[user.username] = token;
-  return token;
+  check(response, {
+    'login returned 200': (r) => r.status === 200,
+    'login returned token': (r) => Boolean(loginToken(r)),
+  });
+  recordFailure('login', response, { user: user.username, url: apiUrl('/v0/login') });
+  return '';
 }
 
 export function preAuthenticateUsers(limit = PREAUTH_USERS) {
@@ -201,6 +230,162 @@ export function pickAuthenticatedUser(authenticatedUsers) {
     return null;
   }
   return pick(authenticatedUsers);
+}
+
+export function readApiPath(path, {
+  name = path,
+  token = '',
+  expectedStatuses = [200],
+  tags = {},
+} = {}) {
+  siteReadsAttempted.add(1, { name, ...tags });
+  const options = token ? authHeaders(token) : undefined;
+  const response = http.get(apiUrl(path), options);
+  const ok = check(response, {
+    [`${name} returned expected status`]: (r) => expectedStatuses.includes(r.status),
+  });
+  if (ok) {
+    siteReadsSucceeded.add(1, { name, ...tags });
+  } else {
+    recordFailure('site_read', response, { name, url: apiUrl(path), ...tags });
+  }
+  return response;
+}
+
+export function fetchActiveTagSlugs() {
+  const response = http.get(apiUrl('/v0/market-tags'));
+  if (response.status !== 200) {
+    return [];
+  }
+
+  try {
+    const result = response.json('result');
+    const tags = result && Array.isArray(result.tags) ? result.tags : [];
+    return tags
+      .filter((tag) => tag && tag.slug && tag.active !== false)
+      .map((tag) => tag.slug);
+  } catch {
+    return [];
+  }
+}
+
+export function pickTagSlug(tagSlugs = []) {
+  if (!tagSlugs || tagSlugs.length === 0) return '';
+  return pick(tagSlugs);
+}
+
+export function readMarketDiscovery({ slug = 'markets', status = '', tagSlug = '' } = {}) {
+  const safeSlug = encodeURIComponent(slug || 'markets');
+  const params = [];
+  if (status && status !== 'all') params.push(`status=${encodeURIComponent(status)}`);
+  params.push('limit=21');
+  params.push('offset=0');
+  if (tagSlug) params.push(`tagSlug=${encodeURIComponent(tagSlug)}`);
+  return readApiPath(`/v0/read/market-discovery/${safeSlug}?${params.join('&')}`, {
+    name: 'market discovery read model',
+    tags: { slug: slug || 'markets', status: status || 'all' },
+  });
+}
+
+export function readMarketSummary(market = pickMarket()) {
+  return readApiPath(`/v0/read/markets/${market.id}/summary`, {
+    name: 'market summary read model',
+    tags: { marketId: String(market.id) },
+  });
+}
+
+export function readMarketBetsPage(market = pickMarket()) {
+  return readApiPath(`/v0/markets/bets/${market.id}?limit=21&offset=0`, {
+    name: 'market bets page',
+    tags: { marketId: String(market.id) },
+  });
+}
+
+export function readMarketPositionsPage(market = pickMarket()) {
+  return readApiPath(`/v0/markets/positions/${market.id}?limit=21&offset=0`, {
+    name: 'market positions read model',
+    tags: { marketId: String(market.id) },
+  });
+}
+
+export function readMarketLeaderboardPage(market = pickMarket()) {
+  return readApiPath(`/v0/markets/${market.id}/leaderboard?limit=21&offset=0`, {
+    name: 'market leaderboard read model',
+    tags: { marketId: String(market.id) },
+  });
+}
+
+export function readUserDisplay(authenticatedUsers = []) {
+  const authenticatedUser = pickAuthenticatedUser(authenticatedUsers);
+  if (!authenticatedUser) {
+    return readApiPath('/v0/setup/frontend', { name: 'setup frontend fallback' });
+  }
+
+  const username = encodeURIComponent(authenticatedUser.username);
+  const roll = secureRandomFraction();
+  if (roll < 0.25) {
+    return readApiPath(`/v0/userinfo/${username}`, {
+      name: 'user info',
+      token: authenticatedUser.token,
+      tags: { username: authenticatedUser.username },
+    });
+  }
+  if (roll < 0.5) {
+    return readApiPath(`/v0/portfolio/${username}`, {
+      name: 'user portfolio',
+      token: authenticatedUser.token,
+      tags: { username: authenticatedUser.username },
+    });
+  }
+  if (roll < 0.75) {
+    return readApiPath(`/v0/users/${username}/owned-markets`, {
+      name: 'user owned markets',
+      token: authenticatedUser.token,
+      tags: { username: authenticatedUser.username },
+    });
+  }
+  return readApiPath(`/v0/read/users/${username}/financial-summary`, {
+    name: 'user financial read model',
+    token: authenticatedUser.token,
+    tags: { username: authenticatedUser.username },
+  });
+}
+
+export function readUserFinancialSummary(authenticatedUsers = []) {
+  const authenticatedUser = pickAuthenticatedUser(authenticatedUsers);
+  if (!authenticatedUser) {
+    return readApiPath('/v0/setup/frontend', { name: 'setup frontend fallback' });
+  }
+
+  const username = encodeURIComponent(authenticatedUser.username);
+  return readApiPath(`/v0/read/users/${username}/financial-summary`, {
+    name: 'user financial read model',
+    token: authenticatedUser.token,
+    tags: { username: authenticatedUser.username },
+  });
+}
+
+export function readStatsDisplay(authenticatedUsers = []) {
+  const authenticatedUser = pickAuthenticatedUser(authenticatedUsers);
+  const token = authenticatedUser ? authenticatedUser.token : '';
+  if (secureRandomBoolean()) {
+    return readApiPath('/v0/system/metrics', {
+      name: 'system metrics read model',
+      token,
+    });
+  }
+  return readApiPath('/v0/global/leaderboard?limit=21&offset=0', {
+    name: 'global leaderboard read model',
+    token,
+  });
+}
+
+export function readConfigDisplay() {
+  const roll = secureRandomFraction();
+  if (roll < 0.25) return readApiPath('/v0/setup/frontend', { name: 'frontend setup' });
+  if (roll < 0.5) return readApiPath('/v0/content/home', { name: 'home content' });
+  if (roll < 0.75) return readApiPath('/v0/content/social-share', { name: 'social share content' });
+  return readApiPath('/v0/market-tags', { name: 'market tags' });
 }
 
 export function placeBet({ hotOnly = false, authenticatedUsers = null } = {}) {
@@ -232,24 +417,24 @@ export function placeBet({ hotOnly = false, authenticatedUsers = null } = {}) {
 }
 
 export function readMarket() {
-	const market = pickMarket();
-	const response = http.get(apiUrl(`/v0/markets/${market.id}`));
-	const ok = check(response, {
-		'market detail returned 200': (r) => r.status === 200,
-	});
-	if (!ok) {
-		recordFailure('market_read', response, { marketId: market.id, url: apiUrl(`/v0/markets/${market.id}`) });
-	}
+  const market = pickMarket();
+  const response = http.get(apiUrl(`/v0/markets/${market.id}`));
+  const ok = check(response, {
+    'market detail returned 200': (r) => r.status === 200,
+  });
+  if (!ok) {
+    recordFailure('market_read', response, { marketId: market.id, url: apiUrl(`/v0/markets/${market.id}`) });
+  }
 }
 
 export function readMarketList() {
-	const response = http.get(apiUrl('/v0/markets'));
-	const ok = check(response, {
-		'market list returned 200': (r) => r.status === 200,
-	});
-	if (!ok) {
-		recordFailure('market_read', response, { url: apiUrl('/v0/markets') });
-	}
+  const response = http.get(apiUrl('/v0/markets'));
+  const ok = check(response, {
+    'market list returned 200': (r) => r.status === 200,
+  });
+  if (!ok) {
+    recordFailure('market_read', response, { url: apiUrl('/v0/markets') });
+  }
 }
 
 export function checkProbes() {

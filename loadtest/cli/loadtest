@@ -17,7 +17,7 @@ Commands:
   host profile <env>     Capture static host/Docker profile JSON over SSH
   host monitor <env>     Capture host CPU/RAM/disk/Docker telemetry over SSH
   host summarize <csv>   Summarize host telemetry CSV
-  run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, soak
+  run <scenario>         Run k6 scenario: smoke, baseline, hot-market-burst, site-mix, soak
   dossier                Generate release dossier JSON from a k6 summary
   help                   Show this help
 
@@ -33,6 +33,7 @@ Run examples:
   ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
   ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100 --setup-timeout 5m
   ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --target-rate 50 --duration 60s --preauth-users 100 --setup-timeout 5m --monitor-env staging
+  ./loadtest/cli/loadtest run site-mix --base-url https://kconfs.com --api-prefix /api --duration 5m --bet-rate 25 --browse-rate 250 --preauth-users 500 --monitor-env staging
   ./loadtest/cli/loadtest dossier --summary loadtest/results/smoke-20260528T120000Z-summary.json --out loadtest/dossier/runs/smoke.json
 
 Fixture defaults:
@@ -120,7 +121,7 @@ resolve_host_defaults() {
 
 scenario_path() {
   case "$1" in
-    smoke|baseline|hot-market-burst|soak)
+    smoke|baseline|hot-market-burst|site-mix|soak)
       echo "${LOADTEST_DIR}/k6/$1.js"
       ;;
     *)

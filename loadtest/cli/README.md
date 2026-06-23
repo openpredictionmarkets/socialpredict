@@ -19,6 +19,7 @@ LOAD_TEST_ENABLED=true ./SocialPredict load seed --users 10 --moderators 2 --mar
 ./loadtest/cli/loadtest run baseline --base-url https://kconfs.com --api-prefix /api --duration 5m --browse-rate 1 --browse-time-unit 5s --bet-rate 1 --bet-time-unit 20s
 ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100
 ./loadtest/cli/loadtest run hot-market-burst --base-url https://kconfs.com --api-prefix /api --target-rate 50 --duration 60s --preauth-users 100 --monitor-env staging
+./loadtest/cli/loadtest run site-mix --base-url https://kconfs.com --api-prefix /api --duration 5m --bet-rate 10 --browse-rate 50 --preauth-users 500 --monitor-env staging
 ./loadtest/cli/loadtest dossier --summary loadtest/results/<summary>.json --host-summary loadtest/hostops/<run>-host-summary.json --metadata loadtest/dossier/metadata.example.json --out loadtest/dossier/runs/<run>.json
 ```
 
@@ -159,6 +160,71 @@ hot-market tests focused on betting throughput instead of measuring login churn.
   --duration 1m \
   --target-rate 50 \
   --preauth-users 100
+```
+
+## Site Mix
+
+`site-mix` runs hot-market betting in parallel with a broader API read mix that
+models users clicking around the site. It uses cached/read-model endpoints for
+market discovery, topic pages, market summary widgets, market positions,
+and market leaderboards where those endpoints exist. The default mix intentionally excludes the
+raw full market detail route and live bets table route so the test models the
+intended cached display paths rather than worst-case recomputation.
+
+It also excludes global reporting endpoints and the user financial summary read
+model. Global reporting endpoints currently refresh synchronously when stale,
+which makes them better as separate control tests than part of default browsing
+traffic. Random load-test users may not have a precomputed financial snapshot,
+which makes that endpoint return `404` and turns the test into a
+fixture-readiness check rather than a browsing-capacity test.
+
+During setup, `site-mix` pre-authenticates users before the measured scenarios
+start. Transient login timeouts are retried and skipped if they still fail, so
+one setup timeout does not abort the entire run.
+
+The default first ratio is `10` read actions for each `1` bet action:
+
+| Read family | Endpoint pattern | Default read share |
+| --- | --- | ---: |
+| Main market discovery | `/v0/read/market-discovery/markets?...` | `25%` |
+| Topic discovery | `/v0/read/market-discovery/{tagSlug}?...` | `15%` |
+| Market summary widgets | `/v0/read/markets/{id}/summary` | `43%` |
+| Market positions | `/v0/markets/positions/{id}?limit=21&offset=0` | `10%` |
+| Market leaderboard | `/v0/markets/{id}/leaderboard?limit=21&offset=0` | `7%` |
+
+Market positions and market leaderboard requests use the cached snapshot path
+only when `limit` or `offset` are present. If a snapshot is stale, the current
+application may refresh it synchronously, but the work is scoped to the selected
+market rather than global reporting.
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url https://kconfs.com \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 10 \
+  --browse-rate 50 \
+  --preauth-users 500 \
+  --monitor-env staging \
+  --monitor-interval 5
+```
+
+For temporary raw-IP large-host tests, replace `--base-url` and provide the
+remote monitor target:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url "http://$LOADTEST_DROPLET_IP" \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 10 \
+  --browse-rate 50 \
+  --preauth-users 500 \
+  --setup-timeout 5m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@"$LOADTEST_DROPLET_IP" \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
 ```
 
 ## Low-Rate Runs

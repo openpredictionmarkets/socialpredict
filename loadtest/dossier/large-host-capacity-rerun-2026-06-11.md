@@ -1,0 +1,1164 @@
+# SocialPredict Large-Host Capacity Rerun Notebook
+
+Date opened: 2026-06-11
+
+Status: closed experiment; temporary large host was deployed, seeded, smoke-tested, tested through the `35/350` clean mixed workload, and destroyed after the `42/420` failed bracket.
+
+Base URL: `http://159.65.37.166`
+
+## Research Question
+
+Can the current release build, including cached reporting/read-model improvements and the `v3.4.0` market-summary read-model fix, reproduce or improve the previous larger-host SocialPredict capacity evidence on a temporary DigitalOcean Basic AMD host?
+
+This rerun also adds a mixed cached-read workload to model ordinary site browsing while hot-market betting is active.
+
+## Host
+
+| Field | Value |
+| --- | --- |
+| Provider | DigitalOcean |
+| Droplet name | `socialpredict-loadtest-20260611-023140` |
+| Droplet ID | `576807920` |
+| Public IPv4 | `159.65.37.166` |
+| Region | `nyc3` |
+| Size slug | `s-8vcpu-32gb-amd` |
+| Destroyed at | `2026-06-11T04:46:22Z` |
+| CPU model observed | `DO-Premium-AMD` |
+| Host CPU count | `8` |
+| Host RAM total | `32095 MiB` |
+| Root disk observed | `395700 MiB` |
+| Root disk used at profile | `4133 MiB` |
+| Docker CPU count | `8` |
+| Docker RAM total | `32095 MiB` |
+| Explicit container CPU limits | `0/6` |
+| Explicit container memory limits | `0/6` |
+
+Interpretation caveat: this is a DigitalOcean Basic AMD shared-CPU host. Results should be presented as observed shared-CPU evidence, not dedicated-CPU evidence.
+
+## Deployment
+
+The temporary host was created with Ubuntu 24.04 and Docker cloud-init, then deployed through the `openpredictionmarkets/ansible_playbooks` load-test workflow.
+
+Workflow:
+
+```text
+https://github.com/openpredictionmarkets/ansible_playbooks/actions/runs/27319946755
+```
+
+Version boundary:
+
+| Time UTC | Workflow / release | Deployed ref | Interpretation |
+| --- | --- | --- | --- |
+| `2026-06-11T02:33:54Z` | Load-test deploy `27319946755` | `main` before `v3.4.0` | Used for smoke, `100/sec` hot-market baseline, and the first mixed workload attempts below. This is effectively `v3.3.0`-era code plus then-current `main`, but without PR #749's pure market-summary read-model fix. |
+| `2026-06-11T03:59:21Z` | SocialPredict release `v3.4.0` | `v3.4.0` | Adds cached market read-model behavior, including `/v0/read/markets/{id}/summary` avoiding synchronous full market accounting refresh. |
+| `2026-06-11T04:03:31Z` | Load-test deploy `27322972380` | `v3.4.0` | This deploy was dispatched after the release. Mixed workload results after this deploy should be recorded as the `v3.4.0` series. |
+
+External readiness passed:
+
+```text
+GET http://159.65.37.166/health -> live
+GET http://159.65.37.166/readyz -> ready
+GET http://159.65.37.166/api/ops/status -> ready DB pool
+```
+
+## Fixtures
+
+Seed command:
+
+```bash
+./loadtest/cli/loadtest fixtures seed loadtest \
+  --host root@159.65.37.166 \
+  --key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --repo-path /opt/socialpredict \
+  --users 10000 \
+  --moderators 100 \
+  --markets 1000 \
+  --hot-markets 10 \
+  --user-balance 1000000 \
+  --reset
+```
+
+Seed output:
+
+| Fixture | Count |
+| --- | ---: |
+| Regular users | `10000` |
+| Moderators | `100` |
+| Markets | `1000` |
+| Hot markets | `10` |
+| Password change required | `false` |
+
+Local fixture pull confirmed `markets.csv` contains IDs `1-1000`, with `1-10` marked `hot`.
+
+## Smoke
+
+Smoke test passed against the raw-IP deployment.
+
+| Metric | Value |
+| --- | ---: |
+| Bets attempted | `3` |
+| Bets succeeded | `3` |
+| HTTP failures | `0%` |
+| HTTP p95 | `170.79ms` |
+
+Raw artifact:
+
+```text
+loadtest/results/smoke-20260611T023734Z-summary.json
+```
+
+## Hot-Market Baseline: 100/sec For 1m
+
+Command:
+
+```bash
+./loadtest/cli/loadtest run hot-market-burst \
+  --base-url http://159.65.37.166 \
+  --api-prefix /api \
+  --duration 1m \
+  --target-rate 100 \
+  --preauth-users 2000 \
+  --setup-timeout 5m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@159.65.37.166 \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
+Result:
+
+| Metric | Value |
+| --- | ---: |
+| Result | Pass |
+| Measured scenario duration | `1m` |
+| Target betting rate | `100/sec` |
+| Bets attempted | `6001` |
+| Bets succeeded | `6001` |
+| Failed bets | `0` |
+| HTTP failures | `0/8004` |
+| HTTP p95 | `66.45ms` |
+| HTTP max | `178.62ms` |
+| Iteration p95 | `80.40ms` |
+| Interrupted iterations | `0` |
+
+Important interpretation note: k6 custom metric rates include the setup phase, so `sp_bets_succeeded` reported around `33/sec` over total wall time. The measured scenario itself completed `6001` bets over `60s`, which is effectively `100/sec`.
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `22` |
+| Window | `2026-06-11T02:38:53Z` to `2026-06-11T02:41:44Z` |
+| Max CPU user | `8.38%` |
+| Max CPU system | `8.63%` |
+| Min CPU idle | `82.99%` |
+| Min RAM available | `31128 MiB` |
+| Max RAM used | `967 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `42784 KiB/s` |
+| Max Docker CPU sum | `121.82%` |
+| Max Docker RAM sum | `133.5 MiB` |
+| Max backend CPU | `66.88%` |
+| Max Postgres CPU | `46.77%` |
+| Max Traefik CPU | `10.75%` |
+
+Raw artifacts:
+
+```text
+loadtest/results/hot-market-burst-20260611T023847Z-summary.json
+loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260611T023847Z-host.csv
+loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260611T023847Z-host-summary.json
+loadtest/hostops/hot-market-burst-loadtest-basic-amd-20260611T023847Z-host-profile.json
+```
+
+## Pre-v3.4.0 Mixed Cached-Read Workload Plan
+
+The first mixed workload attempts used `site-mix`, which combines hot-market betting with cached/read-model browsing paths. These runs happened before the `v3.4.0` load-test deploy, so they should not be used as final evidence for the `v3.4.0` cache behavior.
+
+Default read distribution at `250` reads/sec:
+
+| Share | Approx/sec | Endpoint family |
+| ---: | ---: | --- |
+| `25%` | `62.5/sec` | `/v0/read/market-discovery/markets?...` |
+| `15%` | `37.5/sec` | `/v0/read/market-discovery/{tagSlug}?...` |
+| `43%` | `107.5/sec` | `/v0/read/markets/{id}/summary` |
+| `10%` | `25/sec` | `/v0/markets/positions/{id}?limit=21&offset=0` |
+| `7%` | `17.5/sec` | `/v0/markets/{id}/leaderboard?limit=21&offset=0` |
+
+The default mixed run intentionally excludes the raw full market detail route, the live bets table route, global reporting endpoints, and user financial summaries. Those should be measured separately as control or worst-case paths after the harness can warm the relevant snapshots.
+
+Pre-`v3.4.0`, market positions and market leaderboard requests used cached snapshots only when pagination parameters were present, and could still refresh synchronously when stale. Global reporting endpoints were excluded because active betting marked analytics snapshots stale, which could cause synchronous global recomputation on read. The `v3.4.0` release changes the read model behavior so existing stale display snapshots are served without synchronous refresh.
+
+### Aborted Setup Attempt
+
+An initial `site-mix` attempt started at `2026-06-11T02:58:01Z` but did not reach the measured scenarios. k6 was still in `setup()` pre-authenticating `2000` users when one `/api/v0/login` request timed out. The helper then attempted to parse the timeout response's null body as JSON and aborted the script.
+
+This is classified as a load-test harness failure, not an application capacity failure:
+
+| Metric | Value |
+| --- | ---: |
+| Authenticated logins before abort | `774` |
+| Failed login requests | `1` |
+| HTTP failure rate during setup | `0.12%` |
+| Max host CPU user during setup | `1.24%` |
+| Max Postgres CPU during setup | `1.41%` |
+| Min CPU idle during setup | `97.64%` |
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T025801Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T025801Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T025801Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T025801Z-host-profile.json
+```
+
+Harness adjustment: login token parsing now tolerates null/timeout bodies, and setup logins retry transient failures instead of aborting the entire run.
+
+### Interrupted Fixture-Shape Attempt
+
+A second `site-mix` attempt started at `2026-06-11T03:09:34Z` and reached the measured scenarios, but it was manually interrupted after repeated `404 NOT_FOUND` responses from `/api/v0/read/users/{username}/financial-summary`.
+
+This is also classified as a load-test fixture-shape issue, not a host-capacity failure. The endpoint requires an existing user financial read-model snapshot. Random load-test users did not have those snapshots precomputed, so the endpoint consistently returned `404`.
+
+Partial run observations before interruption:
+
+| Metric | Value |
+| --- | ---: |
+| Runtime before interruption | `~2m02s` wall time, measured scenarios about `6s` |
+| Bets attempted | `159` |
+| Bets succeeded | `152` |
+| Site reads attempted | `1549` |
+| Site read failures | `117` |
+| Failed read family | `user financial read model` |
+| HTTP p95 | `804.28ms` |
+| Dropped iterations | `33` |
+| Max CPU user | `1.61%` |
+| Max Postgres CPU | `2.05%` |
+| Min CPU idle | `97.03%` |
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T030934Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T030934Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T030934Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T030934Z-host-profile.json
+```
+
+Harness adjustment: user financial summaries were removed from the default `site-mix` distribution. They should be added back only after a snapshot warmup command exists or the endpoint returns a safe zero/default read model for existing users without snapshots.
+
+### Mixed Workload Failure: 25 Bets/sec Plus 250 Reads/sec
+
+A third `site-mix` attempt started at `2026-06-11T03:13:46Z` after user financial summaries were removed from the default mix. This run reached the measured scenario but was manually interrupted after the host saturated and k6 began reporting request timeouts.
+
+Command:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url http://159.65.37.166 \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 25 \
+  --browse-rate 250 \
+  --preauth-users 2000 \
+  --setup-timeout 10m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@159.65.37.166 \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
+Observed result:
+
+| Metric | Value |
+| --- | ---: |
+| Result | Interrupted failure signal |
+| Checks passed | `98.46%` |
+| HTTP failure rate | `1.84%` |
+| Bets attempted | `1530` |
+| Bets succeeded | `856` |
+| Site reads attempted | `8606` |
+| Site reads succeeded | `7417` |
+| Site reads failed | `192` |
+| HTTP p95 | `10.67s` |
+| Iteration p95 | `13.71s` |
+| Dropped iterations | `13034` |
+| Max active VUs | `1675` |
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Max CPU user | `75.84%` |
+| Max CPU system | `26.39%` |
+| Min CPU idle | `1.34%` |
+| Max Docker CPU sum | `775.15%` |
+| Max backend CPU | `362.8%` |
+| Max Postgres CPU | `400.02%` |
+| Min RAM available | `29952 MiB` |
+
+Interpretation:
+
+- This was not RAM-bound.
+- The host was effectively CPU-bound across backend/Postgres.
+- The reporting slice distorted the default browsing mix because global reporting snapshots can refresh synchronously when stale.
+- Global reporting should be tested as a separate control until it is changed to stale-while-revalidate.
+- This run should not be used as the final mixed-workload capacity ceiling; rerun a lower mix without reporting endpoints first.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T031346Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T031346Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T031346Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T031346Z-host-profile.json
+```
+
+Harness adjustment: global reporting endpoints were removed from the default `site-mix` distribution and the next mixed run was reduced to `10` bets/sec plus `50` reads/sec.
+
+Next command:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url http://159.65.37.166 \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 10 \
+  --browse-rate 50 \
+  --preauth-users 500 \
+  --setup-timeout 5m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@159.65.37.166 \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
+## Open Questions
+
+- Does `10` bets/sec plus `50` cached reads/sec stay clean for `5m` after reporting endpoints are removed?
+- Does cached-read traffic materially affect write-path p95 compared with hot-market-only runs?
+- At what mixed workload do Postgres or backend CPU become dominant?
+- Should separate control tests be added for raw full market detail and live bets table routes after cached-read runs complete?
+
+### Mixed Workload Pass: 10 Bets/sec Plus 50 Reads/sec
+
+After the higher `25` bets/sec plus `250` reads/sec mixed workload saturated the host, the mixed scenario was reduced to a smaller representative read/write baseline. This run completed cleanly.
+
+Command:
+
+```bash
+./loadtest/cli/loadtest run site-mix \
+  --base-url http://159.65.37.166 \
+  --api-prefix /api \
+  --duration 5m \
+  --bet-rate 10 \
+  --browse-rate 50 \
+  --preauth-users 500 \
+  --setup-timeout 5m \
+  --monitor-env loadtest-basic-amd \
+  --monitor-host root@159.65.37.166 \
+  --monitor-key ~/.keys/socialpredict/loadtest/id_ed25519 \
+  --monitor-interval 5
+```
+
+Scenario mix:
+
+| Scenario | Target | Duration | Notes |
+| --- | ---: | --- | --- |
+| Hot-market bets | `10/sec` | `5m` | Pre-authenticated users, hot-market-only writes. |
+| Site reads | `50/sec` | `5m` | Cached/read-model browsing paths only. |
+
+Read distribution for this run:
+
+| Share | Approx/sec at `50` reads/sec | Endpoint family |
+| ---: | ---: | --- |
+| `25%` | `12.5/sec` | `/v0/read/market-discovery/markets?...` |
+| `15%` | `7.5/sec` | `/v0/read/market-discovery/{tagSlug}?...` |
+| `43%` | `21.5/sec` | `/v0/read/markets/{id}/summary` |
+| `10%` | `5.0/sec` | `/v0/markets/positions/{id}?limit=21&offset=0` |
+| `7%` | `3.5/sec` | `/v0/markets/{id}/leaderboard?limit=21&offset=0` |
+
+Result:
+
+| Metric | Value |
+| --- | ---: |
+| Result | Pass |
+| Wall-clock runtime | `5m27.5s` including setup/graceful stop |
+| Measured scenario duration | `5m` |
+| Bets attempted | `3001` |
+| Bets succeeded | `3001` |
+| Failed bets | `0` |
+| Site reads attempted | `15001` |
+| Site reads succeeded | `15001` |
+| HTTP requests | `18506` |
+| HTTP failures | `0` |
+| HTTP request rate | `56.51/sec` |
+| HTTP p95 | `183.83ms` |
+| HTTP max | `364.47ms` |
+| Iteration p95 | `196.95ms` |
+| Dropped/interrupted iterations | `0` |
+| Max VUs observed | `13` |
+
+Endpoint check counts:
+
+| Check | Passes | Fails |
+| --- | ---: | ---: |
+| `bet returned 201` | `3001` | `0` |
+| `market discovery read model returned expected status` | `6050` | `0` |
+| `market summary read model returned expected status` | `6417` | `0` |
+| `market positions read model returned expected status` | `1503` | `0` |
+| `market leaderboard read model returned expected status` | `1031` | `0` |
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `41` |
+| Window | `2026-06-11T03:37:26Z` to `2026-06-11T03:42:53Z` |
+| Max CPU user | `25.35%` |
+| Max CPU system | `9.89%` |
+| Min CPU idle | `65.65%` |
+| Min RAM available | `30867 MiB` |
+| Max RAM used | `1228 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `38616 KiB/s` |
+| Max network RX | `66.34 KiB/s` |
+| Max network TX | `2291.69 KiB/s` |
+| Max Docker CPU sum | `298.01%` |
+| Max Docker RAM sum | `200.94 MiB` |
+| Max backend CPU | `200.21%` |
+| Max Postgres CPU | `89.66%` |
+| Max Traefik CPU | `11.34%` |
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T033720Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T033720Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T033720Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T033720Z-host-profile.json
+```
+
+Interpretation:
+
+- This is the first clean mixed read/write datapoint in the June 10/11 rerun sequence.
+- The host had substantial CPU and RAM headroom at this reduced mix.
+- Backend CPU was the largest app-side slice, while Postgres stayed under `90%` container CPU in the observed maximum sample.
+- This run is not a maximum-capacity claim. It is a stable mixed baseline after the higher `25` bets/sec plus `250` reads/sec attempt exposed read-path pressure.
+- The run was executed before the pure market-summary read-model fix that removes synchronous accounting refresh from `/v0/read/markets/{id}/summary`. After that fix is deployed, rerun this same command first, then ladder upward.
+
+## Current Interpretation After Pre-v3.4.0 June 10/11 Mixed Runs
+
+- Pure hot-market betting still has a stronger clean datapoint from the earlier large-host experiment than the mixed workload has so far.
+- The mixed workload is more representative of real site behavior because it combines hot-market writes with market discovery, market summary cards, positions pages, and leaderboards.
+- The failed `25` bets/sec plus `250` reads/sec run should not be treated as final capacity evidence until the read-model fixes are deployed, because the market summary endpoint was still capable of synchronous accounting refresh.
+- The clean `10` bets/sec plus `50` reads/sec run is the current pre-`v3.4.0` mixed baseline for this host.
+
+Recommended next sequence after the `v3.4.0` load-test deploy:
+
+1. Use a larger bracket, not tiny increments. The pre-`v3.4.0` `10/50` pass had substantial headroom and is too low to estimate the edge.
+2. Rerun a meaningful `v3.4.0` baseline at `25` bets/sec plus `250` reads/sec for `5m`.
+3. If clean, jump to `50` bets/sec plus `500` reads/sec for `5m`.
+4. If that is clean, test `75` bets/sec plus `750` reads/sec for `5m`; if it fails, bisect between the last clean and failed rate.
+5. Keep global reporting and user financial summaries out of the default site mix until those paths have explicit warmup/default-snapshot behavior and separate tests.
+
+## v3.4.0 Mixed Workload Edge-Finding Plan
+
+The goal of the `v3.4.0` series is to bracket the mixed read/write edge quickly.
+
+The prior clean mixed run was `10` bets/sec plus `50` reads/sec. Its host profile showed enough headroom that smaller steps are unlikely to be informative. The next series should use larger jumps and then bisect.
+
+| Step | Command target | Purpose | Decision rule |
+| --- | ---: | --- | --- |
+| A | `25` bets/sec + `250` reads/sec for `5m` | Re-test the prior failed mixed target after `v3.4.0` removes synchronous market-summary refresh. | If clean, move up. If it fails, inspect failure family before assuming host limit. |
+| B | `50` bets/sec + `500` reads/sec for `5m` | Find whether the fix creates substantial new mixed-read headroom. | If p95 stays below `1s`, no failed bets, and no dropped iterations, move up. |
+| C | `75` bets/sec + `750` reads/sec for `5m` | Stress the host near a likely mixed-workload edge. | If it fails, bisect between B and C. |
+| D | `100` bets/sec + `1000` reads/sec for `5m` | Optional only if C is clean and host telemetry still has headroom. | Stop if Postgres/backend CPU pins or request failures appear. |
+
+Pass/fail criteria:
+
+- Pass: zero failed bets, effectively zero HTTP failures, no dropped iterations, p95 below `1s`, and host CPU not pinned near `0%` idle for sustained samples.
+- Degraded: no failed bets but dropped iterations, p95 above `1s`, or CPU pinned for sustained samples.
+- Fail: any meaningful failed bets, sustained HTTP failures, site unreachability, or k6 abort.
+
+The `v3.4.0` series should be documented separately from the pre-`v3.4.0` runs even though it uses the same Droplet and fixtures.
+
+## v3.4.0 Mixed Workload Results
+
+### Invalid Setup Run: Fixture Mismatch After v3.4.0 Deploy
+
+A first post-deploy attempt started at `2026-06-11T04:07:22Z` using `25` bets/sec plus `250` reads/sec, but it never reached the measured scenarios. The load-test users failed authentication during setup.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `25` bets/sec + `250` reads/sec |
+| Result | Invalid setup run |
+| Failed login requests | `8` |
+| Login failure reason | `AUTHORIZATION_DENIED` |
+| HTTP failure rate | `89.28%` during setup only |
+| Host CPU idle | `99.75%` |
+
+Interpretation:
+
+- This is not capacity evidence.
+- The server was idle and ready; the failure was fixture/auth state mismatch after redeploy.
+- Corrective action was to reseed remote load-test fixtures and pull fresh local `users.csv` / `markets.csv` before rerunning.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T040722Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040722Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040722Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040722Z-host-profile.json
+```
+
+### Partial Probe: 25 Bets/sec Plus 250 Reads/sec
+
+A later `25` bets/sec plus `250` reads/sec attempt started at `2026-06-11T04:08:48Z`. It looked clean, but it did not run to the full five-minute confirmation target, so it is recorded as a partial probe rather than proof.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `25` bets/sec + `250` reads/sec |
+| Result | Partial clean probe, not full proof |
+| Bets attempted | `2597` |
+| Bets succeeded | `2595` |
+| Failed bets | `0` recorded in check failures |
+| Site reads attempted | `25967` |
+| Site reads succeeded | `25948` |
+| HTTP failures | `0` |
+| HTTP p95 | `108.23ms` |
+| Max VUs | `200` |
+| Host min CPU idle | `58.24%` |
+| Max Docker CPU sum | `276.41%` |
+| Max backend CPU | `83.18%` |
+| Max Postgres CPU | `42.14%` |
+| Min RAM available | `31091 MiB` |
+
+Interpretation:
+
+- This run suggests `25/250` is plausible on `v3.4.0`, but it must be rerun to completion before being treated as a passing evidence point.
+- The host had meaningful headroom during the partial window.
+- Because the follow-up `50/500` failed badly, the full `25/250` confirmation is still necessary before testing the midpoint.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T040848Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040848Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040848Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T040848Z-host-profile.json
+```
+
+### Failed Bracket: 50 Bets/sec Plus 500 Reads/sec
+
+A `50` bets/sec plus `500` reads/sec attempt started at `2026-06-11T04:12:07Z` and was manually aborted after the run degraded heavily.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `50` bets/sec + `500` reads/sec |
+| Result | Fail / upper-bound bracket |
+| Scenario time before abort | About `1m20s` |
+| Bets attempted | `1911` |
+| Bets succeeded | `196` |
+| Bets failed | `715` |
+| Site reads attempted | `8236` |
+| Site reads succeeded | `7229` |
+| Site reads failed | `7` |
+| HTTP failure rate | `6.77%` |
+| HTTP p95 | `33.05s` |
+| HTTP max | `60.26s` |
+| Dropped iterations | `34104` |
+| VUs maxed | `2000/2000` |
+| Host min CPU idle | `88.18%` |
+| Max Docker CPU sum | `117.48%` |
+| Max backend CPU | `38.37%` |
+| Max Postgres CPU | `51.78%` |
+| Min RAM available | `30540 MiB` |
+
+Interpretation:
+
+- `50/500` is above the current mixed workload envelope.
+- The host was mostly idle while k6 reached `2000` VUs and requests timed out, so this does not look like a simple server CPU saturation limit.
+- The failure pattern points toward request queueing, connection pool pressure, client/load-generator saturation, network behavior, or another concurrency bottleneck.
+- This is a useful upper-bound bracket, but it should not be interpreted as the raw CPU capacity of the host.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T041207Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041207Z-host-profile.json
+```
+
+### Interim v3.4.0 Bracket After Failed 50/500
+
+| Bound | Status | Evidence |
+| --- | --- | --- |
+| Lower candidate | `25/250` looked clean but partial | Needs full five-minute confirmation. |
+| Upper bound | `50/500` failed | Too aggressive under current harness/system behavior. |
+| Next midpoint after full lower confirmation | `35/350` | Run only after full `25/250` completes cleanly. |
+
+This was the interim bracket immediately after the failed `50/500` attempt. Later sections record the completed `25/250` and `35/350` passes.
+
+### Confirmed Pass: 25 Bets/sec Plus 250 Reads/sec
+
+A full `25` bets/sec plus `250` reads/sec confirmation run started at `2026-06-11T04:18:13Z` and completed the five-minute scenario cleanly.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `25` bets/sec + `250` reads/sec |
+| Result | Pass |
+| Scenario duration | `5m` |
+| Wall-clock runtime | `6m24.6s` including setup/graceful stop |
+| Bets attempted | `7500` |
+| Bets succeeded | `7500` |
+| Failed bets | `0` |
+| Site reads attempted | `75000` |
+| Site reads succeeded | `75000` |
+| Site reads failed | `0` |
+| HTTP requests | `84004` |
+| HTTP failures | `0` |
+| HTTP p95 | `109.08ms` |
+| HTTP max | `402.17ms` |
+| Iteration p95 | `121.65ms` |
+| Dropped/interrupted iterations | `0` |
+| Max VUs observed | `34` |
+
+Important interpretation note: k6 custom metric rates include setup and teardown wall time, so `sp_bets_succeeded` reports `19.50/sec` and `sp_site_reads_succeeded` reports `195.03/sec`. The scenario counts confirm the configured rate over the measured five-minute phase: `7500 / 300s = 25` bets/sec and `75000 / 300s = 250` reads/sec.
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `47` |
+| Window | `2026-06-11T04:18:19Z` to `2026-06-11T04:24:35Z` |
+| Max CPU user | `11.52%` |
+| Max CPU system | `31.5%` |
+| Min CPU idle | `56.98%` |
+| Min RAM available | `30824 MiB` |
+| Max RAM used | `1271 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `48864 KiB/s` |
+| Max network RX | `132.35 KiB/s` |
+| Max network TX | `2156.83 KiB/s` |
+| Max Docker CPU sum | `291.16%` |
+| Max Docker RAM sum | `314.44 MiB` |
+| Max backend CPU | `75.44%` |
+| Max Postgres CPU | `57.61%` |
+| Max Traefik CPU | `28.35%` |
+
+Interpretation:
+
+- `25/250` is now a confirmed clean `v3.4.0` mixed workload datapoint on this host.
+- The host still had substantial CPU and RAM headroom.
+- This establishes a solid lower bound below the failed `50/500` upper bracket.
+- The next edge-finding run should be `35/350`, not another `25/250` and not another `50/500`.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T041813Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T041813Z-host-profile.json
+```
+
+### Confirmed Pass: 35 Bets/sec Plus 350 Reads/sec
+
+A full `35` bets/sec plus `350` reads/sec midpoint run started at `2026-06-11T04:26:37Z` and completed the five-minute scenario cleanly.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `35` bets/sec + `350` reads/sec |
+| Result | Pass |
+| Scenario duration | `5m` |
+| Wall-clock runtime | `6m53.0s` including setup/graceful stop |
+| Bets attempted | `10501` |
+| Bets succeeded | `10501` |
+| Failed bets | `0` |
+| Site reads attempted | `105000` |
+| Site reads succeeded | `105000` |
+| Site reads failed | `0` |
+| HTTP requests | `117505` |
+| HTTP failures | `0` |
+| HTTP p95 | `112.84ms` |
+| HTTP max | `249.85ms` |
+| Iteration p95 | `125.38ms` |
+| Dropped/interrupted iterations | `0` |
+| Max VUs observed | `51` |
+
+Important interpretation note: k6 custom metric rates include setup and teardown wall time, so `sp_bets_succeeded` reports `25.43/sec` and `sp_site_reads_succeeded` reports `254.25/sec`. The scenario counts confirm the configured rate over the measured five-minute phase: `10501 / 300s ~= 35` bets/sec and `105000 / 300s = 350` reads/sec.
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `51` |
+| Window | `2026-06-11T04:26:43Z` to `2026-06-11T04:33:32Z` |
+| Max CPU user | `17.83%` |
+| Max CPU system | `43.88%` |
+| Min CPU idle | `40.94%` |
+| Min RAM available | `31019 MiB` |
+| Max RAM used | `1076 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `40760 KiB/s` |
+| Max network RX | `185.54 KiB/s` |
+| Max network TX | `3002.83 KiB/s` |
+| Max Docker CPU sum | `414.72%` |
+| Max Docker RAM sum | `212.31 MiB` |
+| Max backend CPU | `100.81%` |
+| Max Postgres CPU | `58.1%` |
+| Max Traefik CPU | `40.25%` |
+
+Interpretation:
+
+- `35/350` is now a confirmed clean `v3.4.0` mixed workload datapoint on this host.
+- Latency stayed tight: HTTP p95 remained near `113ms` with zero HTTP failures.
+- Host CPU and RAM still had room, so `35/350` is not the observed edge.
+- At this point, the next edge-finding run was the direct midpoint between clean `35/350` and failed `50/500`; the following section records that `42/420` attempt.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T042637Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T042637Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T042637Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T042637Z-host-profile.json
+```
+
+### Failed Bracket: 42 Bets/sec Plus 420 Reads/sec
+
+A `42` bets/sec plus `420` reads/sec midpoint attempt started at `2026-06-11T04:36:53Z` and degraded quickly. It was manually aborted after k6 reported repeated request timeouts and the scenario had only progressed about `35s` into the five-minute measured phase.
+
+| Metric | Value |
+| --- | ---: |
+| Target | `42` bets/sec + `420` reads/sec |
+| Result | Fail / upper-bound bracket |
+| Scenario time before abort | About `35s` |
+| Wall-clock runtime | `4m26.2s` including setup and abort |
+| Bets attempted | `1011` |
+| Bets succeeded | `87` |
+| Bets failed | `572` |
+| Site reads attempted | `5981` |
+| Site reads succeeded | `4780` |
+| Site reads failed | `201` |
+| Check success rate | `91.98%` |
+| HTTP failure rate | `10.11%` |
+| HTTP p95 | `2m20s` |
+| HTTP max | `2m32s` |
+| Dropped iterations | `9301` |
+| Interrupted iterations | `1352` |
+| Max VUs observed | `1550` |
+| Max VUs allocated | `1558` |
+
+Host telemetry:
+
+| Metric | Value |
+| --- | ---: |
+| Samples | `33` |
+| Window | `2026-06-11T04:36:58Z` to `2026-06-11T04:41:19Z` |
+| Max CPU user | `9.99%` |
+| Max CPU system | `7.62%` |
+| Min CPU idle | `82.4%` |
+| Min RAM available | `30610 MiB` |
+| Max RAM used | `1485 MiB` |
+| Max disk used | `2%` |
+| Max disk write | `1984 KiB/s` |
+| Max network RX | `156.94 KiB/s` |
+| Max network TX | `1871.43 KiB/s` |
+| Max Docker CPU sum | `540.02%` |
+| Max Docker RAM sum | `622.6 MiB` |
+| Max backend CPU | `190.63%` |
+| Max Postgres CPU | `272.79%` |
+| Max Traefik CPU | `40.07%` |
+
+Interpretation:
+
+- `42/420` is above the currently supported mixed workload envelope for this host/release/harness.
+- The failure mode is not memory exhaustion and not simple whole-host CPU saturation. RAM remained abundant and the host telemetry still reported high idle time.
+- The collapse appeared as request queueing/timeouts under concurrency: k6 VUs climbed above `1500`, p95 latency reached minutes, and Postgres/backend Docker CPU climbed materially.
+- The next edge-finding run should be below `42/420`. A reasonable midpoint between clean `35/350` and failed `42/420` is `38/380`; `40/400` is now a more aggressive follow-up if `38/380` passes cleanly.
+
+Raw artifacts:
+
+```text
+loadtest/results/site-mix-20260611T043653Z-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T043653Z-host.csv
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T043653Z-host-summary.json
+loadtest/hostops/site-mix-loadtest-basic-amd-20260611T043653Z-host-profile.json
+```
+
+### Updated v3.4.0 Bracket After Failed 42/420
+
+| Bound | Status | Evidence |
+| --- | --- | --- |
+| Lower bound | `35/350` passed full `5m` | Clean: `10501` bets, `105000` reads, `0` failures, p95 `112.84ms`. |
+| Upper bound | `42/420` failed | Severe latency, `10.11%` HTTP failures, `9301` dropped iterations, and k6 VUs above `1500`. |
+| Prior upper bound | `50/500` failed | Heavy bet failures, p95 `33.05s`, `34104` dropped iterations. |
+| Next midpoint | `38/380` | Midpoint between clean `35/350` and failed `42/420`. |
+| Aggressive follow-up | `40/400` | Only run after `38/380` passes cleanly. |
+
+## User-Equivalent Interpretation For v3.4.0 Mixed Tests
+
+The mixed `site-mix` scenario has two different interpretations:
+
+- **Measured server load:** configured API action rate from k6.
+- **Human user equivalent:** estimated active users required to naturally generate that action rate under normal rate limits.
+
+Normal/model-office rate limits are intentionally conservative:
+
+```env
+RATE_LIMIT_GENERAL_RATE_PER_SECOND=1
+RATE_LIMIT_GENERAL_BURST=10
+```
+
+The load-test profile is intentionally permissive so one k6 source can generate aggregate traffic. Therefore, the user counts below are estimates, not authentication counts. They are best read as **minimum client identities** and **active-user equivalents**.
+
+### Formulas
+
+```text
+total_actions_per_second = bets_per_second + reads_per_second
+minimum_client_identities = ceil(total_actions_per_second / 1 general action per second)
+active_users = total_actions_per_second / actions_per_second_per_active_user
+active_bettors = bets_per_second * seconds_between_bets_per_bettor
+hot_window_bettors = bets_per_second * hot_window_seconds
+```
+
+Important caveats:
+
+- A client identity is effectively a rate-limit identity, commonly an IP/client identity depending on deployment headers and proxy trust settings.
+- Many human users behind one NAT/proxy can share a limiter identity, so this is not always equal to unique users.
+- A real browser page can issue multiple API actions. The `site-mix` scenario intentionally models API action load, not browser tab count.
+- Public cached reads and authenticated betting both still consume backend/proxy capacity, even if they differ in business risk.
+- k6 `--preauth-users` is a fixture credential pool. It is not the same as the number of concurrently active human users. The clean full `25/250` run used a larger authenticated fixture pool but only needed `34` max observed VUs to deliver the target arrival rate.
+
+### Actual Measured Throughput To User Equivalents
+
+| Run | Status | Fixture auth pool | Max observed VUs | Measured/target bets/sec | Measured/target reads/sec | Modeled API actions/sec | Minimum normal-limit client identities | Active users at `1` action every `5s` | Active users at `1` action every `10s` |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `25/250`, full `5m`, `v3.4.0` | Pass | `1500` | `34` | `25` actual | `250` actual | `275` | `275` | `1375` | `2750` |
+| `35/350`, full `5m`, `v3.4.0` | Pass | `2000` | `51` | `35` actual | `350` actual | `385` | `385` | `1925` | `3850` |
+| `42/420`, aborted `v3.4.0` | Failed upper bracket | `2000` | `1550` | `42` target, not sustained | `420` target, not sustained | `462` target | `462` target only | `2310` target only | `4620` target only |
+| `50/500`, aborted `v3.4.0` | Failed upper bracket | `2000` | `2000` ceiling hit | `50` target, not sustained | `500` target, not sustained | `550` target | `550` target only | `2750` target only | `5500` target only |
+| `38/380`, next midpoint | Pending | `2000` planned | TBD | `38` target | `380` target | `418` | `418` | `2090` | `4180` |
+
+Interpretation:
+
+- The clean evidence-backed claim is currently `385` modeled API actions/sec for five minutes on this host and release.
+- Under the normal sustained `1` general API action/sec/client-identity policy, that is equivalent to at least `385` independent client identities if every identity is fully active.
+- Under a more human browsing model of one API action every `5-10s`, the same clean run corresponds to roughly `1925-3850` simultaneously active users.
+- The failed `50/500` row is intentionally labeled as a target-only upper bracket. It should not be used as capacity until a clean five-minute pass exists.
+
+### Hot-Window Platform User Interpretation
+
+This table translates betting rate into the number of humans who place one bet during a one-minute hot market window. It ignores read traffic, so it should be read alongside the mixed API-action table above.
+
+| Betting rate | Bettors in `1m` | Share of `10,000` users | Share of `30,000` users | Share of `50,000` users | Evidence status |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| `25` bets/sec | `1500` bettors | `15%` | `5%` | `3%` | Clean full `25/250` mixed pass. |
+| `35` bets/sec | `2100` bettors | `21%` | `7%` | `4.2%` | Clean full `35/350` mixed pass. |
+| `38` bets/sec | `2280` bettors | `22.8%` | `7.6%` | `4.56%` | Next midpoint target. |
+| `42` bets/sec | `2520` bettors | `25.2%` | `8.4%` | `5.04%` | Failed as part of `42/420`; not supported yet. |
+| `50` bets/sec | `3000` bettors | `30%` | `10%` | `6%` | Failed as part of `50/500`; not supported yet. |
+| `100` bets/sec | `6000` bettors | `60%` | `20%` | `12%` | Clean pure hot-market `1m` baseline only; not a mixed five-minute proof. |
+
+The practical read is that the current clean mixed evidence supports a very active `10,000` user event if about `21%` of users place one bet in the same minute, or a broader `30,000-50,000` user event if `4.2-7%` of the platform is actively betting in that hot minute while other users are browsing cached read paths.
+
+### Clean 25/250 Result: User Equivalents
+
+The confirmed clean `v3.4.0` mixed result was:
+
+```text
+25 bets/sec + 250 reads/sec = 275 API actions/sec
+```
+
+Minimum normal-limit client identities:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `275` |
+| Active users at `1` action/sec each | `275` |
+| Active users at `1` action every `2s` | `550` |
+| Active users at `1` action every `5s` | `1375` |
+| Active users at `1` action every `10s` | `2750` |
+| Active users at `1` action every `30s` | `8250` |
+
+Betting-only equivalents for the same clean run:
+
+| Bettor behavior | Active bettor equivalent |
+| --- | ---: |
+| `1` bet/sec/bettor | `25` bettors |
+| `1` bet every `10s` | `250` bettors |
+| `1` bet every `30s` | `750` bettors |
+| `1` bet every `60s` | `1500` bettors |
+| `1` bet every `5m` | `7500` bettors |
+
+Read-only equivalents for the same clean run:
+
+| Reader behavior | Active reader equivalent |
+| --- | ---: |
+| `1` read/sec/reader | `250` readers |
+| `1` read every `2s` | `500` readers |
+| `1` read every `5s` | `1250` readers |
+| `1` read every `10s` | `2500` readers |
+| `1` read every `30s` | `7500` readers |
+
+Interpretation:
+
+- The clean `25/250` run is not only `25 users`. It is `275` API actions/sec.
+- Under normal per-client rate limits, it requires at least about `275` independent client identities if each identity consumes the full sustained allowance.
+- Under a more realistic active-user model of one API action every `5-10s`, the clean run corresponds to roughly `1375-2750` simultaneously active users generating the modeled site mix.
+- If the hot-market event is mostly users placing one bet per minute, the `25` bets/sec component corresponds to about `1500` active bettors in that minute, plus concurrent readers.
+
+### Failed 50/500 Bracket: User Equivalents
+
+The failed upper bracket attempted:
+
+```text
+50 bets/sec + 500 reads/sec = 550 API actions/sec
+```
+
+Minimum normal-limit client identities and user equivalents:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `550` |
+| Active users at `1` action/sec each | `550` |
+| Active users at `1` action every `2s` | `1100` |
+| Active users at `1` action every `5s` | `2750` |
+| Active users at `1` action every `10s` | `5500` |
+| Active users at `1` action every `30s` | `16500` |
+
+Because `50/500` failed, these are not supported capacity claims. They are the current failed upper-bound target for this single-host topology and current harness behavior.
+
+### Clean 35/350 Result: User Equivalents
+
+The confirmed clean `v3.4.0` mixed result was:
+
+```text
+35 bets/sec + 350 reads/sec = 385 API actions/sec
+```
+
+Minimum normal-limit client identities and user equivalents:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `385` |
+| Active users at `1` action/sec each | `385` |
+| Active users at `1` action every `2s` | `770` |
+| Active users at `1` action every `5s` | `1925` |
+| Active users at `1` action every `10s` | `3850` |
+| Active users at `1` action every `30s` | `11550` |
+
+Betting-only equivalents for `35` bets/sec:
+
+| Bettor behavior | Active bettor equivalent |
+| --- | ---: |
+| `1` bet every `10s` | `350` bettors |
+| `1` bet every `30s` | `1050` bettors |
+| `1` bet every `60s` | `2100` bettors |
+| `1` bet every `5m` | `10500` bettors |
+
+### Failed 42/420 Bracket: User Equivalents
+
+The failed upper bracket attempted:
+
+```text
+42 bets/sec + 420 reads/sec = 462 API actions/sec
+```
+
+Because `42/420` failed, these are not supported capacity claims. They are target-only user equivalents for the failed bracket:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `462` |
+| Active users at `1` action/sec each | `462` |
+| Active users at `1` action every `2s` | `924` |
+| Active users at `1` action every `5s` | `2310` |
+| Active users at `1` action every `10s` | `4620` |
+| Active users at `1` action every `30s` | `13860` |
+
+### Next Midpoint Target: 38/380 User Equivalents
+
+The next midpoint target is:
+
+```text
+38 bets/sec + 380 reads/sec = 418 API actions/sec
+```
+
+If it passes cleanly, the user-equivalent table will be:
+
+| Assumption | Required identities/users |
+| --- | ---: |
+| Minimum client identities at `1` action/sec each | `418` |
+| Active users at `1` action/sec each | `418` |
+| Active users at `1` action every `2s` | `836` |
+| Active users at `1` action every `5s` | `2090` |
+| Active users at `1` action every `10s` | `4180` |
+| Active users at `1` action every `30s` | `12540` |
+
+Betting-only equivalents for `38` bets/sec:
+
+| Bettor behavior | Active bettor equivalent |
+| --- | ---: |
+| `1` bet every `10s` | `380` bettors |
+| `1` bet every `30s` | `1140` bettors |
+| `1` bet every `60s` | `2280` bettors |
+| `1` bet every `5m` | `11400` bettors |
+
+## Conclusion
+
+This experiment closes with a useful mixed-workload range for the `v3.4.0` SocialPredict build on a temporary DigitalOcean Basic AMD shared-CPU `8 vCPU / 32 GiB RAM` single-node host.
+
+The best clean mixed read/write proof is:
+
+```text
+35 bets/sec + 350 cached/read-model reads/sec for 5m
+= 385 modeled API actions/sec
+= 0 failed requests
+= HTTP p95 about 113ms
+```
+
+The next attempted midpoint failed:
+
+```text
+42 bets/sec + 420 cached/read-model reads/sec
+= 462 target API actions/sec
+= failed within the first measured minute
+= HTTP p95 measured in minutes
+= k6 VUs climbed above 1500
+```
+
+That places the current mixed-workload operating envelope somewhere between `385` and `462` modeled API actions/sec for this host, release, data shape, and test harness. The safest evidence-backed number is `385` actions/sec. The first observed mixed failure is `462` target actions/sec.
+
+### What This Means For Human Users
+
+The numbers above are API action rates, not literal user counts. Human interpretation depends on how frequently people click, refresh, open pages, and submit bets.
+
+| Scenario | Approximate behavior | API load estimate | Evidence-based interpretation |
+| --- | --- | ---: | --- |
+| Normal active browsing | Each active user triggers `1` API action every `10s` | `385` actions/sec equals about `3850` active users | Inside the clean `35/350` proof. |
+| Heavy active browsing | Each active user triggers `1` API action every `5s` | `385` actions/sec equals about `1925` active users | Inside the clean `35/350` proof. |
+| Very active hot market | `2100` people place one bet during the same `1m` window, while reads run at `350/sec` | `35` bets/sec + `350` reads/sec | Cleanly supported for `5m`. |
+| Aggressive hot market | `2520` people place one bet during the same `1m` window, while reads run at `420/sec` | `42` bets/sec + `420` reads/sec | Failed quickly. Do not claim. |
+| Read-heavy event with modest betting | Many users open pages, but only `1500-2100` users bet in the same minute | Around `25-35` bets/sec plus up to `250-350` reads/sec | Supported by clean `25/250` and `35/350` runs. |
+| Pure betting burst | Users are already authenticated and mostly submit bets, with minimal browsing | Prior dossier showed `250` bets/sec clean for `5m` | Supported only as a pure betting workload, not as a mixed browsing event. |
+
+A practical way to read this is:
+
+- A `10,000` user platform can likely survive a very active event on this host if around `15-21%` of users place one bet inside the same minute and browsing stays near the modeled cached-read mix.
+- A `30,000` user platform can likely survive a moderately hot event if around `5-7%` of users place one bet inside the same minute and read traffic stays near the clean `350 reads/sec` envelope.
+- A `50,000` user platform can likely survive a smaller hot event if around `3-4.2%` of users place one bet inside the same minute with similar read behavior.
+- A `50,000` user platform where `25%` of users bet inside one minute would require about `208` bets/sec before counting reads. That is within the previous pure-betting evidence but not within this mixed read/write evidence if browsing scales at a `10:1` read/write ratio.
+- A `50,000` user platform where `50%` of users bet inside one minute would require about `417` bets/sec before counting reads. This remains a scale project, not a single-Droplet claim.
+
+### Gaussian Event-Impulse Interpretation
+
+The one-minute hot-window tables above are intentionally conservative because they assume a sharp rectangular burst: many users act inside the same minute. Real human activity is more likely to be distributed over time. A major event might happen at `t=0`, then users process it, open the site, read, discuss, and act over several minutes. A rough planning model is a truncated post-event Gaussian impulse:
+
+```text
+traffic_rate(t) = peak_rate * exp(-0.5 * ((t - peak_time) / sigma)^2)
+```
+
+Assumptions for this section:
+
+- The peak happens about `5m` after the real-world event, not instantly at the event.
+- Activity ramps up before the peak and ramps down afterward.
+- The mathematical left tail before `t=0` is ignored; this is a post-event planning approximation, not a literal behavioral model.
+- The clean mixed evidence-backed peak is `385` API actions/sec from the `35/350` run.
+- The first failed mixed target is `462` API actions/sec from the `42/420` run.
+- Human users usually do not click or bet every second. A more plausible peak cadence is one API-relevant action every `10-20s`.
+- This is a planning model, not a measured production distribution.
+
+Peak simultaneous active-user equivalents:
+
+| Peak action cadence | Clean `385 actions/sec` equivalent | Failed `462 actions/sec` target equivalent | Interpretation |
+| --- | ---: | ---: | --- |
+| `1` action every `5s` | `1925` active users | `2310` active users | Heavy active use; users are clicking frequently. |
+| `1` action every `10s` | `3850` active users | `4620` active users | Plausible busy-event active browsing cadence. |
+| `1` action every `20s` | `7700` active users | `9240` active users | Plausible if most users read/watch between clicks. |
+| `1` action every `30s` | `11550` active users | `13860` active users | Plausible for calmer read-mostly audiences. |
+
+Gaussian impulse total-audience equivalents:
+
+```text
+total_actions ~= peak_actions_per_second * sigma_seconds * sqrt(2*pi)
+total_event_users ~= total_actions / actions_per_user_during_impulse
+```
+
+Using the clean `385 actions/sec` peak:
+
+| Gaussian spread | Approximate user activity shape | Total API actions under curve | Users if `2` actions/user | Users if `3` actions/user | Users if `5` actions/user |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `sigma=2.5m` | Sharp impulse centered around `+5m`; most action inside roughly `5-10m` | `~144,800` | `~72,400` | `~48,300` | `~29,000` |
+| `sigma=5m` | Moderate event wave; most action inside roughly the first `15-20m` | `~289,500` | `~144,800` | `~96,500` | `~57,900` |
+| `sigma=10m` | Broad event wave; activity spreads across a larger audience over `20-40m` | `~579,000` | `~289,500` | `~193,000` | `~115,800` |
+
+Interpretation:
+
+- If human activity is genuinely spread out over `10-20m`, this host can theoretically serve a much larger total event audience than the one-minute tables suggest.
+- The relevant risk is the peak of the curve, not the total area under the curve. If the peak stays near or below `385 actions/sec`, the clean `35/350` evidence applies.
+- If a social or UI pattern causes synchronized retries, page refreshes, or repeated bet submission, the distribution stops behaving like a smooth Gaussian and starts behaving like a spike. That is closer to the failed `42/420` behavior.
+- The Gaussian model is most credible for read-mostly behavior. Betting bursts are less smooth because users may rush to trade at the same perceived information moment.
+- A practical planning estimate for this host is therefore: thousands of simultaneous active users are plausible if each acts every `10-20s`, and tens of thousands of total event participants are plausible if their activity is spread over a multi-minute wave. The host should not be expected to handle several thousand people all clicking and trading repeatedly at the same instant.
+
+### Event Behavior Expectations
+
+For a major event such as the final minute of a game, user behavior probably clusters into three waves:
+
+| Wave | User behavior | Likely system effect on this host |
+| --- | --- | --- |
+| Watch/read wave | Users open market pages, browse topic pages, inspect positions/leaderboards, and refresh cached views | Likely safe if aggregate cached reads stay around `350/sec`; untested above that as a read-only workload. |
+| Bet wave | A subset submits bets rapidly around a key event | Clean through `35/sec` while `350/sec` reads are also active; pure betting has stronger prior evidence, but mixed traffic is the safer planning constraint. |
+| Panic refresh wave | Users repeatedly refresh and retry when latency rises | This can create a feedback loop. The failed `42/420` run shows how quickly VUs and latency can explode once the system starts queueing. |
+
+The dangerous case is not just many users. The dangerous case is many users acting in the same short window while reads and writes rise together. Once the host crosses the mixed-workload edge, failure appears abrupt: the `42/420` run degraded within the first measured minute, request latency moved from milliseconds to minutes, and k6 began accumulating thousands of dropped iterations.
+
+### Safe, Squeak-By, And Failure Zones
+
+| Zone | Approximate mixed workload | Human interpretation | Confidence |
+| --- | ---: | --- | --- |
+| Safe zone | Up to `25/250` for `5m` | About `275` API actions/sec; `1500` one-minute bettors plus `250/sec` reads | High, clean full run. |
+| Strong supported zone | `35/350` for `5m` | About `385` API actions/sec; `2100` one-minute bettors plus `350/sec` reads | High, clean full run. |
+| Squeak-by candidate | `38/380` | About `418` API actions/sec; `2280` one-minute bettors plus `380/sec` reads | Untested, next logical probe. |
+| Likely failure edge | `42/420` | About `462` target API actions/sec; `2520` one-minute bettors plus `420/sec` reads | Failed quickly. |
+| Unsupported | `50/500` and above | About `550+` target API actions/sec | Failed hard; do not claim. |
+
+### Engineering Interpretation
+
+The `42/420` failure did not look like simple memory exhaustion. RAM stayed plentiful. It also did not look like whole-host CPU exhaustion in the simple `idle=0` sense. Instead, the system showed a concurrency/queueing collapse: k6 VUs rose sharply, latency ballooned, and backend/Postgres Docker CPU rose materially.
+
+The practical next engineering work is therefore not only larger hardware. The likely returns are:
+
+1. Reduce transaction-path database work under active betting.
+2. Continue converting display paths to bounded, cached, paginated read models.
+3. Keep raw full-detail and global analytics endpoints out of high-frequency UI paths.
+4. Add more targeted read-only tests so cached browsing capacity can be measured separately from write pressure.
+5. Rerun `38/380` after any query/index/read-model improvements to see whether the mixed edge moves closer to `42/420` or beyond.
+
+### Release/Deployment Recommendation
+
+For a model-office or early public deployment, this host shape is plausible if expectations are set around modest to medium hot-window traffic. It should not be described as ready for a viral event where tens of thousands of users simultaneously refresh and trade.
+
+For product planning, the clean claim should be:
+
+```text
+On v3.4.0, a single Basic AMD 8 vCPU / 32 GiB host cleanly handled
+35 hot-market bets/sec plus 350 cached/read-model reads/sec for five minutes.
+```
+
+The conservative operational cap for this topology should be lower than the demonstrated clean limit, for example around `25/250`, unless active monitoring and retry/backpressure behavior are in place. The demonstrated clean high-water mark is `35/350`; the demonstrated failure region begins by `42/420`.
+
+### Experiment Closure
+
+The temporary DigitalOcean load-test droplet was destroyed after the final failed bracket to avoid ongoing charges.
+
+| Field | Value |
+| --- | --- |
+| Droplet ID | `576807920` |
+| Droplet name | `socialpredict-loadtest-20260611-023140` |
+| Public IPv4 | `159.65.37.166` |
+| Destroyed at | `2026-06-11T04:46:22Z` |
