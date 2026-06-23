@@ -46,8 +46,13 @@ const SiteTabs = ({ tabs, onTabChange, defaultTab, activeTab }) => {
                         onClick={() => handleTabClick(tab.label)}
                     >
                         {/* Mobile-responsive text with truncation */}
-                        <span className="truncate text-xs sm:text-sm block">
-                            {tab.label}
+                        <span className="flex min-w-0 items-center justify-center gap-2 text-xs sm:text-sm">
+                            <span className="truncate">{tab.label}</span>
+                            {tab.badge ? (
+                                <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-white">
+                                    {tab.badge}
+                                </span>
+                            ) : null}
                         </span>
                     </div>
                 ))}

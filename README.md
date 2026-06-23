@@ -26,8 +26,8 @@ SocialPredict lets **anyone** – individuals, classrooms, companies, and even g
 
 * Kenyon College (Political Science course PSCI 303, Campaigns & Elections; syllabus [here](https://www.zacharymcgee.net/syllabi/PSCI_303_public.pdf))
                         
-## Stargazers over time
-[![Stargazers over time](https://starchart.cc/openpredictionmarkets/socialpredict.svg?variant=adaptive)](https://starchart.cc/openpredictionmarkets/socialpredict)
+## Stargazers Over Time
+[![Star History Chart](https://app.repohistory.com/api/svg?repo=openpredictionmarkets/socialpredict&type=Date&background=0D1117&color=62C3F8)](https://app.repohistory.com/star-history)
 
 ## Licensing
 
@@ -77,9 +77,9 @@ Highlights:
 - Admin review queues for proposed, approved, and rejected markets
 - Full market descriptions and custom YES/NO labels shown during review
 
-> Screenshot placeholder: moderator profile with proposed/published/rejected market tabs
+![Moderator profile showing proposed, published, and rejected market tabs](README/IMG/screenshots/moderator-profile-market-tabs.png)
 
-> Screenshot placeholder: admin market review queue showing custom labels and full description controls
+![Admin published market review queue with full-description controls and tag adjustments](README/IMG/screenshots/admin-market-review-published.png)
 
 ### Admin and CMS Tools
 
@@ -94,11 +94,11 @@ Highlights:
 - CMS-managed social share title, description, image, and image-enable setting
 - Default OpenGraph/social share image support
 
-> Screenshot placeholder: admin dashboard user queue
+![Admin user governance queue](README/IMG/screenshots/admin-user-governance.png)
 
-> Screenshot placeholder: admin market discovery layout / tag management
+![Admin market discovery layout editor](README/IMG/screenshots/admin-market-discovery-layout.png)
 
-> Screenshot placeholder: admin social share / CMS settings tab
+![Admin social share CMS settings with share preview](README/IMG/screenshots/admin-social-share-settings.png)
 
 ### Market Discovery and Governance
 
@@ -113,9 +113,9 @@ Highlights:
 - Infinite-scroll market lists for `/markets` and topic pages
 - Search and pagination improvements for admin market review and user/moderator queues
 
-> Screenshot placeholder: `/markets` page with topic navigation and pinned market cards
+![Markets discovery page with topic navigation and pinned market cards](README/IMG/screenshots/markets-discovery.png)
 
-> Screenshot placeholder: topic page filtered by tag/category
+![Topic page filtered by Category A](README/IMG/screenshots/markets-topic-category-a.png)
 
 ### Sharing and Embeddable Markets
 
@@ -128,7 +128,7 @@ Highlights:
 - Security-header updates needed for controlled embedding
 - Feature planning for iframe-friendly market embeds
 
-> Screenshot placeholder: market detail page with share preview or social card validation
+![Market detail page with chart and public sharing-ready metadata](README/IMG/screenshots/market-detail-share-ready.png)
 
 ### Market Amendments, Stewardship, and Work Profits
 
@@ -144,9 +144,9 @@ Highlights:
 - Thresholded moderator work-profit payouts after successful market resolution
 - User financial reporting for moderator work profits
 
-> Screenshot placeholder: market page showing description amendments
+![Market page showing expanded contract text and approved amendments](README/IMG/screenshots/market-description-amendments.png)
 
-> Screenshot placeholder: admin amendment review queue
+![Admin amendment review queue](README/IMG/screenshots/admin-amendment-review-queue.png)
 
 ### Read Models and Performance Foundations
 

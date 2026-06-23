@@ -3,9 +3,9 @@ title: Moderator Work Profits
 document_type: feature-overview
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-07T00:00:00Z
-updated_at_display: "Sunday, June 7, 2026"
-update_reason: "Define thresholded moderator work-profit payout and financial reporting for resolved markets."
+updated_at: 2026-06-16T00:00:00Z
+updated_at_display: "Tuesday, June 16, 2026"
+update_reason: "Clarify gross resolution-time work-income payout versus net financial work-profit reporting."
 status: draft
 ---
 
@@ -13,7 +13,7 @@ status: draft
 
 ## Purpose
 
-Moderators pay to create markets. If those markets attract enough participants to exceed the market creation/proposal cost, the current steward who governs and resolves the market should later receive the surplus first-participation fee income. This feature treats that surplus as moderator work profit while preserving transaction correctness and existing canonical tables.
+Moderators pay to create markets. If those markets attract participants, the current steward who governs and resolves the market later receives the collected first-participation fee income. Financial reporting then subtracts the proposal cost to show net work profit, which can be negative when a market underperforms.
 
 ## Rule Summary
 
@@ -22,9 +22,10 @@ Moderators pay to create markets. If those markets attract enough participants t
 - Selling out and buying back in does not create another initial entry fee for the same user on the same market.
 - Collected entry fees remain server-side until market resolution.
 - After a market resolves to `YES` or `NO`, ordinary winner payouts run first.
-- After ordinary payout, the current steward/resolver receives only the surplus collected entry-fee income after the market creation/proposal cost threshold has been met.
+- After ordinary payout, the current steward/resolver receives collected entry-fee income as a gross `WORK_PROFIT` balance transaction.
 - `N/A` refund resolutions do not pay moderator work profit in this baseline.
-- User financial display derives work profit for resolved markets stewarded by that user using the same thresholded surplus rule.
+- User financial display derives net work profit for resolved markets stewarded by that user by subtracting the market creation/proposal cost from collected entry-fee income.
+- User financial display also shows unrealized work income and unrealized work profit for unresolved markets. Income is projected participant-fee income for markets currently stewarded by the user; profit nets that income against unresolved proposal-cost exposure for markets the user created.
 
 ## Stateless Accounting
 
@@ -33,25 +34,28 @@ This feature does not add new database columns or tables. Work-profit income is 
 ```text
 uniquePositiveParticipants = count(distinct username where market_id = M and bet.amount > 0)
 marketFeeIncome = uniquePositiveParticipants * initialBetFee
-marketCreationThreshold = market.proposalCost or configured createMarketCost fallback
-workProfit = max(marketFeeIncome - marketCreationThreshold, 0)
+marketCreationCost = market.proposalCost or configured createMarketCost fallback
+resolutionWorkIncomePayout = marketFeeIncome
+financialNetWorkProfit = marketFeeIncome - marketCreationCost
+unrealizedWorkIncome = unresolvedStewardedMarketFeeIncomeSoFar
+unrealizedWorkProfit = unresolvedStewardedMarketFeeIncomeSoFar - unresolvedCreatedMarketProposalCosts
 ```
 
-Resolution-time payout credits only surplus `workProfit`. The creation fee has already been deducted from the original creator when the market was created and is not paid back out as work profit. The first participant fees effectively satisfy the market's creation-cost threshold; only fees above that threshold become steward work income.
+Resolution-time payout credits gross entry-fee income. The creation fee has already been deducted from the creator when the market was created, so subtracting it again from the balance transaction would double-charge the steward/creator path. Financial views still show the lifecycle economics by reporting net work profit as fee income minus proposal cost.
 
 ## Boundary Notes
 
 - Payout decisions use canonical bet history, not cached/read-model snapshots.
 - Work-profit display may appear in user financial read models, but those read models remain display-only.
-- System metrics should treat only the paid surplus on resolved `YES`/`NO` markets as redistributed steward work income. Threshold participation fees that do not become work profit remain retained participation fees.
+- System metrics should distinguish collected participant fees, gross steward work-income payouts, and net work profit so retained-fee reporting does not double-count.
 - The payout goes to the current steward who governs resolution. A reassigned steward receives the work income; the original creator does not receive it unless they remain steward.
 - Future historical policy changes may require durable per-market fee policy capture. The current implementation intentionally uses existing state and current economics config to avoid adding new state for this baseline.
 
 ## Acceptance Criteria
 
 - Resolving a non-`N/A` market pays ordinary winners first.
-- Resolving a non-`N/A` market then credits the current steward/resolver only for participation-fee surplus above the market creation/proposal cost threshold.
+- Resolving a non-`N/A` market then credits the current steward/resolver for gross first-participation fee income.
 - Resolving `N/A` refunds participant bet amounts and does not credit work profit.
-- User financials show thresholded `workProfits` for resolved markets stewarded by that user.
+- User financials show net `workProfits` for resolved markets stewarded by that user, including negative values when fee income is below proposal cost.
 - Tests prove repeated participation by the same user is counted once.
 - Tests prove sale/negative bet rows do not create extra work-profit income.

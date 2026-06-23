@@ -8,11 +8,10 @@ import (
 	"socialpredict/handlers/markets/dto"
 	dmarkets "socialpredict/internal/domain/markets"
 	"socialpredict/internal/domain/readmodels"
-	"socialpredict/logger"
 )
 
-type marketAccountingSnapshotRefresher interface {
-	RefreshMarketAccountingSnapshot(ctx context.Context, marketID int64) (*dmarkets.MarketAccountingSnapshot, error)
+type marketSummaryReadModelService interface {
+	GetMarketSummaryReadModel(ctx context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error)
 }
 
 type marketSummaryReadModelResponse struct {
@@ -49,29 +48,26 @@ func (h *Handler) MarketSummaryReadModel(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	details, err := h.service.GetMarketDetails(r.Context(), marketID)
+	service, ok := h.service.(marketSummaryReadModelService)
+	if !ok {
+		writeInternalError(w)
+		return
+	}
+
+	summary, err := service.GetMarketSummaryReadModel(r.Context(), marketID)
 	if err != nil {
 		writeDetailsError(w, err)
 		return
 	}
 
-	freshness := readmodels.NewFreshness(details.Market.UpdatedAt, "live", dmarkets.MarketAccountingSnapshotTargetFreshness, false)
-	if refresher, ok := h.service.(marketAccountingSnapshotRefresher); ok {
-		if snapshot, refreshErr := refresher.RefreshMarketAccountingSnapshot(r.Context(), marketID); refreshErr == nil && snapshot != nil {
-			freshness = snapshot.Freshness()
-		} else if refreshErr != nil {
-			logger.LogError("MarketSummaryReadModel", "RefreshMarketAccountingSnapshot", refreshErr)
-		}
-	}
-
 	response := marketSummaryReadModelResponse{
-		Market:      publicMarketResponseFromDomain(details.Market),
-		Creator:     creatorResponseFromSummary(details.Creator),
-		Probability: probabilityChangesToResponse(details.ProbabilityChanges),
-		NumUsers:    details.NumUsers,
-		TotalVolume: details.TotalVolume,
-		MarketDust:  details.MarketDust,
-		Freshness:   readModelFreshnessToResponse(freshness),
+		Market:      publicMarketResponseFromDomain(summary.Market),
+		Creator:     creatorResponseFromSummary(summary.Creator),
+		Probability: probabilityChangesToResponse(summary.Accounting.ProbabilityChanges),
+		NumUsers:    summary.Accounting.UserCount,
+		TotalVolume: summary.Accounting.VolumeWithDust,
+		MarketDust:  summary.Accounting.MarketDust,
+		Freshness:   readModelFreshnessToResponse(summary.Accounting.Freshness()),
 	}
 	_ = handlers.WriteResult(w, http.StatusOK, response)
 }

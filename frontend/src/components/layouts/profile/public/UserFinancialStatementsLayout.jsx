@@ -184,8 +184,20 @@ const UserFinancialStatementsLayout = ({ username }) => {
         {
             name: 'Work Profits',
             value: financialData.workProfits,
-            description: 'Earnings from work rewards and bounties',
-            formula: 'Sum of WorkReward + Bounty transactions'
+            description: 'Net work profit from resolved stewarded markets',
+            formula: 'Resolved participant fees - proposal costs'
+        },
+        {
+            name: 'Unrealized Work Income',
+            value: financialData.unrealizedWorkIncome,
+            description: 'Projected participant-fee income from unresolved stewarded markets',
+            formula: 'Unresolved participant fees'
+        },
+        {
+            name: 'Unrealized Work Profits',
+            value: financialData.unrealizedWorkProfits,
+            description: 'Projected work profit from unresolved stewarded markets',
+            formula: 'Unresolved participant fees - proposal costs'
         },
         {
             name: 'Total Profits',

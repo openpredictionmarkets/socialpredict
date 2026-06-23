@@ -31,9 +31,20 @@ type frontendGameResponse struct {
 	Mode string `json:"mode"`
 }
 
+type frontendMarketGroupResponse struct {
+	MultipleChoiceBinary frontendMultipleChoiceBinaryResponse `json:"multipleChoiceBinary"`
+}
+
+type frontendMultipleChoiceBinaryResponse struct {
+	AddAnswerCost             int64 `json:"addAnswerCost"`
+	SoftAnswerReviewThreshold int   `json:"softAnswerReviewThreshold"`
+	HardAnswerSafetyCap       int   `json:"hardAnswerSafetyCap"`
+}
+
 type frontendConfigResponse struct {
-	Charts frontendChartsResponse `json:"charts"`
-	Game   frontendGameResponse   `json:"game"`
+	Charts       frontendChartsResponse      `json:"charts"`
+	Game         frontendGameResponse        `json:"game"`
+	MarketGroups frontendMarketGroupResponse `json:"marketGroups"`
 }
 
 func GetFrontendSetupHandler(configService configsvc.Service) func(w http.ResponseWriter, r *http.Request) {
@@ -43,12 +54,20 @@ func GetFrontendSetupHandler(configService configsvc.Service) func(w http.Respon
 			return
 		}
 
+		economics := configService.Economics()
 		response := frontendConfigResponse{
 			Charts: frontendChartsResponse{
 				SigFigs: configService.ChartSigFigs(),
 			},
 			Game: frontendGameResponse{
 				Mode: configService.Game().Mode,
+			},
+			MarketGroups: frontendMarketGroupResponse{
+				MultipleChoiceBinary: frontendMultipleChoiceBinaryResponse{
+					AddAnswerCost:             economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost,
+					SoftAnswerReviewThreshold: economics.MarketIncentives.MultipleChoiceBinary.SoftAnswerReviewThreshold,
+					HardAnswerSafetyCap:       economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap,
+				},
 			},
 		}
 

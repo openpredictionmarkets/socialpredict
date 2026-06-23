@@ -69,6 +69,22 @@ const normalizeMarketTags = (raw) => {
     .filter((tag) => tag !== null);
 };
 
+const normalizeMarketGroupLink = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  return {
+    id: raw.id ?? raw.ID ?? null,
+    questionTitle: raw.questionTitle ?? raw.QuestionTitle ?? '',
+    groupType: raw.groupType ?? raw.GroupType ?? '',
+    lifecycleStatus: raw.lifecycleStatus ?? raw.LifecycleStatus ?? '',
+    status: raw.status ?? raw.Status ?? '',
+    answerLabel: raw.answerLabel ?? raw.AnswerLabel ?? '',
+    answerCount: toNumber(raw.answerCount ?? raw.AnswerCount),
+  };
+};
+
 const normalizeDescriptionAmendment = (amendment) => {
   if (!amendment || typeof amendment !== 'object') {
     return null;
@@ -135,6 +151,7 @@ const normalizeMarket = (market) => {
       isResolved: false,
       resolutionResult: null,
       tags: [],
+      marketGroup: null,
     };
   }
 
@@ -155,6 +172,7 @@ const normalizeMarket = (market) => {
     isResolved: market.isResolved ?? market.IsResolved ?? false,
     resolutionResult: market.resolutionResult ?? market.ResolutionResult ?? null,
     tags: normalizeMarketTags(market.tags ?? market.Tags),
+    marketGroup: normalizeMarketGroupLink(market.marketGroup ?? market.MarketGroup),
   };
 };
 

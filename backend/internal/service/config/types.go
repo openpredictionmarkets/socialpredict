@@ -20,8 +20,15 @@ type MarketCreation struct {
 }
 
 type MarketIncentives struct {
-	CreateMarketCost int64 `yaml:"createMarketCost" json:"createMarketCost"`
-	TraderBonus      int64 `yaml:"traderBonus" json:"traderBonus"`
+	CreateMarketCost     int64                       `yaml:"createMarketCost" json:"createMarketCost"`
+	TraderBonus          int64                       `yaml:"traderBonus" json:"traderBonus"`
+	MultipleChoiceBinary MultipleChoiceBinaryMarkets `yaml:"multipleChoiceBinary" json:"multipleChoiceBinary"`
+}
+
+type MultipleChoiceBinaryMarkets struct {
+	AddAnswerCost             int64 `yaml:"addAnswerCost" json:"addAnswerCost"`
+	SoftAnswerReviewThreshold int   `yaml:"softAnswerReviewThreshold" json:"softAnswerReviewThreshold"`
+	HardAnswerSafetyCap       int   `yaml:"hardAnswerSafetyCap" json:"hardAnswerSafetyCap"`
 }
 
 type User struct {
@@ -102,6 +109,11 @@ func FromSetup(cfg *setup.EconomicConfig) *AppConfig {
 			MarketIncentives: MarketIncentives{
 				CreateMarketCost: cfg.Economics.MarketIncentives.CreateMarketCost,
 				TraderBonus:      cfg.Economics.MarketIncentives.TraderBonus,
+				MultipleChoiceBinary: MultipleChoiceBinaryMarkets{
+					AddAnswerCost:             cfg.Economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost,
+					SoftAnswerReviewThreshold: cfg.Economics.MarketIncentives.MultipleChoiceBinary.SoftAnswerReviewThreshold,
+					HardAnswerSafetyCap:       cfg.Economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap,
+				},
 			},
 			User: User{
 				InitialAccountBalance: cfg.Economics.User.InitialAccountBalance,
@@ -154,6 +166,11 @@ func (cfg *AppConfig) ToSetup() *setup.EconomicConfig {
 			MarketIncentives: setup.MarketIncentives{
 				CreateMarketCost: cfg.Economics.MarketIncentives.CreateMarketCost,
 				TraderBonus:      cfg.Economics.MarketIncentives.TraderBonus,
+				MultipleChoiceBinary: setup.MultipleChoiceBinaryMarkets{
+					AddAnswerCost:             cfg.Economics.MarketIncentives.MultipleChoiceBinary.AddAnswerCost,
+					SoftAnswerReviewThreshold: cfg.Economics.MarketIncentives.MultipleChoiceBinary.SoftAnswerReviewThreshold,
+					HardAnswerSafetyCap:       cfg.Economics.MarketIncentives.MultipleChoiceBinary.HardAnswerSafetyCap,
+				},
 			},
 			User: setup.User{
 				InitialAccountBalance: cfg.Economics.User.InitialAccountBalance,

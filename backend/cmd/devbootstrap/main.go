@@ -118,7 +118,10 @@ func run() error {
 			}
 		}
 
-		return upsertBootstrapMarkets(tx, prefix, config.Economics().MarketCreation.InitialMarketProbability)
+		if err := upsertBootstrapMarkets(tx, prefix, config.Economics().MarketCreation.InitialMarketProbability); err != nil {
+			return err
+		}
+		return expireBootstrapMarketDiscoverySnapshots(tx)
 	}); err != nil {
 		return err
 	}
@@ -134,6 +137,18 @@ func run() error {
 	fmt.Printf("CreditAvailableBeforeBets: %d\n", initialBalance+maximumDebtAllowed)
 	fmt.Printf("MustChangePassword: false\n")
 	return nil
+}
+
+func expireBootstrapMarketDiscoverySnapshots(db *gorm.DB) error {
+	now := time.Now().UTC()
+	return db.Model(&models.AnalyticsReadModelSnapshot{}).
+		Where("snapshot_key LIKE ?", "market_discovery:%").
+		Updates(map[string]any{
+			"is_stale":        true,
+			"stale_reason":    "dev_bootstrap",
+			"marked_stale_at": now,
+			"generated_at":    now.Add(-24 * time.Hour),
+		}).Error
 }
 
 func upsertBootstrapUser(db *gorm.DB, seed bootstrapUser, password string, initialBalance int64) error {

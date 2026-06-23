@@ -5,14 +5,41 @@ import LoadingSpinner from '../../../loaders/LoadingSpinner';
 import { mapInternalToDisplay } from '../../../../utils/labelMapping';
 import { useAuth } from '../../../../helpers/AuthContent';
 
+const PAGE_SIZE = 20;
+const paginationButtonClass = [
+    'rounded',
+    'border',
+    'border-transparent',
+    'bg-neutral-btn',
+    'px-3',
+    'py-1.5',
+    'text-xs',
+    'font-semibold',
+    'text-white',
+    'transition-colors',
+    'duration-200',
+    'hover:bg-neutral-btn-hover',
+    'disabled:cursor-not-allowed',
+    'disabled:bg-custom-gray-light',
+    'disabled:text-gray-400',
+    'disabled:opacity-60',
+].join(' ');
+
 const PortfolioTabContent = ({ username }) => {
     const [positions, setPositions] = useState([]);
+    const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { isLoggedIn, token } = useAuth();
 
     useEffect(() => {
+        setPage(0);
+    }, [username]);
+
+    useEffect(() => {
         const fetchPositions = async () => {
+            setLoading(true);
+            setError(null);
             try {
                 const response = await fetch(`${API_URL}/v0/portfolio/${username}`, {
                     headers: {
@@ -23,6 +50,7 @@ const PortfolioTabContent = ({ username }) => {
                 if (response.ok) {
                     const data = await response.json();
                     setPositions(data.portfolioItems || []);
+                    setPage(0);
                 } else {
                     throw new Error(`Error fetching portfolio: ${response.statusText}`);
                 }
@@ -103,6 +131,10 @@ const PortfolioTabContent = ({ username }) => {
         );
     };
 
+    const start = page * PAGE_SIZE;
+    const visiblePositions = positions.slice(start, start + PAGE_SIZE);
+    const hasNextPage = start + PAGE_SIZE < positions.length;
+
     return (
         <div className="space-y-6">
             {/* Portfolio Summary */}
@@ -132,6 +164,29 @@ const PortfolioTabContent = ({ username }) => {
 
             {/* Portfolio Table */}
             <div className="bg-primary-background shadow-md rounded-lg border border-custom-gray-dark overflow-hidden">
+                <div className="flex flex-col gap-2 border-b border-custom-gray-dark bg-gray-900/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs uppercase tracking-[0.16em] text-gray-400">
+                        Showing portfolio page {page + 1}{visiblePositions.length ? ` (${start + 1}-${start + visiblePositions.length} of ${positions.length})` : ''}
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setPage((current) => Math.max(0, current - 1))}
+                            disabled={page === 0}
+                            className={paginationButtonClass}
+                        >
+                            Previous
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setPage((current) => current + 1)}
+                            disabled={!hasNextPage}
+                            className={paginationButtonClass}
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-custom-gray-dark">
                         <thead className="bg-custom-gray-dark">
@@ -154,7 +209,7 @@ const PortfolioTabContent = ({ username }) => {
                             </tr>
                         </thead>
                         <tbody className="bg-primary-background divide-y divide-custom-gray-dark">
-                            {positions.map((position, index) => (
+                            {visiblePositions.map((position, index) => (
                                 <tr key={position.marketId || index} className="hover:bg-custom-gray-dark transition-colors">
                                     <td className="px-6 py-4">
                                         <Link

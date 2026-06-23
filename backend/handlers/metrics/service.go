@@ -50,10 +50,3 @@ func freshnessResponseFromDomain(freshness readmodels.Freshness) FreshnessRespon
 		MarkedStaleAt:          freshness.MarkedStaleAt,
 	}
 }
-
-func freshnessWithinTargetAge(freshness readmodels.Freshness, target time.Duration) bool {
-	if freshness.GeneratedAt.IsZero() {
-		return false
-	}
-	return time.Since(freshness.GeneratedAt) <= target
-}

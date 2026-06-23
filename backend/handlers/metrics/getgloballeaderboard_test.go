@@ -169,8 +169,8 @@ func (s *cachedGlobalLeaderboardService) RefreshGlobalLeaderboardSnapshot(contex
 	}, nil
 }
 
-func TestGlobalLeaderboardReadModel_ServesStaleSnapshotUntilAgeExpires(t *testing.T) {
-	generatedAt := time.Now().UTC().Add(-5 * time.Minute)
+func TestGlobalLeaderboardReadModel_ServesStaleSnapshotWithoutRefresh(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-2 * analytics.GlobalLeaderboardSnapshotTargetFreshness)
 	svc := &cachedGlobalLeaderboardService{
 		readModel: &analytics.GlobalLeaderboardReadModel{
 			Entries: []analytics.GlobalUserProfitability{{Username: "cached", Rank: 1}},
@@ -196,7 +196,7 @@ func TestGlobalLeaderboardReadModel_ServesStaleSnapshotUntilAgeExpires(t *testin
 		t.Fatalf("expected stale freshness to be served, got %+v", freshness)
 	}
 	if svc.refreshCalls != 0 {
-		t.Fatalf("expected no refresh for stale-but-young snapshot, got %d", svc.refreshCalls)
+		t.Fatalf("expected no refresh for stale snapshot, got %d", svc.refreshCalls)
 	}
 }
 

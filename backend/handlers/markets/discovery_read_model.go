@@ -22,6 +22,7 @@ import (
 
 const (
 	marketDiscoverySnapshotKind            = "market_discovery"
+	marketDiscoverySnapshotVersion         = "v2"
 	marketDiscoverySnapshotTargetFreshness = 10 * time.Minute
 )
 
@@ -32,6 +33,10 @@ type marketDiscoveryService interface {
 type marketDiscoverySnapshotStore interface {
 	Get(ctx context.Context, key string) (*readmodelrepo.Snapshot, error)
 	Upsert(ctx context.Context, snapshot readmodelrepo.Snapshot) error
+}
+
+type marketDiscoveryListProvider interface {
+	ListMarketDiscovery(ctx context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error)
 }
 
 type MarketDiscoveryReadModelHandler struct {
@@ -86,8 +91,9 @@ type discoveryPinResponse struct {
 }
 
 type pinnedMarketResponse struct {
-	Pin     discoveryPinResponse      `json:"pin"`
-	Details dto.MarketDetailsResponse `json:"details"`
+	Pin          discoveryPinResponse            `json:"pin"`
+	Details      dto.MarketDetailsResponse       `json:"details"`
+	GroupDetails *dto.MarketGroupDetailsResponse `json:"groupDetails,omitempty"`
 }
 
 func (h *MarketDiscoveryReadModelHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -175,11 +181,7 @@ func (h *MarketDiscoveryReadModelHandler) buildResponse(ctx context.Context, slu
 		filters.TagSlug = layout.PrimaryTagSlug
 	}
 
-	markets, err := h.fetchMarkets(ctx, params.status, filters, params.limit, params.offset)
-	if err != nil {
-		return marketDiscoveryReadModelResponse{}, err
-	}
-	overviews, err := buildMarketOverviewResponses(ctx, h.markets, markets)
+	overviews, total, err := h.fetchMarketDiscoveryOverviews(ctx, params.status, filters, params.limit, params.offset)
 	if err != nil {
 		return marketDiscoveryReadModelResponse{}, err
 	}
@@ -194,9 +196,39 @@ func (h *MarketDiscoveryReadModelHandler) buildResponse(ctx context.Context, slu
 		TopicNav:      topicNav,
 		Markets:       overviews,
 		PinnedMarkets: pinned,
-		Total:         len(overviews),
+		Total:         total,
 		Freshness:     readModelFreshnessToResponse(readmodels.NewFreshness(h.now(), "read_model", marketDiscoverySnapshotTargetFreshness, false)),
 	}, nil
+}
+
+func (h *MarketDiscoveryReadModelHandler) fetchMarketDiscoveryOverviews(ctx context.Context, status string, filters dmarkets.ListFilters, limit int, offset int) ([]*dto.MarketOverviewResponse, int, error) {
+	if provider, ok := h.markets.(marketDiscoveryListProvider); ok {
+		filters.Status = status
+		filters.Limit = limit
+		filters.Offset = offset
+		page, err := provider.ListMarketDiscovery(ctx, filters)
+		if err != nil {
+			return nil, 0, err
+		}
+		if page == nil {
+			return []*dto.MarketOverviewResponse{}, 0, nil
+		}
+		overviews, err := buildMarketDiscoveryOverviewResponses(ctx, h.markets, page.Rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		return overviews, page.Total, nil
+	}
+
+	markets, err := h.fetchMarkets(ctx, status, filters, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	overviews, err := buildMarketOverviewResponses(ctx, h.markets, markets)
+	if err != nil {
+		return nil, 0, err
+	}
+	return overviews, len(overviews), nil
 }
 
 func (h *MarketDiscoveryReadModelHandler) fetchMarkets(ctx context.Context, status string, filters dmarkets.ListFilters, limit int, offset int) ([]*dmarkets.Market, error) {
@@ -214,20 +246,55 @@ func (h *MarketDiscoveryReadModelHandler) pinnedMarketResponses(ctx context.Cont
 		if pin.PinType != marketdiscovery.PinTypeMarket || pin.MarketID <= 0 {
 			continue
 		}
+		if summaryProvider, ok := h.markets.(marketSummaryProvider); ok {
+			summary, err := summaryProvider.GetMarketSummaryReadModel(ctx, pin.MarketID)
+			if err != nil {
+				return nil, fmt.Errorf("pinned market %d: %w", pin.MarketID, err)
+			}
+			details := marketSummaryToDetailsResponse(ctx, h.markets, summary)
+			responses = append(responses, pinnedMarketResponse{
+				Pin:          pin,
+				Details:      details,
+				GroupDetails: h.pinnedMarketGroupDetails(ctx, details),
+			})
+			continue
+		}
 		details, err := h.markets.GetMarketDetails(ctx, pin.MarketID)
 		if err != nil {
 			return nil, fmt.Errorf("pinned market %d: %w", pin.MarketID, err)
 		}
+		responseDetails := marketDetailsToResponse(ctx, h.markets, details)
 		responses = append(responses, pinnedMarketResponse{
-			Pin:     pin,
-			Details: marketDetailsToResponse(details),
+			Pin:          pin,
+			Details:      responseDetails,
+			GroupDetails: h.pinnedMarketGroupDetails(ctx, responseDetails),
 		})
 	}
 	return responses, nil
 }
 
+func (h *MarketDiscoveryReadModelHandler) pinnedMarketGroupDetails(ctx context.Context, details dto.MarketDetailsResponse) *dto.MarketGroupDetailsResponse {
+	if details.Market.MarketGroup == nil {
+		return nil
+	}
+	groupID := details.Market.MarketGroup.ID
+	if groupID <= 0 {
+		return nil
+	}
+	groupProvider, ok := h.markets.(marketGroupService)
+	if !ok {
+		return nil
+	}
+	overview, err := groupProvider.GetMarketGroupOverview(ctx, groupID)
+	if err != nil || overview == nil {
+		return nil
+	}
+	response := marketGroupOverviewToResponse(ctx, h.markets, overview)
+	return &response
+}
+
 func (h *MarketDiscoveryReadModelHandler) snapshotUsable(snapshot *readmodelrepo.Snapshot) bool {
-	if snapshot == nil || snapshot.IsStale || snapshot.PayloadJSON == "" {
+	if snapshot == nil || snapshot.PayloadJSON == "" {
 		return false
 	}
 	return h.now().Sub(snapshot.GeneratedAt) <= marketDiscoverySnapshotTargetFreshness
@@ -247,7 +314,7 @@ func marketDiscoverySnapshotKey(slug string, status string, tagSlug string, limi
 	if tagSlug == "" {
 		tagSlug = "none"
 	}
-	return fmt.Sprintf("market_discovery:%s:status=%s:tag=%s:limit=%d:offset=%d", slug, status, tagSlug, limit, offset)
+	return fmt.Sprintf("market_discovery:%s:%s:status=%s:tag=%s:limit=%d:offset=%d", marketDiscoverySnapshotVersion, slug, status, tagSlug, limit, offset)
 }
 
 func freshnessFromSnapshot(snapshot *readmodelrepo.Snapshot) readmodels.Freshness {

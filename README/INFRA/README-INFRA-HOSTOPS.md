@@ -40,13 +40,29 @@ chooses a dedicated migration job or DB-backed advisory lock.
 Scaffold only.
 
 - Implemented:
+  - `./HostOps env help`
   - `./HostOps env list`
+  - `./HostOps env get <env> <KEY>`
+  - `./HostOps host help`
   - `./HostOps host ssh <env>`
-  - `./HostOps host env get <env> <KEY>`
+  - `./HostOps host env help`
+  - `./HostOps host env get <env> <KEY>` as an alias
 - Planned:
   - `./HostOps host logs <env> <service>`
   - `./HostOps deploy <env>`
   - `./HostOps tf <plan|apply|destroy> <env>`
+
+## Command Help
+
+Use scoped help when you know the command family but not the exact syntax:
+
+```bash
+./HostOps env help
+./HostOps host help
+./HostOps host env help
+./HostOps deploy help
+./HostOps tf help
+```
 
 ## Local Environment Convention
 
@@ -235,17 +251,18 @@ Use shell syntax only: `KEY=value`, one setting per line. Do not commit `hostops
 - Optional: SSH user via `HOSTOPS_USER` or `HOSTOPS_<ENV>_USER`, default `root`
 - Optional: SSH port via `HOSTOPS_PORT` or `HOSTOPS_<ENV>_PORT`, default `22`
 
-`./HostOps host env get <env> <KEY>`:
+`./HostOps env get <env> <KEY>`:
 
 - Needs the same SSH keys as `host ssh`
 - Needs remote repo path via `HOSTOPS_REPO_PATH` or `HOSTOPS_<ENV>_REPO_PATH`, default `/opt/socialpredict`
 - Reads from `/opt/socialpredict/.env` by convention
 - Prints the matching `KEY=value` line, so use carefully for secrets
+- Alias: `./HostOps host env get <env> <KEY>`
 
 Example:
 
 ```bash
-./HostOps host env get staging ADMIN_PASSWORD
+./HostOps env get staging ADMIN_PASSWORD
 ```
 
 `./HostOps host disk <env>`:

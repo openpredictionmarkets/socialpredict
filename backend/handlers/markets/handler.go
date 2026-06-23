@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"socialpredict/handlers"
 	"socialpredict/handlers/markets/dto"
@@ -114,6 +113,12 @@ func (h *Handler) CreateMarket(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeCreateError(w, err)
 		return
+	}
+
+	if h.invalidator != nil {
+		if err := h.invalidator.InvalidateAfterMarketTransaction(r.Context(), user.Username, market.ID, "market_created"); err != nil {
+			logger.LogError("CreateMarket", "InvalidateReadModels", err)
+		}
 	}
 
 	response := marketToResponse(market)
@@ -407,7 +412,7 @@ func (h *Handler) GetDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := marketDetailsToResponse(details)
+	response := marketDetailsToResponse(r.Context(), h.service, details)
 
 	_ = writeJSON(w, http.StatusOK, response)
 }
@@ -468,11 +473,8 @@ func (h *Handler) marketLeaderboardReadModel(ctx context.Context, marketID int64
 		return nil, err
 	}
 
-	if snapshot == nil || snapshot.IsStale || snapshot.GeneratedAt.IsZero() || time.Since(snapshot.GeneratedAt) > dmarkets.MarketLeaderboardSnapshotTargetFreshness {
+	if snapshot == nil {
 		if _, refreshErr := service.RefreshMarketLeaderboardSnapshot(ctx, marketID); refreshErr != nil {
-			if snapshot != nil {
-				return snapshot, nil
-			}
 			return nil, refreshErr
 		}
 		snapshot, err = service.GetMarketLeaderboardReadModel(ctx, marketID, page)

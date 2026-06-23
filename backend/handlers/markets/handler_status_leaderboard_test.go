@@ -184,6 +184,58 @@ func TestMarketLeaderboardHandler_UsesSnapshotFreshnessWhenAvailable(t *testing.
 	}
 }
 
+func TestMarketLeaderboardHandler_ServesStaleSnapshotWithoutRefresh(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-2 * dmarkets.MarketLeaderboardSnapshotTargetFreshness)
+	svc := &readModelLeaderboardServiceMock{
+		MockService: MockService{
+			MarketLeaderboardFn: func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
+				t.Fatalf("raw leaderboard calculator should not be used when stale snapshot is available")
+				return nil, nil
+			},
+		},
+		ReadModelFn: func(ctx context.Context, marketID int64, p dmarkets.Page) (*dmarkets.MarketLeaderboardSnapshot, error) {
+			return &dmarkets.MarketLeaderboardSnapshot{
+				MarketID:    marketID,
+				GeneratedAt: generatedAt,
+				Source:      "read_model",
+				IsStale:     true,
+				StaleReason: "bet_accepted",
+				Rows: []*dmarkets.LeaderboardRow{{
+					Username: "stale_snapshot_alice",
+					Rank:     1,
+				}},
+			}, nil
+		},
+		RefreshFn: func(ctx context.Context, marketID int64) (*dmarkets.MarketLeaderboardSnapshot, error) {
+			t.Fatalf("stale leaderboard snapshot should not refresh on read")
+			return nil, nil
+		},
+	}
+
+	handler := NewHandler(svc, nil, security.NewSecurityService())
+	req := httptest.NewRequest(http.MethodGet, "/v0/markets/77/leaderboard?limit=25", nil)
+	rr := httptest.NewRecorder()
+	router := mux.NewRouter()
+	router.HandleFunc("/v0/markets/{id}/leaderboard", handler.MarketLeaderboard)
+
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+
+	var resp handlers.SuccessEnvelope[dto.LeaderboardResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(resp.Result.Leaderboard) != 1 || resp.Result.Leaderboard[0].Username != "stale_snapshot_alice" {
+		t.Fatalf("unexpected leaderboard payload: %+v", resp.Result.Leaderboard)
+	}
+	if resp.Result.Freshness == nil || !resp.Result.Freshness.IsStale {
+		t.Fatalf("expected stale freshness metadata, got %+v", resp.Result.Freshness)
+	}
+}
+
 func TestMarketLeaderboardHandler_FailureEnvelope(t *testing.T) {
 	svc := &MockService{}
 	svc.MarketLeaderboardFn = func(ctx context.Context, marketID int64, p dmarkets.Page) ([]*dmarkets.LeaderboardRow, error) {
@@ -292,5 +344,87 @@ func TestListUserOwnedMarketsHandlerUsesOwnedByFilter(t *testing.T) {
 	}
 	if !resp.OK || resp.Result.Total != 1 || resp.Result.Markets[0].StewardUsername != "alice" {
 		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestListUserOwnedMarketsHandlerAttachesMarketGroupMetadata(t *testing.T) {
+	now := time.Now().UTC()
+	group := &dmarkets.MarketGroup{
+		ID:                 88,
+		QuestionTitle:      "Favorite Tree",
+		Description:        "Grouped favorite tree market",
+		GroupType:          dmarkets.MarketGroupTypeMultipleChoiceBinary,
+		LifecycleStatus:    dmarkets.MarketLifecyclePublished,
+		ProposalCost:       10,
+		CreatorUsername:    "testuser01",
+		StewardUsername:    "testuser01",
+		ApprovedBy:         "auto-approval",
+		ApprovedAt:         &now,
+		ResolutionDateTime: now.Add(24 * time.Hour),
+		CreatedAt:          now,
+		UpdatedAt:          now,
+		Members: []dmarkets.MarketGroupMember{
+			{MarketID: 16, AnswerLabel: "Birch", DisplayOrder: 0},
+			{MarketID: 17, AnswerLabel: "Pine", DisplayOrder: 1},
+			{MarketID: 18, AnswerLabel: "Oak", DisplayOrder: 2},
+		},
+	}
+	svc := &MockService{}
+	svc.ListLifecycleFn = func(ctx context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
+		if filters.OwnedBy != "testuser01" {
+			t.Fatalf("OwnedBy = %q, want testuser01", filters.OwnedBy)
+		}
+		return []*dmarkets.Market{
+			{
+				ID:                 16,
+				QuestionTitle:      "Favorite Tree - Birch",
+				Description:        "Answer choice child market",
+				OutcomeType:        "BINARY",
+				ResolutionDateTime: now.Add(24 * time.Hour),
+				CreatorUsername:    "testuser01",
+				StewardUsername:    "testuser01",
+				YesLabel:           "YES",
+				NoLabel:            "NO",
+				Status:             dmarkets.MarketStatusActive,
+				LifecycleStatus:    dmarkets.MarketLifecyclePublished,
+				CreatedAt:          now,
+				UpdatedAt:          now,
+			},
+		}, nil
+	}
+	svc.MarketGroupLookupFn = func(ctx context.Context, marketID int64) (*dmarkets.MarketGroup, error) {
+		if marketID != 16 {
+			t.Fatalf("marketID = %d, want 16", marketID)
+		}
+		return group, nil
+	}
+
+	handler := ListUserOwnedMarketsHandler(svc, &contractAuthMock{user: &dusers.User{Username: "viewer"}})
+	req := httptest.NewRequest(http.MethodGet, "/v0/users/testuser01/owned-markets", nil)
+	req = mux.SetURLVars(req, map[string]string{"username": "testuser01"})
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp handlers.SuccessEnvelope[userOwnedMarketsResponse]
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if !resp.OK || resp.Result.Total != 1 || len(resp.Result.Markets) != 1 {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+	market := resp.Result.Markets[0]
+	if market.MarketGroup == nil {
+		t.Fatalf("expected owned market response to include grouped-market metadata")
+	}
+	if market.MarketGroup.ID != group.ID ||
+		market.MarketGroup.QuestionTitle != "Favorite Tree" ||
+		market.MarketGroup.AnswerLabel != "Birch" ||
+		market.MarketGroup.AnswerCount != 3 ||
+		market.MarketGroup.DisplayOrder != 0 {
+		t.Fatalf("unexpected market group link: %+v", market.MarketGroup)
 	}
 }

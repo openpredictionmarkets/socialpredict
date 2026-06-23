@@ -1,6 +1,10 @@
 package markets
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 // MarketError exposes message-based sentinel errors behind a reusable type.
 type MarketError interface {
@@ -22,6 +26,8 @@ func newDomainError(message string) MarketError {
 var (
 	// ErrMarketNotFound indicates that the requested market does not exist.
 	ErrMarketNotFound MarketError = newDomainError("market not found")
+	// ErrMarketGroupNotFound indicates that the requested market group does not exist.
+	ErrMarketGroupNotFound MarketError = newDomainError("market group not found")
 	// ErrInvalidQuestionTitle indicates that the market question title is invalid.
 	ErrInvalidQuestionTitle MarketError = newDomainError("invalid question title")
 	// ErrInvalidQuestionLength indicates that the market question title is blank or too long.
@@ -43,6 +49,30 @@ var (
 	// ErrInvalidState indicates that the market state does not allow the requested action.
 	ErrInvalidState MarketError = newDomainError("invalid state")
 )
+
+// MarketGroupChildNotPublishedError identifies the specific child answer market
+// blocking grouped-market resolution.
+type MarketGroupChildNotPublishedError struct {
+	MarketID        int64
+	AnswerLabel     string
+	LifecycleStatus string
+}
+
+func (e *MarketGroupChildNotPublishedError) Error() string {
+	label := strings.TrimSpace(e.AnswerLabel)
+	status := strings.TrimSpace(e.LifecycleStatus)
+	if status == "" {
+		status = "unknown"
+	}
+	if label == "" {
+		return fmt.Sprintf("market group child market %d is not published; current status is %s", e.MarketID, status)
+	}
+	return fmt.Sprintf("market group child %q (market %d) is not published; current status is %s", label, e.MarketID, status)
+}
+
+func (e *MarketGroupChildNotPublishedError) Unwrap() error {
+	return ErrInvalidState
+}
 
 // IsMarketNotFound reports whether err represents a missing market.
 func IsMarketNotFound(err error) bool {

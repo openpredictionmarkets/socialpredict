@@ -14,6 +14,7 @@ import (
 	"socialpredict/internal/domain/boundary"
 	positionsmath "socialpredict/internal/domain/math/positions"
 	"socialpredict/internal/domain/readmodels"
+	ranalytics "socialpredict/internal/repository/analytics"
 	"socialpredict/models/modelstesting"
 
 	"gorm.io/gorm"
@@ -22,7 +23,7 @@ import (
 func newAnalyticsService(t *testing.T, db *gorm.DB) *analytics.Service {
 	t.Helper()
 	cfg := modelstesting.GenerateEconomicConfig()
-	return analytics.NewService(analytics.NewGormRepository(db), analytics.Config{
+	return analytics.NewService(ranalytics.NewGormRepository(db), analytics.Config{
 		MaximumDebtAllowed: cfg.Economics.User.MaximumDebtAllowed,
 		CreateMarketCost:   cfg.Economics.MarketIncentives.CreateMarketCost,
 		InitialBetFee:      cfg.Economics.Betting.BetFees.InitialBetFee,
@@ -90,8 +91,8 @@ func (s *cachedSystemMetricsService) RefreshSystemMetricsSnapshot(context.Contex
 	}, nil
 }
 
-func TestSystemMetricsReadModel_ServesStaleSnapshotUntilAgeExpires(t *testing.T) {
-	generatedAt := time.Now().UTC().Add(-5 * time.Minute)
+func TestSystemMetricsReadModel_ServesStaleSnapshotWithoutRefresh(t *testing.T) {
+	generatedAt := time.Now().UTC().Add(-2 * analytics.SystemMetricsSnapshotTargetFreshness)
 	svc := &cachedSystemMetricsService{
 		readModel: &analytics.SystemMetricsReadModel{
 			Metrics: analytics.SystemMetrics{},
@@ -114,7 +115,7 @@ func TestSystemMetricsReadModel_ServesStaleSnapshotUntilAgeExpires(t *testing.T)
 		t.Fatalf("expected stale freshness to be served, got %+v", freshness)
 	}
 	if svc.refreshCalls != 0 {
-		t.Fatalf("expected no refresh for stale-but-young snapshot, got %d", svc.refreshCalls)
+		t.Fatalf("expected no refresh for stale snapshot, got %d", svc.refreshCalls)
 	}
 }
 

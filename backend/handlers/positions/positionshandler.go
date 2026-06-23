@@ -92,11 +92,8 @@ func marketPositionsReadModel(ctx context.Context, svc dmarkets.ServiceInterface
 		return nil, err
 	}
 
-	if snapshot == nil || snapshot.IsStale || snapshot.GeneratedAt.IsZero() || time.Since(snapshot.GeneratedAt) > dmarkets.MarketPositionsSnapshotTargetFreshness {
+	if snapshot == nil {
 		if _, refreshErr := service.RefreshMarketPositionsSnapshot(ctx, marketID); refreshErr != nil {
-			if snapshot != nil {
-				return snapshot, nil
-			}
 			return nil, refreshErr
 		}
 		snapshot, err = service.GetMarketPositionsReadModel(ctx, marketID, page)
