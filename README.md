@@ -1,6 +1,27 @@
-[![Deploy To Production](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml/badge.svg?event=workflow_run)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml)
+[![GitHub Release][release-img]][release]
+[![14-day clones][clones-14d-img]][traffic]
+[![14-day unique cloners][unique-cloners-14d-img]][traffic]
+[![Test][test-img]][test]
+[![License: MIT][license-img]][license]
+[![Trivy Scan][trivy-img]][trivy]
+[![Deploy To Staging][staging-img]][staging]
+[![Deploy To Production][production-img]][production]
 
-[![Deploy To Staging](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml/badge.svg?event=pull_request)](https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml)
+[release-img]: https://img.shields.io/github/v/release/openpredictionmarkets/socialpredict?label=release
+[release]: https://github.com/openpredictionmarkets/socialpredict/releases/latest
+[clones-14d-img]: https://img.shields.io/badge/14d%20clones-13%2C641-62c3f8
+[unique-cloners-14d-img]: https://img.shields.io/badge/14d%20cloners-884-2ea043
+[traffic]: https://github.com/openpredictionmarkets/socialpredict/graphs/traffic
+[test-img]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/backend.yml/badge.svg?branch=main
+[test]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/backend.yml
+[license-img]: https://img.shields.io/badge/License-MIT-yellow.svg
+[license]: https://github.com/openpredictionmarkets/socialpredict/blob/main/LICENSE
+[trivy-img]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/container-security.yml/badge.svg
+[trivy]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/container-security.yml
+[staging-img]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml/badge.svg?event=pull_request
+[staging]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-staging.yml
+[production-img]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml/badge.svg?event=workflow_run
+[production]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/deploy-to-production.yml
 
 # SocialPredict
 

@@ -1,0 +1,91 @@
+name: Repository Traffic Badges
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * *'
+
+permissions:
+  contents: write
+
+env:
+  METRICS_DIR: README/METRICS
+
+jobs:
+  update-traffic-badges:
+    name: Update repository traffic badges
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Fetch rolling 14-day clone metrics
+        env:
+          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$METRICS_DIR"
+          gh api "repos/$GITHUB_REPOSITORY/traffic/clones" > "$RUNNER_TEMP/clones.json"
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from urllib.parse import quote
+
+          metrics_dir = Path(os.environ['METRICS_DIR'])
+          data = json.loads(Path(os.environ['RUNNER_TEMP'], 'clones.json').read_text())
+          updated = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
+
+          def write_badge(filename, label, value, color):
+              payload = {
+                  'schemaVersion': 1,
+                  'label': label,
+                  'message': f'{int(value):,}',
+                  'color': color,
+              }
+              (metrics_dir / filename).write_text(json.dumps(payload, indent=2) + '\n')
+
+          write_badge('clones-14d.json', '14d clones', data.get('count', 0), '62c3f8')
+          write_badge('unique-cloners-14d.json', '14d cloners', data.get('uniques', 0), '2ea043')
+          (metrics_dir / 'github-traffic-latest.json').write_text(json.dumps({
+              'updated_at': updated,
+              'clones_14d': data.get('count', 0),
+              'unique_cloners_14d': data.get('uniques', 0),
+              'source': 'GitHub repository traffic API, rolling 14-day window',
+              'clones': data.get('clones', []),
+          }, indent=2) + '\n')
+
+          def static_badge(label, value, color):
+              return f"https://img.shields.io/badge/{quote(label)}-{quote(f'{int(value):,}')}-{color}"
+
+          readme = Path('README.md')
+          readme_text = readme.read_text()
+          readme_text = re.sub(
+              r'^\[clones-14d-img\]: .*$',
+              f"[clones-14d-img]: {static_badge('14d clones', data.get('count', 0), '62c3f8')}",
+              readme_text,
+              flags=re.MULTILINE,
+          )
+          readme_text = re.sub(
+              r'^\[unique-cloners-14d-img\]: .*$',
+              f"[unique-cloners-14d-img]: {static_badge('14d cloners', data.get('uniques', 0), '2ea043')}",
+              readme_text,
+              flags=re.MULTILINE,
+          )
+          readme.write_text(readme_text)
+          PY
+
+      - name: Commit updated traffic badges
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md "$METRICS_DIR"/*.json
+          if git diff --cached --quiet; then
+            echo "Traffic badge metrics unchanged."
+            exit 0
+          fi
+          git commit -m "docs: update repository traffic badges"
+          git push

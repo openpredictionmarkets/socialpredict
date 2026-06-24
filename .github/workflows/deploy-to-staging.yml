@@ -5,6 +5,15 @@ on:
     branches:
       - main
     types: [closed]
+    paths-ignore:
+      - '**/*.md'
+      - 'README/**'
+      - 'docs/**'
+      - 'integrationtest/**/*.md'
+      - 'integrationtest/**/*.png'
+      - 'integrationtest/**/*.jpg'
+      - 'integrationtest/**/*.jpeg'
+      - 'integrationtest/**/*.webp'
   workflow_dispatch:
 
 concurrency:

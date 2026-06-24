@@ -4,8 +4,28 @@ permissions:
   contents: read
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'README/**'
+      - 'docs/**'
+      - 'integrationtest/**/*.md'
+      - 'integrationtest/**/*.png'
+      - 'integrationtest/**/*.jpg'
+      - 'integrationtest/**/*.jpeg'
+      - 'integrationtest/**/*.webp'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'README/**'
+      - 'docs/**'
+      - 'integrationtest/**/*.md'
+      - 'integrationtest/**/*.png'
+      - 'integrationtest/**/*.jpg'
+      - 'integrationtest/**/*.jpeg'
+      - 'integrationtest/**/*.webp'
   workflow_dispatch:
 
 concurrency:
@@ -84,6 +104,7 @@ jobs:
       || startsWith(github.head_ref, 'fix/')
       || startsWith(github.head_ref, 'refactor/')
       || startsWith(github.head_ref, 'doc/')
+      || startsWith(github.head_ref, 'docs/')
       || startsWith(github.head_ref, 'chore/')
       || startsWith(github.head_ref, 'test/')
       || startsWith(github.head_ref, 'hotfix/')
@@ -93,28 +114,25 @@ jobs:
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
-        if: ${{ !startsWith(github.head_ref, 'doc/') }}
       # Use go-version-file when mode == file, otherwise go-version
       - name: Setup Go (from go.mod)
-        if: ${{ !startsWith(github.head_ref, 'doc/') && matrix.go.mode == 'file' }}
+        if: ${{ matrix.go.mode == 'file' }}
         uses: actions/setup-go@v6
         with:
           go-version-file: ${{ matrix.go.value }}
           check-latest: true
           cache: true
       - name: Setup Go ${{ matrix.go.value }}
-        if: ${{ !startsWith(github.head_ref, 'doc/') && matrix.go.mode == 'version' }}
+        if: ${{ matrix.go.mode == 'version' }}
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go.value }}
           check-latest: true
           cache: true
       - name: Get Dependencies
-        if: ${{ !startsWith(github.head_ref, 'doc/') }}
         working-directory: ./backend
         run: go get .
       - name: Run unit tests (${{ matrix.go.mode == 'file' && 'go.mod' || matrix.go.value }})
-        if: ${{ !startsWith(github.head_ref, 'doc/') }}
         working-directory: ./backend
         env:
           JWT_SIGNING_KEY: "test-secret-key-for-testing"
@@ -129,6 +147,7 @@ jobs:
       || startsWith(github.head_ref, 'fix/')
       || startsWith(github.head_ref, 'refactor/')
       || startsWith(github.head_ref, 'doc/')
+      || startsWith(github.head_ref, 'docs/')
       || startsWith(github.head_ref, 'chore/')
       || startsWith(github.head_ref, 'test/')
       || startsWith(github.head_ref, 'hotfix/')
