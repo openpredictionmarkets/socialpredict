@@ -9,6 +9,8 @@ RUN npm run build
 
 FROM nginx:1.29.3-alpine3.22
 
+RUN apk add --no-cache --upgrade libcrypto3 libssl3
+
 COPY --from=builder /app/frontend/build /usr/share/nginx/html
 COPY frontend/public/env-config.js.template /usr/share/nginx/html/env-config.js.template
 COPY docker/frontend/nginx.conf /etc/nginx/conf.d/default.conf
