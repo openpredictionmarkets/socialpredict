@@ -24,15 +24,15 @@ Checklist:
 
 Checklist:
 
-- [ ] Define the domain term represented by each `bets` read: replay event stream, visible bet row, participation aggregate, position input, audit record, or display snapshot.
-- [ ] Inventory every production GORM read of `bets`.
-- [ ] Classify each read as transaction-critical, market display, user display, system aggregate, or admin/search.
-- [ ] Assign an owner boundary to each read: Prediction Market Core, Betting/Position Ledger, Participant Account, Analytics/Read Model, Admin/Search, or Persistence Adapter.
-- [ ] Document whether each query is already SQL-scoped, scoped through `IN`, or broad/global by design.
-- [ ] Identify accidental table-wide reads in per-market or per-user paths.
-- [ ] Identify over-wide projections such as `Select("bets.*")`, plain full-model `Find`, or unused model fields.
+- [x] Define the domain term represented by each `bets` read: replay event stream, visible bet row, participation aggregate, position input, audit record, or display snapshot.
+- [x] Inventory every production GORM read of `bets`.
+- [x] Classify each read as transaction-critical, market display, user display, system aggregate, or admin/search.
+- [x] Assign an owner boundary to each read: Prediction Market Core, Betting/Position Ledger, Participant Account, Analytics/Read Model, Admin/Search, or Persistence Adapter.
+- [x] Document whether each query is already SQL-scoped, scoped through `IN`, or broad/global by design.
+- [x] Identify accidental table-wide reads in per-market or per-user paths.
+- [x] Identify over-wide projections such as `Select("bets.*")`, plain full-model `Find`, or unused model fields.
 - [ ] Identify display paths that page in memory after loading full market history.
-- [ ] Identify related query groups that can be consolidated into one aggregate query, scoped DTO query, or read-model refresh.
+- [x] Identify related query groups that can be consolidated into one aggregate query, scoped DTO query, or read-model refresh.
 - [ ] Identify global paths that should move to aggregate SQL or read-model snapshots.
 - [ ] Revisit the PR #352 first-time participation query idea and convert it into aggregate repository methods rather than row materialization.
 - [ ] Document first-participation edge cases: repeated buys, sells after buy, refunds, cancelled/N/A markets, zero/negative rows, and participant identity changes.
@@ -64,6 +64,7 @@ Implementation note:
 - Added `idx_bets_market_id_placed_at_id` for canonical per-market replay reads ordered by `placed_at ASC, id ASC`.
 - Added `idx_bets_market_id_username` for first-participation and market/user existence checks.
 - Added `idx_bets_username_market_id_placed_at_id` for user-scoped position/portfolio reads that identify affected markets and then replay those markets.
+- Added `idx_bets_username_placed_at_id` for user bet-history display ordered by `placed_at DESC, id DESC`.
 - These indexes trade additional bet-insert write/storage cost for scoped read performance. They do not add business state or alter transaction math.
 
 ## 05. Repository Refactor
@@ -79,7 +80,7 @@ Checklist:
 - [ ] Keep framework-specific types and concrete repository packages out of domain/use-case packages.
 - [x] Ensure per-market methods include SQL `market_id` predicates.
 - [ ] Ensure high-volume reads select only needed columns.
-- [ ] Ensure user methods begin from `username` where appropriate.
+- [x] Ensure user methods begin from `username` where appropriate.
 - [ ] Avoid adding generic `ListBets`/`AllBets` methods without explicit global naming.
 - [x] Add tests that seed multiple markets and prove per-market reads exclude unrelated rows.
 - [ ] Add adapter-level query-capture, dry-run, or logger assertions for high-risk methods so correct results cannot hide broad SQL.
@@ -90,6 +91,8 @@ Implementation note:
 
 - Updated market, analytics, sell-transaction, and user-position bet-history readers to use deterministic `placed_at ASC, id ASC` ordering.
 - Added repository tests that seed unrelated market rows between same-timestamp target rows, then verify only the requested market's rows are returned and ties are ordered by ID.
+- Updated user bet-history display to select only `market_id` and `placed_at` with deterministic reverse chronological ordering.
+- Collapsed grouped work-profit member hydration from one query per group into one `WHERE group_id IN ?` query.
 
 ## 06. Display Path Optimization
 

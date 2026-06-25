@@ -192,8 +192,9 @@ func (r *GormRepository) List(ctx context.Context, filters dusers.ListFilters) (
 func (r *GormRepository) ListUserBets(ctx context.Context, username string) ([]*dusers.UserBet, error) {
 	var bets []models.Bet
 	if err := r.db.WithContext(ctx).
+		Select("market_id", "placed_at").
 		Where("username = ?", username).
-		Order("placed_at DESC").
+		Order("placed_at DESC, id DESC").
 		Find(&bets).Error; err != nil {
 		return nil, err
 	}

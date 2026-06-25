@@ -40,6 +40,9 @@ The first implementation slice keeps market math unchanged and improves the pers
 - canonical per-market bet replay now orders by `placed_at ASC, id ASC` where market history is loaded for market, analytics, sale, and user-position paths;
 - a timestamped migration adds composite indexes for market chronology, market/user existence checks, and user/market chronological reads;
 - repository tests seed unrelated market rows between same-timestamp target rows to prove scoped reads exclude cross-market rows and preserve deterministic tie ordering.
+- user bet-history display now uses a narrower projection and deterministic reverse chronological ordering;
+- grouped work-profit hydration now loads child market IDs in one bulk query instead of one query per group;
+- `QUERY_AUDIT.md` records the repository-wide regex pass, actions taken, and follow-up candidates.
 
 ## Design-Plan Alignment
 

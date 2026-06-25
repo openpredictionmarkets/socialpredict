@@ -15,6 +15,7 @@ func MigrateAddBetQueryIndexes(db *gorm.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_bets_market_id_placed_at_id ON bets (market_id, placed_at, id)",
 		"CREATE INDEX IF NOT EXISTS idx_bets_market_id_username ON bets (market_id, username)",
 		"CREATE INDEX IF NOT EXISTS idx_bets_username_market_id_placed_at_id ON bets (username, market_id, placed_at, id)",
+		"CREATE INDEX IF NOT EXISTS idx_bets_username_placed_at_id ON bets (username, placed_at, id)",
 	}
 
 	for _, statement := range indexStatements {

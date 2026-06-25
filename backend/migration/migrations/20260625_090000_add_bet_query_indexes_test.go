@@ -22,6 +22,7 @@ func TestMigrateAddBetQueryIndexesCreatesIndexes(t *testing.T) {
 		"idx_bets_market_id_placed_at_id",
 		"idx_bets_market_id_username",
 		"idx_bets_username_market_id_placed_at_id",
+		"idx_bets_username_placed_at_id",
 	} {
 		if !db.Migrator().HasIndex(&models.Bet{}, indexName) {
 			t.Fatalf("expected index %s after migration", indexName)
