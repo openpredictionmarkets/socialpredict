@@ -6,4 +6,4 @@ GitHub only exposes repository clone/view traffic for a rolling 14-day window. T
 
 The top-level README uses static Shields badge URLs for the rolling clone metrics so badges render correctly before and after branch merges. The scheduled refresh workflow updates both the README badge URLs and these JSON snapshots from `gh api repos/$GITHUB_REPOSITORY/traffic/clones`.
 
-If the default `GITHUB_TOKEN` cannot read traffic metrics, add a repository secret named `TRAFFIC_METRICS_TOKEN` using a fine-grained token with read access to repository administration/traffic metrics.
+GitHub's traffic API requires access that the default `GITHUB_TOKEN` does not provide. Add a repository secret named `TRAFFIC_METRICS_TOKEN` using a fine-grained token or GitHub App token with read access to repository Administration. If this secret is absent, the scheduled workflow exits successfully without updating the traffic badges.

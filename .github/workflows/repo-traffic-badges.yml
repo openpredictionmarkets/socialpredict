@@ -20,12 +20,23 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Fetch rolling 14-day clone metrics
+        id: traffic
         env:
-          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Traffic metrics token missing::Skipping repository traffic badge refresh. Add TRAFFIC_METRICS_TOKEN with read access to repository Administration to update these badges."
+            exit 0
+          fi
+
           mkdir -p "$METRICS_DIR"
-          gh api "repos/$GITHUB_REPOSITORY/traffic/clones" > "$RUNNER_TEMP/clones.json"
+          if ! gh api "repos/$GITHUB_REPOSITORY/traffic/clones" > "$RUNNER_TEMP/clones.json"; then
+            echo "::error title=Traffic metrics API denied::TRAFFIC_METRICS_TOKEN must have read access to repository Administration for $GITHUB_REPOSITORY."
+            exit 1
+          fi
+
           python3 - <<'PY'
           import json
           import os
@@ -76,8 +87,10 @@ jobs:
           )
           readme.write_text(readme_text)
           PY
+          echo "updated=true" >> "$GITHUB_OUTPUT"
 
       - name: Commit updated traffic badges
+        if: steps.traffic.outputs.updated == 'true'
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
