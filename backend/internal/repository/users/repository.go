@@ -227,7 +227,7 @@ func (r *GormRepository) GetUserPositionInMarket(ctx context.Context, marketID i
 	var bets []models.Bet
 	if err := r.db.WithContext(ctx).
 		Where("market_id = ?", marketID).
-		Order("placed_at ASC").
+		Order("placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
 	}

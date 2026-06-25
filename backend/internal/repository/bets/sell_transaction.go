@@ -89,7 +89,7 @@ func (r sellMarketRepository) loadMarketData(ctx context.Context, marketID int64
 		Model(&models.Bet{}).
 		Select("bets.*").
 		Where("market_id = ?", marketID).
-		Order("placed_at ASC")
+		Order("placed_at ASC, id ASC")
 	if r.db.Dialector.Name() == "postgres" {
 		betsQuery = betsQuery.Clauses(clause.Locking{Strength: "UPDATE"})
 	}

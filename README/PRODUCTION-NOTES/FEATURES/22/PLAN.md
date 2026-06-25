@@ -3,10 +3,10 @@ title: Market Bet-History Query Boundaries And Replay Efficiency Plan
 document_type: feature-plan
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-23T00:00:00Z
-updated_at_display: "Tuesday, June 23, 2026"
-update_reason: "Align implementation slices with design-plan review: domain-term classification, narrow repository ports, migration evidence, and query-scope proof."
-status: proposed
+updated_at: 2026-06-25T00:00:00Z
+updated_at_display: "Thursday, June 25, 2026"
+update_reason: "Start implementation with deterministic market bet replay ordering, composite bet indexes, and scoped-read adapter tests."
+status: in_progress
 ---
 
 # Market Bet-History Query Boundaries And Replay Efficiency Plan
@@ -51,13 +51,20 @@ Checklist:
 
 Checklist:
 
-- [ ] Inspect existing timestamped migrations for bet/market/tag indexes.
-- [ ] Confirm index naming and duplicate-index behavior before adding migrations.
-- [ ] Add missing timestamped migrations for market bet chronology.
-- [ ] Add missing timestamped migrations for market+user and user+market bet lookups.
+- [x] Inspect existing timestamped migrations for bet/market/tag indexes.
+- [x] Confirm index naming and duplicate-index behavior before adding migrations.
+- [x] Add missing timestamped migrations for market bet chronology.
+- [x] Add missing timestamped migrations for market+user and user+market bet lookups.
 - [ ] Add missing timestamped migrations for lifecycle/status/tag discovery if absent.
-- [ ] Add migration tests or Postgres verification where practical.
-- [ ] Record write-path/storage/lock-risk notes for each new composite index.
+- [x] Add migration tests or Postgres verification where practical.
+- [x] Record write-path/storage/lock-risk notes for each new composite index.
+
+Implementation note:
+
+- Added `idx_bets_market_id_placed_at_id` for canonical per-market replay reads ordered by `placed_at ASC, id ASC`.
+- Added `idx_bets_market_id_username` for first-participation and market/user existence checks.
+- Added `idx_bets_username_market_id_placed_at_id` for user-scoped position/portfolio reads that identify affected markets and then replay those markets.
+- These indexes trade additional bet-insert write/storage cost for scoped read performance. They do not add business state or alter transaction math.
 
 ## 05. Repository Refactor
 
@@ -70,14 +77,19 @@ Checklist:
 - [ ] Ensure projection rows are scalar DTOs with no GORM hooks/business methods.
 - [ ] Ensure projection rows include deterministic ordering fields where needed.
 - [ ] Keep framework-specific types and concrete repository packages out of domain/use-case packages.
-- [ ] Ensure per-market methods include SQL `market_id` predicates.
+- [x] Ensure per-market methods include SQL `market_id` predicates.
 - [ ] Ensure high-volume reads select only needed columns.
 - [ ] Ensure user methods begin from `username` where appropriate.
 - [ ] Avoid adding generic `ListBets`/`AllBets` methods without explicit global naming.
-- [ ] Add tests that seed multiple markets and prove per-market reads exclude unrelated rows.
+- [x] Add tests that seed multiple markets and prove per-market reads exclude unrelated rows.
 - [ ] Add adapter-level query-capture, dry-run, or logger assertions for high-risk methods so correct results cannot hide broad SQL.
-- [ ] Add ordering tests for chronological market replay.
+- [x] Add ordering tests for chronological market replay.
 - [ ] Add tests proving narrow projections still satisfy WPAM/DBPM calculator inputs.
+
+Implementation note:
+
+- Updated market, analytics, sell-transaction, and user-position bet-history readers to use deterministic `placed_at ASC, id ASC` ordering.
+- Added repository tests that seed unrelated market rows between same-timestamp target rows, then verify only the requested market's rows are returned and ties are ordered by ID.
 
 ## 06. Display Path Optimization
 
@@ -98,14 +110,14 @@ Checklist:
 Checklist:
 
 - [ ] Run backend unit tests.
-- [ ] Run targeted repository tests.
+- [x] Run targeted repository tests.
 - [ ] Run Postgres integration tests for index-heavy paths when `POSTGRES_TEST_DSN` is available.
 - [ ] Capture before/after query counts or query plans for at least one high-risk route.
 - [ ] Capture before/after row count and column projection evidence for at least one hot market replay path.
 - [ ] Run pure WPAM/DBPM tests with in-memory event DTOs for reduced replay inputs.
 - [ ] Run use-case tests with fake repository ports.
 - [ ] Run adapter contract tests with multiple markets/users.
-- [ ] Run migration/index existence tests where practical.
+- [x] Run migration/index existence tests where practical.
 - [ ] Run import-guard/static checks preventing `gorm` imports from domain/use-case packages if such a guard exists or can be added cheaply.
 - [ ] Prove optimized/reduced query inputs produce identical WPAM, DBPM, resolution, refund, and dust results for representative replay histories.
 

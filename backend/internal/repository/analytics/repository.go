@@ -120,7 +120,7 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) (
 	if err := db.Table("bets").
 		Select("id, username, market_id, amount, outcome, placed_at, created_at").
 		Where("market_id = ?", marketID).
-		Order("placed_at ASC").
+		Order("placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
 	}

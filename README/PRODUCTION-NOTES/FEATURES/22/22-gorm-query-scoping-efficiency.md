@@ -3,10 +3,10 @@ title: Market Bet-History Query Boundaries And Replay Efficiency
 document_type: feature-overview
 domain: features
 author: Patrick Delaney
-updated_at: 2026-06-23T00:00:00Z
-updated_at_display: "Tuesday, June 23, 2026"
-update_reason: "Align the query-efficiency spec with the SocialPredict design-plan postures: domain language, evolutionary architecture, clean boundaries, and transaction-safe optimization."
-status: proposed
+updated_at: 2026-06-25T00:00:00Z
+updated_at_display: "Thursday, June 25, 2026"
+update_reason: "Start implementation with deterministic market bet replay ordering, composite bet indexes, and scoped-read adapter tests."
+status: in_progress
 ---
 
 # Market Bet-History Query Boundaries And Replay Efficiency
@@ -32,6 +32,14 @@ When a calculation is for one market, the repository query should fetch only tha
 ```
 
 This feature starts a repository/query audit and implementation plan for tightening bet-history reads, adding the right database indexes, and using display read models where exact transaction-time state is not required.
+
+## Implementation Slice 1
+
+The first implementation slice keeps market math unchanged and improves the persistence adapter boundary:
+
+- canonical per-market bet replay now orders by `placed_at ASC, id ASC` where market history is loaded for market, analytics, sale, and user-position paths;
+- a timestamped migration adds composite indexes for market chronology, market/user existence checks, and user/market chronological reads;
+- repository tests seed unrelated market rows between same-timestamp target rows to prove scoped reads exclude cross-market rows and preserve deterministic tie ordering.
 
 ## Design-Plan Alignment
 
