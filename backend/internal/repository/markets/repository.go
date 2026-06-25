@@ -235,11 +235,7 @@ func applyOwnedByFilter(query *gorm.DB, ownedBy string) *gorm.DB {
 	if ownedBy == "" {
 		return query
 	}
-	return query.Where(
-		"markets.creator_username = ? OR COALESCE(NULLIF(markets.steward_username, ''), markets.creator_username) = ?",
-		ownedBy,
-		ownedBy,
-	)
+	return query.Where("COALESCE(NULLIF(markets.steward_username, ''), markets.creator_username) = ?", ownedBy)
 }
 
 func applyTagSlugFilter(query *gorm.DB, tagSlug string) *gorm.DB {

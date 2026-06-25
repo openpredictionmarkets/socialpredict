@@ -26,7 +26,7 @@ type lifecycleMarketsResponse struct {
 	Total   int                   `json:"total"`
 }
 
-// ListMyLifecycleMarketsHandler returns proposed/published/rejected markets for the current user.
+// ListMyLifecycleMarketsHandler returns proposed/published/rejected markets stewarded by the current user.
 func ListMyLifecycleMarketsHandler(svc lifecycleMarketLister, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -48,7 +48,7 @@ func ListMyLifecycleMarketsHandler(svc lifecycleMarketLister, auth authsvc.Authe
 		if !ok {
 			return
 		}
-		filters.CreatedBy = user.Username
+		filters.OwnedBy = user.Username
 
 		if discoverySvc, ok := svc.(lifecycleMarketDiscoveryLister); ok {
 			page, err := discoverySvc.ListLifecycleMarketDiscovery(r.Context(), filters)
