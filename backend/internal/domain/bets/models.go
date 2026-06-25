@@ -138,6 +138,10 @@ type SellQuoteResult struct {
 	ValuePerShare     int64
 	DustCapCoverage   float64
 	Allowed           bool
+	PositionLocked    bool
+	LockReason        string
+	SellableShares    int64
+	LockedShares      int64
 	SuggestedAmounts  []int64
 	Message           string
 	QuotedAt          time.Time
@@ -145,7 +149,7 @@ type SellQuoteResult struct {
 	DustCapExceededBy int64
 }
 
-func buildSellQuoteResult(target *SellQuoteResult, req SellRequest, outcome string, sale SaleQuote, maxDust int64, allowed bool, suggested []int64, quotedAt time.Time) *SellQuoteResult {
+func buildSellQuoteResult(target *SellQuoteResult, req SellRequest, outcome string, sale SaleQuote, maxDust int64, allowed bool, lock saleLockResult, suggested []int64, quotedAt time.Time) *SellQuoteResult {
 	if target == nil {
 		target = &SellQuoteResult{}
 	}
@@ -168,8 +172,12 @@ func buildSellQuoteResult(target *SellQuoteResult, req SellRequest, outcome stri
 		ValuePerShare:     sale.ValuePerShare,
 		DustCapCoverage:   dustCapCoverage(maxDust, sale.ValuePerShare),
 		Allowed:           allowed,
+		PositionLocked:    lock.Locked,
+		LockReason:        lock.Reason,
+		SellableShares:    lock.SellableShares,
+		LockedShares:      lock.LockedShares,
 		SuggestedAmounts:  suggested,
-		Message:           sellQuoteMessage(allowed, sale.Dust, maxDust),
+		Message:           sellQuoteMessage(allowed, sale.Dust, maxDust, lock),
 		QuotedAt:          quotedAt,
 		DustCapExceeded:   exceededBy > 0,
 		DustCapExceededBy: exceededBy,
@@ -177,6 +185,6 @@ func buildSellQuoteResult(target *SellQuoteResult, req SellRequest, outcome stri
 	return target
 }
 
-func (r *SellQuoteResult) Build(req SellRequest, outcome string, sale SaleQuote, maxDust int64, allowed bool, suggested []int64, quotedAt time.Time) *SellQuoteResult {
-	return buildSellQuoteResult(r, req, outcome, sale, maxDust, allowed, suggested, quotedAt)
+func (r *SellQuoteResult) Build(req SellRequest, outcome string, sale SaleQuote, maxDust int64, allowed bool, lock saleLockResult, suggested []int64, quotedAt time.Time) *SellQuoteResult {
+	return buildSellQuoteResult(r, req, outcome, sale, maxDust, allowed, lock, suggested, quotedAt)
 }

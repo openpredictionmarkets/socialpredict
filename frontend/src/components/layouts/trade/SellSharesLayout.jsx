@@ -326,19 +326,30 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
     const panelTone = quote.allowed
         ? 'border-emerald-400/50 bg-emerald-950/30 text-emerald-50'
         : 'border-amber-300/70 bg-amber-950/40 text-amber-50';
+    const statusLabel = quote.allowed
+        ? 'Allowed'
+        : quote.positionLocked
+            ? 'Locked'
+            : 'Adjust amount';
 
     return (
         <div className={`mb-4 rounded-lg border p-3 text-sm ${panelTone}`}>
             <div className="mb-2 flex items-center justify-between gap-3">
                 <h3 className="text-base font-semibold">Sale Preview</h3>
                 <span className="rounded-full bg-white/10 px-2 py-1 text-xs">
-                    {quote.allowed ? 'Allowed' : 'Adjust amount'}
+                    {statusLabel}
                 </span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
                 <QuoteMetric label="Sale order" value={quote.requestedCredits} />
                 <QuoteMetric label="Credits received" value={quote.netProceeds ?? quote.saleValue} />
                 <QuoteMetric label="Shares sold" value={quote.sharesSold} />
+                {quote.positionLocked && (
+                    <>
+                        <QuoteMetric label="Sellable shares" value={quote.sellableShares ?? 0} />
+                        <QuoteMetric label="Locked shares" value={quote.lockedShares ?? 0} />
+                    </>
+                )}
                 <QuoteMetric label="Dust fee" value={`${quote.dust} / ${quote.maxDust}`} />
                 <QuoteMetric label="Value per share" value={quote.valuePerShare} />
                 <QuoteMetric label="Dust coverage" value={`${coverageLabel}%`} />

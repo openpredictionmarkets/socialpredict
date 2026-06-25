@@ -51,10 +51,16 @@ type PositionReader interface {
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
+// MarketBetReader exposes canonical market bet history for sale-lock checks.
+type MarketBetReader interface {
+	ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error)
+}
+
 // MarketService exposes the subset of market operations required by bets.
 type MarketService interface {
 	MarketReader
 	PositionReader
+	MarketBetReader
 }
 
 // MarketGate ensures market openness before betting operations.

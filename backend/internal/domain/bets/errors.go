@@ -48,6 +48,8 @@ var (
 	ErrNoPosition BetError = newDomainError("no position found for the given market and outcome")
 	// ErrInsufficientShares indicates the user cannot sell the requested credits.
 	ErrInsufficientShares BetError = newDomainError("not enough shares to satisfy requested sale")
+	// ErrPositionLocked indicates the position cannot be sold until external market movement occurs.
+	ErrPositionLocked BetError = newDomainError("position is locked until another user places a later bet on this market")
 )
 
 // ErrDustCapExceeded is returned when a sell transaction would generate dust above the configured cap.

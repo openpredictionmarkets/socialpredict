@@ -28,6 +28,10 @@ const formatApiError = (errorData, fallback) => {
         return `${errorData.message || 'Sale would create too much rounding dust.'}${suffix} Try a different Sale Order amount.`;
     }
 
+    if (errorData.reason === 'POSITION_LOCKED_AWAITING_EXTERNAL_MARKET_MOVEMENT') {
+        return errorData.message || 'Sale is locked until another user places a later bet on this market.';
+    }
+
     return errorData.message || errorData.reason || errorData.error || fallback;
 };
 

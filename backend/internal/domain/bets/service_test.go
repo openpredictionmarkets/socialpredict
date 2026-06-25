@@ -116,6 +116,7 @@ func (f fakeBetHistoryReader) UserHasBet(ctx context.Context, marketID uint, use
 type fakeMarkets struct {
 	reader    fakeMarketReader
 	positions fakePositionReader
+	history   fakeMarketBetReader
 }
 
 func newFakeMarkets(opts ...func(*fakeMarkets)) *fakeMarkets {
@@ -128,6 +129,11 @@ func newFakeMarkets(opts ...func(*fakeMarkets)) *fakeMarkets {
 		positions: fakePositionReader{
 			getUserPositionInMarketFunc: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
 				return nil, errUnexpectedServiceCall
+			},
+		},
+		history: fakeMarketBetReader{
+			listBetsForMarketFunc: func(context.Context, int64) ([]*dmarkets.Bet, error) {
+				return defaultUnlockedSaleHistory(), nil
 			},
 		},
 	}
@@ -149,6 +155,12 @@ func withFakePosition(fn func(ctx context.Context, marketID int64, username stri
 	}
 }
 
+func withFakeMarketBets(fn func(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error)) func(*fakeMarkets) {
+	return func(markets *fakeMarkets) {
+		markets.history.listBetsForMarketFunc = fn
+	}
+}
+
 type fakeMarketReader struct {
 	getMarketFunc func(ctx context.Context, id int64) (*dmarkets.Market, error)
 }
@@ -165,6 +177,10 @@ func (f *fakeMarkets) GetUserPositionInMarket(ctx context.Context, marketID int6
 	return f.positions.GetUserPositionInMarket(ctx, marketID, username)
 }
 
+func (f *fakeMarkets) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
+	return f.history.ListBetsForMarket(ctx, marketID)
+}
+
 func (f fakeMarketReader) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
 	if f.getMarketFunc == nil {
 		return nil, errUnexpectedServiceCall
@@ -177,6 +193,17 @@ func (f fakePositionReader) GetUserPositionInMarket(ctx context.Context, marketI
 		return nil, errUnexpectedServiceCall
 	}
 	return f.getUserPositionInMarketFunc(ctx, marketID, username)
+}
+
+type fakeMarketBetReader struct {
+	listBetsForMarketFunc func(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error)
+}
+
+func (f fakeMarketBetReader) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
+	if f.listBetsForMarketFunc == nil {
+		return nil, errUnexpectedServiceCall
+	}
+	return f.listBetsForMarketFunc(ctx, marketID)
 }
 
 type applyCall struct {
@@ -295,13 +322,50 @@ func withFixturePosition(position *dmarkets.UserPosition) serviceFixtureOption {
 			f.markets = newFakeMarkets()
 		}
 		current := f.markets.reader.getMarketFunc
+		history := f.markets.history.listBetsForMarketFunc
 		f.markets = newFakeMarkets(
 			withFakeMarket(current),
 			withFakePosition(func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
 				return position, nil
 			}),
+			withFakeMarketBets(history),
 		)
 	}
+}
+
+func withFixtureHistory(history []boundary.Bet) serviceFixtureOption {
+	return func(f *serviceFixture) {
+		if f.markets == nil {
+			f.markets = newFakeMarkets()
+		}
+		f.markets.history.listBetsForMarketFunc = func(context.Context, int64) ([]*dmarkets.Bet, error) {
+			return boundaryBetsToMarketBets(history), nil
+		}
+	}
+}
+
+func defaultUnlockedSaleHistory() []*dmarkets.Bet {
+	now := serviceTestTime()
+	return []*dmarkets.Bet{
+		{Username: "alice", MarketID: 1, Amount: 10, Outcome: "YES", PlacedAt: now.Add(-2 * time.Hour), CreatedAt: now.Add(-2 * time.Hour)},
+		{Username: "bob", MarketID: 1, Amount: 1, Outcome: "NO", PlacedAt: now.Add(-1 * time.Hour), CreatedAt: now.Add(-1 * time.Hour)},
+	}
+}
+
+func boundaryBetsToMarketBets(history []boundary.Bet) []*dmarkets.Bet {
+	result := make([]*dmarkets.Bet, len(history))
+	for i := range history {
+		result[i] = &dmarkets.Bet{
+			ID:        history[i].ID,
+			Username:  history[i].Username,
+			MarketID:  history[i].MarketID,
+			Amount:    history[i].Amount,
+			Outcome:   history[i].Outcome,
+			PlacedAt:  history[i].PlacedAt,
+			CreatedAt: history[i].CreatedAt,
+		}
+	}
+	return result
 }
 
 func withFixtureUser(user *dusers.User) serviceFixtureOption {
@@ -770,6 +834,7 @@ func TestServiceSell_MarketHistorySaleOrderDustScenarios(t *testing.T) {
 		{Username: "alice", MarketID: 1, Amount: 70, Outcome: "YES", PlacedAt: now.Add(-4 * time.Hour)},
 		{Username: "bob", MarketID: 1, Amount: 40, Outcome: "NO", PlacedAt: now.Add(-3 * time.Hour)},
 		{Username: "alice", MarketID: 1, Amount: 30, Outcome: "YES", PlacedAt: now.Add(-2 * time.Hour)},
+		{Username: "carol", MarketID: 1, Amount: 1, Outcome: "NO", PlacedAt: now.Add(-90 * time.Minute)},
 		{Username: "bob", MarketID: 1, Amount: -1, Outcome: "NO", PlacedAt: now.Add(-1 * time.Hour)},
 	}
 
@@ -828,6 +893,7 @@ func TestServiceSell_MarketHistorySaleOrderDustScenarios(t *testing.T) {
 				withFixtureMaxDust(tc.maxDust),
 				withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
 				withFixturePosition(position),
+				withFixtureHistory(priorHistory),
 				withFixtureUser(&dusers.User{Username: "alice"}),
 			)
 
@@ -865,6 +931,106 @@ func TestServiceSell_MarketHistorySaleOrderDustScenarios(t *testing.T) {
 			}
 			if len(fixture.users.calls) != 1 || fixture.users.calls[0].transaction != dusers.TransactionSale || fixture.users.calls[0].amount != wantNetProceeds {
 				t.Fatalf("unexpected user ledger calls: %+v", fixture.users.calls)
+			}
+		})
+	}
+}
+
+func TestServiceSell_PositionRemainsLockedAfterSelfTopUp(t *testing.T) {
+	now := serviceTestTime()
+	history := []boundary.Bet{
+		{Username: "alice", MarketID: 1, Amount: 50, Outcome: "YES", PlacedAt: now.Add(-2 * time.Hour), CreatedAt: now.Add(-2 * time.Hour)},
+		{Username: "alice", MarketID: 1, Amount: 1, Outcome: "YES", PlacedAt: now.Add(-1 * time.Hour), CreatedAt: now.Add(-1 * time.Hour)},
+	}
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(&dmarkets.UserPosition{
+			Username:       "alice",
+			MarketID:       1,
+			YesSharesOwned: 5,
+			Value:          50,
+		}),
+		withFixtureHistory(history),
+		withFixtureUser(&dusers.User{Username: "alice"}),
+	)
+
+	quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{
+		Username: "alice",
+		MarketID: 1,
+		Amount:   10,
+		Outcome:  "YES",
+	})
+	if err != nil {
+		t.Fatalf("QuoteSell returned error: %v", err)
+	}
+	if quote.Allowed || !quote.PositionLocked || quote.SellableShares != 0 || quote.LockedShares != 5 {
+		t.Fatalf("expected locked quote with all shares locked, got %+v", quote)
+	}
+
+	_, err = svc.Sell(context.Background(), bets.SellRequest{
+		Username: "alice",
+		MarketID: 1,
+		Amount:   10,
+		Outcome:  "YES",
+	})
+	if !errors.Is(err, bets.ErrPositionLocked) {
+		t.Fatalf("expected ErrPositionLocked, got %v", err)
+	}
+	if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+		t.Fatalf("locked sale must not mutate state: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
+	}
+}
+
+func TestServiceSell_PositionUnlocksAfterAnotherUserBet(t *testing.T) {
+	now := serviceTestTime()
+	for _, bobOutcome := range []string{"YES", "NO"} {
+		t.Run("bob_"+bobOutcome+"_unlocks", func(t *testing.T) {
+			history := []boundary.Bet{
+				{Username: "alice", MarketID: 1, Amount: 50, Outcome: "YES", PlacedAt: now.Add(-3 * time.Hour), CreatedAt: now.Add(-3 * time.Hour)},
+				{Username: "alice", MarketID: 1, Amount: 1, Outcome: "YES", PlacedAt: now.Add(-2 * time.Hour), CreatedAt: now.Add(-2 * time.Hour)},
+				{Username: "bob", MarketID: 1, Amount: 1, Outcome: bobOutcome, PlacedAt: now.Add(-1 * time.Hour), CreatedAt: now.Add(-1 * time.Hour)},
+			}
+			fixture, svc := newServiceFixture(
+				now,
+				withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+				withFixturePosition(&dmarkets.UserPosition{
+					Username:       "alice",
+					MarketID:       1,
+					YesSharesOwned: 5,
+					Value:          50,
+				}),
+				withFixtureHistory(history),
+				withFixtureUser(&dusers.User{Username: "alice"}),
+			)
+
+			quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{
+				Username: "alice",
+				MarketID: 1,
+				Amount:   10,
+				Outcome:  "YES",
+			})
+			if err != nil {
+				t.Fatalf("QuoteSell returned error: %v", err)
+			}
+			if !quote.Allowed || quote.PositionLocked || quote.SellableShares != 5 || quote.LockedShares != 0 {
+				t.Fatalf("expected unlocked quote, got %+v", quote)
+			}
+
+			result, err := svc.Sell(context.Background(), bets.SellRequest{
+				Username: "alice",
+				MarketID: 1,
+				Amount:   10,
+				Outcome:  "YES",
+			})
+			if err != nil {
+				t.Fatalf("Sell returned error: %v", err)
+			}
+			if result.SharesSold != 1 || result.NetProceeds != 10 {
+				t.Fatalf("unexpected sale result: %+v", result)
+			}
+			if fixture.repo.created == nil || fixture.repo.created.Amount != -1 {
+				t.Fatalf("expected stored sale bet for one share, got %+v", fixture.repo.created)
 			}
 		})
 	}
@@ -954,6 +1120,7 @@ func TestServiceSell_ActualMixedMarketHistorySaleOrderDustScenarios(t *testing.T
 					TotalSpent:       position.TotalSpent,
 					TotalSpentInPlay: position.TotalSpentInPlay,
 				}),
+				withFixtureHistory(history),
 				withFixtureUser(&dusers.User{Username: "alice"}),
 			)
 

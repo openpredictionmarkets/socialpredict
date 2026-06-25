@@ -28,6 +28,7 @@ const (
 	ReasonInsufficientBalance FailureReason = "INSUFFICIENT_BALANCE"
 	ReasonNoPosition          FailureReason = "NO_POSITION"
 	ReasonInsufficientShares  FailureReason = "INSUFFICIENT_SHARES"
+	ReasonPositionLocked      FailureReason = "POSITION_LOCKED_AWAITING_EXTERNAL_MARKET_MOVEMENT"
 	ReasonDustCapExceeded     FailureReason = "DUST_CAP_EXCEEDED"
 	ReasonInternalError       FailureReason = "INTERNAL_ERROR"
 )
@@ -51,6 +52,7 @@ var publicFailureReasons = []FailureReason{
 	ReasonInsufficientBalance,
 	ReasonNoPosition,
 	ReasonInsufficientShares,
+	ReasonPositionLocked,
 	ReasonDustCapExceeded,
 	ReasonInternalError,
 }

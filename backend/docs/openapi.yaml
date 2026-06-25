@@ -62,6 +62,7 @@ x-route-family-migration-matrix:
     - INSUFFICIENT_BALANCE
     - NO_POSITION
     - INSUFFICIENT_SHARES
+    - POSITION_LOCKED_AWAITING_EXTERNAL_MARKET_MOVEMENT
     - DUST_CAP_EXCEEDED
     - INTERNAL_ERROR
   plain_text_error_response_state: migration_state_not_target_contract
@@ -5571,7 +5572,7 @@ components:
         - INVALID_STATE: the requested transition is not valid for the resource's current lifecycle state.
         - MARKET_GROUP_CHILD_UNPUBLISHED: grouped-market resolution was blocked because one answer child is not published yet.
         - VALIDATION_FAILED: syntactically valid input that fails route or business validation.
-        - MARKET_CLOSED, INSUFFICIENT_BALANCE, NO_POSITION, INSUFFICIENT_SHARES, and DUST_CAP_EXCEEDED: shared market and bet rule failures.
+        - MARKET_CLOSED, INSUFFICIENT_BALANCE, NO_POSITION, INSUFFICIENT_SHARES, POSITION_LOCKED_AWAITING_EXTERNAL_MARKET_MOVEMENT, and DUST_CAP_EXCEEDED: shared market and bet rule failures.
         - INTERNAL_ERROR: unexpected server-side failure.
       properties:
         ok:
@@ -5598,6 +5599,7 @@ components:
             - INSUFFICIENT_BALANCE
             - NO_POSITION
             - INSUFFICIENT_SHARES
+            - POSITION_LOCKED_AWAITING_EXTERNAL_MARKET_MOVEMENT
             - DUST_CAP_EXCEEDED
             - INTERNAL_ERROR
           example: VALIDATION_FAILED
@@ -7144,6 +7146,20 @@ components:
         allowed:
           type: boolean
           description: Whether POST /v0/sell would be allowed after sale-order rounding.
+        positionLocked:
+          type: boolean
+          description: Whether the sale is blocked because the seller's latest positive buy has not been followed by another user's later positive bet on the same market.
+        lockReason:
+          type: string
+          description: Human-readable explanation when positionLocked is true.
+        sellableShares:
+          type: integer
+          format: int64
+          description: Shares currently sellable under the external market movement lock.
+        lockedShares:
+          type: integer
+          format: int64
+          description: Shares currently locked until another user places a later positive bet on the same market.
         suggestedAmounts:
           type: array
           items:
