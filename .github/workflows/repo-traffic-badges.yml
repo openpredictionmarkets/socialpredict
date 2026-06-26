@@ -2,8 +2,6 @@ name: Repository Traffic Badges
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '17 8 * * *'
 
 permissions:
   contents: write
