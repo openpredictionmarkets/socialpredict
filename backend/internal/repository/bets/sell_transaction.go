@@ -71,6 +71,26 @@ func (r sellMarketRepository) GetUserPositionInMarket(ctx context.Context, marke
 	}, nil
 }
 
+func (r sellMarketRepository) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
+	_, bets, err := r.loadMarketData(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*dmarkets.Bet, len(bets))
+	for i := range bets {
+		result[i] = &dmarkets.Bet{
+			ID:        bets[i].ID,
+			Username:  bets[i].Username,
+			MarketID:  bets[i].MarketID,
+			Amount:    bets[i].Amount,
+			Outcome:   bets[i].Outcome,
+			PlacedAt:  bets[i].PlacedAt,
+			CreatedAt: bets[i].CreatedAt,
+		}
+	}
+	return result, nil
+}
+
 func (r sellMarketRepository) loadMarketData(ctx context.Context, marketID int64) (positionsmath.MarketSnapshot, []boundary.Bet, error) {
 	var market models.Market
 	marketQuery := r.db.WithContext(ctx)
@@ -89,7 +109,7 @@ func (r sellMarketRepository) loadMarketData(ctx context.Context, marketID int64
 		Model(&models.Bet{}).
 		Select("bets.*").
 		Where("market_id = ?", marketID).
-		Order("placed_at ASC")
+		Order("placed_at ASC, id ASC")
 	if r.db.Dialector.Name() == "postgres" {
 		betsQuery = betsQuery.Clauses(clause.Locking{Strength: "UPDATE"})
 	}

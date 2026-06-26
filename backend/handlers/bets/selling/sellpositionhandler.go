@@ -134,6 +134,16 @@ func handleSellError(w http.ResponseWriter, err error) {
 		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonNoPosition)
 	case errors.Is(err, bets.ErrInsufficientShares):
 		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientShares)
+	case errors.Is(err, bets.ErrPositionLocked):
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusConflict,
+			handlers.ReasonPositionLocked,
+			"Sale is locked until another user places a later bet on this market.",
+			map[string]any{
+				"hint": "Wait for external market activity before selling this position.",
+			},
+		)
 	case errors.Is(err, dmarkets.ErrMarketNotFound):
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:
@@ -170,6 +180,10 @@ func writeSellQuoteResponse(w http.ResponseWriter, result *bets.SellQuoteResult)
 		ValuePerShare:     result.ValuePerShare,
 		DustCapCoverage:   result.DustCapCoverage,
 		Allowed:           result.Allowed,
+		PositionLocked:    result.PositionLocked,
+		LockReason:        result.LockReason,
+		SellableShares:    result.SellableShares,
+		LockedShares:      result.LockedShares,
 		SuggestedAmounts:  result.SuggestedAmounts,
 		Message:           result.Message,
 		QuotedAt:          result.QuotedAt,

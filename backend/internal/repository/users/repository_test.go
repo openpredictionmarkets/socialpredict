@@ -73,14 +73,22 @@ func TestGormRepositoryListUserBets(t *testing.T) {
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
+	otherUser := modelstesting.GenerateUser("dave", 1000)
+	if err := db.Create(&otherUser).Error; err != nil {
+		t.Fatalf("seed other user: %v", err)
+	}
 
 	market := modelstesting.GenerateMarket(300, "creator")
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("seed market: %v", err)
 	}
+	otherMarket := modelstesting.GenerateMarket(301, "creator")
+	if err := db.Create(&otherMarket).Error; err != nil {
+		t.Fatalf("seed other market: %v", err)
+	}
 
 	earlier := time.Now().Add(-3 * time.Minute)
-	later := time.Now().Add(-1 * time.Minute)
+	later := time.Now().Add(-1 * time.Minute).UTC().Truncate(time.Second)
 	first := models.Bet{
 		Username: "carol",
 		MarketID: uint(market.ID),
@@ -95,26 +103,51 @@ func TestGormRepositoryListUserBets(t *testing.T) {
 		Outcome:  "NO",
 		PlacedAt: earlier,
 	}
+	third := models.Bet{
+		Username: "carol",
+		MarketID: uint(otherMarket.ID),
+		Amount:   7,
+		Outcome:  "YES",
+		PlacedAt: later,
+	}
+	unrelated := models.Bet{
+		Username: "dave",
+		MarketID: uint(market.ID),
+		Amount:   99,
+		Outcome:  "YES",
+		PlacedAt: later.Add(time.Minute),
+	}
 	if err := db.Create(&first).Error; err != nil {
 		t.Fatalf("insert first bet: %v", err)
 	}
 	if err := db.Create(&second).Error; err != nil {
 		t.Fatalf("insert second bet: %v", err)
 	}
+	if err := db.Create(&third).Error; err != nil {
+		t.Fatalf("insert third bet: %v", err)
+	}
+	if err := db.Create(&unrelated).Error; err != nil {
+		t.Fatalf("insert unrelated bet: %v", err)
+	}
 
 	bets, err := repo.ListUserBets(ctx, "carol")
 	if err != nil {
 		t.Fatalf("ListUserBets returned error: %v", err)
 	}
-	if len(bets) != 2 {
-		t.Fatalf("expected 2 bets, got %d", len(bets))
+	if len(bets) != 3 {
+		t.Fatalf("expected 3 bets, got %d", len(bets))
 	}
 
 	if bets[0].PlacedAt.Before(bets[1].PlacedAt) {
 		t.Fatalf("expected bets ordered descending by PlacedAt")
 	}
-	if bets[0].MarketID != uint(market.ID) {
-		t.Fatalf("unexpected market ID in response: %+v", bets[0])
+	if bets[0].MarketID != uint(otherMarket.ID) || bets[1].MarketID != uint(market.ID) {
+		t.Fatalf("expected same-time rows ordered by id desc, got %+v", bets)
+	}
+	for _, bet := range bets {
+		if bet.MarketID != uint(market.ID) && bet.MarketID != uint(otherMarket.ID) {
+			t.Fatalf("unexpected market ID in response: %+v", bet)
+		}
 	}
 }
 

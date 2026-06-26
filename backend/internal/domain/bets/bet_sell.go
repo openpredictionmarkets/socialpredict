@@ -52,13 +52,21 @@ func (s *Service) QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteRes
 		return nil, err
 	}
 
+	lock, err := evaluateSaleLock(ctx, s.markets, req, outcome, sharesOwned)
+	if err != nil {
+		return nil, err
+	}
+
 	allowed := true
 	if err := validateDustCap(sale.Dust, s.config.MaxDustPerSale); err != nil {
 		allowed = false
 	}
+	if lock.Locked {
+		allowed = false
+	}
 
 	suggested := suggestSaleAmounts(sale, sharesOwned, s.config.MaxDustPerSale)
-	return new(SellQuoteResult).Build(req, outcome, sale, s.config.MaxDustPerSale, allowed, suggested, s.clock.Now()), nil
+	return new(SellQuoteResult).Build(req, outcome, sale, s.config.MaxDustPerSale, allowed, lock, suggested, s.clock.Now()), nil
 }
 
 func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcome string) (*SellResult, error) {
@@ -71,6 +79,12 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 		sharesOwned, position, err := loadUserSharesFrom(txCtx, markets, req, outcome)
 		if err != nil {
 			return err
+		}
+
+		if lock, err := evaluateSaleLock(txCtx, markets, req, outcome, sharesOwned); err != nil {
+			return err
+		} else if lock.Locked {
+			return ErrPositionLocked
 		}
 
 		sale, err := s.saleCalculator.Calculate(position, sharesOwned, req.Amount)
@@ -94,6 +108,64 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 		return nil, err
 	}
 	return result, nil
+}
+
+type saleLockResult struct {
+	Locked         bool
+	Reason         string
+	SellableShares int64
+	LockedShares   int64
+}
+
+func unlockedSaleLock(sharesOwned int64) saleLockResult {
+	return saleLockResult{SellableShares: sharesOwned}
+}
+
+func lockedSaleLock(sharesOwned int64) saleLockResult {
+	return saleLockResult{
+		Locked:         true,
+		Reason:         ErrPositionLocked.Message(),
+		SellableShares: 0,
+		LockedShares:   sharesOwned,
+	}
+}
+
+func evaluateSaleLock(ctx context.Context, markets MarketBetReader, req SellRequest, outcome string, sharesOwned int64) (saleLockResult, error) {
+	if sharesOwned <= 0 {
+		return unlockedSaleLock(0), nil
+	}
+	history, err := markets.ListBetsForMarket(ctx, int64(req.MarketID))
+	if err != nil {
+		return saleLockResult{}, err
+	}
+	if positionLockedAwaitingExternalBet(history, req.Username, outcome) {
+		return lockedSaleLock(sharesOwned), nil
+	}
+	return unlockedSaleLock(sharesOwned), nil
+}
+
+func positionLockedAwaitingExternalBet(history []*dmarkets.Bet, username string, outcome string) bool {
+	lastUserBuyIndex := -1
+	for i, bet := range history {
+		if bet == nil {
+			continue
+		}
+		if bet.Username == username && bet.Outcome == outcome && bet.Amount > 0 {
+			lastUserBuyIndex = i
+		}
+	}
+	if lastUserBuyIndex < 0 {
+		return false
+	}
+	for _, bet := range history[lastUserBuyIndex+1:] {
+		if bet == nil {
+			continue
+		}
+		if bet.Amount > 0 && bet.Username != username {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) loadUserShares(ctx context.Context, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, error) {
@@ -250,7 +322,10 @@ func dustCapCoverage(maxDust int64, valuePerShare int64) float64 {
 	return math.Round(coverage*10000) / 10000
 }
 
-func sellQuoteMessage(allowed bool, dust int64, maxDust int64) string {
+func sellQuoteMessage(allowed bool, dust int64, maxDust int64, lock saleLockResult) string {
+	if lock.Locked {
+		return "This Sale Order is locked until another user places a later bet on this market."
+	}
 	if allowed {
 		if dust == 0 {
 			return "This sale can be submitted with no dust fee."

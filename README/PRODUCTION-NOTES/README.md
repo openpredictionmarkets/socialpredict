@@ -95,6 +95,7 @@ Current feature specs:
 19. **Grouped Market N/A And Documentation Alignment** - [`FEATURES/19/19-grouped-market-na-and-doc-alignment.md`](./FEATURES/19/19-grouped-market-na-and-doc-alignment.md), [`FEATURES/19/DESIGN.md`](./FEATURES/19/DESIGN.md), [`FEATURES/19/PLAN.md`](./FEATURES/19/PLAN.md)
 20. **Analytics Repository Boundary** - [`FEATURES/20/20-analytics-repository-boundary.md`](./FEATURES/20/20-analytics-repository-boundary.md), [`FEATURES/20/DESIGN.md`](./FEATURES/20/DESIGN.md), [`FEATURES/20/PLAN.md`](./FEATURES/20/PLAN.md)
 21. **Container Security Scanning** - [`FEATURES/21/21-container-security-scanning.md`](./FEATURES/21/21-container-security-scanning.md), [`FEATURES/21/DESIGN.md`](./FEATURES/21/DESIGN.md), [`FEATURES/21/PLAN.md`](./FEATURES/21/PLAN.md)
+22. **GORM Query Scoping And Market Bet-History Efficiency** - [`FEATURES/22/22-gorm-query-scoping-efficiency.md`](./FEATURES/22/22-gorm-query-scoping-efficiency.md), [`FEATURES/22/DESIGN.md`](./FEATURES/22/DESIGN.md), [`FEATURES/22/PLAN.md`](./FEATURES/22/PLAN.md), [`FEATURES/22/QUERY_AUDIT.md`](./FEATURES/22/QUERY_AUDIT.md)
 
 ## Implementation Priority
 

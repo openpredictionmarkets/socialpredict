@@ -120,7 +120,7 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID uint) (
 	if err := db.Table("bets").
 		Select("id, username, market_id, amount, outcome, placed_at, created_at").
 		Where("market_id = ?", marketID).
-		Order("placed_at ASC").
+		Order("placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
 	}
@@ -269,17 +269,33 @@ func (r *GormRepository) hydrateWorkProfitMarketGroups(ctx context.Context, grou
 		return nil, err
 	}
 	records := mapWorkProfitMarketGroups(groups)
-	for index := range records {
-		var members []analyticsMarketGroupMemberRow
-		if err := db.Table("market_group_members").
-			Select("market_id").
-			Where("group_id = ?", records[index].ID).
-			Order("display_order ASC, id ASC").
-			Find(&members).Error; err != nil {
-			return nil, err
-		}
-		records[index].MemberMarketIDs = mapMarketGroupMemberIDs(members)
+	if len(records) == 0 {
+		return records, nil
 	}
+
+	groupIDs := make([]uint, 0, len(records))
+	recordIndexByGroupID := make(map[uint]int, len(records))
+	for index, record := range records {
+		groupIDs = append(groupIDs, record.ID)
+		recordIndexByGroupID[record.ID] = index
+	}
+
+	var members []analyticsMarketGroupMemberRow
+	if err := db.Table("market_group_members").
+		Select("group_id, market_id").
+		Where("group_id IN ?", groupIDs).
+		Order("group_id ASC, display_order ASC, id ASC").
+		Find(&members).Error; err != nil {
+		return nil, err
+	}
+	for _, member := range members {
+		index, ok := recordIndexByGroupID[member.GroupID]
+		if !ok || member.MarketID == 0 {
+			continue
+		}
+		records[index].MemberMarketIDs = append(records[index].MemberMarketIDs, member.MarketID)
+	}
+
 	return records, nil
 }
 
@@ -422,6 +438,7 @@ type analyticsWorkProfitMarketGroupRow struct {
 }
 
 type analyticsMarketGroupMemberRow struct {
+	GroupID  uint
 	MarketID uint
 }
 
@@ -495,17 +512,6 @@ func mapWorkProfitMarketGroups(dbGroups []analyticsWorkProfitMarketGroupRow) []W
 		}
 	}
 	return groups
-}
-
-func mapMarketGroupMemberIDs(members []analyticsMarketGroupMemberRow) []uint {
-	ids := make([]uint, 0, len(members))
-	for _, member := range members {
-		if member.MarketID == 0 {
-			continue
-		}
-		ids = append(ids, member.MarketID)
-	}
-	return ids
 }
 
 func mapBets(dbBets []analyticsBetRow) []boundary.Bet {

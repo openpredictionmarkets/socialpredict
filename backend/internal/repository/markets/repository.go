@@ -550,7 +550,7 @@ func (r *GormRepository) ListBetsForMarket(ctx context.Context, marketID int64) 
 		Model(&models.Bet{}).
 		Select("bets.*").
 		Where("market_id = ?", marketID).
-		Order("placed_at ASC").
+		Order("placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return nil, err
 	}
@@ -606,7 +606,7 @@ func (r *GormRepository) loadMarketData(ctx context.Context, marketID int64) (po
 		Model(&models.Bet{}).
 		Select("bets.*").
 		Where("market_id = ?", marketID).
-		Order("placed_at ASC").
+		Order("placed_at ASC, id ASC").
 		Find(&bets).Error; err != nil {
 		return positionsmath.MarketSnapshot{}, nil, err
 	}

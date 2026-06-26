@@ -21,6 +21,7 @@ var errUnexpectedHelperCall = errors.New("unexpected call")
 type stubMarketService struct {
 	marketGetter   stubMarketGetter
 	positionGetter stubPositionGetter
+	betGetter      stubMarketBetGetter
 }
 
 func newStubMarketService(opts ...func(*stubMarketService)) stubMarketService {
@@ -32,6 +33,11 @@ func newStubMarketService(opts ...func(*stubMarketService)) stubMarketService {
 		},
 		positionGetter: stubPositionGetter{
 			getUserPositionInMarketFn: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
+				return nil, errUnexpectedHelperCall
+			},
+		},
+		betGetter: stubMarketBetGetter{
+			listBetsForMarketFn: func(context.Context, int64) ([]*dmarkets.Bet, error) {
 				return nil, errUnexpectedHelperCall
 			},
 		},
@@ -66,8 +72,16 @@ type stubPositionGetter struct {
 	getUserPositionInMarketFn func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
+type stubMarketBetGetter struct {
+	listBetsForMarketFn func(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error)
+}
+
 func (s stubMarketService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return s.positionGetter.GetUserPositionInMarket(ctx, marketID, username)
+}
+
+func (s stubMarketService) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
+	return s.betGetter.ListBetsForMarket(ctx, marketID)
 }
 
 func (s stubMarketGetter) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
@@ -82,6 +96,13 @@ func (s stubPositionGetter) GetUserPositionInMarket(ctx context.Context, marketI
 		return nil, errUnexpectedHelperCall
 	}
 	return s.getUserPositionInMarketFn(ctx, marketID, username)
+}
+
+func (s stubMarketBetGetter) ListBetsForMarket(ctx context.Context, marketID int64) ([]*dmarkets.Bet, error) {
+	if s.listBetsForMarketFn == nil {
+		return nil, errUnexpectedHelperCall
+	}
+	return s.listBetsForMarketFn(ctx, marketID)
 }
 
 type gateClock struct {

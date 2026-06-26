@@ -101,23 +101,38 @@ func TestGormRepositoryListBetsForMarket(t *testing.T) {
 	if err := db.Create(&market).Error; err != nil {
 		t.Fatalf("seed market: %v", err)
 	}
+	otherMarket := modelstesting.GenerateMarket(201, creator.Username)
+	if err := db.Create(&otherMarket).Error; err != nil {
+		t.Fatalf("seed unrelated market: %v", err)
+	}
 
+	placedAt := time.Now().UTC().Truncate(time.Second)
 	first := models.Bet{
 		Username: "bettor",
 		MarketID: uint(market.ID),
 		Amount:   10,
 		Outcome:  "YES",
-		PlacedAt: time.Now().Add(-2 * time.Minute),
+		PlacedAt: placedAt,
+	}
+	unrelated := models.Bet{
+		Username: "bettor",
+		MarketID: uint(otherMarket.ID),
+		Amount:   99,
+		Outcome:  "YES",
+		PlacedAt: placedAt,
 	}
 	second := models.Bet{
 		Username: "bettor",
 		MarketID: uint(market.ID),
 		Amount:   15,
 		Outcome:  "NO",
-		PlacedAt: time.Now().Add(-1 * time.Minute),
+		PlacedAt: placedAt,
 	}
 	if err := db.Create(&first).Error; err != nil {
 		t.Fatalf("insert first bet: %v", err)
+	}
+	if err := db.Create(&unrelated).Error; err != nil {
+		t.Fatalf("insert unrelated bet: %v", err)
 	}
 	if err := db.Create(&second).Error; err != nil {
 		t.Fatalf("insert second bet: %v", err)
@@ -134,8 +149,14 @@ func TestGormRepositoryListBetsForMarket(t *testing.T) {
 	if bets[0].Username != "bettor" || bets[0].Amount != 10 || bets[0].Outcome != "YES" {
 		t.Fatalf("unexpected first bet: %+v", bets[0])
 	}
-	if !bets[0].PlacedAt.Before(bets[1].PlacedAt) {
-		t.Fatalf("bets not ordered ascending by PlacedAt")
+	if bets[1].Username != "bettor" || bets[1].Amount != 15 || bets[1].Outcome != "NO" {
+		t.Fatalf("unexpected second bet: %+v", bets[1])
+	}
+	if bets[0].MarketID != uint(market.ID) || bets[1].MarketID != uint(market.ID) {
+		t.Fatalf("expected only bets for market %d, got %+v", market.ID, bets)
+	}
+	if bets[0].ID >= bets[1].ID {
+		t.Fatalf("expected stable id tie-break ordering, got first id %d second id %d", bets[0].ID, bets[1].ID)
 	}
 }
 

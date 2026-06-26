@@ -26,6 +26,14 @@ func (s *Service) GetMarketBetsPage(ctx context.Context, marketID int64, p Page)
 	return paginateBetDisplayInfos(infos, p), nil
 }
 
+// ListBetsForMarket returns canonical market bet history for transaction-policy callers.
+func (s *Service) ListBetsForMarket(ctx context.Context, marketID int64) ([]*Bet, error) {
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	return s.repo.ListBetsForMarket(ctx, marketID)
+}
+
 func (s *Service) getMarketBetDisplayInfos(ctx context.Context, marketID int64) ([]*BetDisplayInfo, error) {
 	if marketID <= 0 {
 		return nil, ErrInvalidInput

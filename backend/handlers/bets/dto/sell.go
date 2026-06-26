@@ -35,6 +35,10 @@ type SellQuoteResponse struct {
 	ValuePerShare     int64     `json:"valuePerShare"`
 	DustCapCoverage   float64   `json:"dustCapCoverage"`
 	Allowed           bool      `json:"allowed"`
+	PositionLocked    bool      `json:"positionLocked"`
+	LockReason        string    `json:"lockReason,omitempty"`
+	SellableShares    int64     `json:"sellableShares"`
+	LockedShares      int64     `json:"lockedShares"`
 	SuggestedAmounts  []int64   `json:"suggestedAmounts"`
 	Message           string    `json:"message"`
 	QuotedAt          time.Time `json:"quotedAt"`
