@@ -1536,9 +1536,11 @@ paths:
       operationId: listMyLifecycleMarkets
       summary: List current user's lifecycle markets
       description: >
-        Returns proposed, published, or rejected markets created by the authenticated
-        user. This private moderator profile queue includes lifecycle review
-        metadata that public market lists intentionally exclude.
+        Returns proposed, published, or rejected markets currently stewarded by the
+        authenticated user. Current steward ownership falls back to creator ownership
+        for legacy markets without an explicit steward. This private moderator profile
+        queue includes lifecycle review metadata that public market lists intentionally
+        exclude.
       security:
         - bearerAuth: []
       parameters:
@@ -4797,16 +4799,16 @@ paths:
       operationId: getUserOwnedMarkets
       summary: Get user-owned markets
       description: >
-        Returns markets created by or currently stewarded by the requested user.
-        This is login-only game transparency data. Current steward ownership
-        falls back to creator ownership for legacy markets without an explicit steward.
+        Returns markets currently stewarded by the requested user. This is login-only
+        game transparency data. Current steward ownership falls back to creator ownership
+        for legacy markets without an explicit steward.
       security:
         - bearerAuth: []
       parameters:
         - in: path
           name: username
           required: true
-          description: Username whose created and stewarded markets should be returned.
+          description: Username whose currently stewarded markets should be returned.
           schema:
             type: string
         - in: query

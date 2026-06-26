@@ -519,7 +519,7 @@ func TestGormRepositoryListByLifecycleHydratesStewardshipAudits(t *testing.T) {
 	}
 }
 
-func TestGormRepositoryListByLifecycleOwnedByIncludesCreatorAndCurrentSteward(t *testing.T) {
+func TestGormRepositoryListByLifecycleOwnedByUsesCurrentSteward(t *testing.T) {
 	db := modelstesting.NewFakeDB(t)
 	repo := NewGormRepository(db)
 	ctx := context.Background()
@@ -533,19 +533,27 @@ func TestGormRepositoryListByLifecycleOwnedByIncludesCreatorAndCurrentSteward(t 
 		}
 	}
 
-	createdByAlice := modelstesting.GenerateMarket(710, alice.Username)
-	createdByAlice.LifecycleStatus = dmarkets.MarketLifecyclePublished
-	createdByAlice.StewardUsername = alice.Username
+	createdAndStewardedByAlice := modelstesting.GenerateMarket(710, alice.Username)
+	createdAndStewardedByAlice.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	createdAndStewardedByAlice.StewardUsername = alice.Username
 
-	stewardedByAlice := modelstesting.GenerateMarket(711, bob.Username)
-	stewardedByAlice.LifecycleStatus = dmarkets.MarketLifecyclePublished
-	stewardedByAlice.StewardUsername = alice.Username
+	createdByBobStewardedByAlice := modelstesting.GenerateMarket(711, bob.Username)
+	createdByBobStewardedByAlice.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	createdByBobStewardedByAlice.StewardUsername = alice.Username
 
-	unowned := modelstesting.GenerateMarket(712, bob.Username)
+	createdByAliceStewardedByBob := modelstesting.GenerateMarket(712, alice.Username)
+	createdByAliceStewardedByBob.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	createdByAliceStewardedByBob.StewardUsername = bob.Username
+
+	legacyCreatorOwnedByAlice := modelstesting.GenerateMarket(713, alice.Username)
+	legacyCreatorOwnedByAlice.LifecycleStatus = dmarkets.MarketLifecyclePublished
+	legacyCreatorOwnedByAlice.StewardUsername = ""
+
+	unowned := modelstesting.GenerateMarket(714, bob.Username)
 	unowned.LifecycleStatus = dmarkets.MarketLifecyclePublished
 	unowned.StewardUsername = carol.Username
 
-	for _, market := range []any{&createdByAlice, &stewardedByAlice, &unowned} {
+	for _, market := range []any{&createdAndStewardedByAlice, &createdByBobStewardedByAlice, &createdByAliceStewardedByBob, &legacyCreatorOwnedByAlice, &unowned} {
 		if err := db.Create(market).Error; err != nil {
 			t.Fatalf("seed market: %v", err)
 		}
@@ -564,11 +572,33 @@ func TestGormRepositoryListByLifecycleOwnedByIncludesCreatorAndCurrentSteward(t 
 	for _, market := range markets {
 		got[market.ID] = true
 	}
-	if !got[createdByAlice.ID] || !got[stewardedByAlice.ID] {
-		t.Fatalf("expected created and stewarded markets, got %+v", got)
+	if !got[createdAndStewardedByAlice.ID] || !got[createdByBobStewardedByAlice.ID] || !got[legacyCreatorOwnedByAlice.ID] {
+		t.Fatalf("expected current-stewarded and legacy creator-owned markets, got %+v", got)
+	}
+	if got[createdByAliceStewardedByBob.ID] {
+		t.Fatalf("did not expect creator market reassigned to another steward: %+v", got)
 	}
 	if got[unowned.ID] {
 		t.Fatalf("did not expect unowned market in results: %+v", got)
+	}
+
+	bobMarkets, err := repo.ListByLifecycle(ctx, dmarkets.ListFilters{
+		Status:  dmarkets.MarketStatusAll,
+		OwnedBy: bob.Username,
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("ListByLifecycle for bob returned error: %v", err)
+	}
+	bobGot := map[int64]bool{}
+	for _, market := range bobMarkets {
+		bobGot[market.ID] = true
+	}
+	if !bobGot[createdByAliceStewardedByBob.ID] {
+		t.Fatalf("expected reassigned market in bob's stewarded results, got %+v", bobGot)
+	}
+	if bobGot[createdByBobStewardedByAlice.ID] {
+		t.Fatalf("did not expect bob-created market currently stewarded by alice: %+v", bobGot)
 	}
 }
 

@@ -55,8 +55,11 @@ func TestListMyLifecycleMarketsAttachesMarketGroupMetadata(t *testing.T) {
 	}
 	svc := &MockService{
 		ListLifecycleFn: func(_ context.Context, filters dmarkets.ListFilters) ([]*dmarkets.Market, error) {
-			if filters.CreatedBy != "moderator" {
-				t.Fatalf("CreatedBy = %q, want moderator", filters.CreatedBy)
+			if filters.OwnedBy != "moderator" {
+				t.Fatalf("OwnedBy = %q, want moderator", filters.OwnedBy)
+			}
+			if filters.CreatedBy != "" {
+				t.Fatalf("CreatedBy = %q, want empty", filters.CreatedBy)
 			}
 			if filters.Status != dmarkets.MarketLifecyclePublished {
 				t.Fatalf("Status = %q, want published", filters.Status)

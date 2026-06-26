@@ -24,7 +24,7 @@ type userOwnedMarketsResponse struct {
 	Total   int                   `json:"total"`
 }
 
-// ListUserOwnedMarketsHandler returns markets created by or currently stewarded by a user.
+// ListUserOwnedMarketsHandler returns markets currently stewarded by a user.
 func ListUserOwnedMarketsHandler(svc userOwnedMarketLister, auth authsvc.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
