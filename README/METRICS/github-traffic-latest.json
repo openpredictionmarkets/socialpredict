@@ -1,19 +1,9 @@
 {
-  "updated_at": "2026-06-24T18:21:08Z",
-  "clones_14d": 13641,
-  "unique_cloners_14d": 884,
+  "updated_at": "2026-06-26T17:20:53Z",
+  "clones_14d": 10666,
+  "unique_cloners_14d": 813,
   "source": "GitHub repository traffic API, rolling 14-day window",
   "clones": [
-    {
-      "timestamp": "2026-06-10T00:00:00Z",
-      "count": 1608,
-      "uniques": 94
-    },
-    {
-      "timestamp": "2026-06-11T00:00:00Z",
-      "count": 1935,
-      "uniques": 94
-    },
     {
       "timestamp": "2026-06-12T00:00:00Z",
       "count": 1953,
@@ -73,6 +63,16 @@
       "timestamp": "2026-06-23T00:00:00Z",
       "count": 111,
       "uniques": 44
+    },
+    {
+      "timestamp": "2026-06-24T00:00:00Z",
+      "count": 335,
+      "uniques": 54
+    },
+    {
+      "timestamp": "2026-06-25T00:00:00Z",
+      "count": 233,
+      "uniques": 24
     }
   ]
 }
