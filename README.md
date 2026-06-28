@@ -9,8 +9,8 @@
 
 [release-img]: https://img.shields.io/github/v/release/openpredictionmarkets/socialpredict?label=release
 [release]: https://github.com/openpredictionmarkets/socialpredict/releases/latest
-[clones-14d-img]: https://img.shields.io/badge/14d%20clones-10%2C666-62c3f8
-[unique-cloners-14d-img]: https://img.shields.io/badge/14d%20cloners-813-2ea043
+[clones-14d-img]: https://img.shields.io/badge/14d%20clones-6%2C126-62c3f8
+[unique-cloners-14d-img]: https://img.shields.io/badge/14d%20cloners-702-2ea043
 [traffic]: https://github.com/openpredictionmarkets/socialpredict/graphs/traffic
 [test-img]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/backend.yml/badge.svg?branch=main
 [test]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/backend.yml
