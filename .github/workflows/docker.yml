@@ -54,8 +54,8 @@ jobs:
           context: .
           file: docker/frontend/Dockerfile
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=socialpredict-release-frontend
+          cache-to: type=gha,mode=max,scope=socialpredict-release-frontend,ignore-error=true
           push: true
           tags: ${{ steps.frontend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
           labels: ${{ steps.frontend-meta.outputs.labels }}
@@ -113,8 +113,8 @@ jobs:
           context: .
           file: docker/backend/Dockerfile
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=socialpredict-release-backend
+          cache-to: type=gha,mode=max,scope=socialpredict-release-backend,ignore-error=true
           push: true
           tags: ${{ steps.backend-meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
           labels: ${{ steps.backend-meta.outputs.labels }}
