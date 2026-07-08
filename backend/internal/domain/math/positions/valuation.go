@@ -106,7 +106,8 @@ func (c ValuationCalculator) Calculate(
 		}
 	}
 
-	adjusted := c.adjuster.Adjust(result, earliestBets, totalVolume)
+	targetValue := targetValuationPool(userPositions, totalVolume, isResolved)
+	adjusted := c.adjuster.Adjust(result, earliestBets, targetValue)
 	return adjusted, nil
 }
 
@@ -146,6 +147,26 @@ func calculatePositionValue(
 	resolutionResult string,
 ) float64 {
 	return valuationModel{}.PositionValue(position, finalProbability, isResolved, resolutionResult)
+}
+
+func targetValuationPool(userPositions map[string]UserMarketPosition, marketVolume int64, isResolved bool) int64 {
+	if isResolved {
+		return marketVolume
+	}
+
+	var outstandingShares int64
+	for _, position := range userPositions {
+		outstandingShares += positiveInt64(position.YesSharesOwned)
+		outstandingShares += positiveInt64(position.NoSharesOwned)
+	}
+	return outstandingShares
+}
+
+func positiveInt64(value int64) int64 {
+	if value < 0 {
+		return 0
+	}
+	return value
 }
 
 func (valuationModel) PositionValue(

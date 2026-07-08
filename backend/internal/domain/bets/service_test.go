@@ -586,6 +586,36 @@ func TestServiceSell_DustAtCapCreditsNetProceeds(t *testing.T) {
 	}
 }
 
+func TestServiceSell_OneCreditShareDoesNotCashOutHistoricalVolume(t *testing.T) {
+	now := serviceTestTime()
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(0),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 1, Value: 1}),
+		withFixtureUser(&dusers.User{Username: "alice"}),
+	)
+
+	quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 141, Outcome: "NO"})
+	if err != nil {
+		t.Fatalf("QuoteSell returned error: %v", err)
+	}
+	if quote.SharesSold != 1 || quote.SaleValue != 1 || quote.NetProceeds != 1 || quote.RequestedCredits != 1 {
+		t.Fatalf("quote cashed out more than the current share value: %+v", quote)
+	}
+
+	result, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 141, Outcome: "NO"})
+	if err != nil {
+		t.Fatalf("Sell returned error: %v", err)
+	}
+	if result.SharesSold != 1 || result.SaleValue != 1 || result.NetProceeds != 1 {
+		t.Fatalf("sell cashed out more than the current share value: %+v", result)
+	}
+	if len(fixture.users.calls) != 1 || fixture.users.calls[0].amount != 1 {
+		t.Fatalf("unexpected user credit: %+v", fixture.users.calls)
+	}
+}
+
 func TestServiceSell_FullPositionSellRequiresZeroProjectedValue(t *testing.T) {
 	now := serviceTestTime()
 

@@ -82,6 +82,17 @@ func TestCalculateRoundedUserValuationsFromUserMarketPositions(t *testing.T) {
 			Expected:         map[string]int64{"alice": 10, "bob": 10},
 		},
 		{
+			Name: "Unresolved market does not assign inactive historical volume to sole holder",
+			UserPositions: []valuationPositionInput{
+				{"alice", 0, 1},
+			},
+			Probability:      0.5,
+			TotalVolume:      141,
+			IsResolved:       false,
+			ResolutionResult: "",
+			Expected:         map[string]int64{"alice": 1},
+		},
+		{
 			Name: "Resolved market: YES wins",
 			UserPositions: []valuationPositionInput{
 				{"alice", 10, 0},
