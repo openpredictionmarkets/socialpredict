@@ -16,9 +16,11 @@ from `loadtest/`, which is for capacity and performance testing.
 ## Current Coverage
 
 - `cases/multiple-choice-binary-markets.md`
+- `cases/sell-shares-overcashout.md`
 - `reports/multiple-choice-binary-markets-2026-06-15.md`
 - `reports/schemathesis-read-2026-06-16.md`
 - `scripts/multiple-choice-binary-api.mjs`
+- `scripts/sell-shares-overcashout.mjs`
 - `scripts/schemathesis-read.sh`
 - `scripts/schemathesis-grouped-market.mjs`
 
@@ -31,6 +33,7 @@ Last updated: 2026-06-17.
 | Suite | Command | Current result |
 |-------|---------|----------------|
 | Multiple-choice binary API scenario runner | `node integrationtest/scripts/multiple-choice-binary-api.mjs --base-url http://localhost:8080 --api-prefix /v0` | 17/17 checks passing |
+| Sell shares over-cashout API scenario runner | `node integrationtest/scripts/sell-shares-overcashout.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers valid quote/sell, dust accounting, and rejected over-cashout |
 | Read-only Schemathesis contract smoke | `MAX_EXAMPLES=1 integrationtest/scripts/schemathesis-read.sh` | 4/4 operations passing |
 | Grouped-market Schemathesis contract runner | `node integrationtest/scripts/schemathesis-grouped-market.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers grouped read schemas with a real group ID |
 | Backend tests | `JWT_SIGNING_KEY=test-secret-key-for-testing go test ./...` | Passing |
@@ -42,6 +45,14 @@ Run against a local dev stack after `./SocialPredict dev-bootstrap-users`:
 
 ```bash
 node integrationtest/scripts/multiple-choice-binary-api.mjs \
+  --base-url http://localhost:8080 \
+  --api-prefix /v0
+```
+
+Run the sell-shares over-cashout regression:
+
+```bash
+node integrationtest/scripts/sell-shares-overcashout.mjs \
   --base-url http://localhost:8080 \
   --api-prefix /v0
 ```

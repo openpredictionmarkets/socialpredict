@@ -60,6 +60,47 @@ func TestGormRepositorySellBetTransactionRollsBackCreditWhenSaleBetCreateFails(t
 	assertBetCount(t, db, "seller", 201, 1)
 }
 
+func TestGormRepositorySellBetTransactionProjectsSaleInsideTransaction(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	sqlDB, _ := db.DB()
+	if sqlDB != nil {
+		t.Cleanup(func() { _ = sqlDB.Close() })
+	}
+
+	seedSellRows(t, db, "creator", "seller", 1000, 202)
+
+	repo := NewGormRepository(db)
+	err := repo.SellBetTransaction(context.Background(), func(ctx context.Context, _ dbets.Repository, markets dbets.MarketService, _ dbets.UserService) error {
+		current, err := markets.GetUserPositionInMarket(ctx, 202, "seller")
+		if err != nil {
+			return err
+		}
+		projected, err := markets.ProjectUserPositionAfterBet(ctx, 202, "seller", boundary.Bet{
+			Username: "seller",
+			MarketID: 202,
+			Amount:   -2,
+			Outcome:  "YES",
+			PlacedAt: time.Date(2026, time.May, 11, 22, 30, 0, 0, time.UTC),
+		})
+		if err != nil {
+			return err
+		}
+		if projected.YesSharesOwned >= current.YesSharesOwned {
+			t.Fatalf("projected YES shares must decrease after sale: current=%+v projected=%+v", current, projected)
+		}
+		if projected.NoSharesOwned > current.NoSharesOwned {
+			t.Fatalf("projected sale must not create opposite-side shares: current=%+v projected=%+v", current, projected)
+		}
+		if projected.Value > current.Value {
+			t.Fatalf("projected sale must not increase value: current=%+v projected=%+v", current, projected)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("transaction projection returned error: %v", err)
+	}
+}
+
 func seedSellRows(t *testing.T, db *gorm.DB, creatorUsername string, sellerUsername string, sellerBalance int64, marketID int64) {
 	t.Helper()
 

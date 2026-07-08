@@ -51,10 +51,16 @@ type PositionReader interface {
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
+// PositionProjector exposes transaction-aware position projections for proposed sell rows.
+type PositionProjector interface {
+	ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error)
+}
+
 // MarketService exposes the subset of market operations required by bets.
 type MarketService interface {
 	MarketReader
 	PositionReader
+	PositionProjector
 }
 
 // MarketGate ensures market openness before betting operations.
