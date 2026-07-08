@@ -169,13 +169,13 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         onTransactionSuccess();
                     },
                     (error) => {
-                        alert(`Sale failed: ${error.message}`);
+                        alert(error.message);
                         setIsSubmitting(false);
                     }
                 );
             })
             .catch((error) => {
-                alert(`Sale quote failed: ${error.message}`);
+                alert(error.message);
                 setIsSubmitting(false);
             });
     };
