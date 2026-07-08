@@ -56,8 +56,8 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: socialpredict-${{ matrix.image }}:staging-candidate
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=socialpredict-staging-${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=socialpredict-staging-${{ matrix.image }},ignore-error=true
 
       - name: Scan ${{ matrix.image }} staging candidate for SARIF security alerts
         uses: aquasecurity/trivy-action@v0.36.0
