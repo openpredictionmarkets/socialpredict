@@ -21,6 +21,7 @@ var errUnexpectedHelperCall = errors.New("unexpected call")
 type stubMarketService struct {
 	marketGetter   stubMarketGetter
 	positionGetter stubPositionGetter
+	projector      stubPositionProjector
 }
 
 func newStubMarketService(opts ...func(*stubMarketService)) stubMarketService {
@@ -32,6 +33,11 @@ func newStubMarketService(opts ...func(*stubMarketService)) stubMarketService {
 		},
 		positionGetter: stubPositionGetter{
 			getUserPositionInMarketFn: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
+				return nil, errUnexpectedHelperCall
+			},
+		},
+		projector: stubPositionProjector{
+			projectUserPositionAfterBetFn: func(context.Context, int64, string, boundary.Bet) (*dmarkets.UserPosition, error) {
 				return nil, errUnexpectedHelperCall
 			},
 		},
@@ -54,6 +60,12 @@ func withStubPosition(getPosition func(ctx context.Context, marketID int64, user
 	}
 }
 
+func withStubProjection(projectPosition func(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error)) func(*stubMarketService) {
+	return func(stub *stubMarketService) {
+		stub.projector.projectUserPositionAfterBetFn = projectPosition
+	}
+}
+
 type stubMarketGetter struct {
 	getMarketFunc func(ctx context.Context, id int64) (*dmarkets.Market, error)
 }
@@ -66,8 +78,16 @@ type stubPositionGetter struct {
 	getUserPositionInMarketFn func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
 }
 
+type stubPositionProjector struct {
+	projectUserPositionAfterBetFn func(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error)
+}
+
 func (s stubMarketService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return s.positionGetter.GetUserPositionInMarket(ctx, marketID, username)
+}
+
+func (s stubMarketService) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error) {
+	return s.projector.ProjectUserPositionAfterBet(ctx, marketID, username, bet)
 }
 
 func (s stubMarketGetter) GetMarket(ctx context.Context, id int64) (*dmarkets.Market, error) {
@@ -82,6 +102,13 @@ func (s stubPositionGetter) GetUserPositionInMarket(ctx context.Context, marketI
 		return nil, errUnexpectedHelperCall
 	}
 	return s.getUserPositionInMarketFn(ctx, marketID, username)
+}
+
+func (s stubPositionProjector) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error) {
+	if s.projectUserPositionAfterBetFn == nil {
+		return nil, errUnexpectedHelperCall
+	}
+	return s.projectUserPositionAfterBetFn(ctx, marketID, username, bet)
 }
 
 type gateClock struct {

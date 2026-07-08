@@ -4,6 +4,9 @@ import (
 	"context"
 	"sort"
 	"strings"
+
+	"socialpredict/internal/domain/boundary"
+	positionsmath "socialpredict/internal/domain/math/positions"
 )
 
 // GetMarketPositions returns all user positions in a market.
@@ -67,6 +70,66 @@ func (s *Service) GetUserPositionInMarket(ctx context.Context, marketID int64, u
 		return nil, err
 	}
 	return position, nil
+}
+
+// ProjectUserPositionAfterBet returns the user's projected position after appending
+// a proposed bet to the market history without mutating stored state.
+func (s *Service) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*UserPosition, error) {
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if strings.TrimSpace(username) == "" {
+		return nil, ErrInvalidInput
+	}
+
+	market, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	if market == nil {
+		return nil, ErrMarketNotFound
+	}
+
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	boundaryBets := ToBoundaryBets(bets)
+	projectedBet := bet
+	projectedBet.MarketID = uint(marketID)
+	if strings.TrimSpace(projectedBet.Username) == "" {
+		projectedBet.Username = username
+	}
+	boundaryBets = append(boundaryBets, projectedBet)
+
+	position, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(
+		positionsmath.MarketSnapshot{
+			ID:               market.ID,
+			CreatedAt:        market.CreatedAt,
+			IsResolved:       market.IsResolved(),
+			ResolutionResult: market.ResolutionResult,
+		},
+		boundaryBets,
+		username,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return userPositionFromMathPosition(marketID, username, position), nil
+}
+
+func userPositionFromMathPosition(marketID int64, username string, position positionsmath.UserMarketPosition) *UserPosition {
+	return &UserPosition{
+		Username:         username,
+		MarketID:         marketID,
+		YesSharesOwned:   position.YesSharesOwned,
+		NoSharesOwned:    position.NoSharesOwned,
+		Value:            position.Value,
+		TotalSpent:       position.TotalSpent,
+		TotalSpentInPlay: position.TotalSpentInPlay,
+		IsResolved:       position.IsResolved,
+		ResolutionResult: position.ResolutionResult,
+	}
 }
 
 func activeMarketPositions(positions MarketPositions) MarketPositions {

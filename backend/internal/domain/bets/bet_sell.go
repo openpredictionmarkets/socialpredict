@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 
+	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 )
 
@@ -56,6 +57,12 @@ func (s *Service) QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteRes
 	if err := validateDustCap(sale.Dust, s.config.MaxDustPerSale); err != nil {
 		allowed = false
 	}
+	if allowed {
+		bet := req.NewSaleBet(outcome, sale.SharesToSell, s.clock.Now())
+		if err := validateProjectedSale(ctx, s.markets, req, outcome, position, sale, *bet); err != nil {
+			return nil, err
+		}
+	}
 
 	suggested := suggestSaleAmounts(sale, sharesOwned, s.config.MaxDustPerSale)
 	return new(SellQuoteResult).Build(req, outcome, sale, s.config.MaxDustPerSale, allowed, suggested, s.clock.Now()), nil
@@ -83,6 +90,9 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 
 		now := s.clock.Now()
 		bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
+		if err := validateProjectedSale(txCtx, markets, req, outcome, position, sale, *bet); err != nil {
+			return err
+		}
 		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, netSaleProceeds(sale)); err != nil {
 			return err
 		}
@@ -115,6 +125,68 @@ func loadUserSharesFrom(ctx context.Context, markets PositionReader, req SellReq
 	}
 
 	return sharesOwned, position, nil
+}
+
+func validateProjectedSale(
+	ctx context.Context,
+	markets PositionProjector,
+	req SellRequest,
+	outcome string,
+	current *dmarkets.UserPosition,
+	sale SaleQuote,
+	saleBet boundary.Bet,
+) error {
+	if sale.SharesToSell <= 0 {
+		return ErrInsufficientShares
+	}
+	projected, err := markets.ProjectUserPositionAfterBet(ctx, int64(req.MarketID), req.Username, saleBet)
+	if err != nil {
+		return err
+	}
+	return validateSaleProjection(current, projected, outcome, sale)
+}
+
+func validateSaleProjection(current *dmarkets.UserPosition, projected *dmarkets.UserPosition, outcome string, sale SaleQuote) error {
+	if current == nil {
+		return ErrNoPosition
+	}
+	if projected == nil {
+		projected = &dmarkets.UserPosition{}
+	}
+
+	currentSoldShares, err := sharesForOutcome(current, outcome)
+	if err != nil {
+		return err
+	}
+	projectedSoldShares, err := sharesForOutcome(projected, outcome)
+	if err != nil {
+		return err
+	}
+	if currentSoldShares-projectedSoldShares < sale.SharesToSell {
+		return ErrInsufficientShares
+	}
+
+	currentOppositeShares, err := sharesForOutcome(current, oppositeOutcome(outcome))
+	if err != nil {
+		return err
+	}
+	projectedOppositeShares, err := sharesForOutcome(projected, oppositeOutcome(outcome))
+	if err != nil {
+		return err
+	}
+	if projectedOppositeShares > currentOppositeShares {
+		return ErrInsufficientShares
+	}
+
+	maxProjectedValue := current.Value - sale.SaleValue
+	if maxProjectedValue < 0 {
+		maxProjectedValue = 0
+	}
+	if projected.Value > maxProjectedValue {
+		return ErrInsufficientShares
+	}
+
+	return nil
 }
 
 // SaleQuote summarises how a sale request would be executed.
@@ -190,6 +262,31 @@ func sharesOwnedForOutcome(pos *dmarkets.UserPosition, outcome string) (int64, e
 		return pos.NoSharesOwned, nil
 	default:
 		return 0, ErrInvalidOutcome
+	}
+}
+
+func sharesForOutcome(pos *dmarkets.UserPosition, outcome string) (int64, error) {
+	if pos == nil {
+		return 0, nil
+	}
+	switch outcome {
+	case "YES":
+		return pos.YesSharesOwned, nil
+	case "NO":
+		return pos.NoSharesOwned, nil
+	default:
+		return 0, ErrInvalidOutcome
+	}
+}
+
+func oppositeOutcome(outcome string) string {
+	switch outcome {
+	case "YES":
+		return "NO"
+	case "NO":
+		return "YES"
+	default:
+		return ""
 	}
 }
 
