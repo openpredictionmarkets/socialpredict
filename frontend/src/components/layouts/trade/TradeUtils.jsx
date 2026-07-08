@@ -105,7 +105,19 @@ export const fetchUserShares = async (marketId, token) => {
         },
     });
     if (!response.ok) {
-        throw new Error('Failed to fetch user shares');
+        const text = await response.text();
+        let reason = '';
+        try {
+            const errorData = JSON.parse(text);
+            reason = errorData?.reason || errorData?.code || '';
+        } catch {
+            reason = '';
+        }
+        const expectedEmptyPosition = reason === 'NO_POSITION' || response.status === 404 || response.status === 422;
+        if (expectedEmptyPosition) {
+            throw new Error(NO_SELLABLE_SHARES_MESSAGE);
+        }
+        throw new Error('Unable to load sellable shares right now. Try again in a moment.');
     }
     const data = await response.json();
     return unwrapApiResponse(data);
