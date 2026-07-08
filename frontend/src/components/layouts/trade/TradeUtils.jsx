@@ -113,11 +113,15 @@ export const fetchUserShares = async (marketId, token) => {
         } catch {
             reason = '';
         }
-        const expectedEmptyPosition = reason === 'NO_POSITION' || response.status === 404 || response.status === 422;
-        if (expectedEmptyPosition) {
-            throw new Error(NO_SELLABLE_SHARES_MESSAGE);
+
+        if (reason === 'INVALID_TOKEN' || reason === 'AUTHORIZATION_DENIED') {
+            throw new Error('Please log in again to view sellable shares.');
         }
-        throw new Error('Unable to load sellable shares right now. Try again in a moment.');
+        if (reason === 'PASSWORD_CHANGE_REQUIRED') {
+            throw new Error('Please update your password before viewing sellable shares.');
+        }
+
+        throw new Error(NO_SELLABLE_SHARES_MESSAGE);
     }
     const data = await response.json();
     return unwrapApiResponse(data);
