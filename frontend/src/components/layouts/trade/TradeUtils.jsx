@@ -1,5 +1,11 @@
 import { API_URL } from '../../../config';
 
+export const NO_SELLABLE_SHARES_MESSAGE = [
+    'No sellable shares yet.',
+    'Initial value cannot be sold until a follow-up order from another user has been placed.',
+    'Wait for another order from another user, then try selling again.',
+].join(' ');
+
 const unwrapApiResponse = (payload) => {
     if (payload && typeof payload === 'object' && 'ok' in payload) {
         if (payload.ok === false) {
@@ -34,11 +40,18 @@ const formatApiError = (errorData, fallback) => {
 const parseErrorResponse = async (response, fallbackPrefix) => {
     const text = await response.text();
     let errorMessage;
+    let errorData;
+
     try {
-        const errorData = JSON.parse(text);
-        errorMessage = formatApiError(errorData, text);
+        errorData = JSON.parse(text);
     } catch {
         errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`${fallbackPrefix} (${response.status}): ${errorMessage}`);
+    }
+
+    errorMessage = formatApiError(errorData, text);
+    if (fallbackPrefix.startsWith('Sale') && errorData?.reason === 'NO_POSITION') {
+        throw new Error(errorMessage || NO_SELLABLE_SHARES_MESSAGE);
     }
     throw new Error(`${fallbackPrefix} (${response.status}): ${errorMessage}`);
 };
@@ -91,7 +104,23 @@ export const fetchUserShares = async (marketId, token) => {
         },
     });
     if (!response.ok) {
-        throw new Error('Failed to fetch user shares');
+        const text = await response.text();
+        let reason = '';
+        try {
+            const errorData = JSON.parse(text);
+            reason = errorData?.reason || errorData?.code || '';
+        } catch {
+            reason = '';
+        }
+
+        if (reason === 'INVALID_TOKEN' || reason === 'AUTHORIZATION_DENIED') {
+            throw new Error('Please log in again to view sellable shares.');
+        }
+        if (reason === 'PASSWORD_CHANGE_REQUIRED') {
+            throw new Error('Please update your password before viewing sellable shares.');
+        }
+
+        throw new Error(NO_SELLABLE_SHARES_MESSAGE);
     }
     const data = await response.json();
     return unwrapApiResponse(data);

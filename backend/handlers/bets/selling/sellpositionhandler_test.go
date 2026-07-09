@@ -376,6 +376,35 @@ func TestSellPositionHandler_DustCapExceededIncludesUserGuidance(t *testing.T) {
 	}
 }
 
+func TestSellPositionHandler_NoSellableSharesIncludesUserGuidance(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{err: bets.ErrNoSellableShares}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 1, Amount: 10, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellPositionHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonNoPosition) {
+		t.Fatalf("expected no-position reason, got %q", resp.Reason)
+	}
+	if resp.Message != bets.NoSellableSharesMessage {
+		t.Fatalf("expected no-sellable guidance, got %q", resp.Message)
+	}
+}
+
 func TestSellPositionHandler_InvalidJSON(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 	svc := &fakeSellService{}
