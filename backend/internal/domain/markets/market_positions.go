@@ -72,6 +72,46 @@ func (s *Service) GetUserPositionInMarket(ctx context.Context, marketID int64, u
 	return position, nil
 }
 
+// GetUserSellablePositionInMarket returns the user's currently sellable shares
+// for one outcome, excluding newest buy value that has not been unlocked by a
+// later buy from another user.
+func (s *Service) GetUserSellablePositionInMarket(ctx context.Context, marketID int64, username string, outcome string) (*UserPosition, error) {
+	if marketID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	if strings.TrimSpace(username) == "" {
+		return nil, ErrInvalidInput
+	}
+
+	market, err := s.repo.GetByID(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	if market == nil {
+		return nil, ErrMarketNotFound
+	}
+
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	position, err := positionsmath.CalculateUnlockedSellablePosition_WPAM_DBPM(
+		positionsmath.MarketSnapshot{
+			ID:               market.ID,
+			CreatedAt:        market.CreatedAt,
+			IsResolved:       market.IsResolved(),
+			ResolutionResult: market.ResolutionResult,
+		},
+		ToBoundaryBets(bets),
+		username,
+		outcome,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return userPositionFromMathPosition(marketID, username, position), nil
+}
+
 // ProjectUserPositionAfterBet returns the user's projected position after appending
 // a proposed bet to the market history without mutating stored state.
 func (s *Service) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*UserPosition, error) {

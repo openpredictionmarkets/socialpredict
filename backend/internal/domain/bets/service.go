@@ -49,6 +49,7 @@ type MarketReader interface {
 // PositionReader exposes the position reads needed by share-sale flows.
 type PositionReader interface {
 	GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	GetUserSellablePositionInMarket(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error)
 }
 
 // PositionProjector exposes transaction-aware position projections for proposed sell rows.

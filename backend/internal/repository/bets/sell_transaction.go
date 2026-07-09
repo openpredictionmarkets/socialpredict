@@ -71,6 +71,30 @@ func (r sellMarketRepository) GetUserPositionInMarket(ctx context.Context, marke
 	}, nil
 }
 
+func (r sellMarketRepository) GetUserSellablePositionInMarket(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error) {
+	snapshot, bets, err := r.loadMarketData(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+
+	position, err := positionsmath.CalculateUnlockedSellablePosition_WPAM_DBPM(snapshot, bets, username, outcome)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dmarkets.UserPosition{
+		Username:         username,
+		MarketID:         marketID,
+		YesSharesOwned:   position.YesSharesOwned,
+		NoSharesOwned:    position.NoSharesOwned,
+		Value:            position.Value,
+		TotalSpent:       position.TotalSpent,
+		TotalSpentInPlay: position.TotalSpentInPlay,
+		IsResolved:       position.IsResolved,
+		ResolutionResult: position.ResolutionResult,
+	}, nil
+}
+
 func (r sellMarketRepository) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error) {
 	snapshot, bets, err := r.loadMarketData(ctx, marketID)
 	if err != nil {

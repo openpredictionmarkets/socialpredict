@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { SharesBadge, SaleInputAmount, ConfirmSaleButton } from '../../buttons/trade/SellButtons';
-import { fetchSaleQuote, fetchUserShares, submitSale } from './TradeUtils';
+import {
+    fetchSaleQuote,
+    fetchUserShares,
+    NO_SELLABLE_SHARES_MESSAGE,
+    submitSale,
+} from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
 import { API_URL } from '../../../config';
 import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
@@ -15,6 +20,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [saleQuote, setSaleQuote] = useState(null);
     const [quoteError, setQuoteError] = useState('');
+    const [sharesNotice, setSharesNotice] = useState('');
     const [isQuoteLoading, setIsQuoteLoading] = useState(false);
     
     // Get custom labels for this market
@@ -57,6 +63,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             setSellAmount(1);
             setSaleQuote(null);
             setQuoteError('');
+            setSharesNotice('');
             return;
         }
 
@@ -65,6 +72,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             .then(data => {
                 const normalized = normalizeShares(data);
                 setShares(normalized);
+                setSharesNotice('');
 
                 // Set outcome and amount based on shares
                 if (normalized.noSharesOwned > 0 && normalized.yesSharesOwned === 0) {
@@ -79,8 +87,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 }
             })
             .catch(error => {
-                alert(`Error fetching shares: ${error.message}`);
-                // Optionally, reset to default state on error
+                setSharesNotice(error.message || NO_SELLABLE_SHARES_MESSAGE);
                 setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
                 setSelectedOutcome(null);
                 setSellAmount(1);
@@ -169,25 +176,29 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         onTransactionSuccess();
                     },
                     (error) => {
-                        alert(`Sale failed: ${error.message}`);
+                        alert(error.message);
                         setIsSubmitting(false);
                     }
                 );
             })
             .catch((error) => {
-                alert(`Sale quote failed: ${error.message}`);
+                alert(error.message);
                 setIsSubmitting(false);
             });
     };
 
     const isActionDisabled = sharesLoading || isSubmitting || isQuoteLoading;
+    const hasOwnedShares = shares.noSharesOwned > 0 || shares.yesSharesOwned > 0;
+    const sellUnavailableNotice = hasOwnedShares && maxSaleCredits <= 0
+        ? NO_SELLABLE_SHARES_MESSAGE
+        : sharesNotice;
 
     return (
         <div className="p-6 bg-blue-900 rounded-lg text-white">
             <h2 className="text-xl mb-4">Shares Owned</h2>
-            {shares.noSharesOwned < 1 && shares.yesSharesOwned < 1 ? (
+            {!hasOwnedShares ? (
                 <div className="text-center">
-                    <p>No Shares Owned In This Market</p>
+                    <p>{sellUnavailableNotice || 'No Shares Owned In This Market'}</p>
                 </div>
             ) : (
                 <>
@@ -201,6 +212,11 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         <div className="text-center text-lg mt-2">
                             <span className="font-bold">Position Value: </span>
                             <span className="text-green-300">{shares.value}</span>
+                        </div>
+                    )}
+                    {sellUnavailableNotice && (
+                        <div className="mt-3 rounded-lg border border-amber-300/70 bg-amber-950/40 p-3 text-sm leading-relaxed text-amber-50">
+                            {sellUnavailableNotice}
                         </div>
                     )}
                     <div className="border-t border-gray-200 my-2"></div>

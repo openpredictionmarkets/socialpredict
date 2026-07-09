@@ -130,6 +130,9 @@ func newFakeMarkets(opts ...func(*fakeMarkets)) *fakeMarkets {
 			getUserPositionInMarketFunc: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
 				return nil, errUnexpectedServiceCall
 			},
+			getUserSellablePositionInMarketFunc: func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
+				return nil, errUnexpectedServiceCall
+			},
 		},
 		projector: fakePositionProjector{
 			projectUserPositionAfterBetFunc: func(context.Context, int64, string, boundary.Bet) (*dmarkets.UserPosition, error) {
@@ -152,6 +155,15 @@ func withFakeMarket(fn func(ctx context.Context, id int64) (*dmarkets.Market, er
 func withFakePosition(fn func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)) func(*fakeMarkets) {
 	return func(markets *fakeMarkets) {
 		markets.positions.getUserPositionInMarketFunc = fn
+		markets.positions.getUserSellablePositionInMarketFunc = func(ctx context.Context, marketID int64, username string, _ string) (*dmarkets.UserPosition, error) {
+			return fn(ctx, marketID, username)
+		}
+	}
+}
+
+func withFakeSellablePosition(fn func(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error)) func(*fakeMarkets) {
+	return func(markets *fakeMarkets) {
+		markets.positions.getUserSellablePositionInMarketFunc = fn
 	}
 }
 
@@ -170,11 +182,16 @@ func (f *fakeMarkets) GetMarket(ctx context.Context, id int64) (*dmarkets.Market
 }
 
 type fakePositionReader struct {
-	getUserPositionInMarketFunc func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	getUserPositionInMarketFunc         func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	getUserSellablePositionInMarketFunc func(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error)
 }
 
 func (f *fakeMarkets) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return f.positions.GetUserPositionInMarket(ctx, marketID, username)
+}
+
+func (f *fakeMarkets) GetUserSellablePositionInMarket(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error) {
+	return f.positions.GetUserSellablePositionInMarket(ctx, marketID, username, outcome)
 }
 
 type fakePositionProjector struct {
@@ -197,6 +214,13 @@ func (f fakePositionReader) GetUserPositionInMarket(ctx context.Context, marketI
 		return nil, errUnexpectedServiceCall
 	}
 	return f.getUserPositionInMarketFunc(ctx, marketID, username)
+}
+
+func (f fakePositionReader) GetUserSellablePositionInMarket(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error) {
+	if f.getUserSellablePositionInMarketFunc == nil {
+		return nil, errUnexpectedServiceCall
+	}
+	return f.getUserSellablePositionInMarketFunc(ctx, marketID, username, outcome)
 }
 
 func (f fakePositionProjector) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error) {
@@ -325,6 +349,9 @@ func withFixturePosition(position *dmarkets.UserPosition) serviceFixtureOption {
 			f.markets = newFakeMarkets()
 		}
 		f.markets.positions.getUserPositionInMarketFunc = func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
+			return position, nil
+		}
+		f.markets.positions.getUserSellablePositionInMarketFunc = func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
 			return position, nil
 		}
 		f.markets.projector.projectUserPositionAfterBetFunc = func(_ context.Context, _ int64, _ string, bet boundary.Bet) (*dmarkets.UserPosition, error) {
@@ -586,6 +613,36 @@ func TestServiceSell_DustAtCapCreditsNetProceeds(t *testing.T) {
 	}
 }
 
+func TestServiceSell_OneCreditShareDoesNotCashOutHistoricalVolume(t *testing.T) {
+	now := serviceTestTime()
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(0),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 1, Value: 1}),
+		withFixtureUser(&dusers.User{Username: "alice"}),
+	)
+
+	quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 141, Outcome: "NO"})
+	if err != nil {
+		t.Fatalf("QuoteSell returned error: %v", err)
+	}
+	if quote.SharesSold != 1 || quote.SaleValue != 1 || quote.NetProceeds != 1 || quote.RequestedCredits != 1 {
+		t.Fatalf("quote cashed out more than the current share value: %+v", quote)
+	}
+
+	result, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 141, Outcome: "NO"})
+	if err != nil {
+		t.Fatalf("Sell returned error: %v", err)
+	}
+	if result.SharesSold != 1 || result.SaleValue != 1 || result.NetProceeds != 1 {
+		t.Fatalf("sell cashed out more than the current share value: %+v", result)
+	}
+	if len(fixture.users.calls) != 1 || fixture.users.calls[0].amount != 1 {
+		t.Fatalf("unexpected user credit: %+v", fixture.users.calls)
+	}
+}
+
 func TestServiceSell_FullPositionSellRequiresZeroProjectedValue(t *testing.T) {
 	now := serviceTestTime()
 
@@ -650,6 +707,89 @@ func TestServiceSell_NoPosition(t *testing.T) {
 
 	if _, err := (&fakeMarkets{}).GetUserPositionInMarket(context.Background(), 1, "alice"); !errors.Is(err, errUnexpectedServiceCall) {
 		t.Fatalf("expected zero-value position lookup to fail predictably, got %v", err)
+	}
+}
+
+func TestServiceSell_NoSellableShares(t *testing.T) {
+	now := serviceTestTime()
+
+	t.Run("quote rejects aggregate shares with no unlocked value", func(t *testing.T) {
+		_, svc := newServiceFixture(
+			now,
+			withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+			withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 1, Value: 1}),
+			func(f *serviceFixture) {
+				f.markets.positions.getUserSellablePositionInMarketFunc = func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
+					return &dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 0, Value: 0}, nil
+				}
+			},
+			withFixtureUser(&dusers.User{Username: "alice"}),
+		)
+
+		_, err := svc.QuoteSell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 1, Outcome: "NO"})
+		if !errors.Is(err, bets.ErrNoSellableShares) {
+			t.Fatalf("expected ErrNoSellableShares, got %v", err)
+		}
+	})
+
+	t.Run("sell rejects before ledger mutation", func(t *testing.T) {
+		fixture, svc := newServiceFixture(
+			now,
+			withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+			withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 1, Value: 1}),
+			func(f *serviceFixture) {
+				f.markets.positions.getUserSellablePositionInMarketFunc = func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
+					return &dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 0, Value: 0}, nil
+				}
+			},
+			withFixtureUser(&dusers.User{Username: "alice"}),
+		)
+
+		_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 1, Outcome: "NO"})
+		if !errors.Is(err, bets.ErrNoSellableShares) {
+			t.Fatalf("expected ErrNoSellableShares, got %v", err)
+		}
+		if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+			t.Fatalf("locked sell must not mutate ledger: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
+		}
+	})
+}
+
+func TestServiceSell_UsesUnlockedSellableCap(t *testing.T) {
+	now := serviceTestTime()
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(1),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(&dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 3, Value: 3}),
+		func(f *serviceFixture) {
+			f.markets.positions.getUserSellablePositionInMarketFunc = func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
+				return &dmarkets.UserPosition{Username: "alice", MarketID: 1, NoSharesOwned: 2, Value: 2}, nil
+			}
+		},
+		withFixtureUser(&dusers.User{Username: "alice"}),
+	)
+
+	quote, err := svc.QuoteSell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 3, Outcome: "NO"})
+	if err != nil {
+		t.Fatalf("QuoteSell returned error: %v", err)
+	}
+	if quote.SharesSold != 2 || quote.SaleValue != 2 || quote.Dust != 1 || quote.NetProceeds != 1 {
+		t.Fatalf("quote did not respect sellable cap: %+v", quote)
+	}
+
+	result, err := svc.Sell(context.Background(), bets.SellRequest{Username: "alice", MarketID: 1, Amount: 3, Outcome: "NO"})
+	if err != nil {
+		t.Fatalf("Sell returned error: %v", err)
+	}
+	if result.SharesSold != 2 || result.SaleValue != 2 || result.Dust != 1 || result.NetProceeds != 1 {
+		t.Fatalf("sell did not respect sellable cap: %+v", result)
+	}
+	if fixture.repo.created == nil || fixture.repo.created.Amount != -2 {
+		t.Fatalf("unexpected sale row: %+v", fixture.repo.created)
+	}
+	if len(fixture.users.calls) != 1 || fixture.users.calls[0].amount != 1 {
+		t.Fatalf("unexpected sale credit: %+v", fixture.users.calls)
 	}
 }
 

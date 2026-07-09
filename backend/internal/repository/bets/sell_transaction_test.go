@@ -101,6 +101,39 @@ func TestGormRepositorySellBetTransactionProjectsSaleInsideTransaction(t *testin
 	}
 }
 
+func TestGormRepositorySellBetTransactionReadsUnlockedSellablePosition(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	sqlDB, _ := db.DB()
+	if sqlDB != nil {
+		t.Cleanup(func() { _ = sqlDB.Close() })
+	}
+
+	seedSellRowsForUnlock(t, db, "creator", "seller", "follower", 1000, 203)
+
+	repo := NewGormRepository(db)
+	err := repo.SellBetTransaction(context.Background(), func(ctx context.Context, _ dbets.Repository, markets dbets.MarketService, _ dbets.UserService) error {
+		seller, err := markets.GetUserSellablePositionInMarket(ctx, 203, "seller", "NO")
+		if err != nil {
+			return err
+		}
+		if seller.NoSharesOwned != 2 || seller.Value != 2 {
+			t.Fatalf("expected seller unlocked DBPM-rounded value 2, got %+v", seller)
+		}
+
+		follower, err := markets.GetUserSellablePositionInMarket(ctx, 203, "follower", "NO")
+		if err != nil {
+			return err
+		}
+		if follower.NoSharesOwned != 0 || follower.Value != 0 {
+			t.Fatalf("expected latest follower value to remain locked, got %+v", follower)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("transaction sellable read returned error: %v", err)
+	}
+}
+
 func seedSellRows(t *testing.T, db *gorm.DB, creatorUsername string, sellerUsername string, sellerBalance int64, marketID int64) {
 	t.Helper()
 
@@ -122,5 +155,36 @@ func seedSellRows(t *testing.T, db *gorm.DB, creatorUsername string, sellerUsern
 	buy := modelstesting.GenerateBet(100, "YES", sellerUsername, uint(marketID), 0)
 	if err := db.Create(&buy).Error; err != nil {
 		t.Fatalf("seed buy bet: %v", err)
+	}
+}
+
+func seedSellRowsForUnlock(t *testing.T, db *gorm.DB, creatorUsername string, sellerUsername string, followerUsername string, sellerBalance int64, marketID int64) {
+	t.Helper()
+
+	creator := modelstesting.GenerateUser(creatorUsername, 1000)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("seed creator user: %v", err)
+	}
+	seller := modelstesting.GenerateUser(sellerUsername, sellerBalance)
+	if err := db.Create(&seller).Error; err != nil {
+		t.Fatalf("seed seller user: %v", err)
+	}
+	follower := modelstesting.GenerateUser(followerUsername, 1000)
+	if err := db.Create(&follower).Error; err != nil {
+		t.Fatalf("seed follower user: %v", err)
+	}
+
+	market := modelstesting.GenerateMarket(marketID, creatorUsername)
+	if err := db.Create(&market).Error; err != nil {
+		t.Fatalf("seed market: %v", err)
+	}
+
+	first := modelstesting.GenerateBet(1, "NO", sellerUsername, uint(marketID), time.Second)
+	second := modelstesting.GenerateBet(1, "NO", followerUsername, uint(marketID), 2*time.Second)
+	if err := db.Create(&first).Error; err != nil {
+		t.Fatalf("seed first buy bet: %v", err)
+	}
+	if err := db.Create(&second).Error; err != nil {
+		t.Fatalf("seed second buy bet: %v", err)
 	}
 }
