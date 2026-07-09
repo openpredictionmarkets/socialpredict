@@ -8,6 +8,7 @@ const apiPrefix = args['api-prefix'] || '/v0';
 const password = args.password || 'password';
 const moderator = args.moderator || 'testuser01';
 const bettor = args.bettor || 'testuser03';
+const follower = args.follower || 'testuser04';
 const admin = args.admin || 'admin';
 const artifact = args.artifact || 'integrationtest/artifacts/sell-shares-two-share-cap-latest.json';
 const delayMs = Number(args.delay || 150);
@@ -80,6 +81,10 @@ function sameInt(name, got, want) {
 
 function reason(raw) {
   return raw?.data?.reason || raw?.result?.reason || raw?.data?.code || '';
+}
+
+function message(raw) {
+  return raw?.data?.message || raw?.result?.message || '';
 }
 
 function numberField(row, camelName, exportedName) {
@@ -181,12 +186,37 @@ function assertSale(prefix, sale) {
 async function main() {
   const modToken = await login(moderator);
   const bettorToken = await login(bettor);
+  const followerToken = await login(follower);
   const adminToken = await login(admin);
-  check('login seeded moderator, bettor, admin', true);
+  check('login seeded moderator, bettor, follower, admin', true);
 
   const marketId = await createMarket(modToken, adminToken);
   await place(bettorToken, marketId, 'NO', 1);
-  await place(bettorToken, marketId, 'NO', 1);
+
+  const lockedFinancial = await financial(bettor);
+  const lockedPosition = await position(bettorToken, marketId);
+  const lockedDetails = await details(marketId);
+  sameInt('single buy shows aggregate NO share', shares(lockedPosition, 'NO'), 1);
+  sameInt('single buy aggregate value', positionValue(lockedPosition), 1);
+
+  const lockedQuote = await quoteRaw(bettorToken, marketId, 'NO', 1, [422]);
+  check('quote rejected before another user follow-up', lockedQuote.status === 422, `status=${lockedQuote.status}`);
+  check('locked quote uses no-position contract', reason(lockedQuote) === 'NO_POSITION', `reason=${reason(lockedQuote)}`);
+  check('locked quote reports follow-up requirement', message(lockedQuote).includes('follow-up order from another user'), message(lockedQuote));
+
+  const lockedSell = await sellRaw(bettorToken, marketId, 'NO', 1, [422]);
+  check('sell rejected before another user follow-up', lockedSell.status === 422, `status=${lockedSell.status}`);
+  check('locked sell uses no-position contract', reason(lockedSell) === 'NO_POSITION', `reason=${reason(lockedSell)}`);
+  check('locked sell reports follow-up requirement', message(lockedSell).includes('follow-up order from another user'), message(lockedSell));
+  sameInt('locked sell balance unchanged', Number((await financial(bettor)).accountBalance || 0), Number(lockedFinancial.accountBalance || 0));
+  sameInt('locked sell position unchanged', positionValue(await position(bettorToken, marketId)), positionValue(lockedPosition));
+  sameInt('locked sell dust unchanged', Number((await details(marketId)).marketDust || 0), Number(lockedDetails.marketDust || 0));
+
+  await place(followerToken, marketId, 'NO', 1);
+
+  const followerQuote = await quoteRaw(followerToken, marketId, 'NO', 1, [422]);
+  check('latest follower quote remains locked', followerQuote.status === 422, `status=${followerQuote.status}`);
+  check('latest follower quote uses no-position contract', reason(followerQuote) === 'NO_POSITION', `reason=${reason(followerQuote)}`);
 
   const beforeFinancial = await financial(bettor);
   const beforePosition = await position(bettorToken, marketId);
@@ -195,7 +225,7 @@ async function main() {
   const currentValue = positionValue(beforePosition);
   const oversizedAmount = 3;
 
-  sameInt('setup NO shares', ownedNoShares, 2);
+  sameInt('different-user follow-up unlocks bettor NO shares', ownedNoShares, 2);
   sameInt('setup YES shares', shares(beforePosition, 'YES'), 0);
   sameInt('setup position value', currentValue, 2);
 

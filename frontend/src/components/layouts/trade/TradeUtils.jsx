@@ -2,8 +2,8 @@ import { API_URL } from '../../../config';
 
 export const NO_SELLABLE_SHARES_MESSAGE = [
     'No sellable shares yet.',
-    'Initial value cannot be sold until a follow-up order is placed.',
-    'Wait for another order or place another order yourself, then try selling again.',
+    'Initial value cannot be sold until a follow-up order from another user has been placed.',
+    'Wait for another order from another user, then try selling again.',
 ].join(' ');
 
 const unwrapApiResponse = (payload) => {
@@ -49,11 +49,10 @@ const parseErrorResponse = async (response, fallbackPrefix) => {
         throw new Error(`${fallbackPrefix} (${response.status}): ${errorMessage}`);
     }
 
-    if (fallbackPrefix.startsWith('Sale') && errorData?.reason === 'NO_POSITION') {
-        throw new Error(NO_SELLABLE_SHARES_MESSAGE);
-    }
-
     errorMessage = formatApiError(errorData, text);
+    if (fallbackPrefix.startsWith('Sale') && errorData?.reason === 'NO_POSITION') {
+        throw new Error(errorMessage || NO_SELLABLE_SHARES_MESSAGE);
+    }
     throw new Error(`${fallbackPrefix} (${response.status}): ${errorMessage}`);
 };
 

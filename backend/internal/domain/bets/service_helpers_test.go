@@ -35,6 +35,9 @@ func newStubMarketService(opts ...func(*stubMarketService)) stubMarketService {
 			getUserPositionInMarketFn: func(context.Context, int64, string) (*dmarkets.UserPosition, error) {
 				return nil, errUnexpectedHelperCall
 			},
+			getUserSellablePositionInMarketFn: func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
+				return nil, errUnexpectedHelperCall
+			},
 		},
 		projector: stubPositionProjector{
 			projectUserPositionAfterBetFn: func(context.Context, int64, string, boundary.Bet) (*dmarkets.UserPosition, error) {
@@ -57,6 +60,9 @@ func withStubMarket(getMarket func(ctx context.Context, id int64) (*dmarkets.Mar
 func withStubPosition(getPosition func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)) func(*stubMarketService) {
 	return func(stub *stubMarketService) {
 		stub.positionGetter.getUserPositionInMarketFn = getPosition
+		stub.positionGetter.getUserSellablePositionInMarketFn = func(ctx context.Context, marketID int64, username string, _ string) (*dmarkets.UserPosition, error) {
+			return getPosition(ctx, marketID, username)
+		}
 	}
 }
 
@@ -75,7 +81,8 @@ func (s stubMarketService) GetMarket(ctx context.Context, id int64) (*dmarkets.M
 }
 
 type stubPositionGetter struct {
-	getUserPositionInMarketFn func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	getUserPositionInMarketFn         func(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error)
+	getUserSellablePositionInMarketFn func(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error)
 }
 
 type stubPositionProjector struct {
@@ -84,6 +91,10 @@ type stubPositionProjector struct {
 
 func (s stubMarketService) GetUserPositionInMarket(ctx context.Context, marketID int64, username string) (*dmarkets.UserPosition, error) {
 	return s.positionGetter.GetUserPositionInMarket(ctx, marketID, username)
+}
+
+func (s stubMarketService) GetUserSellablePositionInMarket(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error) {
+	return s.positionGetter.GetUserSellablePositionInMarket(ctx, marketID, username, outcome)
 }
 
 func (s stubMarketService) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error) {
@@ -102,6 +113,13 @@ func (s stubPositionGetter) GetUserPositionInMarket(ctx context.Context, marketI
 		return nil, errUnexpectedHelperCall
 	}
 	return s.getUserPositionInMarketFn(ctx, marketID, username)
+}
+
+func (s stubPositionGetter) GetUserSellablePositionInMarket(ctx context.Context, marketID int64, username string, outcome string) (*dmarkets.UserPosition, error) {
+	if s.getUserSellablePositionInMarketFn == nil {
+		return nil, errUnexpectedHelperCall
+	}
+	return s.getUserSellablePositionInMarketFn(ctx, marketID, username, outcome)
 }
 
 func (s stubPositionProjector) ProjectUserPositionAfterBet(ctx context.Context, marketID int64, username string, bet boundary.Bet) (*dmarkets.UserPosition, error) {
