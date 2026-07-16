@@ -54,6 +54,8 @@ var (
 
 const NoSellableSharesMessage = "No sellable shares yet. Initial value cannot be sold until a follow-up order from another user has been placed. Wait for another order from another user, then try selling again."
 
+const InsufficientSellableSharesMessage = "Not enough sellable shares for that sale amount. Try a smaller Sale Order amount, or wait for more market activity if your latest shares are still locked."
+
 // ErrDustCapExceeded is returned when a sell transaction would generate dust above the configured cap.
 type ErrDustCapExceeded struct {
 	Cap       int64

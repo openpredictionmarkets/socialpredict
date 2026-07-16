@@ -151,7 +151,15 @@ func handleSellError(w http.ResponseWriter, err error) {
 			},
 		)
 	case errors.Is(err, bets.ErrInsufficientShares):
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientShares)
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusUnprocessableEntity,
+			handlers.ReasonInsufficientShares,
+			bets.InsufficientSellableSharesMessage,
+			map[string]any{
+				"hint": "Use a smaller sale amount or wait for another user's later buy to unlock the newest value.",
+			},
+		)
 	case errors.Is(err, dmarkets.ErrMarketNotFound):
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:

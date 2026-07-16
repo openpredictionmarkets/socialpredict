@@ -405,6 +405,35 @@ func TestSellPositionHandler_NoSellableSharesIncludesUserGuidance(t *testing.T) 
 	}
 }
 
+func TestSellQuoteHandler_InsufficientSharesIncludesUserGuidance(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{quoteErr: bets.ErrInsufficientShares}
+	users := &fakeUsersService{user: &dusers.User{Username: "alice"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 1, Amount: 10, Outcome: "YES"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell/quote", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("alice"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellQuoteHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, rr.Code)
+	}
+
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInsufficientShares) {
+		t.Fatalf("expected insufficient-shares reason, got %q", resp.Reason)
+	}
+	if resp.Message != bets.InsufficientSellableSharesMessage {
+		t.Fatalf("expected insufficient-shares guidance, got %q", resp.Message)
+	}
+}
+
 func TestSellPositionHandler_InvalidJSON(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 	svc := &fakeSellService{}
