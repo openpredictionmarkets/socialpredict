@@ -25,6 +25,10 @@ const formatApiError = (errorData, fallback) => {
         return fallback;
     }
 
+    if (errorData.reason === 'INSUFFICIENT_SHARES') {
+        return errorData.message || 'Not enough sellable shares for that sale amount. Try a smaller Sale Order amount, or wait for more market activity if your latest shares are still locked.';
+    }
+
     if (errorData.reason === 'DUST_CAP_EXCEEDED') {
         const dust = errorData.details?.dust;
         const maxDust = errorData.details?.maxDust;
@@ -50,7 +54,7 @@ const parseErrorResponse = async (response, fallbackPrefix) => {
     }
 
     errorMessage = formatApiError(errorData, text);
-    if (fallbackPrefix.startsWith('Sale') && errorData?.reason === 'NO_POSITION') {
+    if (fallbackPrefix.startsWith('Sale') && ['NO_POSITION', 'INSUFFICIENT_SHARES'].includes(errorData?.reason)) {
         throw new Error(errorMessage || NO_SELLABLE_SHARES_MESSAGE);
     }
     throw new Error(`${fallbackPrefix} (${response.status}): ${errorMessage}`);

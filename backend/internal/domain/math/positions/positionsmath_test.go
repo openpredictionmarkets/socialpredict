@@ -304,6 +304,38 @@ func TestCalculateUnlockedSellablePosition_WPAM_DBPM(t *testing.T) {
 			username: "bob",
 			outcome:  "NO",
 		},
+		{
+			name: "three alternating users unlock only previous buys",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 1, Outcome: "NO", Username: "bob", Offset: time.Minute},
+				{Amount: 1, Outcome: "NO", Username: "carol", Offset: 2 * time.Minute},
+			},
+			username: "bob",
+			outcome:  "NO",
+			wantNo:   1,
+			wantVal:  1,
+		},
+		{
+			name: "newest user in three-user sequence remains locked",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 1, Outcome: "NO", Username: "bob", Offset: time.Minute},
+				{Amount: 1, Outcome: "NO", Username: "carol", Offset: 2 * time.Minute},
+			},
+			username: "carol",
+			outcome:  "NO",
+		},
 	}
 
 	for _, tt := range tests {
