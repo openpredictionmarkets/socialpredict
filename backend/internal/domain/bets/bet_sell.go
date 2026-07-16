@@ -2,6 +2,7 @@ package bets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -43,12 +44,15 @@ func (s *Service) QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteRes
 		return nil, err
 	}
 
-	sharesOwned, position, err := s.loadUserShares(ctx, req, outcome)
+	currentShares, currentPosition, sellableShares, sellablePosition, err := s.loadUserSalePositions(ctx, req, outcome)
 	if err != nil {
 		return nil, err
 	}
 
-	sale, err := s.saleCalculator.Quote(position, sharesOwned, req.Amount)
+	if sellableShares > currentShares {
+		sellableShares = currentShares
+	}
+	sale, err := s.saleCalculator.Quote(sellablePosition, sellableShares, req.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -59,12 +63,12 @@ func (s *Service) QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteRes
 	}
 	if allowed {
 		bet := req.NewSaleBet(outcome, sale.SharesToSell, s.clock.Now())
-		if err := validateProjectedSale(ctx, s.markets, req, outcome, position, sale, *bet); err != nil {
+		if err := validateProjectedSale(ctx, s.markets, req, outcome, currentPosition, sale, *bet); err != nil {
 			return nil, err
 		}
 	}
 
-	suggested := suggestSaleAmounts(sale, sharesOwned, s.config.MaxDustPerSale)
+	suggested := suggestSaleAmounts(sale, sellableShares, s.config.MaxDustPerSale)
 	return new(SellQuoteResult).Build(req, outcome, sale, s.config.MaxDustPerSale, allowed, suggested, s.clock.Now()), nil
 }
 
@@ -75,12 +79,15 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 			return err
 		}
 
-		sharesOwned, position, err := loadUserSharesFrom(txCtx, markets, req, outcome)
+		currentShares, currentPosition, sellableShares, sellablePosition, err := loadUserSalePositionsFrom(txCtx, markets, req, outcome)
 		if err != nil {
 			return err
 		}
 
-		sale, err := s.saleCalculator.Calculate(position, sharesOwned, req.Amount)
+		if sellableShares > currentShares {
+			sellableShares = currentShares
+		}
+		sale, err := s.saleCalculator.Calculate(sellablePosition, sellableShares, req.Amount)
 		if err != nil {
 			return err
 		}
@@ -90,7 +97,7 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 
 		now := s.clock.Now()
 		bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
-		if err := validateProjectedSale(txCtx, markets, req, outcome, position, sale, *bet); err != nil {
+		if err := validateProjectedSale(txCtx, markets, req, outcome, currentPosition, sale, *bet); err != nil {
 			return err
 		}
 		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, netSaleProceeds(sale)); err != nil {
@@ -110,6 +117,10 @@ func (s *Service) loadUserShares(ctx context.Context, req SellRequest, outcome s
 	return loadUserSharesFrom(ctx, s.markets, req, outcome)
 }
 
+func (s *Service) loadUserSalePositions(ctx context.Context, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, int64, *dmarkets.UserPosition, error) {
+	return loadUserSalePositionsFrom(ctx, s.markets, req, outcome)
+}
+
 func loadUserSharesFrom(ctx context.Context, markets PositionReader, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, error) {
 	position, err := markets.GetUserPositionInMarket(ctx, int64(req.MarketID), req.Username)
 	if err != nil {
@@ -125,6 +136,34 @@ func loadUserSharesFrom(ctx context.Context, markets PositionReader, req SellReq
 	}
 
 	return sharesOwned, position, nil
+}
+
+func loadUserSalePositionsFrom(ctx context.Context, markets PositionReader, req SellRequest, outcome string) (int64, *dmarkets.UserPosition, int64, *dmarkets.UserPosition, error) {
+	currentShares, currentPosition, err := loadUserSharesFrom(ctx, markets, req, outcome)
+	if err != nil {
+		return 0, nil, 0, nil, err
+	}
+
+	sellablePosition, err := markets.GetUserSellablePositionInMarket(ctx, int64(req.MarketID), req.Username, outcome)
+	if err != nil {
+		return 0, nil, 0, nil, err
+	}
+	if sellablePosition == nil {
+		return 0, nil, 0, nil, ErrNoSellableShares
+	}
+
+	sellableShares, err := sharesOwnedForOutcome(sellablePosition, outcome)
+	if err != nil {
+		if errors.Is(err, ErrNoPosition) {
+			return 0, nil, 0, nil, ErrNoSellableShares
+		}
+		return 0, nil, 0, nil, err
+	}
+	if sellableShares <= 0 || sellablePosition.Value <= 0 {
+		return 0, nil, 0, nil, ErrNoSellableShares
+	}
+
+	return currentShares, currentPosition, sellableShares, sellablePosition, nil
 }
 
 func validateProjectedSale(

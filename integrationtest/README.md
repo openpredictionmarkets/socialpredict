@@ -17,10 +17,12 @@ from `loadtest/`, which is for capacity and performance testing.
 
 - `cases/multiple-choice-binary-markets.md`
 - `cases/sell-shares-overcashout.md`
+- `cases/sell-shares-two-share-cap.md`
 - `reports/multiple-choice-binary-markets-2026-06-15.md`
 - `reports/schemathesis-read-2026-06-16.md`
 - `scripts/multiple-choice-binary-api.mjs`
 - `scripts/sell-shares-overcashout.mjs`
+- `scripts/sell-shares-two-share-cap.mjs`
 - `scripts/schemathesis-read.sh`
 - `scripts/schemathesis-grouped-market.mjs`
 
@@ -34,6 +36,7 @@ Last updated: 2026-06-17.
 |-------|---------|----------------|
 | Multiple-choice binary API scenario runner | `node integrationtest/scripts/multiple-choice-binary-api.mjs --base-url http://localhost:8080 --api-prefix /v0` | 17/17 checks passing |
 | Sell shares over-cashout API scenario runner | `node integrationtest/scripts/sell-shares-overcashout.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers valid quote/sell, dust accounting, and rejected over-cashout |
+| Sell shares two-share backend cap runner | `node integrationtest/scripts/sell-shares-two-share-cap.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers locked initial buys, different-user unlock, backend sell message, and oversized quote/sell cap |
 | Read-only Schemathesis contract smoke | `MAX_EXAMPLES=1 integrationtest/scripts/schemathesis-read.sh` | 4/4 operations passing |
 | Grouped-market Schemathesis contract runner | `node integrationtest/scripts/schemathesis-grouped-market.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers grouped read schemas with a real group ID |
 | Backend tests | `JWT_SIGNING_KEY=test-secret-key-for-testing go test ./...` | Passing |
@@ -57,8 +60,16 @@ node integrationtest/scripts/sell-shares-overcashout.mjs \
   --api-prefix /v0
 ```
 
-Defaults assume seeded users `admin`, `testuser01`, and `testuser02` all use
-password `password`.
+Run the focused sell unlock and two-share backend cap regression:
+
+```bash
+node integrationtest/scripts/sell-shares-two-share-cap.mjs \
+  --base-url http://localhost:8080 \
+  --api-prefix /v0
+```
+
+Defaults assume seeded users `admin`, `testuser01`, `testuser02`, `testuser03`,
+and `testuser04` all use password `password`.
 
 Run read-only OpenAPI fuzz/contract checks with Schemathesis:
 

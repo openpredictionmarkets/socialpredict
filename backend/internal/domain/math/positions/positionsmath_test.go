@@ -229,3 +229,124 @@ func TestCalculateMarketPositions_UsesInjectedValuationCalculator(t *testing.T) 
 		t.Fatalf("expected injected valuation value 77, got %+v", positions)
 	}
 }
+
+func TestCalculateUnlockedSellablePosition_WPAM_DBPM(t *testing.T) {
+	snapshot := MarketSnapshot{ID: 1, CreatedAt: positionsMathBaseTime}
+
+	tests := []struct {
+		name string
+		bets []struct {
+			Amount   int64
+			Outcome  string
+			Username string
+			Offset   time.Duration
+		}
+		username string
+		outcome  string
+		wantNo   int64
+		wantYes  int64
+		wantVal  int64
+	}{
+		{
+			name: "single buy is not sellable yet",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+			},
+			username: "alice",
+			outcome:  "NO",
+		},
+		{
+			name: "same user follow up does not unlock newest value",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: time.Minute},
+			},
+			username: "alice",
+			outcome:  "NO",
+		},
+		{
+			name: "different user follow up unlocks prior DBPM rounded value",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 1, Outcome: "NO", Username: "bob", Offset: time.Minute},
+			},
+			username: "alice",
+			outcome:  "NO",
+			wantNo:   2,
+			wantVal:  2,
+		},
+		{
+			name: "latest different user buy remains locked for that buyer",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 1, Outcome: "NO", Username: "bob", Offset: time.Minute},
+			},
+			username: "bob",
+			outcome:  "NO",
+		},
+		{
+			name: "three alternating users unlock only previous buys",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 1, Outcome: "NO", Username: "bob", Offset: time.Minute},
+				{Amount: 1, Outcome: "NO", Username: "carol", Offset: 2 * time.Minute},
+			},
+			username: "bob",
+			outcome:  "NO",
+			wantNo:   1,
+			wantVal:  1,
+		},
+		{
+			name: "newest user in three-user sequence remains locked",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 1, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 1, Outcome: "NO", Username: "bob", Offset: time.Minute},
+				{Amount: 1, Outcome: "NO", Username: "carol", Offset: 2 * time.Minute},
+			},
+			username: "carol",
+			outcome:  "NO",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			position, err := CalculateUnlockedSellablePosition_WPAM_DBPM(snapshot, buildPositionBets(1, tt.bets), tt.username, tt.outcome)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if position.NoSharesOwned != tt.wantNo || position.YesSharesOwned != tt.wantYes || position.Value != tt.wantVal {
+				t.Fatalf("expected no=%d yes=%d value=%d, got %+v", tt.wantNo, tt.wantYes, tt.wantVal, position)
+			}
+		})
+	}
+}

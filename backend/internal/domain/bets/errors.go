@@ -46,9 +46,15 @@ var (
 	ErrSellTransactionUnavailable BetError = newDomainError("sell transaction boundary unavailable")
 	// ErrNoPosition indicates the user has no position to sell.
 	ErrNoPosition BetError = newDomainError("no position found for the given market and outcome")
+	// ErrNoSellableShares indicates the user has shares, but no unlocked value to sell yet.
+	ErrNoSellableShares BetError = newDomainError(NoSellableSharesMessage)
 	// ErrInsufficientShares indicates the user cannot sell the requested credits.
 	ErrInsufficientShares BetError = newDomainError("not enough shares to satisfy requested sale")
 )
+
+const NoSellableSharesMessage = "No sellable shares yet. Initial value cannot be sold until a follow-up order from another user has been placed. Wait for another order from another user, then try selling again."
+
+const InsufficientSellableSharesMessage = "Not enough sellable shares for that sale amount. Try a smaller Sale Order amount, or wait for more market activity if your latest shares are still locked."
 
 // ErrDustCapExceeded is returned when a sell transaction would generate dust above the configured cap.
 type ErrDustCapExceeded struct {

@@ -130,10 +130,36 @@ func handleSellError(w http.ResponseWriter, err error) {
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
 	case errors.Is(err, bets.ErrMarketClosed):
 		_ = handlers.WriteFailure(w, http.StatusConflict, handlers.ReasonMarketClosed)
+	case errors.Is(err, bets.ErrNoSellableShares):
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusUnprocessableEntity,
+			handlers.ReasonNoPosition,
+			bets.NoSellableSharesMessage,
+			map[string]any{
+				"hint": "A later buy from another user is required before this value can be sold.",
+			},
+		)
 	case errors.Is(err, bets.ErrNoPosition):
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonNoPosition)
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusUnprocessableEntity,
+			handlers.ReasonNoPosition,
+			bets.NoSellableSharesMessage,
+			map[string]any{
+				"hint": "A later buy from another user is required before this value can be sold.",
+			},
+		)
 	case errors.Is(err, bets.ErrInsufficientShares):
-		_ = handlers.WriteFailure(w, http.StatusUnprocessableEntity, handlers.ReasonInsufficientShares)
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusUnprocessableEntity,
+			handlers.ReasonInsufficientShares,
+			bets.InsufficientSellableSharesMessage,
+			map[string]any{
+				"hint": "Use a smaller sale amount or wait for another user's later buy to unlock the newest value.",
+			},
+		)
 	case errors.Is(err, dmarkets.ErrMarketNotFound):
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:
