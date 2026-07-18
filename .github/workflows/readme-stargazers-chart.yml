@@ -1,0 +1,84 @@
+name: README Stargazers Chart
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  STARGAZERS_CHART_BRANCH: docs/update-readme-stargazers-chart
+
+jobs:
+  update-stargazers-chart:
+    name: Update README stargazers chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Generate stargazers chart
+        env:
+          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 scripts/readme-stargazers-chart.py
+
+      - name: Open pull request for updated chart
+        env:
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README/METRICS/stargazers-over-time.svg README/METRICS/stargazers-over-time.json
+          if git diff --cached --quiet; then
+            echo "Stargazers chart unchanged."
+            exit 0
+          fi
+          git commit -m "docs: update README stargazers chart"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          remote_sha="$(git ls-remote --heads origin "$STARGAZERS_CHART_BRANCH" | awk '{print $1}')"
+          if [ -n "$remote_sha" ]; then
+            git push --force-with-lease="refs/heads/${STARGAZERS_CHART_BRANCH}:${remote_sha}" origin "HEAD:${STARGAZERS_CHART_BRANCH}"
+          else
+            git push origin "HEAD:${STARGAZERS_CHART_BRANCH}"
+          fi
+
+          pr_body="$(mktemp)"
+          cat > "$pr_body" <<'EOF'
+          Updates the README stargazers-over-time SVG from GitHub's stargazer API.
+
+          This PR is created automatically by the README Stargazers Chart workflow.
+          EOF
+
+          pr_number="$(
+            gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --head "$STARGAZERS_CHART_BRANCH" \
+              --base "$BASE_BRANCH" \
+              --state open \
+              --json number \
+              --jq '.[0].number // ""'
+          )"
+
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "docs: update README stargazers chart" \
+              --body-file "$pr_body"
+            echo "Updated stargazers chart pull request #${pr_number}."
+          else
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base "$BASE_BRANCH" \
+              --head "$STARGAZERS_CHART_BRANCH" \
+              --title "docs: update README stargazers chart" \
+              --body-file "$pr_body"
+          fi
