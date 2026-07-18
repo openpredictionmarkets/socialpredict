@@ -1,0 +1,33 @@
+<svg width="760" height="320" viewBox="0 0 760 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">SocialPredict stargazers over time</title>
+  <desc id="desc">Cumulative GitHub stargazers for openpredictionmarkets/socialpredict, generated from GitHub stargazer timestamps.</desc>
+  <style>
+    .title { fill: #f8fafc; font: 700 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .subtitle { fill: #9fb2c8; font: 500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .axis { fill: #9fb2c8; font: 500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .total { fill: #f8fafc; font: 700 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  </style>
+  <rect width="760" height="320" rx="8" fill="#0d1117" />
+  <text x="62" y="30" class="title">Stargazers over time</text>
+  <text x="732" y="28" text-anchor="end" class="total">212</text>
+  <text x="732" y="47" text-anchor="end" class="subtitle">stars</text>
+  <text x="62" y="312" class="subtitle">Generated from GitHub stargazer timestamps</text>
+  <line x1="62" y1="266.0" x2="732" y2="266.0" stroke="#243244" stroke-width="1" />
+<line x1="62" y1="210.9" x2="732" y2="210.9" stroke="#243244" stroke-width="1" />
+<line x1="62" y1="155.0" x2="732" y2="155.0" stroke="#243244" stroke-width="1" />
+<line x1="62" y1="99.9" x2="732" y2="99.9" stroke="#243244" stroke-width="1" />
+<line x1="62" y1="44.0" x2="732" y2="44.0" stroke="#243244" stroke-width="1" />
+  <line x1="62" y1="266" x2="732" y2="266" stroke="#3a4658" stroke-width="1.5" />
+  <line x1="62" y1="44" x2="62" y2="266" stroke="#3a4658" stroke-width="1.5" />
+  <text x="50" y="270.0" text-anchor="end" class="axis">0</text>
+<text x="50" y="214.9" text-anchor="end" class="axis">62</text>
+<text x="50" y="159.0" text-anchor="end" class="axis">125</text>
+<text x="50" y="103.9" text-anchor="end" class="axis">187</text>
+<text x="50" y="48.0" text-anchor="end" class="axis">250</text>
+  <text x="62.0" y="298" text-anchor="middle" class="axis">2024-01</text>
+<text x="397.0" y="298" text-anchor="middle" class="axis">2025-04</text>
+<text x="732.0" y="298" text-anchor="middle" class="axis">2026-07</text>
+  <polygon points="62,266 62.0,263.3 84.3,261.6 106.7,260.7 129.0,250.0 151.3,244.7 173.7,242.9 196.0,240.2 218.3,234.0 240.7,221.6 263.0,219.8 285.3,210.9 307.7,207.4 330.0,204.7 352.3,202.1 374.7,200.3 397.0,196.7 419.3,194.1 441.7,192.3 464.0,189.6 486.3,184.3 508.7,177.2 531.0,166.5 553.3,149.7 575.7,138.1 598.0,131.9 620.3,128.4 642.7,123.0 665.0,100.8 687.3,91.1 709.7,80.4 732.0,77.7 732,266" fill="#62c3f8" opacity="0.16" />
+  <polyline points="62.0,263.3 84.3,261.6 106.7,260.7 129.0,250.0 151.3,244.7 173.7,242.9 196.0,240.2 218.3,234.0 240.7,221.6 263.0,219.8 285.3,210.9 307.7,207.4 330.0,204.7 352.3,202.1 374.7,200.3 397.0,196.7 419.3,194.1 441.7,192.3 464.0,189.6 486.3,184.3 508.7,177.2 531.0,166.5 553.3,149.7 575.7,138.1 598.0,131.9 620.3,128.4 642.7,123.0 665.0,100.8 687.3,91.1 709.7,80.4 732.0,77.7" fill="none" stroke="#62c3f8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="732.0" cy="77.7" r="5" fill="#2ea043" stroke="#f8fafc" stroke-width="2" />
+</svg>

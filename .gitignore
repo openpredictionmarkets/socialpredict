@@ -78,6 +78,7 @@ node_modules/
 .go-run-cache/
 .tmp/
 .config/go/
+__pycache__/
 
 # Runtime CMS uploads
 /backend/data/uploads/
