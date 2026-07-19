@@ -71,11 +71,11 @@ func main() {
 	} else {
 		logger.Info("startup", "startup writer disabled; verifying database schema before serving", logger.Operation("StartupMutationMode"))
 	}
-	if err := runStartupMutations(db, configService, startupMode, startupMutationHooks{
-		migrate:      migration.MigrateDB,
-		verify:       migration.VerifyApplied,
-		seedUsers:    seed.SeedUsers,
-		seedHomepage: seed.SeedHomepage,
+	if err := appruntime.RunStartupMutations(db, configService, startupMode, appruntime.StartupMutationHooks{
+		Migrate:      migration.MigrateDB,
+		Verify:       migration.VerifyApplied,
+		SeedUsers:    seed.SeedUsers,
+		SeedHomepage: seed.SeedHomepage,
 	}); err != nil {
 		if startupMode.Writer {
 			logger.Fatal("startup", "startup database migration failed", err, startupMigrationFailureFields("RunStartupMutations")...)

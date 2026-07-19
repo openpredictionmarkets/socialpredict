@@ -40,13 +40,13 @@ func TestPostgresStartupReadinessAndMigrationPosture(t *testing.T) {
 	})
 
 	var seedsRan bool
-	err := runStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{Writer: true}, startupMutationHooks{
-		migrate: migration.MigrateDB,
-		seedUsers: func(*gorm.DB, configsvc.Service) error {
+	err := appruntime.RunStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{Writer: true}, appruntime.StartupMutationHooks{
+		Migrate: migration.MigrateDB,
+		SeedUsers: func(*gorm.DB, configsvc.Service) error {
 			seedsRan = true
 			return nil
 		},
-		seedHomepage: func(*gorm.DB, string) error {
+		SeedHomepage: func(*gorm.DB, string) error {
 			seedsRan = true
 			return nil
 		},
@@ -72,12 +72,12 @@ func TestPostgresStartupReadinessAndMigrationPosture(t *testing.T) {
 		return db.Exec(`CREATE TABLE startup_postgres_probe (id integer PRIMARY KEY, note text NOT NULL)`).Error
 	})
 
-	err = runStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{Writer: true}, startupMutationHooks{
-		migrate: migration.MigrateDB,
-		seedUsers: func(*gorm.DB, configsvc.Service) error {
+	err = appruntime.RunStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{Writer: true}, appruntime.StartupMutationHooks{
+		Migrate: migration.MigrateDB,
+		SeedUsers: func(*gorm.DB, configsvc.Service) error {
 			return nil
 		},
-		seedHomepage: func(*gorm.DB, string) error {
+		SeedHomepage: func(*gorm.DB, string) error {
 			return nil
 		},
 	})
@@ -100,8 +100,8 @@ func TestPostgresStartupReadinessAndMigrationPosture(t *testing.T) {
 		return db.Exec(`CREATE TABLE startup_postgres_probe_nonwriter_unexpected (id integer PRIMARY KEY)`).Error
 	})
 
-	err = runStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{}, startupMutationHooks{
-		verify: migration.VerifyApplied,
+	err = appruntime.RunStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{}, appruntime.StartupMutationHooks{
+		Verify: migration.VerifyApplied,
 	})
 	if err != nil {
 		t.Fatalf("expected non-writer to verify already-applied migrations, got %v", err)
@@ -115,8 +115,8 @@ func TestPostgresStartupReadinessAndMigrationPosture(t *testing.T) {
 		return db.Exec(`CREATE TABLE startup_postgres_probe_nonwriter_missing (id integer PRIMARY KEY)`).Error
 	})
 
-	err = runStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{}, startupMutationHooks{
-		verify: migration.VerifyApplied,
+	err = appruntime.RunStartupMutations(db, configsvc.NewStaticService(nil), appruntime.StartupMutationMode{}, appruntime.StartupMutationHooks{
+		Verify: migration.VerifyApplied,
 	})
 	if err == nil {
 		t.Fatalf("expected non-writer startup to fail when a registered migration is missing")
