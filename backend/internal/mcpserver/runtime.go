@@ -65,6 +65,13 @@ func (rt *Runtime) RegisterTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{Name: "get_market", Description: "Get details for one public SocialPredict market."}, rt.GetMarket)
 	mcp.AddTool(server, &mcp.Tool{Name: "get_market_summary", Description: "Get the accounting summary for one public SocialPredict market."}, rt.GetMarketSummary)
 	mcp.AddTool(server, &mcp.Tool{Name: "quote_market_probability", Description: "Quote the projected probability for a hypothetical market bet."}, rt.QuoteMarketProbability)
+	mcp.AddTool(server, &mcp.Tool{Name: "list_market_bets", Description: "List bets placed on a public market."}, rt.ListMarketBets)
+	mcp.AddTool(server, &mcp.Tool{Name: "list_market_positions", Description: "List public positions in a market."}, rt.ListMarketPositions)
+	mcp.AddTool(server, &mcp.Tool{Name: "get_market_user_position", Description: "Get one user's public position in a market."}, rt.GetMarketUserPosition)
+	mcp.AddTool(server, &mcp.Tool{Name: "get_market_leaderboard", Description: "Get the public leaderboard for a market."}, rt.GetMarketLeaderboard)
+	mcp.AddTool(server, &mcp.Tool{Name: "list_market_group_bets", Description: "List bets across a public market group."}, rt.ListMarketGroupBets)
+	mcp.AddTool(server, &mcp.Tool{Name: "list_market_group_positions", Description: "List positions across a public market group."}, rt.ListMarketGroupPositions)
+	mcp.AddTool(server, &mcp.Tool{Name: "get_market_group_leaderboard", Description: "Get the public leaderboard for a market group."}, rt.GetMarketGroupLeaderboard)
 }
 
 func cleanQuery(query string) (string, error) {

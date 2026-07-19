@@ -113,3 +113,38 @@ func LeaderboardRowOutputFromDomain(r *dmarkets.LeaderboardRow) LeaderboardRowOu
 	}
 	return LeaderboardRowOutput{Username: r.Username, Profit: r.Profit, CurrentValue: r.CurrentValue, TotalSpent: r.TotalSpent, Position: r.Position, YesSharesOwned: r.YesSharesOwned, NoSharesOwned: r.NoSharesOwned, Rank: r.Rank}
 }
+
+func MarketGroupBetOutputFromDomain(row *dmarkets.MarketGroupBetDisplayInfo) MarketGroupBetOutput {
+	if row == nil {
+		return MarketGroupBetOutput{}
+	}
+	return MarketGroupBetOutput{AnswerMarketID: row.AnswerMarketID, AnswerLabel: row.AnswerLabel, DisplayOrder: row.DisplayOrder, Username: row.Username, Outcome: row.Outcome, Amount: row.Amount, Probability: row.Probability, PlacedAt: row.PlacedAt}
+}
+
+func MarketGroupPositionOutputFromDomain(row *dmarkets.MarketGroupPositionRow) MarketGroupPositionOutput {
+	if row == nil {
+		return MarketGroupPositionOutput{Answers: []MarketGroupPositionAnswerOutput{}}
+	}
+	answers := make([]MarketGroupPositionAnswerOutput, 0, len(row.Answers))
+	for _, answer := range row.Answers {
+		if answer == nil {
+			continue
+		}
+		answers = append(answers, MarketGroupPositionAnswerOutput{AnswerMarketID: answer.AnswerMarketID, AnswerLabel: answer.AnswerLabel, DisplayOrder: answer.DisplayOrder, MarketID: answer.MarketID, YesSharesOwned: answer.YesSharesOwned, NoSharesOwned: answer.NoSharesOwned, Value: answer.Value, TotalSpent: answer.TotalSpent, TotalSpentInPlay: answer.TotalSpentInPlay, IsResolved: answer.IsResolved, ResolutionResult: answer.ResolutionResult})
+	}
+	return MarketGroupPositionOutput{Username: row.Username, YesSharesOwned: row.YesSharesOwned, NoSharesOwned: row.NoSharesOwned, Value: row.Value, TotalSpent: row.TotalSpent, TotalSpentInPlay: row.TotalSpentInPlay, Answers: answers}
+}
+
+func MarketGroupLeaderboardRowOutputFromDomain(row *dmarkets.MarketGroupLeaderboardRow) MarketGroupLeaderboardRowOutput {
+	if row == nil {
+		return MarketGroupLeaderboardRowOutput{Answers: []MarketGroupLeaderboardAnswerOutput{}}
+	}
+	answers := make([]MarketGroupLeaderboardAnswerOutput, 0, len(row.Answers))
+	for _, answer := range row.Answers {
+		if answer == nil {
+			continue
+		}
+		answers = append(answers, MarketGroupLeaderboardAnswerOutput{AnswerMarketID: answer.AnswerMarketID, AnswerLabel: answer.AnswerLabel, DisplayOrder: answer.DisplayOrder, Profit: answer.Profit, CurrentValue: answer.CurrentValue, TotalSpent: answer.TotalSpent, Position: answer.Position, YesSharesOwned: answer.YesSharesOwned, NoSharesOwned: answer.NoSharesOwned})
+	}
+	return MarketGroupLeaderboardRowOutput{Username: row.Username, Profit: row.Profit, CurrentValue: row.CurrentValue, TotalSpent: row.TotalSpent, Position: row.Position, YesSharesOwned: row.YesSharesOwned, NoSharesOwned: row.NoSharesOwned, Rank: row.Rank, Answers: answers}
+}
