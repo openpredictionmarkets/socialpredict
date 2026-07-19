@@ -62,6 +62,9 @@ func (rt *Runtime) RegisterTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{Name: "list_markets", Description: "List public SocialPredict markets using status and tag filters."}, rt.ListMarkets)
 	mcp.AddTool(server, &mcp.Tool{Name: "search_markets", Description: "Search public SocialPredict markets with fallback metadata."}, rt.SearchMarkets)
 	mcp.AddTool(server, &mcp.Tool{Name: "get_market_discovery", Description: "Get the public market discovery page and rows."}, rt.GetMarketDiscovery)
+	mcp.AddTool(server, &mcp.Tool{Name: "get_market", Description: "Get details for one public SocialPredict market."}, rt.GetMarket)
+	mcp.AddTool(server, &mcp.Tool{Name: "get_market_summary", Description: "Get the accounting summary for one public SocialPredict market."}, rt.GetMarketSummary)
+	mcp.AddTool(server, &mcp.Tool{Name: "quote_market_probability", Description: "Quote the projected probability for a hypothetical market bet."}, rt.QuoteMarketProbability)
 }
 
 func cleanQuery(query string) (string, error) {
