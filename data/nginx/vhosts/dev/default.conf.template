@@ -14,6 +14,18 @@ server {
 	location /swagger/ {
 		proxy_pass http://backend:8080;
 	}
+
+	location = /mcp {
+		proxy_http_version 1.1;
+		proxy_buffering off;
+		proxy_read_timeout 3600s;
+		proxy_send_timeout 3600s;
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_pass http://mcp:8081;
+	}
 	
 	location /api/ {
 		proxy_pass http://backend:8080/;

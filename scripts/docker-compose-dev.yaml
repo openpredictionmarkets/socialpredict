@@ -45,6 +45,33 @@ services:
       db:
         condition: service_healthy
 
+  mcp:
+    container_name: "${BACKEND_CONTAINER_NAME}-mcp"
+    image: socialpredict-dev-backend:latest
+    entrypoint: ["go", "run", "./cmd/mcpserver"]
+    environment:
+      APP_ENV: ${APP_ENV}
+      CONTAINER_NAME: "${BACKEND_CONTAINER_NAME}-mcp"
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DATABASE}
+      STARTUP_WRITER: "false"
+      MCP_PORT: 8081
+    env_file:
+      - ../.env
+    ports:
+      - "${MCP_PORT:-8081}:8081"
+    volumes:
+      - ../backend:/src
+    networks:
+      - socialpredict_dev_network
+    depends_on:
+      db:
+        condition: service_healthy
+
   frontend:
     container_name: "${FRONTEND_CONTAINER_NAME}"
     image: socialpredict-dev-frontend:latest

@@ -44,6 +44,30 @@ services:
     ports:
       - "${BACKEND_PORT}:8080"              # keep if you want to hit backend directly from host
 
+  mcp:
+    container_name: "${BACKEND_CONTAINER_NAME}-mcp"
+    image: "${BACKEND_IMAGE_NAME}"
+    restart: unless-stopped
+    entrypoint: ["/usr/local/bin/mcpserver"]
+    networks:
+      - socialpredict_network
+    env_file:
+      - ../.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DATABASE}
+      APP_ENV: ${APP_ENV}
+      STARTUP_WRITER: "false"
+      MCP_PORT: 8081
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${MCP_PORT:-8081}:8081"
+
   frontend:
     container_name: "${FRONTEND_CONTAINER_NAME}"
     image: "${FRONTEND_IMAGE_NAME}"         # e.g. ghcr.io/openpredictionmarkets/socialpredict-frontend
@@ -74,6 +98,7 @@ services:
       - "${NGINX_PORT}:80"
     depends_on:
       - backend
+      - mcp
       - frontend
 
 networks:
