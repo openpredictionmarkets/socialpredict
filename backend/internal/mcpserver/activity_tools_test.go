@@ -14,6 +14,7 @@ type activityToolService struct {
 	marketToolService
 	lastMarketPage dmarkets.Page
 	lastGroupPage  dmarkets.Page
+	nilGroupResult bool
 }
 
 func (s *activityToolService) GetMarketBetsPage(_ context.Context, marketID int64, page dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
@@ -37,16 +38,25 @@ func (s *activityToolService) GetMarketLeaderboard(_ context.Context, marketID i
 
 func (s *activityToolService) GetMarketGroupBetsPage(_ context.Context, groupID int64, page dmarkets.Page) (*dmarkets.MarketGroupBetsPage, error) {
 	s.lastGroupPage = page
+	if s.nilGroupResult {
+		return nil, nil
+	}
 	return &dmarkets.MarketGroupBetsPage{GroupID: groupID, Bets: []*dmarkets.MarketGroupBetDisplayInfo{{AnswerMarketID: 9, AnswerLabel: "A", Username: "alice", Outcome: "YES"}}, Total: 33}, nil
 }
 
 func (s *activityToolService) GetMarketGroupPositionsPage(_ context.Context, groupID int64, page dmarkets.Page) (*dmarkets.MarketGroupPositionsPage, error) {
 	s.lastGroupPage = page
+	if s.nilGroupResult {
+		return nil, nil
+	}
 	return &dmarkets.MarketGroupPositionsPage{GroupID: groupID, Positions: []*dmarkets.MarketGroupPositionRow{{Username: "alice", YesSharesOwned: 1}}, Total: 44}, nil
 }
 
 func (s *activityToolService) GetMarketGroupLeaderboardPage(_ context.Context, groupID int64, page dmarkets.Page) (*dmarkets.MarketGroupLeaderboardPage, error) {
 	s.lastGroupPage = page
+	if s.nilGroupResult {
+		return nil, nil
+	}
 	return &dmarkets.MarketGroupLeaderboardPage{GroupID: groupID, Leaderboard: []*dmarkets.MarketGroupLeaderboardRow{{Username: "alice", Profit: 10, Rank: 1}}, Total: 55}, nil
 }
 
@@ -86,5 +96,42 @@ func TestGetMarketUserPositionReturnsPublicPosition(t *testing.T) {
 	}
 	if got.Position.Username != "alice" || got.Position.MarketID != 8 {
 		t.Fatalf("position output = %#v", got)
+	}
+}
+
+func TestListMarketGroupBetsOmitsTotalForNilServiceResult(t *testing.T) {
+	rt := NewRuntime(&activityToolService{nilGroupResult: true}, nil)
+	_, got, err := rt.ListMarketGroupBets(context.Background(), &mcp.CallToolRequest{}, MarketGroupActivityInput{GroupID: 7, Limit: 20, Offset: 20})
+	if err != nil {
+		t.Fatalf("ListMarketGroupBets returned error: %v", err)
+	}
+	assertNilGroupPage(t, got.Items, got.Page)
+}
+
+func TestListMarketGroupPositionsOmitsTotalForNilServiceResult(t *testing.T) {
+	rt := NewRuntime(&activityToolService{nilGroupResult: true}, nil)
+	_, got, err := rt.ListMarketGroupPositions(context.Background(), &mcp.CallToolRequest{}, MarketGroupActivityInput{GroupID: 7, Limit: 20, Offset: 20})
+	if err != nil {
+		t.Fatalf("ListMarketGroupPositions returned error: %v", err)
+	}
+	assertNilGroupPage(t, got.Items, got.Page)
+}
+
+func TestGetMarketGroupLeaderboardOmitsTotalForNilServiceResult(t *testing.T) {
+	rt := NewRuntime(&activityToolService{nilGroupResult: true}, nil)
+	_, got, err := rt.GetMarketGroupLeaderboard(context.Background(), &mcp.CallToolRequest{}, MarketGroupActivityInput{GroupID: 7, Limit: 20, Offset: 20})
+	if err != nil {
+		t.Fatalf("GetMarketGroupLeaderboard returned error: %v", err)
+	}
+	assertNilGroupPage(t, got.Items, got.Page)
+}
+
+func assertNilGroupPage[T any](t *testing.T, items []T, page PageOutput) {
+	t.Helper()
+	if items == nil || len(items) != 0 {
+		t.Fatalf("items = %#v, want non-nil empty slice", items)
+	}
+	if page.Total != nil || page.Limit != 20 || page.Offset != 20 || page.Count != 0 || page.HasMore {
+		t.Fatalf("page = %#v", page)
 	}
 }

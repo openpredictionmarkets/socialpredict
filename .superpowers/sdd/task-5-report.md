@@ -60,3 +60,31 @@ Formatting/diff validation: `gofmt` applied to all changed Go files; `git diff -
 ## Concerns
 
 None. Focused tests directly exercise bets pagination, grouped service totals, username normalization, and registration; the remaining parallel handlers follow the same reviewed contracts and the full suite passes.
+
+## Fix Review: Nil Grouped Results
+
+Corrected all three grouped handlers so a `nil, nil` service result returns a non-nil empty items slice with normalized pagination metadata and an omitted `total`. A total pointer is now supplied only when the service returns a non-nil result.
+
+### RED
+
+Command:
+
+`GOCACHE=/private/tmp/socialpredict-task5-gocache go test ./internal/mcpserver -run 'Test(ListMarketGroupBets|ListMarketGroupPositions|GetMarketGroupLeaderboard)OmitsTotalForNilServiceResult' -count=1`
+
+Output: FAIL. All three tests reported `PageOutput.Total` as a non-nil pointer for nil service results.
+
+### GREEN
+
+Focused command:
+
+`GOCACHE=/private/tmp/socialpredict-task5-gocache go test ./internal/mcpserver -run 'Test(ListMarketGroupBets|ListMarketGroupPositions|GetMarketGroupLeaderboard)OmitsTotalForNilServiceResult' -count=1`
+
+Output: `ok socialpredict/internal/mcpserver 0.232s`
+
+Package command:
+
+`GOCACHE=/private/tmp/socialpredict-task5-gocache go test ./internal/mcpserver -count=1`
+
+Output: `ok socialpredict/internal/mcpserver 0.218s`
+
+Self-review: each nil branch preserves limit 20, offset 20, count 0, `hasMore: false`, a nil next offset, non-nil empty items, and nil/omitted total. Non-nil results retain their service-provided totals.

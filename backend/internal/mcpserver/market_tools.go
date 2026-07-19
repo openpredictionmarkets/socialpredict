@@ -164,14 +164,14 @@ func (rt *Runtime) ListMarketGroupBets(ctx context.Context, _ *mcp.CallToolReque
 		return nil, PageItems[MarketGroupBetOutput]{}, MapError(err)
 	}
 	rows := []MarketGroupBetOutput{}
-	total := 0
+	var total *int
 	if result != nil {
-		total = result.Total
+		total = &result.Total
 		for _, row := range result.Bets {
 			rows = append(rows, MarketGroupBetOutputFromDomain(row))
 		}
 	}
-	return nil, NewPageItems(rows, page.Limit, page.Offset, &total), nil
+	return nil, NewPageItems(rows, page.Limit, page.Offset, total), nil
 }
 
 func (rt *Runtime) ListMarketGroupPositions(ctx context.Context, _ *mcp.CallToolRequest, in MarketGroupActivityInput) (*mcp.CallToolResult, PageItems[MarketGroupPositionOutput], error) {
@@ -188,14 +188,14 @@ func (rt *Runtime) ListMarketGroupPositions(ctx context.Context, _ *mcp.CallTool
 		return nil, PageItems[MarketGroupPositionOutput]{}, MapError(err)
 	}
 	rows := []MarketGroupPositionOutput{}
-	total := 0
+	var total *int
 	if result != nil {
-		total = result.Total
+		total = &result.Total
 		for _, row := range result.Positions {
 			rows = append(rows, MarketGroupPositionOutputFromDomain(row))
 		}
 	}
-	return nil, NewPageItems(rows, page.Limit, page.Offset, &total), nil
+	return nil, NewPageItems(rows, page.Limit, page.Offset, total), nil
 }
 
 func (rt *Runtime) GetMarketGroupLeaderboard(ctx context.Context, _ *mcp.CallToolRequest, in MarketGroupActivityInput) (*mcp.CallToolResult, PageItems[MarketGroupLeaderboardRowOutput], error) {
@@ -212,12 +212,12 @@ func (rt *Runtime) GetMarketGroupLeaderboard(ctx context.Context, _ *mcp.CallToo
 		return nil, PageItems[MarketGroupLeaderboardRowOutput]{}, MapError(err)
 	}
 	rows := []MarketGroupLeaderboardRowOutput{}
-	total := 0
+	var total *int
 	if result != nil {
-		total = result.Total
+		total = &result.Total
 		for _, row := range result.Leaderboard {
 			rows = append(rows, MarketGroupLeaderboardRowOutputFromDomain(row))
 		}
 	}
-	return nil, NewPageItems(rows, page.Limit, page.Offset, &total), nil
+	return nil, NewPageItems(rows, page.Limit, page.Offset, total), nil
 }
