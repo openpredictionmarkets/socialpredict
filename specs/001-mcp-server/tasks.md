@@ -27,8 +27,8 @@ Web app, backend-only feature: all code under `backend/` per plan.md structure.
 
 **Purpose**: Dependency + package skeleton
 
-- [ ] T001 Add `github.com/modelcontextprotocol/go-sdk` to `backend/go.mod` (`go get`), verify `go build ./...` passes
-- [ ] T002 Create package skeleton `backend/handlers/mcp/` with `server.go` containing package declaration and doc comment describing the read-only MCP transport adapter
+- [X] T001 Add `github.com/modelcontextprotocol/go-sdk` to `backend/go.mod` (`go get`), verify `go build ./...` passes
+- [X] T002 Create package skeleton `backend/handlers/mcp/` with `server.go` containing package declaration and doc comment describing the read-only MCP transport adapter
 
 ---
 
