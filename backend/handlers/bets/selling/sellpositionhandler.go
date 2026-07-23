@@ -125,6 +125,18 @@ func handleSellError(w http.ResponseWriter, err error) {
 		return
 	}
 
+	var projectionErr bets.SaleProjectionNotExecutableError
+	if errors.As(err, &projectionErr) {
+		_ = handlers.WriteFailureWithDetails(
+			w,
+			http.StatusUnprocessableEntity,
+			handlers.ReasonInsufficientShares,
+			bets.ProjectionInexecutableSaleMessage,
+			saleProjectionDetails(projectionErr.Details),
+		)
+		return
+	}
+
 	switch {
 	case errors.Is(err, bets.ErrInvalidOutcome), errors.Is(err, bets.ErrInvalidAmount):
 		_ = handlers.WriteFailure(w, http.StatusBadRequest, handlers.ReasonValidationFailed)
@@ -164,6 +176,21 @@ func handleSellError(w http.ResponseWriter, err error) {
 		_ = handlers.WriteFailure(w, http.StatusNotFound, handlers.ReasonMarketNotFound)
 	default:
 		_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+	}
+}
+
+func saleProjectionDetails(details bets.SaleProjectionDetails) map[string]any {
+	return map[string]any{
+		"outcome":                      details.Outcome,
+		"requestedCredits":             details.RequestedCredits,
+		"positionValue":                details.PositionValue,
+		"positionOutcomeShares":        details.PositionOutcomeShares,
+		"nominalUnlockedValue":         details.NominalUnlockedValue,
+		"nominalUnlockedOutcomeShares": details.NominalUnlockedOutcomeShares,
+		"projectedPositionValue":       details.ProjectedPositionValue,
+		"projectedOutcomeShares":       details.ProjectedOutcomeShares,
+		"executableSaleValue":          details.ExecutableSaleValue,
+		"hint":                         "This Position has value, but the requested Sale Order does not currently reduce the backend-projected position enough to pay credits safely.",
 	}
 }
 
