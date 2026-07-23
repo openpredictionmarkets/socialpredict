@@ -29,7 +29,8 @@
     "start": "vite --host",
     "build": "vite build",
     "build:report": "npm run build && node scripts/report-build-size.mjs",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "test": "vitest run"
   },
   "eslintConfig": {
     "extends": [
@@ -58,10 +59,12 @@
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.4.17",
     "esbuild": "0.28.1",
+    "jsdom": "^29.1.1",
     "path-to-regexp": ">=8.4.0",
     "postcss": "^8.5.14",
     "rollup": ">=4.59.0",
     "tailwindcss": "^3.4.1",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.10"
   }
 }
