@@ -80,5 +80,10 @@ node_modules/
 .config/go/
 .worktrees/
 
+# Agent workflow artifacts
+/.codebase-graph/
+/.superpowers/
+/docs/superpowers/
+
 # Runtime CMS uploads
 /backend/data/uploads/
