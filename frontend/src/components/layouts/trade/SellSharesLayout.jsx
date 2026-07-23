@@ -7,7 +7,7 @@ import {
     submitSale,
 } from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
-import { API_URL } from '../../../config';
+import { fetchTradingFees } from '../../../api/tradeApi';
 import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
 
 const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
@@ -19,14 +19,14 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     const [sharesLoading, setSharesLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [saleQuote, setSaleQuote] = useState(null);
-    const [quoteError, setQuoteError] = useState('');
+    const [quoteError, setQuoteError] = useState(null);
     const [sharesNotice, setSharesNotice] = useState('');
     const [isQuoteLoading, setIsQuoteLoading] = useState(false);
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
     const showFeeSection = !isLoading && Number(feeData?.sellSharesFee) > 0;
-    const maxSaleCredits = Math.max(0, Number(shares.value) || 0);
+    const positionValue = Math.max(0, Number(shares.value) || 0);
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -36,16 +36,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             }
 
             try {
-                const response = await fetch(`${API_URL}/v0/setup`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-                if (!response.ok) {
-                    throw new Error(`Failed to load setup: ${response.status}`);
-                }
-                const data = await response.json();
-                setFeeData(data.betting?.betFees || null);
+                setFeeData(await fetchTradingFees({ token }));
             } catch {
                 setFeeData(null);
             } finally {
@@ -62,7 +53,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             setSelectedOutcome(null);
             setSellAmount(1);
             setSaleQuote(null);
-            setQuoteError('');
+            setQuoteError(null);
             setSharesNotice('');
             return;
         }
@@ -77,10 +68,10 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                 // Set outcome and amount based on shares
                 if (normalized.noSharesOwned > 0 && normalized.yesSharesOwned === 0) {
                     setSelectedOutcome('NO');
-                    setSellAmount(defaultSaleAmount(normalized));
+                    setSellAmount(defaultSaleAmount());
                 } else if (normalized.yesSharesOwned > 0 && normalized.noSharesOwned === 0) {
                     setSelectedOutcome('YES');
-                    setSellAmount(defaultSaleAmount(normalized));
+                    setSellAmount(defaultSaleAmount());
                 } else {
                     setSelectedOutcome(null);
                     setSellAmount(1);
@@ -101,11 +92,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             return;
         }
         setSaleQuote(null);
-        setQuoteError('');
-        if (maxSaleCredits > 0 && newAmount > maxSaleCredits) {
-            setSellAmount(maxSaleCredits);
-            return;
-        }
+        setQuoteError(null);
         setSellAmount(newAmount);
     };
 
@@ -124,7 +111,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
         setSelectedOutcome(outcomeToUse);
         setIsQuoteLoading(true);
-        setQuoteError('');
+        setQuoteError(null);
 
         return fetchSaleQuote(saleData, token)
             .then((quote) => {
@@ -133,7 +120,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             })
             .catch((error) => {
                 setSaleQuote(null);
-                setQuoteError(error.message);
+                setQuoteError(error);
                 return null;
             })
             .finally(() => {
@@ -177,21 +164,21 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     },
                     (error) => {
                         alert(error.message);
+                        setQuoteError(error);
                         setIsSubmitting(false);
                     }
                 );
             })
             .catch((error) => {
                 alert(error.message);
+                setQuoteError(error);
                 setIsSubmitting(false);
             });
     };
 
     const isActionDisabled = sharesLoading || isSubmitting || isQuoteLoading;
     const hasOwnedShares = shares.noSharesOwned > 0 || shares.yesSharesOwned > 0;
-    const sellUnavailableNotice = hasOwnedShares && maxSaleCredits <= 0
-        ? NO_SELLABLE_SHARES_MESSAGE
-        : sharesNotice;
+    const sellUnavailableNotice = sharesNotice;
 
     return (
         <div className="p-6 bg-blue-900 rounded-lg text-white">
@@ -211,7 +198,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     {(shares.noSharesOwned > 0 || shares.yesSharesOwned > 0) && (
                         <div className="text-center text-lg mt-2">
                             <span className="font-bold">Position Value: </span>
-                            <span className="text-green-300">{shares.value}</span>
+                            <span className="text-green-300">{positionValue}</span>
                         </div>
                     )}
                     {sellUnavailableNotice && (
@@ -227,7 +214,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         <SaleInputAmount
                             value={sellAmount}
                             onChange={handleSellAmountChange}
-                            max={maxSaleCredits || 1}
+                            max={undefined}
                             disabled={isActionDisabled}
                         />
                     </div>
@@ -299,8 +286,8 @@ const normalizeShares = (data) => {
     };
 };
 
-const defaultSaleAmount = (normalized) => {
-    return Math.max(1, Number(normalized?.value) || 1);
+const defaultSaleAmount = () => {
+    return 1;
 };
 
 const buildSaleSuccessMessage = (data) => {
@@ -327,9 +314,12 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
     }
 
     if (quoteError) {
+        const message = typeof quoteError === 'string' ? quoteError : quoteError.message;
+        const details = typeof quoteError === 'object' ? quoteError.details : null;
         return (
             <div className="mb-4 rounded-lg border border-red-400 bg-red-950/40 p-3 text-sm text-red-100">
-                {quoteError}
+                <p>{message}</p>
+                <ProjectionErrorDetails details={details} />
             </div>
         );
     }
@@ -400,6 +390,30 @@ const SaleActionGroup = ({ outcome, disabled, isQuoteLoading, onTerms, onSubmit 
             >
                 {isQuoteLoading ? 'Loading Terms' : 'Terms'}
             </button>
+        </div>
+    );
+};
+
+const ProjectionErrorDetails = ({ details }) => {
+    if (!details) {
+        return null;
+    }
+
+    const rows = [
+        ['Position Value', details.positionValue],
+        ['Nominal Unlocked Value', details.nominalUnlockedValue],
+        ['Currently Executable Sale Value', details.executableSaleValue],
+    ].filter(([, value]) => value !== undefined && value !== null);
+
+    if (rows.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {rows.map(([label, value]) => (
+                <QuoteMetric key={label} label={label} value={value} />
+            ))}
         </div>
     );
 };

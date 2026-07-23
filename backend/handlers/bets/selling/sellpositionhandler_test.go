@@ -434,6 +434,95 @@ func TestSellQuoteHandler_InsufficientSharesIncludesUserGuidance(t *testing.T) {
 	}
 }
 
+func TestSellQuoteHandler_ProjectionInexecutableIncludesRequesterOnlyDetails(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{quoteErr: bets.SaleProjectionNotExecutableError{Details: bets.SaleProjectionDetails{
+		Outcome:                      "NO",
+		RequestedCredits:             17,
+		PositionValue:                34,
+		PositionOutcomeShares:        34,
+		NominalUnlockedValue:         17,
+		NominalUnlockedOutcomeShares: 17,
+		ProjectedPositionValue:       34,
+		ProjectedOutcomeShares:       34,
+		ExecutableSaleValue:          0,
+	}}}
+	users := &fakeUsersService{user: &dusers.User{Username: "testuser03"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 1, Amount: 17, Outcome: "NO"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell/quote", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("testuser03"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellQuoteHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, rr.Code)
+	}
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInsufficientShares) {
+		t.Fatalf("expected insufficient-shares reason, got %q", resp.Reason)
+	}
+	if resp.Message != bets.ProjectionInexecutableSaleMessage {
+		t.Fatalf("expected projection message, got %q", resp.Message)
+	}
+	if resp.Details["outcome"] != "NO" ||
+		resp.Details["requestedCredits"] != float64(17) ||
+		resp.Details["positionValue"] != float64(34) ||
+		resp.Details["nominalUnlockedValue"] != float64(17) ||
+		resp.Details["projectedPositionValue"] != float64(34) ||
+		resp.Details["executableSaleValue"] != float64(0) {
+		t.Fatalf("unexpected projection details: %+v", resp.Details)
+	}
+}
+
+func TestSellPositionHandler_ProjectionInexecutableIncludesRequesterOnlyDetails(t *testing.T) {
+	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
+	svc := &fakeSellService{err: bets.SaleProjectionNotExecutableError{Details: bets.SaleProjectionDetails{
+		Outcome:                      "NO",
+		RequestedCredits:             17,
+		PositionValue:                34,
+		PositionOutcomeShares:        34,
+		NominalUnlockedValue:         17,
+		NominalUnlockedOutcomeShares: 17,
+		ProjectedPositionValue:       34,
+		ProjectedOutcomeShares:       34,
+		ExecutableSaleValue:          0,
+	}}}
+	users := &fakeUsersService{user: &dusers.User{Username: "testuser03"}}
+
+	body, _ := json.Marshal(dto.SellBetRequest{MarketID: 1, Amount: 17, Outcome: "NO"})
+	req := httptest.NewRequest(http.MethodPost, "/v0/sell", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+modelstesting.GenerateValidJWT("testuser03"))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	SellPositionHandler(svc, users).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, rr.Code)
+	}
+	var resp handlers.FailureEnvelope
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode failure envelope: %v", err)
+	}
+	if resp.Reason != string(handlers.ReasonInsufficientShares) {
+		t.Fatalf("expected insufficient-shares reason, got %q", resp.Reason)
+	}
+	if resp.Message != bets.ProjectionInexecutableSaleMessage {
+		t.Fatalf("expected projection message, got %q", resp.Message)
+	}
+	if resp.Details["positionOutcomeShares"] != float64(34) ||
+		resp.Details["nominalUnlockedOutcomeShares"] != float64(17) ||
+		resp.Details["projectedOutcomeShares"] != float64(34) {
+		t.Fatalf("unexpected share details: %+v", resp.Details)
+	}
+}
+
 func TestSellPositionHandler_InvalidJSON(t *testing.T) {
 	t.Setenv("JWT_SIGNING_KEY", "test-secret-key-for-testing")
 	svc := &fakeSellService{}

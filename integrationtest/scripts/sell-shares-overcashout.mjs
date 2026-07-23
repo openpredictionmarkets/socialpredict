@@ -8,6 +8,7 @@ const apiPrefix = args['api-prefix'] || '/v0';
 const password = args.password || 'password';
 const moderator = args.moderator || 'testuser01';
 const bettor = args.bettor || 'testuser02';
+const counterparty = args.counterparty || 'testuser03';
 const admin = args.admin || 'admin';
 const artifact = args.artifact || 'integrationtest/artifacts/sell-shares-overcashout-latest.json';
 const keepGoing = Boolean(args['keep-going']);
@@ -38,6 +39,16 @@ const attachmentSetupThroughSeq18 = [
 ];
 
 const attachmentOvercashoutAttempt = { seq: 19, type: 'sell', outcome: 'NO', amount: 507 };
+
+const projectionInexecutableSequence = [
+  { seq: 1, user: 'bettor', type: 'buy', outcome: 'NO', amount: 50 },
+  { seq: 2, user: 'counterparty', type: 'buy', outcome: 'NO', amount: 25 },
+  { seq: 3, user: 'bettor', type: 'sell', outcome: 'NO', amount: 75 },
+  { seq: 4, user: 'bettor', type: 'buy', outcome: 'NO', amount: 75 },
+  { seq: 5, user: 'counterparty', type: 'buy', outcome: 'NO', amount: 10 },
+];
+
+const projectionInexecutableAttempt = { user: 'counterparty', outcome: 'NO', amount: 17 };
 
 function parseArgs(items) {
   const out = {};
@@ -105,6 +116,14 @@ function sameInt(name, got, want) {
 
 function reason(raw) {
   return raw?.data?.reason || raw?.result?.reason || raw?.data?.code || '';
+}
+
+function message(raw) {
+  return raw?.data?.message || raw?.result?.message || '';
+}
+
+function errorDetails(raw) {
+  return raw?.data?.details || raw?.result?.details || {};
 }
 
 function numberField(row, camelName, exportedName) {
@@ -267,6 +286,18 @@ function assertUnchangedAfterRejection(prefix, beforeFinancial, afterFinancial, 
   sameInt(`${prefix} market volume unchanged`, afterDetails.totalVolume || 0, beforeDetails.totalVolume || 0);
 }
 
+function assertProjectionDetails(prefix, raw) {
+  const details = errorDetails(raw);
+  check(`${prefix} includes projection message`, message(raw).includes('Position value exists'), message(raw));
+  check(`${prefix} details include outcome`, details.outcome === 'NO', JSON.stringify(details));
+  check(`${prefix} details include requested credits`, Number(details.requestedCredits) === projectionInexecutableAttempt.amount, JSON.stringify(details));
+  check(`${prefix} details include position value`, Number(details.positionValue) > 0, JSON.stringify(details));
+  check(`${prefix} details include nominal unlocked value`, Number(details.nominalUnlockedValue) > 0, JSON.stringify(details));
+  sameInt(`${prefix} details executable sale value`, details.executableSaleValue, 0);
+  check(`${prefix} details include projected position value`, Number.isFinite(Number(details.projectedPositionValue)), JSON.stringify(details));
+  check(`${prefix} details include projected outcome shares`, Number.isFinite(Number(details.projectedOutcomeShares)), JSON.stringify(details));
+}
+
 async function assertOvercashoutRejected(token, marketId) {
   const beforeFinancial = await financial(bettor);
   const beforePosition = await position(token, marketId);
@@ -295,11 +326,50 @@ async function assertOvercashoutRejected(token, marketId) {
   rejectedSeq = attempt.seq;
 }
 
+async function replayProjectionInexecutableSequence(tokens, marketId) {
+  for (const step of projectionInexecutableSequence) {
+    const token = tokens[step.user];
+    if (step.type === 'buy') {
+      await place(token, marketId, step.outcome, step.amount);
+      continue;
+    }
+    const quote = (await quoteRaw(token, marketId, step.outcome, step.amount)).result;
+    check(`projection setup seq ${step.seq} quote allowed`, quote.allowed === true);
+    const sell = (await sellRaw(token, marketId, step.outcome, step.amount)).result;
+    check(`projection setup seq ${step.seq} sell succeeded`, sell.sharesSold > 0 && sell.netProceeds >= 0, `shares=${sell.sharesSold}, net=${sell.netProceeds}`);
+  }
+}
+
+async function assertProjectionInexecutableRejected({ token, username, marketId }) {
+  const beforeFinancial = await financial(username);
+  const beforePosition = await position(token, marketId);
+  const beforeDetails = await details(marketId);
+
+  check('projection setup has aggregate value', positionValue(beforePosition) > 0, `value=${positionValue(beforePosition)}`);
+  check('projection setup has NO shares', shares(beforePosition, 'NO') > 0, `shares=${shares(beforePosition, 'NO')}`);
+
+  const quote = await quoteRaw(token, marketId, projectionInexecutableAttempt.outcome, projectionInexecutableAttempt.amount, [422]);
+  check('projection-inexecutable quote rejected', quote.status === 422, `status=${quote.status}`);
+  check('projection-inexecutable quote uses insufficient-shares contract', reason(quote) === 'INSUFFICIENT_SHARES', `reason=${reason(quote)}`);
+  assertProjectionDetails('projection-inexecutable quote', quote);
+
+  const sell = await sellRaw(token, marketId, projectionInexecutableAttempt.outcome, projectionInexecutableAttempt.amount, [422]);
+  check('projection-inexecutable sell rejected', sell.status === 422, `status=${sell.status}`);
+  check('projection-inexecutable sell uses insufficient-shares contract', reason(sell) === 'INSUFFICIENT_SHARES', `reason=${reason(sell)}`);
+  assertProjectionDetails('projection-inexecutable sell', sell);
+
+  const afterFinancial = await financial(username);
+  const afterPosition = await position(token, marketId);
+  const afterDetails = await details(marketId);
+  assertUnchangedAfterRejection('projection-inexecutable', beforeFinancial, afterFinancial, beforePosition, afterPosition, beforeDetails, afterDetails);
+}
+
 async function main() {
   const modToken = await login(moderator);
   const bettorToken = await login(bettor);
+  const counterpartyToken = await login(counterparty);
   const adminToken = await login(admin);
-  check('login seeded moderator, bettor, admin', true);
+  check('login seeded moderator, bettor, counterparty, admin', true);
 
   const happyMarketId = await createMarket('happy', modToken, adminToken);
   await place(bettorToken, happyMarketId, 'NO', 50);
@@ -333,6 +403,14 @@ async function main() {
   await replaySetupThroughSeq18(bettorToken, sadMarketId);
   await assertOvercashoutRejected(bettorToken, sadMarketId);
   check('attachment over-cashout sequence was blocked', rejectedSeq === attachmentOvercashoutAttempt.seq, `seq=${rejectedSeq}`);
+
+  const projectionMarketId = await createMarket('projection', modToken, adminToken);
+  await replayProjectionInexecutableSequence({ bettor: bettorToken, counterparty: counterpartyToken }, projectionMarketId);
+  await assertProjectionInexecutableRejected({
+    token: counterpartyToken,
+    username: counterparty,
+    marketId: projectionMarketId,
+  });
 }
 
 async function finish() {

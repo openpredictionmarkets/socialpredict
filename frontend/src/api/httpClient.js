@@ -65,6 +65,8 @@ export const apiRequest = async (
       const error = new Error(getApiErrorMessage(response, data, fallbackMessage, reasonMessages));
       error.status = response.status;
       error.reason = data?.reason || '';
+      error.details = data?.details || null;
+      error.payload = data;
       throw error;
     }
 
