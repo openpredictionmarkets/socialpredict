@@ -63,7 +63,7 @@ func (s *Service) QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteRes
 	}
 	if allowed {
 		bet := req.NewSaleBet(outcome, sale.SharesToSell, s.clock.Now())
-		if err := validateProjectedSale(ctx, s.markets, req, outcome, currentPosition, sale, *bet); err != nil {
+		if err := validateProjectedSale(ctx, s.markets, req, outcome, currentPosition, sellablePosition, sale, *bet); err != nil {
 			return nil, err
 		}
 	}
@@ -97,7 +97,7 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 
 		now := s.clock.Now()
 		bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
-		if err := validateProjectedSale(txCtx, markets, req, outcome, currentPosition, sale, *bet); err != nil {
+		if err := validateProjectedSale(txCtx, markets, req, outcome, currentPosition, sellablePosition, sale, *bet); err != nil {
 			return err
 		}
 		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, netSaleProceeds(sale)); err != nil {
@@ -172,6 +172,7 @@ func validateProjectedSale(
 	req SellRequest,
 	outcome string,
 	current *dmarkets.UserPosition,
+	sellable *dmarkets.UserPosition,
 	sale SaleQuote,
 	saleBet boundary.Bet,
 ) error {
@@ -182,10 +183,10 @@ func validateProjectedSale(
 	if err != nil {
 		return err
 	}
-	return validateSaleProjection(current, projected, outcome, sale)
+	return validateSaleProjection(req, current, sellable, projected, outcome, sale)
 }
 
-func validateSaleProjection(current *dmarkets.UserPosition, projected *dmarkets.UserPosition, outcome string, sale SaleQuote) error {
+func validateSaleProjection(req SellRequest, current *dmarkets.UserPosition, sellable *dmarkets.UserPosition, projected *dmarkets.UserPosition, outcome string, sale SaleQuote) error {
 	if current == nil {
 		return ErrNoPosition
 	}
@@ -202,7 +203,7 @@ func validateSaleProjection(current *dmarkets.UserPosition, projected *dmarkets.
 		return err
 	}
 	if currentSoldShares-projectedSoldShares < sale.SharesToSell {
-		return ErrInsufficientShares
+		return newSaleProjectionNotExecutableError(req, current, sellable, projected, outcome)
 	}
 
 	currentOppositeShares, err := sharesForOutcome(current, oppositeOutcome(outcome))
@@ -214,7 +215,7 @@ func validateSaleProjection(current *dmarkets.UserPosition, projected *dmarkets.
 		return err
 	}
 	if projectedOppositeShares > currentOppositeShares {
-		return ErrInsufficientShares
+		return newSaleProjectionNotExecutableError(req, current, sellable, projected, outcome)
 	}
 
 	maxProjectedValue := current.Value - sale.SaleValue
@@ -222,7 +223,7 @@ func validateSaleProjection(current *dmarkets.UserPosition, projected *dmarkets.
 		maxProjectedValue = 0
 	}
 	if projected.Value > maxProjectedValue {
-		return ErrInsufficientShares
+		return newSaleProjectionNotExecutableError(req, current, sellable, projected, outcome)
 	}
 
 	return nil
@@ -316,6 +317,37 @@ func sharesForOutcome(pos *dmarkets.UserPosition, outcome string) (int64, error)
 	default:
 		return 0, ErrInvalidOutcome
 	}
+}
+
+func newSaleProjectionNotExecutableError(req SellRequest, current *dmarkets.UserPosition, sellable *dmarkets.UserPosition, projected *dmarkets.UserPosition, outcome string) SaleProjectionNotExecutableError {
+	return SaleProjectionNotExecutableError{
+		Details: SaleProjectionDetails{
+			Outcome:                      outcome,
+			RequestedCredits:             req.Amount,
+			PositionValue:                positionValueOrZero(current),
+			PositionOutcomeShares:        sharesForOutcomeOrZero(current, outcome),
+			NominalUnlockedValue:         positionValueOrZero(sellable),
+			NominalUnlockedOutcomeShares: sharesForOutcomeOrZero(sellable, outcome),
+			ProjectedPositionValue:       positionValueOrZero(projected),
+			ProjectedOutcomeShares:       sharesForOutcomeOrZero(projected, outcome),
+			ExecutableSaleValue:          0,
+		},
+	}
+}
+
+func positionValueOrZero(pos *dmarkets.UserPosition) int64 {
+	if pos == nil {
+		return 0
+	}
+	return pos.Value
+}
+
+func sharesForOutcomeOrZero(pos *dmarkets.UserPosition, outcome string) int64 {
+	shares, err := sharesForOutcome(pos, outcome)
+	if err != nil {
+		return 0
+	}
+	return shares
 }
 
 func oppositeOutcome(outcome string) string {

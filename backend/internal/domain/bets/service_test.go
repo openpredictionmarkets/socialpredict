@@ -934,6 +934,86 @@ func TestServiceSell_RejectsProjectedSaleThatKeepsTooMuchValue(t *testing.T) {
 	}
 }
 
+func TestServiceQuoteSell_ProjectionInexecutableSaleIncludesRequesterOnlyDetails(t *testing.T) {
+	now := serviceTestTime()
+	current := &dmarkets.UserPosition{Username: "testuser03", MarketID: 1, NoSharesOwned: 34, Value: 34}
+	sellable := &dmarkets.UserPosition{Username: "testuser03", MarketID: 1, NoSharesOwned: 17, Value: 17}
+	projected := &dmarkets.UserPosition{Username: "testuser03", MarketID: 1, NoSharesOwned: 34, Value: 34}
+	_, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(1),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(current),
+		func(f *serviceFixture) {
+			f.markets.positions.getUserSellablePositionInMarketFunc = func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
+				return sellable, nil
+			}
+		},
+		withFixtureProjection(projected),
+		withFixtureUser(&dusers.User{Username: "testuser03"}),
+	)
+
+	_, err := svc.QuoteSell(context.Background(), bets.SellRequest{Username: "testuser03", MarketID: 1, Amount: 17, Outcome: "NO"})
+	if !errors.Is(err, bets.ErrInsufficientShares) {
+		t.Fatalf("expected ErrInsufficientShares, got %v", err)
+	}
+	var projectionErr bets.SaleProjectionNotExecutableError
+	if !errors.As(err, &projectionErr) {
+		t.Fatalf("expected SaleProjectionNotExecutableError, got %T %v", err, err)
+	}
+	details := projectionErr.Details
+	if details.Outcome != "NO" || details.RequestedCredits != 17 {
+		t.Fatalf("unexpected request details: %+v", details)
+	}
+	if details.PositionValue != 34 || details.PositionOutcomeShares != 34 {
+		t.Fatalf("unexpected current position details: %+v", details)
+	}
+	if details.NominalUnlockedValue != 17 || details.NominalUnlockedOutcomeShares != 17 {
+		t.Fatalf("unexpected nominal unlocked details: %+v", details)
+	}
+	if details.ProjectedPositionValue != 34 || details.ProjectedOutcomeShares != 34 {
+		t.Fatalf("unexpected projection details: %+v", details)
+	}
+	if details.ExecutableSaleValue != 0 {
+		t.Fatalf("expected executable sale value 0, got %+v", details)
+	}
+}
+
+func TestServiceSell_ProjectionInexecutableSaleIncludesDetailsAndDoesNotMutate(t *testing.T) {
+	now := serviceTestTime()
+	current := &dmarkets.UserPosition{Username: "testuser03", MarketID: 1, NoSharesOwned: 34, Value: 34}
+	sellable := &dmarkets.UserPosition{Username: "testuser03", MarketID: 1, NoSharesOwned: 17, Value: 17}
+	projected := &dmarkets.UserPosition{Username: "testuser03", MarketID: 1, NoSharesOwned: 34, Value: 34}
+	fixture, svc := newServiceFixture(
+		now,
+		withFixtureMaxDust(1),
+		withFixtureMarket(&dmarkets.Market{ID: 1, Status: "active", ResolutionDateTime: now.Add(24 * time.Hour)}),
+		withFixturePosition(current),
+		func(f *serviceFixture) {
+			f.markets.positions.getUserSellablePositionInMarketFunc = func(context.Context, int64, string, string) (*dmarkets.UserPosition, error) {
+				return sellable, nil
+			}
+		},
+		withFixtureProjection(projected),
+		withFixtureUser(&dusers.User{Username: "testuser03"}),
+	)
+
+	_, err := svc.Sell(context.Background(), bets.SellRequest{Username: "testuser03", MarketID: 1, Amount: 17, Outcome: "NO"})
+	if !errors.Is(err, bets.ErrInsufficientShares) {
+		t.Fatalf("expected ErrInsufficientShares, got %v", err)
+	}
+	var projectionErr bets.SaleProjectionNotExecutableError
+	if !errors.As(err, &projectionErr) {
+		t.Fatalf("expected SaleProjectionNotExecutableError, got %T %v", err, err)
+	}
+	if projectionErr.Details.PositionValue != 34 || projectionErr.Details.NominalUnlockedValue != 17 || projectionErr.Details.ExecutableSaleValue != 0 {
+		t.Fatalf("unexpected projection details: %+v", projectionErr.Details)
+	}
+	if fixture.repo.created != nil || len(fixture.users.calls) != 0 {
+		t.Fatalf("projection-inexecutable sale must not mutate ledger: repo=%+v users=%+v", fixture.repo.created, fixture.users.calls)
+	}
+}
+
 func TestServiceSell_AttachmentSequenceRejectsOvercashoutBeforeTinyTail(t *testing.T) {
 	now := serviceTestTime()
 	var history []boundary.Bet
