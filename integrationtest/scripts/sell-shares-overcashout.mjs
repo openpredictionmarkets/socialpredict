@@ -288,7 +288,7 @@ function assertUnchangedAfterRejection(prefix, beforeFinancial, afterFinancial, 
 
 function assertProjectionDetails(prefix, raw) {
   const details = errorDetails(raw);
-  check(`${prefix} includes projection message`, message(raw).includes('Position value exists'), message(raw));
+  check(`${prefix} includes projection message`, message(raw).includes('This value is not sellable yet'), message(raw));
   check(`${prefix} details include outcome`, details.outcome === 'NO', JSON.stringify(details));
   check(`${prefix} details include requested credits`, Number(details.requestedCredits) === projectionInexecutableAttempt.amount, JSON.stringify(details));
   check(`${prefix} details include position value`, Number(details.positionValue) > 0, JSON.stringify(details));
@@ -296,6 +296,7 @@ function assertProjectionDetails(prefix, raw) {
   sameInt(`${prefix} details executable sale value`, details.executableSaleValue, 0);
   check(`${prefix} details include projected position value`, Number.isFinite(Number(details.projectedPositionValue)), JSON.stringify(details));
   check(`${prefix} details include projected outcome shares`, Number.isFinite(Number(details.projectedOutcomeShares)), JSON.stringify(details));
+  check(`${prefix} details include sellability hint`, String(details.hint || '').includes('some or all of that value is not sellable yet'), JSON.stringify(details));
 }
 
 async function assertOvercashoutRejected(token, marketId) {

@@ -176,7 +176,9 @@ Expected: FAIL because `bets.SaleProjectionNotExecutableError` does not exist.
 Add this code to `backend/internal/domain/bets/errors.go` after the existing sell message constants:
 
 ```go
-const ProjectionInexecutableSaleMessage = "Position value exists, but this Sale Order is not executable right now. Market accounting requires a sale to reduce your projected position before credits can be paid out. Wait for more market activity, then try again."
+const ProjectionInexecutableSaleMessage = "This value is not sellable yet. Wait for more market activity, then try again."
+
+const ProjectionInexecutableSaleHint = "Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
 
 type SaleProjectionDetails struct {
 	Outcome                       string
@@ -506,7 +508,7 @@ func saleProjectionDetails(details bets.SaleProjectionDetails) map[string]any {
 		"projectedPositionValue":        details.ProjectedPositionValue,
 		"projectedOutcomeShares":        details.ProjectedOutcomeShares,
 		"executableSaleValue":           details.ExecutableSaleValue,
-		"hint":                          "This Position has value, but the requested Sale Order does not currently reduce the backend-projected position enough to pay credits safely.",
+		"hint":                          bets.ProjectionInexecutableSaleHint,
 	}
 }
 ```
@@ -577,7 +579,7 @@ function errorDetails(raw) {
 
 function assertProjectionDetails(prefix, raw) {
   const details = errorDetails(raw);
-  check(`${prefix} includes projection message`, message(raw).includes('Position value exists'), message(raw));
+  check(`${prefix} includes projection message`, message(raw).includes('This value is not sellable yet'), message(raw));
   check(`${prefix} details include outcome`, details.outcome === 'NO', JSON.stringify(details));
   check(`${prefix} details include requested credits`, Number(details.requestedCredits) === projectionInexecutableAttempt.amount, JSON.stringify(details));
   check(`${prefix} details include position value`, Number(details.positionValue) > 0, JSON.stringify(details));
@@ -763,7 +765,7 @@ describe('tradeApi', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       ok: false,
       reason: 'INSUFFICIENT_SHARES',
-      message: 'Position value exists, but this Sale Order is not executable right now.',
+      message: 'This value is not sellable yet. Wait for more market activity, then try again.',
       details: {
         outcome: 'NO',
         requestedCredits: 17,
@@ -782,7 +784,7 @@ describe('tradeApi', () => {
     })).rejects.toMatchObject({
       status: 422,
       reason: 'INSUFFICIENT_SHARES',
-      message: 'Position value exists, but this Sale Order is not executable right now.',
+      message: 'This value is not sellable yet. Wait for more market activity, then try again.',
       details: {
         outcome: 'NO',
         requestedCredits: 17,

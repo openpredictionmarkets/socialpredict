@@ -190,7 +190,7 @@ func saleProjectionDetails(details bets.SaleProjectionDetails) map[string]any {
 		"projectedPositionValue":       details.ProjectedPositionValue,
 		"projectedOutcomeShares":       details.ProjectedOutcomeShares,
 		"executableSaleValue":          details.ExecutableSaleValue,
-		"hint":                         "This Position has value, but the requested Sale Order does not currently reduce the backend-projected position enough to pay credits safely.",
+		"hint":                         bets.ProjectionInexecutableSaleHint,
 	}
 }
 

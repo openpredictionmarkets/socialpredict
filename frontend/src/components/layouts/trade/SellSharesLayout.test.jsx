@@ -11,6 +11,7 @@ describe('ProjectionErrorDetails', () => {
                     positionValue: 34,
                     nominalUnlockedValue: 17,
                     executableSaleValue: 0,
+                    hint: 'Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value.',
                 }}
             />
         );
@@ -22,5 +23,7 @@ describe('ProjectionErrorDetails', () => {
         const executableRow = screen.getByTestId('projection-error-detail-currently-executable-sale-value');
         expect(within(executableRow).getByText('Currently Executable Sale Value').className).toContain('break-words');
         expect(within(executableRow).getByText('0')).not.toBeNull();
+        expect(screen.getByText('More info')).not.toBeNull();
+        expect(screen.getByText(/This protects the market from users immediately cashing out value/)).not.toBeNull();
     });
 });

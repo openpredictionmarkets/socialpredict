@@ -10,7 +10,7 @@ describe('tradeApi', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       ok: false,
       reason: 'INSUFFICIENT_SHARES',
-      message: 'Position value exists, but this Sale Order is not executable right now.',
+      message: 'This value is not sellable yet. Wait for more market activity, then try again.',
       details: {
         outcome: 'NO',
         requestedCredits: 17,
@@ -18,6 +18,7 @@ describe('tradeApi', () => {
         nominalUnlockedValue: 17,
         projectedPositionValue: 34,
         executableSaleValue: 0,
+        hint: 'Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value.',
       },
     }), { status: 422, headers: { 'Content-Type': 'application/json' } })));
 
@@ -29,7 +30,7 @@ describe('tradeApi', () => {
     })).rejects.toMatchObject({
       status: 422,
       reason: 'INSUFFICIENT_SHARES',
-      message: 'Position value exists, but this Sale Order is not executable right now.',
+      message: 'This value is not sellable yet. Wait for more market activity, then try again.',
       details: {
         outcome: 'NO',
         requestedCredits: 17,
@@ -37,6 +38,7 @@ describe('tradeApi', () => {
         nominalUnlockedValue: 17,
         projectedPositionValue: 34,
         executableSaleValue: 0,
+        hint: 'Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value.',
       },
     });
   });

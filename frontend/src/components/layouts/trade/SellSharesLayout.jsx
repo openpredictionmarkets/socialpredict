@@ -410,20 +410,30 @@ export const ProjectionErrorDetails = ({ details }) => {
     }
 
     return (
-        <dl className="mt-3 space-y-2" data-testid="projection-error-details">
-            {rows.map(([label, value]) => (
-                <div
-                    key={label}
-                    data-testid={`projection-error-detail-${label.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="flex items-start justify-between gap-3 rounded-md bg-white/10 px-3 py-2"
-                >
-                    <dt className="min-w-0 break-words text-[0.7rem] uppercase leading-snug opacity-75">
-                        {label}
-                    </dt>
-                    <dd className="shrink-0 text-right font-semibold">{value}</dd>
-                </div>
-            ))}
-        </dl>
+        <div className="mt-3 space-y-2" data-testid="projection-error-details">
+            {details.hint && (
+                <details className="rounded-md bg-white/10 px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-red-50">
+                        More info
+                    </summary>
+                    <p className="mt-2 text-xs leading-relaxed text-red-50/90">{details.hint}</p>
+                </details>
+            )}
+            <dl className="space-y-2">
+                {rows.map(([label, value]) => (
+                    <div
+                        key={label}
+                        data-testid={`projection-error-detail-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                        className="flex items-start justify-between gap-3 rounded-md bg-white/10 px-3 py-2"
+                    >
+                        <dt className="min-w-0 break-words text-[0.7rem] uppercase leading-snug opacity-75">
+                            {label}
+                        </dt>
+                        <dd className="shrink-0 text-right font-semibold">{value}</dd>
+                    </div>
+                ))}
+            </dl>
+        </div>
     );
 };
 

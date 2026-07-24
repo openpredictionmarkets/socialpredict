@@ -65,7 +65,7 @@ The handler should continue returning the existing error reason:
 {
   "ok": false,
   "reason": "INSUFFICIENT_SHARES",
-  "message": "Position value exists, but this Sale Order is not executable right now. Market accounting requires a sale to reduce your projected position before credits can be paid out. Wait for more market activity, then try again.",
+  "message": "This value is not sellable yet. Wait for more market activity, then try again.",
   "details": {
     "outcome": "NO",
     "requestedCredits": 17,
@@ -76,7 +76,7 @@ The handler should continue returning the existing error reason:
     "projectedPositionValue": 34,
     "projectedOutcomeShares": 34,
     "executableSaleValue": 0,
-    "hint": "This Position has value, but the requested Sale Order does not currently reduce the backend-projected position enough to pay credits safely."
+    "hint": "Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
   }
 }
 ```
