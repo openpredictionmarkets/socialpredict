@@ -75,6 +75,65 @@ func (s *Service) GetMarketSummaryReadModel(ctx context.Context, marketID int64)
 	}, nil
 }
 
+// GetMarketDiscoverySummaries assembles display summaries for hydrated
+// discovery markets from batched repository reads.
+func (s *Service) GetMarketDiscoverySummaries(
+	ctx context.Context,
+	input []*Market,
+) (map[int64]*MarketSummaryReadModel, error) {
+	repo, ok := s.repo.(MarketDiscoveryEnrichmentRepository)
+	if !ok {
+		return nil, ErrInvalidState
+	}
+
+	marketsByID := map[int64]*Market{}
+	marketIDs := make([]int64, 0, len(input))
+	creators := make([]string, 0, len(input))
+	for _, market := range input {
+		if market == nil || market.ID <= 0 {
+			continue
+		}
+		if _, exists := marketsByID[market.ID]; exists {
+			continue
+		}
+		marketsByID[market.ID] = market
+		marketIDs = append(marketIDs, market.ID)
+		creators = append(creators, market.CreatorUsername)
+	}
+
+	enrichment, err := repo.GetMarketDiscoveryEnrichment(ctx, marketIDs, creators)
+	if err != nil {
+		return nil, err
+	}
+	if enrichment == nil {
+		return nil, ErrInvalidState
+	}
+
+	out := make(map[int64]*MarketSummaryReadModel, len(marketsByID))
+	for _, marketID := range marketIDs {
+		market := marketsByID[marketID]
+		accounting, found := enrichment.AccountingByMarketID[marketID]
+		if !found {
+			refreshed, err := s.RefreshMarketAccountingSnapshot(ctx, marketID)
+			if err != nil {
+				return nil, err
+			}
+			accounting = *refreshed
+		}
+
+		creator := CreatorSummary{Username: market.CreatorUsername}
+		if enriched, found := enrichment.CreatorsByUsername[market.CreatorUsername]; found {
+			creator = enriched
+		}
+		out[marketID] = &MarketSummaryReadModel{
+			Market:     market,
+			Creator:    &creator,
+			Accounting: accounting,
+		}
+	}
+	return out, nil
+}
+
 // MarkMarketAccountingSnapshotStale marks a market accounting read model stale
 // after canonical market activity. It does not update market/bet truth.
 func (s *Service) MarkMarketAccountingSnapshotStale(ctx context.Context, marketID int64, reason string) error {

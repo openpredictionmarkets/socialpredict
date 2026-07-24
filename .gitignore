@@ -78,7 +78,13 @@ node_modules/
 .go-run-cache/
 .tmp/
 .config/go/
+.worktrees/
 __pycache__/
+
+# Agent workflow artifacts
+/.codebase-graph/
+/.superpowers/
+/docs/superpowers/
 
 # Runtime CMS uploads
 /backend/data/uploads/

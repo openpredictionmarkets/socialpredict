@@ -2,6 +2,7 @@ package markets_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -149,6 +150,108 @@ func TestServiceGetMarketSummaryReadModelComputesMissingSnapshotOnce(t *testing.
 	if stored == nil {
 		t.Fatalf("expected missing snapshot to be stored after first summary read")
 	}
+}
+
+func TestServiceGetMarketDiscoverySummariesDeduplicatesAndPreservesHydratedMarkets(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	baseRepo := rmarkets.NewGormRepository(db)
+	repo := &recordingDiscoveryEnrichmentRepo{
+		GormRepository: baseRepo,
+		enrichment: &markets.MarketDiscoveryEnrichment{
+			AccountingByMarketID: map[int64]markets.MarketAccountingSnapshot{
+				8101: {MarketID: 8101, VolumeWithDust: 101},
+				8102: {MarketID: 8102, VolumeWithDust: 202},
+			},
+			CreatorsByUsername: map[string]markets.CreatorSummary{
+				"alice": {Username: "alice", DisplayName: "Alice"},
+				"bob":   {Username: "bob", DisplayName: "Bob"},
+			},
+		},
+	}
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(marketsTestTime()), markets.Config{})
+	marketA := &markets.Market{ID: 8101, CreatorUsername: "alice", QuestionTitle: "A"}
+	marketB := &markets.Market{ID: 8102, CreatorUsername: "bob", QuestionTitle: "B"}
+
+	got, err := service.GetMarketDiscoverySummaries(context.Background(), []*markets.Market{marketA, marketB, marketA, nil})
+	if err != nil {
+		t.Fatalf("GetMarketDiscoverySummaries returned error: %v", err)
+	}
+	if len(repo.marketIDs) != 2 || repo.marketIDs[0] != marketA.ID || repo.marketIDs[1] != marketB.ID {
+		t.Fatalf("market IDs = %#v, want [%d %d]", repo.marketIDs, marketA.ID, marketB.ID)
+	}
+	if len(repo.creatorUsernames) != 2 || repo.creatorUsernames[0] != "alice" || repo.creatorUsernames[1] != "bob" {
+		t.Fatalf("creator usernames = %#v", repo.creatorUsernames)
+	}
+	if got[marketA.ID].Market != marketA {
+		t.Fatalf("service replaced hydrated market")
+	}
+	if got[marketA.ID].Creator.DisplayName != "Alice" {
+		t.Fatalf("creator = %#v", got[marketA.ID].Creator)
+	}
+}
+
+func TestServiceGetMarketDiscoverySummariesRefreshesMissingSnapshotOnce(t *testing.T) {
+	service, db, _ := setupServiceWithDB(t)
+	ctx := context.Background()
+	creator := modelstesting.GenerateUser("batch_missing_creator", 0)
+	if err := db.Create(&creator).Error; err != nil {
+		t.Fatalf("create creator: %v", err)
+	}
+	dbMarket := modelstesting.GenerateMarket(8103, creator.Username)
+	if err := db.Create(&dbMarket).Error; err != nil {
+		t.Fatalf("create market: %v", err)
+	}
+	bet := modelstesting.GenerateBet(75, "YES", "alice", uint(dbMarket.ID), time.Minute)
+	if err := db.Create(&bet).Error; err != nil {
+		t.Fatalf("create bet: %v", err)
+	}
+	market := &markets.Market{ID: dbMarket.ID, CreatorUsername: dbMarket.CreatorUsername}
+
+	first, err := service.GetMarketDiscoverySummaries(ctx, []*markets.Market{market})
+	if err != nil {
+		t.Fatalf("first discovery summaries: %v", err)
+	}
+	second, err := service.GetMarketDiscoverySummaries(ctx, []*markets.Market{market})
+	if err != nil {
+		t.Fatalf("second discovery summaries: %v", err)
+	}
+	if first[market.ID].Accounting.BetCount != 1 || first[market.ID].Accounting.VolumeWithDust != 75 {
+		t.Fatalf("first accounting = %#v", first[market.ID].Accounting)
+	}
+	if !second[market.ID].Accounting.GeneratedAt.Equal(first[market.ID].Accounting.GeneratedAt) {
+		t.Fatalf("snapshot refreshed twice: first=%s second=%s", first[market.ID].Accounting.GeneratedAt, second[market.ID].Accounting.GeneratedAt)
+	}
+}
+
+func TestServiceGetMarketDiscoverySummariesPropagatesRepositoryError(t *testing.T) {
+	errBatch := errors.New("batch failed")
+	repo := &recordingDiscoveryEnrichmentRepo{
+		GormRepository: rmarkets.NewGormRepository(modelstesting.NewFakeDB(t)),
+		err:            errBatch,
+	}
+	service := markets.NewService(repo, newNoopUserService(), newFixedClock(marketsTestTime()), markets.Config{})
+	_, err := service.GetMarketDiscoverySummaries(context.Background(), []*markets.Market{{ID: 8104, CreatorUsername: "alice"}})
+	if !errors.Is(err, errBatch) {
+		t.Fatalf("error = %v, want %v", err, errBatch)
+	}
+}
+
+type recordingDiscoveryEnrichmentRepo struct {
+	*rmarkets.GormRepository
+	marketIDs        []int64
+	creatorUsernames []string
+	enrichment       *markets.MarketDiscoveryEnrichment
+	err              error
+}
+
+func (r *recordingDiscoveryEnrichmentRepo) GetMarketDiscoveryEnrichment(
+	_ context.Context,
+	marketIDs []int64,
+	creatorUsernames []string,
+) (*markets.MarketDiscoveryEnrichment, error) {
+	r.marketIDs = append([]int64(nil), marketIDs...)
+	r.creatorUsernames = append([]string(nil), creatorUsernames...)
+	return r.enrichment, r.err
 }
 
 func TestServiceRefreshMarketAccountingSnapshotRequiresSnapshotRepository(t *testing.T) {

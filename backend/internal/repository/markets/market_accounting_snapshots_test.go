@@ -137,6 +137,71 @@ func TestGormRepositoryMarketAccountingSnapshotCanBeMarkedStaleAndRefreshed(t *t
 	}
 }
 
+func TestGormRepositoryGetMarketDiscoveryEnrichmentBatchesSnapshotsAndCreators(t *testing.T) {
+	db := modelstesting.NewFakeDB(t)
+	repo := NewGormRepository(db)
+	ctx := context.Background()
+
+	creatorA := modelstesting.GenerateUser("batch_creator_a", 0)
+	creatorB := modelstesting.GenerateUser("batch_creator_b", 0)
+	if err := db.Create(&creatorA).Error; err != nil {
+		t.Fatalf("create creator A: %v", err)
+	}
+	if err := db.Create(&creatorB).Error; err != nil {
+		t.Fatalf("create creator B: %v", err)
+	}
+
+	marketA := modelstesting.GenerateMarket(7101, creatorA.Username)
+	marketB := modelstesting.GenerateMarket(7102, creatorB.Username)
+	if err := db.Create(&marketA).Error; err != nil {
+		t.Fatalf("create market A: %v", err)
+	}
+	if err := db.Create(&marketB).Error; err != nil {
+		t.Fatalf("create market B: %v", err)
+	}
+
+	snapshotA := dmarkets.MarketAccountingSnapshot{MarketID: marketA.ID, VolumeWithDust: 101}
+	snapshotB := dmarkets.MarketAccountingSnapshot{MarketID: marketB.ID, VolumeWithDust: 202}
+	if err := repo.UpsertMarketAccountingSnapshot(ctx, snapshotA); err != nil {
+		t.Fatalf("upsert snapshot A: %v", err)
+	}
+	if err := repo.UpsertMarketAccountingSnapshot(ctx, snapshotB); err != nil {
+		t.Fatalf("upsert snapshot B: %v", err)
+	}
+
+	got, err := repo.GetMarketDiscoveryEnrichment(
+		ctx,
+		[]int64{marketA.ID, marketB.ID, marketA.ID, 0},
+		[]string{creatorA.Username, creatorB.Username, creatorA.Username, " "},
+	)
+	if err != nil {
+		t.Fatalf("GetMarketDiscoveryEnrichment returned error: %v", err)
+	}
+	if len(got.AccountingByMarketID) != 2 {
+		t.Fatalf("accounting count = %d, want 2", len(got.AccountingByMarketID))
+	}
+	if got.AccountingByMarketID[marketA.ID].VolumeWithDust != snapshotA.VolumeWithDust {
+		t.Fatalf("market A accounting = %#v", got.AccountingByMarketID[marketA.ID])
+	}
+	if len(got.CreatorsByUsername) != 2 {
+		t.Fatalf("creator count = %d, want 2", len(got.CreatorsByUsername))
+	}
+	if got.CreatorsByUsername[creatorA.Username].DisplayName != creatorA.DisplayName {
+		t.Fatalf("creator A = %#v", got.CreatorsByUsername[creatorA.Username])
+	}
+}
+
+func TestGormRepositoryGetMarketDiscoveryEnrichmentReturnsStableEmptyMaps(t *testing.T) {
+	repo := NewGormRepository(modelstesting.NewFakeDB(t))
+	got, err := repo.GetMarketDiscoveryEnrichment(context.Background(), nil, nil)
+	if err != nil {
+		t.Fatalf("empty enrichment returned error: %v", err)
+	}
+	if got == nil || got.AccountingByMarketID == nil || got.CreatorsByUsername == nil {
+		t.Fatalf("empty enrichment = %#v", got)
+	}
+}
+
 func assertAccountingSnapshotEqual(t *testing.T, got *dmarkets.MarketAccountingSnapshot, want dmarkets.MarketAccountingSnapshot) {
 	t.Helper()
 	if got == nil {
