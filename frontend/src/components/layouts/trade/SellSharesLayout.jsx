@@ -394,7 +394,7 @@ const SaleActionGroup = ({ outcome, disabled, isQuoteLoading, onTerms, onSubmit 
     );
 };
 
-const ProjectionErrorDetails = ({ details }) => {
+export const ProjectionErrorDetails = ({ details }) => {
     if (!details) {
         return null;
     }
@@ -410,11 +410,20 @@ const ProjectionErrorDetails = ({ details }) => {
     }
 
     return (
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <dl className="mt-3 space-y-2" data-testid="projection-error-details">
             {rows.map(([label, value]) => (
-                <QuoteMetric key={label} label={label} value={value} />
+                <div
+                    key={label}
+                    data-testid={`projection-error-detail-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                    className="flex items-start justify-between gap-3 rounded-md bg-white/10 px-3 py-2"
+                >
+                    <dt className="min-w-0 break-words text-[0.7rem] uppercase leading-snug opacity-75">
+                        {label}
+                    </dt>
+                    <dd className="shrink-0 text-right font-semibold">{value}</dd>
+                </div>
             ))}
-        </div>
+        </dl>
     );
 };
 
