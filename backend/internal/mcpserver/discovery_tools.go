@@ -200,9 +200,13 @@ func (rt *Runtime) discoveryRows(ctx context.Context, page *dmarkets.MarketDisco
 	return rows, &total, err
 }
 func (rt *Runtime) discoveryRowOutputs(ctx context.Context, rows []dmarkets.MarketDiscoveryRow) ([]DiscoveryRowOutput, error) {
+	summaries, err := rt.markets.GetMarketDiscoverySummaries(ctx, discoveryMarkets(rows))
+	if err != nil {
+		return nil, err
+	}
 	out := make([]DiscoveryRowOutput, 0, len(rows))
 	for _, row := range rows {
-		enriched, err := rt.discoveryRowOutput(ctx, row)
+		enriched, err := discoveryRowOutput(row, summaries)
 		if err != nil {
 			return nil, err
 		}
@@ -210,9 +214,41 @@ func (rt *Runtime) discoveryRowOutputs(ctx context.Context, rows []dmarkets.Mark
 	}
 	return out, nil
 }
-func (rt *Runtime) discoveryRowOutput(ctx context.Context, row dmarkets.MarketDiscoveryRow) (DiscoveryRowOutput, error) {
+
+func discoveryMarkets(rows []dmarkets.MarketDiscoveryRow) []*dmarkets.Market {
+	out := make([]*dmarkets.Market, 0, len(rows))
+	seen := map[int64]struct{}{}
+	add := func(market *dmarkets.Market) {
+		if market == nil || market.ID <= 0 {
+			return
+		}
+		if _, ok := seen[market.ID]; ok {
+			return
+		}
+		seen[market.ID] = struct{}{}
+		out = append(out, market)
+	}
+	for _, row := range rows {
+		if row.Group != nil && row.Group.ID > 0 {
+			for _, child := range row.Children {
+				add(child)
+			}
+			if len(row.Children) == 0 {
+				add(row.Market)
+			}
+			continue
+		}
+		add(row.Market)
+	}
+	return out
+}
+
+func discoveryRowOutput(
+	row dmarkets.MarketDiscoveryRow,
+	summaries map[int64]*dmarkets.MarketSummaryReadModel,
+) (DiscoveryRowOutput, error) {
 	if row.Group == nil || row.Group.ID <= 0 {
-		overview, err := rt.marketOverviewOutput(ctx, row.Market)
+		overview, err := marketOverviewOutput(row.Market, nil, summaries)
 		if err != nil {
 			return DiscoveryRowOutput{}, err
 		}
@@ -224,7 +260,7 @@ func (rt *Runtime) discoveryRowOutput(ctx context.Context, row dmarkets.MarketDi
 	}
 	out := DiscoveryRowOutput{IsMarketGroup: true, Group: MarketGroupOutputFromDomain(row.Group), ChildMarkets: []MarketOverviewOutput{}}
 	for _, child := range children {
-		overview, err := rt.marketOverviewOutput(ctx, child)
+		overview, err := marketOverviewOutput(child, row.Group, summaries)
 		if err != nil {
 			return DiscoveryRowOutput{}, err
 		}
@@ -234,16 +270,21 @@ func (rt *Runtime) discoveryRowOutput(ctx context.Context, row dmarkets.MarketDi
 	}
 	return out, nil
 }
-func (rt *Runtime) marketOverviewOutput(ctx context.Context, market *dmarkets.Market) (MarketOverviewOutput, error) {
+
+func marketOverviewOutput(
+	market *dmarkets.Market,
+	group *dmarkets.MarketGroup,
+	summaries map[int64]*dmarkets.MarketSummaryReadModel,
+) (MarketOverviewOutput, error) {
 	if market == nil || market.ID <= 0 {
 		return MarketOverviewOutputFromDomain(&dmarkets.MarketOverview{Market: market}), nil
 	}
-	summary, err := rt.markets.GetMarketSummaryReadModel(ctx, market.ID)
-	if err != nil {
-		return MarketOverviewOutput{}, err
+	summary, ok := summaries[market.ID]
+	if !ok || summary == nil {
+		return MarketOverviewOutput{}, dmarkets.ErrInvalidState
 	}
-	out := MarketOverviewOutputFromDomain(&dmarkets.MarketOverview{Market: summary.Market, Creator: summary.Creator, LastProbability: summary.Accounting.LastProbability, NumUsers: summary.Accounting.UserCount, TotalVolume: summary.Accounting.VolumeWithDust, MarketDust: summary.Accounting.MarketDust})
-	if group, err := rt.markets.GetMarketGroupForMarket(ctx, market.ID); err == nil && group != nil {
+	out := MarketOverviewOutputFromDomain(&dmarkets.MarketOverview{Market: market, Creator: summary.Creator, LastProbability: summary.Accounting.LastProbability, NumUsers: summary.Accounting.UserCount, TotalVolume: summary.Accounting.VolumeWithDust, MarketDust: summary.Accounting.MarketDust})
+	if group != nil {
 		out.Market.MarketGroup = MarketGroupLinkOutputFromDomain(group, market.ID)
 	}
 	return out, nil

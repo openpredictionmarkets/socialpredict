@@ -14,6 +14,7 @@ type MarketService interface {
 	ListMarketTags(context.Context, bool) ([]dmarkets.MarketTag, error)
 	ListMarketDiscovery(context.Context, dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error)
 	SearchMarketDiscovery(context.Context, string, dmarkets.SearchFilters) (*dmarkets.MarketDiscoverySearchResults, error)
+	GetMarketDiscoverySummaries(context.Context, []*dmarkets.Market) (map[int64]*dmarkets.MarketSummaryReadModel, error)
 	GetMarketDetails(context.Context, int64) (*dmarkets.MarketOverview, error)
 	GetMarketSummaryReadModel(context.Context, int64) (*dmarkets.MarketSummaryReadModel, error)
 	GetMarketGroupOverview(context.Context, int64) (*dmarkets.MarketGroupOverview, error)

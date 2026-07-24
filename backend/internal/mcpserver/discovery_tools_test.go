@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -18,6 +19,12 @@ type discoveryToolMarketService struct {
 	searchQuery   string
 	searchFilters dmarkets.SearchFilters
 	summaries     map[int64]*dmarkets.MarketSummaryReadModel
+	listPage      *dmarkets.MarketDiscoveryPage
+	batchCalls    int
+	batchMarkets  []*dmarkets.Market
+	batchErr      error
+	summaryCalls  int
+	groupCalls    int
 }
 
 func (s *discoveryToolMarketService) ListMarketTags(context.Context, bool) ([]dmarkets.MarketTag, error) {
@@ -25,6 +32,9 @@ func (s *discoveryToolMarketService) ListMarketTags(context.Context, bool) ([]dm
 }
 func (s *discoveryToolMarketService) ListMarketDiscovery(_ context.Context, filters dmarkets.ListFilters) (*dmarkets.MarketDiscoveryPage, error) {
 	s.listFilters = filters
+	if s.listPage != nil {
+		return s.listPage, nil
+	}
 	return &dmarkets.MarketDiscoveryPage{Rows: []dmarkets.MarketDiscoveryRow{{Market: &dmarkets.Market{ID: 1, QuestionTitle: "One", Status: dmarkets.MarketStatusActive}}}, Total: 1}, nil
 }
 func (s *discoveryToolMarketService) SearchMarketDiscovery(_ context.Context, query string, filters dmarkets.SearchFilters) (*dmarkets.MarketDiscoverySearchResults, error) {
@@ -32,10 +42,40 @@ func (s *discoveryToolMarketService) SearchMarketDiscovery(_ context.Context, qu
 	return &dmarkets.MarketDiscoverySearchResults{Query: query, PrimaryStatus: filters.Status, PrimaryRows: []dmarkets.MarketDiscoveryRow{{Market: &dmarkets.Market{ID: 2, QuestionTitle: "Two", Status: filters.Status}}}, PrimaryCount: 1, TotalCount: 1}, nil
 }
 func (s *discoveryToolMarketService) GetMarketSummaryReadModel(_ context.Context, marketID int64) (*dmarkets.MarketSummaryReadModel, error) {
+	s.summaryCalls++
 	if s.summaries != nil && s.summaries[marketID] != nil {
 		return s.summaries[marketID], nil
 	}
 	return &dmarkets.MarketSummaryReadModel{Market: &dmarkets.Market{ID: marketID, QuestionTitle: "Summary", Status: dmarkets.MarketStatusActive}, Accounting: dmarkets.MarketAccountingSnapshot{MarketID: marketID, LastProbability: .5, VolumeWithDust: 100, MarketDust: 3}}, nil
+}
+func (s *discoveryToolMarketService) GetMarketDiscoverySummaries(
+	_ context.Context,
+	markets []*dmarkets.Market,
+) (map[int64]*dmarkets.MarketSummaryReadModel, error) {
+	s.batchCalls++
+	s.batchMarkets = append([]*dmarkets.Market(nil), markets...)
+	if s.batchErr != nil {
+		return nil, s.batchErr
+	}
+	out := map[int64]*dmarkets.MarketSummaryReadModel{}
+	for _, market := range markets {
+		out[market.ID] = s.summaryFor(market)
+	}
+	return out, nil
+}
+func (s *discoveryToolMarketService) summaryFor(market *dmarkets.Market) *dmarkets.MarketSummaryReadModel {
+	if s.summaries != nil && s.summaries[market.ID] != nil {
+		return s.summaries[market.ID]
+	}
+	return &dmarkets.MarketSummaryReadModel{
+		Market: market,
+		Accounting: dmarkets.MarketAccountingSnapshot{
+			MarketID:        market.ID,
+			LastProbability: .5,
+			VolumeWithDust:  100,
+			MarketDust:      3,
+		},
+	}
 }
 
 func TestListMarketTagsReturnsActiveTags(t *testing.T) {
@@ -79,6 +119,55 @@ func TestListMarketsUsesDiscoveryWithOpenAliasAndPagination(t *testing.T) {
 	}
 }
 
+func TestListMarketsUsesSingleBatchEnrichmentAndRowGroupLinks(t *testing.T) {
+	childA := &dmarkets.Market{ID: 11, QuestionTitle: "A", Status: dmarkets.MarketStatusActive}
+	childB := &dmarkets.Market{ID: 12, QuestionTitle: "B", Status: dmarkets.MarketStatusActive}
+	group := &dmarkets.MarketGroup{
+		ID:              9,
+		QuestionTitle:   "Group",
+		LifecycleStatus: dmarkets.MarketLifecyclePublished,
+		Members: []dmarkets.MarketGroupMember{
+			{MarketID: childA.ID, AnswerLabel: "A", DisplayOrder: 1},
+			{MarketID: childB.ID, AnswerLabel: "B", DisplayOrder: 2},
+		},
+	}
+	svc := &discoveryToolMarketService{
+		listPage: &dmarkets.MarketDiscoveryPage{
+			Rows:  []dmarkets.MarketDiscoveryRow{{Market: childA, Group: group, Children: []*dmarkets.Market{childA, childB}}},
+			Total: 1,
+		},
+	}
+
+	_, got, err := NewRuntime(svc, nil).ListMarkets(context.Background(), nil, MarketListInput{})
+	if err != nil {
+		t.Fatalf("ListMarkets returned error: %v", err)
+	}
+	if svc.batchCalls != 1 {
+		t.Fatalf("batch calls = %d, want 1", svc.batchCalls)
+	}
+	if svc.summaryCalls != 0 || svc.groupCalls != 0 {
+		t.Fatalf("per-market calls: summary=%d group=%d, want 0", svc.summaryCalls, svc.groupCalls)
+	}
+	if len(svc.batchMarkets) != 2 {
+		t.Fatalf("batch markets = %#v, want 2", svc.batchMarkets)
+	}
+	link := got.Results.Items[0].ChildMarkets[0].Market.MarketGroup
+	if link == nil || link.ID != group.ID || link.AnswerLabel != "A" {
+		t.Fatalf("group link = %#v", link)
+	}
+}
+
+func TestListMarketsMapsBatchEnrichmentError(t *testing.T) {
+	svc := &discoveryToolMarketService{batchErr: errors.New("batch failed")}
+	_, _, err := NewRuntime(svc, nil).ListMarkets(context.Background(), nil, MarketListInput{})
+	if err == nil {
+		t.Fatalf("ListMarkets returned nil error")
+	}
+	if got := MapError(err); got.Code != "internal_error" {
+		t.Fatalf("error = %#v, want internal_error", got)
+	}
+}
+
 func TestSearchMarketsPreservesFallbackMetadata(t *testing.T) {
 	svc := &discoveryToolMarketService{}
 	_, got, err := NewRuntime(svc, nil).SearchMarkets(context.Background(), &mcp.CallToolRequest{}, MarketSearchInput{Query: "rain", Status: "resolved"})
@@ -116,6 +205,7 @@ func (s *discoveryToolMarketService) GetMarketGroupOverview(context.Context, int
 	return nil, dmarkets.ErrInvalidInput
 }
 func (s *discoveryToolMarketService) GetMarketGroupForMarket(context.Context, int64) (*dmarkets.MarketGroup, error) {
+	s.groupCalls++
 	return nil, nil
 }
 func (s *discoveryToolMarketService) GetMarketBetsPage(context.Context, int64, dmarkets.Page) ([]*dmarkets.BetDisplayInfo, error) {
