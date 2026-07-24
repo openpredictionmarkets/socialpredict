@@ -477,7 +477,7 @@ func TestSellQuoteHandler_ProjectionInexecutableIncludesRequesterOnlyDetails(t *
 		resp.Details["nominalUnlockedValue"] != float64(17) ||
 		resp.Details["projectedPositionValue"] != float64(34) ||
 		resp.Details["executableSaleValue"] != float64(0) ||
-		resp.Details["hint"] != "Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value." {
+		resp.Details["hint"] != "Your position still has value but is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value." {
 		t.Fatalf("unexpected projection details: %+v", resp.Details)
 	}
 }
@@ -522,7 +522,7 @@ func TestSellPositionHandler_ProjectionInexecutableIncludesRequesterOnlyDetails(
 	if resp.Details["positionOutcomeShares"] != float64(34) ||
 		resp.Details["nominalUnlockedOutcomeShares"] != float64(17) ||
 		resp.Details["projectedOutcomeShares"] != float64(34) ||
-		resp.Details["hint"] != "Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value." {
+		resp.Details["hint"] != "Your position still has value but is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value." {
 		t.Fatalf("unexpected share details: %+v", resp.Details)
 	}
 }

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ProjectionErrorDetails, SaleQuotePanel } from './SellSharesLayout';
 
 const primaryMessage = 'This value is not sellable yet. Wait for more market activity, then try again.';
-const moreInfoMessage = 'Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value.';
+const moreInfoMessage = 'Your position still has value but is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value.';
 
 describe('ProjectionErrorDetails', () => {
     it('renders projection values as stacked rows so long labels do not overlap in narrow dialogs', () => {

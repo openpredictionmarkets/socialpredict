@@ -58,7 +58,7 @@ const InsufficientSellableSharesMessage = "Not enough sellable shares for that s
 
 const ProjectionInexecutableSaleMessage = "This value is not sellable yet. Wait for more market activity, then try again."
 
-const ProjectionInexecutableSaleHint = "Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
+const ProjectionInexecutableSaleHint = "Your position still has value but is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
 
 // SaleProjectionDetails exposes requester-only values explaining why a Sale
 // Order failed the backend projection invariant.

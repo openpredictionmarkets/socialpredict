@@ -296,7 +296,7 @@ function assertProjectionDetails(prefix, raw) {
   sameInt(`${prefix} details executable sale value`, details.executableSaleValue, 0);
   check(`${prefix} details include projected position value`, Number.isFinite(Number(details.projectedPositionValue)), JSON.stringify(details));
   check(`${prefix} details include projected outcome shares`, Number.isFinite(Number(details.projectedOutcomeShares)), JSON.stringify(details));
-  check(`${prefix} details include sellability hint`, String(details.hint || '').includes('some or all of that value is not sellable yet'), JSON.stringify(details));
+  check(`${prefix} details include sellability hint`, String(details.hint || '').includes('not sellable yet'), JSON.stringify(details));
 }
 
 async function assertOvercashoutRejected(token, marketId) {

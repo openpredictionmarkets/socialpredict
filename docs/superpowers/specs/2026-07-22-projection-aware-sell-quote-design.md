@@ -76,7 +76,7 @@ The handler should continue returning the existing error reason:
     "projectedPositionValue": 34,
     "projectedOutcomeShares": 34,
     "executableSaleValue": 0,
-    "hint": "Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
+    "hint": "Your position still has value but is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
   }
 }
 ```

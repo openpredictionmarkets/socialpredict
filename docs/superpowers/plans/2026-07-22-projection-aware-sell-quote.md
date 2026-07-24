@@ -178,7 +178,7 @@ Add this code to `backend/internal/domain/bets/errors.go` after the existing sel
 ```go
 const ProjectionInexecutableSaleMessage = "This value is not sellable yet. Wait for more market activity, then try again."
 
-const ProjectionInexecutableSaleHint = "Your position still has value, but some or all of that value is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
+const ProjectionInexecutableSaleHint = "Your position still has value but is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
 
 type SaleProjectionDetails struct {
 	Outcome                       string
