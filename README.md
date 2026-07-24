@@ -9,8 +9,8 @@
 
 [release-img]: https://img.shields.io/github/v/release/openpredictionmarkets/socialpredict?label=release
 [release]: https://github.com/openpredictionmarkets/socialpredict/releases/latest
-[clones-14d-img]: https://img.shields.io/badge/14d%20clones-3%2C702-62c3f8
-[unique-cloners-14d-img]: https://img.shields.io/badge/14d%20cloners-535-2ea043
+[clones-14d-img]: https://img.shields.io/badge/14d%20clones-15%2C321-62c3f8
+[unique-cloners-14d-img]: https://img.shields.io/badge/14d%20cloners-219-2ea043
 [traffic]: https://github.com/openpredictionmarkets/socialpredict/graphs/traffic
 [test-img]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/backend.yml/badge.svg?branch=main
 [test]: https://github.com/openpredictionmarkets/socialpredict/actions/workflows/backend.yml
@@ -48,7 +48,7 @@ SocialPredict lets **anyone** – individuals, classrooms, companies, and even g
 * Kenyon College (Political Science course PSCI 303, Campaigns & Elections; syllabus [here](https://www.zacharymcgee.net/syllabi/PSCI_303_public.pdf))
                         
 ## Stargazers Over Time
-[![Star History Chart](https://app.repohistory.com/api/svg?repo=openpredictionmarkets/socialpredict&type=Date&background=0D1117&color=62C3F8)](https://app.repohistory.com/star-history)
+[![Stargazers over time](README/METRICS/stargazers-over-time.svg)](https://github.com/openpredictionmarkets/socialpredict/stargazers)
 
 ## Licensing
 

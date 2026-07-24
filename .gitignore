@@ -79,6 +79,7 @@ node_modules/
 .tmp/
 .config/go/
 .worktrees/
+__pycache__/
 
 # Agent workflow artifacts
 /.codebase-graph/
