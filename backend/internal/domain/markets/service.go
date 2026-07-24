@@ -70,6 +70,19 @@ type MarketAccountingSnapshotRepository interface {
 	MarkMarketAccountingSnapshotStale(ctx context.Context, marketID int64, reason string) error
 }
 
+// MarketDiscoveryEnrichment contains display-only data loaded in batches for
+// public discovery responses.
+type MarketDiscoveryEnrichment struct {
+	AccountingByMarketID map[int64]MarketAccountingSnapshot
+	CreatorsByUsername   map[string]CreatorSummary
+}
+
+// MarketDiscoveryEnrichmentRepository batches public discovery read models.
+// It remains separate from transaction repository interfaces.
+type MarketDiscoveryEnrichmentRepository interface {
+	GetMarketDiscoveryEnrichment(ctx context.Context, marketIDs []int64, creatorUsernames []string) (*MarketDiscoveryEnrichment, error)
+}
+
 // Repository defines the interface for market data access.
 type Repository interface {
 	MarketReadRepository
