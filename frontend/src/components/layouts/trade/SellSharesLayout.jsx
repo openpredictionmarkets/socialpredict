@@ -300,7 +300,7 @@ const buildSaleSuccessMessage = (data) => {
     return `${base} Dust assessed: ${dust} credit${dust === 1 ? '' : 's'} retained by the market due to whole-share rounding.`;
 };
 
-const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelectAmount }) => {
+export const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelectAmount }) => {
     if (!selectedOutcome && !quoteError && !isLoading) {
         return null;
     }
@@ -317,7 +317,10 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
         const message = typeof quoteError === 'string' ? quoteError : quoteError.message;
         const details = typeof quoteError === 'object' ? quoteError.details : null;
         return (
-            <div className="mb-4 rounded-lg border border-red-400 bg-red-950/40 p-3 text-sm text-red-100">
+            <div
+                className="mb-4 rounded-lg border border-red-400 bg-red-950/40 p-3 text-sm text-red-100"
+                data-testid="sale-quote-error"
+            >
                 <p>{message}</p>
                 <ProjectionErrorDetails details={details} />
             </div>
