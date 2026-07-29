@@ -7,12 +7,13 @@ remaining market position supports.
 
 This scenario covers both sell quote and settlement behavior:
 
-- `/v0/sell/quote` must reject unsafe projected sales before returning an
-  allowed quote.
-- `/v0/sell` must reject the same unsafe sale through the existing
-  insufficient-shares API contract.
-- Rejected sells must not credit the user, append a sell row, increase position
-  value, or increase market dust/volume.
+- `/v0/sell/quote` must never return an allowed quote whose executed
+  `sharesSold` or `saleValue` exceeds backend-derived unlocked inventory.
+- `/v0/sell` must settle the same capped execution that quote returned.
+- Oversized sale requests may round down to remaining executable value when the
+  dust rules allow it.
+- Sales must credit only `netProceeds`; dust is retained by the market.
+- Previously unlocked value must remain executable after a later same-user buy.
 
 ## Setup
 
@@ -40,18 +41,21 @@ Happy path:
 - Replays additional buys and quotes/sells the valid seq 10 dust-generating YES
   sale.
 - Asserts `sharesSold`, `saleValue`, `dust`, `netProceeds`, user balance,
-  projected position value, and market detail dust/volume fields.
+  position display values, and market detail dust/volume fields.
 
-Sad path:
+Capped over-request path:
 
 - Replays the reported sequence through seq 18.
 - Attempts the seq 19 NO sale that would previously set up the alternating
   tiny-share large-cashout tail.
-- Asserts both quote and sell return the existing `INSUFFICIENT_SHARES` failure
-  reason and that user balance, position, market dust, and market volume remain
-  unchanged.
+- Asserts quote and sell cap the oversized request to remaining executable
+  unlocked inventory.
+- Asserts the capped sale does not produce large proceeds from tiny remaining
+  shares.
+- Asserts user balance increases only by `netProceeds` and market dust/volume
+  reflect the capped sell row.
 
-Projection-inexecutable path:
+Sequence-based unlocked-lot path:
 
 - Replays the reported two-user NO sequence:
   - `testuser02 NO 50`
@@ -59,12 +63,12 @@ Projection-inexecutable path:
   - `testuser02 NO -75`
   - `testuser02 NO 75`
   - `testuser03 NO 10`
-- Attempts the `testuser03` NO sale that has aggregate Position Value and
-  nominal unlocked value but does not reduce the backend-projected DBPM position
-  enough to pay credits.
-- Asserts quote and sell both return `422 INSUFFICIENT_SHARES` with
-  backend-owned message text and requester-only projection details.
-- Asserts the rejected quote/sell do not change user balance, user position,
-  market dust, or market volume.
+  - `testuser02 NO 20`
+- Uses separate fresh markets to assert both `testuser02` and `testuser03` can
+  quote and sell a small amount from previously unlocked NO value.
+- Asserts quote and sell match on `sharesSold`, `saleValue`, `dust`, and
+  `netProceeds`.
+- Asserts user balance increases only by `netProceeds` and market dust is
+  retained by the market.
 
 The input is based on `.context/attachments/pPjgi8/sell_market.json`.

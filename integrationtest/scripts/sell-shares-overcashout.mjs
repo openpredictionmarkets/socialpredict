@@ -15,7 +15,7 @@ const keepGoing = Boolean(args['keep-going']);
 const delayMs = Number(args.delay || 150);
 const results = [];
 const marketIds = [];
-let rejectedSeq = 0;
+let cappedSeq = 0;
 
 const attachmentSetupThroughSeq18 = [
   { seq: 1, type: 'buy', outcome: 'NO', amount: 50 },
@@ -40,15 +40,14 @@ const attachmentSetupThroughSeq18 = [
 
 const attachmentOvercashoutAttempt = { seq: 19, type: 'sell', outcome: 'NO', amount: 507 };
 
-const projectionInexecutableSequence = [
+const sequenceBasedUnlockedSequence = [
   { seq: 1, user: 'bettor', type: 'buy', outcome: 'NO', amount: 50 },
   { seq: 2, user: 'counterparty', type: 'buy', outcome: 'NO', amount: 25 },
   { seq: 3, user: 'bettor', type: 'sell', outcome: 'NO', amount: 75 },
   { seq: 4, user: 'bettor', type: 'buy', outcome: 'NO', amount: 75 },
   { seq: 5, user: 'counterparty', type: 'buy', outcome: 'NO', amount: 10 },
+  { seq: 6, user: 'bettor', type: 'buy', outcome: 'NO', amount: 20 },
 ];
-
-const projectionInexecutableAttempt = { user: 'counterparty', outcome: 'NO', amount: 17 };
 
 function parseArgs(items) {
   const out = {};
@@ -112,18 +111,6 @@ function check(name, ok, detail = '') {
 
 function sameInt(name, got, want) {
   check(name, Number(got) === Number(want), `got=${got}, want=${want}`);
-}
-
-function reason(raw) {
-  return raw?.data?.reason || raw?.result?.reason || raw?.data?.code || '';
-}
-
-function message(raw) {
-  return raw?.data?.message || raw?.result?.message || '';
-}
-
-function errorDetails(raw) {
-  return raw?.data?.details || raw?.result?.details || {};
 }
 
 function numberField(row, camelName, exportedName) {
@@ -277,92 +264,76 @@ async function replaySetupThroughSeq18(token, marketId) {
   }
 }
 
-function assertUnchangedAfterRejection(prefix, beforeFinancial, afterFinancial, beforePosition, afterPosition, beforeDetails, afterDetails) {
-  sameInt(`${prefix} balance unchanged`, afterFinancial.accountBalance || 0, beforeFinancial.accountBalance || 0);
-  sameInt(`${prefix} YES shares unchanged`, shares(afterPosition, 'YES'), shares(beforePosition, 'YES'));
-  sameInt(`${prefix} NO shares unchanged`, shares(afterPosition, 'NO'), shares(beforePosition, 'NO'));
-  sameInt(`${prefix} position value unchanged`, positionValue(afterPosition), positionValue(beforePosition));
-  sameInt(`${prefix} market dust unchanged`, afterDetails.marketDust || 0, beforeDetails.marketDust || 0);
-  sameInt(`${prefix} market volume unchanged`, afterDetails.totalVolume || 0, beforeDetails.totalVolume || 0);
-}
-
-function assertProjectionDetails(prefix, raw) {
-  const details = errorDetails(raw);
-  check(`${prefix} includes projection message`, message(raw).includes('This value is not sellable yet'), message(raw));
-  check(`${prefix} details include outcome`, details.outcome === 'NO', JSON.stringify(details));
-  check(`${prefix} details include requested credits`, Number(details.requestedCredits) === projectionInexecutableAttempt.amount, JSON.stringify(details));
-  check(`${prefix} details include position value`, Number(details.positionValue) > 0, JSON.stringify(details));
-  check(`${prefix} details include nominal unlocked value`, Number(details.nominalUnlockedValue) > 0, JSON.stringify(details));
-  sameInt(`${prefix} details executable sale value`, details.executableSaleValue, 0);
-  check(`${prefix} details include projected position value`, Number.isFinite(Number(details.projectedPositionValue)), JSON.stringify(details));
-  check(`${prefix} details include projected outcome shares`, Number.isFinite(Number(details.projectedOutcomeShares)), JSON.stringify(details));
-  check(`${prefix} details include sellability hint`, String(details.hint || '').includes('not sellable yet'), JSON.stringify(details));
-}
-
-async function assertOvercashoutRejected(token, marketId) {
+async function assertOvercashoutCapped(token, marketId) {
   const beforeFinancial = await financial(bettor);
   const beforePosition = await position(token, marketId);
   const beforeDetails = await details(marketId);
   const attempt = attachmentOvercashoutAttempt;
 
-  const quote = await quoteRaw(token, marketId, attempt.outcome, attempt.amount, [200, 422]);
-  check(`sad seq ${attempt.seq} quote rejected/not allowed`, quote.status === 422 || quote.result?.allowed === false, `status=${quote.status}`);
-  if (quote.status === 422) {
-    check(`sad seq ${attempt.seq} quote uses insufficient-shares contract`, reason(quote) === 'INSUFFICIENT_SHARES', `reason=${reason(quote)}`);
-  }
+  const quote = (await quoteRaw(token, marketId, attempt.outcome, attempt.amount, [200])).result;
+  check(`seq ${attempt.seq} quote caps oversized request`, quote.allowed === true && quote.sharesSold > 0, JSON.stringify(quote));
+  check(`seq ${attempt.seq} quote avoids tiny-tail over-cashout`, !(quote.sharesSold <= 4 && quote.netProceeds >= 400), JSON.stringify(quote));
+  sameInt(`seq ${attempt.seq} quote net formula`, quote.netProceeds, quote.saleValue - quote.dust);
 
-  const sell = await sellRaw(token, marketId, attempt.outcome, attempt.amount, [201, 422]);
-  check(`sad seq ${attempt.seq} sell rejected`, sell.status === 422, `status=${sell.status}`);
-  if (sell.status === 422) {
-    check(`sad seq ${attempt.seq} sell uses insufficient-shares contract`, reason(sell) === 'INSUFFICIENT_SHARES', `reason=${reason(sell)}`);
-  }
-  if (sell.status === 201) {
-    check(`sad seq ${attempt.seq} does not produce large proceeds from small shares`, !(sell.result.sharesSold <= 4 && sell.result.netProceeds >= 400), JSON.stringify(sell.result));
-  }
+  const sell = (await sellRaw(token, marketId, attempt.outcome, attempt.amount, [201])).result;
+  sameInt(`seq ${attempt.seq} sell matches quote shares`, sell.sharesSold, quote.sharesSold);
+  sameInt(`seq ${attempt.seq} sell matches quote value`, sell.saleValue, quote.saleValue);
+  sameInt(`seq ${attempt.seq} sell matches quote dust`, sell.dust, quote.dust);
+  sameInt(`seq ${attempt.seq} sell credits only net proceeds`, sell.netProceeds, sell.saleValue - sell.dust);
+  check(`seq ${attempt.seq} sell avoids tiny-tail over-cashout`, !(sell.sharesSold <= 4 && sell.netProceeds >= 400), JSON.stringify(sell));
 
   const afterFinancial = await financial(bettor);
   const afterPosition = await position(token, marketId);
   const afterDetails = await details(marketId);
-  assertUnchangedAfterRejection(`sad seq ${attempt.seq}`, beforeFinancial, afterFinancial, beforePosition, afterPosition, beforeDetails, afterDetails);
-  rejectedSeq = attempt.seq;
+  sameInt(`seq ${attempt.seq} balance increases by net proceeds`, Number(afterFinancial.accountBalance || 0) - Number(beforeFinancial.accountBalance || 0), sell.netProceeds);
+  check(`seq ${attempt.seq} sold shares do not exceed pre-sale NO shares`, sell.sharesSold <= shares(beforePosition, attempt.outcome), `sold=${sell.sharesSold}, before=${shares(beforePosition, attempt.outcome)}`);
+  const dustDelta = Number(afterDetails.marketDust || 0) - Number(beforeDetails.marketDust || 0);
+  const volumeDelta = Number(afterDetails.totalVolume || 0) - Number(beforeDetails.totalVolume || 0);
+  sameInt(`seq ${attempt.seq} market dust retained`, dustDelta, sell.dust);
+  sameInt(`seq ${attempt.seq} market volume accounts for capped sell`, volumeDelta, -sell.sharesSold + sell.dust);
+  cappedSeq = attempt.seq;
 }
 
-async function replayProjectionInexecutableSequence(tokens, marketId) {
-  for (const step of projectionInexecutableSequence) {
+async function replaySequenceBasedUnlockedFlow(tokens, marketId) {
+  for (const step of sequenceBasedUnlockedSequence) {
     const token = tokens[step.user];
     if (step.type === 'buy') {
       await place(token, marketId, step.outcome, step.amount);
       continue;
     }
     const quote = (await quoteRaw(token, marketId, step.outcome, step.amount)).result;
-    check(`projection setup seq ${step.seq} quote allowed`, quote.allowed === true);
+    check(`sequence setup seq ${step.seq} quote allowed`, quote.allowed === true);
     const sell = (await sellRaw(token, marketId, step.outcome, step.amount)).result;
-    check(`projection setup seq ${step.seq} sell succeeded`, sell.sharesSold > 0 && sell.netProceeds >= 0, `shares=${sell.sharesSold}, net=${sell.netProceeds}`);
+    check(`sequence setup seq ${step.seq} sell succeeded`, sell.sharesSold > 0 && sell.netProceeds >= 0, `shares=${sell.sharesSold}, net=${sell.netProceeds}`);
   }
 }
 
-async function assertProjectionInexecutableRejected({ token, username, marketId }) {
+async function assertSequenceBasedUnlockedSaleAllowed({ token, username, marketId, amount }) {
   const beforeFinancial = await financial(username);
   const beforePosition = await position(token, marketId);
   const beforeDetails = await details(marketId);
 
-  check('projection setup has aggregate value', positionValue(beforePosition) > 0, `value=${positionValue(beforePosition)}`);
-  check('projection setup has NO shares', shares(beforePosition, 'NO') > 0, `shares=${shares(beforePosition, 'NO')}`);
+  check(`${username} sequence has aggregate value`, positionValue(beforePosition) > 0, `value=${positionValue(beforePosition)}`);
+  check(`${username} sequence has NO shares`, shares(beforePosition, 'NO') > 0, `shares=${shares(beforePosition, 'NO')}`);
 
-  const quote = await quoteRaw(token, marketId, projectionInexecutableAttempt.outcome, projectionInexecutableAttempt.amount, [422]);
-  check('projection-inexecutable quote rejected', quote.status === 422, `status=${quote.status}`);
-  check('projection-inexecutable quote uses insufficient-shares contract', reason(quote) === 'INSUFFICIENT_SHARES', `reason=${reason(quote)}`);
-  assertProjectionDetails('projection-inexecutable quote', quote);
+  const quote = (await quoteRaw(token, marketId, 'NO', amount, [200])).result;
+  check(`${username} sequence quote allowed`, quote.allowed === true, JSON.stringify(quote));
+  check(`${username} sequence quote executable shares`, quote.sharesSold > 0, JSON.stringify(quote));
+  check(`${username} sequence quote executable value`, quote.saleValue > 0, JSON.stringify(quote));
+  check(`${username} sequence quote no over-cashout`, quote.saleValue <= positionValue(beforePosition), `sale=${quote.saleValue}, value=${positionValue(beforePosition)}`);
+  sameInt(`${username} sequence quote net formula`, quote.netProceeds, quote.saleValue - quote.dust);
 
-  const sell = await sellRaw(token, marketId, projectionInexecutableAttempt.outcome, projectionInexecutableAttempt.amount, [422]);
-  check('projection-inexecutable sell rejected', sell.status === 422, `status=${sell.status}`);
-  check('projection-inexecutable sell uses insufficient-shares contract', reason(sell) === 'INSUFFICIENT_SHARES', `reason=${reason(sell)}`);
-  assertProjectionDetails('projection-inexecutable sell', sell);
+  const sell = (await sellRaw(token, marketId, 'NO', amount, [201])).result;
+  sameInt(`${username} sequence sell matches quote shares`, sell.sharesSold, quote.sharesSold);
+  sameInt(`${username} sequence sell matches quote value`, sell.saleValue, quote.saleValue);
+  sameInt(`${username} sequence sell matches quote dust`, sell.dust, quote.dust);
+  sameInt(`${username} sequence sell credits only net proceeds`, sell.netProceeds, sell.saleValue - sell.dust);
 
   const afterFinancial = await financial(username);
-  const afterPosition = await position(token, marketId);
   const afterDetails = await details(marketId);
-  assertUnchangedAfterRejection('projection-inexecutable', beforeFinancial, afterFinancial, beforePosition, afterPosition, beforeDetails, afterDetails);
+  sameInt(`${username} sequence balance net proceeds`, Number(afterFinancial.accountBalance || 0) - Number(beforeFinancial.accountBalance || 0), sell.netProceeds);
+  const dustDelta = Number(afterDetails.marketDust || 0) - Number(beforeDetails.marketDust || 0);
+  sameInt(`${username} sequence market dust retained`, dustDelta, sell.dust);
 }
 
 async function main() {
@@ -402,21 +373,31 @@ async function main() {
 
   const sadMarketId = await createMarket('sad', modToken, adminToken);
   await replaySetupThroughSeq18(bettorToken, sadMarketId);
-  await assertOvercashoutRejected(bettorToken, sadMarketId);
-  check('attachment over-cashout sequence was blocked', rejectedSeq === attachmentOvercashoutAttempt.seq, `seq=${rejectedSeq}`);
+  await assertOvercashoutCapped(bettorToken, sadMarketId);
+  check('attachment over-cashout sequence was capped safely', cappedSeq === attachmentOvercashoutAttempt.seq, `seq=${cappedSeq}`);
 
-  const projectionMarketId = await createMarket('projection', modToken, adminToken);
-  await replayProjectionInexecutableSequence({ bettor: bettorToken, counterparty: counterpartyToken }, projectionMarketId);
-  await assertProjectionInexecutableRejected({
+  const sequenceBettorMarketId = await createMarket('sequence-bettor', modToken, adminToken);
+  await replaySequenceBasedUnlockedFlow({ bettor: bettorToken, counterparty: counterpartyToken }, sequenceBettorMarketId);
+  await assertSequenceBasedUnlockedSaleAllowed({
+    token: bettorToken,
+    username: bettor,
+    marketId: sequenceBettorMarketId,
+    amount: 1,
+  });
+
+  const sequenceCounterpartyMarketId = await createMarket('sequence-counterparty', modToken, adminToken);
+  await replaySequenceBasedUnlockedFlow({ bettor: bettorToken, counterparty: counterpartyToken }, sequenceCounterpartyMarketId);
+  await assertSequenceBasedUnlockedSaleAllowed({
     token: counterpartyToken,
     username: counterparty,
-    marketId: projectionMarketId,
+    marketId: sequenceCounterpartyMarketId,
+    amount: 1,
   });
 }
 
 async function finish() {
   await mkdir(dirname(artifact), { recursive: true });
-  await writeFile(artifact, `${JSON.stringify({ marketIds, rejectedSeq, results }, null, 2)}\n`);
+  await writeFile(artifact, `${JSON.stringify({ marketIds, cappedSeq, results }, null, 2)}\n`);
   const failed = results.filter((result) => !result.ok);
   console.log(`artifact: ${artifact}`);
   console.log(`summary: ${results.length - failed.length} passed, ${failed.length} failed`);
