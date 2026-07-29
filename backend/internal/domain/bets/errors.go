@@ -56,6 +56,42 @@ const NoSellableSharesMessage = "No sellable shares yet. Initial value cannot be
 
 const InsufficientSellableSharesMessage = "Not enough sellable shares for that sale amount. Try a smaller Sale Order amount, or wait for more market activity if your latest shares are still locked."
 
+const ProjectionInexecutableSaleMessage = "This value is not sellable yet. Wait for more market activity, then try again."
+
+const ProjectionInexecutableSaleHint = "Your position still has value but is not sellable yet. This protects the market from users immediately cashing out value created by their own order. More market activity can unlock additional sellable value."
+
+// SaleProjectionDetails exposes requester-only values explaining why a Sale
+// Order failed the backend projection invariant.
+type SaleProjectionDetails struct {
+	Outcome                      string
+	RequestedCredits             int64
+	PositionValue                int64
+	PositionOutcomeShares        int64
+	NominalUnlockedValue         int64
+	NominalUnlockedOutcomeShares int64
+	ProjectedPositionValue       int64
+	ProjectedOutcomeShares       int64
+	ExecutableSaleValue          int64
+}
+
+// SaleProjectionNotExecutableError keeps the public insufficient-shares
+// contract while carrying backend-computed explanation details.
+type SaleProjectionNotExecutableError struct {
+	Details SaleProjectionDetails
+}
+
+func (e SaleProjectionNotExecutableError) Error() string {
+	return ProjectionInexecutableSaleMessage
+}
+
+func (e SaleProjectionNotExecutableError) Message() string {
+	return ProjectionInexecutableSaleMessage
+}
+
+func (e SaleProjectionNotExecutableError) Unwrap() error {
+	return ErrInsufficientShares
+}
+
 // ErrDustCapExceeded is returned when a sell transaction would generate dust above the configured cap.
 type ErrDustCapExceeded struct {
 	Cap       int64
