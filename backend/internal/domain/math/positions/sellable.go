@@ -56,12 +56,7 @@ func CalculateUnlockedSellablePosition_WPAM_DBPM(snapshot MarketSnapshot, bets [
 	}
 
 	payouts := CalculateBetPayouts_WPAM_DBPM(snapshot, bets)
-	unlockedShares := int64(0)
-	for i, payout := range payouts {
-		if isUnlockedBuy(payouts, i, username, outcome) && payout.Payout > 0 {
-			unlockedShares += payout.Payout
-		}
-	}
+	unlockedShares := deriveRemainingUnlockedShares(payouts, username, outcome)
 	if unlockedShares > currentShares {
 		unlockedShares = currentShares
 	}
@@ -96,22 +91,64 @@ func CalculateUnlockedSellablePosition_WPAM_DBPM(snapshot MarketSnapshot, bets [
 	return position, nil
 }
 
-func isUnlockedBuy(payouts []BetPayout, index int, username string, outcome string) bool {
-	if index < 0 || index >= len(payouts) {
-		return false
-	}
-	bet := payouts[index].Bet
-	if bet.Username != username || bet.Outcome != outcome || bet.Amount <= 0 {
-		return false
-	}
+type unlockedLot struct {
+	remainingShares int64
+}
 
-	for i := index + 1; i < len(payouts); i++ {
-		later := payouts[i].Bet
-		if later.Amount > 0 && later.Username != username {
-			return true
+func deriveRemainingUnlockedShares(payouts []BetPayout, username string, outcome string) int64 {
+	lots := make([]unlockedLot, 0)
+	unlockedEnd := 0
+	consumeHead := 0
+
+	for _, payout := range payouts {
+		bet := payout.Bet
+		if bet.Amount > 0 && bet.Username == username && bet.Outcome == outcome && payout.Payout > 0 {
+			lots = append(lots, unlockedLot{remainingShares: payout.Payout})
+		}
+		if bet.Amount > 0 && bet.Username != username {
+			unlockedEnd = len(lots)
+		}
+		if bet.Amount < 0 && bet.Username == username && bet.Outcome == outcome {
+			consumeHead = consumeUnlockedLots(lots, consumeHead, unlockedEnd, -bet.Amount)
 		}
 	}
-	return false
+
+	return sumRemainingUnlockedLots(lots, consumeHead, unlockedEnd)
+}
+
+func consumeUnlockedLots(lots []unlockedLot, consumeHead int, unlockedEnd int, shares int64) int {
+	if consumeHead < 0 {
+		consumeHead = 0
+	}
+	if unlockedEnd > len(lots) {
+		unlockedEnd = len(lots)
+	}
+	for shares > 0 && consumeHead < unlockedEnd {
+		consumed := lots[consumeHead].remainingShares
+		if consumed > shares {
+			consumed = shares
+		}
+		lots[consumeHead].remainingShares -= consumed
+		shares -= consumed
+		if lots[consumeHead].remainingShares == 0 {
+			consumeHead++
+		}
+	}
+	return consumeHead
+}
+
+func sumRemainingUnlockedLots(lots []unlockedLot, consumeHead int, unlockedEnd int) int64 {
+	if consumeHead < 0 {
+		consumeHead = 0
+	}
+	if unlockedEnd > len(lots) {
+		unlockedEnd = len(lots)
+	}
+	total := int64(0)
+	for i := consumeHead; i < unlockedEnd; i++ {
+		total += lots[i].remainingShares
+	}
+	return total
 }
 
 func sharesForPositionOutcome(position UserMarketPosition, outcome string) int64 {

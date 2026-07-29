@@ -336,6 +336,62 @@ func TestCalculateUnlockedSellablePosition_WPAM_DBPM(t *testing.T) {
 			username: "carol",
 			outcome:  "NO",
 		},
+		{
+			name: "prior sale consumes unlocked value before later same-user buy",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 50, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 25, Outcome: "NO", Username: "bob", Offset: time.Minute},
+				{Amount: -75, Outcome: "NO", Username: "alice", Offset: 2 * time.Minute},
+				{Amount: 75, Outcome: "NO", Username: "alice", Offset: 3 * time.Minute},
+			},
+			username: "alice",
+			outcome:  "NO",
+		},
+		{
+			name: "reported mixed sequence leaves prior unlocked value executable for both users",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 50, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 25, Outcome: "NO", Username: "bob", Offset: time.Minute},
+				{Amount: -75, Outcome: "NO", Username: "alice", Offset: 2 * time.Minute},
+				{Amount: 75, Outcome: "NO", Username: "alice", Offset: 3 * time.Minute},
+				{Amount: 10, Outcome: "NO", Username: "bob", Offset: 4 * time.Minute},
+				{Amount: 20, Outcome: "NO", Username: "alice", Offset: 5 * time.Minute},
+			},
+			username: "alice",
+			outcome:  "NO",
+			wantNo:   17,
+			wantVal:  17,
+		},
+		{
+			name: "reported mixed sequence keeps counterparty unlocked value executable",
+			bets: []struct {
+				Amount   int64
+				Outcome  string
+				Username string
+				Offset   time.Duration
+			}{
+				{Amount: 50, Outcome: "NO", Username: "alice", Offset: 0},
+				{Amount: 25, Outcome: "NO", Username: "bob", Offset: time.Minute},
+				{Amount: -75, Outcome: "NO", Username: "alice", Offset: 2 * time.Minute},
+				{Amount: 75, Outcome: "NO", Username: "alice", Offset: 3 * time.Minute},
+				{Amount: 10, Outcome: "NO", Username: "bob", Offset: 4 * time.Minute},
+				{Amount: 20, Outcome: "NO", Username: "alice", Offset: 5 * time.Minute},
+			},
+			username: "bob",
+			outcome:  "NO",
+			wantNo:   35,
+			wantVal:  35,
+		},
 	}
 
 	for _, tt := range tests {
