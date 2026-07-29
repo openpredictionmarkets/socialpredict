@@ -3,7 +3,7 @@ import { BetYesButton, BetNoButton, BetInputAmount, ConfirmBetButton } from '../
 import MarketProjectionLayout from '../marketprojection/MarketProjectionLayout';
 import { submitBet } from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
-import { API_URL } from '../../../config';
+import { fetchTradingFees } from '../../../api/tradeApi';
 import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
 
 
@@ -26,16 +26,7 @@ const BuySharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
                 return;
             }
             try {
-                const response = await fetch(`${API_URL}/v0/setup`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-                if (!response.ok) {
-                    throw new Error(`Failed to load setup: ${response.status}`);
-                }
-                const data = await response.json();
-                setFeeData(data.betting?.betFees || null);
+                setFeeData(await fetchTradingFees({ token }));
             } catch {
                 setFeeData(null);
             } finally {
