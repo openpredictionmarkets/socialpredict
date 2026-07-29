@@ -23,11 +23,12 @@ Run against a local dev stack after seeded users exist:
 ./SocialPredict dev-bootstrap-users
 node integrationtest/scripts/sell-shares-overcashout.mjs \
   --base-url http://localhost:8080 \
-  --api-prefix /v0
+  --api-prefix /v0 \
+  --delay 1100
 ```
 
-Defaults assume seeded users `admin`, `testuser01`, and `testuser02` all use
-password `password`.
+Defaults assume seeded users `admin`, `testuser01`, and `testuser02` through
+`testuser07` all use password `password`.
 
 ## Scenario
 
@@ -37,17 +38,19 @@ through the admin route when market governance creates proposals.
 Happy path:
 
 - Replays the opening trades from the reported sequence.
-- Quotes and sells the valid seq 4 YES sale.
+- Adds a later counterparty buy before each sale so the bettor's prior YES value
+  is sellable under sequence-based unlocking.
+- Quotes and sells the valid seq 4 YES sale after that unlock.
 - Replays additional buys and quotes/sells the valid seq 10 dust-generating YES
-  sale.
+  sale after a second counterparty unlock.
 - Asserts `sharesSold`, `saleValue`, `dust`, `netProceeds`, user balance,
   position display values, and market detail dust/volume fields.
 
 Capped over-request path:
 
-- Replays the reported sequence through seq 18.
-- Attempts the seq 19 NO sale that would previously set up the alternating
-  tiny-share large-cashout tail.
+- Replays the final two-user unlocked-lot NO sequence.
+- Attempts the reported oversized `507` credit NO sale request against the
+  remaining unlocked position.
 - Asserts quote and sell cap the oversized request to remaining executable
   unlocked inventory.
 - Asserts the capped sale does not produce large proceeds from tiny remaining

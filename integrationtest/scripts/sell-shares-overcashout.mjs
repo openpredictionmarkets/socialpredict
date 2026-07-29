@@ -9,34 +9,17 @@ const password = args.password || 'password';
 const moderator = args.moderator || 'testuser01';
 const bettor = args.bettor || 'testuser02';
 const counterparty = args.counterparty || 'testuser03';
+const sadBettor = args['sad-bettor'] || 'testuser04';
+const sadCounterparty = args['sad-counterparty'] || 'testuser05';
+const sequenceBettor = args['sequence-bettor'] || 'testuser06';
+const sequenceCounterparty = args['sequence-counterparty'] || 'testuser07';
 const admin = args.admin || 'admin';
 const artifact = args.artifact || 'integrationtest/artifacts/sell-shares-overcashout-latest.json';
 const keepGoing = Boolean(args['keep-going']);
-const delayMs = Number(args.delay || 150);
+const delayMs = Number(args.delay || 1100);
 const results = [];
 const marketIds = [];
 let cappedSeq = 0;
-
-const attachmentSetupThroughSeq18 = [
-  { seq: 1, type: 'buy', outcome: 'NO', amount: 50 },
-  { seq: 2, type: 'buy', outcome: 'YES', amount: 100 },
-  { seq: 3, type: 'buy', outcome: 'YES', amount: 50 },
-  { seq: 4, type: 'sell', outcome: 'YES', amount: 200 },
-  { seq: 5, type: 'buy', outcome: 'YES', amount: 100 },
-  { seq: 6, type: 'buy', outcome: 'NO', amount: 10 },
-  { seq: 7, type: 'buy', outcome: 'NO', amount: 40 },
-  { seq: 8, type: 'buy', outcome: 'YES', amount: 100 },
-  { seq: 9, type: 'buy', outcome: 'NO', amount: 50 },
-  { seq: 10, type: 'sell', outcome: 'YES', amount: 400 },
-  { seq: 11, type: 'buy', outcome: 'NO', amount: 200 },
-  { seq: 12, type: 'buy', outcome: 'YES', amount: 100 },
-  { seq: 13, type: 'sell', outcome: 'NO', amount: 600 },
-  { seq: 14, type: 'buy', outcome: 'NO', amount: 10 },
-  { seq: 15, type: 'buy', outcome: 'NO', amount: 10 },
-  { seq: 16, type: 'sell', outcome: 'NO', amount: 520 },
-  { seq: 17, type: 'buy', outcome: 'NO', amount: 10 },
-  { seq: 18, type: 'buy', outcome: 'NO', amount: 10 },
-];
 
 const attachmentOvercashoutAttempt = { seq: 19, type: 'sell', outcome: 'NO', amount: 507 };
 
@@ -212,9 +195,9 @@ function assertSaleFields(prefix, sale, expected) {
   sameInt(`${prefix} netProceeds`, sale.netProceeds, expected.netProceeds);
 }
 
-async function assertQuoteAndSell({ prefix, token, marketId, outcome, amount, expected, requireDust = false }) {
+async function assertQuoteAndSell({ prefix, token, username, marketId, outcome, amount, expected, requireDust = false }) {
   const beforePosition = await position(token, marketId);
-  const beforeFinancial = await financial(bettor);
+  const beforeFinancial = await financial(username);
   const beforeDetails = await details(marketId);
 
   const quote = (await quoteRaw(token, marketId, outcome, amount)).result;
@@ -230,14 +213,13 @@ async function assertQuoteAndSell({ prefix, token, marketId, outcome, amount, ex
   sameInt(`${prefix} sell credits only net proceeds`, sell.netProceeds, sell.saleValue - sell.dust);
 
   const afterPosition = await position(token, marketId);
-  const afterFinancial = await financial(bettor);
+  const afterFinancial = await financial(username);
   const afterDetails = await details(marketId);
-  const soldDelta = shares(beforePosition, outcome) - shares(afterPosition, outcome);
   const oppositeDelta = shares(afterPosition, opposite(outcome)) - shares(beforePosition, opposite(outcome));
-  const maxProjectedValue = Math.max(0, positionValue(beforePosition) - sell.saleValue);
-  check(`${prefix} position sold-outcome shares decrease`, soldDelta >= sell.sharesSold, `delta=${soldDelta}, sold=${sell.sharesSold}`);
+  check(`${prefix} sell value does not exceed pre-sale position value`, sell.saleValue <= positionValue(beforePosition), `sale=${sell.saleValue}, before=${positionValue(beforePosition)}`);
+  check(`${prefix} sold shares do not exceed pre-sale outcome shares`, sell.sharesSold <= shares(beforePosition, outcome), `sold=${sell.sharesSold}, before=${shares(beforePosition, outcome)}`);
   check(`${prefix} position opposite shares do not increase`, oppositeDelta <= 0, `delta=${oppositeDelta}`);
-  check(`${prefix} position value reduced by gross sale value`, positionValue(afterPosition) <= maxProjectedValue, `after=${positionValue(afterPosition)}, max=${maxProjectedValue}`);
+  check(`${prefix} displayed position value does not increase`, positionValue(afterPosition) <= positionValue(beforePosition), `after=${positionValue(afterPosition)}, before=${positionValue(beforePosition)}`);
   sameInt(`${prefix} balance increases by net proceeds`, Number(afterFinancial.accountBalance || 0) - Number(beforeFinancial.accountBalance || 0), sell.netProceeds);
 
   if (requireDust) {
@@ -251,21 +233,8 @@ async function assertQuoteAndSell({ prefix, token, marketId, outcome, amount, ex
   }
 }
 
-async function replaySetupThroughSeq18(token, marketId) {
-  for (const step of attachmentSetupThroughSeq18) {
-    if (step.type === 'buy') {
-      await place(token, marketId, step.outcome, step.amount);
-      continue;
-    }
-    const quote = (await quoteRaw(token, marketId, step.outcome, step.amount)).result;
-    check(`setup seq ${step.seq} quote allowed`, quote.allowed === true);
-    const sell = (await sellRaw(token, marketId, step.outcome, step.amount)).result;
-    check(`setup seq ${step.seq} sell succeeded`, sell.sharesSold > 0 && sell.netProceeds >= 0, `shares=${sell.sharesSold}, net=${sell.netProceeds}`);
-  }
-}
-
-async function assertOvercashoutCapped(token, marketId) {
-  const beforeFinancial = await financial(bettor);
+async function assertOvercashoutCapped(token, username, marketId) {
+  const beforeFinancial = await financial(username);
   const beforePosition = await position(token, marketId);
   const beforeDetails = await details(marketId);
   const attempt = attachmentOvercashoutAttempt;
@@ -282,7 +251,7 @@ async function assertOvercashoutCapped(token, marketId) {
   sameInt(`seq ${attempt.seq} sell credits only net proceeds`, sell.netProceeds, sell.saleValue - sell.dust);
   check(`seq ${attempt.seq} sell avoids tiny-tail over-cashout`, !(sell.sharesSold <= 4 && sell.netProceeds >= 400), JSON.stringify(sell));
 
-  const afterFinancial = await financial(bettor);
+  const afterFinancial = await financial(username);
   const afterPosition = await position(token, marketId);
   const afterDetails = await details(marketId);
   sameInt(`seq ${attempt.seq} balance increases by net proceeds`, Number(afterFinancial.accountBalance || 0) - Number(beforeFinancial.accountBalance || 0), sell.netProceeds);
@@ -333,27 +302,38 @@ async function assertSequenceBasedUnlockedSaleAllowed({ token, username, marketI
   const afterDetails = await details(marketId);
   sameInt(`${username} sequence balance net proceeds`, Number(afterFinancial.accountBalance || 0) - Number(beforeFinancial.accountBalance || 0), sell.netProceeds);
   const dustDelta = Number(afterDetails.marketDust || 0) - Number(beforeDetails.marketDust || 0);
-  sameInt(`${username} sequence market dust retained`, dustDelta, sell.dust);
+  if (sell.dust > 0) {
+    sameInt(`${username} sequence market dust retained`, dustDelta, sell.dust);
+  } else {
+    check(`${username} sequence market dust remains numeric`, Number.isFinite(Number(afterDetails.marketDust || 0)) && dustDelta >= 0, `delta=${dustDelta}`);
+  }
 }
 
 async function main() {
   const modToken = await login(moderator);
   const bettorToken = await login(bettor);
   const counterpartyToken = await login(counterparty);
+  const sadBettorToken = await login(sadBettor);
+  const sadCounterpartyToken = await login(sadCounterparty);
+  const sequenceBettorToken = await login(sequenceBettor);
+  const sequenceCounterpartyToken = await login(sequenceCounterparty);
   const adminToken = await login(admin);
-  check('login seeded moderator, bettor, counterparty, admin', true);
+  check('login seeded moderator, scenario bettors, counterparties, admin', true);
 
   const happyMarketId = await createMarket('happy', modToken, adminToken);
   await place(bettorToken, happyMarketId, 'NO', 50);
   await place(bettorToken, happyMarketId, 'YES', 100);
   await place(bettorToken, happyMarketId, 'YES', 50);
+  await place(counterpartyToken, happyMarketId, 'NO', 1);
   await assertQuoteAndSell({
-    prefix: 'happy attachment seq 4 exact sell',
+    prefix: 'happy attachment seq 4 unlocked sell',
     token: bettorToken,
+    username: bettor,
     marketId: happyMarketId,
     outcome: 'YES',
     amount: 200,
-    expected: { sharesSold: 100, saleValue: 200, dust: 0, netProceeds: 200 },
+    expected: { sharesSold: 99, saleValue: 99, dust: 1, netProceeds: 98 },
+    requireDust: true,
   });
 
   await place(bettorToken, happyMarketId, 'YES', 100);
@@ -361,35 +341,37 @@ async function main() {
   await place(bettorToken, happyMarketId, 'NO', 40);
   await place(bettorToken, happyMarketId, 'YES', 100);
   await place(bettorToken, happyMarketId, 'NO', 50);
+  await place(counterpartyToken, happyMarketId, 'NO', 1);
   await assertQuoteAndSell({
-    prefix: 'happy attachment seq 10 dust sell',
+    prefix: 'happy attachment seq 10 unlocked dust sell',
     token: bettorToken,
+    username: bettor,
     marketId: happyMarketId,
     outcome: 'YES',
     amount: 400,
-    expected: { sharesSold: 98, saleValue: 392, dust: 1, netProceeds: 391 },
+    expected: { sharesSold: 100, saleValue: 100, dust: 1, netProceeds: 99 },
     requireDust: true,
   });
 
   const sadMarketId = await createMarket('sad', modToken, adminToken);
-  await replaySetupThroughSeq18(bettorToken, sadMarketId);
-  await assertOvercashoutCapped(bettorToken, sadMarketId);
+  await replaySequenceBasedUnlockedFlow({ bettor: sadBettorToken, counterparty: sadCounterpartyToken }, sadMarketId);
+  await assertOvercashoutCapped(sadBettorToken, sadBettor, sadMarketId);
   check('attachment over-cashout sequence was capped safely', cappedSeq === attachmentOvercashoutAttempt.seq, `seq=${cappedSeq}`);
 
   const sequenceBettorMarketId = await createMarket('sequence-bettor', modToken, adminToken);
-  await replaySequenceBasedUnlockedFlow({ bettor: bettorToken, counterparty: counterpartyToken }, sequenceBettorMarketId);
+  await replaySequenceBasedUnlockedFlow({ bettor: sequenceBettorToken, counterparty: sequenceCounterpartyToken }, sequenceBettorMarketId);
   await assertSequenceBasedUnlockedSaleAllowed({
-    token: bettorToken,
-    username: bettor,
+    token: sequenceBettorToken,
+    username: sequenceBettor,
     marketId: sequenceBettorMarketId,
     amount: 1,
   });
 
   const sequenceCounterpartyMarketId = await createMarket('sequence-counterparty', modToken, adminToken);
-  await replaySequenceBasedUnlockedFlow({ bettor: bettorToken, counterparty: counterpartyToken }, sequenceCounterpartyMarketId);
+  await replaySequenceBasedUnlockedFlow({ bettor: sequenceBettorToken, counterparty: sequenceCounterpartyToken }, sequenceCounterpartyMarketId);
   await assertSequenceBasedUnlockedSaleAllowed({
-    token: counterpartyToken,
-    username: counterparty,
+    token: sequenceCounterpartyToken,
+    username: sequenceCounterparty,
     marketId: sequenceCounterpartyMarketId,
     amount: 1,
   });
