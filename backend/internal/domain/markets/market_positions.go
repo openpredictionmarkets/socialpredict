@@ -72,6 +72,41 @@ func (s *Service) GetUserPositionInMarket(ctx context.Context, marketID int64, u
 	return position, nil
 }
 
+// GetUserTradePositionInMarket loads the market history once and returns both
+// aggregate ownership and outcome-specific unlocked inventory.
+func (s *Service) GetUserTradePositionInMarket(ctx context.Context, marketID int64, username string) (*TradePosition, error) {
+	if marketID <= 0 || strings.TrimSpace(username) == "" {
+		return nil, ErrInvalidInput
+	}
+	market, err := s.repo.GetByID(ctx, marketID)
+	if err != nil || market == nil {
+		if err != nil {
+			return nil, err
+		}
+		return nil, ErrMarketNotFound
+	}
+	bets, err := s.repo.ListBetsForMarket(ctx, marketID)
+	if err != nil {
+		return nil, err
+	}
+	snapshot := positionsmath.MarketSnapshot{ID: market.ID, CreatedAt: market.CreatedAt, IsResolved: market.IsResolved(), ResolutionResult: market.ResolutionResult}
+	history := ToBoundaryBets(bets)
+	owned, err := positionsmath.CalculateMarketPositionForUser_WPAM_DBPM(snapshot, history, username)
+	if err != nil {
+		return nil, err
+	}
+	yes, err := positionsmath.CalculateUnlockedSellablePosition_WPAM_DBPM(snapshot, history, username, "YES")
+	if err != nil {
+		return nil, err
+	}
+	no, err := positionsmath.CalculateUnlockedSellablePosition_WPAM_DBPM(snapshot, history, username, "NO")
+	if err != nil {
+		return nil, err
+	}
+	position := userPositionFromMathPosition(marketID, username, owned)
+	return &TradePosition{UserPosition: *position, YesSellableShares: yes.YesSharesOwned, NoSellableShares: no.NoSharesOwned, YesSellableValue: yes.Value, NoSellableValue: no.Value}, nil
+}
+
 // GetUserSellablePositionInMarket returns the user's currently sellable shares
 // for one outcome, excluding newest buy value that has not been unlocked by a
 // later buy from another user.

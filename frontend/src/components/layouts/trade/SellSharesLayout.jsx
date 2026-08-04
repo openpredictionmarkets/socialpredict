@@ -11,7 +11,7 @@ import { fetchTradingFees } from '../../../api/tradeApi';
 import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
 
 const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
-    const [shares, setShares] = useState({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
+    const [shares, setShares] = useState({ noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 });
     const [sellAmount, setSellAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
     const [feeData, setFeeData] = useState(null);
@@ -27,6 +27,12 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     const { yesLabel, noLabel } = useMarketLabels(market);
     const showFeeSection = !isLoading && Number(feeData?.sellSharesFee) > 0;
     const positionValue = Math.max(0, Number(shares.value) || 0);
+    const selectedSellableValue = selectedOutcome === 'YES'
+        ? Math.max(0, Number(shares.yesSellableValue) || 0)
+        : Math.max(0, Number(shares.noSellableValue) || 0);
+    const outcomeIsSellable = (outcome) => outcome === 'YES'
+        ? Number(shares.yesSellableValue) > 0
+        : Number(shares.noSellableValue) > 0;
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -49,7 +55,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
     useEffect(() => {
         if (!token) {
-            setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
+            setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 });
             setSelectedOutcome(null);
             setSellAmount(1);
             setSaleQuote(null);
@@ -63,7 +69,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             .then(data => {
                 const normalized = normalizeShares(data);
                 setShares(normalized);
-                setSharesNotice('');
+                setSharesNotice(Number(normalized.yesSellableValue) > 0 || Number(normalized.noSellableValue) > 0 ? '' : NO_SELLABLE_SHARES_MESSAGE);
 
                 // Set outcome and amount based on shares
                 if (normalized.noSharesOwned > 0 && normalized.yesSharesOwned === 0) {
@@ -79,7 +85,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             })
             .catch(error => {
                 setSharesNotice(error.message || NO_SELLABLE_SHARES_MESSAGE);
-                setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
+                setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 });
                 setSelectedOutcome(null);
                 setSellAmount(1);
             })
@@ -93,7 +99,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
         }
         setSaleQuote(null);
         setQuoteError(null);
-        setSellAmount(newAmount);
+        setSellAmount(selectedSellableValue > 0 ? Math.min(newAmount, selectedSellableValue) : newAmount);
     };
 
     const requestSaleQuote = (outcomeOverride, amountOverride = sellAmount) => {
@@ -201,6 +207,12 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                             <span className="text-green-300">{positionValue}</span>
                         </div>
                     )}
+                    {(shares.noSellableValue > 0 || shares.yesSellableValue > 0) && (
+                        <div className="text-center text-lg mt-2">
+                            <span className="font-bold">Sellable Value: </span>
+                            <span className="text-green-300">{selectedSellableValue || Math.max(shares.noSellableValue, shares.yesSellableValue)}</span>
+                        </div>
+                    )}
                     {sellUnavailableNotice && (
                         <div className="mt-3 rounded-lg border border-amber-300/70 bg-amber-950/40 p-3 text-sm leading-relaxed text-amber-50">
                             {sellUnavailableNotice}
@@ -214,7 +226,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         <SaleInputAmount
                             value={sellAmount}
                             onChange={handleSellAmountChange}
-                            max={undefined}
+                            max={selectedSellableValue || 1}
                             disabled={isActionDisabled}
                         />
                     </div>
@@ -229,7 +241,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         }}
                     />
                     <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-                        {shares.noSharesOwned > 0 &&
+                        {shares.noSharesOwned > 0 && outcomeIsSellable('NO') &&
                             <SaleActionGroup
                                 outcome="NO"
                                 disabled={isActionDisabled}
@@ -240,7 +252,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                                     handleSaleSubmission('NO');
                                 }}
                             />}
-                        {shares.yesSharesOwned > 0 &&
+                        {shares.yesSharesOwned > 0 && outcomeIsSellable('YES') &&
                             <SaleActionGroup
                                 outcome="YES"
                                 disabled={isActionDisabled}
@@ -273,7 +285,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
 const normalizeShares = (data) => {
     if (!data) {
-        return { noSharesOwned: 0, yesSharesOwned: 0, value: 0 };
+        return { noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 };
     }
     if (Array.isArray(data)) {
         return normalizeShares(data[0]);
@@ -283,6 +295,10 @@ const normalizeShares = (data) => {
         noSharesOwned: data.noSharesOwned ?? data.NoSharesOwned ?? 0,
         yesSharesOwned: data.yesSharesOwned ?? data.YesSharesOwned ?? 0,
         value: data.value ?? data.Value ?? 0,
+        noSellableShares: data.noSellableShares ?? data.NoSellableShares ?? 0,
+        yesSellableShares: data.yesSellableShares ?? data.YesSellableShares ?? 0,
+        noSellableValue: data.noSellableValue ?? data.NoSellableValue ?? 0,
+        yesSellableValue: data.yesSellableValue ?? data.YesSellableValue ?? 0,
     };
 };
 
