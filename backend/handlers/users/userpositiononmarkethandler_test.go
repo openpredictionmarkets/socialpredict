@@ -93,7 +93,14 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
 
-	var response handlers.SuccessEnvelope[positionsmath.UserMarketPosition]
+	type tradePositionResponse struct {
+		positionsmath.UserMarketPosition
+		YesSellableShares int64 `json:"yesSellableShares"`
+		NoSellableShares  int64 `json:"noSellableShares"`
+		YesSellableValue  int64 `json:"yesSellableValue"`
+		NoSellableValue   int64 `json:"noSellableValue"`
+	}
+	var response handlers.SuccessEnvelope[tradePositionResponse]
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
@@ -101,6 +108,12 @@ func TestUserMarketPositionHandlerReturnsUserPosition(t *testing.T) {
 	position := response.Result
 	if position.YesSharesOwned == 0 && position.NoSharesOwned == 0 {
 		t.Fatalf("expected non-zero shares for bettor, got %+v", position)
+	}
+	if position.YesSellableShares <= 0 {
+		t.Fatalf("expected unlocked YES inventory, got %+v", position)
+	}
+	if position.NoSellableShares != 0 || position.NoSellableValue != 0 {
+		t.Fatalf("expected no unlocked NO inventory, got %+v", position)
 	}
 }
 
