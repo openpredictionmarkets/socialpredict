@@ -79,7 +79,7 @@ jobs:
           ignore-unfixed: false
 
       - name: Upload Frontend image scan SARIF
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.4
         with:
           sarif_file: trivy-frontend.sarif
           category: trivy-frontend-image
@@ -138,7 +138,7 @@ jobs:
           ignore-unfixed: false
 
       - name: Upload Backend image scan SARIF
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.4
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend-image
