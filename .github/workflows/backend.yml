@@ -79,7 +79,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Setup Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
       - name: Get Dependencies
@@ -116,14 +116,14 @@ jobs:
       # Use go-version-file when mode == file, otherwise go-version
       - name: Setup Go (from go.mod)
         if: ${{ matrix.go.mode == 'file' }}
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: ${{ matrix.go.value }}
           check-latest: true
           cache: true
       - name: Setup Go ${{ matrix.go.value }}
         if: ${{ matrix.go.mode == 'version' }}
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go.value }}
           check-latest: true
