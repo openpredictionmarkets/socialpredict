@@ -1,6 +1,7 @@
 package usershandlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,6 +14,10 @@ import (
 	dusers "socialpredict/internal/domain/users"
 	authsvc "socialpredict/internal/service/auth"
 )
+
+type tradePositionReader interface {
+	GetUserTradePositionInMarket(context.Context, int64, string) (*dmarkets.TradePosition, error)
+}
 
 // UserMarketPositionHandlerWithService returns an HTTP handler that resolves the authenticated
 // user's position in the specified market via the markets service.
@@ -35,7 +40,12 @@ func UserMarketPositionHandlerWithService(marketSvc dmarkets.ServiceInterface, u
 			return
 		}
 
-		position, err := marketSvc.GetUserPositionInMarket(r.Context(), marketID, user.Username)
+		tradeSvc, ok := marketSvc.(tradePositionReader)
+		if !ok {
+			_ = handlers.WriteFailure(w, http.StatusInternalServerError, handlers.ReasonInternalError)
+			return
+		}
+		position, err := tradeSvc.GetUserTradePositionInMarket(r.Context(), marketID, user.Username)
 		if err != nil {
 			writeUserPositionError(w, marketID, user.Username, err)
 			return

@@ -122,7 +122,7 @@ func TestMarketSummaryToDetailsResponseDoesNotIncludeAmendments(t *testing.T) {
 	}
 }
 
-func TestMarketDiscoverySnapshotUsableAllowsYoungStaleSnapshot(t *testing.T) {
+func TestMarketDiscoverySnapshotUsableRejectsStaleSnapshot(t *testing.T) {
 	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
 	handler := &MarketDiscoveryReadModelHandler{clock: func() time.Time { return now }}
 	snapshot := &readmodelrepo.Snapshot{
@@ -132,10 +132,11 @@ func TestMarketDiscoverySnapshotUsableAllowsYoungStaleSnapshot(t *testing.T) {
 		StaleReason: "bet_accepted",
 	}
 
-	if !handler.snapshotUsable(snapshot) {
-		t.Fatalf("expected young stale discovery snapshot to be usable")
+	if handler.snapshotUsable(snapshot) {
+		t.Fatalf("expected stale discovery snapshot to be unusable")
 	}
 
+	snapshot.IsStale = false
 	snapshot.GeneratedAt = now.Add(-marketDiscoverySnapshotTargetFreshness - time.Second)
 	if handler.snapshotUsable(snapshot) {
 		t.Fatalf("expected expired discovery snapshot to be unusable")

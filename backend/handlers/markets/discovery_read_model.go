@@ -297,6 +297,9 @@ func (h *MarketDiscoveryReadModelHandler) snapshotUsable(snapshot *readmodelrepo
 	if snapshot == nil || snapshot.PayloadJSON == "" {
 		return false
 	}
+	if snapshot.IsStale {
+		return false
+	}
 	return h.now().Sub(snapshot.GeneratedAt) <= marketDiscoverySnapshotTargetFreshness
 }
 

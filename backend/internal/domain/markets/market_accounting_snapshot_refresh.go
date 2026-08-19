@@ -61,7 +61,7 @@ func (s *Service) GetMarketSummaryReadModel(ctx context.Context, marketID int64)
 	if err != nil {
 		return nil, err
 	}
-	if snapshot == nil {
+	if snapshot == nil || snapshot.IsStale {
 		snapshot, err = s.RefreshMarketAccountingSnapshot(ctx, marketID)
 		if err != nil {
 			return nil, err

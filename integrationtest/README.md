@@ -35,7 +35,7 @@ Last updated: 2026-06-17.
 | Suite | Command | Current result |
 |-------|---------|----------------|
 | Multiple-choice binary API scenario runner | `node integrationtest/scripts/multiple-choice-binary-api.mjs --base-url http://localhost:8080 --api-prefix /v0` | 17/17 checks passing |
-| Sell shares over-cashout API scenario runner | `node integrationtest/scripts/sell-shares-overcashout.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers valid quote/sell, dust accounting, and rejected over-cashout |
+| Sell shares over-cashout API scenario runner | `node integrationtest/scripts/sell-shares-overcashout.mjs --base-url http://localhost:8080 --api-prefix /v0 --delay 1100` | Covers valid quote/sell, dust accounting, capped over-cashout requests, and sequence-based unlocked-lot sellability |
 | Sell shares two-share backend cap runner | `node integrationtest/scripts/sell-shares-two-share-cap.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers locked initial buys, different-user unlock, backend sell message, and oversized quote/sell cap |
 | Read-only Schemathesis contract smoke | `MAX_EXAMPLES=1 integrationtest/scripts/schemathesis-read.sh` | 4/4 operations passing |
 | Grouped-market Schemathesis contract runner | `node integrationtest/scripts/schemathesis-grouped-market.mjs --base-url http://localhost:8080 --api-prefix /v0` | Covers grouped read schemas with a real group ID |
@@ -57,7 +57,8 @@ Run the sell-shares over-cashout regression:
 ```bash
 node integrationtest/scripts/sell-shares-overcashout.mjs \
   --base-url http://localhost:8080 \
-  --api-prefix /v0
+  --api-prefix /v0 \
+  --delay 1100
 ```
 
 Run the focused sell unlock and two-share backend cap regression:
@@ -68,8 +69,8 @@ node integrationtest/scripts/sell-shares-two-share-cap.mjs \
   --api-prefix /v0
 ```
 
-Defaults assume seeded users `admin`, `testuser01`, `testuser02`, `testuser03`,
-and `testuser04` all use password `password`.
+Defaults assume seeded users `admin`, `testuser01`, and `testuser02` through
+`testuser07` all use password `password`.
 
 Run read-only OpenAPI fuzz/contract checks with Schemathesis:
 

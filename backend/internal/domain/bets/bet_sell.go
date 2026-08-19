@@ -7,7 +7,6 @@ import (
 	"math"
 	"sort"
 
-	"socialpredict/internal/domain/boundary"
 	dmarkets "socialpredict/internal/domain/markets"
 )
 
@@ -62,8 +61,7 @@ func (s *Service) QuoteSell(ctx context.Context, req SellRequest) (*SellQuoteRes
 		allowed = false
 	}
 	if allowed {
-		bet := req.NewSaleBet(outcome, sale.SharesToSell, s.clock.Now())
-		if err := validateProjectedSale(ctx, s.markets, req, outcome, currentPosition, sale, *bet); err != nil {
+		if err := validateSaleWithinSellableInventory(req, currentPosition, sellablePosition, sellableShares, sale, outcome); err != nil {
 			return nil, err
 		}
 	}
@@ -97,7 +95,7 @@ func (s *Service) sellInTransaction(ctx context.Context, req SellRequest, outcom
 
 		now := s.clock.Now()
 		bet := req.NewSaleBet(outcome, sale.SharesToSell, now)
-		if err := validateProjectedSale(txCtx, markets, req, outcome, currentPosition, sale, *bet); err != nil {
+		if err := validateSaleWithinSellableInventory(req, currentPosition, sellablePosition, sellableShares, sale, outcome); err != nil {
 			return err
 		}
 		if err := (betLedger{repo: repo, users: users}).CreditSale(txCtx, bet, netSaleProceeds(sale)); err != nil {
@@ -166,65 +164,19 @@ func loadUserSalePositionsFrom(ctx context.Context, markets PositionReader, req 
 	return currentShares, currentPosition, sellableShares, sellablePosition, nil
 }
 
-func validateProjectedSale(
-	ctx context.Context,
-	markets PositionProjector,
-	req SellRequest,
-	outcome string,
-	current *dmarkets.UserPosition,
-	sale SaleQuote,
-	saleBet boundary.Bet,
-) error {
-	if sale.SharesToSell <= 0 {
-		return ErrInsufficientShares
-	}
-	projected, err := markets.ProjectUserPositionAfterBet(ctx, int64(req.MarketID), req.Username, saleBet)
-	if err != nil {
-		return err
-	}
-	return validateSaleProjection(current, projected, outcome, sale)
-}
-
-func validateSaleProjection(current *dmarkets.UserPosition, projected *dmarkets.UserPosition, outcome string, sale SaleQuote) error {
+func validateSaleWithinSellableInventory(req SellRequest, current *dmarkets.UserPosition, sellable *dmarkets.UserPosition, sellableShares int64, sale SaleQuote, outcome string) error {
 	if current == nil {
 		return ErrNoPosition
 	}
-	if projected == nil {
-		projected = &dmarkets.UserPosition{}
+	if sellable == nil || sellableShares <= 0 || sellable.Value <= 0 {
+		return ErrNoSellableShares
 	}
-
-	currentSoldShares, err := sharesForOutcome(current, outcome)
-	if err != nil {
-		return err
-	}
-	projectedSoldShares, err := sharesForOutcome(projected, outcome)
-	if err != nil {
-		return err
-	}
-	if currentSoldShares-projectedSoldShares < sale.SharesToSell {
+	if sale.SharesToSell <= 0 {
 		return ErrInsufficientShares
 	}
-
-	currentOppositeShares, err := sharesForOutcome(current, oppositeOutcome(outcome))
-	if err != nil {
-		return err
+	if sale.SharesToSell > sellableShares || sale.SaleValue > sellable.Value {
+		return newSaleProjectionNotExecutableError(req, current, sellable, sellable, outcome)
 	}
-	projectedOppositeShares, err := sharesForOutcome(projected, oppositeOutcome(outcome))
-	if err != nil {
-		return err
-	}
-	if projectedOppositeShares > currentOppositeShares {
-		return ErrInsufficientShares
-	}
-
-	maxProjectedValue := current.Value - sale.SaleValue
-	if maxProjectedValue < 0 {
-		maxProjectedValue = 0
-	}
-	if projected.Value > maxProjectedValue {
-		return ErrInsufficientShares
-	}
-
 	return nil
 }
 
@@ -318,15 +270,35 @@ func sharesForOutcome(pos *dmarkets.UserPosition, outcome string) (int64, error)
 	}
 }
 
-func oppositeOutcome(outcome string) string {
-	switch outcome {
-	case "YES":
-		return "NO"
-	case "NO":
-		return "YES"
-	default:
-		return ""
+func newSaleProjectionNotExecutableError(req SellRequest, current *dmarkets.UserPosition, sellable *dmarkets.UserPosition, projected *dmarkets.UserPosition, outcome string) SaleProjectionNotExecutableError {
+	return SaleProjectionNotExecutableError{
+		Details: SaleProjectionDetails{
+			Outcome:                      outcome,
+			RequestedCredits:             req.Amount,
+			PositionValue:                positionValueOrZero(current),
+			PositionOutcomeShares:        sharesForOutcomeOrZero(current, outcome),
+			NominalUnlockedValue:         positionValueOrZero(sellable),
+			NominalUnlockedOutcomeShares: sharesForOutcomeOrZero(sellable, outcome),
+			ProjectedPositionValue:       positionValueOrZero(projected),
+			ProjectedOutcomeShares:       sharesForOutcomeOrZero(projected, outcome),
+			ExecutableSaleValue:          0,
+		},
 	}
+}
+
+func positionValueOrZero(pos *dmarkets.UserPosition) int64 {
+	if pos == nil {
+		return 0
+	}
+	return pos.Value
+}
+
+func sharesForOutcomeOrZero(pos *dmarkets.UserPosition, outcome string) int64 {
+	shares, err := sharesForOutcome(pos, outcome)
+	if err != nil {
+		return 0
+	}
+	return shares
 }
 
 func validatePositionValue(value int64) error {

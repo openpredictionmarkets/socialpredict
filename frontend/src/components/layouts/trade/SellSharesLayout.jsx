@@ -7,11 +7,11 @@ import {
     submitSale,
 } from './TradeUtils';
 import { useMarketLabels } from '../../../hooks/useMarketLabels';
-import { API_URL } from '../../../config';
+import { fetchTradingFees } from '../../../api/tradeApi';
 import { USER_CREDIT_REFRESH_EVENT } from '../../utils/userFinanceTools/FetchUserCredit';
 
 const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => {
-    const [shares, setShares] = useState({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
+    const [shares, setShares] = useState({ noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 });
     const [sellAmount, setSellAmount] = useState(1);
     const [selectedOutcome, setSelectedOutcome] = useState(null);
     const [feeData, setFeeData] = useState(null);
@@ -19,14 +19,20 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
     const [sharesLoading, setSharesLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [saleQuote, setSaleQuote] = useState(null);
-    const [quoteError, setQuoteError] = useState('');
+    const [quoteError, setQuoteError] = useState(null);
     const [sharesNotice, setSharesNotice] = useState('');
     const [isQuoteLoading, setIsQuoteLoading] = useState(false);
     
     // Get custom labels for this market
     const { yesLabel, noLabel } = useMarketLabels(market);
     const showFeeSection = !isLoading && Number(feeData?.sellSharesFee) > 0;
-    const maxSaleCredits = Math.max(0, Number(shares.value) || 0);
+    const positionValue = Math.max(0, Number(shares.value) || 0);
+    const selectedSellableValue = selectedOutcome === 'YES'
+        ? Math.max(0, Number(shares.yesSellableValue) || 0)
+        : Math.max(0, Number(shares.noSellableValue) || 0);
+    const outcomeIsSellable = (outcome) => outcome === 'YES'
+        ? Number(shares.yesSellableValue) > 0
+        : Number(shares.noSellableValue) > 0;
 
     useEffect(() => {
         const fetchFeeData = async () => {
@@ -36,16 +42,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             }
 
             try {
-                const response = await fetch(`${API_URL}/v0/setup`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-                if (!response.ok) {
-                    throw new Error(`Failed to load setup: ${response.status}`);
-                }
-                const data = await response.json();
-                setFeeData(data.betting?.betFees || null);
+                setFeeData(await fetchTradingFees({ token }));
             } catch {
                 setFeeData(null);
             } finally {
@@ -58,11 +55,11 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
     useEffect(() => {
         if (!token) {
-            setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
+            setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 });
             setSelectedOutcome(null);
             setSellAmount(1);
             setSaleQuote(null);
-            setQuoteError('');
+            setQuoteError(null);
             setSharesNotice('');
             return;
         }
@@ -72,15 +69,15 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             .then(data => {
                 const normalized = normalizeShares(data);
                 setShares(normalized);
-                setSharesNotice('');
+                setSharesNotice(Number(normalized.yesSellableValue) > 0 || Number(normalized.noSellableValue) > 0 ? '' : NO_SELLABLE_SHARES_MESSAGE);
 
                 // Set outcome and amount based on shares
                 if (normalized.noSharesOwned > 0 && normalized.yesSharesOwned === 0) {
                     setSelectedOutcome('NO');
-                    setSellAmount(defaultSaleAmount(normalized));
+                    setSellAmount(defaultSaleAmount());
                 } else if (normalized.yesSharesOwned > 0 && normalized.noSharesOwned === 0) {
                     setSelectedOutcome('YES');
-                    setSellAmount(defaultSaleAmount(normalized));
+                    setSellAmount(defaultSaleAmount());
                 } else {
                     setSelectedOutcome(null);
                     setSellAmount(1);
@@ -88,7 +85,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             })
             .catch(error => {
                 setSharesNotice(error.message || NO_SELLABLE_SHARES_MESSAGE);
-                setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0 });
+                setShares({ noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 });
                 setSelectedOutcome(null);
                 setSellAmount(1);
             })
@@ -101,12 +98,8 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             return;
         }
         setSaleQuote(null);
-        setQuoteError('');
-        if (maxSaleCredits > 0 && newAmount > maxSaleCredits) {
-            setSellAmount(maxSaleCredits);
-            return;
-        }
-        setSellAmount(newAmount);
+        setQuoteError(null);
+        setSellAmount(selectedSellableValue > 0 ? Math.min(newAmount, selectedSellableValue) : newAmount);
     };
 
     const requestSaleQuote = (outcomeOverride, amountOverride = sellAmount) => {
@@ -124,7 +117,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
         setSelectedOutcome(outcomeToUse);
         setIsQuoteLoading(true);
-        setQuoteError('');
+        setQuoteError(null);
 
         return fetchSaleQuote(saleData, token)
             .then((quote) => {
@@ -133,7 +126,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
             })
             .catch((error) => {
                 setSaleQuote(null);
-                setQuoteError(error.message);
+                setQuoteError(error);
                 return null;
             })
             .finally(() => {
@@ -177,21 +170,21 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     },
                     (error) => {
                         alert(error.message);
+                        setQuoteError(error);
                         setIsSubmitting(false);
                     }
                 );
             })
             .catch((error) => {
                 alert(error.message);
+                setQuoteError(error);
                 setIsSubmitting(false);
             });
     };
 
     const isActionDisabled = sharesLoading || isSubmitting || isQuoteLoading;
     const hasOwnedShares = shares.noSharesOwned > 0 || shares.yesSharesOwned > 0;
-    const sellUnavailableNotice = hasOwnedShares && maxSaleCredits <= 0
-        ? NO_SELLABLE_SHARES_MESSAGE
-        : sharesNotice;
+    const sellUnavailableNotice = sharesNotice;
 
     return (
         <div className="p-6 bg-blue-900 rounded-lg text-white">
@@ -211,7 +204,13 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                     {(shares.noSharesOwned > 0 || shares.yesSharesOwned > 0) && (
                         <div className="text-center text-lg mt-2">
                             <span className="font-bold">Position Value: </span>
-                            <span className="text-green-300">{shares.value}</span>
+                            <span className="text-green-300">{positionValue}</span>
+                        </div>
+                    )}
+                    {(shares.noSellableValue > 0 || shares.yesSellableValue > 0) && (
+                        <div className="text-center text-lg mt-2">
+                            <span className="font-bold">Sellable Value: </span>
+                            <span className="text-green-300">{selectedSellableValue || Math.max(shares.noSellableValue, shares.yesSellableValue)}</span>
                         </div>
                     )}
                     {sellUnavailableNotice && (
@@ -227,7 +226,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         <SaleInputAmount
                             value={sellAmount}
                             onChange={handleSellAmountChange}
-                            max={maxSaleCredits || 1}
+                            max={selectedSellableValue || 1}
                             disabled={isActionDisabled}
                         />
                     </div>
@@ -242,7 +241,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                         }}
                     />
                     <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-                        {shares.noSharesOwned > 0 &&
+                        {shares.noSharesOwned > 0 && outcomeIsSellable('NO') &&
                             <SaleActionGroup
                                 outcome="NO"
                                 disabled={isActionDisabled}
@@ -253,7 +252,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
                                     handleSaleSubmission('NO');
                                 }}
                             />}
-                        {shares.yesSharesOwned > 0 &&
+                        {shares.yesSharesOwned > 0 && outcomeIsSellable('YES') &&
                             <SaleActionGroup
                                 outcome="YES"
                                 disabled={isActionDisabled}
@@ -286,7 +285,7 @@ const SellSharesLayout = ({ marketId, market, token, onTransactionSuccess }) => 
 
 const normalizeShares = (data) => {
     if (!data) {
-        return { noSharesOwned: 0, yesSharesOwned: 0, value: 0 };
+        return { noSharesOwned: 0, yesSharesOwned: 0, value: 0, noSellableValue: 0, yesSellableValue: 0 };
     }
     if (Array.isArray(data)) {
         return normalizeShares(data[0]);
@@ -296,11 +295,15 @@ const normalizeShares = (data) => {
         noSharesOwned: data.noSharesOwned ?? data.NoSharesOwned ?? 0,
         yesSharesOwned: data.yesSharesOwned ?? data.YesSharesOwned ?? 0,
         value: data.value ?? data.Value ?? 0,
+        noSellableShares: data.noSellableShares ?? data.NoSellableShares ?? 0,
+        yesSellableShares: data.yesSellableShares ?? data.YesSellableShares ?? 0,
+        noSellableValue: data.noSellableValue ?? data.NoSellableValue ?? 0,
+        yesSellableValue: data.yesSellableValue ?? data.YesSellableValue ?? 0,
     };
 };
 
-const defaultSaleAmount = (normalized) => {
-    return Math.max(1, Number(normalized?.value) || 1);
+const defaultSaleAmount = () => {
+    return 1;
 };
 
 const buildSaleSuccessMessage = (data) => {
@@ -313,7 +316,7 @@ const buildSaleSuccessMessage = (data) => {
     return `${base} Dust assessed: ${dust} credit${dust === 1 ? '' : 's'} retained by the market due to whole-share rounding.`;
 };
 
-const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelectAmount }) => {
+export const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelectAmount }) => {
     if (!selectedOutcome && !quoteError && !isLoading) {
         return null;
     }
@@ -327,9 +330,15 @@ const SaleQuotePanel = ({ quote, quoteError, isLoading, selectedOutcome, onSelec
     }
 
     if (quoteError) {
+        const message = typeof quoteError === 'string' ? quoteError : quoteError.message;
+        const details = typeof quoteError === 'object' ? quoteError.details : null;
         return (
-            <div className="mb-4 rounded-lg border border-red-400 bg-red-950/40 p-3 text-sm text-red-100">
-                {quoteError}
+            <div
+                className="mb-4 rounded-lg border border-red-400 bg-red-950/40 p-3 text-sm text-red-100"
+                data-testid="sale-quote-error"
+            >
+                <p>{message}</p>
+                <ProjectionErrorDetails details={details} />
             </div>
         );
     }
@@ -400,6 +409,49 @@ const SaleActionGroup = ({ outcome, disabled, isQuoteLoading, onTerms, onSubmit 
             >
                 {isQuoteLoading ? 'Loading Terms' : 'Terms'}
             </button>
+        </div>
+    );
+};
+
+export const ProjectionErrorDetails = ({ details }) => {
+    if (!details) {
+        return null;
+    }
+
+    const rows = [
+        ['Position Value', details.positionValue],
+        ['Nominal Unlocked Value', details.nominalUnlockedValue],
+        ['Currently Executable Sale Value', details.executableSaleValue],
+    ].filter(([, value]) => value !== undefined && value !== null);
+
+    if (rows.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="mt-3 space-y-2" data-testid="projection-error-details">
+            {details.hint && (
+                <details className="rounded-md bg-white/10 px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-red-50">
+                        More info
+                    </summary>
+                    <p className="mt-2 text-xs leading-relaxed text-red-50/90">{details.hint}</p>
+                </details>
+            )}
+            <dl className="space-y-2">
+                {rows.map(([label, value]) => (
+                    <div
+                        key={label}
+                        data-testid={`projection-error-detail-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                        className="flex items-start justify-between gap-3 rounded-md bg-white/10 px-3 py-2"
+                    >
+                        <dt className="min-w-0 break-words text-[0.7rem] uppercase leading-snug opacity-75">
+                            {label}
+                        </dt>
+                        <dd className="shrink-0 text-right font-semibold">{value}</dd>
+                    </div>
+                ))}
+            </dl>
         </div>
     );
 };

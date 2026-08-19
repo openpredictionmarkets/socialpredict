@@ -238,6 +238,16 @@ type ServiceInterface interface {
 	GetPublicMarket(ctx context.Context, marketID int64) (*PublicMarket, error)
 }
 
+// TradePosition combines the owned position with the inventory currently
+// unlocked for sale. It is intended for the authenticated trading UI.
+type TradePosition struct {
+	UserPosition
+	YesSellableShares int64 `json:"yesSellableShares"`
+	NoSellableShares  int64 `json:"noSellableShares"`
+	YesSellableValue  int64 `json:"yesSellableValue"`
+	NoSellableValue   int64 `json:"noSellableValue"`
+}
+
 // Service implements the core market business logic.
 type Service struct {
 	repo        Repository

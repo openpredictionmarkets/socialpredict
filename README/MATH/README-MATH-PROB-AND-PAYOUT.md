@@ -130,6 +130,8 @@ So instead, we need to come up with an operation where every user's bet will be 
 \end{align*}
 ```
 
+DBPM course payouts use absolute probability distance and are outcome-neutral; they do not represent directional profit and do not by themselves determine whether a position is sellable.
+
 ```math
 \begin{flalign*}
 & \text{where:} & \\

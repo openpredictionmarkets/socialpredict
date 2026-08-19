@@ -12,6 +12,7 @@ import (
 	"socialpredict/handlers/cms/homepage"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func getEnv(key string) (string, error) {
@@ -36,9 +37,10 @@ func SeedUsers(db *gorm.DB, configService configsvc.Service) error {
 		return fmt.Errorf("ADMIN_PASSWORD is set but empty")
 	}
 
-	// Check if the admin user already exists.
 	var count int64
-	db.Model(&models.User{}).Where("username = ?", "admin").Count(&count)
+	if err := db.Model(&models.User{}).Where("username = ?", "admin").Count(&count).Error; err != nil {
+		return fmt.Errorf("check admin user: %w", err)
+	}
 	if count == 0 {
 		adminUser := models.User{
 			PublicUser: models.PublicUser{
@@ -61,7 +63,10 @@ func SeedUsers(db *gorm.DB, configService configsvc.Service) error {
 			return fmt.Errorf("hash admin password: %w", err)
 		}
 
-		if err := db.Create(&adminUser).Error; err != nil {
+		if err := db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "username"}},
+			DoNothing: true,
+		}).Create(&adminUser).Error; err != nil {
 			return fmt.Errorf("create admin user: %w", err)
 		}
 	}

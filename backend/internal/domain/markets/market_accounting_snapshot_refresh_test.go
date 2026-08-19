@@ -69,7 +69,7 @@ func TestServiceRefreshMarketAccountingSnapshotPersistsRawRecomputedSnapshot(t *
 	}
 }
 
-func TestServiceGetMarketSummaryReadModelReturnsStaleSnapshotWithoutRecomputing(t *testing.T) {
+func TestServiceGetMarketSummaryReadModelRefreshesStaleSnapshot(t *testing.T) {
 	service, db, _ := setupServiceWithDB(t)
 	ctx := context.Background()
 
@@ -106,12 +106,12 @@ func TestServiceGetMarketSummaryReadModelReturnsStaleSnapshotWithoutRecomputing(
 	if err != nil {
 		t.Fatalf("GetMarketSummaryReadModel returned error: %v", err)
 	}
-	if summary.Accounting.BetCount != 1 || summary.Accounting.UserCount != 1 || summary.Accounting.VolumeWithDust != 100 {
-		t.Fatalf("summary recomputed instead of returning stale snapshot: %+v", summary.Accounting)
+	if summary.Accounting.BetCount != 2 || summary.Accounting.UserCount != 2 || summary.Accounting.VolumeWithDust != 150 {
+		t.Fatalf("summary did not refresh stale snapshot: %+v", summary.Accounting)
 	}
 	freshness := summary.Accounting.Freshness()
-	if !freshness.IsStale || freshness.StaleReason != "bet_accepted" {
-		t.Fatalf("expected stale freshness from stored snapshot, got %+v", freshness)
+	if freshness.IsStale || freshness.StaleReason != "" {
+		t.Fatalf("expected refreshed non-stale freshness, got %+v", freshness)
 	}
 }
 
