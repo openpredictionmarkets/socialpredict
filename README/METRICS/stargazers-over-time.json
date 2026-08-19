@@ -1,7 +1,7 @@
 {
   "repo": "openpredictionmarkets/socialpredict",
   "source": "GitHub stargazers API with starred_at timestamps",
-  "total_stargazers": 212,
+  "total_stargazers": 214,
   "points": [
     {
       "month": "2024-01",
@@ -125,7 +125,7 @@
     },
     {
       "month": "2026-07",
-      "total": 212
+      "total": 214
     }
   ]
 }
