@@ -6,7 +6,7 @@ RUN go mod download
 COPY backend/ .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /app/server .
 
-FROM alpine:3.24.1
+FROM alpine:3.24.2
 
 RUN addgroup -S app && adduser -S -G app app \
 	&& mkdir -p /data/socialpredict/uploads/social-share \
