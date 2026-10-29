@@ -2,6 +2,7 @@ package setup
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -35,6 +36,12 @@ func TestGetSetupHandler(t *testing.T) {
 		}, {
 			Name:             "missing config service",
 			ConfigService:    nil,
+			ExpectedStatus:   http.StatusInternalServerError,
+			ExpectedResponse: string(handlers.ReasonInternalError),
+			IsJSONResponse:   false,
+		}, {
+			Name:             "config service returns unencodable economics",
+			ConfigService:    unencodableEconomicsConfigService{},
 			ExpectedStatus:   http.StatusInternalServerError,
 			ExpectedResponse: string(handlers.ReasonInternalError),
 			IsJSONResponse:   false,
@@ -208,6 +215,36 @@ func (economicsOnlyConfigService) Game() configsvc.Game {
 }
 
 func (economicsOnlyConfigService) ChartSigFigs() int {
+	panic("ChartSigFigs should not be called")
+}
+
+// unencodableEconomicsConfigService returns an Economics value whose
+// InitialMarketProbability is NaN. json.NewEncoder reports "unsupported
+// value" for NaN before writing anything, which drives the handler's
+// encode-failure 500 branch.
+type unencodableEconomicsConfigService struct{}
+
+func (unencodableEconomicsConfigService) Current() *configsvc.AppConfig {
+	panic("Current should not be called")
+}
+
+func (unencodableEconomicsConfigService) Economics() configsvc.Economics {
+	return configsvc.Economics{
+		MarketCreation: configsvc.MarketCreation{
+			InitialMarketProbability: math.NaN(),
+		},
+	}
+}
+
+func (unencodableEconomicsConfigService) Frontend() configsvc.Frontend {
+	panic("Frontend should not be called")
+}
+
+func (unencodableEconomicsConfigService) Game() configsvc.Game {
+	panic("Game should not be called")
+}
+
+func (unencodableEconomicsConfigService) ChartSigFigs() int {
 	panic("ChartSigFigs should not be called")
 }
 
