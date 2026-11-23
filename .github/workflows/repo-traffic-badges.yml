@@ -37,7 +37,14 @@ jobs:
 
           mkdir -p "$METRICS_DIR"
           if ! gh api "repos/$GITHUB_REPOSITORY/traffic/clones" > "$RUNNER_TEMP/clones.json"; then
-            echo "::error title=Traffic metrics API denied::TRAFFIC_METRICS_TOKEN must have read access to repository Administration for $GITHUB_REPOSITORY."
+            status="$(python3 -c 'import json, sys; print(json.load(sys.stdin).get("status", ""))' < "$RUNNER_TEMP/clones.json" 2>/dev/null || true)"
+            if [ "$status" = "401" ] || [ "$status" = "403" ]; then
+              echo "updated=false" >> "$GITHUB_OUTPUT"
+              echo "::warning title=Traffic metrics token unavailable::Skipping traffic badge refresh (HTTP $status); keeping the last successful metrics. Replace TRAFFIC_METRICS_TOKEN with a valid token with read access to repository Administration for $GITHUB_REPOSITORY."
+              echo "Traffic badges were not refreshed (HTTP $status). The previous snapshot is unchanged. Replace TRAFFIC_METRICS_TOKEN with a valid token with repository Administration read access." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::error title=Traffic metrics API request failed::Unable to fetch repository traffic; see the GitHub CLI error above."
             exit 1
           fi
 
@@ -97,7 +104,7 @@ jobs:
         if: steps.traffic.outputs.updated == 'true'
         env:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
-          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
