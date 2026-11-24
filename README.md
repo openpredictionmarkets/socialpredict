@@ -1,3 +1,5 @@
+**[Explore SocialPredict: interactive product tour](https://openpredictionmarkets.github.io/socialpredict/)**
+
 [![GitHub Release][release-img]][release]
 [![14-day clones][clones-14d-img]][traffic]
 [![14-day unique cloners][unique-cloners-14d-img]][traffic]

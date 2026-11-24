@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0e121d">
+  <meta name="description" content="Try SocialPredict in nine interactive slides: run a community, publish questions, and forecast with play credits.">
+  <title>SocialPredict | Forecast together. Learn together.</title>
+  <link rel="icon" href="assets/socialpredict.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to presentation</a>
+  <header class="site-header"><a class="wordmark" href="#overview"><img class="brand-image" src="assets/socialpredict.svg" width="32" height="32" alt="">SocialPredict</a><nav class="header-nav" aria-label="Presentation tools"><a href="https://github.com/openpredictionmarkets/socialpredict">Source code</a><span class="simulation-label">Interactive tour · simulated play credits</span><button class="quiet" id="chapters">Chapters</button></nav></header>
+  <div class="layout"><nav id="rail" aria-label="Slides"></nav><main id="main" tabindex="-1" aria-label="Presentation"></main></div>
+  <footer class="tour-footer"><div class="footer-progress"><span id="counter">01 / 09</span><span id="chapter-name">Overview</span><span class="footer-help"><kbd>←</kbd> <kbd>→</kbd> to change slides</span></div><button class="text-button" id="reset">Reset tour</button><div class="footer-actions"><button class="quiet" id="previous" aria-label="Previous slide">Previous</button><button class="primary" id="next" aria-label="Next slide">Next</button></div></footer>
+  <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+  <dialog id="evidence" aria-labelledby="evidence-heading"><div class="dialog-top"><h2 id="evidence-heading">From the running app</h2><button class="quiet" id="close-evidence">Close</button></div><label class="sr-only" for="capture-select">Choose an appendix screenshot</label><select id="capture-select"></select><figure><a id="full-image" target="_blank" rel="noopener"><img id="capture-image" alt="" width="1440" height="1050"></a><figcaption><h3 id="capture-title"></h3><p id="capture-verification"></p><details><summary>Read the appendix caption</summary><p id="capture-caption"></p></details><a id="capture-source" target="_blank" rel="noopener">Open source appendix</a></figcaption></figure><div class="dialog-bottom"><button id="previous-capture" class="quiet">Previous capture</button><span id="capture-count"></span><button id="next-capture" class="quiet">Next capture</button></div></dialog>
+  <dialog id="chapter-dialog" aria-labelledby="chapter-heading"><div class="dialog-top"><h2 id="chapter-heading">Choose a chapter</h2><button id="close-chapters" class="quiet">Close</button></div><nav id="chapter-list" aria-label="Chapter selection"></nav></dialog>
+  <noscript><p class="no-script">This interactive tour needs JavaScript. <a href="https://github.com/openpredictionmarkets/socialpredict">Read the SocialPredict documentation.</a></p></noscript>
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>
