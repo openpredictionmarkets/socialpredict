@@ -28,7 +28,11 @@ test('nine-slide tour works under a GitHub project Pages path on desktop and mob
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()}: ${r.url()}`); });
     const url = `http://127.0.0.1:${server.address().port}/socialpredict/`;
-    const next = () => page.getByRole('button', { name: 'Next slide', exact: true }).click();
+    const next = async () => {
+      const current = await page.locator('.slide').getAttribute('data-slide');
+      await page.getByRole('button', { name: 'Next slide', exact: true }).click();
+      await page.locator(`.slide:not([data-slide="${current}"])`).waitFor();
+    };
     await page.goto(url);
     assert.equal(await page.getByText('Nine slides. Real app captures. Click to try.', { exact: true }).count(), 0);
     assert.equal(await page.getByRole('heading', { name: 'Forecast together. Learn together.', exact: true }).isVisible(), true);
