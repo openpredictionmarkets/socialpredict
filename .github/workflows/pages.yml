@@ -1,0 +1,67 @@
+name: Product tour Pages
+
+on:
+  pull_request:
+    paths:
+      - 'docs/tour/**'
+      - '.github/workflows/pages.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/tour/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-tour-pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Check tour and browser interactions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: docs/tour/package-lock.json
+      - run: npm ci
+        working-directory: docs/tour
+      - run: npm test
+        working-directory: docs/tour
+      - run: npx playwright install --with-deps chromium
+        working-directory: docs/tour
+      - run: npm run test:browser
+        working-directory: docs/tour
+      - name: Assemble static site
+        run: |
+          mkdir _site
+          cp docs/tour/index.html docs/tour/styles.css docs/tour/app.mjs docs/tour/model.mjs docs/tour/sources.mjs _site/
+          cp -R docs/tour/assets _site/assets
+          touch _site/.nojekyll
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy product tour
+        id: deployment
+        uses: actions/deploy-pages@v5

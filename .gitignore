@@ -82,3 +82,6 @@ __pycache__/
 
 # Runtime CMS uploads
 /backend/data/uploads/
+
+# Local agent planning documents
+/docs/superpowers/

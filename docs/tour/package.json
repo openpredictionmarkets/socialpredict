@@ -1,0 +1,10 @@
+{
+  "name": "socialpredict-pages-tour",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/model.test.mjs tests/site.test.mjs",
+    "test:browser": "node --test tests/browser.test.mjs"
+  },
+  "devDependencies": { "playwright": "1.65.1" }
+}
