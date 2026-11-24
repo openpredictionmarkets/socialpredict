@@ -24,7 +24,7 @@ jobs:
 
       - name: Generate stargazers chart
         env:
-          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 scripts/readme-stargazers-chart.py
@@ -32,7 +32,7 @@ jobs:
       - name: Open pull request for updated chart
         env:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
-          GH_TOKEN: ${{ secrets.TRAFFIC_METRICS_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
