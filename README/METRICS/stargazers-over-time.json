@@ -1,7 +1,7 @@
 {
   "repo": "openpredictionmarkets/socialpredict",
   "source": "GitHub stargazers API with starred_at timestamps",
-  "total_stargazers": 212,
+  "total_stargazers": 232,
   "points": [
     {
       "month": "2024-01",
@@ -17,115 +17,131 @@
     },
     {
       "month": "2024-04",
-      "total": 18
+      "total": 17
     },
     {
       "month": "2024-05",
-      "total": 24
+      "total": 23
     },
     {
       "month": "2024-06",
-      "total": 26
+      "total": 25
     },
     {
       "month": "2024-07",
-      "total": 29
+      "total": 28
     },
     {
       "month": "2024-08",
-      "total": 36
+      "total": 35
     },
     {
       "month": "2024-09",
-      "total": 50
+      "total": 49
     },
     {
       "month": "2024-10",
-      "total": 52
+      "total": 51
     },
     {
       "month": "2024-11",
-      "total": 62
+      "total": 61
     },
     {
       "month": "2024-12",
-      "total": 66
+      "total": 65
     },
     {
       "month": "2025-01",
-      "total": 69
+      "total": 68
     },
     {
       "month": "2025-02",
-      "total": 72
+      "total": 71
     },
     {
       "month": "2025-03",
-      "total": 74
+      "total": 73
     },
     {
       "month": "2025-04",
-      "total": 78
+      "total": 77
     },
     {
       "month": "2025-05",
-      "total": 81
+      "total": 80
     },
     {
       "month": "2025-06",
-      "total": 83
+      "total": 82
     },
     {
       "month": "2025-07",
-      "total": 86
+      "total": 85
     },
     {
       "month": "2025-08",
-      "total": 92
+      "total": 91
     },
     {
       "month": "2025-09",
-      "total": 100
+      "total": 99
     },
     {
       "month": "2025-10",
-      "total": 112
+      "total": 111
     },
     {
       "month": "2025-11",
-      "total": 131
+      "total": 130
     },
     {
       "month": "2025-12",
-      "total": 144
+      "total": 143
     },
     {
       "month": "2026-01",
-      "total": 151
+      "total": 150
     },
     {
       "month": "2026-02",
-      "total": 155
+      "total": 154
     },
     {
       "month": "2026-03",
-      "total": 161
+      "total": 160
     },
     {
       "month": "2026-04",
-      "total": 186
+      "total": 184
     },
     {
       "month": "2026-05",
-      "total": 197
+      "total": 195
     },
     {
       "month": "2026-06",
-      "total": 209
+      "total": 205
     },
     {
       "month": "2026-07",
       "total": 212
+    },
+    {
+      "month": "2026-08",
+      "total": 221
+    },
+    {
+      "month": "2026-09",
+      "total": 226
+    },
+    {
+      "month": "2026-10",
+      "total": 229
+    },
+    {
+      "month": "2026-11",
+      "total": 232
     }
   ]
 }
